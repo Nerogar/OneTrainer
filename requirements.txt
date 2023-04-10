@@ -1,0 +1,19 @@
+# base requirements
+numpy==1.23.5
+opencv-python==4.6.0.66
+pillow==9.3.0
+tqdm==4.64.1
+
+# pytorch
+--extra-index-url https://download.pytorch.org/whl/nightly/cu118
+torch==2.1.0.dev20230407+cu118
+torchvision==0.16.0.dev20230407+cu118
+
+# stable diffusion
+git+https://github.com/huggingface/diffusers.git@ce144d6#egg=diffusers
+git+https://github.com/huggingface/transformers.git@656e869#egg=transformers
+omegaconf # needed to load ckpt files
+
+# data loader
+git+https://github.com/Nerogar/stable-diffusion-dataloader.git@51e2ded#egg=mgds
+
