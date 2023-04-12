@@ -33,8 +33,8 @@ class BaseTrainer(metaclass=ABCMeta):
                 losses = F.mse_loss(predicted, target, reduction='none').mean([1, 2, 3])
             case LossFunction.MASKED_MSE:
                 losses = self.__masked_mse_loss(predicted, target, mask=batch['latent_mask'], reduction='none').mean([1, 2, 3])
-                # TODO: only apply if normalize masked area loss is enabled
-                losses = losses * batch['latent_mask'].mean(dim=(1, 2, 3))
+                if self.args.normalize_masked_area_loss:
+                    losses = losses / batch['latent_mask'].mean(dim=(1, 2, 3))
 
         return losses.mean()
 
@@ -42,7 +42,13 @@ class BaseTrainer(metaclass=ABCMeta):
         return create.create_model_loader(self.args.training_method)
 
     def create_model_setup(self) -> BaseModelSetup:
-        return create.create_model_setup(self.args.model_type, self.args.train_device, self.args.temp_device, self.args.training_method)
+        return create.create_model_setup(
+            self.args.model_type,
+            self.args.train_device,
+            self.args.temp_device,
+            self.args.training_method,
+            self.args.debug_mode,
+        )
 
     def create_data_loader(self, model: BaseModel):
         model_setup = None

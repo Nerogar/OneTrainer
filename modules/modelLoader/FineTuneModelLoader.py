@@ -15,14 +15,14 @@ class FineTuneModelLoader(BaseModelLoader):
         super(FineTuneModelLoader, self).__init__()
 
     @staticmethod
-    def __load_diffusers_model(base_model_name: str, model_type: ModelType, dtype: torch.dtype) -> StableDiffusionModel | None:
+    def __load_diffusers_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
         try:
             tokenizer = CLIPTokenizer.from_pretrained(
                 base_model_name,
                 subfolder="tokenizer"
             )
 
-            noise_scheduler = DDPMScheduler.from_config(
+            noise_scheduler = DDPMScheduler.from_pretrained(
                 base_model_name,
                 subfolder="scheduler"
             )
@@ -30,19 +30,19 @@ class FineTuneModelLoader(BaseModelLoader):
             text_encoder = CLIPTextModel.from_pretrained(
                 base_model_name,
                 subfolder="text_encoder",
-                torch_dtype=dtype,
+                torch_dtype=torch.float32,
             )
 
             vae = AutoencoderKL.from_pretrained(
                 base_model_name,
                 subfolder="vae",
-                torch_dtype=dtype,
+                torch_dtype=torch.float32,
             )
 
             unet = UNet2DConditionModel.from_pretrained(
                 base_model_name,
                 subfolder="unet",
-                torch_dtype=dtype,
+                torch_dtype=torch.float32,
             )
 
             image_depth_processor = DPTImageProcessor.from_pretrained(
@@ -84,7 +84,7 @@ class FineTuneModelLoader(BaseModelLoader):
                 return None
 
     @staticmethod
-    def __load_ckpt_model(base_model_name: str, model_type: ModelType, dtype: torch.dtype) -> StableDiffusionModel | None:
+    def __load_ckpt_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
         try:
             yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
             if not os.path.exists(yaml_name):
@@ -100,21 +100,21 @@ class FineTuneModelLoader(BaseModelLoader):
             return StableDiffusionModel(
                 tokenizer=pipeline.tokenizer,
                 noise_scheduler=pipeline.scheduler,
-                text_encoder=pipeline.text_encoder.to(dtype=dtype),
-                vae=pipeline.vae.to(dtype=dtype),
-                unet=pipeline.unet.to(dtype=dtype),
+                text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
+                vae=pipeline.vae.to(dtype=torch.float32),
+                unet=pipeline.unet.to(dtype=torch.float32),
                 image_depth_processor=None,  # TODO
                 depth_estimator=None,  # TODO
             )
         except:
             return None
 
-    def load(self, base_model_name: str, model_type: ModelType, dtype: torch.dtype) -> StableDiffusionModel | None:
-        model = self.__load_diffusers_model(base_model_name, model_type, dtype)
+    def load(self, base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
+        model = self.__load_diffusers_model(base_model_name, model_type)
         if model is not None:
             return model
 
-        model = self.__load_ckpt_model(base_model_name, model_type, dtype)
+        model = self.__load_ckpt_model(base_model_name, model_type)
         if model is not None:
             return model
 

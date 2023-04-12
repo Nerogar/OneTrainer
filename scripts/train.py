@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.getcwd())
+
 from modules.trainer.EmbeddingTrainer import EmbeddingTrainer
 from modules.trainer.FineTuneTrainer import FineTuneTrainer
 from modules.trainer.LoraTrainer import LoraTrainer

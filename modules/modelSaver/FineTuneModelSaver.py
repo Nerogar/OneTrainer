@@ -14,10 +14,28 @@ from modules.util.enum.ModelType import ModelType
 class FineTuneModelSaver(BaseModelSaver):
 
     @staticmethod
-    def __save_stable_diffusion_ckpt(model: StableDiffusionModel, destination: str):
+    def __convert(state_dict: dict, dtype: torch.dtype) -> dict:
+        converted_state_dict = {}
+
+        for (key, value) in state_dict.items():
+            if isinstance(value, dict):
+                converted_state_dict[key] = FineTuneModelSaver.__convert(value, dtype)
+            else:
+                converted_state_dict[key] = value.clone().detach().to(dtype=dtype)
+
+        return converted_state_dict
+
+    @staticmethod
+    def __save_stable_diffusion_ckpt(
+            model: StableDiffusionModel,
+            destination: str,
+            dtype: torch.dtype
+    ):
         state_dict = convert_sd_diffusers_to_ckpt(model.vae.state_dict(), model.unet.state_dict(), model.text_encoder.state_dict())
+        save_state_dict = FineTuneModelSaver.__convert(state_dict, dtype)
+
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(state_dict, destination)
+        torch.save(save_state_dict, destination)
 
     def save(
             self,
@@ -25,6 +43,7 @@ class FineTuneModelSaver(BaseModelSaver):
             model_type: ModelType,
             output_model_format: ModelFormat,
             output_model_destination: str,
+            dtype: torch.dtype,
     ):
         match model_type:
             case ModelType.STABLE_DIFFUSION_15 \
@@ -36,6 +55,6 @@ class FineTuneModelSaver(BaseModelSaver):
                     case ModelFormat.DIFFUSERS:
                         raise NotImplementedError
                     case ModelFormat.CKPT:
-                        self.__save_stable_diffusion_ckpt(model, output_model_destination)
+                        self.__save_stable_diffusion_ckpt(model, output_model_destination, dtype)
                     case ModelFormat.SAFETENSORS:
                         raise NotImplementedError

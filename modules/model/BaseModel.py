@@ -16,5 +16,5 @@ class BaseModel(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def predict(self, batch: dict, args: TrainArgs) -> (Tensor, Tensor):
+    def predict(self, batch: dict, args: TrainArgs, step: int) -> (Tensor, Tensor):
         pass

@@ -13,3 +13,5 @@ def torch_dtype(dtype_name: str) -> torch.dtype:
             return torch.float16
         case 'bfloat16':
             return torch.bfloat16
+        case _:
+            raise NotImplementedError

@@ -12,7 +12,7 @@ def main():
     model_setup = create.create_model_setup(args.model_type, device, device)
 
     print("Loading model " + args.base_model_name)
-    model = model_loader.load(args.base_model_name, args.model_type, torch.float16)
+    model = model_loader.load(args.base_model_name, args.model_type)
     model_setup.start_eval(model)
 
     model_sampler = create.create_model_sampler(

@@ -39,6 +39,7 @@ def create_model_setup(
         train_device: torch.device,
         temp_device: torch.device,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
+        debug_mode: bool = False,
 ) -> BaseModelSetup:
     model_setup = None
     match training_method:
@@ -49,7 +50,7 @@ def create_model_setup(
                      | ModelType.STABLE_DIFFUSION_20_DEPTH \
                      | ModelType.STABLE_DIFFUSION_20 \
                      | ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                    model_setup = StableDiffusionFineTuneSetup(train_device, temp_device)
+                    model_setup = StableDiffusionFineTuneSetup(train_device, temp_device, debug_mode)
 
     return model_setup
 

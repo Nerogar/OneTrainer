@@ -1,5 +1,6 @@
 import json
 
+import torch
 from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
@@ -22,18 +23,25 @@ class MgdsStableDiffusionDataLoader:
             concepts = json.load(f)
 
         self.ds = create_dataset(
-            args.model_type, concepts, args.cache_dir, args.batch_size, device=args.train_device, dtype=args.train_dtype,
-            tokenizer=model.tokenizer, vae=model.vae, image_depth_processor=model.image_depth_processor, depth_estimator=model.depth_estimator,
+            model_type=args.model_type,
+            concepts=concepts,
+            cache_dir=args.cache_dir,
+            batch_size=args.batch_size,
+            resolution=args.resolution,
+            device=args.train_device,
+            dtype=args.train_dtype,
+            tokenizer=model.tokenizer,
+            vae=model.vae,
+            image_depth_processor=model.image_depth_processor,
+            depth_estimator=model.depth_estimator,
         )
         self.dl = TrainDataLoader(self.ds, args.batch_size)
 
 
 def create_dataset(
-        model_type: ModelType, concepts: list[dict], cache_dir: str, batch_size: int, device: torch.device, dtype: torch.dtype,
+        model_type: ModelType, concepts: list[dict], cache_dir: str, batch_size: int, resolution: int, device: torch.device, dtype: torch.dtype,
         tokenizer: CLIPTokenizer, vae: AutoencoderKL, image_depth_processor: DPTImageProcessor, depth_estimator: DPTForDepthEstimation
 ):
-    size = 768
-
     input_modules = [
         CollectPaths(concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept', extensions=['.png', '.jpg'], include_postfix=None,
                      exclude_postfix=['-masklabel']),
@@ -42,11 +50,11 @@ def create_dataset(
         LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0),
         LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1),
         GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=image_depth_processor, depth_estimator=depth_estimator) if model_type.has_depth_input() else None,
-        #RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0),
-        RandomMaskRotateCrop(mask_name='mask', additional_names=['image', 'depth'], min_size=size, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20) if model_type.has_depth_input() else
-        RandomMaskRotateCrop(mask_name='mask', additional_names=['image'], min_size=size, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20),
+        # RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0),
+        RandomMaskRotateCrop(mask_name='mask', additional_names=['image', 'depth'], min_size=resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20) if model_type.has_depth_input() else
+        RandomMaskRotateCrop(mask_name='mask', additional_names=['image'], min_size=resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20),
         CalcAspect(image_in_name='image', resolution_out_name='original_resolution'),
-        AspectBucketing(batch_size=batch_size, target_resolution=size, resolution_in_name='original_resolution', scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution',
+        AspectBucketing(batch_size=batch_size, target_resolution=resolution, resolution_in_name='original_resolution', scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution',
                         possible_resolutions_out_name='possible_resolutions'),
         ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='image'),
         ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='mask'),
@@ -70,9 +78,9 @@ def create_dataset(
     debug_modules = [
         DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=vae),
         DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=vae),
-        SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
-        SaveImage(image_in_name='mask', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=0, in_range_max=1),
-        SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
+        SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=-1, in_range_max=1),
+        SaveImage(image_in_name='mask', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=0, in_range_max=1),
+        SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=-1, in_range_max=1),
         # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=0, in_range_max=1),
         # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
