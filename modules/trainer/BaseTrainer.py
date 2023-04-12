@@ -1,9 +1,10 @@
 from abc import ABCMeta
+from typing import Callable
 
+import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from modules.dataLoader.MgdsStableDiffusionDataLoader import MgdsStableDiffusionDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -12,8 +13,6 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.LossFunction import LossFunction
-from modules.util.enum.ModelType import ModelType
-from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class BaseTrainer(metaclass=ABCMeta):
@@ -21,20 +20,50 @@ class BaseTrainer(metaclass=ABCMeta):
         self.args = args
 
     @staticmethod
-    def __masked_mse_loss(predicted, target, mask, reduction="none"):
-        masked_predicted = predicted * mask
-        masked_target = target * mask
-        return F.mse_loss(masked_predicted, masked_target, reduction=reduction)
+    def __masked_loss(
+            loss_fn: Callable,
+            predicted: Tensor,
+            target: Tensor,
+            mask: Tensor,
+            unmasked_weight: float,
+            normalize_masked_area_loss: bool
+    ) -> Tensor:
+        clamped_mask = torch.clamp(mask, unmasked_weight, 1)
+
+        masked_predicted = predicted * clamped_mask
+        masked_target = target * clamped_mask
+
+        losses = loss_fn(masked_predicted, masked_target, reduction="none")
+
+        if normalize_masked_area_loss:
+            losses = losses / clamped_mask.mean(dim=(1, 2, 3))
+
+        del clamped_mask
+
+        return losses
 
     def loss(self, batch: dict, predicted: Tensor, target: Tensor) -> Tensor:
         losses = None
-        match self.args.loss_function:
-            case LossFunction.MSE:
-                losses = F.mse_loss(predicted, target, reduction='none').mean([1, 2, 3])
-            case LossFunction.MASKED_MSE:
-                losses = self.__masked_mse_loss(predicted, target, mask=batch['latent_mask'], reduction='none').mean([1, 2, 3])
-                if self.args.normalize_masked_area_loss:
-                    losses = losses / batch['latent_mask'].mean(dim=(1, 2, 3))
+        if self.args.masked_training:
+            match self.args.loss_function:
+                case LossFunction.MSE:
+                    losses = self.__masked_loss(
+                        F.mse_loss,
+                        predicted,
+                        target,
+                        batch['latent_mask'],
+                        self.args.unmasked_weight,
+                        self.args.normalize_masked_area_loss
+                    ).mean([1, 2, 3])
+
+        else:
+            match self.args.loss_function:
+                case LossFunction.MSE:
+                    losses = F.mse_loss(
+                        predicted,
+                        target,
+                        reduction='none'
+                    ).mean([1, 2, 3])
 
         return losses.mean()
 
@@ -51,18 +80,12 @@ class BaseTrainer(metaclass=ABCMeta):
         )
 
     def create_data_loader(self, model: BaseModel):
-        model_setup = None
-        match self.args.training_method:
-            case TrainingMethod.FINE_TUNE:
-                match self.args.model_type:
-                    case ModelType.STABLE_DIFFUSION_15 \
-                         | ModelType.STABLE_DIFFUSION_15_INPAINTING \
-                         | ModelType.STABLE_DIFFUSION_20_DEPTH \
-                         | ModelType.STABLE_DIFFUSION_20 \
-                         | ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                        model_setup = MgdsStableDiffusionDataLoader(self.args, model)
-
-        return model_setup
+        return create.create_data_loader(
+            model,
+            self.args.model_type,
+            self.args.training_method,
+            self.args
+        )
 
     def create_model_saver(self) -> BaseModelSaver:
         return create.create_model_saver(self.args.training_method)

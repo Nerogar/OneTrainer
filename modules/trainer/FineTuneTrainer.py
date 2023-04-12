@@ -44,7 +44,7 @@ class FineTuneTrainer(BaseTrainer):
     def sample_during_training(self, epoch: int, epoch_step: int, global_step: int):
         self.model_setup.setup_eval_device(self.model)
         sample_path = os.path.join(self.args.sample_dir, f"training-sample-{global_step}-{epoch}-{epoch_step}.png")
-        self.model_sampler.sample(self.args.sample_prompt, 42, sample_path)
+        self.model_sampler.sample(prompt=self.args.sample_prompt, resolution=(self.args.sample_resolution, self.args.sample_resolution), seed=42, destination=sample_path)
         self.model_setup.setup_train_device(self.model, self.args)
 
     def needs_sample(self, epoch: int, epoch_step: int, global_step: int):

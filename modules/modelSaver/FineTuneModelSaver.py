@@ -14,12 +14,12 @@ from modules.util.enum.ModelType import ModelType
 class FineTuneModelSaver(BaseModelSaver):
 
     @staticmethod
-    def __convert(state_dict: dict, dtype: torch.dtype) -> dict:
+    def __convert_dtype(state_dict: dict, dtype: torch.dtype) -> dict:
         converted_state_dict = {}
 
         for (key, value) in state_dict.items():
             if isinstance(value, dict):
-                converted_state_dict[key] = FineTuneModelSaver.__convert(value, dtype)
+                converted_state_dict[key] = FineTuneModelSaver.__convert_dtype(value, dtype)
             else:
                 converted_state_dict[key] = value.clone().detach().to(dtype=dtype)
 
@@ -32,7 +32,7 @@ class FineTuneModelSaver(BaseModelSaver):
             dtype: torch.dtype
     ):
         state_dict = convert_sd_diffusers_to_ckpt(model.vae.state_dict(), model.unet.state_dict(), model.text_encoder.state_dict())
-        save_state_dict = FineTuneModelSaver.__convert(state_dict, dtype)
+        save_state_dict = FineTuneModelSaver.__convert_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)

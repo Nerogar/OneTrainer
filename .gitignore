@@ -1,3 +1,6 @@
 .idea
 /venv
+/venv_torch1
+/venv_torch2
 /debug
+/workspace

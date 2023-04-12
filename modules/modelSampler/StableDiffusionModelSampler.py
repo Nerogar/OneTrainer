@@ -50,22 +50,20 @@ class StableDiffusionModelSampler(BaseModelSampler):
                 requires_safety_checker=False,
             )
 
-    def sample(self, prompt: str, seed: int, destination: str):
-        size = (1016, 680)
-
+    def sample(self, prompt: str, resolution: tuple[int, int], seed: int, destination: str):
         generator = torch.Generator(device=self.train_device)
         generator.manual_seed(seed)
 
         if self.model_type.has_conditioning_image_input():
-            conditioning_image = torch.zeros(size=(3, size[0], size[1]))
-            mask_image = torch.ones(size=(1, size[0], size[1]))
+            conditioning_image = torch.zeros(size=(3, resolution[0], resolution[1]))
+            mask_image = torch.ones(size=(1, resolution[0], resolution[1]))
 
             output = self.pipeline(
                 prompt=prompt,
                 image=conditioning_image,
                 mask_image=mask_image,
-                height=size[0],
-                width=size[1],
+                height=resolution[0],
+                width=resolution[1],
                 num_inference_steps=20,
                 guidance_scale=7,
                 num_images_per_prompt=1,
@@ -75,8 +73,8 @@ class StableDiffusionModelSampler(BaseModelSampler):
         else:
             output = self.pipeline(
                 prompt=prompt,
-                height=size[0],
-                width=size[1],
+                height=resolution[0],
+                width=resolution[1],
                 num_inference_steps=20,
                 guidance_scale=7,
                 num_images_per_prompt=1,

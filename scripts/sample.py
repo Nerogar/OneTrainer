@@ -13,7 +13,7 @@ def main():
 
     print("Loading model " + args.base_model_name)
     model = model_loader.load(args.base_model_name, args.model_type)
-    model_setup.start_eval(model)
+    model_setup.setup_eval_device(model)
 
     model_sampler = create.create_model_sampler(
         model=model,
@@ -22,7 +22,7 @@ def main():
     )
 
     print("Sampling " + args.destination)
-    model_sampler.sample(args.prompt, 42, args.destination)
+    model_sampler.sample(prompt=args.prompt, size=(512, 512), seed=42, destination=args.destination)
 
 
 if __name__ == '__main__':

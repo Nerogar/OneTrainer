@@ -1,16 +1,13 @@
 import json
 
-import torch
 from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
 from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.TransformersDataLoaderModules import *
-from transformers import CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.enum.ModelType import ModelType
 
 
 class MgdsStableDiffusionDataLoader:
@@ -23,61 +20,232 @@ class MgdsStableDiffusionDataLoader:
             concepts = json.load(f)
 
         self.ds = create_dataset(
-            model_type=args.model_type,
+            args=args,
+            model=model,
             concepts=concepts,
             cache_dir=args.cache_dir,
-            batch_size=args.batch_size,
-            resolution=args.resolution,
-            device=args.train_device,
-            dtype=args.train_dtype,
-            tokenizer=model.tokenizer,
-            vae=model.vae,
-            image_depth_processor=model.image_depth_processor,
-            depth_estimator=model.depth_estimator,
         )
         self.dl = TrainDataLoader(self.ds, args.batch_size)
 
 
+def __enumerate_input_modules(args: TrainArgs) -> list:
+    supported_extensions = ['.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp']
+
+    collect_paths = CollectPaths(
+        concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept', extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
+    )
+
+    mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
+    prompt_path = ModifyPath(in_name='image_path', out_name='prompt_path', postfix='', extension='.txt')
+
+    modules = [collect_paths, prompt_path]
+
+    if args.masked_training:
+        modules.append(mask_path)
+
+    return modules
+
+
+def __load_input_modules(args: TrainArgs, model: StableDiffusionModel) -> list:
+    load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0)
+    load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
+    generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
+    generate_depth = GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=model.image_depth_processor, depth_estimator=model.depth_estimator)
+    load_text = LoadText(path_in_name='prompt_path', text_out_name='prompt')
+
+    modules = [load_image, load_text]
+
+    if args.masked_training:
+        modules.append(load_mask)
+    elif args.model_type.has_mask_input():
+        modules.append(generate_mask)
+
+    if args.model_type.has_depth_input():
+        modules.append(generate_depth)
+
+    return modules
+
+
+def __mask_augmentation_modules(args: TrainArgs, model: StableDiffusionModel) -> list:
+    inputs = ['image']
+
+    if args.model_type.has_depth_input():
+        inputs.append('depth')
+
+    circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0)
+    random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20)
+
+    modules = []
+
+    if (args.masked_training or args.model_type.has_mask_input()) and args.circular_mask_generation:
+        modules.append(circular_mask_shrink)
+
+    if (args.masked_training or args.model_type.has_mask_input()) and args.random_rotate_and_crop:
+        modules.append(random_mask_rotate_crop)
+
+    return modules
+
+
+def __aspect_bucketing_in(args: TrainArgs):
+    calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
+    aspect_bucketing = AspectBucketing(
+        batch_size=args.batch_size, target_resolution=args.resolution,
+        resolution_in_name='original_resolution',
+        scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution', possible_resolutions_out_name='possible_resolutions'
+    )
+
+    modules = []
+
+    if args.aspect_ratio_bucketing:
+        modules.append(calc_aspect)
+        modules.append(aspect_bucketing)
+
+    return modules
+
+
+def __crop_modules(args: TrainArgs):
+    scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='image')
+    scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='mask')
+    scale_crop_depth = ScaleCropImage(image_in_name='depth', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='depth')
+
+    modules = [scale_crop_image]
+
+    if args.masked_training or args.model_type.has_mask_input():
+        modules.append(scale_crop_mask)
+
+    if args.model_type.has_depth_input():
+        modules.append(scale_crop_depth)
+
+    return modules
+
+
+def __inpainting_modules(args: TrainArgs):
+    conditioning_image = GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image')
+
+    modules = []
+
+    if args.model_type.has_conditioning_image_input():
+        modules.append(conditioning_image)
+
+    return modules
+
+
+def __augmentation_modules(args: TrainArgs):
+    inputs = ['image']
+
+    if args.masked_training or args.model_type.has_mask_input():
+        inputs.append('mask')
+
+    if args.model_type.has_conditioning_image_input():
+        inputs.append('conditioning_image')
+
+    if args.model_type.has_depth_input():
+        inputs.append('depth')
+
+    random_flip = RandomFlip(names=inputs)
+
+    modules = [random_flip]
+
+    return modules
+
+
+def __preparation_modules(args: TrainArgs, model: StableDiffusionModel):
+    image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
+    mask = Downscale(in_name='mask', out_name='latent_mask')
+    conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
+    depth = Downscale(in_name='depth', out_name='latent_depth')
+    tokens = Tokenize(in_name='prompt', out_name='tokens', tokenizer=model.tokenizer)
+
+    modules = [image, tokens]
+
+    if args.masked_training or args.model_type.has_mask_input():
+        modules.append(mask)
+
+    if args.model_type.has_conditioning_image_input():
+        modules.append(conditioning_image)
+
+    if args.model_type.has_depth_input():
+        modules.append(depth)
+
+    return modules
+
+
+def __cache_modules(args: TrainArgs):
+    split_names = ['latent_image_distribution', 'tokens']
+
+    if args.masked_training or args.model_type.has_mask_input():
+        split_names.append('latent_mask')
+
+    if args.model_type.has_conditioning_image_input():
+        split_names.append('latent_conditioning_image_distribution')
+
+    if args.model_type.has_depth_input():
+        split_names.append('latent_depth')
+
+    aggregate_names = ['crop_resolution']
+
+    disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names)
+
+    modules = []
+
+    if args.latent_caching:
+        modules.append(disk_cache)
+
+    return modules
+
+
+def __output_modules(args: TrainArgs, model: StableDiffusionModel):
+    inputs = ['latent_image', 'tokens']
+
+    if args.masked_training or args.model_type.has_mask_input():
+        inputs.append('latent_mask')
+
+    if args.model_type.has_conditioning_image_input():
+        inputs.append('latent_conditioning_image')
+
+    if args.model_type.has_depth_input():
+        inputs.append('latent_depth')
+
+    image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
+    conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
+    mask_remove = RandomLatentMaskRemove(
+        latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
+        replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions'
+    )
+    batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=inputs, batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+
+    modules = [image_sample]
+
+    if args.model_type.has_conditioning_image_input():
+        modules.append(conditioning_image_sample)
+
+    if args.model_type.has_mask_input():
+        modules.append(mask_remove)
+
+    modules.append(batch_sorting)
+
+    return modules
+
+
 def create_dataset(
-        model_type: ModelType, concepts: list[dict], cache_dir: str, batch_size: int, resolution: int, device: torch.device, dtype: torch.dtype,
-        tokenizer: CLIPTokenizer, vae: AutoencoderKL, image_depth_processor: DPTImageProcessor, depth_estimator: DPTForDepthEstimation
+        args: TrainArgs,
+        model: StableDiffusionModel,
+        concepts: list[dict], cache_dir: str,
 ):
-    input_modules = [
-        CollectPaths(concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept', extensions=['.png', '.jpg'], include_postfix=None,
-                     exclude_postfix=['-masklabel']),
-        ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png'),
-        ModifyPath(in_name='image_path', out_name='prompt_path', postfix='', extension='.txt'),
-        LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0),
-        LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1),
-        GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=image_depth_processor, depth_estimator=depth_estimator) if model_type.has_depth_input() else None,
-        # RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0),
-        RandomMaskRotateCrop(mask_name='mask', additional_names=['image', 'depth'], min_size=resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20) if model_type.has_depth_input() else
-        RandomMaskRotateCrop(mask_name='mask', additional_names=['image'], min_size=resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20),
-        CalcAspect(image_in_name='image', resolution_out_name='original_resolution'),
-        AspectBucketing(batch_size=batch_size, target_resolution=resolution, resolution_in_name='original_resolution', scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution',
-                        possible_resolutions_out_name='possible_resolutions'),
-        ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='image'),
-        ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='mask'),
-        ScaleCropImage(image_in_name='depth', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='depth') if model_type.has_depth_input() else None,
-        LoadText(path_in_name='prompt_path', text_out_name='prompt'),
-        GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image'),
-        RandomFlip(names=['image', 'mask', 'depth', 'conditioning_image']) if model_type.has_depth_input() else
-        RandomFlip(names=['image', 'mask', 'conditioning_image']),
-        EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=vae),
-        Downscale(in_name='mask', out_name='latent_mask'),
-        EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=vae),
-        Downscale(in_name='depth', out_name='latent_depth') if model_type.has_depth_input() else None,
-        Tokenize(in_name='prompt', out_name='tokens', tokenizer=tokenizer),
-        DiskCache(cache_dir=cache_dir, split_names=['latent_image_distribution', 'latent_mask', 'latent_conditioning_image_distribution', 'latent_depth', 'tokens'], aggregate_names=['crop_resolution']) if model_type.has_depth_input() else
-        DiskCache(cache_dir=cache_dir, split_names=['latent_image_distribution', 'latent_mask', 'latent_conditioning_image_distribution', 'tokens'], aggregate_names=['crop_resolution']),
-        SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean'),
-        SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean'),
-        RandomLatentMaskRemove(latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image', replace_probability=0.0, vae=vae, possible_resolutions_in_name='possible_resolutions')
-    ]
+    enumerate_input = __enumerate_input_modules(args)
+    load_input = __load_input_modules(args, model)
+    mask_augmentation = __mask_augmentation_modules(args, model)
+    aspect_bucketing_in = __aspect_bucketing_in(args)
+    crop_modules = __crop_modules(args)
+    inpainting_modules = __inpainting_modules(args)
+    augmentation_modules = __augmentation_modules(args)
+    preparation_modules = __preparation_modules(args, model)
+    cache_modules = __cache_modules(args)
+    output_modules = __output_modules(args, model)
 
     debug_modules = [
-        DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=vae),
-        DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=vae),
+        DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae),
+        DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae),
         SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=-1, in_range_max=1),
         SaveImage(image_in_name='mask', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=0, in_range_max=1),
         SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=-1, in_range_max=1),
@@ -86,19 +254,24 @@ def create_dataset(
         # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
     ]
 
-    output_modules = [
-        AspectBatchSorting(resolution_in_name='crop_resolution', names=['latent_image', 'latent_conditioning_image', 'latent_mask', 'latent_depth', 'tokens'], batch_size=batch_size,
-                           sort_resolutions_for_each_epoch=True) if model_type.has_depth_input() else
-        AspectBatchSorting(resolution_in_name='crop_resolution', names=['latent_image', 'latent_conditioning_image', 'latent_mask', 'tokens'], batch_size=batch_size, sort_resolutions_for_each_epoch=True),
-    ]
-
     ds = MGDS(
-        device, dtype,
+        args.train_device,
+        args.train_dtype,
+        args.train_dtype != torch.float32,
         concepts,
         [
-            input_modules,
+            enumerate_input,
+            load_input,
+            mask_augmentation,
+            aspect_bucketing_in,
+            crop_modules,
+            inpainting_modules,
+            augmentation_modules,
+            preparation_modules,
+            cache_modules,
+            output_modules,
+
             # debug_modules,
-            output_modules
         ]
     )
 
