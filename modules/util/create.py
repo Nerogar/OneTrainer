@@ -40,13 +40,8 @@ def create_model_setup(
 ) -> BaseModelSetup:
     match training_method:
         case TrainingMethod.FINE_TUNE:
-            match model_type:
-                case ModelType.STABLE_DIFFUSION_15 \
-                     | ModelType.STABLE_DIFFUSION_15_INPAINTING \
-                     | ModelType.STABLE_DIFFUSION_20_DEPTH \
-                     | ModelType.STABLE_DIFFUSION_20 \
-                     | ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                    return StableDiffusionFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_stable_diffusion():
+                return StableDiffusionFineTuneSetup(train_device, temp_device, debug_mode)
 
 
 def create_model_sampler(
@@ -66,10 +61,5 @@ def create_data_loader(
 ):
     match training_method:
         case TrainingMethod.FINE_TUNE:
-            match model_type:
-                case ModelType.STABLE_DIFFUSION_15 \
-                     | ModelType.STABLE_DIFFUSION_15_INPAINTING \
-                     | ModelType.STABLE_DIFFUSION_20_DEPTH \
-                     | ModelType.STABLE_DIFFUSION_20 \
-                     | ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                    return MgdsStableDiffusionDataLoader(args, model)
+            if model_type.is_stable_diffusion():
+                return MgdsStableDiffusionDataLoader(args, model)
