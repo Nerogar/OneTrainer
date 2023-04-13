@@ -1,4 +1,5 @@
 import torch
+from torch.optim import AdamW
 
 from modules.dataLoader.MgdsStableDiffusionDataLoader import MgdsStableDiffusionDataLoader
 from modules.model.BaseModel import BaseModel
@@ -10,6 +11,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.FineTuneModelSaver import FineTuneModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
+from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -58,8 +60,23 @@ def create_data_loader(
         model_type: ModelType,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
         args: TrainArgs = None,
+        train_progress: TrainProgress = TrainProgress(),
 ):
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return MgdsStableDiffusionDataLoader(args, model)
+                return MgdsStableDiffusionDataLoader(args, model, train_progress)
+
+
+def create_optimizer(
+        model: BaseModel,
+        args: TrainArgs = None,
+):
+    optimizer = AdamW(
+        params=model.parameters(args),
+        lr=3e-6,
+        weight_decay=1e-2,
+        eps=1e-8,
+    )
+
+    return optimizer

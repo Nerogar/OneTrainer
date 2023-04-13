@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.getcwd())
+
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
 

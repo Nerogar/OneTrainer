@@ -8,5 +8,8 @@ class TimeUnit(Enum):
     MINUTE = 'MINUTE'
     HOUR = 'HOUR'
 
+    NEVER = 'NEVER'
+    ALWAYS = 'ALWAYS'
+
     def __str__(self):
         return self.value

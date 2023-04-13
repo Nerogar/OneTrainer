@@ -1,8 +1,11 @@
 import torch
 from diffusers.utils.import_utils import is_xformers_available
+from torch.optim import Optimizer
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import create
+from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
@@ -19,17 +22,24 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             debug_mode=debug_mode,
         )
 
-    def setup_gradients(
+    def setup_model(
             self,
             model: StableDiffusionModel,
-            epoch: int,
             args: TrainArgs,
     ):
-        train_text_encoder = args.train_text_encoder and (epoch < args.train_text_encoder_epochs)
+        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
 
         model.text_encoder.requires_grad_(train_text_encoder)
         model.vae.requires_grad_(False)
         model.unet.requires_grad_(True)
+
+        if model.optimizer_state_dict is not None and model.optimizer is None:
+            model.optimizer = create.create_optimizer(model, args)
+            # TODO: this will break if the optimizer class changed during a restart
+            model.optimizer.load_state_dict(model.optimizer_state_dict)
+            del model.optimizer_state_dict
+        elif model.optimizer_state_dict is None and model.optimizer is None:
+            model.optimizer = create.create_optimizer(model, args)
 
     def setup_eval_device(
             self,
@@ -71,3 +81,17 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
 
         model.vae.train()
         model.unet.train()
+
+    def get_optimizer(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+    ) -> Optimizer:
+        return model.optimizer
+
+    def get_train_progress(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+    ) -> TrainProgress:
+        return model.train_progress

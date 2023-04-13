@@ -26,6 +26,7 @@ class TrainArgs:
     random_rotate_and_crop: bool
     aspect_ratio_bucketing: bool
     latent_caching: bool
+    latent_caching_epochs: int
 
     # training settings
     epochs: int
@@ -53,6 +54,12 @@ class TrainArgs:
     sample_dir: str
     sample_resolution: int
 
+    # backup settings
+    backup_after: float
+    backup_after_unit: TimeUnit
+    backup_dir: str
+    backup_before_save: bool
+
     def __init__(self, args: dict):
         for (key, value) in args.items():
             setattr(self, key, value)
@@ -78,6 +85,7 @@ class TrainArgs:
         parser.add_argument("--random-rotate-and-crop", required=False, action='store_true', dest="random_rotate_and_crop", help="Randomly rotate and crop samples")
         parser.add_argument("--aspect-ratio-bucketing", required=False, action='store_true', dest="aspect_ratio_bucketing", help="Enable aspect ratio bucketing")
         parser.add_argument("--latent-caching", required=False, action='store_true', dest="latent_caching", help="Enable latent caching")
+        parser.add_argument("--latent-caching-epochs", type=int, required=False, default=1, dest="latent_caching_epochs", help="The amount of epochs to cache, to increase sample diversity")
 
         # training settings
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
@@ -93,7 +101,7 @@ class TrainArgs:
         parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
         parser.add_argument("--learning-rate", type=float, required=True, dest="learning_rate", help="The learning rate")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
-        parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Aktivates masked training to let the model focus on certain parts of the training sample")
+        parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
         parser.add_argument("--unmasked-probability", type=float, required=False, default=0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
         parser.add_argument("--unmasked-weight", type=float, required=False, default=0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
         parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
@@ -105,5 +113,11 @@ class TrainArgs:
         parser.add_argument("--sample-after-unit", type=TimeUnit, required=True, dest="sample_after_unit", help="The unit applied to the sample-after option")
         parser.add_argument("--sample-dir", type=str, required=True, dest="sample_dir", help="Directory to save samples")
         parser.add_argument("--sample-resolution", type=int, required=False, default=512, dest="sample_resolution", help="The resolution of samples")
+
+        # backup settings
+        parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
+        parser.add_argument("--backup-after-unit", type=TimeUnit, required=True, dest="backup_after_unit", help="The unit applied to the backup-after option")
+        parser.add_argument("--backup-dir", type=str, required=True, dest="backup_dir", help="Directory to save backups")
+        parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
 
         return TrainArgs(vars(parser.parse_args()))

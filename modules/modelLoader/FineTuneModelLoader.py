@@ -1,3 +1,4 @@
+import json
 import os
 
 import torch
@@ -7,12 +8,38 @@ from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTFor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
 class FineTuneModelLoader(BaseModelLoader):
     def __init__(self):
         super(FineTuneModelLoader, self).__init__()
+
+    @staticmethod
+    def __load_internal_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
+        try:
+            with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
+                meta = json.load(meta_file)
+                train_progress = TrainProgress(
+                    epoch=meta['train_progress']['epoch'],
+                    epoch_step=meta['train_progress']['epoch_step'],
+                    epoch_sample=meta['train_progress']['epoch_sample'],
+                    global_step=meta['train_progress']['global_step'],
+                )
+
+            # base model
+            model = FineTuneModelLoader.__load_diffusers_model(base_model_name, model_type)
+
+            # optimizer
+            model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
+
+            # meta
+            model.train_progress = train_progress
+
+            return model
+        except:
+            return None
 
     @staticmethod
     def __load_diffusers_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
@@ -56,6 +83,7 @@ class FineTuneModelLoader(BaseModelLoader):
             ) if model_type.has_depth_input() else None
 
             return StableDiffusionModel(
+                model_type=model_type,
                 tokenizer=tokenizer,
                 noise_scheduler=noise_scheduler,
                 text_encoder=text_encoder,
@@ -95,9 +123,11 @@ class FineTuneModelLoader(BaseModelLoader):
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
                 original_config_file=yaml_name,
+                load_safety_checker=False,
             )
 
             return StableDiffusionModel(
+                model_type=model_type,
                 tokenizer=pipeline.tokenizer,
                 noise_scheduler=pipeline.scheduler,
                 text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
@@ -110,6 +140,10 @@ class FineTuneModelLoader(BaseModelLoader):
             return None
 
     def load(self, base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
+        model = self.__load_internal_model(base_model_name, model_type)
+        if model is not None:
+            return model
+
         model = self.__load_diffusers_model(base_model_name, model_type)
         if model is not None:
             return model

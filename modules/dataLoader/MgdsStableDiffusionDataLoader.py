@@ -3,10 +3,11 @@ import json
 from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import MGDS, TrainDataLoader
+from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
 from mgds.TransformersDataLoaderModules import *
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
@@ -15,6 +16,7 @@ class MgdsStableDiffusionDataLoader:
             self,
             args: TrainArgs,
             model: StableDiffusionModel,
+            train_progress: TrainProgress,
     ):
         with open(args.concept_file_name, 'r') as f:
             concepts = json.load(f)
@@ -23,7 +25,7 @@ class MgdsStableDiffusionDataLoader:
             args=args,
             model=model,
             concepts=concepts,
-            cache_dir=args.cache_dir,
+            train_progress=train_progress,
         )
         self.dl = TrainDataLoader(self.ds, args.batch_size)
 
@@ -66,7 +68,7 @@ def __load_input_modules(args: TrainArgs, model: StableDiffusionModel) -> list:
     return modules
 
 
-def __mask_augmentation_modules(args: TrainArgs, model: StableDiffusionModel) -> list:
+def __mask_augmentation_modules(args: TrainArgs) -> list:
     inputs = ['image']
 
     if args.model_type.has_depth_input():
@@ -182,9 +184,9 @@ def __cache_modules(args: TrainArgs):
     if args.model_type.has_depth_input():
         split_names.append('latent_depth')
 
-    aggregate_names = ['crop_resolution']
+    aggregate_names = ['crop_resolution', 'image_path']
 
-    disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names)
+    disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, cached_epochs=args.latent_caching_epochs)
 
     modules = []
 
@@ -195,16 +197,16 @@ def __cache_modules(args: TrainArgs):
 
 
 def __output_modules(args: TrainArgs, model: StableDiffusionModel):
-    inputs = ['latent_image', 'tokens']
+    output_names = ['latent_image', 'tokens', 'image_path']
 
     if args.masked_training or args.model_type.has_mask_input():
-        inputs.append('latent_mask')
+        output_names.append('latent_mask')
 
     if args.model_type.has_conditioning_image_input():
-        inputs.append('latent_conditioning_image')
+        output_names.append('latent_conditioning_image')
 
     if args.model_type.has_depth_input():
-        inputs.append('latent_depth')
+        output_names.append('latent_depth')
 
     image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
     conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
@@ -212,7 +214,8 @@ def __output_modules(args: TrainArgs, model: StableDiffusionModel):
         latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
         replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions'
     )
-    batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=inputs, batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+    batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+    output = OutputPipelineModule(names=output_names)
 
     modules = [image_sample]
 
@@ -223,6 +226,7 @@ def __output_modules(args: TrainArgs, model: StableDiffusionModel):
         modules.append(mask_remove)
 
     modules.append(batch_sorting)
+    modules.append(output)
 
     return modules
 
@@ -230,11 +234,12 @@ def __output_modules(args: TrainArgs, model: StableDiffusionModel):
 def create_dataset(
         args: TrainArgs,
         model: StableDiffusionModel,
-        concepts: list[dict], cache_dir: str,
+        concepts: list[dict],
+        train_progress: TrainProgress,
 ):
     enumerate_input = __enumerate_input_modules(args)
     load_input = __load_input_modules(args, model)
-    mask_augmentation = __mask_augmentation_modules(args, model)
+    mask_augmentation = __mask_augmentation_modules(args)
     aspect_bucketing_in = __aspect_bucketing_in(args)
     crop_modules = __crop_modules(args)
     inpainting_modules = __inpainting_modules(args)
@@ -243,15 +248,17 @@ def create_dataset(
     cache_modules = __cache_modules(args)
     output_modules = __output_modules(args, model)
 
+    debug_dir = os.path.join(args.debug_dir, "dataloader")
     debug_modules = [
         DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae),
         DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae),
-        SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=-1, in_range_max=1),
-        SaveImage(image_in_name='mask', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=0, in_range_max=1),
-        SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=cache_dir + '/debug', in_range_min=-1, in_range_max=1),
-        # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
-        # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=0, in_range_max=1),
-        # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=cache_dir+'/debug', in_range_min=-1, in_range_max=1),
+        SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+        SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
+        SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+        SaveImage(image_in_name='image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+        # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+        # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
+        # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
     ]
 
     ds = MGDS(
@@ -271,8 +278,11 @@ def create_dataset(
             cache_modules,
             output_modules,
 
-            # debug_modules,
-        ]
+            debug_modules if args.debug_mode else None,
+        ],
+        batch_size=args.batch_size,
+        initial_epoch=train_progress.epoch,
+        initial_epoch_sample=train_progress.epoch_sample,
     )
 
     return ds

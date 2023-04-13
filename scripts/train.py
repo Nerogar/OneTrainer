@@ -23,7 +23,13 @@ def main():
             trainer = EmbeddingTrainer(args)
 
     trainer.start()
-    trainer.train()
+
+    try:
+        trainer.train()
+    except KeyboardInterrupt:
+        if args.backup_before_save:
+            trainer.backup()
+
     trainer.end()
 
 
