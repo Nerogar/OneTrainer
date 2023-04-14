@@ -13,7 +13,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class FineTuneModelSaver(BaseModelSaver):
+class StableDiffusionModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_stable_diffusion_diffusers(
@@ -60,7 +60,7 @@ class FineTuneModelSaver(BaseModelSaver):
             raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
 
         # base model
-        FineTuneModelSaver.__save_stable_diffusion_diffusers(model, destination, torch.float32)
+        StableDiffusionModelSaver.__save_stable_diffusion_diffusers(model, destination, torch.float32)
 
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)

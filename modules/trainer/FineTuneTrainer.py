@@ -7,7 +7,7 @@ from torch.cuda.amp import GradScaler
 from torch.optim import Optimizer
 from tqdm import tqdm
 
-from modules.dataLoader.MgdsStableDiffusionDataLoader import MgdsStableDiffusionDataLoader
+from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -23,7 +23,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 class FineTuneTrainer(BaseTrainer):
     model_loader: BaseModelLoader
     model_setup: BaseModelSetup
-    data_loader: MgdsStableDiffusionDataLoader
+    data_loader: MgdsStableDiffusionFineTuneDataLoader
     model_saver: BaseModelSaver
     model_sampler: BaseModelSampler
     model: BaseModel
@@ -39,6 +39,7 @@ class FineTuneTrainer(BaseTrainer):
 
         self.model = self.model_loader.load(self.args.base_model_name, self.args.model_type)
 
+        self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
         self.model_setup.setup_eval_device(self.model)
 
@@ -48,7 +49,7 @@ class FineTuneTrainer(BaseTrainer):
         self.model_sampler = self.create_model_sampler(self.model)
         self.previous_sample_time = -1
 
-    def sample_during_training(self, train_progress: TrainProgress):
+    def __sample_during_training(self, train_progress: TrainProgress):
         self.model_setup.setup_eval_device(self.model)
         sample_path = os.path.join(self.args.sample_dir, f"training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png")
         self.model_sampler.sample(prompt=self.args.sample_prompt, resolution=(self.args.sample_resolution, self.args.sample_resolution), seed=42, destination=sample_path)
@@ -64,21 +65,22 @@ class FineTuneTrainer(BaseTrainer):
             path,
             torch.float32
         )
+        self.model_setup.setup_train_device(self.model, self.args)
 
-    def needs_sample(self, train_progress: TrainProgress):
+    def __needs_sample(self, train_progress: TrainProgress):
         return self.action_needed("sample", self.args.sample_after, self.args.sample_after_unit, train_progress)
 
-    def needs_backup(self, train_progress: TrainProgress):
+    def __needs_backup(self, train_progress: TrainProgress):
         return self.action_needed("backup", self.args.backup_after, self.args.backup_after_unit, train_progress, start_at_zero=False)
 
-    def is_update_step(self, train_progress: TrainProgress) -> bool:
+    def __is_update_step(self, train_progress: TrainProgress) -> bool:
         return self.action_needed("update_step", self.args.gradient_accumulation_steps, TimeUnit.STEP, train_progress, start_at_zero=False)
 
     def train(self):
-        parameters = self.model.parameters(self.args)
+        parameters = self.model_setup.create_parameters(self.model, self.args)
 
         train_progress = self.model_setup.get_train_progress(self.model, self.args)
-        optimizer = self.model_setup.get_optimizer(self.model, self.args)
+        optimizer = self.model_setup.create_optimizer(self.model, self.args)
 
         scaler = GradScaler()
 
@@ -86,25 +88,25 @@ class FineTuneTrainer(BaseTrainer):
             self.model_setup.setup_eval_device(self.model)
             self.data_loader.ds.start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
-            for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="sample")):
-                if self.needs_sample(train_progress):
-                    self.sample_during_training(train_progress)
+            for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
+                if self.__needs_sample(train_progress):
+                    self.__sample_during_training(train_progress)
 
-                if self.needs_backup(train_progress):
+                if self.__needs_backup(train_progress):
                     self.backup()
 
                 with torch.autocast(self.args.train_device.type, dtype=self.args.train_dtype):
-                    predicted, target = self.model.predict(batch, self.args)
+                    predicted, target = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
                     loss = self.loss(batch, predicted.float(), target.float())
 
-                if self.is_update_step(train_progress):
+                if self.__is_update_step(train_progress):
                     optimizer.zero_grad()
 
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
                 nn.utils.clip_grad_norm_(parameters, 1)
-                if self.is_update_step(train_progress):
+                if self.__is_update_step(train_progress):
                     scaler.step(optimizer)
                 scaler.update()
 

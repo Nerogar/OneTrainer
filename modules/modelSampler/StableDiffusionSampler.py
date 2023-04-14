@@ -8,7 +8,7 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionModelSampler(BaseModelSampler):
+class StableDiffusionSampler(BaseModelSampler):
     def __init__(self, model: StableDiffusionModel, model_type: ModelType, train_device: torch.device):
         self.model = model
         self.model_type = model_type

@@ -11,7 +11,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStableDiffusionDataLoader:
+class MgdsStableDiffusionFineTuneDataLoader:
     def __init__(
             self,
             args: TrainArgs,

@@ -13,7 +13,7 @@ def main():
     args = SampleArgs.parse_args()
     device = torch.device("cuda")
 
-    model_loader = create.create_model_loader()
+    model_loader = create.create_model_loader(args.model_type)
     model_setup = create.create_model_setup(args.model_type, device, device)
 
     print("Loading model " + args.base_model_name)

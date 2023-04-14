@@ -1,7 +1,10 @@
+import os
 from abc import ABCMeta, abstractmethod
 
 import torch
+from torch import Tensor
 from torch.optim import Optimizer
+from torchvision import transforms
 
 from modules.model.BaseModel import BaseModel
 from modules.util.TrainProgress import TrainProgress
@@ -18,6 +21,46 @@ class BaseModelSetup(metaclass=ABCMeta):
         self.train_device = train_device
         self.temp_device = temp_device
         self.debug_mode = debug_mode
+
+    def save_image(self, image_tensor: Tensor, directory: str, name: str, step: int):
+        path = os.path.join(directory, "step-" + str(step) + "-" + name + ".png")
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        t = transforms.ToPILImage()
+
+        image_tensor = image_tensor[0].unsqueeze(0)
+
+        range_min = -1
+        range_max = 1
+        image_tensor = (image_tensor - range_min) / (range_max - range_min)
+
+        image = t(image_tensor.squeeze())
+        image.save(path)
+
+    @abstractmethod
+    def create_parameters(
+            self,
+            model: BaseModel,
+            args: TrainArgs,
+    ):
+        pass
+
+    @abstractmethod
+    def create_optimizer(
+            self,
+            model: BaseModel,
+            args: TrainArgs,
+    ) -> Optimizer:
+        pass
+
+    @abstractmethod
+    def get_train_progress(
+            self,
+            model: BaseModel,
+            args: TrainArgs,
+    ) -> TrainProgress:
+        pass
 
     @abstractmethod
     def setup_model(
@@ -43,17 +86,11 @@ class BaseModelSetup(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_optimizer(
+    def predict(
             self,
             model: BaseModel,
+            batch: dict,
             args: TrainArgs,
-    ) -> Optimizer:
-        pass
-
-    @abstractmethod
-    def get_train_progress(
-            self,
-            model: BaseModel,
-            args: TrainArgs,
-    ) -> TrainProgress:
+            train_progress: TrainProgress
+    ) -> (Tensor, Tensor):
         pass

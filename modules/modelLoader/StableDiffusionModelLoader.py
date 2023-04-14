@@ -12,9 +12,9 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class FineTuneModelLoader(BaseModelLoader):
+class StableDiffusionModelLoader(BaseModelLoader):
     def __init__(self):
-        super(FineTuneModelLoader, self).__init__()
+        super(StableDiffusionModelLoader, self).__init__()
 
     @staticmethod
     def __load_internal_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
@@ -29,7 +29,7 @@ class FineTuneModelLoader(BaseModelLoader):
                 )
 
             # base model
-            model = FineTuneModelLoader.__load_diffusers_model(base_model_name, model_type)
+            model = StableDiffusionModelLoader.__load_diffusers_model(base_model_name, model_type)
 
             # optimizer
             model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
@@ -118,7 +118,7 @@ class FineTuneModelLoader(BaseModelLoader):
             if not os.path.exists(yaml_name):
                 yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
                 if not os.path.exists(yaml_name):
-                    yaml_name = FineTuneModelLoader.__default_yaml_name(model_type)
+                    yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
 
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,

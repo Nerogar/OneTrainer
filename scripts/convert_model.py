@@ -10,8 +10,8 @@ from modules.util.args.ConvertModelArgs import ConvertModelArgs
 def main():
     args = ConvertModelArgs.parse_args()
 
-    model_loader = create.create_model_loader()
-    model_saver = create.create_model_saver()
+    model_loader = create.create_model_loader(args.model_type)
+    model_saver = create.create_model_saver(args.model_type)
 
     print("Loading model " + args.base_model_name)
     model = model_loader.load(args.base_model_name, args.model_type)

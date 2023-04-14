@@ -64,6 +64,8 @@ class BaseTrainer(metaclass=ABCMeta):
 
     def loss(self, batch: dict, predicted: Tensor, target: Tensor) -> Tensor:
         losses = None
+        # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
+        #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
         if self.args.masked_training and not self.args.model_type.has_conditioning_image_input():
             match self.args.loss_function:
                 case LossFunction.MSE:
@@ -91,7 +93,7 @@ class BaseTrainer(metaclass=ABCMeta):
         return losses.mean()
 
     def create_model_loader(self) -> BaseModelLoader:
-        return create.create_model_loader(self.args.training_method)
+        return create.create_model_loader(self.args.model_type, self.args.training_method)
 
     def create_model_setup(self) -> BaseModelSetup:
         return create.create_model_setup(
@@ -112,10 +114,10 @@ class BaseTrainer(metaclass=ABCMeta):
         )
 
     def create_model_saver(self) -> BaseModelSaver:
-        return create.create_model_saver(self.args.training_method)
+        return create.create_model_saver(self.args.model_type, self.args.training_method)
 
     def create_model_sampler(self, model: BaseModel) -> BaseModelSampler:
-        return create.create_model_sampler(model, self.args.model_type, self.args.train_device)
+        return create.create_model_sampler(model, self.args.model_type, self.args.train_device, self.args.training_method)
 
     def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress, start_at_zero: bool = True):
         if name not in self.previous_action:

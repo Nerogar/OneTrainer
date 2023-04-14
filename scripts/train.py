@@ -21,16 +21,19 @@ def main():
             trainer = LoraTrainer(args)
         case TrainingMethod.EMBEDDING:
             trainer = EmbeddingTrainer(args)
+        case TrainingMethod.FINE_TUNE_VAE:
+            trainer = FineTuneTrainer(args)
 
     trainer.start()
 
+    canceled = False
     try:
         trainer.train()
     except KeyboardInterrupt:
-        if args.backup_before_save:
-            trainer.backup()
+        canceled = True
 
-    trainer.end()
+    if not canceled or args.backup_before_save:
+        trainer.end()
 
 
 if __name__ == '__main__':

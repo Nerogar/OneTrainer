@@ -1,6 +1,7 @@
 import argparse
 
 from modules.util.args.arg_type_util import *
+from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -29,6 +30,9 @@ class TrainArgs:
     latent_caching_epochs: int
 
     # training settings
+    optimizer: Optimizer
+    learning_rate: float
+    weight_decay: float
     epochs: int
     batch_size: int
     gradient_accumulation_steps: int
@@ -88,6 +92,9 @@ class TrainArgs:
         parser.add_argument("--latent-caching-epochs", type=int, required=False, default=1, dest="latent_caching_epochs", help="The amount of epochs to cache, to increase sample diversity")
 
         # training settings
+        parser.add_argument("--optimizer", type=Optimizer, required=False, default=Optimizer.ADAMW, dest="optimizer", help="The optimizer", choices=list(Optimizer))
+        parser.add_argument("--learning-rate", type=float, required=False, default=3e-6, dest="learning_rate", help="The learning rate used when creating the optimizer")
+        parser.add_argument("--weight-decay", type=float, required=False, default=1e-2, dest="weight_decay", help="The weight decay used when creating the optimizer")
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
         parser.add_argument("--batch-size", type=int, required=True, dest="batch_size", help="The batch size")
         parser.add_argument("--gradient-accumulation-steps", type=int, required=False, default=1, dest="gradient_accumulation_steps", help="The amount of steps used for gradient accumulation")
@@ -99,7 +106,6 @@ class TrainArgs:
         parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=torch_dtype, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights")
         parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
-        parser.add_argument("--learning-rate", type=float, required=True, dest="learning_rate", help="The learning rate")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
         parser.add_argument("--unmasked-probability", type=float, required=False, default=0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
