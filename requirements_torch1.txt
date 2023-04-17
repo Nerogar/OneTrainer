@@ -16,7 +16,7 @@ git+https://github.com/huggingface/transformers.git@656e869#egg=transformers
 omegaconf # needed to load ckpt files
 
 # data loader
-git+https://github.com/Nerogar/stable-diffusion-dataloader.git@98fbf56#egg=mgds
+git+https://github.com/Nerogar/stable-diffusion-dataloader.git@629c05a#egg=mgds
 
 # xformers
 https://huggingface.co/r4ziel/xformers_pre_built/resolve/main/xformers-0.0.17.dev464-cp310-cp310-win_amd64.whl
