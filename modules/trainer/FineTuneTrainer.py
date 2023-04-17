@@ -104,11 +104,12 @@ class FineTuneTrainer(BaseTrainer):
                     optimizer.zero_grad()
 
                 scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
-                nn.utils.clip_grad_norm_(parameters, 1)
+
                 if self.__is_update_step(train_progress):
+                    scaler.unscale_(optimizer)
+                    nn.utils.clip_grad_norm_(parameters, 1)
                     scaler.step(optimizer)
-                scaler.update()
+                    scaler.update()
 
                 train_progress.next_step(self.args.batch_size)
 
