@@ -100,9 +100,6 @@ class FineTuneTrainer(BaseTrainer):
 
                     loss = self.loss(batch, predicted.float(), target.float())
 
-                if self.__is_update_step(train_progress):
-                    optimizer.zero_grad()
-
                 scaler.scale(loss).backward()
 
                 if self.__is_update_step(train_progress):
@@ -110,6 +107,7 @@ class FineTuneTrainer(BaseTrainer):
                     nn.utils.clip_grad_norm_(parameters, 1)
                     scaler.step(optimizer)
                     scaler.update()
+                    optimizer.zero_grad()
 
                 train_progress.next_step(self.args.batch_size)
 
