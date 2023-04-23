@@ -1,10 +1,18 @@
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler, StableDiffusionDepth2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline
+from torch import Tensor
 from torch.optim import Optimizer
 from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.BaseModel import BaseModel
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
+
+
+class StableDiffusionModelEmbedding:
+    def __init__(self, name: str, vector: Tensor, token_count: int):
+        self.name = name
+        self.vector = vector
+        self.token_count = token_count
 
 
 class StableDiffusionModel(BaseModel):
@@ -22,6 +30,7 @@ class StableDiffusionModel(BaseModel):
     optimizer: Optimizer | None
     optimizer_state_dict: dict | None
     train_progress: TrainProgress
+    embeddings: list[StableDiffusionModelEmbedding] | None
 
     def __init__(
             self,
@@ -34,7 +43,8 @@ class StableDiffusionModel(BaseModel):
             image_depth_processor: DPTImageProcessor | None = None,
             depth_estimator: DPTForDepthEstimation | None = None,
             optimizer_state_dict: dict | None = None,
-            train_progress: TrainProgress = TrainProgress()
+            train_progress: TrainProgress = TrainProgress(),
+            embeddings: list[StableDiffusionModelEmbedding] = None,
     ):
         super(StableDiffusionModel, self).__init__(model_type)
 
@@ -49,6 +59,7 @@ class StableDiffusionModel(BaseModel):
         self.optimizer = None
         self.optimizer_state_dict = optimizer_state_dict
         self.train_progress = train_progress
+        self.embeddings = embeddings if embeddings is not None else []
 
     def create_pipeline(self) -> DiffusionPipeline:
         if self.model_type.has_depth_input():

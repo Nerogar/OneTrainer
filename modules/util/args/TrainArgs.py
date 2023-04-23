@@ -1,10 +1,10 @@
 import argparse
 
 from modules.util.args.arg_type_util import *
-from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -17,6 +17,7 @@ class TrainArgs:
     # model settings
     model_type: ModelType
     base_model_name: str
+    extra_model_name: str
     output_dtype: torch.dtype
 
     # data settings
@@ -50,6 +51,8 @@ class TrainArgs:
     unmasked_weight: float
     normalize_masked_area_loss: bool
     max_noising_strength: float
+    token_count: int
+    initial_embedding_text: str
 
     # sample settings
     sample_prompt: str
@@ -79,6 +82,7 @@ class TrainArgs:
         # model settings
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
+        parser.add_argument("--extra-model-name", type=str, required=False, default=None, dest="extra_model_name", help="The extra model to start training from")
         parser.add_argument("--output-dtype", type=torch_dtype, required=True, dest="output_dtype", help="The data type to use for saving weights")
 
         # data settings
@@ -112,6 +116,8 @@ class TrainArgs:
         parser.add_argument("--unmasked-weight", type=float, required=False, default=0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
         parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
         parser.add_argument("--max-noising-strength", type=float, required=False, default=1, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
+        parser.add_argument("--token-count", type=int, required=False, default=1, dest="token_count", help="The number of tokens to train")
+        parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
 
         # sample settings
         parser.add_argument("--sample-prompt", type=str, required=True, dest="sample_prompt", help="The prompt used for sampling")

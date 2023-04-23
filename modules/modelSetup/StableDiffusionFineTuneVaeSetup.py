@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterable
 
 import torch
 from diffusers.utils.import_utils import is_xformers_available
@@ -30,7 +30,7 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
             self,
             model: StableDiffusionModel,
             args: TrainArgs,
-    ) -> Iterator[Parameter]:
+    ) -> Iterable[Parameter] | Iterable[Tensor]:
         return model.vae.decoder.parameters()
 
     def setup_model(
@@ -127,3 +127,11 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
                 self.save_image(predicted_image_clamped, args.debug_dir + "/training_batches", "2-predicted_image", train_progress.global_step)
 
         return predicted_image, image
+
+    def after_optimizer_step(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+            train_progress: TrainProgress
+    ):
+        pass

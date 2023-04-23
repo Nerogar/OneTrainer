@@ -1,6 +1,8 @@
 import os
 import sys
 
+from modules.util.enum.TrainingMethod import TrainingMethod
+
 sys.path.append(os.getcwd())
 
 import torch
@@ -13,11 +15,15 @@ def main():
     args = SampleArgs.parse_args()
     device = torch.device("cuda")
 
-    model_loader = create.create_model_loader(args.model_type)
-    model_setup = create.create_model_setup(args.model_type, device, device)
+    training_method = TrainingMethod.FINE_TUNE
+    if args.embedding_name is not None:
+        training_method = TrainingMethod.EMBEDDING
+
+    model_loader = create.create_model_loader(args.model_type, training_method=training_method)
+    model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
 
     print("Loading model " + args.base_model_name)
-    model = model_loader.load(args.base_model_name, args.model_type)
+    model = model_loader.load(args.model_type, args.base_model_name, args.embedding_name)
     model_setup.setup_eval_device(model)
 
     model_sampler = create.create_model_sampler(

@@ -11,7 +11,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStableDiffusionFineTuneDataLoader:
+class MgdsStableDiffusionEmbeddingDataLoader:
     def __init__(
             self,
             args: TrainArgs,
@@ -38,9 +38,8 @@ def __enumerate_input_modules(args: TrainArgs) -> list:
     )
 
     mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
-    prompt_path = ModifyPath(in_name='image_path', out_name='prompt_path', postfix='', extension='.txt')
 
-    modules = [collect_paths, prompt_path]
+    modules = [collect_paths]
 
     if args.masked_training:
         modules.append(mask_path)
@@ -49,13 +48,18 @@ def __enumerate_input_modules(args: TrainArgs) -> list:
 
 
 def __load_input_modules(args: TrainArgs, model: StableDiffusionModel) -> list:
+    tokens = [f"<embedding_{i}>" for i in range(model.embeddings[0].token_count)]
+    all_token_string = ''.join(tokens)
+
     load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0)
     load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
     generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
     generate_depth = GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=model.image_depth_processor, depth_estimator=model.depth_estimator)
-    load_text = LoadText(path_in_name='prompt_path', text_out_name='prompt')
+    load_texts = LoadMultipleTexts(path_in_name='concept.prompt_template_path', texts_out_name='prompts')
+    select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
+    replace_text = ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text='<embedding>', new_text=all_token_string)
 
-    modules = [load_image, load_text]
+    modules = [load_image, load_texts, select_random_text, replace_text]
 
     if args.masked_training:
         modules.append(load_mask)
@@ -173,7 +177,7 @@ def __preparation_modules(args: TrainArgs, model: StableDiffusionModel):
 
 
 def __cache_modules(args: TrainArgs):
-    split_names = ['latent_image_distribution', 'tokens']
+    split_names = ['latent_image_distribution']
 
     if args.masked_training or args.model_type.has_mask_input():
         split_names.append('latent_mask')

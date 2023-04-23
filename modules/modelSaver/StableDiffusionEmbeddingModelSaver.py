@@ -1,4 +1,3 @@
-import copy
 import json
 import os.path
 from pathlib import Path
@@ -8,32 +7,11 @@ import torch
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
-from modules.util.convert.convert_sd_diffusers_to_ckpt import convert_sd_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionModelSaver(BaseModelSaver):
-
-    @staticmethod
-    def __save_diffusers(
-            model: StableDiffusionModel,
-            destination: str,
-            dtype: torch.dtype,
-    ):
-        # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
-        pipeline = model.create_pipeline()
-        original_device = pipeline.device
-        pipeline.to("cpu")
-        pipeline_copy = copy.deepcopy(pipeline)
-        pipeline.to(original_device)
-
-        pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
-
-        os.makedirs(Path(destination).absolute(), exist_ok=True)
-        pipeline_copy.save_pretrained(destination)
-
-        del pipeline_copy
+class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_ckpt(
@@ -41,26 +19,40 @@ class StableDiffusionModelSaver(BaseModelSaver):
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = convert_sd_diffusers_to_ckpt(model.vae.state_dict(), model.unet.state_dict(), model.text_encoder.state_dict())
-        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
-
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
+
+        vector_cpu = model.embeddings[0].vector.to("cpu", dtype)
+
+        torch.save(
+            {
+                "string_to_token": {"*": 265},
+                "string_to_param": {"*": vector_cpu},
+                "name": model.embeddings[0].name,
+                "step": 0,
+                "sd_checkpoint": "",
+                "sd_checkpoint_name": "",
+            },
+            destination
+        )
 
     @staticmethod
     def __save_internal(
             model: StableDiffusionModel,
             destination: str,
     ):
-        if model.text_encoder.dtype != torch.float32 \
-                or model.vae.dtype != torch.float32 \
-                or model.unet.dtype != torch.float32:
+        if model.embeddings[0].vector.dtype != torch.float32:
             # The internal model format requires float32 weights.
             # Other formats don't have the required precision for training.
             raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
 
-        # base model
-        StableDiffusionModelSaver.__save_diffusers(model, destination, torch.float32)
+        os.makedirs(destination, exist_ok=True)
+
+        # embedding
+        StableDiffusionEmbeddingModelSaver.__save_ckpt(
+            model,
+            os.path.join(destination, "embedding", "embedding.pt"),
+            torch.float32
+        )
 
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
@@ -88,7 +80,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
         if model_type.is_stable_diffusion():
             match output_model_format:
                 case ModelFormat.DIFFUSERS:
-                    self.__save_diffusers(model, output_model_destination, dtype)
+                    raise NotImplementedError
                 case ModelFormat.CKPT:
                     self.__save_ckpt(model, output_model_destination, dtype)
                 case ModelFormat.SAFETENSORS:

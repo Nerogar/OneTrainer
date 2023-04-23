@@ -37,7 +37,7 @@ class FineTuneTrainer(BaseTrainer):
         self.model_loader = self.create_model_loader()
         self.model_setup = self.create_model_setup()
 
-        self.model = self.model_loader.load(self.args.base_model_name, self.args.model_type)
+        self.model = self.model_loader.load(self.args.model_type, self.args.base_model_name, self.args.extra_model_name)
 
         self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
@@ -108,6 +108,7 @@ class FineTuneTrainer(BaseTrainer):
                     scaler.step(optimizer)
                     scaler.update()
                     optimizer.zero_grad()
+                    self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
 
                 train_progress.next_step(self.args.batch_size)
 

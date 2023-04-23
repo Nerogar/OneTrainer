@@ -1,8 +1,10 @@
 import os
 from abc import ABCMeta, abstractmethod
+from typing import Iterable
 
 import torch
 from torch import Tensor
+from torch.nn import Parameter
 from torch.optim import Optimizer
 from torchvision import transforms
 
@@ -43,7 +45,7 @@ class BaseModelSetup(metaclass=ABCMeta):
             self,
             model: BaseModel,
             args: TrainArgs,
-    ):
+    ) -> Iterable[Parameter] | Iterable[Tensor]:
         pass
 
     @abstractmethod
@@ -93,4 +95,13 @@ class BaseModelSetup(metaclass=ABCMeta):
             args: TrainArgs,
             train_progress: TrainProgress
     ) -> (Tensor, Tensor):
+        pass
+
+    @abstractmethod
+    def after_optimizer_step(
+            self,
+            model: BaseModel,
+            args: TrainArgs,
+            train_progress: TrainProgress
+    ):
         pass

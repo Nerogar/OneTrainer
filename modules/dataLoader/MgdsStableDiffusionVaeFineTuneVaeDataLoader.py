@@ -183,11 +183,14 @@ def create_dataset(
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
     ]
 
+    settings = {}
+
     ds = MGDS(
         args.train_device,
         args.train_dtype,
         args.train_dtype != torch.float32,
         concepts,
+        settings,
         [
             enumerate_input,
             load_input,

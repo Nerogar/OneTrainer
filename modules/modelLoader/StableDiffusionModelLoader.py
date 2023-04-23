@@ -17,7 +17,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
         super(StableDiffusionModelLoader, self).__init__()
 
     @staticmethod
-    def __load_internal_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
+    def __load_internal(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
         try:
             with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
                 meta = json.load(meta_file)
@@ -29,7 +29,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 )
 
             # base model
-            model = StableDiffusionModelLoader.__load_diffusers_model(base_model_name, model_type)
+            model = StableDiffusionModelLoader.__load_diffusers(model_type, base_model_name)
 
             # optimizer
             model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
@@ -42,7 +42,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_diffusers_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
+    def __load_diffusers(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
         try:
             tokenizer = CLIPTokenizer.from_pretrained(
                 base_model_name,
@@ -112,7 +112,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 return None
 
     @staticmethod
-    def __load_ckpt_model(base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
+    def __load_ckpt(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
         try:
             yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
             if not os.path.exists(yaml_name):
@@ -139,17 +139,17 @@ class StableDiffusionModelLoader(BaseModelLoader):
         except:
             return None
 
-    def load(self, base_model_name: str, model_type: ModelType) -> StableDiffusionModel | None:
-        model = self.__load_internal_model(base_model_name, model_type)
+    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: None) -> StableDiffusionModel | None:
+        model = self.__load_internal(model_type, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_diffusers_model(base_model_name, model_type)
+        model = self.__load_diffusers(model_type, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_ckpt_model(base_model_name, model_type)
+        model = self.__load_ckpt(model_type, base_model_name)
         if model is not None:
             return model
 
-        return None
+        raise Exception("could not load model: " + base_model_name)
