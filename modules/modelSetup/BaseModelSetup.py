@@ -45,8 +45,15 @@ class BaseModelSetup(metaclass=ABCMeta):
             self,
             model: BaseModel,
             args: TrainArgs,
-    ) -> Iterable[Parameter] | Iterable[Tensor]:
+    ) -> Iterable[Parameter]:
         pass
+
+    def create_parameters_for_optimizer(
+            self,
+            model: BaseModel,
+            args: TrainArgs,
+    ) -> Iterable[Parameter] | list[dict]:
+        return self.create_parameter_list(model, args)
 
     @abstractmethod
     def create_optimizer(

@@ -35,7 +35,7 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
             self,
             model: StableDiffusionModel,
             args: TrainArgs,
-    ) -> Iterable[Parameter] | Iterable[Tensor]:
+    ) -> Iterable[Parameter] | [dict]:
         return model.text_encoder.get_input_embeddings().parameters()
 
     def setup_model(

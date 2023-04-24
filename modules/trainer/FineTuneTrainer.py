@@ -16,6 +16,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 
@@ -30,8 +31,9 @@ class FineTuneTrainer(BaseTrainer):
     optimizer: Optimizer
     previous_sample_time: float
 
-    def __init__(self, args: TrainArgs):
+    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks):
         super(FineTuneTrainer, self).__init__(args=args)
+        self.callbacks = callbacks
 
     def start(self):
         self.model_loader = self.create_model_loader()
@@ -80,6 +82,15 @@ class FineTuneTrainer(BaseTrainer):
         parameters = self.model_setup.create_parameters(self.model, self.args)
 
         train_progress = self.model_setup.get_train_progress(self.model, self.args)
+
+        if self.args.only_cache:
+            self.model_setup.setup_eval_device(self.model)
+            for _ in tqdm(range(train_progress.epoch, min(self.args.epochs, self.args.latent_caching_epochs), 1), desc="epoch"):
+                self.data_loader.ds.start_next_epoch()
+                for _ in tqdm(self.data_loader.dl, desc="step"):
+                    pass
+            return
+
         optimizer = self.model_setup.create_optimizer(self.model, self.args)
 
         scaler = GradScaler()
@@ -100,6 +111,7 @@ class FineTuneTrainer(BaseTrainer):
 
                     loss = self.loss(batch, predicted.float(), target.float())
 
+                loss = loss / self.args.gradient_accumulation_steps
                 scaler.scale(loss).backward()
 
                 if self.__is_update_step(train_progress):
@@ -111,11 +123,14 @@ class FineTuneTrainer(BaseTrainer):
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
 
                 train_progress.next_step(self.args.batch_size)
+                self.callbacks.on_update_progress(train_progress)
 
             train_progress.next_epoch()
+            self.callbacks.on_update_progress(train_progress)
 
     def end(self):
-        if self.args.backup_before_save:
-            self.backup()
+        if not self.args.only_cache:
+            if self.args.backup_before_save:
+                self.backup()
 
-        self.model_saver.save(self.model, self.args.model_type, self.args.output_model_format, self.args.output_model_destination, self.args.output_dtype)
+            self.model_saver.save(self.model, self.args.model_type, self.args.output_model_format, self.args.output_model_destination, self.args.output_dtype)

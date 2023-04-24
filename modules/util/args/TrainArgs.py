@@ -33,18 +33,24 @@ class TrainArgs:
     # training settings
     optimizer: Optimizer
     learning_rate: float
+    learning_rate: float
     weight_decay: float
     epochs: int
     batch_size: int
     gradient_accumulation_steps: int
     train_text_encoder: bool
     train_text_encoder_epochs: int
+    text_encoder_learning_rate: float
+    train_unet: bool
+    train_unet_epochs: int
+    unet_learning_rate: float
     loss_function: LossFunction
     offset_noise_weight: float
     train_device: torch.device
     temp_device: torch.device
     train_dtype: torch.dtype
     cache_dir: str
+    only_cache: bool
     resolution: int
     masked_training: bool
     unmasked_probability: float
@@ -103,13 +109,18 @@ class TrainArgs:
         parser.add_argument("--batch-size", type=int, required=True, dest="batch_size", help="The batch size")
         parser.add_argument("--gradient-accumulation-steps", type=int, required=False, default=1, dest="gradient_accumulation_steps", help="The amount of steps used for gradient accumulation")
         parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
-        parser.add_argument("--train-text-encoder-epochs", type=int, required=True, dest="train_text_encoder_epochs", help="Number of epochs to train the text encoder for")
+        parser.add_argument("--train-text-encoder-epochs", type=int, required=False, default=2 ** 30, dest="train_text_encoder_epochs", help="Number of epochs to train the text encoder for")
+        parser.add_argument("--text-encoder-learning-rate", type=float, required=False, default=None, dest="text_encoder_learning_rate", help="Learning rate for the text encoder")
+        parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
+        parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
+        parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
         parser.add_argument("--offset_noise_weight", type=float, required=False, default=0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--train-device", type=torch_device, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=torch_dtype, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights")
         parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
+        parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
         parser.add_argument("--unmasked-probability", type=float, required=False, default=0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")

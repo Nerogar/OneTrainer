@@ -118,7 +118,7 @@ def create_data_loader(
 
 
 def create_optimizer(
-        parameters: Iterable[Parameter] | Iterable[Tensor],
+        parameters: Iterable[Parameter] | list[dict],
         args: TrainArgs = None,
 ):
     match args.optimizer:

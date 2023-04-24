@@ -30,7 +30,7 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
             self,
             model: StableDiffusionModel,
             args: TrainArgs,
-    ) -> Iterable[Parameter] | Iterable[Tensor]:
+    ) -> Iterable[Parameter] | list[dict]:
         return model.vae.decoder.parameters()
 
     def setup_model(

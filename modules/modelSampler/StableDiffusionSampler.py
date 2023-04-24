@@ -19,9 +19,10 @@ class StableDiffusionSampler(BaseModelSampler):
         generator = torch.Generator(device=self.train_device)
         generator.manual_seed(seed)
 
-        tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
-        embedding_string = ''.join(tokens)
-        prompt = prompt.replace("<embedding>", embedding_string)
+        if len(self.model.embeddings) > 0:
+            tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
+            embedding_string = ''.join(tokens)
+            prompt = prompt.replace("<embedding>", embedding_string)
 
         if self.model_type.has_conditioning_image_input():
             conditioning_image = torch.zeros(size=(3, resolution[0], resolution[1]))

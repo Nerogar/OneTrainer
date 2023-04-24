@@ -30,11 +30,37 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             self,
             model: StableDiffusionModel,
             args: TrainArgs,
-    ) -> Iterable[Parameter] | Iterable[Tensor]:
+    ) -> Iterable[Parameter]:
+        params = list()
+
         if args.train_text_encoder:
-            return list(model.text_encoder.parameters()) + list(model.unet.parameters())
-        else:
-            return list(model.unet.parameters())
+            params += list(model.text_encoder.parameters())
+
+        if args.train_unet:
+            params += list(model.unet.parameters())
+
+        return params
+
+    def create_parameters_for_optimizer(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+    ) -> Iterable[Parameter] | list[dict]:
+        param_groups = list()
+
+        if args.train_unet:
+            param_groups.append({
+                'params': model.unet.parameters(),
+                'lr': args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+            })
+
+        if args.train_text_encoder:
+            param_groups.append({
+                'params': model.text_encoder.parameters(),
+                'lr': args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
+            })
+
+        return param_groups
 
     def setup_model(
             self,
@@ -42,18 +68,22 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             args: TrainArgs,
     ):
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        model.text_encoder.requires_grad_(train_text_encoder)
+
+        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        model.unet.requires_grad_(train_unet)
 
         model.text_encoder.requires_grad_(train_text_encoder)
         model.vae.requires_grad_(False)
-        model.unet.requires_grad_(True)
+        model.unet.requires_grad_(train_unet)
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters(model, args), args)
+            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
             # TODO: this will break if the optimizer class changed during a restart
             model.optimizer.load_state_dict(model.optimizer_state_dict)
             del model.optimizer_state_dict
         elif model.optimizer_state_dict is None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters(model, args), args)
+            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
 
     def setup_eval_device(
             self,
@@ -209,4 +239,8 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             args: TrainArgs,
             train_progress: TrainProgress
     ):
-        pass
+        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        model.text_encoder.requires_grad_(train_text_encoder)
+
+        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        model.unet.requires_grad_(train_unet)
