@@ -6,26 +6,22 @@ from torch import Tensor
 from torch.nn import Parameter
 from torch.optim import Optimizer
 
-from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
+from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class StableDiffusionEmbeddingSetup(BaseModelSetup):
-    all_token_embeds: Tensor
-    all_original_token_embeds: Tensor
-    trainable_token_embeds_mask: list[bool]
-    untrainable_token_embeds_mask: list[bool]
-
+class StableDiffusionLoRASetup(BaseModelSetup):
     def __init__(
             self,
             train_device: torch.device,
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(StableDiffusionEmbeddingSetup, self).__init__(
+        super(StableDiffusionLoRASetup, self).__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -36,59 +32,61 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
             model: StableDiffusionModel,
             args: TrainArgs,
     ) -> Iterable[Parameter]:
-        return model.text_encoder.get_input_embeddings().parameters()
+        params = list()
+
+        if args.train_text_encoder:
+            params += list(model.text_encoder_lora.parameters())
+
+        if args.train_unet:
+            params += list(model.unet_lora.parameters())
+
+        return params
+
+    def create_parameters_for_optimizer(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+    ) -> Iterable[Parameter] | list[dict]:
+        param_groups = list()
+
+        if args.train_text_encoder:
+            param_groups.append({
+                'params': model.text_encoder_lora.parameters(),
+                'lr': args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
+            })
+
+        if args.train_unet:
+            param_groups.append({
+                'params': model.unet_lora.parameters(),
+                'lr': args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+            })
+
+        return param_groups
 
     def setup_model(
             self,
             model: StableDiffusionModel,
             args: TrainArgs,
     ):
+        if model.text_encoder_lora is None:
+            model.text_encoder_lora = LoRAModuleWrapper(
+                model.text_encoder, args.lora_rank, "lora_te", args.lora_alpha
+            )
+
+        if model.unet_lora is None:
+            model.unet_lora = LoRAModuleWrapper(
+                model.unet, args.lora_rank, "lora_unet", args.lora_alpha, ["attentions"]
+            )
+
         model.text_encoder.requires_grad_(False)
-        model.text_encoder.get_input_embeddings().requires_grad_(True)
         model.vae.requires_grad_(False)
         model.unet.requires_grad_(False)
 
-        token_count = args.token_count if len(model.embeddings) == 0 else model.embeddings[0].token_count
+        model.text_encoder_lora.requires_grad_(True)
+        model.unet_lora.requires_grad_(True)
 
-        tokens = [f"<embedding_{i}>" for i in range(token_count)]
-        model.tokenizer.add_tokens(tokens)
-        model.text_encoder.resize_token_embeddings(len(model.tokenizer))
-
-        with torch.no_grad():
-            token_ids = model.tokenizer.encode(
-                tokens,
-                add_special_tokens=False,
-            )
-
-            self.all_token_embeds = model.text_encoder.get_input_embeddings().weight.data
-            self.all_original_token_embeds = self.all_token_embeds.clone()
-            self.trainable_token_embeds_mask = [(i in token_ids) for i in range(len(self.all_original_token_embeds))]
-            self.untrainable_token_embeds_mask = [(i not in token_ids) for i in
-                                                  range(len(self.all_original_token_embeds))]
-
-            if len(model.embeddings) > 0:
-                # an embedding was loaded
-                for i, token_id in enumerate(token_ids):
-                    self.all_token_embeds[token_id] = model.embeddings[0].vector[i]
-            else:
-                # create a new embedding
-                initial_token_ids = model.tokenizer.encode(
-                    args.initial_embedding_text,
-                    add_special_tokens=False,
-                    max_length=token_count,
-                )
-                pad_token_id = model.tokenizer.encode(
-                    '*',
-                    add_special_tokens=False,
-                    max_length=token_count,
-                )[0]
-                initial_token_ids += [pad_token_id] * (token_count - len(initial_token_ids))
-                for token_id, initial_token_id in zip(token_ids, initial_token_ids):
-                    self.all_token_embeds[token_id] = self.all_token_embeds[initial_token_id]
-
-                model.embeddings = [
-                    StableDiffusionModelEmbedding("*", self.all_token_embeds[self.trainable_token_embeds_mask],
-                                                  token_count)]
+        model.text_encoder_lora.hook_to_module()
+        model.unet_lora.hook_to_module()
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
             model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
@@ -108,6 +106,9 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
 
+        model.text_encoder_lora.to(self.train_device)
+        model.unet_lora.to(self.train_device)
+
         model.text_encoder.eval()
         model.vae.eval()
         model.unet.eval()
@@ -122,6 +123,9 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
         model.unet.to(self.train_device)
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
+
+        model.text_encoder_lora.to(self.train_device)
+        model.unet_lora.to(self.train_device)
 
         if is_xformers_available():
             try:
@@ -175,7 +179,8 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
 
         if args.offset_noise_weight > 0:
             normal_noise = torch.randn(
-                scaled_latent_image.shape, generator=generator, device=args.train_device, dtype=args.train_dtype
+                scaled_latent_image.shape, generator=generator, device=args.train_device,
+                dtype=args.train_dtype
             )
             offset_noise = torch.randn(
                 scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1,
@@ -184,7 +189,8 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
             latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
         else:
             latent_noise = torch.randn(
-                scaled_latent_image.shape, generator=generator, device=args.train_device, dtype=args.train_dtype
+                scaled_latent_image.shape, generator=generator, device=args.train_device,
+                dtype=args.train_dtype
             )
 
         timestep = torch.randint(
@@ -207,9 +213,8 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
             latent_input = scaled_noisy_latent_image
 
         if args.model_type.has_depth_input():
-            predicted_latent_noise = model.unet(
-                latent_input, timestep, text_encoder_output, batch['latent_depth']
-            ).sample
+            predicted_latent_noise = model.unet(latent_input, timestep, text_encoder_output,
+                                                batch['latent_depth']).sample
         else:
             predicted_latent_noise = model.unet(latent_input, timestep, text_encoder_output).sample
 
@@ -223,15 +228,19 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
                 # predicted noise
                 predicted_noise = model.vae.decode(predicted_latent_noise / model.vae.scaling_factor).sample
                 predicted_noise = predicted_noise.clamp(-1, 1)
-                self.save_image(predicted_noise, args.debug_dir + "/training_batches", "2-predicted_noise",
-                                train_progress.global_step)
+                self.save_image(
+                    predicted_noise, args.debug_dir + "/training_batches", "2-predicted_noise",
+                    train_progress.global_step
+                )
 
                 # noisy image
                 noisy_latent_image = scaled_noisy_latent_image / model.vae.scaling_factor
                 noisy_image = model.vae.decode(noisy_latent_image).sample
                 noisy_image = noisy_image.clamp(-1, 1)
-                self.save_image(noisy_image, args.debug_dir + "/training_batches", "3-noisy_image",
-                                train_progress.global_step)
+                self.save_image(
+                    noisy_image, args.debug_dir + "/training_batches", "3-noisy_image",
+                    train_progress.global_step
+                )
 
                 # predicted image
                 sqrt_alpha_prod = model.noise_scheduler.alphas_cumprod[timestep] ** 0.5
@@ -254,8 +263,7 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
                 image = model.vae.decode(latent_image).sample
                 image = image.clamp(-1, 1)
                 self.save_image(
-                    image, args.debug_dir + "/training_batches", "5-image",
-                    model.train_progress.global_step
+                    image, args.debug_dir + "/training_batches", "5-image", model.train_progress.global_step
                 )
 
                 # conditioning image
@@ -275,13 +283,8 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
             args: TrainArgs,
             train_progress: TrainProgress
     ):
-        # reset untrainable embeddings
-        with torch.no_grad():
-            model.text_encoder.get_input_embeddings().weight[
-                self.untrainable_token_embeds_mask
-            ] = self.all_original_token_embeds[self.untrainable_token_embeds_mask]
+        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        model.text_encoder_lora.requires_grad_(train_text_encoder)
 
-        # save back to model
-        model.embeddings = [StableDiffusionModelEmbedding(
-            "*", self.all_token_embeds[self.trainable_token_embeds_mask], model.embeddings[0].token_count
-        )]
+        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        model.unet_lora.requires_grad_(train_unet)

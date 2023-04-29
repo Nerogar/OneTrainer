@@ -30,7 +30,7 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
             self,
             model: StableDiffusionModel,
             args: TrainArgs,
-    ) -> Iterable[Parameter] | list[dict]:
+    ) -> Iterable[Parameter]:
         return model.vae.decoder.parameters()
 
     def setup_model(
@@ -44,12 +44,12 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
         model.unet.requires_grad_(False)
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters(model, args), args)
+            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
             # TODO: this will break if the optimizer class changed during a restart
             model.optimizer.load_state_dict(model.optimizer_state_dict)
             del model.optimizer_state_dict
         elif model.optimizer_state_dict is None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters(model, args), args)
+            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
 
     def setup_eval_device(
             self,
@@ -124,7 +124,10 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
 
                 # predicted image
                 predicted_image_clamped = predicted_image.clamp(-1, 1)
-                self.save_image(predicted_image_clamped, args.debug_dir + "/training_batches", "2-predicted_image", train_progress.global_step)
+                self.save_image(
+                    predicted_image_clamped, args.debug_dir + "/training_batches", "2-predicted_image",
+                    train_progress.global_step
+                )
 
         return predicted_image, image
 

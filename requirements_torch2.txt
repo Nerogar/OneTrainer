@@ -9,6 +9,7 @@ tqdm==4.64.1
 torch==2.1.0.dev20230407+cu118
 torchvision==0.16.0.dev20230407+cu118
 accelerate
+safetensors==0.3.1
 
 # stable diffusion
 git+https://github.com/huggingface/diffusers.git@ce144d6#egg=diffusers

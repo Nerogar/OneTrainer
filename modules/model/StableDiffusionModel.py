@@ -1,9 +1,11 @@
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler, StableDiffusionDepth2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler, StableDiffusionDepth2ImgPipeline, \
+    StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline
 from torch import Tensor
 from torch.optim import Optimizer
 from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.BaseModel import BaseModel
+from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
@@ -31,6 +33,8 @@ class StableDiffusionModel(BaseModel):
     optimizer_state_dict: dict | None
     train_progress: TrainProgress
     embeddings: list[StableDiffusionModelEmbedding] | None
+    text_encoder_lora: LoRAModuleWrapper | None
+    unet_lora: LoRAModuleWrapper | None
 
     def __init__(
             self,
@@ -43,8 +47,10 @@ class StableDiffusionModel(BaseModel):
             image_depth_processor: DPTImageProcessor | None = None,
             depth_estimator: DPTForDepthEstimation | None = None,
             optimizer_state_dict: dict | None = None,
-            train_progress: TrainProgress = TrainProgress(),
+            train_progress: TrainProgress = None,
             embeddings: list[StableDiffusionModelEmbedding] = None,
+            text_encoder_lora: LoRAModuleWrapper | None = None,
+            unet_lora: LoRAModuleWrapper | None = None,
     ):
         super(StableDiffusionModel, self).__init__(model_type)
 
@@ -58,8 +64,10 @@ class StableDiffusionModel(BaseModel):
 
         self.optimizer = None
         self.optimizer_state_dict = optimizer_state_dict
-        self.train_progress = train_progress
+        self.train_progress = train_progress if train_progress is not None else TrainProgress()
         self.embeddings = embeddings if embeddings is not None else []
+        self.text_encoder_lora = text_encoder_lora
+        self.unet_lora = unet_lora
 
     def create_pipeline(self) -> DiffusionPipeline:
         if self.model_type.has_depth_input():

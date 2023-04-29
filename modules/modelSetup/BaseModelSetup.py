@@ -53,7 +53,7 @@ class BaseModelSetup(metaclass=ABCMeta):
             model: BaseModel,
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
-        return self.create_parameter_list(model, args)
+        return self.create_parameters(model, args)
 
     @abstractmethod
     def create_optimizer(

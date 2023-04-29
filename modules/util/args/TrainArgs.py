@@ -59,6 +59,8 @@ class TrainArgs:
     max_noising_strength: float
     token_count: int
     initial_embedding_text: str
+    lora_rank: int
+    lora_alpha: float
 
     # sample settings
     sample_prompt: str
@@ -115,7 +117,7 @@ class TrainArgs:
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
-        parser.add_argument("--offset_noise_weight", type=float, required=False, default=0, dest="offset_noise_weight", help="The weight for offset noise prediction")
+        parser.add_argument("--offset_noise_weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--train-device", type=torch_device, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=torch_dtype, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights")
@@ -123,12 +125,14 @@ class TrainArgs:
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
-        parser.add_argument("--unmasked-probability", type=float, required=False, default=0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
-        parser.add_argument("--unmasked-weight", type=float, required=False, default=0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
+        parser.add_argument("--unmasked-probability", type=float, required=False, default=0.0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
+        parser.add_argument("--unmasked-weight", type=float, required=False, default=0.0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
         parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
-        parser.add_argument("--max-noising-strength", type=float, required=False, default=1, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
+        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
         parser.add_argument("--token-count", type=int, required=False, default=1, dest="token_count", help="The number of tokens to train")
         parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
+        parser.add_argument("--lora-rank", type=int, required=False, default=1, dest="lora_rank", help="The rank parameter used when initializing new LoRA networks")
+        parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
 
         # sample settings
         parser.add_argument("--sample-prompt", type=str, required=True, dest="sample_prompt", help="The prompt used for sampling")

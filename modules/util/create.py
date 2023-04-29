@@ -1,7 +1,6 @@
 from typing import Iterable
 
 import torch
-from torch import Tensor
 from torch.nn import Parameter
 from torch.optim import AdamW, Adam
 
@@ -11,17 +10,20 @@ from modules.dataLoader.MgdsStableDiffusionVaeFineTuneVaeDataLoader import MgdsS
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
+from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
+from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
+from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.ModelType import ModelType
@@ -40,6 +42,9 @@ def create_model_loader(
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelLoader()
+        case TrainingMethod.LORA:
+            if model_type.is_stable_diffusion():
+                return StableDiffusionLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -56,6 +61,9 @@ def create_model_saver(
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelSaver()
+        case TrainingMethod.LORA:
+            if model_type.is_stable_diffusion():
+                return StableDiffusionLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -75,6 +83,9 @@ def create_model_setup(
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
+        case TrainingMethod.LORA:
+            if model_type.is_stable_diffusion():
+                return StableDiffusionLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -93,6 +104,9 @@ def create_model_sampler(
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(model, model_type, train_device)
+        case TrainingMethod.LORA:
+            if model_type.is_stable_diffusion():
+                return StableDiffusionSampler(model, model_type, train_device)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
@@ -112,6 +126,9 @@ def create_data_loader(
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionFineTuneVaeDataLoader(args, model, train_progress)
+        case TrainingMethod.LORA:
+            if model_type.is_stable_diffusion():
+                return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionEmbeddingDataLoader(args, model, train_progress)
