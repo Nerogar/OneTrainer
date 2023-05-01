@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
+from typing import Callable
 
 import torch
+from PIL.Image import Image
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -15,7 +17,14 @@ class StableDiffusionSampler(BaseModelSampler):
         self.train_device = train_device
         self.pipeline = model.create_pipeline()
 
-    def sample(self, prompt: str, resolution: tuple[int, int], seed: int, destination: str):
+    def sample(
+            self,
+            prompt: str,
+            resolution: tuple[int, int],
+            seed: int,
+            destination: str,
+            on_sample: Callable[[Image], None] = lambda _: None,
+    ):
         generator = torch.Generator(device=self.train_device)
         generator.manual_seed(seed)
 
@@ -56,3 +65,5 @@ class StableDiffusionSampler(BaseModelSampler):
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         image.save(destination)
+
+        on_sample(image)

@@ -14,13 +14,15 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.TimeUnit import TimeUnit
 
 
 class BaseTrainer(metaclass=ABCMeta):
-    def __init__(self, args: TrainArgs):
+    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks):
         self.args = args
+        self.callbacks = callbacks
         self.previous_action = {}
 
     @abstractmethod
@@ -117,9 +119,11 @@ class BaseTrainer(metaclass=ABCMeta):
         return create.create_model_saver(self.args.model_type, self.args.training_method)
 
     def create_model_sampler(self, model: BaseModel) -> BaseModelSampler:
-        return create.create_model_sampler(model, self.args.model_type, self.args.train_device, self.args.training_method)
+        return create.create_model_sampler(model, self.args.model_type, self.args.train_device,
+                                           self.args.training_method)
 
-    def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress, start_at_zero: bool = True):
+    def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress,
+                      start_at_zero: bool = True):
         if name not in self.previous_action:
             self.previous_action[name] = -1
 
@@ -129,7 +133,8 @@ class BaseTrainer(metaclass=ABCMeta):
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0
                 else:
                     # should actually be the last step of each epoch, but we don't know how many steps an epoch has
-                    return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 and train_progress.epoch > 0
+                    return train_progress.epoch % int(
+                        interval) == 0 and train_progress.epoch_step == 0 and train_progress.epoch > 0
             case TimeUnit.STEP:
                 if start_at_zero:
                     return train_progress.global_step % int(interval) == 0

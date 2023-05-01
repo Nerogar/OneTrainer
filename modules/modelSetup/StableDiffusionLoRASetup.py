@@ -106,8 +106,11 @@ class StableDiffusionLoRASetup(BaseModelSetup):
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
 
-        model.text_encoder_lora.to(self.train_device)
-        model.unet_lora.to(self.train_device)
+        if model.text_encoder_lora is not None:
+            model.text_encoder_lora.to(self.train_device)
+
+        if model.unet_lora is not None:
+            model.unet_lora.to(self.train_device)
 
         model.text_encoder.eval()
         model.vae.eval()
@@ -124,8 +127,11 @@ class StableDiffusionLoRASetup(BaseModelSetup):
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
 
-        model.text_encoder_lora.to(self.train_device)
-        model.unet_lora.to(self.train_device)
+        if model.text_encoder_lora is not None:
+            model.text_encoder_lora.to(self.train_device)
+
+        if model.unet_lora is not None:
+            model.unet_lora.to(self.train_device)
 
         if is_xformers_available():
             try:

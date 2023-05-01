@@ -13,6 +13,9 @@ class TrainArgs:
     training_method: TrainingMethod
     debug_mode: bool
     debug_dir: str
+    workspace_dir: str
+    cache_dir: str
+    tensorboard: bool
 
     # model settings
     model_type: ModelType
@@ -33,7 +36,6 @@ class TrainArgs:
     # training settings
     optimizer: Optimizer
     learning_rate: float
-    learning_rate: float
     weight_decay: float
     epochs: int
     batch_size: int
@@ -49,7 +51,6 @@ class TrainArgs:
     train_device: torch.device
     temp_device: torch.device
     train_dtype: torch.dtype
-    cache_dir: str
     only_cache: bool
     resolution: int
     masked_training: bool
@@ -63,16 +64,13 @@ class TrainArgs:
     lora_alpha: float
 
     # sample settings
-    sample_prompt: str
+    sample_definition_file_name: str
     sample_after: float
     sample_after_unit: TimeUnit
-    sample_dir: str
-    sample_resolution: int
 
     # backup settings
     backup_after: float
     backup_after_unit: TimeUnit
-    backup_dir: str
     backup_before_save: bool
 
     def __init__(self, args: dict):
@@ -83,9 +81,14 @@ class TrainArgs:
     def parse_args() -> 'TrainArgs':
         parser = argparse.ArgumentParser(description="One Trainer Training Script.")
 
+        # @formatter:off
+
         parser.add_argument("--training-method", type=TrainingMethod, required=True, dest="training_method", help="The method of training", choices=list(TrainingMethod))
         parser.add_argument("--debug-mode", required=False, action='store_true', dest="debug_mode", help="Enable debug mode")
         parser.add_argument("--debug-dir", type=str, required=False, default="debug", dest="debug_dir", help="directory to save debug information")
+        parser.add_argument("--workspace-dir", type=str, required=True, dest="workspace_dir", help="directory to use as a workspace")
+        parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
+        parser.add_argument("--tensorboard", required=False, action='store_true', dest="tensorboard", help="Start a tensorboard interface during training. The web server will run on port 6006")
 
         # model settings
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
@@ -117,11 +120,10 @@ class TrainArgs:
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
-        parser.add_argument("--offset_noise_weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
+        parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--train-device", type=torch_device, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=torch_dtype, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights")
-        parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
@@ -135,16 +137,13 @@ class TrainArgs:
         parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
 
         # sample settings
-        parser.add_argument("--sample-prompt", type=str, required=True, dest="sample_prompt", help="The prompt used for sampling")
+        parser.add_argument("--sample-definition-file-name", type=str, required=True, dest="sample_definition_file_name", help="The json file containing the sample definition")
         parser.add_argument("--sample-after", type=float, required=True, dest="sample_after", help="The interval to sample")
         parser.add_argument("--sample-after-unit", type=TimeUnit, required=True, dest="sample_after_unit", help="The unit applied to the sample-after option")
-        parser.add_argument("--sample-dir", type=str, required=True, dest="sample_dir", help="Directory to save samples")
-        parser.add_argument("--sample-resolution", type=int, required=False, default=512, dest="sample_resolution", help="The resolution of samples")
 
         # backup settings
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
         parser.add_argument("--backup-after-unit", type=TimeUnit, required=True, dest="backup_after_unit", help="The unit applied to the backup-after option")
-        parser.add_argument("--backup-dir", type=str, required=True, dest="backup_dir", help="Directory to save backups")
         parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
 
         return TrainArgs(vars(parser.parse_args()))
