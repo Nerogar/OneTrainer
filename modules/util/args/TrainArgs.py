@@ -110,6 +110,7 @@ class TrainArgs:
         parser.add_argument("--optimizer", type=Optimizer, required=False, default=Optimizer.ADAMW, dest="optimizer", help="The optimizer", choices=list(Optimizer))
         parser.add_argument("--learning-rate", type=float, required=False, default=3e-6, dest="learning_rate", help="The learning rate used when creating the optimizer")
         parser.add_argument("--weight-decay", type=float, required=False, default=1e-2, dest="weight_decay", help="The weight decay used when creating the optimizer")
+        parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
         parser.add_argument("--batch-size", type=int, required=True, dest="batch_size", help="The batch size")
         parser.add_argument("--gradient-accumulation-steps", type=int, required=False, default=1, dest="gradient_accumulation_steps", help="The amount of steps used for gradient accumulation")
@@ -119,7 +120,6 @@ class TrainArgs:
         parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
-        parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
         parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--train-device", type=torch_device, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
@@ -146,4 +146,75 @@ class TrainArgs:
         parser.add_argument("--backup-after-unit", type=TimeUnit, required=True, dest="backup_after_unit", help="The unit applied to the backup-after option")
         parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
 
+        # @formatter:on
+
         return TrainArgs(vars(parser.parse_args()))
+
+    @staticmethod
+    def default_values():
+        args = {}
+
+        args["training_method"] = TrainingMethod.FINE_TUNE
+        args["debug_mode"] = False
+        args["debug_dir"] = "debug"
+        args["workspace_dir"] = "workspace/run"
+        args["cache_dir"] = "workspace-cache/run"
+        args["tensorboard"] = True
+
+        # model settings
+        args["model_type"] = ModelType.STABLE_DIFFUSION_15
+        args["base_model_name"] = ""
+        args["extra_model_name"] = ""
+        args["output_dtype"] = torch.float32
+
+        # data settings
+        args["concept_file_name"] = "concepts.json"
+        args["output_model_format"] = ModelFormat.SAFETENSORS
+        args["output_model_destination"] = "models/model.safetensors"
+        args["circular_mask_generation"] = False
+        args["random_rotate_and_crop"] = False
+        args["aspect_ratio_bucketing"] = True
+        args["latent_caching"] = True
+        args["latent_caching_epochs"] = 1
+
+        # training settings
+        args["optimizer"] = Optimizer.ADAMW
+        args["learning_rate"] = 3e-6
+        args["weight_decay"] = 1e-2
+        args["loss_function"] = LossFunction.MSE
+        args["epochs"] = 100
+        args["batch_size"] = 1
+        args["gradient_accumulation_steps"] = 1
+        args["train_text_encoder"] = True
+        args["train_text_encoder_epochs"] = 30
+        args["text_encoder_learning_rate"] = 3e-6
+        args["train_unet"] = True
+        args["train_unet_epochs"] = 100
+        args["unet_learning_rate"] = 3e-6
+        args["offset_noise_weight"] = 0.0
+        args["train_device"] = "cuda"
+        args["temp_device"] = "cpu"
+        args["train_dtype"] = torch.float16
+        args["only_cache"] = False
+        args["resolution"] = 512
+        args["masked_training"] = False
+        args["unmasked_probability"] = 0.1
+        args["unmasked_weight"] = 0.1
+        args["normalize_masked_area_loss"] = True
+        args["max_noising_strength"] = 1.0
+        args["token_count"] = 1
+        args["initial_embedding_text"] = "*"
+        args["lora_rank"] = 16
+        args["lora_alpha"] = 1.0
+
+        # sample settings
+        args["sample_definition_file_name"] = "samples.json"
+        args["sample_after"] = 10
+        args["sample_after_unit"] = TimeUnit.MINUTE
+
+        # backup settings
+        args["backup_after"] = 30
+        args["backup_after_unit"] = TimeUnit.MINUTE
+        args["backup_before_save"] = True
+
+        return TrainArgs(args)

@@ -19,3 +19,5 @@ omegaconf # needed to load ckpt files
 # data loader
 git+https://github.com/Nerogar/mgds.git@a2bebb2#egg=mgds
 
+# ui
+customtkinter==5.1.2

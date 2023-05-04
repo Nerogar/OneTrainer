@@ -22,3 +22,6 @@ git+https://github.com/Nerogar/mgds.git@a2bebb2#egg=mgds
 
 # xformers
 https://huggingface.co/r4ziel/xformers_pre_built/resolve/main/xformers-0.0.17.dev464-cp310-cp310-win_amd64.whl
+
+# ui
+customtkinter==5.1.2
