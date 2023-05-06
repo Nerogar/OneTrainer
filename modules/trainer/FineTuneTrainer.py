@@ -20,6 +20,7 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
+from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
@@ -78,7 +79,7 @@ class FineTuneTrainer(BaseTrainer):
         self.model_setup.setup_eval_device(self.model)
 
         for i, sample_definition in enumerate(self.sample_definition):
-            safe_prompt = ''.join(filter(lambda x: str.isalnum(x) or x == ' ', sample_definition['prompt']))[0:32]
+            safe_prompt = path_util.safe_filename(sample_definition['prompt'])
 
             sample_dir = os.path.join(
                 self.args.workspace_dir,
@@ -92,7 +93,8 @@ class FineTuneTrainer(BaseTrainer):
             )
 
             def on_sample(image: Image):
-                self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image), train_progress.global_step)
+                self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
+                                           train_progress.global_step)
                 self.callbacks.on_sample(image)
 
             self.model_sampler.sample(
@@ -161,7 +163,7 @@ class FineTuneTrainer(BaseTrainer):
                 if self.__needs_backup(train_progress):
                     self.backup()
 
-                with torch.autocast(self.args.train_device.type, dtype=self.args.train_dtype):
+                with torch.autocast(self.args.train_device.type, dtype=self.args.train_dtype.torch_dtype()):
                     predicted, target = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
                     loss = self.loss(batch, predicted.float(), target.float())
@@ -197,7 +199,7 @@ class FineTuneTrainer(BaseTrainer):
                 model_type=self.args.model_type,
                 output_model_format=self.args.output_model_format,
                 output_model_destination=self.args.output_model_destination,
-                dtype=self.args.output_dtype
+                dtype=self.args.output_dtype.torch_dtype()
             )
 
         self.tensorboard.close()

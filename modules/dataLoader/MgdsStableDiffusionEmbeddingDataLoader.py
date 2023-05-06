@@ -269,8 +269,8 @@ def create_dataset(
 
     ds = MGDS(
         args.train_device,
-        args.train_dtype,
-        args.train_dtype != torch.float32,
+        args.train_dtype.torch_dtype(),
+        args.train_dtype.enable_mixed_precision(),
         concepts,
         settings,
         [

@@ -1,6 +1,8 @@
 import argparse
+from enum import Enum
 
 from modules.util.args.arg_type_util import *
+from modules.util.enum.DataType import DataType
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -21,12 +23,12 @@ class TrainArgs:
     model_type: ModelType
     base_model_name: str
     extra_model_name: str
-    output_dtype: torch.dtype
+    output_dtype: DataType
+    output_model_format: ModelFormat
+    output_model_destination: str
 
     # data settings
     concept_file_name: str
-    output_model_format: ModelFormat
-    output_model_destination: str
     circular_mask_generation: bool
     random_rotate_and_crop: bool
     aspect_ratio_bucketing: bool
@@ -50,7 +52,7 @@ class TrainArgs:
     offset_noise_weight: float
     train_device: torch.device
     temp_device: torch.device
-    train_dtype: torch.dtype
+    train_dtype: DataType
     only_cache: bool
     resolution: int
     masked_training: bool
@@ -77,6 +79,47 @@ class TrainArgs:
         for (key, value) in args.items():
             setattr(self, key, value)
 
+    def to_json(self):
+        data = {}
+        for (key, value) in vars(self).items():
+            if isinstance(value, str):
+                data[key] = value
+            elif isinstance(value, Enum):
+                data[key] = str(value)
+            elif isinstance(value, bool):
+                data[key] = value
+            elif isinstance(value, int):
+                data[key] = value
+            elif isinstance(value, float):
+                data[key] = value
+            elif isinstance(value, torch.device):
+                data[key] = str(value)
+            else:
+                data[key] = value
+
+        return data
+
+    def from_json(self, data):
+        for (key, value) in vars(self).items():
+            try:
+                if isinstance(value, str):
+                    setattr(self, key, data[key])
+                elif isinstance(value, Enum):
+                    enum_type = type(getattr(self, key))
+                    setattr(self, key, enum_type[data[key]])
+                elif isinstance(value, bool):
+                    setattr(self, key, data[key])
+                elif isinstance(value, int):
+                    setattr(self, key, int(data[key]))
+                elif isinstance(value, float):
+                    setattr(self, key, float(data[key]))
+                elif isinstance(value, torch.device):
+                    setattr(self, key, data[key])
+                else:
+                    setattr(self, key, data[key])
+            except Exception as e:
+                print(f"Could not set {key} as {str(value)}")
+
     @staticmethod
     def parse_args() -> 'TrainArgs':
         parser = argparse.ArgumentParser(description="One Trainer Training Script.")
@@ -94,12 +137,12 @@ class TrainArgs:
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
         parser.add_argument("--extra-model-name", type=str, required=False, default=None, dest="extra_model_name", help="The extra model to start training from")
-        parser.add_argument("--output-dtype", type=torch_dtype, required=True, dest="output_dtype", help="The data type to use for saving weights")
+        parser.add_argument("--output-dtype", type=DataType, required=True, dest="output_dtype", help="The data type to use for saving weights", choices=list(DataType))
+        parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.CKPT, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
+        parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
 
         # data settings
         parser.add_argument("--concept-file-name", type=str, required=True, dest="concept_file_name", help="The json file containing the concept definition")
-        parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.CKPT, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
-        parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
         parser.add_argument("--circular-mask-generation", required=False, action='store_true', dest="circular_mask_generation", help="Automatically generate circular masks for training")
         parser.add_argument("--random-rotate-and-crop", required=False, action='store_true', dest="random_rotate_and_crop", help="Randomly rotate and crop samples")
         parser.add_argument("--aspect-ratio-bucketing", required=False, action='store_true', dest="aspect_ratio_bucketing", help="Enable aspect ratio bucketing")
@@ -123,7 +166,7 @@ class TrainArgs:
         parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--train-device", type=torch_device, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
-        parser.add_argument("--train-dtype", type=torch_dtype, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights")
+        parser.add_argument("--train-dtype", type=DataType, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
@@ -165,12 +208,12 @@ class TrainArgs:
         args["model_type"] = ModelType.STABLE_DIFFUSION_15
         args["base_model_name"] = ""
         args["extra_model_name"] = ""
-        args["output_dtype"] = torch.float32
+        args["output_dtype"] = DataType.FLOAT_32
+        args["output_model_format"] = ModelFormat.SAFETENSORS
+        args["output_model_destination"] = "models/model.safetensors"
 
         # data settings
         args["concept_file_name"] = "concepts.json"
-        args["output_model_format"] = ModelFormat.SAFETENSORS
-        args["output_model_destination"] = "models/model.safetensors"
         args["circular_mask_generation"] = False
         args["random_rotate_and_crop"] = False
         args["aspect_ratio_bucketing"] = True
@@ -194,7 +237,7 @@ class TrainArgs:
         args["offset_noise_weight"] = 0.0
         args["train_device"] = "cuda"
         args["temp_device"] = "cpu"
-        args["train_dtype"] = torch.float16
+        args["train_dtype"] = DataType.FLOAT_16
         args["only_cache"] = False
         args["resolution"] = 512
         args["masked_training"] = False

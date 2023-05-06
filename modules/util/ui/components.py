@@ -1,5 +1,5 @@
 from tkinter import filedialog
-from typing import Tuple, Any
+from typing import Tuple, Any, Callable
 
 import customtkinter as ctk
 from PIL import Image
@@ -37,7 +37,7 @@ def entry(master, row, column, ui_state: UIState, var_name: str):
     return component
 
 
-def file_entry(master, row, column, ui_state: UIState, var_name: str):
+def file_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
@@ -56,6 +56,7 @@ def file_entry(master, row, column, ui_state: UIState, var_name: str):
 
         if model_path:
             ui_state.vars[var_name].set(model_path)
+            command(model_path)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
@@ -83,19 +84,26 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
     return frame
 
 
+def icon_button(master, row, column, text, command):
+    component = ctk.CTkButton(master, text=text, width=40, command=command)
+    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    return component
+
+
 def button(master, row, column, text, command):
     component = ctk.CTkButton(master, text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
     return component
 
 
-def options(master, row, column, values, ui_state: UIState, var_name: str):
-    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.vars[var_name])
+def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.vars[var_name], command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
     return component
 
 
-def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str):
+def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
+               command: Callable[[None], None] = None):
     var = ui_state.vars[var_name]
     keys = [key for key, value in values]
 
@@ -103,6 +111,7 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
         for key, value in values:
             if text == key:
                 var.set(value)
+                command(value)
                 break
 
     component = ctk.CTkOptionMenu(master, values=keys, command=update_component)
@@ -115,6 +124,7 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
                 break
 
     var.trace_add("write", lambda _0, _1, _2: update_var())
+    update_var()  # call update_var once to set the initial value
 
     return component
 

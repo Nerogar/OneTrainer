@@ -4,7 +4,6 @@ from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
 from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
-from mgds.TransformersDataLoaderModules import *
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util.TrainProgress import TrainProgress
@@ -187,8 +186,8 @@ def create_dataset(
 
     ds = MGDS(
         args.train_device,
-        args.train_dtype,
-        args.train_dtype != torch.float32,
+        args.train_dtype.torch_dtype(),
+        args.train_dtype.enable_mixed_precision(),
         concepts,
         settings,
         [

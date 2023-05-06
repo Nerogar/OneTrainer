@@ -17,7 +17,9 @@ def main():
     model = model_loader.load(args.model_type, args.base_model_name, None)
 
     print("Saving model " + args.output_model_destination)
-    model_saver.save(model, args.model_type, args.output_model_format, args.output_model_destination, args.output_dtype)
+    model_saver.save(
+        model, args.model_type, args.output_model_format, args.output_model_destination, args.output_dtype.torch_dtype()
+    )
 
 
 if __name__ == '__main__':
