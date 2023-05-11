@@ -7,6 +7,7 @@ from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
 from mgds.TransformersDataLoaderModules import *
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
@@ -31,7 +32,7 @@ class MgdsStableDiffusionEmbeddingDataLoader:
 
 
 def __enumerate_input_modules(args: TrainArgs) -> list:
-    supported_extensions = ['.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp']
+    supported_extensions = path_util.supported_image_extensions()
 
     collect_paths = CollectPaths(
         concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept', extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']

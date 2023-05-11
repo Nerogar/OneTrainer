@@ -25,9 +25,9 @@ def app_title(master, row, column):
     label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
 
 
-def label(master, row, column, text):
+def label(master, row, column, text, pad=PAD):
     component = ctk.CTkLabel(master, text=text)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="nw")
+    component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
     return component
 
 
@@ -47,16 +47,42 @@ def file_entry(master, row, column, ui_state: UIState, var_name: str, command: C
     entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
 
     def __open_dialog():
-        model_path = filedialog.askopenfilename(filetypes=[
+        file_path = filedialog.askopenfilename(filetypes=[
             ("All Files", "*.*"),
             ("Diffusers", "model_index.json"),
             ("Checkpoint", "*.ckpt *.pt *.bin"),
             ("Safetensors", "*.safetensors"),
         ])
 
-        if model_path:
-            ui_state.vars[var_name].set(model_path)
-            command(model_path)
+        if file_path:
+            ui_state.vars[var_name].set(file_path)
+
+            if command:
+                command(file_path)
+
+    button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
+    button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
+
+    return frame
+
+
+def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+    frame = ctk.CTkFrame(master, fg_color="transparent")
+    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
+
+    frame.grid_columnconfigure(0, weight=1)
+
+    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.vars[var_name])
+    entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
+
+    def __open_dialog():
+        dir_path = filedialog.askdirectory()
+
+        if dir_path:
+            ui_state.vars[var_name].set(dir_path)
+
+            if command:
+                command(dir_path)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
@@ -111,7 +137,8 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
         for key, value in values:
             if text == key:
                 var.set(value)
-                command(value)
+                if command:
+                    command(value)
                 break
 
     component = ctk.CTkOptionMenu(master, values=keys, command=update_component)
@@ -121,6 +148,8 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
         for key, value in values:
             if var.get() == str(value):
                 component.set(key)
+                if command:
+                    command(value)
                 break
 
     var.trace_add("write", lambda _0, _1, _2: update_var())

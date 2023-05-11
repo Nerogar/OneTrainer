@@ -1,23 +1,22 @@
-import json
-import os.path
+import threading
 import webbrowser
 from typing import Callable
 
 import customtkinter as ctk
+import torch
 
 from modules.trainer.FineTuneTrainer import FineTuneTrainer
-from modules.ui.UIConfig import UIConfig
-from modules.util import path_util
+from modules.ui.ConceptTab import ConceptTab
+from modules.ui.TopBar import TopBar
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
+from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.DataType import DataType
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ui import components, dialogs
-from modules.util.ui.ConceptWindow import ConceptWindow
+from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
@@ -25,15 +24,11 @@ class TrainUI(ctk.CTk):
     set_step_progress: Callable[[int, int], None]
     set_epoch_progress: Callable[[int, int], None]
 
+    training_callbacks: TrainCallbacks | None
+    training_commands: TrainCommands | None
+
     def __init__(self):
         super(TrainUI, self).__init__()
-
-        self.ui_config = UIConfig()
-        self.ui_config.load("ui_config.json")
-        self.config_ui_state = UIState(self, self.ui_config)
-
-        self.train_args = TrainArgs.default_values()
-        self.ui_state = UIState(self, self.train_args)
 
         self.title("OneTrainer")
         self.geometry("1000x700")
@@ -41,41 +36,26 @@ class TrainUI(ctk.CTk):
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
 
+        self.train_args = TrainArgs.default_values()
+        self.ui_state = UIState(self, self.train_args)
+
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=0)
         self.grid_columnconfigure(0, weight=1)
 
+        self.training_button = None
+
         self.top_bar(self)
         self.content_frame(self)
         self.bottom_bar(self)
 
+        self.training_thread = None
+        self.training_callbacks = None
+        self.training_commands = None
+
     def top_bar(self, master):
-        frame = ctk.CTkFrame(master=master, corner_radius=0)
-        frame.grid(row=0, column=0, sticky="nsew")
-
-        # title
-        components.app_title(frame, 0, 0)
-
-        components.options_kv(
-            frame, 0, 1, self.ui_config.configs, self.config_ui_state, "config_name", self.load_config)
-        components.icon_button(frame, 0, 2, "-", self.remove_config)
-        components.button(frame, 0, 3, "save current", self.save_config)
-
-        # padding
-        frame.grid_columnconfigure(4, weight=1)
-
-        # training method
-        components.options_kv(
-            frame, 0, 5, [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-                ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
-            ], self.ui_state, "training_method"
-        )
-
-        return frame
+        TopBar(master, self.train_args, self.ui_state)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -93,7 +73,7 @@ class TrainUI(ctk.CTk):
         components.button(frame, 0, 3, "Tensorboard", self.open_tensorboard)
 
         # training button
-        components.button(frame, 0, 4, "Start Training", self.start_training)
+        self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training)
 
         return frame
 
@@ -189,33 +169,28 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=0)
         master.grid_columnconfigure(4, weight=1)
 
-        # base model
-        components.label(master, 0, 0, "Concept Definition")
-        components.file_entry(master, 0, 1, self.ui_state, "concept_file_name")
-
         # circular mask generation
-        components.label(master, 1, 0, "Circular Mask Generation")
-        components.switch(master, 1, 1, self.ui_state, "circular_mask_generation")
+        components.label(master, 0, 0, "Circular Mask Generation")
+        components.switch(master, 0, 1, self.ui_state, "circular_mask_generation")
 
         # random rotate and crop
-        components.label(master, 2, 0, "Random Rotate and Crop")
-        components.switch(master, 2, 1, self.ui_state, "random_rotate_and_crop")
+        components.label(master, 1, 0, "Random Rotate and Crop")
+        components.switch(master, 1, 1, self.ui_state, "random_rotate_and_crop")
 
         # aspect ratio bucketing
-        components.label(master, 3, 0, "Aspect Ratio Bucketing")
-        components.switch(master, 3, 1, self.ui_state, "aspect_ratio_bucketing")
+        components.label(master, 2, 0, "Aspect Ratio Bucketing")
+        components.switch(master, 2, 1, self.ui_state, "aspect_ratio_bucketing")
 
         # latent caching
-        components.label(master, 4, 0, "Latent Caching")
-        components.switch(master, 4, 1, self.ui_state, "latent_caching")
+        components.label(master, 3, 0, "Latent Caching")
+        components.switch(master, 3, 1, self.ui_state, "latent_caching")
 
         # latent caching epochs
-        components.label(master, 5, 0, "Latent Caching Epochs")
-        components.entry(master, 5, 1, self.ui_state, "latent_caching_epochs")
+        components.label(master, 4, 0, "Latent Caching Epochs")
+        components.entry(master, 4, 1, self.ui_state, "latent_caching_epochs")
 
     def concepts_tab(self, master):
-        components.label(master, 0, 0, "Test")
-        components.button(master, 0, 0, "Open", self.open_concept_window)
+        ConceptTab(master, self.train_args, self.ui_state)
 
     def training_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -351,45 +326,10 @@ class TrainUI(ctk.CTk):
     def tools_tab(self, master):
         pass
 
-    def save_config(self):
-        def create_file(name):
-            name = path_util.safe_filename(name)
-            with open(os.path.join("training_presets", f"{name}.json"), "w") as f:
-                json.dump(self.train_args.to_json(), f)
-
-        dialog = dialogs.StringInputDialog(self, "name", "Config Name", create_file)
-        dialog.mainloop()
-
-    def remove_config(self):
-        pass
-
-    def load_config(self, file):
-        try:
-            with open(file, "r") as f:
-                self.train_args.from_json(json.load(f))
-                self.ui_state.update(self.train_args)
-        except Exception as e:
-            print(e)
-
-    def open_concept_window(self):
-        concepts = [
-            {
-                "name": "",
-                "path": "",
-            }, {
-                "name": "",
-                "path": "",
-            }
-        ]
-
-        window = ConceptWindow(self, concepts[0])
-
-        print(concepts)
-
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)
 
-    def start_training(self):
+    def training_thread_function(self):
         callbacks = TrainCallbacks()
 
         trainer = FineTuneTrainer(self.train_args, callbacks)
@@ -403,3 +343,17 @@ class TrainUI(ctk.CTk):
 
         if not canceled or self.train_args.backup_before_save:
             trainer.end()
+
+    def start_training(self):
+        if self.training_thread is None:
+            self.training_button.configure(text="Stop Training")
+
+            # patch to fix training device until a better solution is found
+            self.train_args.train_device = torch.device("cuda")
+            self.train_args.temp_device = torch.device("cpu")
+
+            self.training_thread = threading.Thread(target=self.training_thread_function)
+            self.training_thread.start()
+        else:
+            self.training_button.configure(text="Start Training")
+            self.training_commands.stop()

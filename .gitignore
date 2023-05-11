@@ -2,4 +2,5 @@
 /venv*
 /debug*
 /workspace*
+/training_concepts
 debug.py

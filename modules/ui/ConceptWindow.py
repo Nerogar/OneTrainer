@@ -1,5 +1,3 @@
-import tkinter as tk
-
 import customtkinter as ctk
 
 from modules.util.ui import components
@@ -10,12 +8,7 @@ class ConceptWindow(ctk.CTkToplevel):
     def __init__(self, parent, concept, *args, **kwargs):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
-        x = {
-            "name": "",
-            "path": "",
-        }
-
-        self.ui_state = UIState(self, x)
+        self.ui_state = UIState(self, concept)
 
         self.title("Concept")
         self.geometry("380x300")
@@ -32,6 +25,9 @@ class ConceptWindow(ctk.CTkToplevel):
 
         # path
         components.label(self, 1, 0, "Path")
-        components.file_entry(self, 1, 1, self.ui_state, "path")
+        components.dir_entry(self, 1, 1, self.ui_state, "path")
 
-        components.button(self, 2, 0, "close", self.destroy)
+        components.button(self, 2, 0, "ok", self.__ok)
+
+    def __ok(self):
+        self.destroy()

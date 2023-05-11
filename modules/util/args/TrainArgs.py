@@ -118,7 +118,12 @@ class TrainArgs:
                 else:
                     setattr(self, key, data[key])
             except Exception as e:
-                print(f"Could not set {key} as {str(value)}")
+                if key in data:
+                    print(f"Could not set {key} as {str(data[key])}")
+                else:
+                    print(f"Could not set {key}, not found.")
+
+        print("")
 
     @staticmethod
     def parse_args() -> 'TrainArgs':
@@ -213,7 +218,7 @@ class TrainArgs:
         args["output_model_destination"] = "models/model.safetensors"
 
         # data settings
-        args["concept_file_name"] = "concepts.json"
+        args["concept_file_name"] = "training_concepts/concepts.json"
         args["circular_mask_generation"] = False
         args["random_rotate_and_crop"] = False
         args["aspect_ratio_bucketing"] = True
