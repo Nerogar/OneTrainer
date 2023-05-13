@@ -10,7 +10,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.
-- **Automatic backups**: Fully back up your training progress regularly during training. This includes all information to seamlessly continue training. 
+- **Automatic backups**: Fully back up your training progress regularly during training. This includes all information
+  to seamlessly continue training.
 
 ## Planned Features
 
@@ -44,3 +45,11 @@ All functionality is split into different scrips located in the `scripts` direct
 - `sample.py` A utility to sample any model
 
 To learn more about the different parameters, execute `<scipt-name> -h`. For example `scripts\train.py -h`
+
+## Contributing
+
+Contributions are always welcome in any form. You can open issues, participate in discussions, or even open pull
+requests for new or improved functionality. You can find more information [here](docs/Contributing.md)
+
+Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
+For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.
