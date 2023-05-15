@@ -125,6 +125,33 @@ class TrainArgs:
 
         print("")
 
+    def __to_arg_name(self, var_name: str) -> str:
+        return "--" + var_name.replace('_', '-')
+
+    def __to_var_name(self, arg_name: str) -> str:
+        return arg_name.lstrip('-').replace('-', '_')
+
+    def to_args(self) -> str:
+        data = []
+        for (key, value) in vars(self).items():
+            if isinstance(value, str):
+                data.append(self.__to_arg_name(key) + " " + value)
+            elif isinstance(value, Enum):
+                data.append(self.__to_arg_name(key) + " " + str(value))
+            elif isinstance(value, bool):
+                if value:
+                    data.append(self.__to_arg_name(key))
+            elif isinstance(value, int):
+                data.append(self.__to_arg_name(key) + " " + str(value))
+            elif isinstance(value, float):
+                data.append(self.__to_arg_name(key) + " " + str(value))
+            else:
+                data.append(self.__to_arg_name(key) + " " + str(value))
+
+        return data
+
+        pass
+
     @staticmethod
     def parse_args() -> 'TrainArgs':
         parser = argparse.ArgumentParser(description="One Trainer Training Script.")
@@ -256,7 +283,7 @@ class TrainArgs:
         args["lora_alpha"] = 1.0
 
         # sample settings
-        args["sample_definition_file_name"] = "samples.json"
+        args["sample_definition_file_name"] = "training_samples/samples.json"
         args["sample_after"] = 10
         args["sample_after_unit"] = TimeUnit.MINUTE
 

@@ -16,3 +16,7 @@ def canonical_join(base_path: str, *paths: str):
 
 def supported_image_extensions() -> list[str]:
     return ['.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp']
+
+
+def is_supported_image_extension(extension: str) -> bool:
+    return extension.lower() in supported_image_extensions()

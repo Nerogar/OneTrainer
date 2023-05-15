@@ -15,14 +15,16 @@ from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
+from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.TimeUnit import TimeUnit
 
 
 class BaseTrainer(metaclass=ABCMeta):
-    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks):
+    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks, commands: TrainCommands):
         self.args = args
         self.callbacks = callbacks
+        self.commands = commands
         self.previous_action = {}
 
     @abstractmethod

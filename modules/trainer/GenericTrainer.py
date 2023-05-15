@@ -24,11 +24,12 @@ from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
+from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 
 
-class FineTuneTrainer(BaseTrainer):
+class GenericTrainer(BaseTrainer):
     model_loader: BaseModelLoader
     model_setup: BaseModelSetup
     data_loader: MgdsStableDiffusionFineTuneDataLoader
@@ -41,31 +42,39 @@ class FineTuneTrainer(BaseTrainer):
     tensorboard_subprocess: subprocess.Popen
     tensorboard: SummaryWriter
 
-    sample_definition: list[dict]
+    sample_definitions: list[dict]
 
-    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks):
-        super(FineTuneTrainer, self).__init__(args, callbacks)
+    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks, commands: TrainCommands):
+        super(GenericTrainer, self).__init__(args, callbacks, commands)
 
         tensorboard_dir = os.path.join(args.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_dir).absolute(), exist_ok=True)
         self.tensorboard = SummaryWriter(tensorboard_dir)
         if args.tensorboard:
-            self.tensorboard_subprocess = subprocess.Popen(f"tensorboard --logdir {tensorboard_dir} --port 6006")
+            self.tensorboard_subprocess = subprocess.Popen(
+                f"tensorboard --logdir {tensorboard_dir} --port 6006 --samples_per_plugin=images=100"
+            )
 
         with open(args.sample_definition_file_name, 'r') as f:
-            self.sample_definition = json.load(f)
+            self.sample_definitions = json.load(f)
 
     def start(self):
         self.model_loader = self.create_model_loader()
         self.model_setup = self.create_model_setup()
 
+        self.callbacks.on_update_status("loading the model")
+
         self.model = self.model_loader.load(
             self.args.model_type, self.args.base_model_name, self.args.extra_model_name
         )
 
+        self.callbacks.on_update_status("running model setup")
+
         self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
         self.model_setup.setup_eval_device(self.model)
+
+        self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
             self.model, self.model_setup.get_train_progress(self.model, self.args)
@@ -75,10 +84,15 @@ class FineTuneTrainer(BaseTrainer):
         self.model_sampler = self.create_model_sampler(self.model)
         self.previous_sample_time = -1
 
-    def __sample_during_training(self, train_progress: TrainProgress):
+    def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: dict = None):
+        self.callbacks.on_update_status("sampling")
+
         self.model_setup.setup_eval_device(self.model)
 
-        for i, sample_definition in enumerate(self.sample_definition):
+        if not sample_definitions:
+            sample_definitions = self.sample_definitions
+
+        for i, sample_definition in enumerate(sample_definitions):
             safe_prompt = path_util.safe_filename(sample_definition['prompt'])
 
             sample_dir = os.path.join(
@@ -108,6 +122,8 @@ class FineTuneTrainer(BaseTrainer):
         self.model_setup.setup_train_device(self.model, self.args)
 
     def backup(self):
+        self.callbacks.on_update_status("creating backup")
+
         path = os.path.join(self.args.workspace_dir, "backup", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
         print("Creating Backup " + path)
         self.model_saver.save(
@@ -138,6 +154,8 @@ class FineTuneTrainer(BaseTrainer):
         train_progress = self.model_setup.get_train_progress(self.model, self.args)
 
         if self.args.only_cache:
+            self.callbacks.on_update_status("caching")
+
             self.model_setup.setup_eval_device(self.model)
             start_epoch = min(self.args.epochs, self.args.latent_caching_epochs)
             for _ in tqdm(range(train_progress.epoch, start_epoch, 1), desc="epoch"):
@@ -152,16 +170,25 @@ class FineTuneTrainer(BaseTrainer):
 
         accumulated_loss = 0.0
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
+            self.callbacks.on_update_status("starting epoch/caching")
+
             self.model_setup.setup_eval_device(self.model)
             self.data_loader.ds.start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
 
+            current_epoch_length = len(self.data_loader.dl)
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
                 if self.__needs_sample(train_progress):
                     self.__sample_during_training(train_progress)
 
+                sample_command = self.commands.get_and_reset_sample_command()
+                if sample_command:
+                    self.__sample_during_training(train_progress, sample_command)
+
                 if self.__needs_backup(train_progress):
                     self.backup()
+
+                self.callbacks.on_update_status("training")
 
                 with torch.autocast(self.args.train_device.type, dtype=self.args.train_dtype.torch_dtype()):
                     predicted, target = self.model_setup.predict(self.model, batch, self.args, train_progress)
@@ -184,15 +211,23 @@ class FineTuneTrainer(BaseTrainer):
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
 
                 train_progress.next_step(self.args.batch_size)
-                self.callbacks.on_update_progress(train_progress)
+                self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
+
+                if self.commands.get_stop_command():
+                    break
 
             train_progress.next_epoch()
-            self.callbacks.on_update_progress(train_progress)
+            self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
+
+            if self.commands.get_stop_command():
+                break
 
     def end(self):
         if not self.args.only_cache:
             if self.args.backup_before_save:
                 self.backup()
+
+            self.callbacks.on_update_status("saving the final model")
 
             self.model_saver.save(
                 model=self.model,

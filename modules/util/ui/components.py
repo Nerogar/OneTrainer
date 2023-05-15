@@ -37,7 +37,11 @@ def entry(master, row, column, ui_state: UIState, var_name: str):
     return component
 
 
-def file_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+def file_entry(
+        master, row, column, ui_state: UIState, var_name: str,
+        path_modifier: Callable[[str], str] = None,
+        command: Callable[[str], None] = None,
+):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
@@ -55,6 +59,9 @@ def file_entry(master, row, column, ui_state: UIState, var_name: str, command: C
         ])
 
         if file_path:
+            if path_modifier:
+                file_path = path_modifier(file_path)
+
             ui_state.vars[var_name].set(file_path)
 
             if command:
@@ -147,10 +154,11 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     def update_var():
         for key, value in values:
             if var.get() == str(value):
-                component.set(key)
-                if command:
-                    command(value)
-                break
+                if component.winfo_exists():  # the component could already be destroyed
+                    component.set(key)
+                    if command:
+                        command(value)
+                    break
 
     var.trace_add("write", lambda _0, _1, _2: update_var())
     update_var()  # call update_var once to set the initial value

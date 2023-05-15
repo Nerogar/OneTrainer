@@ -35,12 +35,15 @@ Installing OneTrainer requires Python 3.10 or newer. Then follow these steps:
 
 ## Usage
 
-OneTrainer is currently command line only. All commands need to be run inside the active venv created during
-installation.
+OneTrainer supports two modes of operation. Command line only, and a UI. the UI can be started by running the
+train_ui.py script.
+
+All commands need to be run inside the active venv created during installation.
 
 All functionality is split into different scrips located in the `scripts` directory. This currently includes:
 
 - `train.py` The central training script
+- `train_ui.py` A UI for training
 - `convert_model.py` A utility to convert between different model formats
 - `sample.py` A utility to sample any model
 

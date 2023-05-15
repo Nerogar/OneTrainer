@@ -5,7 +5,7 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 
 sys.path.append(os.getcwd())
 
-from modules.trainer.FineTuneTrainer import FineTuneTrainer
+from modules.trainer.GenericTrainer import GenericTrainer
 from modules.util.args.TrainArgs import TrainArgs
 
 
@@ -13,7 +13,7 @@ def main():
     args = TrainArgs.parse_args()
     callbacks = TrainCallbacks()
 
-    trainer = FineTuneTrainer(args, callbacks)
+    trainer = GenericTrainer(args, callbacks)
 
     trainer.start()
 

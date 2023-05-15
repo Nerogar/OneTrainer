@@ -1,13 +1,17 @@
 import threading
 import webbrowser
+from pathlib import Path
 from typing import Callable
 
 import customtkinter as ctk
 import torch
+from PIL.Image import Image
 
-from modules.trainer.FineTuneTrainer import FineTuneTrainer
+from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.ConceptTab import ConceptTab
+from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
+from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -24,6 +28,8 @@ class TrainUI(ctk.CTk):
     set_step_progress: Callable[[int, int], None]
     set_epoch_progress: Callable[[int, int], None]
 
+    status_label: ctk.CTkLabel | None
+    training_button: ctk.CTkButton | None
     training_callbacks: TrainCallbacks | None
     training_commands: TrainCommands | None
 
@@ -44,6 +50,7 @@ class TrainUI(ctk.CTk):
         self.grid_rowconfigure(2, weight=0)
         self.grid_columnconfigure(0, weight=1)
 
+        self.status_label = None
         self.training_button = None
 
         self.top_bar(self)
@@ -61,10 +68,9 @@ class TrainUI(ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=2, column=0, sticky="nsew")
 
-        self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 1, "step", "epoch")
+        self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.set_epoch_progress(1, 2)
-        self.set_step_progress(10, 20)
+        self.status_label = components.label(frame, 0, 1, "")
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
@@ -131,7 +137,10 @@ class TrainUI(ctk.CTk):
 
         # base model
         components.label(master, 0, 0, "Base Model")
-        components.file_entry(master, 0, 1, self.ui_state, "base_model_name")
+        components.file_entry(
+            master, 0, 1, self.ui_state, "base_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
 
         # model type
         components.label(master, 0, 3, "Model Type")
@@ -294,19 +303,22 @@ class TrainUI(ctk.CTk):
         components.entry(master, 8, 7, self.ui_state, "max_noising_strength")
 
     def sampling_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
-
-        # optimizer
-        components.label(master, 0, 0, "Sample Definition")
-        components.file_entry(master, 0, 1, self.ui_state, "sample_definition_file_name")
+        master.grid_rowconfigure(0, weight=0)
+        master.grid_rowconfigure(1, weight=1)
+        master.grid_columnconfigure(0, weight=1)
 
         # sample after
-        components.label(master, 1, 0, "Sample After")
-        components.time_entry(master, 1, 1, self.ui_state, "sample_after", "sample_after_unit")
+        top_frame = ctk.CTkFrame(master=master, corner_radius=0)
+        top_frame.grid(row=0, column=0, sticky="nsew")
+
+        components.label(top_frame, 0, 0, "Sample After")
+        components.time_entry(top_frame, 0, 1, self.ui_state, "sample_after", "sample_after_unit")
+
+        # table
+        frame = ctk.CTkFrame(master=master, corner_radius=0)
+        frame.grid(row=1, column=0, sticky="nsew")
+
+        SamplingTab(frame, self.train_args, self.ui_state)
 
     def backup_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -329,24 +341,45 @@ class TrainUI(ctk.CTk):
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)
 
-    def training_thread_function(self):
-        callbacks = TrainCallbacks()
+    def on_update_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
+        self.set_step_progress(train_progress.epoch_step, max_sample)
+        self.set_epoch_progress(train_progress.epoch, max_epoch)
+        pass
 
-        trainer = FineTuneTrainer(self.train_args, callbacks)
+    def on_update_status(self, status: str):
+        self.status_label.configure(text=status)
+        pass
+
+    def on_sample(self, sample: Image):
+        pass
+
+    def training_thread_function(self):
+        callbacks = TrainCallbacks(
+            on_update_progress=self.on_update_progress,
+            on_update_status=self.on_update_status,
+            on_sample=self.on_sample,
+        )
+
+        trainer = GenericTrainer(self.train_args, callbacks, self.training_commands)
 
         trainer.start()
-        canceled = False
         try:
             trainer.train()
-        except KeyboardInterrupt:
-            canceled = True
+        except:
+            pass
 
-        if not canceled or self.train_args.backup_before_save:
+        if self.train_args.backup_before_save:
             trainer.end()
+
+        torch.cuda.empty_cache()
+
+        self.on_update_status("stopped")
 
     def start_training(self):
         if self.training_thread is None:
             self.training_button.configure(text="Stop Training")
+
+            self.training_commands = TrainCommands()
 
             # patch to fix training device until a better solution is found
             self.train_args.train_device = torch.device("cuda")
@@ -356,4 +389,5 @@ class TrainUI(ctk.CTk):
             self.training_thread.start()
         else:
             self.training_button.configure(text="Start Training")
+            self.on_update_status("stopping")
             self.training_commands.stop()
