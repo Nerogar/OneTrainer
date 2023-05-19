@@ -26,6 +26,7 @@ class ConceptTab(ConfigList):
         return {
             "name": "",
             "path": "",
+            "random_flip": True,
         }
 
     def open_element_window(self, i) -> ctk.CTkToplevel:

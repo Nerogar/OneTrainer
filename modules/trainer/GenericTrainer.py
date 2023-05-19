@@ -157,11 +157,13 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status("caching")
 
             self.model_setup.setup_eval_device(self.model)
-            start_epoch = min(self.args.epochs, self.args.latent_caching_epochs)
-            for _ in tqdm(range(train_progress.epoch, start_epoch, 1), desc="epoch"):
-                self.data_loader.ds.start_next_epoch()
-                for _ in tqdm(self.data_loader.dl, desc="step"):
-                    pass
+            cached_epochs = [False] * self.args.latent_caching_epochs
+            for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
+                if not cached_epochs[epoch % self.args.latent_caching_epochs]:
+                    self.data_loader.ds.start_next_epoch()
+                    for _ in tqdm(self.data_loader.dl, desc="step"):
+                        pass
+                    cached_epochs[epoch % self.args.latent_caching_epochs] = True
             return
 
         optimizer = self.model_setup.create_optimizer(self.model, self.args)

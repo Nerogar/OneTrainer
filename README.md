@@ -31,7 +31,7 @@ Installing OneTrainer requires Python 3.10 or newer. Then follow these steps:
 - Navigate into the cloned directory `cd OneTrainer`
 - Set up a virtual environment `python -m venv venv`
 - Activate the new venv `venv\scripts\activate`
-- Install the requirements `pip install -r requirements_torch1.txt`
+- Install the requirements `pip install -r requirements.txt`
 
 ## Usage
 

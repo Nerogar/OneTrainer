@@ -1,6 +1,7 @@
 from typing import Iterable
 
 import torch
+from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor
 from diffusers.utils.import_utils import is_xformers_available
 from torch import Tensor
 from torch.nn import Parameter
@@ -112,6 +113,7 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
 
         if is_xformers_available():
             try:
+                model.unet.set_attn_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
                 model.unet.enable_xformers_memory_efficient_attention()
             except Exception as e:
@@ -150,13 +152,13 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             train_progress: TrainProgress
     ) -> (Tensor, Tensor):
         latent_image = batch['latent_image']
-        scaled_latent_image = latent_image * model.vae.scaling_factor
+        scaled_latent_image = latent_image * model.vae.config['scaling_factor']
 
         latent_conditioning_image = None
         scaled_latent_conditioning_image = None
         if args.model_type.has_conditioning_image_input():
             latent_conditioning_image = batch['latent_conditioning_image']
-            scaled_latent_conditioning_image = latent_conditioning_image * model.vae.scaling_factor
+            scaled_latent_conditioning_image = latent_conditioning_image * model.vae.config['scaling_factor']
 
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)

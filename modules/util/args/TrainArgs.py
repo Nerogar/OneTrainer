@@ -135,22 +135,20 @@ class TrainArgs:
         data = []
         for (key, value) in vars(self).items():
             if isinstance(value, str):
-                data.append(self.__to_arg_name(key) + " " + value)
+                data.append(f"{self.__to_arg_name(key)}=\"{value}\"")
             elif isinstance(value, Enum):
-                data.append(self.__to_arg_name(key) + " " + str(value))
+                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
             elif isinstance(value, bool):
                 if value:
                     data.append(self.__to_arg_name(key))
             elif isinstance(value, int):
-                data.append(self.__to_arg_name(key) + " " + str(value))
+                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
             elif isinstance(value, float):
-                data.append(self.__to_arg_name(key) + " " + str(value))
+                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
             else:
-                data.append(self.__to_arg_name(key) + " " + str(value))
+                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
 
-        return data
-
-        pass
+        return ' '.join(data)
 
     @staticmethod
     def parse_args() -> 'TrainArgs':

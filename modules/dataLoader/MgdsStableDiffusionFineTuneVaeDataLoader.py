@@ -34,7 +34,9 @@ def __enumerate_input_modules(args: TrainArgs) -> list:
     supported_extensions = path_util.supported_image_extensions()
 
     collect_paths = CollectPaths(
-        concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept', extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
+        concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path',
+        concept_out_name='concept', extensions=supported_extensions, include_postfix=None,
+        exclude_postfix=['-masklabel']
     )
 
     mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
@@ -62,7 +64,8 @@ def __load_input_modules(args: TrainArgs) -> list:
 def __mask_augmentation_modules(args: TrainArgs) -> list:
     inputs = ['image']
 
-    random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20)
+    random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution,
+                                                   min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20)
 
     modules = []
 
@@ -75,9 +78,10 @@ def __mask_augmentation_modules(args: TrainArgs) -> list:
 def __aspect_bucketing_in(args: TrainArgs):
     calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
     aspect_bucketing = AspectBucketing(
-        batch_size=args.batch_size, target_resolution=args.resolution,
+        target_resolution=args.resolution,
         resolution_in_name='original_resolution',
-        scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution', possible_resolutions_out_name='possible_resolutions'
+        scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution',
+        possible_resolutions_out_name='possible_resolutions'
     )
 
     modules = []
@@ -90,8 +94,10 @@ def __aspect_bucketing_in(args: TrainArgs):
 
 
 def __crop_modules(args: TrainArgs):
-    scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='image')
-    scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='mask')
+    scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution',
+                                      crop_resolution_in_name='crop_resolution', image_out_name='image')
+    scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution',
+                                     crop_resolution_in_name='crop_resolution', image_out_name='mask')
 
     modules = [scale_crop_image]
 
@@ -116,7 +122,7 @@ def __augmentation_modules(args: TrainArgs):
 
 def __preparation_modules(args: TrainArgs, model: StableDiffusionModel):
     image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
-    mask = Downscale(in_name='mask', out_name='latent_mask')
+    mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
 
     modules = [image]
 
@@ -134,7 +140,8 @@ def __cache_modules(args: TrainArgs):
 
     aggregate_names = ['crop_resolution', 'image_path']
 
-    disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, cached_epochs=args.latent_caching_epochs)
+    disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names,
+                           cached_epochs=args.latent_caching_epochs)
 
     modules = []
 
@@ -151,10 +158,16 @@ def __output_modules(args: TrainArgs):
         output_names.append('latent_mask')
 
     image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
-    batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+    batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names,
+                                       batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
     output = OutputPipelineModule(names=output_names)
 
-    modules = [image_sample, batch_sorting, output]
+    modules = [image_sample]
+
+    if args.aspect_ratio_bucketing:
+        modules.append(batch_sorting)
+
+    modules.append(output)
 
     return modules
 
@@ -178,8 +191,10 @@ def create_dataset(
     debug_dir = os.path.join(args.debug_dir, "dataloader")
     debug_modules = [
         DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae),
-        SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-        SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
+        SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1,
+                  in_range_max=1),
+        SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0,
+                  in_range_max=1),
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
     ]
 

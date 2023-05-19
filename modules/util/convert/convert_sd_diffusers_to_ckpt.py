@@ -45,10 +45,27 @@ def __map_vae_attention_block(in_states: dict, out_prefix: str, in_prefix: str) 
     out_states = {}
 
     out_states |= __map_wb(in_states, __combine(out_prefix, "norm"), __combine(in_prefix, "group_norm"))
-    out_states |= __map_wb(in_states, __combine(out_prefix, "q"), __combine(in_prefix, "query"))
-    out_states |= __map_wb(in_states, __combine(out_prefix, "k"), __combine(in_prefix, "key"))
-    out_states |= __map_wb(in_states, __combine(out_prefix, "v"), __combine(in_prefix, "value"))
-    out_states |= __map_wb(in_states, __combine(out_prefix, "proj_out"), __combine(in_prefix, "proj_attn"))
+
+    # support for both deprecated and current attention block names
+    if __combine(in_prefix, "query") in in_states.keys():
+        out_states |= __map_wb(in_states, __combine(out_prefix, "q"), __combine(in_prefix, "query"))  # deprecated
+    else:
+        out_states |= __map_wb(in_states, __combine(out_prefix, "q"), __combine(in_prefix, "to_q"))  # current
+
+    if __combine(in_prefix, "key") in in_states.keys():
+        out_states |= __map_wb(in_states, __combine(out_prefix, "k"), __combine(in_prefix, "key"))  # deprecated
+    else:
+        out_states |= __map_wb(in_states, __combine(out_prefix, "k"), __combine(in_prefix, "to_k"))  # current
+
+    if __combine(in_prefix, "value") in in_states.keys():
+        out_states |= __map_wb(in_states, __combine(out_prefix, "v"), __combine(in_prefix, "value"))  # deprecated
+    else:
+        out_states |= __map_wb(in_states, __combine(out_prefix, "v"), __combine(in_prefix, "to_v"))  # current
+
+    if __combine(in_prefix, "proj_attn") in in_states.keys():
+        out_states |= __map_wb(in_states, __combine(out_prefix, "proj_out"), __combine(in_prefix, "proj_attn"))  # deprecated
+    else:
+        out_states |= __map_wb(in_states, __combine(out_prefix, "proj_out"), __combine(in_prefix, "to_out.0"))  # current
 
     out_states[__combine(out_prefix, "q.weight")] = __reshape_vae_attention_weight(out_states[__combine(out_prefix, "q.weight")])
     out_states[__combine(out_prefix, "k.weight")] = __reshape_vae_attention_weight(out_states[__combine(out_prefix, "k.weight")])

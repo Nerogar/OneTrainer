@@ -75,15 +75,15 @@ def __mask_augmentation_modules(args: TrainArgs) -> list:
     if args.model_type.has_depth_input():
         inputs.append('depth')
 
-    circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0)
-    random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20)
+    circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='settings.enable_random_circular_mask_shrink')
+    random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='settings.enable_random_mask_rotate_crop')
 
     modules = []
 
-    if (args.masked_training or args.model_type.has_mask_input()) and args.circular_mask_generation:
+    if args.masked_training or args.model_type.has_mask_input():
         modules.append(circular_mask_shrink)
 
-    if (args.masked_training or args.model_type.has_mask_input()) and args.random_rotate_and_crop:
+    if args.masked_training or args.model_type.has_mask_input():
         modules.append(random_mask_rotate_crop)
 
     return modules
@@ -92,7 +92,7 @@ def __mask_augmentation_modules(args: TrainArgs) -> list:
 def __aspect_bucketing_in(args: TrainArgs):
     calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
     aspect_bucketing = AspectBucketing(
-        batch_size=args.batch_size, target_resolution=args.resolution,
+        target_resolution=args.resolution,
         resolution_in_name='original_resolution',
         scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution', possible_resolutions_out_name='possible_resolutions'
     )
@@ -145,7 +145,7 @@ def __augmentation_modules(args: TrainArgs):
     if args.model_type.has_depth_input():
         inputs.append('depth')
 
-    random_flip = RandomFlip(names=inputs)
+    random_flip = RandomFlip(names=inputs, enabled_in_name='concept.random_flip')
 
     modules = [random_flip]
 
@@ -154,9 +154,9 @@ def __augmentation_modules(args: TrainArgs):
 
 def __preparation_modules(args: TrainArgs, model: StableDiffusionModel):
     image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
-    mask = Downscale(in_name='mask', out_name='latent_mask')
+    mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
     conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
-    depth = Downscale(in_name='depth', out_name='latent_depth')
+    depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
     tokens = Tokenize(in_name='prompt', out_name='tokens', tokenizer=model.tokenizer)
 
     modules = [image, tokens]
@@ -226,7 +226,9 @@ def __output_modules(args: TrainArgs, model: StableDiffusionModel):
     if args.model_type.has_mask_input():
         modules.append(mask_remove)
 
-    modules.append(batch_sorting)
+    if args.aspect_ratio_bucketing:
+        modules.append(batch_sorting)
+
     modules.append(output)
 
     return modules
@@ -262,7 +264,10 @@ def create_dataset(
         # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
     ]
 
-    settings = {}
+    settings = {
+        "enable_random_circular_mask_shrink": args.circular_mask_generation,
+        "enable_random_mask_rotate_crop": args.random_rotate_and_crop,
+    }
 
     ds = MGDS(
         args.train_device,

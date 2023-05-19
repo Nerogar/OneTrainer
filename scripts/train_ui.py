@@ -1,9 +1,9 @@
 import os
 import sys
 
-from modules.ui.TrainUI import TrainUI
-
 sys.path.append(os.getcwd())
+
+from modules.ui.TrainUI import TrainUI
 
 
 def main():

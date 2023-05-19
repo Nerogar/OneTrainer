@@ -27,7 +27,11 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(self, 1, 0, "Path")
         components.dir_entry(self, 1, 1, self.ui_state, "path")
 
-        components.button(self, 2, 0, "ok", self.__ok)
+        # flip
+        components.label(self, 2, 0, "Random Flip")
+        components.switch(self, 2, 1, self.ui_state, "random_flip")
+
+        components.button(self, 3, 0, "ok", self.__ok)
 
     def __ok(self):
         self.destroy()

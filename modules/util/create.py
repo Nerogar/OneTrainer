@@ -145,6 +145,8 @@ def create_optimizer(
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
                 eps=1e-8,
+                foreach=False,  # disabled, because it uses too much VRAM
+                fused=True,
             )
         case Optimizer.ADAMW:
             return AdamW(
@@ -152,4 +154,6 @@ def create_optimizer(
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
                 eps=1e-8,
+                foreach=False,  # disabled, because it uses too much VRAM
+                fused=True,
             )

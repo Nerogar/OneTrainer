@@ -133,7 +133,12 @@ class ConfigList(metaclass=ABCMeta):
     def __load_current_config(self, filename):
         try:
             with open(filename, "r") as f:
-                self.current_config = json.load(f)
+                self.current_config = []
+
+                loaded_config = json.load(f)
+                for element in loaded_config:
+                    element = self.create_new_element() | element
+                    self.current_config.append(element)
         except:
             self.current_config = []
 

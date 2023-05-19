@@ -1,9 +1,10 @@
 import os
 import sys
 
-from modules.util.callbacks.TrainCallbacks import TrainCallbacks
-
 sys.path.append(os.getcwd())
+
+from modules.util.callbacks.TrainCallbacks import TrainCallbacks
+from modules.util.commands.TrainCommands import TrainCommands
 
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.util.args.TrainArgs import TrainArgs
@@ -12,8 +13,9 @@ from modules.util.args.TrainArgs import TrainArgs
 def main():
     args = TrainArgs.parse_args()
     callbacks = TrainCallbacks()
+    commands = TrainCommands()
 
-    trainer = GenericTrainer(args, callbacks)
+    trainer = GenericTrainer(args, callbacks, commands)
 
     trainer.start()
 

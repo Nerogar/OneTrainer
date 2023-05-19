@@ -1,12 +1,11 @@
 import os
 import sys
 
-from modules.util.enum.TrainingMethod import TrainingMethod
-
 sys.path.append(os.getcwd())
 
 import torch
 
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
 from modules.util.args.SampleArgs import SampleArgs
 

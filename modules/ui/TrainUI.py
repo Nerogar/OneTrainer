@@ -1,4 +1,5 @@
 import threading
+import traceback
 import webbrowser
 from pathlib import Path
 from typing import Callable
@@ -80,6 +81,9 @@ class TrainUI(ctk.CTk):
 
         # training button
         self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training)
+
+        # export button
+        self.export_button = components.button(frame, 0, 5, "Export", self.export_training)
 
         return frame
 
@@ -366,7 +370,7 @@ class TrainUI(ctk.CTk):
         try:
             trainer.train()
         except:
-            pass
+            traceback.print_exc()
 
         if self.train_args.backup_before_save:
             trainer.end()
@@ -391,3 +395,10 @@ class TrainUI(ctk.CTk):
             self.training_button.configure(text="Start Training")
             self.on_update_status("stopping")
             self.training_commands.stop()
+
+    def export_training(self):
+        args = self.train_args.to_args()
+        command = "python scripts/train.py " + args
+
+        with open("train.bat", "w") as f:
+            f.write(command)

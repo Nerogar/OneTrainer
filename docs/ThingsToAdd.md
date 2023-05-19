@@ -12,9 +12,7 @@ OneTrainer is far from done. Here is a list of things that I would love to imple
   moment. The goal would be to support all currently released model types.
 - Accelerate support for multi GPU training: This will be a bit more complicated.
   [MGDS](https://github.com/Nerogar/MGDS), the data loader library, needs to be thread safe first.
-- Full Pytorch2 support: Pytorch2 enables the use of SDP-Attention, which should be able to replace XFormers. It should
-  be straight forward to upgrade, but in my limited tests, There were always some limitations like high memory usage, or
-  crashes.
+
 
 Some ideas that need to be implemented in [MGDS](https://github.com/Nerogar/MGDS):
 

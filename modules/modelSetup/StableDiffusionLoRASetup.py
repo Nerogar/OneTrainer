@@ -172,13 +172,13 @@ class StableDiffusionLoRASetup(BaseModelSetup):
             train_progress: TrainProgress
     ) -> (Tensor, Tensor):
         latent_image = batch['latent_image']
-        scaled_latent_image = latent_image * model.vae.scaling_factor
+        scaled_latent_image = latent_image * model.vae.config['scaling_factor']
 
         latent_conditioning_image = None
         scaled_latent_conditioning_image = None
         if args.model_type.has_conditioning_image_input():
             latent_conditioning_image = batch['latent_conditioning_image']
-            scaled_latent_conditioning_image = latent_conditioning_image * model.vae.scaling_factor
+            scaled_latent_conditioning_image = latent_conditioning_image * model.vae.config['scaling_factor']
 
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
