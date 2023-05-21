@@ -149,6 +149,8 @@ class GenericTrainer(BaseTrainer):
         )
 
     def train(self):
+        train_device = torch.device(self.args.train_device)
+
         parameters = self.model_setup.create_parameters(self.model, self.args)
 
         train_progress = self.model_setup.get_train_progress(self.model, self.args)
@@ -192,7 +194,7 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("training")
 
-                with torch.autocast(self.args.train_device.type, dtype=self.args.train_dtype.torch_dtype()):
+                with torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype()):
                     predicted, target = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
                     loss = self.loss(batch, predicted.float(), target.float())

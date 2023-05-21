@@ -74,9 +74,7 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
         model.unet.requires_grad_(train_unet)
 
-        model.text_encoder.requires_grad_(train_text_encoder)
         model.vae.requires_grad_(False)
-        model.unet.requires_grad_(train_unet)
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
             model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
@@ -206,12 +204,12 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
         if args.debug_mode:
             with torch.no_grad():
                 # noise
-                noise = model.vae.decode(latent_noise / model.vae.scaling_factor).sample
+                noise = model.vae.decode(latent_noise / model.vae.config['scaling_factor']).sample
                 noise = noise.clamp(-1, 1)
                 self.save_image(noise, args.debug_dir + "/training_batches", "1-noise", train_progress.global_step)
 
                 # predicted noise
-                predicted_noise = model.vae.decode(predicted_latent_noise / model.vae.scaling_factor).sample
+                predicted_noise = model.vae.decode(predicted_latent_noise / model.vae.config['scaling_factor']).sample
                 predicted_noise = predicted_noise.clamp(-1, 1)
                 self.save_image(
                     predicted_noise, args.debug_dir + "/training_batches", "2-predicted_noise",
@@ -219,7 +217,7 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
                 )
 
                 # noisy image
-                noisy_latent_image = scaled_noisy_latent_image / model.vae.scaling_factor
+                noisy_latent_image = scaled_noisy_latent_image / model.vae.config['scaling_factor']
                 noisy_image = model.vae.decode(noisy_latent_image).sample
                 noisy_image = noisy_image.clamp(-1, 1)
                 self.save_image(
@@ -228,15 +226,16 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
                 )
 
                 # predicted image
-                sqrt_alpha_prod = model.noise_scheduler.alphas_cumprod[timestep] ** 0.5
+                alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(args.train_device)
+                sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
                 sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                sqrt_one_minus_alpha_prod = (1 - model.noise_scheduler.alphas_cumprod[timestep]) ** 0.5
+                sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
                 sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
                 scaled_predicted_latent_image = \
                     (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
-                predicted_latent_image = scaled_predicted_latent_image / model.vae.scaling_factor
+                predicted_latent_image = scaled_predicted_latent_image / model.vae.config['scaling_factor']
                 predicted_image = model.vae.decode(predicted_latent_image).sample
                 predicted_image = predicted_image.clamp(-1, 1)
                 self.save_image(

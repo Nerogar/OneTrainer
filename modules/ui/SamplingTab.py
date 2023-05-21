@@ -14,8 +14,8 @@ class SamplingTab(ConfigList):
             "training_samples", "samples.json", "add sample"
         )
 
-    def create_widget(self, master, element, i, open_command, remove_command, save_command):
-        return SampleWidget(master, element, i, open_command, remove_command, save_command)
+    def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
+        return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
         return {
@@ -30,7 +30,7 @@ class SamplingTab(ConfigList):
 
 
 class SampleWidget(ctk.CTkFrame):
-    def __init__(self, master, sample, i, open_command, remove_command, save_command):
+    def __init__(self, master, sample, i, open_command, remove_command, clone_command, save_command):
         super(SampleWidget, self).__init__(
             master=master, corner_radius=10, bg_color="transparent"
         )
@@ -44,7 +44,7 @@ class SampleWidget(ctk.CTkFrame):
         self.command = open_command
 
         # close button
-        self.close_button = ctk.CTkButton(
+        close_button = ctk.CTkButton(
             master=self,
             width=20,
             height=20,
@@ -53,29 +53,41 @@ class SampleWidget(ctk.CTkFrame):
             fg_color="#C00000",
             command=lambda: remove_command(self.i),
         )
-        self.close_button.grid(row=0, column=0)
+        close_button.grid(row=0, column=0)
+
+        # clone button
+        clone_button = ctk.CTkButton(
+            master=self,
+            width=20,
+            height=20,
+            text="+",
+            corner_radius=2,
+            fg_color="#00C000",
+            command=lambda: clone_command(self.i),
+        )
+        clone_button.grid(row=0, column=1, padx=5)
 
         # height
-        components.label(self, 0, 1, "height:")
-        height_entry = components.entry(self, 0, 2, self.ui_state, "height")
+        components.label(self, 0, 2, "height:")
+        height_entry = components.entry(self, 0, 3, self.ui_state, "height")
         height_entry.bind('<FocusOut>', lambda _: save_command())
         height_entry.configure(width=50)
 
         # width
-        components.label(self, 0, 3, "width:")
-        width_entry = components.entry(self, 0, 4, self.ui_state, "width")
+        components.label(self, 0, 4, "width:")
+        width_entry = components.entry(self, 0, 5, self.ui_state, "width")
         width_entry.bind('<FocusOut>', lambda _: save_command())
         width_entry.configure(width=50)
 
         # seed
-        components.label(self, 0, 5, "seed:")
-        seed_entry = components.entry(self, 0, 6, self.ui_state, "seed")
+        components.label(self, 0, 6, "seed:")
+        seed_entry = components.entry(self, 0, 7, self.ui_state, "seed")
         seed_entry.bind('<FocusOut>', lambda _: save_command())
         seed_entry.configure(width=80)
 
         # prompt
-        components.label(self, 0, 7, "prompt:")
-        prompt_entry = components.entry(self, 0, 8, self.ui_state, "prompt")
+        components.label(self, 0, 8, "prompt:")
+        prompt_entry = components.entry(self, 0, 9, self.ui_state, "prompt")
         prompt_entry.bind('<FocusOut>', lambda _: save_command())
 
     def configure_element(self):

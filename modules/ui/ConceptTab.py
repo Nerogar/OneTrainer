@@ -19,14 +19,17 @@ class ConceptTab(ConfigList):
             "training_concepts", "concepts.json", "add concept"
         )
 
-    def create_widget(self, master, element, i, open_command, remove_command, save_command):
-        return ConceptWidget(master, element, i, open_command, remove_command, save_command)
+    def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
+        return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
         return {
             "name": "",
             "path": "",
-            "random_flip": True,
+            "enable_random_flip": True,
+            "enable_crop_jitter": True,
+            "prompt_source": "sample",
+            "prompt_path": "",
         }
 
     def open_element_window(self, i) -> ctk.CTkToplevel:
@@ -34,7 +37,7 @@ class ConceptTab(ConfigList):
 
 
 class ConceptWidget(ctk.CTkFrame):
-    def __init__(self, master, concept, i, open_command, remove_command, save_command):
+    def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command):
         super(ConceptWidget, self).__init__(
             master=master, width=150, height=170, corner_radius=10, bg_color="transparent"
         )
@@ -57,7 +60,7 @@ class ConceptWidget(ctk.CTkFrame):
         self.name_label = components.label(self, 1, 0, self.concept["name"], pad=5)
 
         # close button
-        self.close_button = ctk.CTkButton(
+        close_button = ctk.CTkButton(
             master=self,
             width=20,
             height=20,
@@ -66,7 +69,19 @@ class ConceptWidget(ctk.CTkFrame):
             fg_color="#C00000",
             command=lambda: remove_command(self.i),
         )
-        self.close_button.place(x=0, y=0)
+        close_button.place(x=0, y=0)
+
+        # clone button
+        clone_button = ctk.CTkButton(
+            master=self,
+            width=20,
+            height=20,
+            text="+",
+            corner_radius=2,
+            fg_color="#00C000",
+            command=lambda: clone_command(self.i),
+        )
+        clone_button.place(x=25, y=0)
 
         image_label.bind("<Button-1>", lambda event: self.command(self.i))
 
@@ -91,9 +106,9 @@ class ConceptWidget(ctk.CTkFrame):
         size = min(image.width, image.height)
         image = image.crop((
             (image.width - size) // 2,
-            (image.width - size) // 2,
+            (image.height - size) // 2,
             (image.width - size) // 2 + size,
-            (image.width - size) // 2 + size,
+            (image.height - size) // 2 + size,
         ))
         image = image.resize((150, 150), Image.Resampling.LANCZOS)
         return image

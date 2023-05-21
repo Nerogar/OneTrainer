@@ -136,7 +136,7 @@ def options(master, row, column, values, ui_state: UIState, var_name: str, comma
 
 
 def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
-               command: Callable[[None], None] = None):
+               command: Callable[[str], None] = None):
     var = ui_state.vars[var_name]
     keys = [key for key, value in values]
 

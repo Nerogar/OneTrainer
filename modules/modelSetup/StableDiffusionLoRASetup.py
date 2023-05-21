@@ -78,12 +78,13 @@ class StableDiffusionLoRASetup(BaseModelSetup):
                 model.unet, args.lora_rank, "lora_unet", args.lora_alpha, ["attentions"]
             )
 
-        model.text_encoder.requires_grad_(False)
-        model.vae.requires_grad_(False)
-        model.unet.requires_grad_(False)
+        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        model.text_encoder.requires_grad_(train_text_encoder)
 
-        model.text_encoder_lora.requires_grad_(True)
-        model.unet_lora.requires_grad_(True)
+        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        model.unet.requires_grad_(train_unet)
+
+        model.vae.requires_grad_(False)
 
         model.text_encoder_lora.hook_to_module()
         model.unet_lora.hook_to_module()
@@ -249,10 +250,11 @@ class StableDiffusionLoRASetup(BaseModelSetup):
                 )
 
                 # predicted image
-                sqrt_alpha_prod = model.noise_scheduler.alphas_cumprod[timestep] ** 0.5
+                alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(args.train_device)
+                sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
                 sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                sqrt_one_minus_alpha_prod = (1 - model.noise_scheduler.alphas_cumprod[timestep]) ** 0.5
+                sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
                 sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
                 scaled_predicted_latent_image = \

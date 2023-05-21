@@ -234,10 +234,11 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
                                 train_progress.global_step)
 
                 # predicted image
-                sqrt_alpha_prod = model.noise_scheduler.alphas_cumprod[timestep] ** 0.5
+                alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(args.train_device)
+                sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
                 sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                sqrt_one_minus_alpha_prod = (1 - model.noise_scheduler.alphas_cumprod[timestep]) ** 0.5
+                sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
                 sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
                 scaled_predicted_latent_image = \

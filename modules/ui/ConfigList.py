@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 from abc import abstractmethod, ABCMeta
@@ -47,7 +48,7 @@ class ConfigList(metaclass=ABCMeta):
         components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
 
     @abstractmethod
-    def create_widget(self, master, element, i, open_command, remove_command, save_command):
+    def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         pass
 
     @abstractmethod
@@ -76,7 +77,10 @@ class ConfigList(metaclass=ABCMeta):
 
         for i, element in enumerate(self.current_config):
             widget = self.create_widget(
-                self.element_list, element, i, self.__open_element_window, self.__remove_element,
+                self.element_list, element, i,
+                self.__open_element_window,
+                self.__remove_element,
+                self.__clone_element,
                 self.__save_current_config
             )
             self.widgets.append(widget)
@@ -111,7 +115,28 @@ class ConfigList(metaclass=ABCMeta):
 
         self.current_config.append(new_element)
         widget = self.create_widget(
-            self.element_list, new_element, i, self.__open_element_window, self.__remove_element,
+            self.element_list, new_element, i,
+            self.__open_element_window,
+            self.__remove_element,
+            self.__clone_element,
+            self.__save_current_config
+        )
+        self.widgets.append(widget)
+
+        widget.place_in_list()
+
+        self.__save_current_config()
+
+    def __clone_element(self, clone_i):
+        i = len(self.current_config)
+        new_element = copy.deepcopy(self.current_config[clone_i])
+
+        self.current_config.append(new_element)
+        widget = self.create_widget(
+            self.element_list, new_element, i,
+            self.__open_element_window,
+            self.__remove_element,
+            self.__clone_element,
             self.__save_current_config
         )
         self.widgets.append(widget)
