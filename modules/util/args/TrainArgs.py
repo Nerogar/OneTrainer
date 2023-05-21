@@ -232,7 +232,7 @@ class TrainArgs:
 
         # model settings
         args["model_type"] = ModelType.STABLE_DIFFUSION_15
-        args["base_model_name"] = ""
+        args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
         args["extra_model_name"] = ""
         args["output_dtype"] = DataType.FLOAT_32
         args["output_model_format"] = ModelFormat.SAFETENSORS

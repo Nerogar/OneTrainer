@@ -21,5 +21,4 @@ Some ideas that need to be implemented in [MGDS](https://github.com/Nerogar/MGDS
 - Support for loading concepts from nested folder structures
 - Better caching: Make it possible somehow to add and remove concepts or samples from the cache without rebuilding the
   whole cache. Maybe by splitting the cache into multiple folders based on concepts.
-- Support for multiple prompts per image sample
 - Support for class images and prior loss preservation for each concept

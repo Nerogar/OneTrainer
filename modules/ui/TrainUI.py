@@ -124,14 +124,18 @@ class TrainUI(ctk.CTk):
         components.file_entry(master, 1, 1, self.ui_state, "cache_dir")
 
         # debug
-        components.label(master, 2, 0, "Debug mode")
-        components.switch(master, 2, 1, self.ui_state, "debug_mode")
+        components.label(master, 2, 0, "Only Cache")
+        components.switch(master, 2, 1, self.ui_state, "only_cache")
 
-        components.label(master, 3, 0, "Debug Directory")
-        components.file_entry(master, 3, 1, self.ui_state, "debug_dir")
+        # debug
+        components.label(master, 3, 0, "Debug mode")
+        components.switch(master, 3, 1, self.ui_state, "debug_mode")
 
-        components.label(master, 4, 0, "Tensorboard")
-        components.switch(master, 4, 1, self.ui_state, "tensorboard")
+        components.label(master, 4, 0, "Debug Directory")
+        components.file_entry(master, 4, 1, self.ui_state, "debug_dir")
+
+        components.label(master, 5, 0, "Tensorboard")
+        components.switch(master, 5, 1, self.ui_state, "tensorboard")
 
     def model_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -381,7 +385,7 @@ class TrainUI(ctk.CTk):
         self.on_update_status("stopped")
 
         self.training_thread = None
-        self.training_button.configure(state="normal")
+        self.training_button.configure(text="Start Training", state="normal")
 
     def start_training(self):
         if self.training_thread is None:
@@ -392,7 +396,7 @@ class TrainUI(ctk.CTk):
             self.training_thread = threading.Thread(target=self.training_thread_function)
             self.training_thread.start()
         else:
-            self.training_button.configure(text="Start Training", state="disabled")
+            self.training_button.configure(state="disabled")
             self.on_update_status("stopping")
             self.training_commands.stop()
 

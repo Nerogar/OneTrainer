@@ -50,7 +50,7 @@ class MgdsStablDiffusionBaseDataLoader:
 
 
     def _load_input_modules(self, args: TrainArgs, model: StableDiffusionModel) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0)
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1)
 
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
@@ -167,20 +167,33 @@ class MgdsStablDiffusionBaseDataLoader:
             inputs.append('depth')
 
         random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
+        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.enable_random_rotate', max_angle_in_name='concept.random_rotate_max_angle')
+        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.enable_random_brightness', max_strength_in_name='concept.random_brightness_max_strength')
+        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.enable_random_contrast', max_strength_in_name='concept.random_contrast_max_strength')
+        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.enable_random_saturation', max_strength_in_name='concept.random_saturation_max_strength')
+        random_hue = RandomHue(names=['image'], enabled_in_name='concept.enable_random_hue', max_strength_in_name='concept.random_hue_max_strength')
 
-        modules = [random_flip]
+        modules = [
+            random_flip,
+            random_rotate,
+            random_brightness,
+            random_contrast,
+            random_saturation,
+            random_hue,
+        ]
 
         return modules
 
 
     def _preparation_modules(self, args: TrainArgs, model: StableDiffusionModel):
+        rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
         mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
         conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
         depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
         tokens = Tokenize(in_name='prompt', out_name='tokens', tokenizer=model.tokenizer)
 
-        modules = [image, tokens]
+        modules = [rescale_image, image, tokens]
 
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(mask)
@@ -255,6 +268,44 @@ class MgdsStablDiffusionBaseDataLoader:
         return modules
 
 
+    def _debug_modules(self, args: TrainArgs, model: StableDiffusionModel):
+        debug_dir = os.path.join(args.debug_dir, "dataloader")
+
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae)
+        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae)
+        upscale_mask = Upscale(in_name='latent_mask', out_name='decoded_mask', factor=8)
+        decode_prompt = DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer)
+        save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)
+        save_conditioning_image = SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)
+        # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
+        save_mask = SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1)
+        # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+        save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir)
+
+        # These modules don't really work, since they are inserted after a sorting operation that does not include this data
+        # SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
+        # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+        # SaveImage(image_in_name='image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
+
+        modules = []
+
+        modules.append(decode_image)
+        modules.append(save_image)
+
+        if args.model_type.has_conditioning_image_input():
+            modules.append(decode_conditioning_image)
+            modules.append(save_conditioning_image)
+
+        if args.masked_training or args.model_type.has_mask_input():
+            modules.append(upscale_mask)
+            modules.append(save_mask)
+
+        modules.append(decode_prompt)
+        modules.append(save_prompt)
+
+        return modules
+
+
     def create_dataset(
             self,
             args: TrainArgs,
@@ -273,24 +324,7 @@ class MgdsStablDiffusionBaseDataLoader:
         cache_modules = self._cache_modules(args)
         output_modules = self._output_modules(args, model)
 
-        debug_dir = os.path.join(args.debug_dir, "dataloader")
-        debug_modules = [
-            DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae),
-            DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae),
-            Upscale(in_name='latent_mask', out_name='decoded_mask', factor=8),
-            DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer),
-            SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-            SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-            # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
-            SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
-            # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-            SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir),
-
-            # These modules don't really work, since they are inserted after a sorting operation that does not include this data
-            # SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
-            # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-            # SaveImage(image_in_name='image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-        ]
+        debug_modules = self._debug_modules(args, model)
 
         settings = {
             "enable_random_circular_mask_shrink": args.circular_mask_generation,

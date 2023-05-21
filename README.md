@@ -12,12 +12,14 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **Masked Training**: Let the training focus on just certain parts of the samples.
 - **Automatic backups**: Fully back up your training progress regularly during training. This includes all information
   to seamlessly continue training.
+- **Image augmentation**: Apply random transforms such as rotation, brightness, contrast or saturation to each image
+  sample to quickly create a more diverse dataset.
+- **Multiple prompts per image**: Train the model on multiple different prompts per image sample. 
 
 ## Planned Features
 
 It is currently still in very early development. Planned features include:
 
-- **User friendly UI**: I'm still evaluating options. The most likely solution is a web based UI.
 - **Different models**: Training on all currently released Stable Diffusion models, this includes the base models (1.x
   and 2.x), inpainting models, the depth to image model, and SDXL once it is released
 - **Different training methods**: Fine-Tuning, LoRA, Embeddings, ControlNet
