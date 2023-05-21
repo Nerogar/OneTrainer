@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -47,12 +48,14 @@ class GenericTrainer(BaseTrainer):
     def __init__(self, args: TrainArgs, callbacks: TrainCallbacks, commands: TrainCommands):
         super(GenericTrainer, self).__init__(args, callbacks, commands)
 
-        tensorboard_dir = os.path.join(args.workspace_dir, "tensorboard")
-        os.makedirs(Path(tensorboard_dir).absolute(), exist_ok=True)
-        self.tensorboard = SummaryWriter(tensorboard_dir)
+        tensorboard_log_dir = os.path.join(args.workspace_dir, "tensorboard")
+        os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
+        self.tensorboard = SummaryWriter(tensorboard_log_dir)
         if args.tensorboard:
+            tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
+
             self.tensorboard_subprocess = subprocess.Popen(
-                f"tensorboard --logdir {tensorboard_dir} --port 6006 --samples_per_plugin=images=100"
+                f"{tensorboard_executable} --logdir {tensorboard_log_dir} --port 6006 --samples_per_plugin=images=100"
             )
 
         with open(args.sample_definition_file_name, 'r') as f:
