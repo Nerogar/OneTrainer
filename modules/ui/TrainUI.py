@@ -2,6 +2,7 @@ import threading
 import traceback
 import webbrowser
 from pathlib import Path
+from tkinter import filedialog
 from typing import Callable
 
 import customtkinter as ctk
@@ -400,5 +401,12 @@ class TrainUI(ctk.CTk):
         args = self.train_args.to_args()
         command = "python scripts/train.py " + args
 
-        with open("train.bat", "w") as f:
-            f.write(command)
+        file_path = filedialog.asksaveasfilename(filetypes=[
+            ("All Files", "*.*"),
+            ("Batch", "*.bat"),
+            ("Shell", "*.sh"),
+        ], initialdir=".", initialfile="train.bat")
+
+        if file_path:
+            with open(file_path, "w") as f:
+                f.write(command)

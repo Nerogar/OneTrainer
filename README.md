@@ -27,17 +27,36 @@ It is currently still in very early development. Planned features include:
 
 Installing OneTrainer requires Python 3.10 or newer. Then follow these steps:
 
-- Clone the repository `git clone git@github.com:Nerogar/OneTrainer.git`
+Automatic installation
+
+- Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
+- Run `install.bat`
+
+Manual installation
+
+- Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
 - Navigate into the cloned directory `cd OneTrainer`
 - Set up a virtual environment `python -m venv venv`
 - Activate the new venv `venv\scripts\activate`
 - Install the requirements `pip install -r requirements.txt`
 
+## Updating
+
+Automatic update
+
+- Run `update.bat`
+
+Manual update
+
+- Pull changes `git pull`
+- Activate the venv `venv\scripts\activate`
+- Re-Install all requirements `pip install -r requirements.txt --force-reinstall`
+
 ## Usage
 
-OneTrainer supports two modes of operation. Command line only, and a UI. the UI can be started by running the
-train_ui.py script.
+To start the UI, run `start-ui.bat`
 
+If you need more control, OneTrainer supports two modes of operation. Command line only, and a UI.
 All commands need to be run inside the active venv created during installation.
 
 All functionality is split into different scrips located in the `scripts` directory. This currently includes:
@@ -47,7 +66,7 @@ All functionality is split into different scrips located in the `scripts` direct
 - `convert_model.py` A utility to convert between different model formats
 - `sample.py` A utility to sample any model
 
-To learn more about the different parameters, execute `<scipt-name> -h`. For example `scripts\train.py -h`
+To learn more about the different parameters, execute `<scipt-name> -h`. For example `python scripts\train.py -h`
 
 ## Contributing
 
