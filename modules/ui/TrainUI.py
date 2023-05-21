@@ -380,20 +380,19 @@ class TrainUI(ctk.CTk):
 
         self.on_update_status("stopped")
 
+        self.training_thread = None
+        self.training_button.configure(state="normal")
+
     def start_training(self):
         if self.training_thread is None:
-            self.training_button.configure(text="Stop Training")
+            self.training_button.configure(text="Stop Training", state="normal")
 
             self.training_commands = TrainCommands()
-
-            # patch to fix training device until a better solution is found
-            self.train_args.train_device = torch.device("cuda")
-            self.train_args.temp_device = torch.device("cpu")
 
             self.training_thread = threading.Thread(target=self.training_thread_function)
             self.training_thread.start()
         else:
-            self.training_button.configure(text="Start Training")
+            self.training_button.configure(text="Start Training", state="disabled")
             self.on_update_status("stopping")
             self.training_commands.stop()
 

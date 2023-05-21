@@ -298,7 +298,7 @@ class MgdsStablDiffusionBaseDataLoader:
         }
 
         ds = MGDS(
-            args.train_device,
+            torch.device(args.train_device),
             args.train_dtype.torch_dtype(),
             args.train_dtype.enable_mixed_precision(),
             concepts,

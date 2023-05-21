@@ -43,8 +43,6 @@ class GenericTrainer(BaseTrainer):
     tensorboard_subprocess: subprocess.Popen
     tensorboard: SummaryWriter
 
-    sample_definitions: list[dict]
-
     def __init__(self, args: TrainArgs, callbacks: TrainCallbacks, commands: TrainCommands):
         super(GenericTrainer, self).__init__(args, callbacks, commands)
 
@@ -57,9 +55,6 @@ class GenericTrainer(BaseTrainer):
             self.tensorboard_subprocess = subprocess.Popen(
                 f"{tensorboard_executable} --logdir {tensorboard_log_dir} --port 6006 --samples_per_plugin=images=100"
             )
-
-        with open(args.sample_definition_file_name, 'r') as f:
-            self.sample_definitions = json.load(f)
 
     def start(self):
         self.model_loader = self.create_model_loader()
@@ -93,7 +88,8 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_eval_device(self.model)
 
         if not sample_definitions:
-            sample_definitions = self.sample_definitions
+            with open(self.args.sample_definition_file_name, 'r') as f:
+                sample_definitions = json.load(f)
 
         for i, sample_definition in enumerate(sample_definitions):
             safe_prompt = path_util.safe_filename(sample_definition['prompt'])

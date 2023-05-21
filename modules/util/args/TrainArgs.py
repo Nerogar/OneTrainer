@@ -50,8 +50,8 @@ class TrainArgs:
     unet_learning_rate: float
     loss_function: LossFunction
     offset_noise_weight: float
-    train_device: torch.device
-    temp_device: torch.device
+    train_device: str
+    temp_device: str
     train_dtype: DataType
     only_cache: bool
     resolution: int
@@ -92,8 +92,6 @@ class TrainArgs:
                 data[key] = value
             elif isinstance(value, float):
                 data[key] = value
-            elif isinstance(value, torch.device):
-                data[key] = str(value)
             else:
                 data[key] = value
 
@@ -113,8 +111,6 @@ class TrainArgs:
                     setattr(self, key, int(data[key]))
                 elif isinstance(value, float):
                     setattr(self, key, float(data[key]))
-                elif isinstance(value, torch.device):
-                    setattr(self, key, data[key])
                 else:
                     setattr(self, key, data[key])
             except Exception as e:
@@ -194,8 +190,8 @@ class TrainArgs:
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
-        parser.add_argument("--train-device", type=torch_device, required=False, default="cuda", dest="train_device", help="The device to train on")
-        parser.add_argument("--temp-device", type=torch_device, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
+        parser.add_argument("--train-device", type=str, required=False, default="cuda", dest="train_device", help="The device to train on")
+        parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=DataType, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")

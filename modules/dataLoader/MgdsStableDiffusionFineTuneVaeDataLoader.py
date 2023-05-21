@@ -179,15 +179,15 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
             concepts: list[dict],
             train_progress: TrainProgress,
     ):
-        enumerate_input = __enumerate_input_modules(args)
-        load_input = __load_input_modules(args)
-        mask_augmentation = __mask_augmentation_modules(args)
-        aspect_bucketing_in = __aspect_bucketing_in(args)
-        crop_modules = __crop_modules(args)
-        augmentation_modules = __augmentation_modules(args)
-        preparation_modules = __preparation_modules(args, model)
-        cache_modules = __cache_modules(args)
-        output_modules = __output_modules(args)
+        enumerate_input = self.__enumerate_input_modules(args)
+        load_input = self.__load_input_modules(args)
+        mask_augmentation = self.__mask_augmentation_modules(args)
+        aspect_bucketing_in = self.__aspect_bucketing_in(args)
+        crop_modules = self.__crop_modules(args)
+        augmentation_modules = self.__augmentation_modules(args)
+        preparation_modules = self.__preparation_modules(args, model)
+        cache_modules = self.__cache_modules(args)
+        output_modules = self.__output_modules(args)
 
         debug_dir = os.path.join(args.debug_dir, "dataloader")
         debug_modules = [
@@ -202,7 +202,7 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
         settings = {}
 
         ds = MGDS(
-            args.train_device,
+            torch.device(args.train_device),
             args.train_dtype.torch_dtype(),
             args.train_dtype.enable_mixed_precision(),
             concepts,
