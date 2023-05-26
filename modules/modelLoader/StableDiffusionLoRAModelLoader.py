@@ -95,7 +95,10 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
                 return False
 
             # optimizer
-            model.optimizer_state_dict = torch.load(os.path.join(lora_name, "optimizer", "optimizer.pt"))
+            try:
+                model.optimizer_state_dict = torch.load(os.path.join(lora_name, "optimizer", "optimizer.pt"))
+            except FileNotFoundError:
+                pass
 
             # meta
             model.train_progress = train_progress

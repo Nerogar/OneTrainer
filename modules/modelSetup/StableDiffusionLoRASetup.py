@@ -50,15 +50,19 @@ class StableDiffusionLoRASetup(BaseModelSetup):
         param_groups = list()
 
         if args.train_text_encoder:
+            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.text_encoder_lora.parameters(),
-                'lr': args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
+                'lr': lr,
+                'initial_lr': lr,
             })
 
         if args.train_unet:
+            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.unet_lora.parameters(),
-                'lr': args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+                'lr': lr,
+                'initial_lr': lr,
             })
 
         return param_groups
@@ -90,7 +94,13 @@ class StableDiffusionLoRASetup(BaseModelSetup):
         model.unet_lora.hook_to_module()
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
+            params_for_optimizer = self.create_parameters_for_optimizer(model, args)
+            model.optimizer = create.create_optimizer(params_for_optimizer, args)
+
+            for i, params in enumerate(params_for_optimizer):
+                model.optimizer_state_dict['param_groups'][i]['lr'] = params['lr']
+                model.optimizer_state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
+
             # TODO: this will break if the optimizer class changed during a restart
             model.optimizer.load_state_dict(model.optimizer_state_dict)
             del model.optimizer_state_dict
@@ -151,10 +161,9 @@ class StableDiffusionLoRASetup(BaseModelSetup):
         model.vae.eval()
         model.unet.train()
 
-    def create_optimizer(
+    def get_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
     ) -> Optimizer:
         return model.optimizer
 

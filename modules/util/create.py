@@ -2,7 +2,8 @@ from typing import Iterable
 
 import torch
 from torch.nn import Parameter
-from torch.optim import AdamW, Adam
+from torch.optim import AdamW, Adam, SGD
+from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
@@ -26,9 +27,11 @@ from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFi
 from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.lr_scheduler_util import *
 
 
 def create_model_loader(
@@ -136,9 +139,15 @@ def create_data_loader(
 
 def create_optimizer(
         parameters: Iterable[Parameter] | list[dict],
-        args: TrainArgs = None,
-):
+        args: TrainArgs,
+) -> torch.optim.Optimizer:
     match args.optimizer:
+        case Optimizer.SGD:
+            return SGD(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
         case Optimizer.ADAM:
             return Adam(
                 params=parameters,
@@ -157,3 +166,48 @@ def create_optimizer(
                 foreach=False,  # disabled, because it uses too much VRAM
                 fused=True,
             )
+
+
+def create_lr_scheduler(
+        optimizer: torch.optim.Optimizer,
+        learning_rate_scheduler: LearningRateScheduler,
+        warmup_steps: int,
+        num_cycles: float,
+        max_epochs: int,
+        approximate_epoch_length: int,
+        global_step: int = 0,
+) -> LRScheduler:
+    match learning_rate_scheduler:
+        case LearningRateScheduler.CONSTANT:
+            lr_lambda = lr_lambda_constant()
+
+        case LearningRateScheduler.LINEAR:
+            lr_lambda = lr_lambda_linear(
+                warmup_steps, max_epochs, approximate_epoch_length
+            )
+
+        case LearningRateScheduler.COSINE:
+            lr_lambda = lr_lambda_cosine(
+                warmup_steps, max_epochs, approximate_epoch_length
+            )
+
+        case LearningRateScheduler.COSINE_WITH_RESTARTS:
+            lr_lambda = lr_lambda_cosine_with_restarts(
+                warmup_steps, num_cycles, max_epochs, approximate_epoch_length
+            )
+
+        case LearningRateScheduler.COSINE_WITH_HARD_RESTARTS:
+            lr_lambda = lr_lambda_cosine_with_hard_restarts(
+                warmup_steps, num_cycles, max_epochs, approximate_epoch_length
+            )
+        case _:
+            lr_lambda = lr_lambda_constant()
+
+    if warmup_steps > 0:
+        lr_lambda = lr_lambda_warmup(warmup_steps, lr_lambda)
+
+    return LambdaLR(
+        optimizer=optimizer,
+        lr_lambda=lr_lambda,
+        last_epoch=global_step - 1,
+    )

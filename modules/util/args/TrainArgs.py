@@ -1,7 +1,7 @@
 import argparse
 from enum import Enum
 
-from modules.util.args.arg_type_util import *
+from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.DataType import DataType
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
@@ -37,7 +37,10 @@ class TrainArgs:
 
     # training settings
     optimizer: Optimizer
+    learning_rate_scheduler: LearningRateScheduler
     learning_rate: float
+    learning_rate_warmup_steps: int
+    learning_rate_cycles: float
     weight_decay: float
     epochs: int
     batch_size: int
@@ -177,7 +180,10 @@ class TrainArgs:
 
         # training settings
         parser.add_argument("--optimizer", type=Optimizer, required=False, default=Optimizer.ADAMW, dest="optimizer", help="The optimizer", choices=list(Optimizer))
+        parser.add_argument("--learning-rate-scheduler", type=LearningRateScheduler, required=False, default=LearningRateScheduler.CONSTANT, dest="learning_rate_scheduler", help="The learning rate scheduler")
         parser.add_argument("--learning-rate", type=float, required=False, default=3e-6, dest="learning_rate", help="The learning rate used when creating the optimizer")
+        parser.add_argument("--learning-rate-warmup-steps", type=int, required=False, default=0, dest="learning_rate_warmup_steps", help="The number of warmup steps when creating the learning rate scheduler")
+        parser.add_argument("--learning-rate-cycles", type=float, required=False, default=1, dest="learning_rate_cycles", help="The number of cycles of the learning rate scheduler")
         parser.add_argument("--weight-decay", type=float, required=False, default=1e-2, dest="weight_decay", help="The weight decay used when creating the optimizer")
         parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
@@ -235,8 +241,8 @@ class TrainArgs:
         args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
         args["extra_model_name"] = ""
         args["output_dtype"] = DataType.FLOAT_32
-        args["output_model_format"] = ModelFormat.SAFETENSORS
-        args["output_model_destination"] = "models/model.safetensors"
+        args["output_model_format"] = ModelFormat.CKPT
+        args["output_model_destination"] = "models/model.ckpt"
 
         # data settings
         args["concept_file_name"] = "training_concepts/concepts.json"
@@ -248,7 +254,10 @@ class TrainArgs:
 
         # training settings
         args["optimizer"] = Optimizer.ADAMW
+        args["learning_rate_scheduler"] = LearningRateScheduler.CONSTANT
         args["learning_rate"] = 3e-6
+        args["learning_rate_warmup_steps"] = 200
+        args["learning_rate_cycles"] = 1
         args["weight_decay"] = 1e-2
         args["loss_function"] = LossFunction.MSE
         args["epochs"] = 100
@@ -269,7 +278,7 @@ class TrainArgs:
         args["masked_training"] = False
         args["unmasked_probability"] = 0.1
         args["unmasked_weight"] = 0.1
-        args["normalize_masked_area_loss"] = True
+        args["normalize_masked_area_loss"] = False
         args["max_noising_strength"] = 1.0
         args["token_count"] = 1
         args["initial_embedding_text"] = "*"

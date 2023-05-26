@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class Optimizer(Enum):
+    SGD = 'SGD'
     ADAM = 'ADAM'
     ADAMW = 'ADAMW'
 

@@ -56,10 +56,9 @@ class BaseModelSetup(metaclass=ABCMeta):
         return self.create_parameters(model, args)
 
     @abstractmethod
-    def create_optimizer(
+    def get_optimizer(
             self,
             model: BaseModel,
-            args: TrainArgs,
     ) -> Optimizer:
         pass
 

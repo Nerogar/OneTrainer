@@ -14,6 +14,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
   to seamlessly continue training.
 - **Image augmentation**: Apply random transforms such as rotation, brightness, contrast or saturation to each image
   sample to quickly create a more diverse dataset.
+- **Tensorboard**: A simple tensorboard integration to track the training progress. 
 - **Multiple prompts per image**: Train the model on multiple different prompts per image sample. 
 
 ## Planned Features

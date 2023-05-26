@@ -21,7 +21,7 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import path_util
+from modules.util import path_util, create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
@@ -55,6 +55,7 @@ class GenericTrainer(BaseTrainer):
             self.tensorboard_subprocess = subprocess.Popen(
                 f"{tensorboard_executable} --logdir {tensorboard_log_dir} --port 6006 --samples_per_plugin=images=100"
             )
+        self.one_step_trained = False
 
     def start(self):
         self.model_loader = self.create_model_loader()
@@ -167,7 +168,16 @@ class GenericTrainer(BaseTrainer):
                     cached_epochs[epoch % self.args.latent_caching_epochs] = True
             return
 
-        optimizer = self.model_setup.create_optimizer(self.model, self.args)
+        optimizer = self.model_setup.get_optimizer(self.model)
+        lr_scheduler = create.create_lr_scheduler(
+            optimizer=optimizer,
+            learning_rate_scheduler=self.args.learning_rate_scheduler,
+            warmup_steps=self.args.learning_rate_warmup_steps,
+            num_cycles=self.args.learning_rate_cycles,
+            max_epochs=self.args.epochs,
+            approximate_epoch_length=self.data_loader.ds.approximate_length(),
+            global_step=train_progress.global_step
+        )
 
         scaler = GradScaler()
 
@@ -208,10 +218,15 @@ class GenericTrainer(BaseTrainer):
                     scaler.step(optimizer)
                     scaler.update()
                     optimizer.zero_grad()
+                    lr_scheduler.step()
 
+                    self.tensorboard.add_scalar(
+                        "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
+                    )
                     self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
                     accumulated_loss = 0.0
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
+                    self.one_step_trained = True
 
                 train_progress.next_step(self.args.batch_size)
                 self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
@@ -226,7 +241,7 @@ class GenericTrainer(BaseTrainer):
                 break
 
     def end(self):
-        if not self.args.only_cache:
+        if self.one_step_trained:
             if self.args.backup_before_save:
                 self.backup()
 

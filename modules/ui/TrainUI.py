@@ -18,6 +18,7 @@ from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.DataType import DataType
+from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -39,7 +40,7 @@ class TrainUI(ctk.CTk):
         super(TrainUI, self).__init__()
 
         self.title("OneTrainer")
-        self.geometry("1000x700")
+        self.geometry("1100x700")
 
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
@@ -225,29 +226,41 @@ class TrainUI(ctk.CTk):
         components.label(master, 0, 0, "Optimizer")
         components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
 
+        # learning rate scheduler
+        components.label(master, 1, 0, "Learning Rate Scheduler")
+        components.options(master, 1, 1,  [str(x) for x in list(LearningRateScheduler)], self.ui_state, "learning_rate_scheduler")
+
         # learning rate
-        components.label(master, 1, 0, "Learning Rate")
-        components.entry(master, 1, 1, self.ui_state, "learning_rate")
+        components.label(master, 2, 0, "Learning Rate")
+        components.entry(master, 2, 1, self.ui_state, "learning_rate")
+
+        # learning rate warmup steps
+        components.label(master, 3, 0, "Learning Rate Warmup Steps")
+        components.entry(master, 3, 1, self.ui_state, "learning_rate_warmup_steps")
+
+        # learning rate cycles
+        components.label(master, 4, 0, "Learning Rate Cycles")
+        components.entry(master, 4, 1, self.ui_state, "learning_rate_cycles")
 
         # weight decay
-        components.label(master, 2, 0, "Weight Decay")
-        components.entry(master, 2, 1, self.ui_state, "weight_decay")
+        components.label(master, 5, 0, "Weight Decay")
+        components.entry(master, 5, 1, self.ui_state, "weight_decay")
 
         # loss function
-        components.label(master, 3, 0, "Loss Function")
-        components.options(master, 3, 1, [str(x) for x in list(LossFunction)], self.ui_state, "loss_function")
+        components.label(master, 6, 0, "Loss Function")
+        components.options(master, 6, 1, [str(x) for x in list(LossFunction)], self.ui_state, "loss_function")
 
         # epochs
-        components.label(master, 4, 0, "Epochs")
-        components.entry(master, 4, 1, self.ui_state, "epochs")
+        components.label(master, 7, 0, "Epochs")
+        components.entry(master, 7, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(master, 5, 0, "Batch Size")
-        components.entry(master, 5, 1, self.ui_state, "batch_size")
+        components.label(master, 8, 0, "Batch Size")
+        components.entry(master, 8, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(master, 6, 0, "Accumulation Steps")
-        components.entry(master, 6, 1, self.ui_state, "gradient_accumulation_steps")
+        components.label(master, 9, 0, "Accumulation Steps")
+        components.entry(master, 9, 1, self.ui_state, "gradient_accumulation_steps")
 
         # column 2
         # train text encoder
@@ -363,6 +376,8 @@ class TrainUI(ctk.CTk):
         pass
 
     def training_thread_function(self):
+        error_caught = False
+
         callbacks = TrainCallbacks(
             on_update_progress=self.on_update_progress,
             on_update_status=self.on_update_status,
@@ -371,10 +386,11 @@ class TrainUI(ctk.CTk):
 
         trainer = GenericTrainer(self.train_args, callbacks, self.training_commands)
 
-        trainer.start()
         try:
+            trainer.start()
             trainer.train()
         except:
+            error_caught = True
             traceback.print_exc()
 
         if self.train_args.backup_before_save:
@@ -382,7 +398,10 @@ class TrainUI(ctk.CTk):
 
         torch.cuda.empty_cache()
 
-        self.on_update_status("stopped")
+        if error_caught:
+            self.on_update_status("error: check the console for more information")
+        else:
+            self.on_update_status("stopped")
 
         self.training_thread = None
         self.training_button.configure(text="Start Training", state="normal")

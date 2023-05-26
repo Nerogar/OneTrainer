@@ -38,6 +38,19 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
     ) -> Iterable[Parameter]:
         return model.text_encoder.get_input_embeddings().parameters()
 
+    def create_parameters_for_optimizer(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+    ) -> Iterable[Parameter] | list[dict]:
+        return [
+            {
+                'params': model.text_encoder.get_input_embeddings().parameters(),
+                'lr': args.learning_rate,
+                'initial_lr': args.learning_rate,
+            }
+        ]
+
     def setup_model(
             self,
             model: StableDiffusionModel,
@@ -91,7 +104,13 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
                                                   token_count)]
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
+            params_for_optimizer = self.create_parameters_for_optimizer(model, args)
+            model.optimizer = create.create_optimizer(params_for_optimizer, args)
+
+            for i, params in enumerate(params_for_optimizer):
+                model.optimizer_state_dict['param_groups'][i]['lr'] = params['lr']
+                model.optimizer_state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
+
             # TODO: this will break if the optimizer class changed during a restart
             model.optimizer.load_state_dict(model.optimizer_state_dict)
             del model.optimizer_state_dict
@@ -140,10 +159,9 @@ class StableDiffusionEmbeddingSetup(BaseModelSetup):
         model.vae.eval()
         model.unet.train()
 
-    def create_optimizer(
+    def get_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
     ) -> Optimizer:
         return model.optimizer
 

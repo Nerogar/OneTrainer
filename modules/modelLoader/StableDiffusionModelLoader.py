@@ -32,7 +32,10 @@ class StableDiffusionModelLoader(BaseModelLoader):
             model = StableDiffusionModelLoader.__load_diffusers(model_type, base_model_name)
 
             # optimizer
-            model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
+            try:
+                model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
+            except FileNotFoundError:
+                pass
 
             # meta
             model.train_progress = train_progress

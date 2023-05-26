@@ -1,7 +1,7 @@
 from typing import Iterable
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor
+from diffusers.models.attention_processor import XFormersAttnProcessor
 from diffusers.utils.import_utils import is_xformers_available
 from torch import Tensor
 from torch.nn import Parameter
@@ -50,15 +50,20 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
         param_groups = list()
 
         if args.train_text_encoder:
+            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
+
             param_groups.append({
                 'params': model.text_encoder.parameters(),
-                'lr': args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
+                'lr': lr,
+                'initial_lr': lr,
             })
 
         if args.train_unet:
+            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.unet.parameters(),
-                'lr': args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+                'lr': lr,
+                'initial_lr': lr,
             })
 
         return param_groups
@@ -77,7 +82,13 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
         model.vae.requires_grad_(False)
 
         if model.optimizer_state_dict is not None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
+            params_for_optimizer = self.create_parameters_for_optimizer(model, args)
+            model.optimizer = create.create_optimizer(params_for_optimizer, args)
+
+            for i, params in enumerate(params_for_optimizer):
+                model.optimizer_state_dict['param_groups'][i]['lr'] = params['lr']
+                model.optimizer_state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
+
             # TODO: this will break if the optimizer class changed during a restart
             model.optimizer.load_state_dict(model.optimizer_state_dict)
             del model.optimizer_state_dict
@@ -128,10 +139,9 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
         model.vae.train()
         model.unet.train()
 
-    def create_optimizer(
+    def get_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
     ) -> Optimizer:
         return model.optimizer
 
@@ -173,7 +183,8 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
         else:
             latent_noise = torch.randn(
-                scaled_latent_image.shape, generator=generator, device=args.train_device, dtype=args.train_dtype.torch_dtype()
+                scaled_latent_image.shape, generator=generator, device=args.train_device,
+                dtype=args.train_dtype.torch_dtype()
             )
 
         timestep = torch.randint(
