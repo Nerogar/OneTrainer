@@ -143,25 +143,11 @@ class MgdsStablDiffusionBaseDataLoader:
         return modules
 
 
-    def _inpainting_modules(self, args: TrainArgs):
-        conditioning_image = GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image')
-
-        modules = []
-
-        if args.model_type.has_conditioning_image_input():
-            modules.append(conditioning_image)
-
-        return modules
-
-
     def _augmentation_modules(self, args: TrainArgs):
         inputs = ['image']
 
         if args.masked_training or args.model_type.has_mask_input():
             inputs.append('mask')
-
-        if args.model_type.has_conditioning_image_input():
-            inputs.append('conditioning_image')
 
         if args.model_type.has_depth_input():
             inputs.append('depth')
@@ -185,24 +171,37 @@ class MgdsStablDiffusionBaseDataLoader:
         return modules
 
 
-    def _preparation_modules(self, args: TrainArgs, model: StableDiffusionModel):
-        rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
-        mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
-        conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
-        depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
-        tokens = Tokenize(in_name='prompt', out_name='tokens', tokenizer=model.tokenizer)
+    def _inpainting_modules(self, args: TrainArgs):
+        conditioning_image = GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image', image_range_min=0, image_range_max=1)
 
-        modules = [rescale_image, image, tokens]
-
-        if args.masked_training or args.model_type.has_mask_input():
-            modules.append(mask)
+        modules = []
 
         if args.model_type.has_conditioning_image_input():
             modules.append(conditioning_image)
 
+        return modules
+
+
+    def _preparation_modules(self, args: TrainArgs, model: StableDiffusionModel):
+        rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
+        downscale_mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
+        downscale_depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
+        tokenize_prompt = Tokenize(in_name='prompt', out_name='tokens', tokenizer=model.tokenizer)
+
+        modules = [rescale_image, encode_image, tokenize_prompt]
+
+        if args.masked_training or args.model_type.has_mask_input():
+            modules.append(downscale_mask)
+
+        if args.model_type.has_conditioning_image_input():
+            modules.append(rescale_conditioning_image)
+            modules.append(encode_conditioning_image)
+
         if args.model_type.has_depth_input():
-            modules.append(depth)
+            modules.append(downscale_depth)
 
         return modules
 
@@ -318,8 +317,8 @@ class MgdsStablDiffusionBaseDataLoader:
         mask_augmentation = self._mask_augmentation_modules(args)
         aspect_bucketing_in = self._aspect_bucketing_in(args)
         crop_modules = self._crop_modules(args)
-        inpainting_modules = self._inpainting_modules(args)
         augmentation_modules = self._augmentation_modules(args)
+        inpainting_modules = self._inpainting_modules(args)
         preparation_modules = self._preparation_modules(args, model)
         cache_modules = self._cache_modules(args)
         output_modules = self._output_modules(args, model)
@@ -343,8 +342,8 @@ class MgdsStablDiffusionBaseDataLoader:
                 mask_augmentation,
                 aspect_bucketing_in,
                 crop_modules,
-                inpainting_modules,
                 augmentation_modules,
+                inpainting_modules,
                 preparation_modules,
                 cache_modules,
                 output_modules,
