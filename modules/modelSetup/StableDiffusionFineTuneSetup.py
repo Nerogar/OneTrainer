@@ -198,7 +198,15 @@ class StableDiffusionFineTuneSetup(BaseModelSetup):
             original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
         )
 
-        text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True)[0]
+        if args.text_encoder_layer_skip > 0:
+            text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True, output_hidden_states=True)
+            final_layer_norm = model.text_encoder.text_model.final_layer_norm
+            text_encoder_output = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
+            )
+        else:
+            text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True)
+            text_encoder_output = text_encoder_output.last_hidden_state
 
         if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
             latent_input = torch.concat(

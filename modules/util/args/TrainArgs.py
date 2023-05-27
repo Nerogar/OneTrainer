@@ -48,6 +48,7 @@ class TrainArgs:
     train_text_encoder: bool
     train_text_encoder_epochs: int
     text_encoder_learning_rate: float
+    text_encoder_layer_skip: int
     train_unet: bool
     train_unet_epochs: int
     unet_learning_rate: float
@@ -192,6 +193,7 @@ class TrainArgs:
         parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
         parser.add_argument("--train-text-encoder-epochs", type=int, required=False, default=2 ** 30, dest="train_text_encoder_epochs", help="Number of epochs to train the text encoder for")
         parser.add_argument("--text-encoder-learning-rate", type=float, required=False, default=None, dest="text_encoder_learning_rate", help="Learning rate for the text encoder")
+        parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
         parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
@@ -266,6 +268,7 @@ class TrainArgs:
         args["train_text_encoder"] = True
         args["train_text_encoder_epochs"] = 30
         args["text_encoder_learning_rate"] = 3e-6
+        args["text_encoder_layer_skip"] = 0
         args["train_unet"] = True
         args["train_unet_epochs"] = 100
         args["unet_learning_rate"] = 3e-6

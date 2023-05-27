@@ -275,21 +275,25 @@ class TrainUI(ctk.CTk):
         components.label(master, 2, 3, "Text Encoder Learning Rate")
         components.entry(master, 2, 4, self.ui_state, "text_encoder_learning_rate")
 
+        # text encoder layer skip (clip skip)
+        components.label(master, 3, 3, "Clip Skip")
+        components.entry(master, 3, 4, self.ui_state, "text_encoder_layer_skip")
+
         # offset noise weight
-        components.label(master, 4, 3, "Offset Noise Weight")
-        components.entry(master, 4, 4, self.ui_state, "offset_noise_weight")
+        components.label(master, 5, 3, "Offset Noise Weight")
+        components.entry(master, 5, 4, self.ui_state, "offset_noise_weight")
 
         # train dtype
-        components.label(master, 5, 3, "Train Data Type")
-        components.options_kv(master, 5, 4, [
+        components.label(master, 6, 3, "Train Data Type")
+        components.options_kv(master, 6, 4, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "train_dtype")
 
         # resolution
-        components.label(master, 6, 3, "Resolution")
-        components.entry(master, 6, 4, self.ui_state, "resolution")
+        components.label(master, 7, 3, "Resolution")
+        components.entry(master, 7, 4, self.ui_state, "resolution")
 
         # column 3
         # train unet
@@ -305,24 +309,24 @@ class TrainUI(ctk.CTk):
         components.entry(master, 2, 7, self.ui_state, "unet_learning_rate")
 
         # Masked Training
-        components.label(master, 4, 6, "Masked Training")
-        components.switch(master, 4, 7, self.ui_state, "masked_training")
+        components.label(master, 5, 6, "Masked Training")
+        components.switch(master, 5, 7, self.ui_state, "masked_training")
 
         # unmasked probability
-        components.label(master, 5, 6, "Unmasked Probability")
-        components.entry(master, 5, 7, self.ui_state, "unmasked_probability")
+        components.label(master, 6, 6, "Unmasked Probability")
+        components.entry(master, 6, 7, self.ui_state, "unmasked_probability")
 
         # unmasked weight
-        components.label(master, 6, 6, "Unmasked Weight")
-        components.entry(master, 6, 7, self.ui_state, "unmasked_weight")
+        components.label(master, 7, 6, "Unmasked Weight")
+        components.entry(master, 7, 7, self.ui_state, "unmasked_weight")
 
         # normalize masked area loss
-        components.label(master, 7, 6, "Normalize Masked Area Loss")
-        components.switch(master, 7, 7, self.ui_state, "normalize_masked_area_loss")
+        components.label(master, 8, 6, "Normalize Masked Area Loss")
+        components.switch(master, 8, 7, self.ui_state, "normalize_masked_area_loss")
 
         # max noising strength
-        components.label(master, 8, 6, "Max Noising Strength")
-        components.entry(master, 8, 7, self.ui_state, "max_noising_strength")
+        components.label(master, 9, 6, "Max Noising Strength")
+        components.entry(master, 9, 7, self.ui_state, "max_noising_strength")
 
     def sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
