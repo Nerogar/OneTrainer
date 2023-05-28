@@ -85,8 +85,8 @@ class LinearLoRAModule(LoRAModule):
         in_features = orig_module.in_features
         out_features = orig_module.out_features
 
-        self.lora_down = Linear(in_features, rank, bias=False)
-        self.lora_up = Linear(rank, out_features, bias=False)
+        self.lora_down = Linear(in_features, rank, bias=False, device=orig_module.weight.device)
+        self.lora_up = Linear(rank, out_features, bias=False, device=orig_module.weight.device)
 
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
@@ -98,8 +98,8 @@ class Conv2dLoRAModule(LoRAModule):
         in_channels = orig_module.in_channels
         out_channels = orig_module.out_channels
 
-        self.lora_down = Conv2d(in_channels, rank, (1, 1), bias=False)
-        self.lora_up = Conv2d(rank, out_channels, (1, 1), bias=False)
+        self.lora_down = Conv2d(in_channels, rank, (1, 1), bias=False, device=orig_module.weight.device)
+        self.lora_up = Conv2d(rank, out_channels, (1, 1), bias=False, device=orig_module.weight.device)
 
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)

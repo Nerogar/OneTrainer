@@ -1,0 +1,27 @@
+a photo of a <embedding>
+a rendering of a <embedding>
+a cropped photo of the <embedding>
+the photo of a <embedding>
+a photo of a clean <embedding>
+a photo of a dirty <embedding>
+a dark photo of the <embedding>
+a photo of my <embedding>
+a photo of the cool <embedding>
+a close-up photo of a <embedding>
+a bright photo of the <embedding>
+a cropped photo of a <embedding>
+a photo of the <embedding>
+a good photo of the <embedding>
+a photo of one <embedding>
+a close-up photo of the <embedding>
+a rendition of the <embedding>
+a photo of the clean <embedding>
+a rendition of a <embedding>
+a photo of a nice <embedding>
+a good photo of a <embedding>
+a photo of the nice <embedding>
+a photo of the small <embedding>
+a photo of the weird <embedding>
+a photo of the large <embedding>
+a photo of a cool <embedding>
+a photo of a small <embedding>

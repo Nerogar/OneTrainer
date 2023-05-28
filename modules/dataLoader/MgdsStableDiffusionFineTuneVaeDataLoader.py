@@ -142,11 +142,14 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
 
         disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names,
                                cached_epochs=args.latent_caching_epochs)
+        ram_cache = RamCache(names=split_names + aggregate_names)
 
         modules = []
 
         if args.latent_caching:
             modules.append(disk_cache)
+        else:
+            modules.append(ram_cache)
 
         return modules
 

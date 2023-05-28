@@ -2,6 +2,7 @@ import json
 import os
 
 import torch
+from safetensors.torch import load_file
 
 from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -26,6 +27,25 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader):
                 name=name,
                 vector=string_to_param_dict['*'],
                 token_count=string_to_param_dict['*'].shape[0]
+            )
+
+            model.embeddings = [embedding]
+
+            return True
+        except:
+            return False
+
+    @staticmethod
+    def __load_safetensors(model: StableDiffusionModel, embedding_name: str) -> bool:
+        try:
+            embedding_state = load_file(embedding_name)
+
+            tensor = embedding_state["emp_params"]
+
+            embedding = StableDiffusionModelEmbedding(
+                name="*",
+                vector=tensor,
+                token_count=tensor.shape[0]
             )
 
             model.embeddings = [embedding]
@@ -72,6 +92,9 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader):
         model = base_model_loader.load(model_type, base_model_name, None)
 
         embedding_loaded = self.__load_internal(model, extra_model_name)
+
+        if not embedding_loaded:
+            embedding_loaded = self.__load_safetensors(model, extra_model_name)
 
         if not embedding_loaded:
             embedding_loaded = self.__load_ckpt(model, extra_model_name)

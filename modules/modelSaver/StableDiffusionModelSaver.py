@@ -4,6 +4,7 @@ import os.path
 from pathlib import Path
 
 import torch
+from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -41,11 +42,27 @@ class StableDiffusionModelSaver(BaseModelSaver):
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = convert_sd_diffusers_to_ckpt(model.vae.state_dict(), model.unet.state_dict(), model.text_encoder.state_dict())
+        state_dict = convert_sd_diffusers_to_ckpt(
+            model.vae.state_dict(), model.unet.state_dict(), model.text_encoder.state_dict()
+        )
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
+
+    @staticmethod
+    def __save_safetensors(
+            model: StableDiffusionModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+        state_dict = convert_sd_diffusers_to_ckpt(
+            model.vae.state_dict(), model.unet.state_dict(),model.text_encoder.state_dict()
+        )
+        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        save_file(save_state_dict, destination)
 
     @staticmethod
     def __save_internal(
@@ -92,6 +109,6 @@ class StableDiffusionModelSaver(BaseModelSaver):
                 case ModelFormat.CKPT:
                     self.__save_ckpt(model, output_model_destination, dtype)
                 case ModelFormat.SAFETENSORS:
-                    raise NotImplementedError
+                    self.__save_safetensors(model, output_model_destination, dtype)
                 case ModelFormat.INTERNAL:
                     self.__save_internal(model, output_model_destination)

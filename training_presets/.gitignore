@@ -5,3 +5,5 @@
 !sd_1.5_masked.json
 !sd_1.5_inpaint.json
 !sd_1.5_inpaint_masked.json
+!sd_1.5_embedding.json
+!sd_1.5_LoRA.json

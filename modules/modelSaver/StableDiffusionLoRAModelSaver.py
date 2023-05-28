@@ -2,7 +2,9 @@ import json
 import os.path
 from pathlib import Path
 
+from safetensors.torch import save_file
 import torch
+from torch import Tensor
 
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -14,21 +16,40 @@ from modules.util.enum.ModelType import ModelType
 class StableDiffusionLoRAModelSaver(BaseModelSaver):
 
     @staticmethod
+    def __get_state_dict(model: StableDiffusionModel) -> dict[str, Tensor]:
+        state_dict = {}
+        if model.text_encoder_lora is not None:
+            state_dict |= model.text_encoder_lora.state_dict()
+        if model.unet_lora is not None:
+            state_dict |= model.unet_lora.state_dict()
+
+        return state_dict
+
+    @staticmethod
     def __save_ckpt(
             model: StableDiffusionModel,
             destination: str,
             dtype: torch.dtype,
     ):
 
-        state_dict = {}
-        if model.text_encoder_lora is not None:
-            state_dict |= model.text_encoder_lora.state_dict()
-        if model.unet_lora is not None:
-            state_dict |= model.unet_lora.state_dict()
+        state_dict = StableDiffusionLoRAModelSaver.__get_state_dict(model)
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
+
+    @staticmethod
+    def __save_safetensors(
+            model: StableDiffusionModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+
+        state_dict = StableDiffusionLoRAModelSaver.__get_state_dict(model)
+        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        save_file(save_state_dict, destination)
 
     @staticmethod
     def __save_internal(
@@ -86,6 +107,6 @@ class StableDiffusionLoRAModelSaver(BaseModelSaver):
                 case ModelFormat.CKPT:
                     self.__save_ckpt(model, output_model_destination, dtype)
                 case ModelFormat.SAFETENSORS:
-                    raise NotImplementedError
+                    self.__save_safetensors(model, output_model_destination, dtype)
                 case ModelFormat.INTERNAL:
                     self.__save_internal(model, output_model_destination)

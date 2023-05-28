@@ -232,13 +232,13 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
 
                 if self.commands.get_stop_command():
-                    break
+                    return
 
             train_progress.next_epoch()
             self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
 
             if self.commands.get_stop_command():
-                break
+                return
 
     def end(self):
         if self.one_step_trained:

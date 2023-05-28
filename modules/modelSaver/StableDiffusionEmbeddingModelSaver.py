@@ -3,6 +3,7 @@ import os.path
 from pathlib import Path
 
 import torch
+from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -32,6 +33,21 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
                 "sd_checkpoint": "",
                 "sd_checkpoint_name": "",
             },
+            destination
+        )
+
+    @staticmethod
+    def __save_safetensors(
+            model: StableDiffusionModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+
+        vector_cpu = model.embeddings[0].vector.to("cpu", dtype)
+
+        save_file(
+            {"emp_params": vector_cpu},
             destination
         )
 
@@ -84,6 +100,6 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
                 case ModelFormat.CKPT:
                     self.__save_ckpt(model, output_model_destination, dtype)
                 case ModelFormat.SAFETENSORS:
-                    raise NotImplementedError
+                    self.__save_safetensors(model, output_model_destination, dtype)
                 case ModelFormat.INTERNAL:
                     self.__save_internal(model, output_model_destination)

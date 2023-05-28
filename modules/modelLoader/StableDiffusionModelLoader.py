@@ -142,12 +142,45 @@ class StableDiffusionModelLoader(BaseModelLoader):
         except:
             return None
 
+    @staticmethod
+    def __load_safetensors(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
+        try:
+            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+            if not os.path.exists(yaml_name):
+                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
+                if not os.path.exists(yaml_name):
+                    yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
+
+            pipeline = download_from_original_stable_diffusion_ckpt(
+                checkpoint_path=base_model_name,
+                original_config_file=yaml_name,
+                load_safety_checker=False,
+                from_safetensors=True,
+            )
+
+            return StableDiffusionModel(
+                model_type=model_type,
+                tokenizer=pipeline.tokenizer,
+                noise_scheduler=pipeline.scheduler,
+                text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
+                vae=pipeline.vae.to(dtype=torch.float32),
+                unet=pipeline.unet.to(dtype=torch.float32),
+                image_depth_processor=None,  # TODO
+                depth_estimator=None,  # TODO
+            )
+        except:
+            return None
+
     def load(self, model_type: ModelType, base_model_name: str, extra_model_name: None) -> StableDiffusionModel | None:
         model = self.__load_internal(model_type, base_model_name)
         if model is not None:
             return model
 
         model = self.__load_diffusers(model_type, base_model_name)
+        if model is not None:
+            return model
+
+        model = self.__load_safetensors(model_type, base_model_name)
         if model is not None:
             return model
 

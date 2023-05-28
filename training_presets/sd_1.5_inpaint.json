@@ -16,7 +16,7 @@
     "random_rotate_and_crop": false,
     "aspect_ratio_bucketing": true,
     "latent_caching": true,
-    "latent_caching_epochs": 10,
+    "latent_caching_epochs": 1,
     "learning_rate_scheduler": "CONSTANT",
     "optimizer": "ADAMW",
     "learning_rate_warmup_steps": 200,

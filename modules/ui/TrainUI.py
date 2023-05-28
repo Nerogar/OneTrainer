@@ -23,6 +23,7 @@ from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -55,6 +56,7 @@ class TrainUI(ctk.CTk):
 
         self.status_label = None
         self.training_button = None
+        self.tabview = None
 
         self.top_bar(self)
         self.content_frame(self)
@@ -65,7 +67,7 @@ class TrainUI(ctk.CTk):
         self.training_commands = None
 
     def top_bar(self, master):
-        TopBar(master, self.train_args, self.ui_state)
+        TopBar(master, self.train_args, self.ui_state, self.change_training_method)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -96,17 +98,19 @@ class TrainUI(ctk.CTk):
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
-        tabview = ctk.CTkTabview(frame)
-        tabview.grid(row=0, column=0, sticky="nsew")
+        self.tabview = ctk.CTkTabview(frame)
+        self.tabview.grid(row=0, column=0, sticky="nsew")
 
-        self.general_tab(tabview.add("general"))
-        self.model_tab(tabview.add("model"))
-        self.data_tab(tabview.add("data"))
-        self.concepts_tab(tabview.add("concepts"))
-        self.training_tab(tabview.add("training"))
-        self.sampling_tab(tabview.add("sampling"))
-        self.backup_tab(tabview.add("backup"))
-        self.tools_tab(tabview.add("tools"))
+        self.general_tab(self.tabview.add("general"))
+        self.model_tab(self.tabview.add("model"))
+        self.data_tab(self.tabview.add("data"))
+        self.concepts_tab(self.tabview.add("concepts"))
+        self.training_tab(self.tabview.add("training"))
+        self.sampling_tab(self.tabview.add("sampling"))
+        self.backup_tab(self.tabview.add("backup"))
+        self.tools_tab(self.tabview.add("tools"))
+
+        self.change_training_method(self.train_args.training_method)
 
         return frame
 
@@ -159,24 +163,21 @@ class TrainUI(ctk.CTk):
             ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
         ], self.ui_state, "model_type")
 
-        # extra model
-        components.label(master, 1, 0, "Extra Model")
-        components.file_entry(master, 1, 1, self.ui_state, "extra_model_name")
-
         # output model destination
-        components.label(master, 2, 0, "Model Output Destination")
-        components.file_entry(master, 2, 1, self.ui_state, "output_model_destination")
+        components.label(master, 1, 0, "Model Output Destination")
+        components.file_entry(master, 1, 1, self.ui_state, "output_model_destination", is_output=True)
 
         # output format
-        components.label(master, 2, 3, "Output Format")
-        components.options_kv(master, 2, 4, [
+        components.label(master, 1, 3, "Output Format")
+        components.options_kv(master, 1, 4, [
             ("Diffusers", ModelFormat.DIFFUSERS),
             ("Checkpoint", ModelFormat.CKPT),
+            ("Safetensors", ModelFormat.SAFETENSORS),
         ], self.ui_state, "output_model_format")
 
         # output data type
-        components.label(master, 3, 0, "Output Data Type")
-        components.options_kv(master, 3, 1, [
+        components.label(master, 2, 0, "Output Data Type")
+        components.options_kv(master, 2, 1, [
             ("float16", DataType.FLOAT_16),
             ("float32", DataType.FLOAT_32),
         ], self.ui_state, "output_dtype")
@@ -228,7 +229,8 @@ class TrainUI(ctk.CTk):
 
         # learning rate scheduler
         components.label(master, 1, 0, "Learning Rate Scheduler")
-        components.options(master, 1, 1,  [str(x) for x in list(LearningRateScheduler)], self.ui_state, "learning_rate_scheduler")
+        components.options(master, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
+                           "learning_rate_scheduler")
 
         # learning rate
         components.label(master, 2, 0, "Learning Rate")
@@ -361,8 +363,71 @@ class TrainUI(ctk.CTk):
         components.label(master, 1, 0, "Backup Before Save")
         components.switch(master, 1, 1, self.ui_state, "backup_before_save")
 
+    def lora_tab(self, master):
+        master.grid_columnconfigure(0, weight=0)
+        master.grid_columnconfigure(1, weight=1)
+        master.grid_columnconfigure(2, minsize=50)
+        master.grid_columnconfigure(3, weight=0)
+        master.grid_columnconfigure(4, weight=1)
+
+        # extra model
+        components.label(master, 0, 0, "LoRA base model")
+        components.file_entry(
+            master, 0, 1, self.ui_state, "extra_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
+        # lora rank
+        components.label(master, 1, 0, "LoRA rank")
+        components.entry(master, 1, 1, self.ui_state, "lora_rank")
+
+        # lora rank
+        components.label(master, 2, 0, "LoRA alpha")
+        components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+
+        return master
+
+    def embedding_tab(self, master):
+        master.grid_columnconfigure(0, weight=0)
+        master.grid_columnconfigure(1, weight=1)
+        master.grid_columnconfigure(2, minsize=50)
+        master.grid_columnconfigure(3, weight=0)
+        master.grid_columnconfigure(4, weight=1)
+
+        # extra model
+        components.label(master, 0, 0, "Base embedding")
+        components.file_entry(
+            master, 0, 1, self.ui_state, "extra_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
+        # token count
+        components.label(master, 1, 0, "Token count")
+        components.entry(master, 1, 1, self.ui_state, "token_count")
+
+        # initial embedding text
+        components.label(master, 2, 0, "Initial embedding text")
+        components.entry(master, 2, 1, self.ui_state, "initial_embedding_text")
+
+        return master
+
     def tools_tab(self, master):
         pass
+
+    def change_training_method(self, training_method: TrainingMethod):
+        if not self.tabview:
+            return
+
+        if training_method != TrainingMethod.LORA and "LoRA" in self.tabview._tab_dict:
+            self.tabview.delete("LoRA")
+        if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:
+            self.tabview.delete("embedding")
+
+        if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
+            self.lora_tab(self.tabview.add("LoRA"))
+        if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
+            self.embedding_tab(self.tabview.add("embedding"))
+
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)

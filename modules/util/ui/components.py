@@ -42,6 +42,7 @@ def entry(master, row, column, ui_state: UIState, var_name: str, command: Callab
 
 def file_entry(
         master, row, column, ui_state: UIState, var_name: str,
+        is_output: bool = False,
         path_modifier: Callable[[str], str] = None,
         command: Callable[[str], None] = None,
 ):
@@ -54,12 +55,20 @@ def file_entry(
     entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
 
     def __open_dialog():
-        file_path = filedialog.askopenfilename(filetypes=[
-            ("All Files", "*.*"),
-            ("Diffusers", "model_index.json"),
-            ("Checkpoint", "*.ckpt *.pt *.bin"),
-            ("Safetensors", "*.safetensors"),
-        ])
+        if is_output:
+            file_path = filedialog.asksaveasfilename(filetypes=[
+                ("All Files", "*.*"),
+                ("Diffusers", "model_index.json"),
+                ("Checkpoint", "*.ckpt *.pt *.bin"),
+                ("Safetensors", "*.safetensors"),
+            ])
+        else:
+            file_path = filedialog.askopenfilename(filetypes=[
+                ("All Files", "*.*"),
+                ("Diffusers", "model_index.json"),
+                ("Checkpoint", "*.ckpt *.pt *.bin"),
+                ("Safetensors", "*.safetensors"),
+            ])
 
         if file_path:
             if path_modifier:
@@ -139,7 +148,7 @@ def options(master, row, column, values, ui_state: UIState, var_name: str, comma
 
 
 def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
-               command: Callable[[str], None] = None):
+               command: Callable[[Any], None] = None):
     var = ui_state.vars[var_name]
     keys = [key for key, value in values]
 

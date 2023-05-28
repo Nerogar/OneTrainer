@@ -1,0 +1,4 @@
+# ignores everything except the builtin template files
+*
+!.gitignore
+!subject.txt

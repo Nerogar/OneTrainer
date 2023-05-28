@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Callable
 
 import customtkinter as ctk
 
@@ -11,10 +12,18 @@ from modules.util.ui.UIState import UIState
 
 
 class TopBar:
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(
+            self,
+            master,
+            train_args:
+            TrainArgs,
+            ui_state: UIState,
+            change_training_method_callback: Callable[[TrainingMethod], None]
+    ):
         self.master = master
         self.train_args = train_args
         self.ui_state = ui_state
+        self.change_training_method_callback = change_training_method_callback
 
         self.dir = "training_presets"
 
@@ -49,12 +58,18 @@ class TopBar:
 
         # training method
         components.options_kv(
-            self.frame, 0, 5, [
+            self.frame,
+            row=0,
+            column=5,
+            values=[
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
                 ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
-            ], self.ui_state, "training_method"
+            ],
+            ui_state=self.ui_state,
+            var_name="training_method",
+            command=self.change_training_method_callback
         )
 
     def __create_configs_dropdown(self):
