@@ -97,17 +97,18 @@ class ConfigList(metaclass=ABCMeta):
                     self.configs.append((name, path))
 
         if len(self.configs) == 0:
-            path = path_util.canonical_join(self.config_dir, self.default_config_name)
-            self.configs.append((self.default_config_name.removesuffix(".json"), path))
+            name = self.default_config_name.removesuffix(".json")
+            self.__create_config(name)
+            self.__save_current_config()
+
+    def __create_config(self, name: str):
+        name = path_util.safe_filename(name)
+        path = path_util.canonical_join(self.config_dir, f"{name}.json")
+        self.configs.append((name, path))
+        self.__create_configs_dropdown()
 
     def __add_config(self):
-        def create_config(name):
-            name = path_util.safe_filename(name)
-            path = path_util.canonical_join(self.config_dir, f"{name}.json")
-            self.configs.append((name, path))
-            self.__create_configs_dropdown()
-
-        dialogs.StringInputDialog(self.master, "name", "Name", create_config)
+        dialogs.StringInputDialog(self.master, "name", "Name", self.__create_config)
 
     def __add_element(self):
         i = len(self.current_config)
@@ -171,6 +172,9 @@ class ConfigList(metaclass=ABCMeta):
 
     def __save_current_config(self):
         try:
+            if not os.path.exists(self.config_dir):
+                os.mkdir(self.config_dir)
+
             with open(getattr(self.train_args, self.element_attr_name), "w") as f:
                 json.dump(self.current_config, f, indent=4)
         except:
