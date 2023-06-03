@@ -90,6 +90,10 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
         model.text_encoder_lora.hook_to_module()
         model.unet_lora.hook_to_module()
 
+        if args.rescale_noise_scheduler_to_zero_terminal_snr:
+            model.rescale_noise_scheduler_to_zero_terminal_snr()
+            model.force_v_prediction()
+
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
         )

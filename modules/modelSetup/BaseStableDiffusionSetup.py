@@ -190,4 +190,9 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
                         train_progress.global_step
                     )
 
-        return predicted_latent_noise, latent_noise
+        if model.noise_scheduler.config.prediction_type == 'epsilon':
+            return predicted_latent_noise, latent_noise
+        elif model.noise_scheduler.config.prediction_type == 'v_prediction':
+            predicted_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
+            return predicted_latent_noise, predicted_velocity
+

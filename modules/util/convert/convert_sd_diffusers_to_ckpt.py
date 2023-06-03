@@ -1,4 +1,5 @@
 import torch
+from diffusers import DDIMScheduler
 from torch import Tensor
 
 
@@ -337,14 +338,43 @@ def __map_text_encoder(in_states: dict, out_prefix: str, in_prefix: str) -> dict
     return out_states
 
 
-def convert_sd_diffusers_to_ckpt(vae_state_dict: dict, unet_state_dict: dict, text_encoder_state_dict: dict) -> dict:
+def __map_noise_scheduler(noise_scheduler: DDIMScheduler) -> dict:
+    out_states = {}
+
+    betas = noise_scheduler.betas
+    alphas = 1 - betas
+    alphas_cumprod = torch.cumprod(alphas, dim=0)
+    alphas_cumprod_prev = torch.cat((torch.tensor([1], dtype=alphas_cumprod.dtype), alphas_cumprod[:-1]))
+    posterior_variance = betas * (1 - alphas_cumprod_prev) / (1 - alphas_cumprod)
+
+    out_states["betas"] = betas
+    out_states["alphas_cumprod"] = alphas_cumprod
+    out_states["alphas_cumprod_prev"] = alphas_cumprod_prev
+    out_states["sqrt_alphas_cumprod"] = torch.sqrt(alphas_cumprod)
+    out_states["sqrt_one_minus_alphas_cumprod"] = torch.sqrt(1 - alphas_cumprod)
+    out_states["log_one_minus_alphas_cumprod"] = torch.log(1 - alphas_cumprod)
+    out_states["sqrt_recip_alphas_cumprod"] = torch.rsqrt(alphas_cumprod)
+    out_states["sqrt_recipm1_alphas_cumprod"] = torch.sqrt(1 / alphas_cumprod - 1)
+    out_states["posterior_variance"] = posterior_variance
+    out_states["posterior_log_variance_clipped"] = torch.log(posterior_variance.clamp(min=1e-20))
+    out_states["posterior_mean_coef1"] = (betas * torch.sqrt(alphas_cumprod_prev) / (1 - alphas_cumprod))
+    out_states["posterior_mean_coef2"] = ((1 - alphas_cumprod_prev) * torch.sqrt(alphas) / (1 - alphas_cumprod))
+
+    return out_states
+
+
+def convert_sd_diffusers_to_ckpt(
+        vae_state_dict: dict,
+        unet_state_dict: dict,
+        text_encoder_state_dict: dict,
+        noise_scheduler: DDIMScheduler,
+) -> dict:
     states = {}
 
     states |= __map_vae(vae_state_dict, "first_stage_model", "")
     states |= __map_unet(unet_state_dict, "model.diffusion_model", "")
     states |= __map_text_encoder(text_encoder_state_dict, "cond_stage_model.transformer", "")
-
-    # TODO: map the scheduler state
+    states |= __map_noise_scheduler(noise_scheduler)
 
     state_dict = {'state_dict': states}
 

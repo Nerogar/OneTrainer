@@ -2,7 +2,7 @@ import json
 import os
 
 import torch
-from diffusers import DDPMScheduler, AutoencoderKL, UNet2DConditionModel
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
 
@@ -52,7 +52,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 subfolder="tokenizer"
             )
 
-            noise_scheduler = DDPMScheduler.from_pretrained(
+            noise_scheduler = DDIMScheduler.from_pretrained(
                 base_model_name,
                 subfolder="scheduler"
             )

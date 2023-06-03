@@ -35,6 +35,7 @@
     "train_unet_epochs": 100000,
     "unet_learning_rate": 3e-06,
     "offset_noise_weight": 0.05,
+    "rescale_noise_scheduler_to_zero_terminal_snr": false,
     "train_device": "cuda",
     "temp_device": "cpu",
     "train_dtype": "FLOAT_16",

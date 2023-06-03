@@ -290,6 +290,10 @@ class TrainUI(ctk.CTk):
         components.label(master, 5, 3, "Offset Noise Weight")
         components.entry(master, 5, 4, self.ui_state, "offset_noise_weight")
 
+        # rescale noise scheduler to zero terminal SNR
+        components.label(master, 5, 3, "Rescale Noise Scheduler")
+        components.switch(master, 5, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+
         # train dtype
         components.label(master, 6, 3, "Train Data Type")
         components.options_kv(master, 6, 4, [

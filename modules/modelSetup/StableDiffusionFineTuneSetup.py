@@ -77,6 +77,10 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
 
         model.vae.requires_grad_(False)
 
+        if args.rescale_noise_scheduler_to_zero_terminal_snr:
+            model.rescale_noise_scheduler_to_zero_terminal_snr()
+            model.force_v_prediction()
+
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
         )

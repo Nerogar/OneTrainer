@@ -1,5 +1,5 @@
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler, StableDiffusionDepth2ImgPipeline, \
-    StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline
+from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
+    StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline, DDIMScheduler
 from torch import Tensor
 from torch.optim import Optimizer
 from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
@@ -7,6 +7,8 @@ from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTFor
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
+from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import \
+    rescale_noise_scheduler_to_zero_terminal_snr
 from modules.util.enum.ModelType import ModelType
 
 
@@ -21,7 +23,7 @@ class StableDiffusionModel(BaseModel):
     # base model data
     model_type: ModelType
     tokenizer: CLIPTokenizer
-    noise_scheduler: DDPMScheduler
+    noise_scheduler: DDIMScheduler
     text_encoder: CLIPTextModel
     vae: AutoencoderKL
     unet: UNet2DConditionModel
@@ -37,7 +39,7 @@ class StableDiffusionModel(BaseModel):
             self,
             model_type: ModelType,
             tokenizer: CLIPTokenizer,
-            noise_scheduler: DDPMScheduler,
+            noise_scheduler: DDIMScheduler,
             text_encoder: CLIPTextModel,
             vae: AutoencoderKL,
             unet: UNet2DConditionModel,
@@ -96,3 +98,12 @@ class StableDiffusionModel(BaseModel):
                 feature_extractor=None,
                 requires_safety_checker=False,
             )
+
+    def force_v_prediction(self):
+        self.noise_scheduler.config.prediction_type = 'v_prediction'
+
+    def force_epsilon_prediction(self):
+        self.noise_scheduler.config.prediction_type = 'epsilon'
+
+    def rescale_noise_scheduler_to_zero_terminal_snr(self):
+        rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
