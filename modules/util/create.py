@@ -139,17 +139,20 @@ def create_data_loader(
 
 def create_optimizer(
         parameters: Iterable[Parameter] | list[dict],
+        state_dict: dict | None,
         args: TrainArgs,
-) -> torch.optim.Optimizer:
+):
+    optimizer = None
+
     match args.optimizer:
         case Optimizer.SGD:
-            return SGD(
+            optimizer = SGD(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
         case Optimizer.ADAM:
-            return Adam(
+            optimizer = Adam(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
@@ -158,7 +161,7 @@ def create_optimizer(
                 fused=True,
             )
         case Optimizer.ADAMW:
-            return AdamW(
+            optimizer = AdamW(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
@@ -166,6 +169,17 @@ def create_optimizer(
                 foreach=False,  # disabled, because it uses too much VRAM
                 fused=True,
             )
+
+    if state_dict is not None:
+        for i, params in enumerate(parameters):
+            state_dict['param_groups'][i]['lr'] = params['lr']
+            state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
+
+        # TODO: this will break if the optimizer class changed during a restart
+        optimizer.load_state_dict(state_dict)
+        del state_dict
+
+    return optimizer
 
 
 def create_lr_scheduler(

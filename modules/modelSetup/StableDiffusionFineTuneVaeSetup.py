@@ -1,19 +1,17 @@
 from typing import Iterable
 
 import torch
-from diffusers.utils.import_utils import is_xformers_available
 from torch import Tensor
 from torch.nn import Parameter
-from torch.optim import Optimizer
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
+class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
     def __init__(
             self,
             train_device: torch.device,
@@ -56,19 +54,12 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
         model.vae.decoder.requires_grad_(True)
         model.unet.requires_grad_(False)
 
-        if model.optimizer_state_dict is not None and model.optimizer is None:
-            params_for_optimizer = self.create_parameters_for_optimizer(model, args)
-            model.optimizer = create.create_optimizer(params_for_optimizer, args)
+        model.optimizer = create.create_optimizer(
+            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+        )
+        del model.optimizer_state_dict
 
-            for i, params in enumerate(params_for_optimizer):
-                model.optimizer_state_dict['param_groups'][i]['lr'] = params['lr']
-                model.optimizer_state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
-
-            # TODO: this will break if the optimizer class changed during a restart
-            model.optimizer.load_state_dict(model.optimizer_state_dict)
-            del model.optimizer_state_dict
-        elif model.optimizer_state_dict is None and model.optimizer is None:
-            model.optimizer = create.create_optimizer(self.create_parameters_for_optimizer(model, args), args)
+        self.setup_optimizations()
 
     def setup_eval_device(
             self,
@@ -95,26 +86,9 @@ class StableDiffusionFineTuneVaeSetup(BaseModelSetup):
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
 
-        if is_xformers_available():
-            try:
-                model.vae.enable_xformers_memory_efficient_attention()
-            except Exception as e:
-                print(
-                    "Could not enable memory efficient attention. Make sure xformers is installed"
-                    f" correctly and a GPU is available: {e}"
-                )
-
-        model.vae.enable_gradient_checkpointing()
-
         model.text_encoder.eval()
         model.vae.train()
         model.unet.eval()
-
-    def get_optimizer(
-            self,
-            model: StableDiffusionModel,
-    ) -> Optimizer:
-        return model.optimizer
 
     def get_train_progress(
             self,

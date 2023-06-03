@@ -17,6 +17,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossFunction import LossFunction
@@ -264,6 +265,10 @@ class TrainUI(ctk.CTk):
         components.label(master, 9, 0, "Accumulation Steps")
         components.entry(master, 9, 1, self.ui_state, "gradient_accumulation_steps")
 
+        # attention mechanism
+        components.label(master, 10, 0, "Attention")
+        components.options(master, 10, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state, "attention_mechanism")
+
         # column 2
         # train text encoder
         components.label(master, 0, 3, "Train Text Encoder")
@@ -291,6 +296,7 @@ class TrainUI(ctk.CTk):
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
+            ("tfloat32", DataType.TFLOAT_32),
         ], self.ui_state, "train_dtype")
 
         # resolution

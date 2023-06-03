@@ -5,7 +5,6 @@ from typing import Iterable
 import torch
 from torch import Tensor
 from torch.nn import Parameter
-from torch.optim import Optimizer
 from torchvision import transforms
 
 from modules.model.BaseModel import BaseModel
@@ -54,13 +53,6 @@ class BaseModelSetup(metaclass=ABCMeta):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         return self.create_parameters(model, args)
-
-    @abstractmethod
-    def get_optimizer(
-            self,
-            model: BaseModel,
-    ) -> Optimizer:
-        pass
 
     @abstractmethod
     def get_train_progress(

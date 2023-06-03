@@ -1,6 +1,7 @@
 import argparse
 from enum import Enum
 
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.DataType import DataType
 from modules.util.enum.LossFunction import LossFunction
@@ -68,6 +69,7 @@ class TrainArgs:
     initial_embedding_text: str
     lora_rank: int
     lora_alpha: float
+    attention_mechanism: AttentionMechanism
 
     # sample settings
     sample_definition_file_name: str
@@ -200,7 +202,7 @@ class TrainArgs:
         parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--train-device", type=str, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
-        parser.add_argument("--train-dtype", type=DataType, required=False, default="float16", dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
+        parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
@@ -212,6 +214,7 @@ class TrainArgs:
         parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
         parser.add_argument("--lora-rank", type=int, required=False, default=1, dest="lora_rank", help="The rank parameter used when initializing new LoRA networks")
         parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
+        parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
 
         # sample settings
         parser.add_argument("--sample-definition-file-name", type=str, required=True, dest="sample_definition_file_name", help="The json file containing the sample definition")
@@ -287,6 +290,7 @@ class TrainArgs:
         args["initial_embedding_text"] = "*"
         args["lora_rank"] = 16
         args["lora_alpha"] = 1.0
+        args["attention_mechanism"] = AttentionMechanism.XFORMERS
 
         # sample settings
         args["sample_definition_file_name"] = "training_samples/samples.json"

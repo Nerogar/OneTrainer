@@ -58,6 +58,10 @@ class GenericTrainer(BaseTrainer):
         self.one_step_trained = False
 
     def start(self):
+        if self.args.train_dtype.enable_tf():
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+
         self.model_loader = self.create_model_loader()
         self.model_setup = self.create_model_setup()
 
@@ -84,6 +88,8 @@ class GenericTrainer(BaseTrainer):
         self.previous_sample_time = -1
 
     def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: dict = None):
+        torch.cuda.empty_cache()
+
         self.callbacks.on_update_status("sampling")
 
         self.model_setup.setup_eval_device(self.model)
@@ -121,7 +127,11 @@ class GenericTrainer(BaseTrainer):
 
         self.model_setup.setup_train_device(self.model, self.args)
 
+        torch.cuda.empty_cache()
+
     def backup(self):
+        torch.cuda.empty_cache()
+
         self.callbacks.on_update_status("creating backup")
 
         path = os.path.join(self.args.workspace_dir, "backup", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -134,6 +144,8 @@ class GenericTrainer(BaseTrainer):
             torch.float32
         )
         self.model_setup.setup_train_device(self.model, self.args)
+
+        torch.cuda.empty_cache()
 
     def __needs_sample(self, train_progress: TrainProgress):
         return self.action_needed("sample", self.args.sample_after, self.args.sample_after_unit, train_progress)
@@ -163,14 +175,11 @@ class GenericTrainer(BaseTrainer):
             for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
                 if not cached_epochs[epoch % self.args.latent_caching_epochs]:
                     self.data_loader.ds.start_next_epoch()
-                    for _ in tqdm(self.data_loader.dl, desc="step"):
-                        pass
                     cached_epochs[epoch % self.args.latent_caching_epochs] = True
             return
 
-        optimizer = self.model_setup.get_optimizer(self.model)
         lr_scheduler = create.create_lr_scheduler(
-            optimizer=optimizer,
+            optimizer=self.model.optimizer,
             learning_rate_scheduler=self.args.learning_rate_scheduler,
             warmup_steps=self.args.learning_rate_warmup_steps,
             num_cycles=self.args.learning_rate_cycles,
@@ -189,7 +198,7 @@ class GenericTrainer(BaseTrainer):
             self.data_loader.ds.start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
 
-            current_epoch_length = len(self.data_loader.dl)
+            current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
                 if self.__needs_sample(train_progress):
                     self.__sample_during_training(train_progress)
@@ -213,11 +222,11 @@ class GenericTrainer(BaseTrainer):
                 accumulated_loss += loss.item()
 
                 if self.__is_update_step(train_progress):
-                    scaler.unscale_(optimizer)
+                    scaler.unscale_(self.model.optimizer)
                     nn.utils.clip_grad_norm_(parameters, 1)
-                    scaler.step(optimizer)
+                    scaler.step(self.model.optimizer)
                     scaler.update()
-                    optimizer.zero_grad()
+                    self.model.optimizer.zero_grad()
                     lr_scheduler.step()
 
                     self.tensorboard.add_scalar(

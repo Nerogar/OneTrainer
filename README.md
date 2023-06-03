@@ -14,8 +14,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
   to seamlessly continue training.
 - **Image augmentation**: Apply random transforms such as rotation, brightness, contrast or saturation to each image
   sample to quickly create a more diverse dataset.
-- **Tensorboard**: A simple tensorboard integration to track the training progress. 
-- **Multiple prompts per image**: Train the model on multiple different prompts per image sample. 
+- **Tensorboard**: A simple tensorboard integration to track the training progress.
+- **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
 
 ## Planned Features
 
@@ -78,3 +78,12 @@ requests for new or improved functionality. You can find more information [here]
 
 Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
 For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.
+
+## Related Projects
+
+- **[MGDS](https://github.com/Nerogar/mgds)**: A custom dataset implementation for Pytorch that is built around the idea
+  of a node based graph.
+- **[StableTuner](https://github.com/devilismyfriend/StableTuner)**: Another training application for Stable Diffusion.
+  OneTrainer takes a lot of inspiration from StableTuner and wouldn't exist without it.
+- **[Visions of Chaos](https://softology.pro/voc.htm)**: A collection of machine learning tools that also includes
+  OneTrainer.

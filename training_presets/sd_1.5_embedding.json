@@ -49,6 +49,7 @@
     "initial_embedding_text": "*",
     "lora_rank": 16,
     "lora_alpha": 1.0,
+    "attention_mechanism": "XFORMERS",
     "sample_definition_file_name": "training_samples/samples.json",
     "sample_after": 1,
     "sample_after_unit": "MINUTE",

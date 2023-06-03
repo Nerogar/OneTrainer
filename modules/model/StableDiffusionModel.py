@@ -29,9 +29,6 @@ class StableDiffusionModel(BaseModel):
     depth_estimator: DPTForDepthEstimation
 
     # persistent training data
-    optimizer: Optimizer | None
-    optimizer_state_dict: dict | None
-    train_progress: TrainProgress
     embeddings: list[StableDiffusionModelEmbedding] | None
     text_encoder_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
@@ -52,7 +49,7 @@ class StableDiffusionModel(BaseModel):
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
     ):
-        super(StableDiffusionModel, self).__init__(model_type)
+        super(StableDiffusionModel, self).__init__(model_type, optimizer_state_dict, train_progress)
 
         self.tokenizer = tokenizer
         self.noise_scheduler = noise_scheduler
@@ -62,9 +59,6 @@ class StableDiffusionModel(BaseModel):
         self.image_depth_processor = image_depth_processor
         self.depth_estimator = depth_estimator
 
-        self.optimizer = None
-        self.optimizer_state_dict = optimizer_state_dict
-        self.train_progress = train_progress if train_progress is not None else TrainProgress()
         self.embeddings = embeddings if embeddings is not None else []
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
