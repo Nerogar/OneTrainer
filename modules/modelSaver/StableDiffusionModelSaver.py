@@ -54,7 +54,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
 
-        yaml_name = os.path.splitext(destination)[0] + '.xaml'
+        yaml_name = os.path.splitext(destination)[0] + '.yaml'
         with open(yaml_name, 'w', encoding='utf8') as f:
             yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
 
@@ -75,7 +75,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination)
 
-        yaml_name = os.path.splitext(destination)[0] + '.xaml'
+        yaml_name = os.path.splitext(destination)[0] + '.yaml'
         with open(yaml_name, 'w', encoding='utf8') as f:
             yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
 
