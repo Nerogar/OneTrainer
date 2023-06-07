@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Callable
 
 import torch
 from PIL import Image
@@ -16,7 +17,16 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         self.model_type = model_type
         self.train_device = train_device
 
-    def sample(self, prompt: str, resolution: tuple[int, int], seed: int, destination: str):
+    def sample(
+            self,
+            prompt: str,
+            resolution: tuple[int, int],
+            seed: int,
+            destination: str,
+            text_encoder_layer_skip: int,
+            force_last_timestep: bool = False,
+            on_sample: Callable[[Image], None] = lambda _: None,
+    ):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
 
         generator = torch.Generator(device=self.train_device)

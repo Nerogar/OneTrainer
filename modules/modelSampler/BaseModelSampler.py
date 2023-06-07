@@ -13,6 +13,8 @@ class BaseModelSampler(metaclass=ABCMeta):
             resolution: tuple[int, int],
             seed: int,
             destination: str,
+            text_encoder_layer_skip: int,
+            force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
         pass

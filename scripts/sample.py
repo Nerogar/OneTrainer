@@ -32,7 +32,13 @@ def main():
     )
 
     print("Sampling " + args.destination)
-    model_sampler.sample(prompt=args.prompt, size=(512, 512), seed=42, destination=args.destination)
+    model_sampler.sample(
+        prompt=args.prompt,
+        size=(512, 512),
+        seed=42,
+        destination=args.destination,
+        text_encoder_layer_skip=args.text_encoder_layer_skip,
+    )
 
 
 if __name__ == '__main__':

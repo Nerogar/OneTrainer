@@ -2,6 +2,7 @@ import json
 import os
 
 import torch
+import yaml
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
@@ -15,6 +16,22 @@ from modules.util.enum.ModelType import ModelType
 class StableDiffusionModelLoader(BaseModelLoader):
     def __init__(self):
         super(StableDiffusionModelLoader, self).__init__()
+
+    @staticmethod
+    def __default_yaml_name(model_type: ModelType) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_15:
+                return "resources/diffusers_model_config/v1-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
+                return "resources/diffusers_model_config/v1-inpainting-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_20:
+                return "resources/diffusers_model_config/v2-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
+                return "resources/diffusers_model_config/v2-inpainting-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_20_DEPTH:
+                return "resources/diffusers_model_config/v2-midas-inference.yaml"
+            case _:
+                return None
 
     @staticmethod
     def __load_internal(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
@@ -36,6 +53,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
             except FileNotFoundError:
                 pass
+
+            with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
+                model.sd_config = yaml.safe_load(f)
 
             # meta
             model.train_progress = train_progress
@@ -85,6 +105,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 subfolder="depth_estimator"
             ) if model_type.has_depth_input() else None
 
+            with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
+                sd_config = yaml.safe_load(f)
+
             return StableDiffusionModel(
                 model_type=model_type,
                 tokenizer=tokenizer,
@@ -94,25 +117,10 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 unet=unet,
                 image_depth_processor=image_depth_processor,
                 depth_estimator=depth_estimator,
+                sd_config=sd_config,
             )
         except:
             return None
-
-    @staticmethod
-    def __default_yaml_name(model_type: ModelType) -> str | None:
-        match model_type:
-            case ModelType.STABLE_DIFFUSION_15:
-                return "resources/diffusers_model_config/v1-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
-                return "resources/diffusers_model_config/v1-inpainting-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_20:
-                return "resources/diffusers_model_config/v2-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                return "resources/diffusers_model_config/v2-inpainting-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_20_DEPTH:
-                return "resources/diffusers_model_config/v2-midas-inference.yaml"
-            case _:
-                return None
 
     @staticmethod
     def __load_ckpt(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
@@ -129,6 +137,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 load_safety_checker=False,
             )
 
+            with open(yaml_name, "r") as f:
+                sd_config = yaml.safe_load(f)
+
             return StableDiffusionModel(
                 model_type=model_type,
                 tokenizer=pipeline.tokenizer,
@@ -138,6 +149,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 unet=pipeline.unet.to(dtype=torch.float32),
                 image_depth_processor=None,  # TODO
                 depth_estimator=None,  # TODO
+                sd_config=sd_config,
             )
         except:
             return None
@@ -158,6 +170,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 from_safetensors=True,
             )
 
+            with open(yaml_name, "r") as f:
+                sd_config = yaml.safe_load(f)
+
             return StableDiffusionModel(
                 model_type=model_type,
                 tokenizer=pipeline.tokenizer,
@@ -167,6 +182,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 unet=pipeline.unet.to(dtype=torch.float32),
                 image_depth_processor=None,  # TODO
                 depth_estimator=None,  # TODO
+                sd_config=sd_config,
             )
         except:
             return None

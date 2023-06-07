@@ -80,6 +80,10 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
         if args.rescale_noise_scheduler_to_zero_terminal_snr:
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
+        elif args.force_v_prediction:
+            model.force_v_prediction()
+        elif args.force_epsilon_prediction:
+            model.force_epsilon_prediction()
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args

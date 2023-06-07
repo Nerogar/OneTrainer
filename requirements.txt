@@ -3,6 +3,7 @@ numpy==1.23.5
 opencv-python==4.7.0.72
 pillow==9.3.0
 tqdm==4.64.1
+PyYAML==6.0
 
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu118

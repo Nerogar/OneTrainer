@@ -9,6 +9,7 @@ class SampleArgs:
     embedding_name: str
     prompt: str
     destination: str
+    text_encoder_layer_skip: int
 
     def __init__(self, args: dict):
         for (key, value) in args.items():
@@ -23,5 +24,6 @@ class SampleArgs:
         parser.add_argument("--embedding-name", type=str, required=False, default="", dest="extra_model_name", help="An embedding to use during sampling")
         parser.add_argument("--prompt", type=str, required=True, dest="prompt", help="The prompt for sampling")
         parser.add_argument("--destination", type=str, required=True, dest="destination", help="The destination to save the output")
+        parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
 
         return SampleArgs(vars(parser.parse_args()))

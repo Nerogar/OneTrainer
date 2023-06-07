@@ -4,6 +4,7 @@ import os.path
 from pathlib import Path
 
 import torch
+import yaml
 from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
@@ -53,6 +54,10 @@ class StableDiffusionModelSaver(BaseModelSaver):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
 
+        yaml_name = os.path.splitext(destination)[0] + '.xaml'
+        with open(yaml_name, 'w', encoding='utf8') as f:
+            yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
+
     @staticmethod
     def __save_safetensors(
             model: StableDiffusionModel,
@@ -60,12 +65,20 @@ class StableDiffusionModelSaver(BaseModelSaver):
             dtype: torch.dtype,
     ):
         state_dict = convert_sd_diffusers_to_ckpt(
-            model.vae.state_dict(), model.unet.state_dict(),model.text_encoder.state_dict()
+            model.vae.state_dict(),
+            model.unet.state_dict(),
+            model.text_encoder.state_dict(),
+            model.noise_scheduler
         )
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination)
+
+        yaml_name = os.path.splitext(destination)[0] + '.xaml'
+        with open(yaml_name, 'w', encoding='utf8') as f:
+            yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
+
 
     @staticmethod
     def __save_internal(

@@ -56,6 +56,8 @@ class TrainArgs:
     loss_function: LossFunction
     offset_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
+    force_v_prediction: bool
+    force_epsilon_prediction: bool
     train_device: str
     temp_device: str
     train_dtype: DataType
@@ -202,6 +204,8 @@ class TrainArgs:
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
         parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
+        parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
+        parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
         parser.add_argument("--train-device", type=str, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
@@ -275,10 +279,12 @@ class TrainArgs:
         args["text_encoder_learning_rate"] = 3e-6
         args["text_encoder_layer_skip"] = 0
         args["train_unet"] = True
-        args["train_unet_epochs"] = 100
+        args["train_unet_epochs"] = 10000
         args["unet_learning_rate"] = 3e-6
         args["offset_noise_weight"] = 0.0
         args["rescale_noise_scheduler_to_zero_terminal_snr"] = False
+        args["force_v_prediction"] = False
+        args["force_epsilon_prediction"] = False
         args["train_device"] = "cuda"
         args["temp_device"] = "cpu"
         args["train_dtype"] = DataType.FLOAT_16

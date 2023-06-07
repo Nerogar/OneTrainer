@@ -1,7 +1,6 @@
 from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
     StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline, DDIMScheduler
 from torch import Tensor
-from torch.optim import Optimizer
 from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.BaseModel import BaseModel
@@ -34,6 +33,7 @@ class StableDiffusionModel(BaseModel):
     embeddings: list[StableDiffusionModelEmbedding] | None
     text_encoder_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
+    sd_config: dict | None
 
     def __init__(
             self,
@@ -50,6 +50,7 @@ class StableDiffusionModel(BaseModel):
             embeddings: list[StableDiffusionModelEmbedding] = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
+            sd_config: dict | None = None,
     ):
         super(StableDiffusionModel, self).__init__(model_type, optimizer_state_dict, train_progress)
 
@@ -64,6 +65,7 @@ class StableDiffusionModel(BaseModel):
         self.embeddings = embeddings if embeddings is not None else []
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
+        self.sd_config = sd_config
 
     def create_pipeline(self) -> DiffusionPipeline:
         if self.model_type.has_depth_input():
@@ -101,9 +103,11 @@ class StableDiffusionModel(BaseModel):
 
     def force_v_prediction(self):
         self.noise_scheduler.config.prediction_type = 'v_prediction'
+        self.sd_config['model']['params']['parameterization'] = 'v'
 
     def force_epsilon_prediction(self):
         self.noise_scheduler.config.prediction_type = 'epsilon'
+        self.sd_config['model']['params']['parameterization'] = 'epsilon'
 
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)

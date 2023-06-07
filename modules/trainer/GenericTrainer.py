@@ -122,6 +122,8 @@ class GenericTrainer(BaseTrainer):
                 resolution=(sample_definition["height"], sample_definition["width"]),
                 seed=sample_definition["seed"],
                 destination=sample_path,
+                text_encoder_layer_skip=self.args.text_encoder_layer_skip,
+                force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
                 on_sample=on_sample,
             )
 

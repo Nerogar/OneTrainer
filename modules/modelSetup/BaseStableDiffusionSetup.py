@@ -93,6 +93,8 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
         )
 
         if args.text_encoder_layer_skip > 0:
+            # TODO: use attention mask if this is true:
+            # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
             text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True, output_hidden_states=True)
             final_layer_norm = model.text_encoder.text_model.final_layer_norm
             text_encoder_output = final_layer_norm(

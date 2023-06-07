@@ -291,12 +291,12 @@ class TrainUI(ctk.CTk):
         components.entry(master, 5, 4, self.ui_state, "offset_noise_weight")
 
         # rescale noise scheduler to zero terminal SNR
-        components.label(master, 5, 3, "Rescale Noise Scheduler")
-        components.switch(master, 5, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+        components.label(master, 6, 3, "Rescale Noise Scheduler")
+        components.switch(master, 6, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
         # train dtype
-        components.label(master, 6, 3, "Train Data Type")
-        components.options_kv(master, 6, 4, [
+        components.label(master, 7, 3, "Train Data Type")
+        components.options_kv(master, 7, 4, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
@@ -304,8 +304,8 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "train_dtype")
 
         # resolution
-        components.label(master, 7, 3, "Resolution")
-        components.entry(master, 7, 4, self.ui_state, "resolution")
+        components.label(master, 8, 3, "Resolution")
+        components.entry(master, 8, 4, self.ui_state, "resolution")
 
         # column 3
         # train unet
