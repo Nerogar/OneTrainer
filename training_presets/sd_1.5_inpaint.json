@@ -36,6 +36,8 @@
     "unet_learning_rate": 3e-06,
     "offset_noise_weight": 0.05,
     "rescale_noise_scheduler_to_zero_terminal_snr": false,
+    "force_v_prediction": false,
+    "force_epsilon_prediction": false,
     "train_device": "cuda",
     "temp_device": "cpu",
     "train_dtype": "FLOAT_16",
