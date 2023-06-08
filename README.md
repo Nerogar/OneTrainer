@@ -16,6 +16,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
   sample to quickly create a more diverse dataset.
 - **Tensorboard**: A simple tensorboard integration to track the training progress.
 - **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
+- **Noise Scheduler Rescaling**: From the paper [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
 
 ## Planned Features
 
