@@ -59,7 +59,7 @@ class TrainUI(ctk.CTk):
         self.training_button = None
         self.tabview = None
 
-        self.top_bar(self)
+        self.top_bar_component = self.top_bar(self)
         self.content_frame(self)
         self.bottom_bar(self)
 
@@ -67,8 +67,11 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+    def close(self):
+        self.top_bar_component.save_default()
+
     def top_bar(self, master):
-        TopBar(master, self.train_args, self.ui_state, self.change_training_method)
+        return TopBar(master, self.train_args, self.ui_state, self.change_training_method)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -123,11 +126,11 @@ class TrainUI(ctk.CTk):
 
         # workspace dir
         components.label(master, 0, 0, "Workspace Directory")
-        components.file_entry(master, 0, 1, self.ui_state, "workspace_dir")
+        components.dir_entry(master, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
         components.label(master, 1, 0, "Cache Directory")
-        components.file_entry(master, 1, 1, self.ui_state, "cache_dir")
+        components.dir_entry(master, 1, 1, self.ui_state, "cache_dir")
 
         # debug
         components.label(master, 2, 0, "Only Cache")
@@ -162,6 +165,9 @@ class TrainUI(ctk.CTk):
         components.options_kv(master, 0, 4, [
             ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
             ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+            ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
+            ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+            ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
         ], self.ui_state, "model_type")
 
         # output model destination
@@ -487,6 +493,8 @@ class TrainUI(ctk.CTk):
 
     def start_training(self):
         if self.training_thread is None:
+            self.top_bar_component.save_default()
+
             self.training_button.configure(text="Stop Training", state="normal")
 
             self.training_commands = TrainCommands()

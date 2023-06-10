@@ -28,11 +28,11 @@ class TopBar:
         self.dir = "training_presets"
 
         self.config_ui_data = {
-            "config_name": ""
+            "config_name": path_util.canonical_join(self.dir, "#.json")
         }
         self.config_ui_state = UIState(master, self.config_ui_data)
 
-        self.configs = [("", "")]
+        self.configs = [("", path_util.canonical_join(self.dir, "#.json"))]
         self.__load_available_config_names()
 
         self.current_config = []
@@ -48,10 +48,11 @@ class TopBar:
         self.__create_configs_dropdown()
 
         # remove button
-        components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
+        # TODO
+        #components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
         # save button
-        components.button(self.frame, 0, 3, "save current", self.__save_config)
+        components.button(self.frame, 0, 3, "save current config", self.__save_config)
 
         # padding
         self.frame.grid_columnconfigure(4, weight=1)
@@ -83,25 +84,44 @@ class TopBar:
     def __load_available_config_names(self):
         if os.path.isdir(self.dir):
             for path in os.listdir(self.dir):
-                path = path_util.canonical_join(self.dir, path)
-                if path.endswith(".json") and os.path.isfile(path):
-                    name = os.path.basename(path)
-                    name = os.path.splitext(name)[0]
-                    self.configs.append((name, path))
+                if path != "#.json":
+                    path = path_util.canonical_join(self.dir, path)
+                    if path.endswith(".json") and os.path.isfile(path):
+                        name = os.path.basename(path)
+                        name = os.path.splitext(name)[0]
+                        self.configs.append((name, path))
 
-    def __save_config(self):
-        def create_file(name):
-            name = path_util.safe_filename(name)
-            path = path_util.canonical_join("training_presets", f"{name}.json")
-            with open(path, "w") as f:
-                json.dump(self.train_args.to_json(), f, indent=4)
+    def __save_to_file(self, name) -> str:
+        name = path_util.safe_filename(name)
+        path = path_util.canonical_join("training_presets", f"{name}.json")
+        with open(path, "w") as f:
+            json.dump(self.train_args.to_json(), f, indent=4)
 
-            if name not in [x[0] for x in self.configs]:
-                self.configs.append((name, path))
+        return path
 
+    def __save_new_config(self, name):
+        path = self.__save_to_file(name)
+
+        is_new_config = name not in [x[0] for x in self.configs]
+
+        if is_new_config:
+            self.configs.append((name, path))
+
+        if self.config_ui_data["config_name"] != path_util.canonical_join(self.dir, f"{name}.json"):
+            self.config_ui_state.vars["config_name"].set(path_util.canonical_join(self.dir, f"{name}.json"))
+
+        if is_new_config:
             self.__create_configs_dropdown()
 
-        dialogs.StringInputDialog(self.master, "name", "Config Name", create_file)
+    def __save_config(self):
+        dialogs.StringInputDialog(
+            parent=self.master,
+            title="name",
+            question="Config Name",
+            callback=self.__save_new_config,
+            default_value=self.configs_dropdown.get(),
+            validate_callback=lambda x: not x.startswith("#")
+        )
 
     def __load_current_config(self, filename):
         try:
@@ -112,4 +132,8 @@ class TopBar:
             print(e)
 
     def __remove_config(self):
+        # TODO
         pass
+
+    def save_default(self):
+        self.__save_to_file("#")

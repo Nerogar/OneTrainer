@@ -25,11 +25,17 @@ class StableDiffusionModelLoader(BaseModelLoader):
             case ModelType.STABLE_DIFFUSION_15_INPAINTING:
                 return "resources/diffusers_model_config/v1-inpainting-inference.yaml"
             case ModelType.STABLE_DIFFUSION_20:
+                return "resources/diffusers_model_config/v2-inference-v.yaml"
+            case ModelType.STABLE_DIFFUSION_20_BASE:
                 return "resources/diffusers_model_config/v2-inference.yaml"
             case ModelType.STABLE_DIFFUSION_20_INPAINTING:
                 return "resources/diffusers_model_config/v2-inpainting-inference.yaml"
             case ModelType.STABLE_DIFFUSION_20_DEPTH:
                 return "resources/diffusers_model_config/v2-midas-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_21:
+                return "resources/diffusers_model_config/v2-inference-v.yaml"
+            case ModelType.STABLE_DIFFUSION_21_BASE:
+                return "resources/diffusers_model_config/v2-inference.yaml"
             case _:
                 return None
 

@@ -1,9 +1,7 @@
-# ignores everything except the builtin config files
+# ignores everything except the builtin config files starting with #
 *
 !.gitignore
-!sd_1.5.json
-!sd_1.5_masked.json
-!sd_1.5_inpaint.json
-!sd_1.5_inpaint_masked.json
-!sd_1.5_embedding.json
-!sd_1.5_LoRA.json
+!\#*
+
+# #.json is an exception (from the exception). This file stores the ui state from a previous run.
+\#.json

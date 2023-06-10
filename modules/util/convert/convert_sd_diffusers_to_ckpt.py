@@ -2,6 +2,8 @@ import torch
 from diffusers import DDIMScheduler
 from torch import Tensor
 
+from modules.util.enum.ModelType import ModelType
+
 
 def __combine(left: str, right: str) -> str:
     if left == "":
@@ -329,11 +331,51 @@ def __map_unet(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     return out_states
 
 
-def __map_text_encoder(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
+def __map_text_encoder_resblock(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
-    for (key, value) in in_states.items():
-        out_states[__combine(out_prefix, key)] = value
+    in_proj_weight = torch.cat([
+        in_states[__combine(in_prefix, "self_attn.q_proj.weight")],
+        in_states[__combine(in_prefix, "self_attn.k_proj.weight")],
+        in_states[__combine(in_prefix, "self_attn.v_proj.weight")],
+    ], 0)
+
+    in_proj_bias = torch.cat([
+        in_states[__combine(in_prefix, "self_attn.q_proj.bias")],
+        in_states[__combine(in_prefix, "self_attn.k_proj.bias")],
+        in_states[__combine(in_prefix, "self_attn.v_proj.bias")],
+    ], 0)
+
+    out_states[__combine(out_prefix, "attn.in_proj_weight")] = in_proj_weight
+    out_states[__combine(out_prefix, "attn.in_proj_bias")] = in_proj_bias
+
+    out_states |= __map_wb(in_states, __combine(out_prefix, "attn.out_proj"), __combine(in_prefix, "self_attn.out_proj"))
+    out_states |= __map_wb(in_states, __combine(out_prefix, "ln_1"), __combine(in_prefix, "layer_norm1"))
+    out_states |= __map_wb(in_states, __combine(out_prefix, "ln_2"), __combine(in_prefix, "layer_norm2"))
+    out_states |= __map_wb(in_states, __combine(out_prefix, "mlp.c_fc"), __combine(in_prefix, "mlp.fc1"))
+    out_states |= __map_wb(in_states, __combine(out_prefix, "mlp.c_proj"), __combine(in_prefix, "mlp.fc2"))
+
+    return out_states
+
+
+def __map_text_encoder(in_states: dict, out_prefix: str, in_prefix: str, is_v2: bool) -> dict:
+    out_states = {}
+
+    if is_v2:
+        dtype = in_states[__combine(in_prefix, "embeddings.position_embedding.weight")].dtype
+        device = in_states[__combine(in_prefix, "embeddings.position_embedding.weight")].device
+
+        out_states |= __map_wb(in_states, __combine(out_prefix, "model.ln_final"), __combine(in_prefix, "final_layer_norm"))
+        out_states[__combine(out_prefix, "model.positional_embedding")] = in_states[__combine(in_prefix, "embeddings.position_embedding.weight")]
+        out_states[__combine(out_prefix, "model.token_embedding.weight")] = in_states[__combine(in_prefix, "embeddings.token_embedding.weight")]
+        out_states[__combine(out_prefix, "model.text_projection")] = torch.ones((1024, 1024), dtype=dtype, device=device)
+        out_states[__combine(out_prefix, "model.logit_scale")] = torch.tensor(1, dtype=dtype, device=device)
+
+        for i in range(0, 23, 1):
+            out_states |= __map_text_encoder_resblock(in_states, __combine(out_prefix, f"model.transformer.resblocks.{str(i)}"), __combine(in_prefix, f"encoder.layers.{str(i)}"))
+    else:
+        for (key, value) in in_states.items():
+            out_states[__combine(__combine(out_prefix, ".transformer"), key)] = value
 
     return out_states
 
@@ -364,6 +406,7 @@ def __map_noise_scheduler(noise_scheduler: DDIMScheduler) -> dict:
 
 
 def convert_sd_diffusers_to_ckpt(
+        model_type: ModelType,
         vae_state_dict: dict,
         unet_state_dict: dict,
         text_encoder_state_dict: dict,
@@ -373,7 +416,7 @@ def convert_sd_diffusers_to_ckpt(
 
     states |= __map_vae(vae_state_dict, "first_stage_model", "")
     states |= __map_unet(unet_state_dict, "model.diffusion_model", "")
-    states |= __map_text_encoder(text_encoder_state_dict, "cond_stage_model.transformer", "")
+    states |= __map_text_encoder(text_encoder_state_dict, "cond_stage_model", "text_model", model_type.is_sd_v2())
     states |= __map_noise_scheduler(noise_scheduler)
 
     state_dict = {'state_dict': states}

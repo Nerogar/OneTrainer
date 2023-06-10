@@ -4,11 +4,22 @@ import customtkinter as ctk
 
 
 class StringInputDialog(ctk.CTkToplevel):
-    def __init__(self, parent, title: str, question: str, callback: Callable[[str], None], *args, **kwargs):
+    def __init__(
+            self,
+            parent,
+            title: str,
+            question: str,
+            callback: Callable[[str], None],
+            default_value: str = None,
+            validate_callback: Callable[[str], bool] = None,
+            *args, **kwargs
+    ):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
         self.callback = callback
+        self.validate_callback = validate_callback
+
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
@@ -31,9 +42,13 @@ class StringInputDialog(ctk.CTkToplevel):
         self.ok_button = ctk.CTkButton(self, width=30, text="cancel", command=self.cancel)
         self.ok_button.grid(row=2, column=1, sticky="we", padx=10, pady=5)
 
+        if default_value is not None:
+            self.entry.insert(0, default_value)
+
     def ok(self):
-        self.callback(self.entry.get())
-        self.destroy()
+        if self.validate_callback is None or self.validate_callback(self.entry.get()):
+            self.callback(self.entry.get())
+            self.destroy()
 
     def cancel(self):
         self.destroy()

@@ -152,25 +152,31 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     var = ui_state.vars[var_name]
     keys = [key for key, value in values]
 
+    deactivate_update_var = False
+
     def update_component(text):
         for key, value in values:
             if text == key:
+                nonlocal deactivate_update_var
+                deactivate_update_var = True
                 var.set(value)
                 if command:
                     command(value)
+                deactivate_update_var = False
                 break
 
     component = ctk.CTkOptionMenu(master, values=keys, command=update_component)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
     def update_var():
-        for key, value in values:
-            if var.get() == str(value):
-                if component.winfo_exists():  # the component could already be destroyed
-                    component.set(key)
-                    if command:
-                        command(value)
-                    break
+        if not deactivate_update_var:
+            for key, value in values:
+                if var.get() == str(value):
+                    if component.winfo_exists():  # the component could already be destroyed
+                        component.set(key)
+                        if command:
+                            command(value)
+                        break
 
     var.trace_add("write", lambda _0, _1, _2: update_var())
     update_var()  # call update_var once to set the initial value

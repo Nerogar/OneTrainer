@@ -6,7 +6,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
 ## Features
 
-- **Supported models**: Stable Diffusion 1.5 and inpainting models
+- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1 and inpainting models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.
@@ -16,16 +16,21 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
   sample to quickly create a more diverse dataset.
 - **Tensorboard**: A simple tensorboard integration to track the training progress.
 - **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
-- **Noise Scheduler Rescaling**: From the paper [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
+- **Noise Scheduler Rescaling**: From the paper
+  [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
 
 ## Planned Features
 
-It is currently still in very early development. Planned features include:
+While OneTrainer already has many useful features, it is still being developed and improved. Here are some features that
+are planned for the future:
 
 - **Different models**: Training on all currently released Stable Diffusion models, this includes the base models (1.x
-  and 2.x), inpainting models, the depth to image model, and SDXL once it is released
-- **Different training methods**: Fine-Tuning, LoRA, Embeddings, ControlNet
-- **VAE fine tuning**: Already implemented, but with limited functionality
+  and 2.x), inpainting models, the depth to image model, and SDXL once it is released. Other publicly released models
+  might also be supported in the future.
+- **VAE fine-tuning**: Already implemented, but with limited functionality
+- **Tooling around dataset management**: Automatic tagging, sorting of images, etc.
+
+A more detailed list can be found [here](ThingsToAdd.md).
 
 ## Installation
 

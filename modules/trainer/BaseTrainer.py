@@ -60,7 +60,7 @@ class BaseTrainer(metaclass=ABCMeta):
         losses = loss_fn(masked_predicted, masked_target, reduction="none")
 
         if normalize_masked_area_loss:
-            losses = losses / clamped_mask.mean(dim=(1, 2, 3))
+            losses = losses / clamped_mask.mean(dim=(1, 2, 3), keepdim=True)
 
         del clamped_mask
 
@@ -102,8 +102,8 @@ class BaseTrainer(metaclass=ABCMeta):
     def create_model_setup(self) -> BaseModelSetup:
         return create.create_model_setup(
             self.args.model_type,
-            self.args.train_device,
-            self.args.temp_device,
+            torch.device(self.args.train_device),
+            torch.device(self.args.temp_device),
             self.args.training_method,
             self.args.debug_mode,
         )
@@ -121,8 +121,12 @@ class BaseTrainer(metaclass=ABCMeta):
         return create.create_model_saver(self.args.model_type, self.args.training_method)
 
     def create_model_sampler(self, model: BaseModel) -> BaseModelSampler:
-        return create.create_model_sampler(model, self.args.model_type, self.args.train_device,
-                                           self.args.training_method)
+        return create.create_model_sampler(
+            model,
+            self.args.model_type,
+            torch.device(self.args.train_device),
+            self.args.training_method
+        )
 
     def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress,
                       start_at_zero: bool = True):

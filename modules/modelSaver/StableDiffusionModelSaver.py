@@ -40,10 +40,12 @@ class StableDiffusionModelSaver(BaseModelSaver):
     @staticmethod
     def __save_ckpt(
             model: StableDiffusionModel,
+            model_type: ModelType,
             destination: str,
             dtype: torch.dtype,
     ):
         state_dict = convert_sd_diffusers_to_ckpt(
+            model_type,
             model.vae.state_dict(),
             model.unet.state_dict(),
             model.text_encoder.state_dict(),
@@ -61,10 +63,12 @@ class StableDiffusionModelSaver(BaseModelSaver):
     @staticmethod
     def __save_safetensors(
             model: StableDiffusionModel,
+            model_type: ModelType,
             destination: str,
             dtype: torch.dtype,
     ):
         state_dict = convert_sd_diffusers_to_ckpt(
+            model_type,
             model.vae.state_dict(),
             model.unet.state_dict(),
             model.text_encoder.state_dict(),
@@ -123,8 +127,8 @@ class StableDiffusionModelSaver(BaseModelSaver):
                 case ModelFormat.DIFFUSERS:
                     self.__save_diffusers(model, output_model_destination, dtype)
                 case ModelFormat.CKPT:
-                    self.__save_ckpt(model, output_model_destination, dtype)
+                    self.__save_ckpt(model, model_type, output_model_destination, dtype)
                 case ModelFormat.SAFETENSORS:
-                    self.__save_safetensors(model, output_model_destination, dtype)
+                    self.__save_safetensors(model, model_type, output_model_destination, dtype)
                 case ModelFormat.INTERNAL:
                     self.__save_internal(model, output_model_destination)
