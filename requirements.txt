@@ -23,7 +23,7 @@ omegaconf # needed to load ckpt files
 git+https://github.com/Nerogar/mgds.git@c7e3a7c#egg=mgds
 
 # xformers
-xformers==0.0.20.dev539
+xformers==0.0.20
 
 # ui
 customtkinter==5.1.2
