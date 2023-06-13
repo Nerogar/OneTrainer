@@ -1,8 +1,8 @@
 from typing import Iterable
 
+import bitsandbytes as bnb
 import torch
 from torch.nn import Parameter
-from torch.optim import AdamW, Adam, SGD
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
@@ -146,13 +146,13 @@ def create_optimizer(
 
     match args.optimizer:
         case Optimizer.SGD:
-            optimizer = SGD(
+            optimizer = torch.optim.SGD(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
         case Optimizer.ADAM:
-            optimizer = Adam(
+            optimizer = torch.optim.Adam(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
@@ -161,13 +161,27 @@ def create_optimizer(
                 fused=True,
             )
         case Optimizer.ADAMW:
-            optimizer = AdamW(
+            optimizer = torch.optim.AdamW(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
                 eps=1e-8,
                 foreach=False,  # disabled, because it uses too much VRAM
                 fused=True,
+            )
+        case Optimizer.ADAM_8BIT:
+            optimizer = bnb.optim.Adam8bit(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                eps=1e-8,
+            )
+        case Optimizer.ADAMW_8BIT:
+            optimizer = bnb.optim.AdamW8bit(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                eps=1e-8,
             )
 
     if state_dict is not None:

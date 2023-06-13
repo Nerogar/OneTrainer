@@ -4,7 +4,6 @@ opencv-python==4.7.0.72
 pillow==9.3.0
 tqdm==4.64.1
 PyYAML==6.0
-pytorch-lightning==2.0.3
 
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu118
@@ -13,6 +12,8 @@ torchvision==0.15.2+cu118
 accelerate==0.18.0
 safetensors==0.3.1
 tensorboard==2.13.0
+pytorch-lightning==2.0.3
+https://github.com/acpopescu/bitsandbytes/releases/download/v0.38.0-win0/bitsandbytes-0.38.1-py3-none-any.whl
 
 # stable diffusion
 git+https://github.com/huggingface/diffusers.git@7200985#egg=diffusers
