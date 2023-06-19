@@ -90,13 +90,6 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         model.vae.train()
         model.unet.eval()
 
-    def get_train_progress(
-            self,
-            model: StableDiffusionModel,
-            args: TrainArgs,
-    ) -> TrainProgress:
-        return model.train_progress
-
     def predict(
             self,
             model: StableDiffusionModel,

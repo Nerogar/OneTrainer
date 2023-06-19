@@ -79,8 +79,10 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
         aspect_bucketing = AspectBucketing(
             target_resolution=args.resolution,
+            quantization=8,
             resolution_in_name='original_resolution',
-            scale_resolution_out_name='scale_resolution', crop_resolution_out_name='crop_resolution',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
             possible_resolutions_out_name='possible_resolutions'
         )
 

@@ -5,15 +5,18 @@ import torch
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
+from modules.dataLoader.MgdsKandinskyFineTuneDataLoader import MgdsKandinskyFineTuneDataLoader
 from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneVaeDataLoader import MgdsStableDiffusionFineTuneVaeDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.modelSampler import BaseModelSampler
+from modules.modelSampler.KandinskySampler import KandinskySampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
@@ -21,6 +24,7 @@ from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusio
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.KandinskyFineTuneSetup import KandinskyFineTuneSetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
@@ -42,6 +46,8 @@ def create_model_loader(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelLoader()
+            elif model_type.is_kandinsky():
+                return KandinskyModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelLoader()
@@ -83,6 +89,8 @@ def create_model_setup(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneSetup(train_device, temp_device, debug_mode)
+            elif model_type.is_kandinsky():
+                return KandinskyFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -104,6 +112,8 @@ def create_model_sampler(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
+            if model_type.is_kandinsky():
+                return KandinskySampler(model, model_type, train_device)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(model, model_type, train_device)
@@ -126,6 +136,8 @@ def create_data_loader(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
+            elif model_type.is_kandinsky():
+                return MgdsKandinskyFineTuneDataLoader(args, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionFineTuneVaeDataLoader(args, model, train_progress)
@@ -167,7 +179,7 @@ def create_optimizer(
                 weight_decay=args.weight_decay,
                 eps=1e-8,
                 foreach=False,  # disabled, because it uses too much VRAM
-                fused=True,
+                fused=False,
             )
         case Optimizer.ADAM_8BIT:
             optimizer = bnb.optim.Adam8bit(

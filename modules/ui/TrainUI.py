@@ -91,7 +91,8 @@ class TrainUI(ctk.CTk):
         self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training)
 
         # export button
-        self.export_button = components.button(frame, 0, 5, "Export", self.export_training)
+        self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
+                                               tooltip="Export the current configuration as a script to run without a UI")
 
         return frame
 
@@ -125,25 +126,31 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=1)
 
         # workspace dir
-        components.label(master, 0, 0, "Workspace Directory")
+        components.label(master, 0, 0, "Workspace Directory",
+                         tooltip="The directory where all files of this training run is saved")
         components.dir_entry(master, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
-        components.label(master, 1, 0, "Cache Directory")
+        components.label(master, 1, 0, "Cache Directory",
+                         tooltip="The directory where cached data is saved")
         components.dir_entry(master, 1, 1, self.ui_state, "cache_dir")
 
         # debug
-        components.label(master, 2, 0, "Only Cache")
+        components.label(master, 2, 0, "Only Cache",
+                         tooltip="Only populate the cache, without any training")
         components.switch(master, 2, 1, self.ui_state, "only_cache")
 
         # debug
-        components.label(master, 3, 0, "Debug mode")
+        components.label(master, 3, 0, "Debug mode",
+                         tooltip="Save debug information during the training into the debug directory")
         components.switch(master, 3, 1, self.ui_state, "debug_mode")
 
-        components.label(master, 4, 0, "Debug Directory")
+        components.label(master, 4, 0, "Debug Directory",
+                         tooltip="The directory where debug data is saved")
         components.file_entry(master, 4, 1, self.ui_state, "debug_dir")
 
-        components.label(master, 5, 0, "Tensorboard")
+        components.label(master, 5, 0, "Tensorboard",
+                         tooltip="Starts the Tensorboard Web UI during training")
         components.switch(master, 5, 1, self.ui_state, "tensorboard")
 
     def model_tab(self, master):
@@ -168,6 +175,7 @@ class TrainUI(ctk.CTk):
             ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
             ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
             ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
+            ("Kandinsky 2.1", ModelType.KANDINSKY_21),
         ], self.ui_state, "model_type")
 
         # output model destination
@@ -273,7 +281,8 @@ class TrainUI(ctk.CTk):
 
         # attention mechanism
         components.label(master, 10, 0, "Attention")
-        components.options(master, 10, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state, "attention_mechanism")
+        components.options(master, 10, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
+                           "attention_mechanism")
 
         # column 2
         # train text encoder
@@ -443,7 +452,6 @@ class TrainUI(ctk.CTk):
             self.lora_tab(self.tabview.add("LoRA"))
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
-
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)

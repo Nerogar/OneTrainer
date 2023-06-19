@@ -14,6 +14,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 
 class TrainArgs:
     training_method: TrainingMethod
+    model_type: ModelType
     debug_mode: bool
     debug_dir: str
     workspace_dir: str
@@ -21,7 +22,6 @@ class TrainArgs:
     tensorboard: bool
 
     # model settings
-    model_type: ModelType
     base_model_name: str
     extra_model_name: str
     output_dtype: DataType
@@ -162,6 +162,7 @@ class TrainArgs:
         # @formatter:off
 
         parser.add_argument("--training-method", type=TrainingMethod, required=True, dest="training_method", help="The method of training", choices=list(TrainingMethod))
+        parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--debug-mode", required=False, action='store_true', dest="debug_mode", help="Enable debug mode")
         parser.add_argument("--debug-dir", type=str, required=False, default="debug", dest="debug_dir", help="directory to save debug information")
         parser.add_argument("--workspace-dir", type=str, required=True, dest="workspace_dir", help="directory to use as a workspace")
@@ -169,7 +170,6 @@ class TrainArgs:
         parser.add_argument("--tensorboard", required=False, action='store_true', dest="tensorboard", help="Start a tensorboard interface during training. The web server will run on port 6006")
 
         # model settings
-        parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
         parser.add_argument("--extra-model-name", type=str, required=False, default=None, dest="extra_model_name", help="The extra model to start training from")
         parser.add_argument("--output-dtype", type=DataType, required=True, dest="output_dtype", help="The data type to use for saving weights", choices=list(DataType))
@@ -241,6 +241,7 @@ class TrainArgs:
         args = {}
 
         args["training_method"] = TrainingMethod.FINE_TUNE
+        args["model_type"] = ModelType.STABLE_DIFFUSION_15
         args["debug_mode"] = False
         args["debug_dir"] = "debug"
         args["workspace_dir"] = "workspace/run"
@@ -248,7 +249,6 @@ class TrainArgs:
         args["tensorboard"] = True
 
         # model settings
-        args["model_type"] = ModelType.STABLE_DIFFUSION_15
         args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
         args["extra_model_name"] = ""
         args["output_dtype"] = DataType.FLOAT_32

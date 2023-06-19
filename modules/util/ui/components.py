@@ -5,6 +5,7 @@ import customtkinter as ctk
 from PIL import Image
 
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
 
 PAD = 10
@@ -25,9 +26,11 @@ def app_title(master, row, column):
     label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
 
 
-def label(master, row, column, text, pad=PAD):
+def label(master, row, column, text, pad=PAD, tooltip=None):
     component = ctk.CTkLabel(master, text=text)
     component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
+    if tooltip:
+        ToolTip(component, tooltip)
     return component
 
 
@@ -135,9 +138,11 @@ def icon_button(master, row, column, text, command):
     return component
 
 
-def button(master, row, column, text, command):
+def button(master, row, column, text, command, tooltip=None):
     component = ctk.CTkButton(master, text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    if tooltip:
+        ToolTip(component, tooltip, x_position=25)
     return component
 
 

@@ -4,6 +4,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 import torch
 from PIL.Image import Image
@@ -38,7 +39,9 @@ class GenericTrainer(BaseTrainer):
     model_sampler: BaseModelSampler
     model: BaseModel
     optimizer: Optimizer
+
     previous_sample_time: float
+    sample_queue: list[Callable]
 
     tensorboard_subprocess: subprocess.Popen
     tensorboard: SummaryWriter
@@ -80,12 +83,21 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
-            self.model, self.model_setup.get_train_progress(self.model, self.args)
+            self.model, self.model.train_progress
         )
         self.model_saver = self.create_model_saver()
 
         self.model_sampler = self.create_model_sampler(self.model)
         self.previous_sample_time = -1
+        self.sample_queue = []
+
+    def __enqueue_sample_during_training(self, fun: Callable):
+        self.sample_queue.append(fun)
+
+    def __execute_sample_during_training(self):
+        for fun in self.sample_queue:
+            fun()
+        self.sample_queue = []
 
     def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: dict = None):
         torch.cuda.empty_cache()
@@ -127,6 +139,8 @@ class GenericTrainer(BaseTrainer):
                 on_sample=on_sample,
             )
 
+            torch.cuda.empty_cache()
+
         self.model_setup.setup_train_device(self.model, self.args)
 
         torch.cuda.empty_cache()
@@ -167,7 +181,7 @@ class GenericTrainer(BaseTrainer):
 
         parameters = self.model_setup.create_parameters(self.model, self.args)
 
-        train_progress = self.model_setup.get_train_progress(self.model, self.args)
+        train_progress = self.model.train_progress
 
         if self.args.only_cache:
             self.callbacks.on_update_status("caching")
@@ -192,6 +206,10 @@ class GenericTrainer(BaseTrainer):
 
         scaler = GradScaler()
 
+        # False if the model gradients are all None, True otherwise
+        # This is used to schedule sampling only when the gradients don't take up any space
+        has_gradient = False
+
         accumulated_loss = 0.0
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
@@ -203,11 +221,18 @@ class GenericTrainer(BaseTrainer):
             current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
                 if self.__needs_sample(train_progress):
-                    self.__sample_during_training(train_progress)
+                    self.__enqueue_sample_during_training(
+                        lambda: self.__sample_during_training(train_progress)
+                    )
 
                 sample_command = self.commands.get_and_reset_sample_command()
                 if sample_command:
-                    self.__sample_during_training(train_progress, sample_command)
+                    self.__enqueue_sample_during_training(
+                        lambda: self.__sample_during_training(train_progress, sample_command)
+                    )
+
+                if not has_gradient:
+                    self.__execute_sample_during_training()
 
                 if self.__needs_backup(train_progress):
                     self.backup()
@@ -221,6 +246,7 @@ class GenericTrainer(BaseTrainer):
 
                 loss = loss / self.args.gradient_accumulation_steps
                 scaler.scale(loss).backward()
+                has_gradient = True
                 accumulated_loss += loss.item()
 
                 if self.__is_update_step(train_progress):
@@ -228,7 +254,8 @@ class GenericTrainer(BaseTrainer):
                     nn.utils.clip_grad_norm_(parameters, 1)
                     scaler.step(self.model.optimizer)
                     scaler.update()
-                    self.model.optimizer.zero_grad()
+                    self.model.optimizer.zero_grad(set_to_none=True)
+                    has_gradient = False
                     lr_scheduler.step()
 
                     self.tensorboard.add_scalar(

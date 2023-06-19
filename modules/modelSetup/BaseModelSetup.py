@@ -55,14 +55,6 @@ class BaseModelSetup(metaclass=ABCMeta):
         return self.create_parameters(model, args)
 
     @abstractmethod
-    def get_train_progress(
-            self,
-            model: BaseModel,
-            args: TrainArgs,
-    ) -> TrainProgress:
-        pass
-
-    @abstractmethod
     def setup_model(
             self,
             model: BaseModel,

@@ -16,7 +16,7 @@ pytorch-lightning==2.0.3
 https://github.com/acpopescu/bitsandbytes/releases/download/v0.38.0-win0/bitsandbytes-0.38.1-py3-none-any.whl
 
 # stable diffusion
-git+https://github.com/huggingface/diffusers.git@7200985#egg=diffusers
+git+https://github.com/huggingface/diffusers.git@f96b760#egg=diffusers
 git+https://github.com/huggingface/transformers.git@656e869#egg=transformers
 omegaconf # needed to load ckpt files
 

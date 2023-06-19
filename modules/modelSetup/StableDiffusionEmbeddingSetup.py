@@ -139,13 +139,6 @@ class StableDiffusionEmbeddingSetup(BaseStableDiffusionSetup):
         model.vae.eval()
         model.unet.train()
 
-    def get_train_progress(
-            self,
-            model: StableDiffusionModel,
-            args: TrainArgs,
-    ) -> TrainProgress:
-        return model.train_progress
-
     def after_optimizer_step(
             self,
             model: StableDiffusionModel,

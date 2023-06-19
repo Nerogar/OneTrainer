@@ -1,22 +1,23 @@
 from abc import ABCMeta
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
+from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, \
+    XFormersAttnAddedKVProcessor
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.KandinskyModel import KandinskyModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 
 
-class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
+class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
 
     def setup_optimizations(
             self,
-            model: StableDiffusionModel,
+            model: KandinskyModel,
             args: TrainArgs,
     ):
         if args.attention_mechanism == AttentionMechanism.DEFAULT:
@@ -24,8 +25,9 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
             pass
         elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                model.unet.set_attn_processor(XFormersAttnProcessor())
-                model.vae.enable_xformers_memory_efficient_attention()
+                model.unet.set_attn_processor(XFormersAttnAddedKVProcessor())
+                model.unet.enable_xformers_memory_efficient_attention()
+                model.movq.enable_xformers_memory_efficient_attention()
             except Exception as e:
                 print(
                     "Could not enable memory efficient attention. Make sure xformers is installed"
@@ -36,33 +38,35 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
 
             if is_xformers_available():
                 try:
-                    model.vae.enable_xformers_memory_efficient_attention()
+                    model.movq.enable_xformers_memory_efficient_attention()
                 except Exception as e:
                     print(
                         "Could not enable memory efficient attention. Make sure xformers is installed"
                         f" correctly and a GPU is available: {e}"
                     )
 
+        model.prior_text_encoder.gradient_checkpointing_enable()
+        model.prior_image_encoder.gradient_checkpointing_enable()
+
         model.unet.enable_gradient_checkpointing()
-        model.text_encoder.gradient_checkpointing_enable()
 
     def predict(
             self,
-            model: StableDiffusionModel,
+            model: KandinskyModel,
             batch: dict,
             args: TrainArgs,
             train_progress: TrainProgress
     ) -> (Tensor, Tensor):
-        vae_scaling_factor = model.vae.config['scaling_factor']
+        movq_scaling_factor = 1.0 # TODO: check if the movq has a scaling factor
 
         latent_image = batch['latent_image']
-        scaled_latent_image = latent_image * vae_scaling_factor
+        scaled_latent_image = latent_image * movq_scaling_factor
 
         latent_conditioning_image = None
         scaled_latent_conditioning_image = None
         if args.model_type.has_conditioning_image_input():
             latent_conditioning_image = batch['latent_conditioning_image']
-            scaled_latent_conditioning_image = latent_conditioning_image * vae_scaling_factor
+            scaled_latent_conditioning_image = latent_conditioning_image * movq_scaling_factor
 
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
@@ -94,17 +98,9 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
             original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
         )
 
-        if args.text_encoder_layer_skip > 0:
-            # TODO: use attention mask if this is true:
-            # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-            text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True, output_hidden_states=True)
-            final_layer_norm = model.text_encoder.text_model.final_layer_norm
-            text_encoder_output = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
-            )
-        else:
-            text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True)
-            text_encoder_output = text_encoder_output.last_hidden_state
+        prompt_embeds, text_encoder_hidden_states = model.text_encoder(
+            input_ids=batch['tokens'], attention_mask=batch['tokens_mask']
+        )
 
         if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
             latent_input = torch.concat(
@@ -113,17 +109,19 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
         else:
             latent_input = scaled_noisy_latent_image
 
-        if args.model_type.has_depth_input():
-            predicted_latent_noise = model.unet(
-                latent_input, timestep, text_encoder_output, batch['latent_depth']
-            ).sample
-        else:
-            predicted_latent_noise = model.unet(latent_input, timestep, text_encoder_output).sample
+        added_cond_kwargs = {"text_embeds": prompt_embeds, "image_embeds": batch['prior_embedding']}
+        predicted_latent_noise = model.unet(
+            sample=latent_input,
+            timestep=timestep,
+            encoder_hidden_states=text_encoder_hidden_states,
+            added_cond_kwargs=added_cond_kwargs,
+        ).sample
+        predicted_latent_noise, _ = predicted_latent_noise.split(latent_input.shape[1], dim=1)
 
         if args.debug_mode:
             with torch.no_grad():
                 # noise
-                noise = model.vae.decode(latent_noise / vae_scaling_factor).sample
+                noise = model.vae.decode(latent_noise / movq_scaling_factor).sample
                 noise = noise.clamp(-1, 1)
                 self.save_image(
                     noise,
@@ -133,7 +131,7 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
                 )
 
                 # predicted noise
-                predicted_noise = model.vae.decode(predicted_latent_noise / vae_scaling_factor).sample
+                predicted_noise = model.vae.decode(predicted_latent_noise / movq_scaling_factor).sample
                 predicted_noise = predicted_noise.clamp(-1, 1)
                 self.save_image(
                     predicted_noise,
@@ -143,7 +141,7 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
                 )
 
                 # noisy image
-                noisy_latent_image = scaled_noisy_latent_image / vae_scaling_factor
+                noisy_latent_image = scaled_noisy_latent_image / movq_scaling_factor
                 noisy_image = model.vae.decode(noisy_latent_image).sample
                 noisy_image = noisy_image.clamp(-1, 1)
                 self.save_image(
@@ -163,7 +161,7 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
 
                 scaled_predicted_latent_image = \
                     (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
-                predicted_latent_image = scaled_predicted_latent_image / vae_scaling_factor
+                predicted_latent_image = scaled_predicted_latent_image / movq_scaling_factor
                 predicted_image = model.vae.decode(predicted_latent_image).sample
                 predicted_image = predicted_image.clamp(-1, 1)
                 self.save_image(

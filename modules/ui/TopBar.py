@@ -52,7 +52,8 @@ class TopBar:
         #components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
         # save button
-        components.button(self.frame, 0, 3, "save current config", self.__save_config)
+        components.button(self.frame, 0, 3, "save current config", self.__save_config,
+                          tooltip="Save the current configuration in a custom preset")
 
         # padding
         self.frame.grid_columnconfigure(4, weight=1)

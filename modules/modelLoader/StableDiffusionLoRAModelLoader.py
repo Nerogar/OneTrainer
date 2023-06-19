@@ -93,7 +93,7 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
         except:
             return False
 
-    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str) -> StableDiffusionModel | None:
+    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str | None) -> StableDiffusionModel | None:
         base_model_loader = StableDiffusionModelLoader()
         model = base_model_loader.load(model_type, base_model_name, None)
 

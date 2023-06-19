@@ -75,12 +75,12 @@ class StableDiffusionModelLoader(BaseModelLoader):
         try:
             tokenizer = CLIPTokenizer.from_pretrained(
                 base_model_name,
-                subfolder="tokenizer"
+                subfolder="tokenizer",
             )
 
             noise_scheduler = DDIMScheduler.from_pretrained(
                 base_model_name,
-                subfolder="scheduler"
+                subfolder="scheduler",
             )
 
             text_encoder = CLIPTextModel.from_pretrained(
@@ -103,12 +103,12 @@ class StableDiffusionModelLoader(BaseModelLoader):
 
             image_depth_processor = DPTImageProcessor.from_pretrained(
                 base_model_name,
-                subfolder="feature_extractor"
+                subfolder="feature_extractor",
             ) if model_type.has_depth_input() else None
 
             depth_estimator = DPTForDepthEstimation.from_pretrained(
                 base_model_name,
-                subfolder="depth_estimator"
+                subfolder="depth_estimator",
             ) if model_type.has_depth_input() else None
 
             with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
@@ -193,7 +193,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
         except:
             return None
 
-    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: None) -> StableDiffusionModel | None:
+    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str | None) -> StableDiffusionModel | None:
         model = self.__load_internal(model_type, base_model_name)
         if model is not None:
             return model
