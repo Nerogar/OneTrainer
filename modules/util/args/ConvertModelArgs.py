@@ -18,10 +18,10 @@ class ConvertModelArgs:
 
     @staticmethod
     def parse_args() -> 'ConvertModelArgs':
-        parser = argparse.ArgumentParser(description="One Trainer Training Script.")
+        parser = argparse.ArgumentParser(description="One Trainer Converter Script.")
 
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
-        parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
+        parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to convert")
         parser.add_argument("--output-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="output_dtype", help="The data type to save the output model", choices=list(DataType))
         parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.CKPT, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")

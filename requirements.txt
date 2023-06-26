@@ -26,5 +26,8 @@ git+https://github.com/Nerogar/mgds.git@22a95ef#egg=mgds
 # xformers
 xformers==0.0.20
 
+# bitsandbytes
+#bitsandbytes-windows==0.37.5 # deactivated for now
+
 # ui
 customtkinter==5.1.2

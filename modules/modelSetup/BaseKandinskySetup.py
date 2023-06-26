@@ -1,19 +1,30 @@
 from abc import ABCMeta
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, \
-    XFormersAttnAddedKVProcessor
+import torch.nn.functional as F
+from diffusers.models.attention_processor import AttnProcessor, AttnProcessor2_0, XFormersAttnAddedKVProcessor
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.kandinsky.kandinsky import KandinskyLoss
+from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 
 
 class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
+
+    def __init__(
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
+    ):
+        super(BaseKandinskySetup, self).__init__(train_device, temp_device, debug_mode)
+        self.kandinsky_loss = None
 
     def setup_optimizations(
             self,
@@ -56,8 +67,8 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
             batch: dict,
             args: TrainArgs,
             train_progress: TrainProgress
-    ) -> (Tensor, Tensor):
-        movq_scaling_factor = 1.0 # TODO: check if the movq has a scaling factor
+    ) -> dict:
+        movq_scaling_factor = 1.0  # TODO: check if the movq has a scaling factor
 
         latent_image = batch['latent_image']
         scaled_latent_image = latent_image * movq_scaling_factor
@@ -110,18 +121,36 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
             latent_input = scaled_noisy_latent_image
 
         added_cond_kwargs = {"text_embeds": prompt_embeds, "image_embeds": batch['prior_embedding']}
-        predicted_latent_noise = model.unet(
+        unet_output = model.unet(
             sample=latent_input,
             timestep=timestep,
             encoder_hidden_states=text_encoder_hidden_states,
             added_cond_kwargs=added_cond_kwargs,
         ).sample
-        predicted_latent_noise, _ = predicted_latent_noise.split(latent_input.shape[1], dim=1)
+        predicted_latent_noise, predicted_variance = unet_output.split(latent_input.shape[1], dim=1)
 
-        if args.debug_mode:
+        model_output_data = {}
+
+        # data for the MSE loss
+        if model.noise_scheduler.config.prediction_type == 'epsilon':
+            model_output_data['predicted_eps'] = predicted_latent_noise
+            model_output_data['target_eps'] = latent_noise
+        elif model.noise_scheduler.config.prediction_type == 'v_prediction':
+            target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
+            model_output_data['predicted_eps'] = predicted_latent_noise
+            model_output_data['target_eps'] = target_velocity
+
+        # data for the kl loss
+        model_output_data['predicted_variance'] = predicted_variance
+        model_output_data['scaled_noisy_latent_image'] = scaled_noisy_latent_image
+        model_output_data['timestep'] = timestep
+
+        loss = self.calculate_loss(model, batch, model_output_data, args).item()
+
+        if args.debug_mode and loss > 2:
             with torch.no_grad():
                 # noise
-                noise = model.vae.decode(latent_noise / movq_scaling_factor).sample
+                noise = model.movq.decode(latent_noise / movq_scaling_factor).sample
                 noise = noise.clamp(-1, 1)
                 self.save_image(
                     noise,
@@ -131,7 +160,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
                 )
 
                 # predicted noise
-                predicted_noise = model.vae.decode(predicted_latent_noise / movq_scaling_factor).sample
+                predicted_noise = model.movq.decode(predicted_latent_noise / movq_scaling_factor).sample
                 predicted_noise = predicted_noise.clamp(-1, 1)
                 self.save_image(
                     predicted_noise,
@@ -142,7 +171,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
 
                 # noisy image
                 noisy_latent_image = scaled_noisy_latent_image / movq_scaling_factor
-                noisy_image = model.vae.decode(noisy_latent_image).sample
+                noisy_image = model.movq.decode(noisy_latent_image).sample
                 noisy_image = noisy_image.clamp(-1, 1)
                 self.save_image(
                     noisy_image,
@@ -160,9 +189,10 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
                 sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
                 scaled_predicted_latent_image = \
-                    (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
+                    (
+                                scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
                 predicted_latent_image = scaled_predicted_latent_image / movq_scaling_factor
-                predicted_image = model.vae.decode(predicted_latent_image).sample
+                predicted_image = model.movq.decode(predicted_latent_image).sample
                 predicted_image = predicted_image.clamp(-1, 1)
                 self.save_image(
                     predicted_image,
@@ -172,7 +202,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
                 )
 
                 # image
-                image = model.vae.decode(latent_image).sample
+                image = model.movq.decode(latent_image).sample
                 image = image.clamp(-1, 1)
                 self.save_image(
                     image,
@@ -183,7 +213,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
 
                 # conditioning image
                 if args.model_type.has_conditioning_image_input():
-                    conditioning_image = model.vae.decode(latent_conditioning_image).sample
+                    conditioning_image = model.movq.decode(latent_conditioning_image).sample
                     conditioning_image = conditioning_image.clamp(-1, 1)
                     self.save_image(
                         conditioning_image,
@@ -192,8 +222,55 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
                         train_progress.global_step
                     )
 
-        if model.noise_scheduler.config.prediction_type == 'epsilon':
-            return predicted_latent_noise, latent_noise
-        elif model.noise_scheduler.config.prediction_type == 'v_prediction':
-            predicted_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
-            return predicted_latent_noise, predicted_velocity
+        return model_output_data
+
+    def calculate_loss(
+            self,
+            model: KandinskyModel,
+            batch: dict,
+            data: dict,
+            args: TrainArgs,
+    ) -> Tensor:
+        if self.kandinsky_loss is None:
+            self.kandinsky_loss = KandinskyLoss(model.noise_scheduler)
+
+        predicted_eps = data['predicted_eps']
+        target_eps = data['target_eps']
+        predicted_variance = data['predicted_variance']
+        scaled_noisy_latent_image = data['scaled_noisy_latent_image']
+        timestep = data['timestep']
+
+        # mse loss
+        if args.masked_training and not args.model_type.has_conditioning_image_input():
+            mse_loss = loss_util.masked_loss(
+                F.mse_loss,
+                predicted_eps,
+                target_eps,
+                batch['latent_mask'],
+                args.unmasked_weight,
+                args.normalize_masked_area_loss
+            ).mean([1, 2, 3])
+        else:
+            mse_loss = F.mse_loss(
+                predicted_eps,
+                target_eps,
+                reduction='none'
+            ).mean([1, 2, 3])
+
+        # vb loss
+        kl_loss = self.kandinsky_loss.vb_terms_bpd(
+            model_eps_values=predicted_eps,
+            model_var_values=predicted_variance,
+            x_0=batch['latent_image'],
+            x_t=scaled_noisy_latent_image,
+            t=timestep,
+            clip_denoised=False,
+        )["output"]
+
+        losses = mse_loss + kl_loss
+
+        if args.normalize_masked_area_loss:
+            clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
+            losses = losses / clamped_mask.mean(dim=(1, 2, 3))
+
+        return losses.mean()

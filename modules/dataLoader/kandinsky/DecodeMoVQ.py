@@ -34,6 +34,7 @@ class DecodeMoVQ(PipelineModule):
         with torch.no_grad():
             with torch.autocast(self.pipeline.device.type) if self.pipeline.allow_mixed_precision else nullcontext():
                 image = self.movq.decode(latent_image.unsqueeze(0)).sample
+                image = image.clamp(-1, 1).squeeze()
 
         return {
             self.out_name: image,

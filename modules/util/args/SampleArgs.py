@@ -17,7 +17,7 @@ class SampleArgs:
 
     @staticmethod
     def parse_args() -> 'SampleArgs':
-        parser = argparse.ArgumentParser(description="One Trainer Training Script.")
+        parser = argparse.ArgumentParser(description="One Trainer Sampling Script.")
 
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to sample from")

@@ -2,7 +2,7 @@ import json
 import os
 
 import torch
-from diffusers import DDIMScheduler, PriorTransformer, UNet2DConditionModel, VQModel, UnCLIPScheduler
+from diffusers import DDIMScheduler, PriorTransformer, UNet2DConditionModel, VQModel, UnCLIPScheduler, DDPMScheduler
 from diffusers.pipelines.kandinsky import MultilingualCLIP
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, CLIPVisionModelWithProjection, \
     CLIPImageProcessor, XLMRobertaTokenizerFast
@@ -103,9 +103,9 @@ class KandinskyModelLoader(BaseModelLoader):
                 torch_dtype=torch.float32,
             )
 
-            noise_scheduler = DDIMScheduler.from_pretrained(
+            noise_scheduler = DDPMScheduler.from_pretrained(
                 diffusion_model_name,
-                subfolder="scheduler",
+                subfolder="ddpm_scheduler",
             )
 
             movq = VQModel.from_pretrained(

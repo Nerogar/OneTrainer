@@ -1,12 +1,14 @@
 from abc import ABCMeta
 
 import torch
+import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -52,7 +54,7 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
             batch: dict,
             args: TrainArgs,
             train_progress: TrainProgress
-    ) -> (Tensor, Tensor):
+    ) -> dict:
         vae_scaling_factor = model.vae.config['scaling_factor']
 
         latent_image = batch['latent_image']
@@ -119,6 +121,20 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
             ).sample
         else:
             predicted_latent_noise = model.unet(latent_input, timestep, text_encoder_output).sample
+
+        model_output_data = {}
+
+        if model.noise_scheduler.config.prediction_type == 'epsilon':
+            model_output_data = {
+                'predicted': predicted_latent_noise,
+                'target': latent_noise,
+            }
+        elif model.noise_scheduler.config.prediction_type == 'v_prediction':
+            target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
+            model_output_data = {
+                'predicted': predicted_latent_noise,
+                'target': target_velocity,
+            }
 
         if args.debug_mode:
             with torch.no_grad():
@@ -194,8 +210,38 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
                         train_progress.global_step
                     )
 
-        if model.noise_scheduler.config.prediction_type == 'epsilon':
-            return predicted_latent_noise, latent_noise
-        elif model.noise_scheduler.config.prediction_type == 'v_prediction':
-            predicted_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
-            return predicted_latent_noise, predicted_velocity
+        return model_output_data
+
+    def calculate_loss(
+            self,
+            model: StableDiffusionModel,
+            batch: dict,
+            data: dict,
+            args: TrainArgs,
+    ) -> Tensor:
+        predicted = data['predicted']
+        target = data['target']
+
+        # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
+        #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
+        if args.masked_training and not args.model_type.has_conditioning_image_input():
+            losses = loss_util.masked_loss(
+                F.mse_loss,
+                predicted,
+                target,
+                batch['latent_mask'],
+                args.unmasked_weight,
+                args.normalize_masked_area_loss
+            ).mean([1, 2, 3])
+        else:
+            losses = F.mse_loss(
+                predicted,
+                target,
+                reduction='none'
+            ).mean([1, 2, 3])
+
+            if args.normalize_masked_area_loss:
+                clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
+                losses = losses / clamped_mask.mean(dim=(1, 2, 3))
+
+        return losses.mean()

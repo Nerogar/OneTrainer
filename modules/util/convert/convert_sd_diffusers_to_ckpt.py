@@ -2,6 +2,7 @@ import torch
 from diffusers import DDIMScheduler
 from torch import Tensor
 
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.enum.ModelType import ModelType
 
 
@@ -383,24 +384,20 @@ def __map_text_encoder(in_states: dict, out_prefix: str, in_prefix: str, is_v2: 
 def __map_noise_scheduler(noise_scheduler: DDIMScheduler) -> dict:
     out_states = {}
 
-    betas = noise_scheduler.betas
-    alphas = 1 - betas
-    alphas_cumprod = torch.cumprod(alphas, dim=0)
-    alphas_cumprod_prev = torch.cat((torch.tensor([1], dtype=alphas_cumprod.dtype), alphas_cumprod[:-1]))
-    posterior_variance = betas * (1 - alphas_cumprod_prev) / (1 - alphas_cumprod)
+    coefficients = DiffusionScheduleCoefficients.from_betas(noise_scheduler.betas)
 
-    out_states["betas"] = betas
-    out_states["alphas_cumprod"] = alphas_cumprod
-    out_states["alphas_cumprod_prev"] = alphas_cumprod_prev
-    out_states["sqrt_alphas_cumprod"] = torch.sqrt(alphas_cumprod)
-    out_states["sqrt_one_minus_alphas_cumprod"] = torch.sqrt(1 - alphas_cumprod)
-    out_states["log_one_minus_alphas_cumprod"] = torch.log(1 - alphas_cumprod)
-    out_states["sqrt_recip_alphas_cumprod"] = torch.rsqrt(alphas_cumprod)
-    out_states["sqrt_recipm1_alphas_cumprod"] = torch.sqrt(1 / alphas_cumprod - 1)
-    out_states["posterior_variance"] = posterior_variance
-    out_states["posterior_log_variance_clipped"] = torch.log(posterior_variance.clamp(min=1e-20))
-    out_states["posterior_mean_coef1"] = (betas * torch.sqrt(alphas_cumprod_prev) / (1 - alphas_cumprod))
-    out_states["posterior_mean_coef2"] = ((1 - alphas_cumprod_prev) * torch.sqrt(alphas) / (1 - alphas_cumprod))
+    out_states["betas"] = coefficients.betas
+    out_states["alphas_cumprod"] = coefficients.alphas_cumprod
+    out_states["alphas_cumprod_prev"] = coefficients.alphas_cumprod_prev
+    out_states["sqrt_alphas_cumprod"] = coefficients.sqrt_alphas_cumprod
+    out_states["sqrt_one_minus_alphas_cumprod"] = coefficients.sqrt_one_minus_alphas_cumprod
+    out_states["log_one_minus_alphas_cumprod"] = coefficients.log_one_minus_alphas_cumprod
+    out_states["sqrt_recip_alphas_cumprod"] = coefficients.sqrt_recip_alphas_cumprod
+    out_states["sqrt_recipm1_alphas_cumprod"] = coefficients.sqrt_recipm1_alphas_cumprod
+    out_states["posterior_variance"] = coefficients.posterior_variance
+    out_states["posterior_log_variance_clipped"] = coefficients.posterior_log_variance_clipped
+    out_states["posterior_mean_coef1"] = coefficients.posterior_mean_coef1
+    out_states["posterior_mean_coef2"] = coefficients.posterior_mean_coef2
 
     return out_states
 

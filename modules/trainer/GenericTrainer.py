@@ -93,6 +93,7 @@ class GenericTrainer(BaseTrainer):
 
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
+        pass
 
     def __execute_sample_during_training(self):
         for fun in self.sample_queue:
@@ -217,6 +218,7 @@ class GenericTrainer(BaseTrainer):
             self.model_setup.setup_eval_device(self.model)
             self.data_loader.ds.start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
+            torch.cuda.empty_cache()
 
             current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
@@ -240,9 +242,9 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype()):
-                    predicted, target = self.model_setup.predict(self.model, batch, self.args, train_progress)
+                    model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
-                    loss = self.loss(batch, predicted.float(), target.float())
+                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
 
                 loss = loss / self.args.gradient_accumulation_steps
                 scaler.scale(loss).backward()

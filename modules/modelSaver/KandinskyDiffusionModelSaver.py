@@ -8,23 +8,23 @@ import yaml
 from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.KandinskyModel import KandinskyModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.util.convert.convert_sd_diffusers_to_ckpt import convert_sd_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionModelSaver(BaseModelSaver):
+class KandinskyModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_diffusers(
-            model: StableDiffusionModel,
+            model: KandinskyModel,
             destination: str,
             dtype: torch.dtype,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
-        pipeline = model.create_pipeline()
+        pipeline = model.create_prior_pipeline()
         original_device = pipeline.device
         pipeline.to("cpu")
         pipeline_copy = copy.deepcopy(pipeline)
@@ -39,7 +39,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_ckpt(
-            model: StableDiffusionModel,
+            model: KandinskyModel,
             model_type: ModelType,
             destination: str,
             dtype: torch.dtype,
@@ -62,7 +62,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_safetensors(
-            model: StableDiffusionModel,
+            model: KandinskyModel,
             model_type: ModelType,
             destination: str,
             dtype: torch.dtype,
@@ -86,7 +86,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_internal(
-            model: StableDiffusionModel,
+            model: KandinskyModel,
             destination: str,
     ):
         if model.text_encoder.dtype != torch.float32 \
@@ -97,7 +97,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
             raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
 
         # base model
-        StableDiffusionModelSaver.__save_diffusers(model, destination, torch.float32)
+        KandinskyModelSaver.__save_diffusers(model, destination, torch.float32)
 
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)

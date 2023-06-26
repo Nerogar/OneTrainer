@@ -83,8 +83,18 @@ class BaseModelSetup(metaclass=ABCMeta):
             model: BaseModel,
             batch: dict,
             args: TrainArgs,
-            train_progress: TrainProgress
-    ) -> (Tensor, Tensor):
+            train_progress: TrainProgress,
+    ) -> dict:
+        pass
+
+    @abstractmethod
+    def calculate_loss(
+            self,
+            model: BaseModel,
+            batch: dict,
+            data: dict,
+            args: TrainArgs,
+    ) -> Tensor:
         pass
 
     @abstractmethod
@@ -92,6 +102,6 @@ class BaseModelSetup(metaclass=ABCMeta):
             self,
             model: BaseModel,
             args: TrainArgs,
-            train_progress: TrainProgress
+            train_progress: TrainProgress,
     ):
         pass

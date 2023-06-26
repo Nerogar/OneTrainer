@@ -1,10 +1,7 @@
 import time
 from abc import ABCMeta, abstractmethod
-from typing import Callable
 
 import torch
-import torch.nn.functional as F
-from torch import Tensor
 
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -16,7 +13,6 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.TimeUnit import TimeUnit
 
 
@@ -42,59 +38,6 @@ class BaseTrainer(metaclass=ABCMeta):
     @abstractmethod
     def backup(self):
         pass
-
-    @staticmethod
-    def __masked_loss(
-            loss_fn: Callable,
-            predicted: Tensor,
-            target: Tensor,
-            mask: Tensor,
-            unmasked_weight: float,
-            normalize_masked_area_loss: bool
-    ) -> Tensor:
-        clamped_mask = torch.clamp(mask, unmasked_weight, 1)
-
-        masked_predicted = predicted * clamped_mask
-        masked_target = target * clamped_mask
-
-        losses = loss_fn(masked_predicted, masked_target, reduction="none")
-
-        if normalize_masked_area_loss:
-            losses = losses / clamped_mask.mean(dim=(1, 2, 3), keepdim=True)
-
-        del clamped_mask
-
-        return losses
-
-    def loss(self, batch: dict, predicted: Tensor, target: Tensor) -> Tensor:
-        losses = None
-        # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
-        #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
-        if self.args.masked_training and not self.args.model_type.has_conditioning_image_input():
-            match self.args.loss_function:
-                case LossFunction.MSE:
-                    losses = self.__masked_loss(
-                        F.mse_loss,
-                        predicted,
-                        target,
-                        batch['latent_mask'],
-                        self.args.unmasked_weight,
-                        self.args.normalize_masked_area_loss
-                    ).mean([1, 2, 3])
-        else:
-            match self.args.loss_function:
-                case LossFunction.MSE:
-                    losses = F.mse_loss(
-                        predicted,
-                        target,
-                        reduction='none'
-                    ).mean([1, 2, 3])
-
-            if self.args.normalize_masked_area_loss:
-                clamped_mask = torch.clamp(batch['latent_mask'], self.args.unmasked_weight, 1)
-                losses = losses / clamped_mask.mean(dim=(1, 2, 3))
-
-        return losses.mean()
 
     def create_model_loader(self) -> BaseModelLoader:
         return create.create_model_loader(self.args.model_type, self.args.training_method)

@@ -280,7 +280,7 @@ class MgdsKandinskyBaseDataLoader:
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         save_mask = SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1)
         # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
-        save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir)
+        # save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir)
 
         # These modules don't really work, since they are inserted after a sorting operation that does not include this data
         # SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
@@ -301,7 +301,7 @@ class MgdsKandinskyBaseDataLoader:
             modules.append(save_mask)
 
         #modules.append(decode_prompt)
-        modules.append(save_prompt)
+        #modules.append(save_prompt)
 
         return modules
 
@@ -349,7 +349,7 @@ class MgdsKandinskyBaseDataLoader:
                 cache_modules,
                 output_modules,
 
-                debug_modules if args.debug_mode else None,
+                #debug_modules if args.debug_mode else None,
             ],
             batch_size=args.batch_size,
             initial_epoch=train_progress.epoch,

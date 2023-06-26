@@ -1,7 +1,6 @@
 from typing import Iterable
 
 import torch
-from torch import Tensor
 from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -59,7 +58,7 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         )
         del model.optimizer_state_dict
 
-        self.setup_optimizations()
+        self.setup_optimizations(model, args)
 
     def setup_eval_device(
             self,
@@ -96,11 +95,16 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
             batch: dict,
             args: TrainArgs,
             train_progress: TrainProgress
-    ) -> (Tensor, Tensor):
+    ) -> dict:
         latent_image = batch['latent_image']
         image = batch['image']
 
         predicted_image = model.vae.decode(latent_image, return_dict=True).sample
+
+        model_output_data = {
+            'predicted': predicted_image,
+            'target': image,
+        }
 
         if args.debug_mode:
             with torch.no_grad():
@@ -114,7 +118,7 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
                     train_progress.global_step
                 )
 
-        return predicted_image, image
+        return model_output_data
 
     def after_optimizer_step(
             self,

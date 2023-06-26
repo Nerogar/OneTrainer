@@ -1,6 +1,5 @@
 from typing import Iterable
 
-import bitsandbytes as bnb
 import torch
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
@@ -11,6 +10,7 @@ from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableD
 from modules.dataLoader.MgdsStableDiffusionFineTuneVaeDataLoader import MgdsStableDiffusionFineTuneVaeDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.modelLoader.KandinskyLoRAModelLoader import KandinskyLoRAModelLoader
 from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
@@ -25,6 +25,7 @@ from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRA
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.KandinskyFineTuneSetup import KandinskyFineTuneSetup
+from modules.modelSetup.KandinskyLoRASetup import KandinskyLoRASetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
@@ -54,6 +55,8 @@ def create_model_loader(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelLoader()
+            if model_type.is_kandinsky():
+                return KandinskyLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -97,6 +100,8 @@ def create_model_setup(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_kandinsky():
+                return KandinskyLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -120,6 +125,8 @@ def create_model_sampler(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
+            if model_type.is_kandinsky():
+                return KandinskySampler(model, model_type, train_device)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
@@ -144,6 +151,8 @@ def create_data_loader(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
+            if model_type.is_kandinsky():
+                return MgdsKandinskyFineTuneDataLoader(args, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionEmbeddingDataLoader(args, model, train_progress)
@@ -179,9 +188,10 @@ def create_optimizer(
                 weight_decay=args.weight_decay,
                 eps=1e-8,
                 foreach=False,  # disabled, because it uses too much VRAM
-                fused=False,
+                fused=True,
             )
         case Optimizer.ADAM_8BIT:
+            import bitsandbytes as bnb
             optimizer = bnb.optim.Adam8bit(
                 params=parameters,
                 lr=args.learning_rate,
@@ -189,6 +199,7 @@ def create_optimizer(
                 eps=1e-8,
             )
         case Optimizer.ADAMW_8BIT:
+            import bitsandbytes as bnb
             optimizer = bnb.optim.AdamW8bit(
                 params=parameters,
                 lr=args.learning_rate,

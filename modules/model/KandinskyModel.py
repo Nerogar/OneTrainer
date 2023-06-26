@@ -1,10 +1,11 @@
-from diffusers import UNet2DConditionModel, DDIMScheduler, PriorTransformer, VQModel, \
+from diffusers import UNet2DConditionModel, DDPMScheduler, PriorTransformer, VQModel, \
     KandinskyPriorPipeline, KandinskyPipeline, UnCLIPScheduler
 from diffusers.pipelines.kandinsky import MultilingualCLIP
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, CLIPVisionModelWithProjection, \
-    CLIPImageProcessor, XLMRobertaTokenizer, XLMRobertaTokenizerFast
+    CLIPImageProcessor, XLMRobertaTokenizerFast
 
 from modules.model.BaseModel import BaseModel
+from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
@@ -24,8 +25,11 @@ class KandinskyModel(BaseModel):
     tokenizer: XLMRobertaTokenizerFast
     text_encoder: MultilingualCLIP
     unet: UNet2DConditionModel
-    noise_scheduler: DDIMScheduler
+    noise_scheduler: DDPMScheduler
     movq: VQModel
+
+    # persistent training data
+    unet_lora: LoRAModuleWrapper | None
 
     def __init__(
             self,
@@ -43,11 +47,13 @@ class KandinskyModel(BaseModel):
             tokenizer: XLMRobertaTokenizerFast,
             text_encoder: MultilingualCLIP,
             unet: UNet2DConditionModel,
-            noise_scheduler: DDIMScheduler,
+            noise_scheduler: DDPMScheduler,
             movq: VQModel,
 
             optimizer_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
+
+            unet_lora: LoRAModuleWrapper | None = None,
     ):
         super(KandinskyModel, self).__init__(model_type, optimizer_state_dict, train_progress)
 
@@ -65,6 +71,8 @@ class KandinskyModel(BaseModel):
         self.unet = unet
         self.noise_scheduler = noise_scheduler
         self.movq = movq
+
+        self.unet_lora = unet_lora
 
     def create_prior_pipeline(self) -> KandinskyPriorPipeline:
         return KandinskyPriorPipeline(

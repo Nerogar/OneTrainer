@@ -78,13 +78,13 @@ class KandinskyFineTuneSetup(BaseKandinskySetup):
         model.unet.to(self.train_device)
         model.movq.to(self.train_device)
 
-        model.prior_text_encoder.train()
-        model.prior_image_encoder.train()
-        model.prior_prior.train()
+        model.prior_text_encoder.eval()
+        model.prior_image_encoder.eval()
+        model.prior_prior.eval()
 
-        model.text_encoder.train()
-        model.unet.train()
-        model.movq.train()
+        model.text_encoder.eval()
+        model.unet.eval()
+        model.movq.eval()
 
     def setup_train_device(
             self,
