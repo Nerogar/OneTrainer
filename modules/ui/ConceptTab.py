@@ -40,6 +40,7 @@ class ConceptTab(ConfigList):
             "random_saturation_max_strength": 0.0,
             "enable_random_hue": False,
             "random_hue_max_strength": 0.0,
+            "include_subdirectories": False,
         }
 
     def open_element_window(self, i) -> ctk.CTkToplevel:

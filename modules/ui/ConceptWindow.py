@@ -67,6 +67,10 @@ class ConceptWindow(ctk.CTkToplevel):
         ], self.ui_state, "prompt_source", command=set_prompt_path_entry_enabled)
         set_prompt_path_entry_enabled(concept["prompt_source"])
 
+        # include subdirectories
+        components.label(master, 3, 0, "Include Subdirectories")
+        prompt_path_entry = components.switch(master, 3, 1, self.ui_state, "include_subdirectories")
+
     def __augmentation_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=0)
