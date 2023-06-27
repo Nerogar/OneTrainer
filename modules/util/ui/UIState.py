@@ -50,17 +50,23 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                try:
-                    obj[name] = int(string_var)
-                except ValueError:
-                    pass
+                if string_var == "":
+                    obj[name] = None
+                else:
+                    try:
+                        obj[name] = int(string_var)
+                    except ValueError:
+                        pass
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                try:
-                    setattr(obj, name, int(string_var))
-                except ValueError:
-                    pass
+                if string_var == "":
+                    setattr(obj, name, None)
+                else:
+                    try:
+                        setattr(obj, name, int(string_var))
+                    except ValueError:
+                        pass
 
         return update
 
@@ -68,17 +74,23 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                try:
-                    obj[name] = float(string_var)
-                except ValueError:
-                    pass
+                if string_var == "":
+                    obj[name] = None
+                else:
+                    try:
+                        obj[name] = float(string_var)
+                    except ValueError:
+                        pass
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                try:
-                    setattr(obj, name, float(string_var))
-                except ValueError:
-                    pass
+                if string_var == "":
+                    setattr(obj, name, None)
+                else:
+                    try:
+                        setattr(obj, name, float(string_var))
+                    except ValueError:
+                        pass
 
         return update
 

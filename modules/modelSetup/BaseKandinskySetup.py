@@ -68,7 +68,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
             args: TrainArgs,
             train_progress: TrainProgress
     ) -> dict:
-        movq_scaling_factor = 1.0  # TODO: check if the movq has a scaling factor
+        movq_scaling_factor = 1.0
 
         latent_image = batch['latent_image']
         scaled_latent_image = latent_image * movq_scaling_factor

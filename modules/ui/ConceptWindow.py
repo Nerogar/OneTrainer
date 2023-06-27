@@ -41,15 +41,18 @@ class ConceptWindow(ctk.CTkToplevel):
         master.grid_columnconfigure(2, weight=1)
 
         # name
-        components.label(master, 0, 0, "Name")
+        components.label(master, 0, 0, "Name",
+                         tooltip="Name of the concept")
         components.entry(master, 0, 1, self.ui_state, "name")
 
         # path
-        components.label(master, 1, 0, "Path")
+        components.label(master, 1, 0, "Path",
+                         tooltip="Path where the training data is located")
         components.dir_entry(master, 1, 1, self.ui_state, "path")
 
         # prompt mode
-        components.label(master, 2, 0, "Prompt Source")
+        components.label(master, 2, 0, "Prompt Source",
+                         tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
         prompt_path_entry = components.file_entry(master, 2, 2, self.ui_state, "prompt_path")
 
         def set_prompt_path_entry_enabled(option: str):
@@ -78,35 +81,42 @@ class ConceptWindow(ctk.CTkToplevel):
         master.grid_columnconfigure(3, weight=1)
 
         # crop jitter
-        components.label(master, 0, 0, "Crop Jitter")
+        components.label(master, 0, 0, "Crop Jitter",
+                         tooltip="Enables random cropping of samples")
         components.switch(master, 0, 1, self.ui_state, "enable_crop_jitter")
 
         # random flip
-        components.label(master, 1, 0, "Random Flip")
+        components.label(master, 1, 0, "Random Flip",
+                         tooltip="Randomly flip the sample during training")
         components.switch(master, 1, 1, self.ui_state, "enable_random_flip")
 
         # random rotation
-        components.label(master, 2, 0, "Random Rotation")
+        components.label(master, 2, 0, "Random Rotation",
+                         tooltip="Randomly rotates the sample during training")
         components.switch(master, 2, 1, self.ui_state, "enable_random_rotate")
         components.entry(master, 2, 2, self.ui_state, "random_rotate_max_angle")
 
         # random brightness
-        components.label(master, 3, 0, "Random Brightness")
+        components.label(master, 3, 0, "Random Brightness",
+                         tooltip="Randomly adjusts the brightness of the sample during training")
         components.switch(master, 3, 1, self.ui_state, "enable_random_brightness")
         components.entry(master, 3, 2, self.ui_state, "random_brightness_max_strength")
 
         # random contrast
-        components.label(master, 4, 0, "Random Contrast")
+        components.label(master, 4, 0, "Random Contrast",
+                         tooltip="Randomly adjusts the contrast of the sample during training")
         components.switch(master, 4, 1, self.ui_state, "enable_random_contrast")
         components.entry(master, 4, 2, self.ui_state, "random_contrast_max_strength")
 
         # random saturation
-        components.label(master, 5, 0, "Random Saturation")
+        components.label(master, 5, 0, "Random Saturation",
+                         tooltip="Randomly adjusts the saturation of the sample during training")
         components.switch(master, 5, 1, self.ui_state, "enable_random_saturation")
         components.entry(master, 5, 2, self.ui_state, "random_saturation_max_strength")
 
         # random hue
-        components.label(master, 6, 0, "Random Hue")
+        components.label(master, 6, 0, "Random Hue",
+                         tooltip="Randomly adjusts the hue of the sample during training")
         components.switch(master, 6, 1, self.ui_state, "enable_random_hue")
         components.entry(master, 6, 2, self.ui_state, "random_hue_max_strength")
 

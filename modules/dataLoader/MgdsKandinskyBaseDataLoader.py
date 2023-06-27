@@ -1,13 +1,11 @@
 import json
 
-from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage, SaveText, DecodeTokens
-from mgds.DiffusersDataLoaderModules import *
+from mgds.DebugDataLoaderModules import SaveImage, DecodeMoVQ
+from mgds.DiffusersDataLoaderModules import EncodeMoVQ
 from mgds.GenericDataLoaderModules import *
 from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
 from mgds.TransformersDataLoaderModules import *
 
-from modules.dataLoader.kandinsky.DecodeMoVQ import DecodeMoVQ
-from modules.dataLoader.kandinsky.EncodeMoVQ import EncodeMoVQ
 from modules.dataLoader.kandinsky.KandinskyPrior import KandinskyPrior
 from modules.model.KandinskyModel import KandinskyModel
 from modules.util import path_util
@@ -349,7 +347,7 @@ class MgdsKandinskyBaseDataLoader:
                 cache_modules,
                 output_modules,
 
-                #debug_modules if args.debug_mode else None,
+                debug_modules if args.debug_mode else None,
             ],
             batch_size=args.batch_size,
             initial_epoch=train_progress.epoch,

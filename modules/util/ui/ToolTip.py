@@ -47,7 +47,7 @@ class ToolTip(object):
         self.tw.wm_overrideredirect(True)
         self.tw.wm_geometry("+%d+%d" % (x, y))
         label = ctk.CTkLabel(self.tw, text=self.text, justify='left', wraplength=self.wraplength)
-        label.pack(padx=5, pady=5)
+        label.pack(padx=8, pady=8)
 
     def hidetip(self):
         tw = self.tw

@@ -79,7 +79,8 @@ class TrainUI(ctk.CTk):
 
         self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.status_label = components.label(frame, 0, 1, "")
+        self.status_label = components.label(frame, 0, 1, "",
+                                             tooltip="Current status of the training run")
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
@@ -113,7 +114,7 @@ class TrainUI(ctk.CTk):
         self.training_tab(self.tabview.add("training"))
         self.sampling_tab(self.tabview.add("sampling"))
         self.backup_tab(self.tabview.add("backup"))
-        self.tools_tab(self.tabview.add("tools"))
+        #self.tools_tab(self.tabview.add("tools"))
 
         self.change_training_method(self.train_args.training_method)
 
@@ -127,7 +128,7 @@ class TrainUI(ctk.CTk):
 
         # workspace dir
         components.label(master, 0, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run is saved")
+                         tooltip="The directory where all files of this training run are saved")
         components.dir_entry(master, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
@@ -161,14 +162,16 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(4, weight=1)
 
         # base model
-        components.label(master, 0, 0, "Base Model")
+        components.label(master, 0, 0, "Base Model",
+                         tooltip="Filename, directory or hugging face repository of the base model")
         components.file_entry(
             master, 0, 1, self.ui_state, "base_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # model type
-        components.label(master, 0, 3, "Model Type")
+        components.label(master, 0, 3, "Model Type",
+                         tooltip="Type of the base model")
         components.options_kv(master, 0, 4, [
             ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
             ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
@@ -179,11 +182,13 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "model_type")
 
         # output model destination
-        components.label(master, 1, 0, "Model Output Destination")
+        components.label(master, 1, 0, "Model Output Destination",
+                         tooltip="Filename or directory where the output model is saved")
         components.file_entry(master, 1, 1, self.ui_state, "output_model_destination", is_output=True)
 
         # output format
-        components.label(master, 1, 3, "Output Format")
+        components.label(master, 1, 3, "Output Format",
+                         tooltip="Format to use when saving the output model")
         components.options_kv(master, 1, 4, [
             ("Diffusers", ModelFormat.DIFFUSERS),
             ("Checkpoint", ModelFormat.CKPT),
@@ -191,7 +196,8 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "output_model_format")
 
         # output data type
-        components.label(master, 2, 0, "Output Data Type")
+        components.label(master, 2, 0, "Output Data Type",
+                         tooltip="Precision to use when saving the output model")
         components.options_kv(master, 2, 1, [
             ("float16", DataType.FLOAT_16),
             ("float32", DataType.FLOAT_32),
@@ -205,23 +211,28 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(4, weight=1)
 
         # circular mask generation
-        components.label(master, 0, 0, "Circular Mask Generation")
+        components.label(master, 0, 0, "Circular Mask Generation",
+                         tooltip="Automatically create circular masks for masked training")
         components.switch(master, 0, 1, self.ui_state, "circular_mask_generation")
 
         # random rotate and crop
-        components.label(master, 1, 0, "Random Rotate and Crop")
+        components.label(master, 1, 0, "Random Rotate and Crop",
+                         tooltip="Randomly rotate the training samples and crop to the masked region")
         components.switch(master, 1, 1, self.ui_state, "random_rotate_and_crop")
 
         # aspect ratio bucketing
-        components.label(master, 2, 0, "Aspect Ratio Bucketing")
+        components.label(master, 2, 0, "Aspect Ratio Bucketing",
+                         tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
         components.switch(master, 2, 1, self.ui_state, "aspect_ratio_bucketing")
 
         # latent caching
-        components.label(master, 3, 0, "Latent Caching")
+        components.label(master, 3, 0, "Latent Caching",
+                         tooltip="Caching of intermediate training data that can be re-used between epochs")
         components.switch(master, 3, 1, self.ui_state, "latent_caching")
 
         # latent caching epochs
-        components.label(master, 4, 0, "Latent Caching Epochs")
+        components.label(master, 4, 0, "Latent Caching Epochs",
+                         tooltip="The number of epochs that are cached. Set this to a number higher than 1 and enable data augmentations if you want to add more diversity to your training data")
         components.entry(master, 4, 1, self.ui_state, "latent_caching_epochs")
 
     def concepts_tab(self, master):
@@ -239,28 +250,34 @@ class TrainUI(ctk.CTk):
 
         # column 1
         # optimizer
-        components.label(master, 0, 0, "Optimizer")
+        components.label(master, 0, 0, "Optimizer",
+                         tooltip="The type of optimizer")
         components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
 
         # learning rate scheduler
-        components.label(master, 1, 0, "Learning Rate Scheduler")
+        components.label(master, 1, 0, "Learning Rate Scheduler",
+                         tooltip="Learning rate scheduler that automatically changes the learning rate during training")
         components.options(master, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
                            "learning_rate_scheduler")
 
         # learning rate
-        components.label(master, 2, 0, "Learning Rate")
+        components.label(master, 2, 0, "Learning Rate",
+                         tooltip="The base learning rate")
         components.entry(master, 2, 1, self.ui_state, "learning_rate")
 
         # learning rate warmup steps
-        components.label(master, 3, 0, "Learning Rate Warmup Steps")
+        components.label(master, 3, 0, "Learning Rate Warmup Steps",
+                         tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate")
         components.entry(master, 3, 1, self.ui_state, "learning_rate_warmup_steps")
 
         # learning rate cycles
-        components.label(master, 4, 0, "Learning Rate Cycles")
+        components.label(master, 4, 0, "Learning Rate Cycles",
+                         tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
         components.entry(master, 4, 1, self.ui_state, "learning_rate_cycles")
 
         # weight decay
-        components.label(master, 5, 0, "Weight Decay")
+        components.label(master, 5, 0, "Weight Decay",
+                         tooltip="The weight decay parameter of the optimizer")
         components.entry(master, 5, 1, self.ui_state, "weight_decay")
 
         # loss function
@@ -268,49 +285,60 @@ class TrainUI(ctk.CTk):
         components.options(master, 6, 1, [str(x) for x in list(LossFunction)], self.ui_state, "loss_function")
 
         # epochs
-        components.label(master, 7, 0, "Epochs")
+        components.label(master, 7, 0, "Epochs",
+                         tooltip="The number of epochs for a full training run")
         components.entry(master, 7, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(master, 8, 0, "Batch Size")
+        components.label(master, 8, 0, "Batch Size",
+                         tooltip="The batch size of one training step")
         components.entry(master, 8, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(master, 9, 0, "Accumulation Steps")
+        components.label(master, 9, 0, "Accumulation Steps",
+                         tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
         components.entry(master, 9, 1, self.ui_state, "gradient_accumulation_steps")
 
         # attention mechanism
-        components.label(master, 10, 0, "Attention")
+        components.label(master, 10, 0, "Attention",
+                         tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
         components.options(master, 10, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
                            "attention_mechanism")
 
         # column 2
         # train text encoder
-        components.label(master, 0, 3, "Train Text Encoder")
+        components.label(master, 0, 3, "Train Text Encoder",
+                         tooltip="Enables training the text encoder model")
         components.switch(master, 0, 4, self.ui_state, "train_text_encoder")
 
         # train text encoder epochs
-        components.label(master, 1, 3, "Train Text Encoder Epochs")
+        components.label(master, 1, 3, "Train Text Encoder Epochs",
+                         tooltip="Number of epochs to train the text encoder")
         components.entry(master, 1, 4, self.ui_state, "train_text_encoder_epochs")
 
         # text encoder learning rate
-        components.label(master, 2, 3, "Text Encoder Learning Rate")
+        components.label(master, 2, 3, "Text Encoder Learning Rate",
+                         tooltip="The learning rate of the text encoder. Overrides the base learning rate")
         components.entry(master, 2, 4, self.ui_state, "text_encoder_learning_rate")
 
         # text encoder layer skip (clip skip)
-        components.label(master, 3, 3, "Clip Skip")
+        components.label(master, 3, 3, "Clip Skip",
+                         tooltip="The number of clip layers to scip. 0 = disabled")
         components.entry(master, 3, 4, self.ui_state, "text_encoder_layer_skip")
 
         # offset noise weight
-        components.label(master, 5, 3, "Offset Noise Weight")
+        components.label(master, 5, 3, "Offset Noise Weight",
+                         tooltip="The weight of offset noise added to each training step")
         components.entry(master, 5, 4, self.ui_state, "offset_noise_weight")
 
         # rescale noise scheduler to zero terminal SNR
-        components.label(master, 6, 3, "Rescale Noise Scheduler")
+        components.label(master, 6, 3, "Rescale Noise Scheduler",
+                         tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
         components.switch(master, 6, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
         # train dtype
-        components.label(master, 7, 3, "Train Data Type")
+        components.label(master, 7, 3, "Train Data Type",
+                         tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
         components.options_kv(master, 7, 4, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
@@ -319,40 +347,49 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "train_dtype")
 
         # resolution
-        components.label(master, 8, 3, "Resolution")
+        components.label(master, 8, 3, "Resolution",
+                         tooltip="The resolution used for training")
         components.entry(master, 8, 4, self.ui_state, "resolution")
 
         # column 3
         # train unet
-        components.label(master, 0, 6, "Train UNet")
+        components.label(master, 0, 6, "Train UNet",
+                         tooltip="Enables training the U-Net model")
         components.switch(master, 0, 7, self.ui_state, "train_unet")
 
         # train unet epochs
-        components.label(master, 1, 6, "Train UNet Epochs")
+        components.label(master, 1, 6, "Train UNet Epochs",
+                         tooltip="Number of epochs to train the U-Net")
         components.entry(master, 1, 7, self.ui_state, "train_unet_epochs")
 
         # unet learning rate
-        components.label(master, 2, 6, "Unet Learning Rate")
+        components.label(master, 2, 6, "Unet Learning Rate",
+                         tooltip="The learning rate of the U-Net. Overrides the base learning rate")
         components.entry(master, 2, 7, self.ui_state, "unet_learning_rate")
 
         # Masked Training
-        components.label(master, 5, 6, "Masked Training")
+        components.label(master, 5, 6, "Masked Training",
+                         tooltip="Masks the training samples to let the model focus on certain parts of the image. When enabled, one mask image is loaded for each training sample.")
         components.switch(master, 5, 7, self.ui_state, "masked_training")
 
         # unmasked probability
-        components.label(master, 6, 6, "Unmasked Probability")
+        components.label(master, 6, 6, "Unmasked Probability",
+                         tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
         components.entry(master, 6, 7, self.ui_state, "unmasked_probability")
 
         # unmasked weight
-        components.label(master, 7, 6, "Unmasked Weight")
+        components.label(master, 7, 6, "Unmasked Weight",
+                         tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
         components.entry(master, 7, 7, self.ui_state, "unmasked_weight")
 
         # normalize masked area loss
-        components.label(master, 8, 6, "Normalize Masked Area Loss")
+        components.label(master, 8, 6, "Normalize Masked Area Loss",
+                         tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(master, 8, 7, self.ui_state, "normalize_masked_area_loss")
 
         # max noising strength
-        components.label(master, 9, 6, "Max Noising Strength")
+        components.label(master, 9, 6, "Max Noising Strength",
+                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(master, 9, 7, self.ui_state, "max_noising_strength")
 
     def sampling_tab(self, master):
@@ -364,7 +401,8 @@ class TrainUI(ctk.CTk):
         top_frame = ctk.CTkFrame(master=master, corner_radius=0)
         top_frame.grid(row=0, column=0, sticky="nsew")
 
-        components.label(top_frame, 0, 0, "Sample After")
+        components.label(top_frame, 0, 0, "Sample After",
+                         tooltip="The interval used when automatically sampling from the model during training")
         components.time_entry(top_frame, 0, 1, self.ui_state, "sample_after", "sample_after_unit")
 
         # table
@@ -381,11 +419,13 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(4, weight=1)
 
         # sample after
-        components.label(master, 0, 0, "Backup After")
+        components.label(master, 0, 0, "Backup After",
+                         tooltip="The interval used when automatically creating model backups during training")
         components.time_entry(master, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
         # optimizer
-        components.label(master, 1, 0, "Backup Before Save")
+        components.label(master, 1, 0, "Backup Before Save",
+                         tooltip="Create a full backup before saving the final model")
         components.switch(master, 1, 1, self.ui_state, "backup_before_save")
 
     def lora_tab(self, master):
@@ -396,18 +436,21 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(4, weight=1)
 
         # extra model
-        components.label(master, 0, 0, "LoRA base model")
+        components.label(master, 0, 0, "LoRA base model",
+                         tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
         components.file_entry(
             master, 0, 1, self.ui_state, "extra_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # lora rank
-        components.label(master, 1, 0, "LoRA rank")
+        components.label(master, 1, 0, "LoRA rank",
+                         tooltip="The rank parameter used when creating a new LoRA")
         components.entry(master, 1, 1, self.ui_state, "lora_rank")
 
         # lora rank
-        components.label(master, 2, 0, "LoRA alpha")
+        components.label(master, 2, 0, "LoRA alpha",
+                         tooltip="The alpha parameter used when creating a new LoRA")
         components.entry(master, 2, 1, self.ui_state, "lora_alpha")
 
         return master
@@ -420,18 +463,21 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(4, weight=1)
 
         # extra model
-        components.label(master, 0, 0, "Base embedding")
+        components.label(master, 0, 0, "Base embedding",
+                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
             master, 0, 1, self.ui_state, "extra_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
-        components.label(master, 1, 0, "Token count")
+        components.label(master, 1, 0, "Token count",
+                         tooltip="The token count used when creating a new embedding")
         components.entry(master, 1, 1, self.ui_state, "token_count")
 
         # initial embedding text
-        components.label(master, 2, 0, "Initial embedding text")
+        components.label(master, 2, 0, "Initial embedding text",
+                         tooltip="The initial embedding text used when creating a new embedding")
         components.entry(master, 2, 1, self.ui_state, "initial_embedding_text")
 
         return master

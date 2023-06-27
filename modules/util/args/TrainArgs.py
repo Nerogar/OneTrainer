@@ -150,7 +150,7 @@ class TrainArgs:
                 data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
             elif isinstance(value, float):
                 data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
-            else:
+            elif value is not None:
                 data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
 
         return ' '.join(data)

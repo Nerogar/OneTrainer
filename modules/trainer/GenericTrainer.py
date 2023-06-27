@@ -93,7 +93,6 @@ class GenericTrainer(BaseTrainer):
 
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
-        pass
 
     def __execute_sample_during_training(self):
         for fun in self.sample_queue:
