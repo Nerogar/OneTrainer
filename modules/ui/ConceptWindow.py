@@ -71,7 +71,8 @@ class ConceptWindow(ctk.CTkToplevel):
         set_prompt_path_entry_enabled(concept["prompt_source"])
 
         # include subdirectories
-        components.label(master, 3, 0, "Include Subdirectories")
+        components.label(master, 3, 0, "Include Subdirectories",
+                         tooltip="Includes images from subdirectories into the dataset")
         prompt_path_entry = components.switch(master, 3, 1, self.ui_state, "include_subdirectories")
 
     def __augmentation_tab(self, master):

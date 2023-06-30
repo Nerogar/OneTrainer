@@ -4,7 +4,6 @@ from enum import Enum
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.DataType import DataType
-from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
@@ -53,7 +52,6 @@ class TrainArgs:
     train_unet: bool
     train_unet_epochs: int
     unet_learning_rate: float
-    loss_function: LossFunction
     offset_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
@@ -191,7 +189,6 @@ class TrainArgs:
         parser.add_argument("--learning-rate-warmup-steps", type=int, required=False, default=0, dest="learning_rate_warmup_steps", help="The number of warmup steps when creating the learning rate scheduler")
         parser.add_argument("--learning-rate-cycles", type=float, required=False, default=1, dest="learning_rate_cycles", help="The number of cycles of the learning rate scheduler")
         parser.add_argument("--weight-decay", type=float, required=False, default=1e-2, dest="weight_decay", help="The weight decay used when creating the optimizer")
-        parser.add_argument("--loss-function", type=LossFunction, required=False, default=LossFunction.MSE, dest="loss_function", help="The loss function", choices=list(LossFunction))
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
         parser.add_argument("--batch-size", type=int, required=True, dest="batch_size", help="The batch size")
         parser.add_argument("--gradient-accumulation-steps", type=int, required=False, default=1, dest="gradient_accumulation_steps", help="The amount of steps used for gradient accumulation")
@@ -270,7 +267,6 @@ class TrainArgs:
         args["learning_rate_warmup_steps"] = 200
         args["learning_rate_cycles"] = 1
         args["weight_decay"] = 1e-2
-        args["loss_function"] = LossFunction.MSE
         args["epochs"] = 100
         args["batch_size"] = 1
         args["gradient_accumulation_steps"] = 1

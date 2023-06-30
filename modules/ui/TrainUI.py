@@ -20,7 +20,6 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
-from modules.util.enum.LossFunction import LossFunction
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
@@ -178,7 +177,6 @@ class TrainUI(ctk.CTk):
             ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
             ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
             ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
-            ("Kandinsky 2.1", ModelType.KANDINSKY_21),
         ], self.ui_state, "model_type")
 
         # output model destination
@@ -280,29 +278,25 @@ class TrainUI(ctk.CTk):
                          tooltip="The weight decay parameter of the optimizer")
         components.entry(master, 5, 1, self.ui_state, "weight_decay")
 
-        # loss function
-        components.label(master, 6, 0, "Loss Function")
-        components.options(master, 6, 1, [str(x) for x in list(LossFunction)], self.ui_state, "loss_function")
-
         # epochs
-        components.label(master, 7, 0, "Epochs",
+        components.label(master, 6, 0, "Epochs",
                          tooltip="The number of epochs for a full training run")
-        components.entry(master, 7, 1, self.ui_state, "epochs")
+        components.entry(master, 6, 1, self.ui_state, "epochs")
 
         # batch size
         components.label(master, 8, 0, "Batch Size",
                          tooltip="The batch size of one training step")
-        components.entry(master, 8, 1, self.ui_state, "batch_size")
+        components.entry(master, 7, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(master, 9, 0, "Accumulation Steps",
+        components.label(master, 8, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(master, 9, 1, self.ui_state, "gradient_accumulation_steps")
+        components.entry(master, 8, 1, self.ui_state, "gradient_accumulation_steps")
 
         # attention mechanism
-        components.label(master, 10, 0, "Attention",
+        components.label(master, 9, 0, "Attention",
                          tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(master, 10, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
+        components.options(master, 9, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
                            "attention_mechanism")
 
         # column 2

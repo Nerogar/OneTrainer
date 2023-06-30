@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from diffusers import DDPMScheduler
 
-from modules.model.KandinskyModel import KandinskyModel
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 
 

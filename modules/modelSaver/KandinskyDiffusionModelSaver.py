@@ -4,13 +4,10 @@ import os.path
 from pathlib import Path
 
 import torch
-import yaml
-from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
-from modules.util.convert.convert_sd_diffusers_to_ckpt import convert_sd_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
@@ -20,22 +17,36 @@ class KandinskyModelSaver(BaseModelSaver):
     @staticmethod
     def __save_diffusers(
             model: KandinskyModel,
-            destination: str,
+            prior_destination: str,
+            diffusion_destination: str,
             dtype: torch.dtype,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
-        pipeline = model.create_prior_pipeline()
-        original_device = pipeline.device
-        pipeline.to("cpu")
-        pipeline_copy = copy.deepcopy(pipeline)
-        pipeline.to(original_device)
+        prior_pipeline = model.create_prior_pipeline()
+        original_device = prior_pipeline.device
+        prior_pipeline.to("cpu")
+        prior_pipeline_copy = copy.deepcopy(prior_pipeline)
+        prior_pipeline.to(original_device)
 
-        pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
+        prior_pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
 
-        os.makedirs(Path(destination).absolute(), exist_ok=True)
-        pipeline_copy.save_pretrained(destination)
+        os.makedirs(Path(prior_destination).absolute(), exist_ok=True)
+        prior_pipeline_copy.save_pretrained(prior_destination)
 
-        del pipeline_copy
+        del prior_pipeline_copy
+
+        diffusion_pipeline = model.create_diffusion_pipeline()
+        original_device = diffusion_pipeline.device
+        diffusion_pipeline.to("cpu")
+        diffusion_pipeline_copy = copy.deepcopy(diffusion_pipeline)
+        diffusion_pipeline.to(original_device)
+
+        diffusion_pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
+
+        os.makedirs(Path(diffusion_destination).absolute(), exist_ok=True)
+        diffusion_pipeline_copy.save_pretrained(diffusion_destination)
+
+        del diffusion_pipeline_copy
 
     @staticmethod
     def __save_ckpt(
@@ -44,21 +55,7 @@ class KandinskyModelSaver(BaseModelSaver):
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = convert_sd_diffusers_to_ckpt(
-            model_type,
-            model.vae.state_dict(),
-            model.unet.state_dict(),
-            model.text_encoder.state_dict(),
-            model.noise_scheduler
-        )
-        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
-
-        yaml_name = os.path.splitext(destination)[0] + '.yaml'
-        with open(yaml_name, 'w', encoding='utf8') as f:
-            yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
+        raise NotImplementedError
 
     @staticmethod
     def __save_safetensors(
@@ -67,37 +64,28 @@ class KandinskyModelSaver(BaseModelSaver):
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = convert_sd_diffusers_to_ckpt(
-            model_type,
-            model.vae.state_dict(),
-            model.unet.state_dict(),
-            model.text_encoder.state_dict(),
-            model.noise_scheduler
-        )
-        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination)
-
-        yaml_name = os.path.splitext(destination)[0] + '.yaml'
-        with open(yaml_name, 'w', encoding='utf8') as f:
-            yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
-
+        raise NotImplementedError
 
     @staticmethod
     def __save_internal(
             model: KandinskyModel,
             destination: str,
     ):
-        if model.text_encoder.dtype != torch.float32 \
-                or model.vae.dtype != torch.float32 \
-                or model.unet.dtype != torch.float32:
+        if model.prior_text_encoder.dtype != torch.float32 \
+                or model.prior_image_encoder.dtype != torch.float32 \
+                or model.prior_prior.dtype != torch.float32 \
+                or model.text_encoder.dtype != torch.float32 \
+                or model.unet.dtype != torch.float32 \
+                or model.movq.dtype != torch.float32:
             # The internal model format requires float32 weights.
             # Other formats don't have the required precision for training.
             raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
 
+        prior_destination = os.path.join(destination, "prior_model")
+        diffusion_destination = os.path.join(destination, "diffusion_model")
+
         # base model
-        KandinskyModelSaver.__save_diffusers(model, destination, torch.float32)
+        KandinskyModelSaver.__save_diffusers(model, prior_destination, diffusion_destination, torch.float32)
 
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
@@ -124,7 +112,8 @@ class KandinskyModelSaver(BaseModelSaver):
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:
-                self.__save_diffusers(model, output_model_destination, dtype)
+                prior_destination, diffusion_destination = output_model_destination.split(';')
+                self.__save_diffusers(model, prior_destination, diffusion_destination, dtype)
             case ModelFormat.CKPT:
                 self.__save_ckpt(model, model_type, output_model_destination, dtype)
             case ModelFormat.SAFETENSORS:

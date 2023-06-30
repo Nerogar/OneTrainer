@@ -23,7 +23,6 @@
     "learning_rate_warmup_steps": 20,
     "learning_rate_cycles": 1,
     "weight_decay": 0.01,
-    "loss_function": "MSE",
     "epochs": 100,
     "batch_size": 4,
     "gradient_accumulation_steps": 1,

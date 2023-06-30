@@ -13,7 +13,6 @@ accelerate==0.18.0
 safetensors==0.3.1
 tensorboard==2.13.0
 pytorch-lightning==2.0.3
-https://github.com/acpopescu/bitsandbytes/releases/download/v0.38.0-win0/bitsandbytes-0.38.1-py3-none-any.whl
 
 # stable diffusion
 git+https://github.com/huggingface/diffusers.git@f96b760#egg=diffusers
@@ -21,13 +20,13 @@ git+https://github.com/huggingface/transformers.git@656e869#egg=transformers
 omegaconf # needed to load ckpt files
 
 # data loader
-git+https://github.com/Nerogar/mgds.git@01f6ca5#egg=mgds
+git+https://github.com/Nerogar/mgds.git@b3e122c#egg=mgds
 
 # xformers
 xformers==0.0.20
 
-# bitsandbytes
-#bitsandbytes-windows==0.37.5 # deactivated for now
+# bitsandbytes for 8-bit optimizers
+bitsandbytes-windows==0.37.5
 
 # ui
 customtkinter==5.1.2
