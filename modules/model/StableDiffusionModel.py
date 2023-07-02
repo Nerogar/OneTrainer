@@ -46,13 +46,14 @@ class StableDiffusionModel(BaseModel):
             image_depth_processor: DPTImageProcessor | None = None,
             depth_estimator: DPTForDepthEstimation | None = None,
             optimizer_state_dict: dict | None = None,
+            ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
             embeddings: list[StableDiffusionModelEmbedding] = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
             sd_config: dict | None = None,
     ):
-        super(StableDiffusionModel, self).__init__(model_type, optimizer_state_dict, train_progress)
+        super(StableDiffusionModel, self).__init__(model_type, optimizer_state_dict, ema_state_dict, train_progress)
 
         self.tokenizer = tokenizer
         self.noise_scheduler = noise_scheduler

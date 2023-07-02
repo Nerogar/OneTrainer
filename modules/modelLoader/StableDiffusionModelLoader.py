@@ -60,6 +60,12 @@ class StableDiffusionModelLoader(BaseModelLoader):
             except FileNotFoundError:
                 pass
 
+            # ema
+            try:
+                model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
+            except FileNotFoundError:
+                pass
+
             with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
                 model.sd_config = yaml.safe_load(f)
 

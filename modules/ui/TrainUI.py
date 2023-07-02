@@ -19,6 +19,7 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
+from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -41,7 +42,7 @@ class TrainUI(ctk.CTk):
         super(TrainUI, self).__init__()
 
         self.title("OneTrainer")
-        self.geometry("1100x700")
+        self.geometry("1100x740")
 
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
@@ -237,103 +238,125 @@ class TrainUI(ctk.CTk):
         ConceptTab(master, self.train_args, self.ui_state)
 
     def training_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
-        master.grid_columnconfigure(5, minsize=50)
-        master.grid_columnconfigure(6, weight=0)
-        master.grid_columnconfigure(7, weight=1)
+        master.grid_rowconfigure(0, weight=1)
+        master.grid_columnconfigure(0, weight=1)
+
+        scroll_frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        scroll_frame.grid(row=0, column=0, sticky="nsew")
+
+        scroll_frame.grid_columnconfigure(0, weight=0)
+        scroll_frame.grid_columnconfigure(1, weight=1)
+        scroll_frame.grid_columnconfigure(2, minsize=50)
+        scroll_frame.grid_columnconfigure(3, weight=0)
+        scroll_frame.grid_columnconfigure(4, weight=1)
+        scroll_frame.grid_columnconfigure(5, minsize=50)
+        scroll_frame.grid_columnconfigure(6, weight=0)
+        scroll_frame.grid_columnconfigure(7, weight=1)
 
         # column 1
         # optimizer
-        components.label(master, 0, 0, "Optimizer",
+        components.label(scroll_frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
-        components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
+        components.options(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
 
         # learning rate scheduler
-        components.label(master, 1, 0, "Learning Rate Scheduler",
+        components.label(scroll_frame, 1, 0, "Learning Rate Scheduler",
                          tooltip="Learning rate scheduler that automatically changes the learning rate during training")
-        components.options(master, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
+        components.options(scroll_frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
                            "learning_rate_scheduler")
 
         # learning rate
-        components.label(master, 2, 0, "Learning Rate",
+        components.label(scroll_frame, 2, 0, "Learning Rate",
                          tooltip="The base learning rate")
-        components.entry(master, 2, 1, self.ui_state, "learning_rate")
+        components.entry(scroll_frame, 2, 1, self.ui_state, "learning_rate")
 
         # learning rate warmup steps
-        components.label(master, 3, 0, "Learning Rate Warmup Steps",
+        components.label(scroll_frame, 3, 0, "Learning Rate Warmup Steps",
                          tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate")
-        components.entry(master, 3, 1, self.ui_state, "learning_rate_warmup_steps")
+        components.entry(scroll_frame, 3, 1, self.ui_state, "learning_rate_warmup_steps")
 
         # learning rate cycles
-        components.label(master, 4, 0, "Learning Rate Cycles",
+        components.label(scroll_frame, 4, 0, "Learning Rate Cycles",
                          tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
-        components.entry(master, 4, 1, self.ui_state, "learning_rate_cycles")
+        components.entry(scroll_frame, 4, 1, self.ui_state, "learning_rate_cycles")
 
         # weight decay
-        components.label(master, 5, 0, "Weight Decay",
+        components.label(scroll_frame, 5, 0, "Weight Decay",
                          tooltip="The weight decay parameter of the optimizer")
-        components.entry(master, 5, 1, self.ui_state, "weight_decay")
+        components.entry(scroll_frame, 5, 1, self.ui_state, "weight_decay")
 
         # epochs
-        components.label(master, 6, 0, "Epochs",
+        components.label(scroll_frame, 6, 0, "Epochs",
                          tooltip="The number of epochs for a full training run")
-        components.entry(master, 6, 1, self.ui_state, "epochs")
+        components.entry(scroll_frame, 6, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(master, 8, 0, "Batch Size",
+        components.label(scroll_frame, 7, 0, "Batch Size",
                          tooltip="The batch size of one training step")
-        components.entry(master, 7, 1, self.ui_state, "batch_size")
+        components.entry(scroll_frame, 7, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(master, 8, 0, "Accumulation Steps",
+        components.label(scroll_frame, 8, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(master, 8, 1, self.ui_state, "gradient_accumulation_steps")
+        components.entry(scroll_frame, 8, 1, self.ui_state, "gradient_accumulation_steps")
 
         # attention mechanism
-        components.label(master, 9, 0, "Attention",
+        components.label(scroll_frame, 9, 0, "Attention",
                          tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(master, 9, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
+        components.options(scroll_frame, 9, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
                            "attention_mechanism")
+
+        # ema
+        components.label(scroll_frame, 10, 0, "EMA",
+                         tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
+        components.options(scroll_frame, 10, 1, [str(x) for x in list(EMAMode)], self.ui_state,
+                           "ema")
+
+        # ema decay
+        components.label(scroll_frame, 11, 0, "EMA Decay",
+                         tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
+        components.entry(scroll_frame, 11, 1, self.ui_state, "ema_decay")
+
+        # ema update step interval
+        components.label(scroll_frame, 12, 0, "EMA Update Step Interval",
+                         tooltip="Number of steps between EMA update steps")
+        components.entry(scroll_frame, 12, 1, self.ui_state, "ema_update_step_interval")
 
         # column 2
         # train text encoder
-        components.label(master, 0, 3, "Train Text Encoder",
+        components.label(scroll_frame, 0, 3, "Train Text Encoder",
                          tooltip="Enables training the text encoder model")
-        components.switch(master, 0, 4, self.ui_state, "train_text_encoder")
+        components.switch(scroll_frame, 0, 4, self.ui_state, "train_text_encoder")
 
         # train text encoder epochs
-        components.label(master, 1, 3, "Train Text Encoder Epochs",
+        components.label(scroll_frame, 1, 3, "Train Text Encoder Epochs",
                          tooltip="Number of epochs to train the text encoder")
-        components.entry(master, 1, 4, self.ui_state, "train_text_encoder_epochs")
+        components.entry(scroll_frame, 1, 4, self.ui_state, "train_text_encoder_epochs")
 
         # text encoder learning rate
-        components.label(master, 2, 3, "Text Encoder Learning Rate",
+        components.label(scroll_frame, 2, 3, "Text Encoder Learning Rate",
                          tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-        components.entry(master, 2, 4, self.ui_state, "text_encoder_learning_rate")
+        components.entry(scroll_frame, 2, 4, self.ui_state, "text_encoder_learning_rate")
 
         # text encoder layer skip (clip skip)
-        components.label(master, 3, 3, "Clip Skip",
+        components.label(scroll_frame, 3, 3, "Clip Skip",
                          tooltip="The number of clip layers to scip. 0 = disabled")
-        components.entry(master, 3, 4, self.ui_state, "text_encoder_layer_skip")
+        components.entry(scroll_frame, 3, 4, self.ui_state, "text_encoder_layer_skip")
 
         # offset noise weight
-        components.label(master, 5, 3, "Offset Noise Weight",
+        components.label(scroll_frame, 5, 3, "Offset Noise Weight",
                          tooltip="The weight of offset noise added to each training step")
-        components.entry(master, 5, 4, self.ui_state, "offset_noise_weight")
+        components.entry(scroll_frame, 5, 4, self.ui_state, "offset_noise_weight")
 
         # rescale noise scheduler to zero terminal SNR
-        components.label(master, 6, 3, "Rescale Noise Scheduler",
+        components.label(scroll_frame, 6, 3, "Rescale Noise Scheduler",
                          tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
-        components.switch(master, 6, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+        components.switch(scroll_frame, 6, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
         # train dtype
-        components.label(master, 7, 3, "Train Data Type",
+        components.label(scroll_frame, 7, 3, "Train Data Type",
                          tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
-        components.options_kv(master, 7, 4, [
+        components.options_kv(scroll_frame, 7, 4, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
@@ -341,50 +364,50 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "train_dtype")
 
         # resolution
-        components.label(master, 8, 3, "Resolution",
+        components.label(scroll_frame, 8, 3, "Resolution",
                          tooltip="The resolution used for training")
-        components.entry(master, 8, 4, self.ui_state, "resolution")
+        components.entry(scroll_frame, 8, 4, self.ui_state, "resolution")
 
         # column 3
         # train unet
-        components.label(master, 0, 6, "Train UNet",
+        components.label(scroll_frame, 0, 6, "Train UNet",
                          tooltip="Enables training the U-Net model")
-        components.switch(master, 0, 7, self.ui_state, "train_unet")
+        components.switch(scroll_frame, 0, 7, self.ui_state, "train_unet")
 
         # train unet epochs
-        components.label(master, 1, 6, "Train UNet Epochs",
+        components.label(scroll_frame, 1, 6, "Train UNet Epochs",
                          tooltip="Number of epochs to train the U-Net")
-        components.entry(master, 1, 7, self.ui_state, "train_unet_epochs")
+        components.entry(scroll_frame, 1, 7, self.ui_state, "train_unet_epochs")
 
         # unet learning rate
-        components.label(master, 2, 6, "Unet Learning Rate",
+        components.label(scroll_frame, 2, 6, "Unet Learning Rate",
                          tooltip="The learning rate of the U-Net. Overrides the base learning rate")
-        components.entry(master, 2, 7, self.ui_state, "unet_learning_rate")
+        components.entry(scroll_frame, 2, 7, self.ui_state, "unet_learning_rate")
 
         # Masked Training
-        components.label(master, 5, 6, "Masked Training",
+        components.label(scroll_frame, 5, 6, "Masked Training",
                          tooltip="Masks the training samples to let the model focus on certain parts of the image. When enabled, one mask image is loaded for each training sample.")
-        components.switch(master, 5, 7, self.ui_state, "masked_training")
+        components.switch(scroll_frame, 5, 7, self.ui_state, "masked_training")
 
         # unmasked probability
-        components.label(master, 6, 6, "Unmasked Probability",
+        components.label(scroll_frame, 6, 6, "Unmasked Probability",
                          tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
-        components.entry(master, 6, 7, self.ui_state, "unmasked_probability")
+        components.entry(scroll_frame, 6, 7, self.ui_state, "unmasked_probability")
 
         # unmasked weight
-        components.label(master, 7, 6, "Unmasked Weight",
+        components.label(scroll_frame, 7, 6, "Unmasked Weight",
                          tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
-        components.entry(master, 7, 7, self.ui_state, "unmasked_weight")
+        components.entry(scroll_frame, 7, 7, self.ui_state, "unmasked_weight")
 
         # normalize masked area loss
-        components.label(master, 8, 6, "Normalize Masked Area Loss",
+        components.label(scroll_frame, 8, 6, "Normalize Masked Area Loss",
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
-        components.switch(master, 8, 7, self.ui_state, "normalize_masked_area_loss")
+        components.switch(scroll_frame, 8, 7, self.ui_state, "normalize_masked_area_loss")
 
         # max noising strength
-        components.label(master, 9, 6, "Max Noising Strength",
+        components.label(scroll_frame, 9, 6, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(master, 9, 7, self.ui_state, "max_noising_strength")
+        components.entry(scroll_frame, 9, 7, self.ui_state, "max_noising_strength")
 
     def sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)

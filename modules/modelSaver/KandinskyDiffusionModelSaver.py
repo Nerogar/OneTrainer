@@ -91,6 +91,11 @@ class KandinskyModelSaver(BaseModelSaver):
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
         torch.save(model.optimizer.state_dict(), os.path.join(destination, "optimizer", "optimizer.pt"))
 
+        # ema
+        if model.ema:
+            os.makedirs(os.path.join(destination, "ema"), exist_ok=True)
+            torch.save(model.ema.state_dict(), os.path.join(destination, "ema", "ema.pt"))
+
         # meta
         with open(os.path.join(destination, "meta.json"), "w") as meta_file:
             json.dump({

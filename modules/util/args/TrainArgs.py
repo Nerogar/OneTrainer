@@ -2,6 +2,7 @@ import argparse
 from enum import Enum
 
 from modules.util.enum.AttentionMechanism import AttentionMechanism
+from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -45,6 +46,9 @@ class TrainArgs:
     epochs: int
     batch_size: int
     gradient_accumulation_steps: int
+    ema: EMAMode
+    ema_decay: float
+    ema_update_step_interval: int
     train_text_encoder: bool
     train_text_encoder_epochs: int
     text_encoder_learning_rate: float
@@ -192,6 +196,9 @@ class TrainArgs:
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
         parser.add_argument("--batch-size", type=int, required=True, dest="batch_size", help="The batch size")
         parser.add_argument("--gradient-accumulation-steps", type=int, required=False, default=1, dest="gradient_accumulation_steps", help="The amount of steps used for gradient accumulation")
+        parser.add_argument("--ema", type=EMAMode, required=False, default=EMAMode.OFF, dest="ema", help="Activate EMA during training", choices=list(EMAMode))
+        parser.add_argument("--ema-decay", type=float, required=False, default=0.999, dest="ema_decay", help="Decay parameter of the EMA model")
+        parser.add_argument("--ema-update-step-interval", type=int, required=False, default=5, dest="ema_update_step_interval", help="")
         parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
         parser.add_argument("--train-text-encoder-epochs", type=int, required=False, default=2 ** 30, dest="train_text_encoder_epochs", help="Number of epochs to train the text encoder for")
         parser.add_argument("--text-encoder-learning-rate", type=float, required=False, default=None, dest="text_encoder_learning_rate", help="Learning rate for the text encoder")
@@ -270,6 +277,9 @@ class TrainArgs:
         args["epochs"] = 100
         args["batch_size"] = 1
         args["gradient_accumulation_steps"] = 1
+        args["ema"] = EMAMode.OFF
+        args["ema_decay"] = 0.999
+        args["ema_update_step_interval"] = 5
         args["train_text_encoder"] = True
         args["train_text_encoder_epochs"] = 30
         args["text_encoder_learning_rate"] = 3e-6

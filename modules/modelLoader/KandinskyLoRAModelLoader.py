@@ -79,6 +79,12 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
             except FileNotFoundError:
                 pass
 
+            # ema
+            try:
+                model.ema_state_dict = torch.load(os.path.join(lora_name, "ema", "ema.pt"))
+            except FileNotFoundError:
+                pass
+
             # meta
             model.train_progress = train_progress
 
