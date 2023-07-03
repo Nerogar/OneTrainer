@@ -284,7 +284,7 @@ class TrainUI(ctk.CTk):
         components.entry(master, 6, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(master, 8, 0, "Batch Size",
+        components.label(master, 7, 0, "Batch Size",
                          tooltip="The batch size of one training step")
         components.entry(master, 7, 1, self.ui_state, "batch_size")
 
