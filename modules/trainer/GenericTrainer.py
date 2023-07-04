@@ -104,7 +104,39 @@ class GenericTrainer(BaseTrainer):
             fun()
         self.sample_queue = []
 
-    def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: dict = None):
+    def __sample_loop(self, train_progress: TrainProgress, sample_definitions: list[dict], folder_postfix: str = ""):
+        for i, sample_definition in enumerate(sample_definitions):
+            safe_prompt = path_util.safe_filename(sample_definition['prompt'])
+
+            sample_dir = os.path.join(
+                self.args.workspace_dir,
+                "samples",
+                f"{str(i)} - {safe_prompt}{folder_postfix}",
+            )
+
+            sample_path = os.path.join(
+                sample_dir,
+                f"training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
+            )
+
+            def on_sample(image: Image):
+                self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
+                                           train_progress.global_step)
+                self.callbacks.on_sample(image)
+
+            self.model_sampler.sample(
+                prompt=sample_definition["prompt"],
+                resolution=(sample_definition["height"], sample_definition["width"]),
+                seed=sample_definition["seed"],
+                destination=sample_path,
+                text_encoder_layer_skip=self.args.text_encoder_layer_skip,
+                force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
+                on_sample=on_sample,
+            )
+
+            torch.cuda.empty_cache()
+
+    def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: list[dict] = None):
         torch.cuda.empty_cache()
 
         self.callbacks.on_update_status("sampling")
@@ -118,72 +150,14 @@ class GenericTrainer(BaseTrainer):
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
-        for i, sample_definition in enumerate(sample_definitions):
-            safe_prompt = path_util.safe_filename(sample_definition['prompt'])
-
-            sample_dir = os.path.join(
-                self.args.workspace_dir,
-                "samples",
-                f"{str(i)} - {safe_prompt}",
-            )
-
-            sample_path = os.path.join(
-                sample_dir,
-                f"training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
-            )
-
-            def on_sample(image: Image):
-                self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                           train_progress.global_step)
-                self.callbacks.on_sample(image)
-
-            self.model_sampler.sample(
-                prompt=sample_definition["prompt"],
-                resolution=(sample_definition["height"], sample_definition["width"]),
-                seed=sample_definition["seed"],
-                destination=sample_path,
-                text_encoder_layer_skip=self.args.text_encoder_layer_skip,
-                force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
-                on_sample=on_sample,
-            )
-
-            torch.cuda.empty_cache()
+        self.__sample_loop(train_progress, sample_definitions)
 
         if self.model.ema:
             self.model.ema.copy_temp_to(self.parameters)
 
-        # TODO: remove this loop
-        # ema-less sampling
-        for i, sample_definition in enumerate(sample_definitions):
-            safe_prompt = path_util.safe_filename(sample_definition['prompt'])
-
-            sample_dir = os.path.join(
-                self.args.workspace_dir,
-                "samples",
-                f"{str(i)} - {safe_prompt} - no-ema",
-            )
-
-            sample_path = os.path.join(
-                sample_dir,
-                f"training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
-            )
-
-            def on_sample(image: Image):
-                self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                           train_progress.global_step)
-                self.callbacks.on_sample(image)
-
-            self.model_sampler.sample(
-                prompt=sample_definition["prompt"],
-                resolution=(sample_definition["height"], sample_definition["width"]),
-                seed=sample_definition["seed"],
-                destination=sample_path,
-                text_encoder_layer_skip=self.args.text_encoder_layer_skip,
-                force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
-                on_sample=on_sample,
-            )
-
-            torch.cuda.empty_cache()
+        # ema-less sampling, if an ema model exists
+        if self.model.ema:
+            self.__sample_loop(train_progress, sample_definitions, " - no-ema")
 
         self.model_setup.setup_train_device(self.model, self.args)
 
