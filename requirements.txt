@@ -20,7 +20,7 @@ git+https://github.com/huggingface/transformers.git@656e869#egg=transformers
 omegaconf # needed to load ckpt files
 
 # data loader
-git+https://github.com/Nerogar/mgds.git@b3e122c#egg=mgds
+git+https://github.com/Nerogar/mgds.git@ecc8465#egg=mgds
 
 # xformers
 xformers==0.0.20

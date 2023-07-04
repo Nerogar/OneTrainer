@@ -74,6 +74,11 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
         torch.save(model.optimizer.state_dict(), os.path.join(destination, "optimizer", "optimizer.pt"))
 
+        # ema
+        if model.ema:
+            os.makedirs(os.path.join(destination, "ema"), exist_ok=True)
+            torch.save(model.ema.state_dict(), os.path.join(destination, "ema", "ema.pt"))
+
         # meta
         with open(os.path.join(destination, "meta.json"), "w") as meta_file:
             json.dump({
@@ -93,13 +98,12 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
             output_model_destination: str,
             dtype: torch.dtype,
     ):
-        if model_type.is_stable_diffusion():
-            match output_model_format:
-                case ModelFormat.DIFFUSERS:
-                    raise NotImplementedError
-                case ModelFormat.CKPT:
-                    self.__save_ckpt(model, output_model_destination, dtype)
-                case ModelFormat.SAFETENSORS:
-                    self.__save_safetensors(model, output_model_destination, dtype)
-                case ModelFormat.INTERNAL:
-                    self.__save_internal(model, output_model_destination)
+        match output_model_format:
+            case ModelFormat.DIFFUSERS:
+                raise NotImplementedError
+            case ModelFormat.CKPT:
+                self.__save_ckpt(model, output_model_destination, dtype)
+            case ModelFormat.SAFETENSORS:
+                self.__save_safetensors(model, output_model_destination, dtype)
+            case ModelFormat.INTERNAL:
+                self.__save_internal(model, output_model_destination)

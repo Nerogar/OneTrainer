@@ -18,6 +18,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
 - **Noise Scheduler Rescaling**: From the paper
   [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
+- **EMA**: Train you own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
 
 ## Planned Features
 

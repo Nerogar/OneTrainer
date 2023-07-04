@@ -51,11 +51,12 @@ class KandinskyModel(BaseModel):
             movq: VQModel,
 
             optimizer_state_dict: dict | None = None,
+            ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
 
             unet_lora: LoRAModuleWrapper | None = None,
     ):
-        super(KandinskyModel, self).__init__(model_type, optimizer_state_dict, train_progress)
+        super(KandinskyModel, self).__init__(model_type, optimizer_state_dict, ema_state_dict, train_progress)
 
         # prior
         self.prior_tokenizer = prior_tokenizer

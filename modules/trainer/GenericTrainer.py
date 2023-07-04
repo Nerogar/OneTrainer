@@ -10,6 +10,7 @@ import torch
 from PIL.Image import Image
 from torch import nn
 from torch.cuda.amp import GradScaler
+from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
@@ -42,6 +43,8 @@ class GenericTrainer(BaseTrainer):
 
     previous_sample_time: float
     sample_queue: list[Callable]
+
+    parameters: list[Parameter]
 
     tensorboard_subprocess: subprocess.Popen
     tensorboard: SummaryWriter
@@ -91,6 +94,8 @@ class GenericTrainer(BaseTrainer):
         self.previous_sample_time = -1
         self.sample_queue = []
 
+        self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
+
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
 
@@ -99,24 +104,14 @@ class GenericTrainer(BaseTrainer):
             fun()
         self.sample_queue = []
 
-    def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: dict = None):
-        torch.cuda.empty_cache()
-
-        self.callbacks.on_update_status("sampling")
-
-        self.model_setup.setup_eval_device(self.model)
-
-        if not sample_definitions:
-            with open(self.args.sample_definition_file_name, 'r') as f:
-                sample_definitions = json.load(f)
-
+    def __sample_loop(self, train_progress: TrainProgress, sample_definitions: list[dict], folder_postfix: str = ""):
         for i, sample_definition in enumerate(sample_definitions):
             safe_prompt = path_util.safe_filename(sample_definition['prompt'])
 
             sample_dir = os.path.join(
                 self.args.workspace_dir,
                 "samples",
-                f"{str(i)} - {safe_prompt}",
+                f"{str(i)} - {safe_prompt}{folder_postfix}",
             )
 
             sample_path = os.path.join(
@@ -140,6 +135,29 @@ class GenericTrainer(BaseTrainer):
             )
 
             torch.cuda.empty_cache()
+
+    def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: list[dict] = None):
+        torch.cuda.empty_cache()
+
+        self.callbacks.on_update_status("sampling")
+
+        self.model_setup.setup_eval_device(self.model)
+
+        if not sample_definitions:
+            with open(self.args.sample_definition_file_name, 'r') as f:
+                sample_definitions = json.load(f)
+
+        if self.model.ema:
+            self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+
+        self.__sample_loop(train_progress, sample_definitions)
+
+        if self.model.ema:
+            self.model.ema.copy_temp_to(self.parameters)
+
+        # ema-less sampling, if an ema model exists
+        if self.model.ema:
+            self.__sample_loop(train_progress, sample_definitions, " - no-ema")
 
         self.model_setup.setup_train_device(self.model, self.args)
 
@@ -178,8 +196,6 @@ class GenericTrainer(BaseTrainer):
 
     def train(self):
         train_device = torch.device(self.args.train_device)
-
-        parameters = self.model_setup.create_parameters(self.model, self.args)
 
         train_progress = self.model.train_progress
 
@@ -252,7 +268,7 @@ class GenericTrainer(BaseTrainer):
 
                 if self.__is_update_step(train_progress):
                     scaler.unscale_(self.model.optimizer)
-                    nn.utils.clip_grad_norm_(parameters, 1)
+                    nn.utils.clip_grad_norm_(self.parameters, 1)
                     scaler.step(self.model.optimizer)
                     scaler.update()
                     self.model.optimizer.zero_grad(set_to_none=True)
@@ -265,6 +281,11 @@ class GenericTrainer(BaseTrainer):
                     self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
                     accumulated_loss = 0.0
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
+                    if self.model.ema:
+                        self.model.ema.step(
+                            self.parameters,
+                            train_progress.global_step // self.args.gradient_accumulation_steps
+                        )
                     self.one_step_trained = True
 
                 train_progress.next_step(self.args.batch_size)
@@ -285,6 +306,9 @@ class GenericTrainer(BaseTrainer):
                 self.backup()
 
             self.callbacks.on_update_status("saving the final model")
+
+            if self.model.ema:
+                self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
             self.model_saver.save(
                 model=self.model,

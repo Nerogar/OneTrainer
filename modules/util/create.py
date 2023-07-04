@@ -21,6 +21,7 @@ from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.KandinskyDiffusionModelSaver import KandinskyModelSaver
+from modules.modelSaver.KandinskyLoRAModelSaver import KandinskyLoRAModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
@@ -31,8 +32,10 @@ from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbe
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
 from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
+from modules.module.EMAModule import EMAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
@@ -80,7 +83,7 @@ def create_model_saver(
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelSaver()
             if model_type.is_kandinsky():
-                return KandinskyModelSaver()
+                return KandinskyLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -167,7 +170,7 @@ def create_optimizer(
         parameters: Iterable[Parameter] | list[dict],
         state_dict: dict | None,
         args: TrainArgs,
-):
+) -> torch.optim.Optimizer:
     optimizer = None
 
     match args.optimizer:
@@ -219,9 +222,33 @@ def create_optimizer(
 
         # TODO: this will break if the optimizer class changed during a restart
         optimizer.load_state_dict(state_dict)
-        del state_dict
 
     return optimizer
+
+
+def create_ema(
+        parameters: Iterable[Parameter] | list[dict],
+        state_dict: dict | None,
+        args: TrainArgs,
+) -> EMAModuleWrapper | None:
+    if args.ema == EMAMode.GPU:
+        device = torch.device(args.train_device)
+    elif args.ema == EMAMode.CPU:
+        device = torch.device("cpu")
+    else:
+        return None
+
+    ema = EMAModuleWrapper(
+        parameters=parameters,
+        decay=args.ema_decay,
+        update_step_interval=args.ema_update_step_interval,
+        device=device,
+    )
+
+    if state_dict is not None:
+        ema.load_state_dict(state_dict)
+
+    return ema
 
 
 def create_lr_scheduler(
