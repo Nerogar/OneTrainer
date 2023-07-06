@@ -35,14 +35,15 @@ A more detailed list can be found [here](ThingsToAdd.md).
 
 ## Installation
 
-Installing OneTrainer requires Python 3.10 or newer. Then follow these steps:
+Installing OneTrainer requires Python 3.10. You can download Python here https://www.python.org/downloads/windows/.
+Then follow these steps:
 
-Automatic installation
+Automatic installation (Windows)
 
 - Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
 - Run `install.bat`
 
-Manual installation
+Manual installation (Windows and other systems)
 
 - Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
 - Navigate into the cloned directory `cd OneTrainer`
@@ -64,7 +65,7 @@ Manual update
 
 ## Usage
 
-To start the UI, run `start-ui.bat`
+To start the UI, run `start-ui.bat`. [You can find a quick start guide here.](docs/QuickStartGuide.md)
 
 If you need more control, OneTrainer supports two modes of operation. Command line only, and a UI.
 All commands need to be run inside the active venv created during installation.
