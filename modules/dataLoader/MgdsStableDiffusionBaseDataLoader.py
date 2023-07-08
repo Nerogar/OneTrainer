@@ -64,7 +64,7 @@ class MgdsStablDiffusionBaseDataLoader:
         select_prompt_input = SelectInput(setting_name='concept.prompt_source', out_name='prompts', setting_to_in_name_map={
             'sample': 'sample_prompts',
             'concept': 'concept_prompts',
-            'filename': 'filename_prompts',
+            'filename': 'filename_prompt',
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
