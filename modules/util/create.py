@@ -8,6 +8,7 @@ from modules.dataLoader.MgdsKandinskyFineTuneDataLoader import MgdsKandinskyFine
 from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneVaeDataLoader import MgdsStableDiffusionFineTuneVaeDataLoader
+from modules.dataLoader.MgdsStableDiffusionFineXLTuneDataLoader import MgdsStableDiffusionXLFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyLoRAModelLoader import KandinskyLoRAModelLoader
@@ -15,16 +16,20 @@ from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
+from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusionXLLoRAModelLoader
+from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.KandinskySampler import KandinskySampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
+from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.KandinskyDiffusionModelSaver import KandinskyModelSaver
 from modules.modelSaver.KandinskyLoRAModelSaver import KandinskyLoRAModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
+from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.KandinskyFineTuneSetup import KandinskyFineTuneSetup
 from modules.modelSetup.KandinskyLoRASetup import KandinskyLoRASetup
@@ -32,6 +37,8 @@ from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbe
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
 from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
+from modules.modelSetup.StableDiffusionXLFineTuneSetup import StableDiffusionXLFineTuneSetup
+from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -51,6 +58,8 @@ def create_model_loader(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelLoader()
+            elif model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLModelLoader()
             elif model_type.is_kandinsky():
                 return KandinskyModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
@@ -59,7 +68,9 @@ def create_model_loader(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelLoader()
-            if model_type.is_kandinsky():
+            elif model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLLoRAModelLoader()
+            elif model_type.is_kandinsky():
                 return KandinskyLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
@@ -82,6 +93,8 @@ def create_model_saver(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelSaver()
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLLoRAModelSaver()
             if model_type.is_kandinsky():
                 return KandinskyLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
@@ -100,6 +113,8 @@ def create_model_setup(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLFineTuneSetup(train_device, temp_device, debug_mode)
             elif model_type.is_kandinsky():
                 return KandinskyFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
@@ -108,6 +123,8 @@ def create_model_setup(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_kandinsky():
                 return KandinskyLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
@@ -125,6 +142,8 @@ def create_model_sampler(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLSampler(model, model_type, train_device)
             if model_type.is_kandinsky():
                 return KandinskySampler(model, model_type, train_device)
         case TrainingMethod.FINE_TUNE_VAE:
@@ -133,6 +152,8 @@ def create_model_sampler(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLSampler(model, model_type, train_device)
             if model_type.is_kandinsky():
                 return KandinskySampler(model, model_type, train_device)
         case TrainingMethod.EMBEDDING:
@@ -151,6 +172,8 @@ def create_data_loader(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
+            if model_type.is_stable_diffusion_xl():
+                return MgdsStableDiffusionXLFineTuneDataLoader(args, model, train_progress)
             elif model_type.is_kandinsky():
                 return MgdsKandinskyFineTuneDataLoader(args, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
@@ -159,6 +182,8 @@ def create_data_loader(
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
+            if model_type.is_stable_diffusion_xl():
+                return MgdsStableDiffusionXLFineTuneDataLoader(args, model, train_progress)
             if model_type.is_kandinsky():
                 return MgdsKandinskyFineTuneDataLoader(args, model, train_progress)
         case TrainingMethod.EMBEDDING:

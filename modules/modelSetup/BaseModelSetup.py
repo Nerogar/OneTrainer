@@ -39,6 +39,14 @@ class BaseModelSetup(metaclass=ABCMeta):
         image = t(image_tensor.squeeze())
         image.save(path)
 
+    def project_latent_to_image(self, latent_tensor: Tensor):
+        generator = torch.Generator(device=latent_tensor.device)
+        generator.manual_seed(42)
+        weight = torch.randn((3, 4, 1, 1), generator=generator, device=latent_tensor.device, dtype=latent_tensor.dtype)
+
+        with torch.no_grad():
+            return torch.nn.functional.conv2d(latent_tensor, weight) / 3.0
+
     @abstractmethod
     def create_parameters(
             self,
