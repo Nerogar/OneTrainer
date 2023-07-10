@@ -2,24 +2,26 @@ import json
 import os.path
 from pathlib import Path
 
-from safetensors.torch import save_file
 import torch
+from safetensors.torch import save_file
 from torch import Tensor
 
 from modules.model.BaseModel import BaseModel
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionLoRAModelSaver(BaseModelSaver):
+class StableDiffusionXLLoRAModelSaver(BaseModelSaver):
 
     @staticmethod
-    def __get_state_dict(model: StableDiffusionModel) -> dict[str, Tensor]:
+    def __get_state_dict(model: StableDiffusionXLModel) -> dict[str, Tensor]:
         state_dict = {}
-        if model.text_encoder_lora is not None:
-            state_dict |= model.text_encoder_lora.state_dict()
+        if model.text_encoder_1_lora is not None:
+            state_dict |= model.text_encoder_1_lora.state_dict()
+        if model.text_encoder_2_lora is not None:
+            state_dict |= model.text_encoder_2_lora.state_dict()
         if model.unet_lora is not None:
             state_dict |= model.unet_lora.state_dict()
 
@@ -27,11 +29,11 @@ class StableDiffusionLoRAModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_ckpt(
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = StableDiffusionLoRAModelSaver.__get_state_dict(model)
+        state_dict = StableDiffusionXLLoRAModelSaver.__get_state_dict(model)
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
@@ -39,11 +41,11 @@ class StableDiffusionLoRAModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_safetensors(
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = StableDiffusionLoRAModelSaver.__get_state_dict(model)
+        state_dict = StableDiffusionXLLoRAModelSaver.__get_state_dict(model)
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
@@ -51,16 +53,20 @@ class StableDiffusionLoRAModelSaver(BaseModelSaver):
 
     @staticmethod
     def __save_internal(
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             destination: str,
     ):
-        text_encoder_dtype = None if model.text_encoder_lora is None else \
-            model.text_encoder_lora.parameters()[0].data.dtype
+        text_encoder_1_dtype = None if model.text_encoder_1_lora is None else \
+            model.text_encoder_1_lora.parameters()[0].data.dtype
+
+        text_encoder_2_dtype = None if model.text_encoder_2_lora is None else \
+            model.text_encoder_2_lora.parameters()[0].data.dtype
 
         unet_dtype = None if model.unet_lora is None else \
             model.unet_lora.parameters()[0].data.dtype
 
-        if text_encoder_dtype is not None and text_encoder_dtype != torch.float32 \
+        if text_encoder_1_dtype is not None and text_encoder_1_dtype != torch.float32 \
+                or text_encoder_2_dtype is not None and text_encoder_2_dtype != torch.float32 \
                 or unet_dtype is not None and unet_dtype != torch.float32:
             # The internal model format requires float32 weights.
             # Other formats don't have the required precision for training.
@@ -69,7 +75,7 @@ class StableDiffusionLoRAModelSaver(BaseModelSaver):
         os.makedirs(destination, exist_ok=True)
 
         # lora
-        StableDiffusionLoRAModelSaver.__save_ckpt(
+        StableDiffusionXLLoRAModelSaver.__save_ckpt(
             model,
             os.path.join(destination, "lora", "lora.pt"),
             torch.float32

@@ -1,5 +1,3 @@
-from mgds.GenericDataLoaderModules import *
-
 from modules.dataLoader.MgdsStableDiffusionBaseDataLoader import MgdsStablDiffusionBaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util.TrainProgress import TrainProgress

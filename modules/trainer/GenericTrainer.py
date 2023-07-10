@@ -1,3 +1,4 @@
+import gc
 import json
 import os
 import subprocess
@@ -96,6 +97,11 @@ class GenericTrainer(BaseTrainer):
 
         self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
 
+    def __gc(self):
+        gc.collect()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
 
@@ -134,10 +140,10 @@ class GenericTrainer(BaseTrainer):
                 on_sample=on_sample,
             )
 
-            torch.cuda.empty_cache()
+            self.__gc()
 
     def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: list[dict] = None):
-        torch.cuda.empty_cache()
+        self.__gc()
 
         self.callbacks.on_update_status("sampling")
 
@@ -161,10 +167,10 @@ class GenericTrainer(BaseTrainer):
 
         self.model_setup.setup_train_device(self.model, self.args)
 
-        torch.cuda.empty_cache()
+        self.__gc()
 
     def backup(self):
-        torch.cuda.empty_cache()
+        self.__gc()
 
         self.callbacks.on_update_status("creating backup")
 
@@ -179,7 +185,7 @@ class GenericTrainer(BaseTrainer):
         )
         self.model_setup.setup_train_device(self.model, self.args)
 
-        torch.cuda.empty_cache()
+        self.__gc()
 
     def __needs_sample(self, train_progress: TrainProgress):
         return self.action_needed("sample", self.args.sample_after, self.args.sample_after_unit, train_progress)
@@ -233,7 +239,7 @@ class GenericTrainer(BaseTrainer):
             self.model_setup.setup_eval_device(self.model)
             self.data_loader.ds.start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
-            torch.cuda.empty_cache()
+            self.__gc()
 
             current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
@@ -245,7 +251,7 @@ class GenericTrainer(BaseTrainer):
                 sample_command = self.commands.get_and_reset_sample_command()
                 if sample_command:
                     self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, sample_command)
+                        lambda: self.__sample_during_training(train_progress, [sample_command])
                     )
 
                 if not has_gradient:

@@ -11,6 +11,8 @@ class ModelType(Enum):
     STABLE_DIFFUSION_21 = 'STABLE_DIFFUSION_21'
     STABLE_DIFFUSION_21_BASE = 'STABLE_DIFFUSION_21_BASE'
 
+    STABLE_DIFFUSION_XL_10_BASE = 'STABLE_DIFFUSION_XL_10_BASE'
+
     KANDINSKY_21 = 'KANDINSKY_21'
 
     def __str__(self):
@@ -25,6 +27,10 @@ class ModelType(Enum):
             or self == ModelType.STABLE_DIFFUSION_20_DEPTH \
             or self == ModelType.STABLE_DIFFUSION_21 \
             or self == ModelType.STABLE_DIFFUSION_21_BASE
+
+    def is_stable_diffusion_xl(self):
+        return self == ModelType.STABLE_DIFFUSION_XL_10_BASE
+
 
     def is_kandinsky(self):
         return self == ModelType.KANDINSKY_21

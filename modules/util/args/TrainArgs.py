@@ -24,6 +24,7 @@ class TrainArgs:
     # model settings
     base_model_name: str
     extra_model_name: str
+    weight_dtype: DataType
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
@@ -174,6 +175,7 @@ class TrainArgs:
         # model settings
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
         parser.add_argument("--extra-model-name", type=str, required=False, default=None, dest="extra_model_name", help="The extra model to start training from")
+        parser.add_argument("--weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="wight_dtype", help="The data type to use for weights during training", choices=list(DataType))
         parser.add_argument("--output-dtype", type=DataType, required=True, dest="output_dtype", help="The data type to use for saving weights", choices=list(DataType))
         parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.CKPT, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
@@ -255,6 +257,7 @@ class TrainArgs:
         # model settings
         args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
         args["extra_model_name"] = ""
+        args["weight_dtype"] = DataType.FLOAT_32
         args["output_dtype"] = DataType.FLOAT_32
         args["output_model_format"] = ModelFormat.CKPT
         args["output_model_destination"] = "models/model.ckpt"
