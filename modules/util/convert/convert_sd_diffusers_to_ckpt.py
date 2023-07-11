@@ -376,7 +376,7 @@ def __map_text_encoder(in_states: dict, out_prefix: str, in_prefix: str, is_v2: 
             out_states |= __map_text_encoder_resblock(in_states, __combine(out_prefix, f"model.transformer.resblocks.{str(i)}"), __combine(in_prefix, f"encoder.layers.{str(i)}"))
     else:
         for (key, value) in in_states.items():
-            out_states[__combine(__combine(out_prefix, ".transformer"), key)] = value
+            out_states[__combine(__combine(out_prefix, "transformer"), key)] = value
 
     return out_states
 
