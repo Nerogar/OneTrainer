@@ -2,8 +2,7 @@ import json
 import os
 
 import torch
-import yaml
-from diffusers import AutoencoderKL, UNet2DConditionModel, EulerDiscreteScheduler, DDIMScheduler
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
@@ -109,31 +108,32 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     @staticmethod
     def __load_ckpt(model_type: ModelType, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
-            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
-            if not os.path.exists(yaml_name):
-                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
-                if not os.path.exists(yaml_name):
-                    yaml_name = StableDiffusionXLModelLoader.__default_yaml_name(model_type)
-
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
-                original_config_file=yaml_name,
                 load_safety_checker=False,
             )
 
-            with open(yaml_name, "r") as f:
-                sd_config = yaml.safe_load(f)
+            noise_scheduler = DDIMScheduler(
+                num_train_timesteps=1000,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
 
             return StableDiffusionXLModel(
                 model_type=model_type,
-                tokenizer=pipeline.tokenizer,
-                noise_scheduler=pipeline.scheduler,
-                text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
+                tokenizer_1=pipeline.tokenizer,
+                tokenizer_2=pipeline.tokenizer_2,
+                noise_scheduler=noise_scheduler,
+                text_encoder_1=pipeline.text_encoder.to(dtype=torch.float32),
+                text_encoder_2=pipeline.text_encoder_2.to(dtype=torch.float32),
                 vae=pipeline.vae.to(dtype=torch.float32),
                 unet=pipeline.unet.to(dtype=torch.float32),
-                image_depth_processor=None,  # TODO
-                depth_estimator=None,  # TODO
-                sd_config=sd_config,
             )
         except:
             return None
@@ -141,32 +141,33 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     @staticmethod
     def __load_safetensors(model_type: ModelType, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
-            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
-            if not os.path.exists(yaml_name):
-                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
-                if not os.path.exists(yaml_name):
-                    yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
-
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
-                original_config_file=yaml_name,
                 load_safety_checker=False,
                 from_safetensors=True,
             )
 
-            with open(yaml_name, "r") as f:
-                sd_config = yaml.safe_load(f)
+            noise_scheduler = DDIMScheduler(
+                num_train_timesteps=1000,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
 
             return StableDiffusionXLModel(
                 model_type=model_type,
-                tokenizer=pipeline.tokenizer,
-                noise_scheduler=pipeline.scheduler,
-                text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
+                tokenizer_1=pipeline.tokenizer,
+                tokenizer_2=pipeline.tokenizer_2,
+                noise_scheduler=noise_scheduler,
+                text_encoder_1=pipeline.text_encoder.to(dtype=torch.float32),
+                text_encoder_2=pipeline.text_encoder_2.to(dtype=torch.float32),
                 vae=pipeline.vae.to(dtype=torch.float32),
                 unet=pipeline.unet.to(dtype=torch.float32),
-                image_depth_processor=None,  # TODO
-                depth_estimator=None,  # TODO
-                sd_config=sd_config,
             )
         except:
             return None
@@ -177,20 +178,20 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             base_model_name: str,
             extra_model_name: str | None
     ) -> StableDiffusionXLModel | None:
-        # model = self.__load_internal(model_type, base_model_name)
-        # if model is not None:
-        #     return model
+        model = self.__load_internal(model_type, base_model_name)
+        if model is not None:
+            return model
 
         model = self.__load_diffusers(model_type, base_model_name)
         if model is not None:
             return model
 
-        # model = self.__load_safetensors(model_type, base_model_name)
-        # if model is not None:
-        #     return model
-        #
-        # model = self.__load_ckpt(model_type, base_model_name)
-        # if model is not None:
-        #     return model
+        model = self.__load_safetensors(model_type, base_model_name)
+        if model is not None:
+            return model
+
+        model = self.__load_ckpt(model_type, base_model_name)
+        if model is not None:
+            return model
 
         raise Exception("could not load model: " + base_model_name)
