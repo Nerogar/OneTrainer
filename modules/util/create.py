@@ -30,6 +30,7 @@ from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusio
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
+from modules.modelSaver.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.KandinskyFineTuneSetup import KandinskyFineTuneSetup
 from modules.modelSetup.KandinskyLoRASetup import KandinskyLoRASetup
@@ -85,6 +86,8 @@ def create_model_saver(
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelSaver()
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLModelSaver()
             if model_type.is_kandinsky():
                 return KandinskyModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:

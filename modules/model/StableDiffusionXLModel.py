@@ -1,5 +1,4 @@
-from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline, EulerDiscreteScheduler, \
-    StableDiffusionXLPipeline
+from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline, StableDiffusionXLPipeline, DDIMScheduler
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from modules.model.BaseModel import BaseModel
@@ -13,7 +12,7 @@ class StableDiffusionXLModel(BaseModel):
     model_type: ModelType
     tokenizer_1: CLIPTokenizer
     tokenizer_2: CLIPTokenizer
-    noise_scheduler: EulerDiscreteScheduler
+    noise_scheduler: DDIMScheduler
     text_encoder_1: CLIPTextModel
     text_encoder_2: CLIPTextModel
     vae: AutoencoderKL
@@ -29,7 +28,7 @@ class StableDiffusionXLModel(BaseModel):
             model_type: ModelType,
             tokenizer_1: CLIPTokenizer,
             tokenizer_2: CLIPTokenizer,
-            noise_scheduler: EulerDiscreteScheduler,
+            noise_scheduler: DDIMScheduler,
             text_encoder_1: CLIPTextModel,
             text_encoder_2: CLIPTextModel,
             vae: AutoencoderKL,

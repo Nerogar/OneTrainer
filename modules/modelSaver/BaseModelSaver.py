@@ -16,7 +16,7 @@ class BaseModelSaver(metaclass=ABCMeta):
             if isinstance(value, dict):
                 converted_state_dict[key] = BaseModelSaver._convert_state_dict_dtype(value, dtype)
             else:
-                converted_state_dict[key] = value.clone().detach().to(dtype=dtype)
+                converted_state_dict[key] = value.to(dtype=dtype)
 
         return converted_state_dict
 
