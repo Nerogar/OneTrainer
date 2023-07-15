@@ -21,7 +21,7 @@ omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # data loader
-git+https://github.com/Nerogar/mgds.git@fe5adfb#egg=mgds
+git+https://github.com/Nerogar/mgds.git@70264e4#egg=mgds
 
 # xformers
 xformers==0.0.20

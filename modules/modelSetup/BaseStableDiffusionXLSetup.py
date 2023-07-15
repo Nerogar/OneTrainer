@@ -1,15 +1,15 @@
 from abc import ABCMeta
-from typing import Callable, Optional, Dict, Any
 
 import torch
 import torch.nn.functional as F
-from diffusers.models.attention import BasicTransformerBlock
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
-from torch import Tensor, nn
+from torch import Tensor
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.stableDiffusion.enable_checkpointing_for_transformer_blocks import \
+    enable_checkpointing_for_transformer_blocks
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -18,36 +18,6 @@ from modules.util.enum.AttentionMechanism import AttentionMechanism
 
 class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
 
-    def __create_basic_transformer_block_forward(self, orig_module) -> Callable:
-        orig_forward = orig_module.forward
-
-        def forward(
-                hidden_states: torch.FloatTensor,
-                attention_mask: Optional[torch.FloatTensor] = None,
-                encoder_hidden_states: Optional[torch.FloatTensor] = None,
-                encoder_attention_mask: Optional[torch.FloatTensor] = None,
-                timestep: Optional[torch.LongTensor] = None,
-                cross_attention_kwargs: Dict[str, Any] = None,
-                class_labels: Optional[torch.LongTensor] = None,
-        ):
-            return torch.utils.checkpoint.checkpoint(
-                orig_forward,
-                hidden_states,  # hidden_states
-                attention_mask,  # attention_mask
-                encoder_hidden_states,  # encoder_hidden_states
-                encoder_attention_mask,  # encoder_attention_mask
-                timestep,  # timestep
-                cross_attention_kwargs,  # cross_attention_kwargs
-                class_labels,  # class_labels
-                use_reentrant=False
-            )
-
-        return forward
-
-    def __enable_checkpointing_for_transformer_blocks(self, orig_module: nn.Module):
-        for name, child_module in orig_module.named_modules():
-            if isinstance(child_module, BasicTransformerBlock):
-                child_module.forward = self.__create_basic_transformer_block_forward(child_module)
 
     def setup_optimizations(
             self,
@@ -79,7 +49,7 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
                     )
 
         model.unet.enable_gradient_checkpointing()
-        self.__enable_checkpointing_for_transformer_blocks(model.unet)
+        enable_checkpointing_for_transformer_blocks(model.unet)
         model.text_encoder_1.gradient_checkpointing_enable()
         model.text_encoder_2.gradient_checkpointing_enable()
 
@@ -138,8 +108,8 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
             pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
             text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
         else:
-            text_encoder_1_output = batch['text_encoder_1_hidden_state'][-2]
-            text_encoder_2_output = batch['text_encoder_2_hidden_state'][-2]
+            text_encoder_1_output = batch['text_encoder_1_hidden_state']
+            text_encoder_2_output = batch['text_encoder_2_hidden_state']
             pooled_text_encoder_2_output = batch['text_encoder_2_pooled_state']
 
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
