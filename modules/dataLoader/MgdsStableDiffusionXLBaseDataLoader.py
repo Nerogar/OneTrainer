@@ -81,9 +81,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
     def _mask_augmentation_modules(self, args: TrainArgs) -> list:
         inputs = ['image']
 
-        if args.model_type.has_depth_input():
-            inputs.append('depth')
-
         circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='settings.enable_random_circular_mask_shrink')
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='settings.enable_random_mask_rotate_crop')
 
@@ -129,17 +126,13 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
 
 
     def _crop_modules(self, args: TrainArgs):
-        scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='image', enable_crop_jitter_in_name='concept.enable_crop_jitter')
-        scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='mask', enable_crop_jitter_in_name='concept.enable_crop_jitter')
-        scale_crop_depth = ScaleCropImage(image_in_name='depth', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', image_out_name='depth', enable_crop_jitter_in_name='concept.enable_crop_jitter')
+        scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='image', crop_offset_out_name='crop_offset')
+        scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='mask', crop_offset_out_name='crop_offset')
 
         modules = [scale_crop_image]
 
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(scale_crop_mask)
-
-        if args.model_type.has_depth_input():
-            modules.append(scale_crop_depth)
 
         return modules
 
@@ -149,9 +142,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
 
         if args.masked_training or args.model_type.has_mask_input():
             inputs.append('mask')
-
-        if args.model_type.has_depth_input():
-            inputs.append('depth')
 
         random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
         random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.enable_random_rotate', max_angle_in_name='concept.random_rotate_max_angle')
@@ -189,7 +179,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
         downscale_mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
-        downscale_depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
         encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, text_encoder=model.text_encoder_1, hidden_state_output_index=-2)
@@ -208,9 +197,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if args.model_type.has_depth_input():
-            modules.append(downscale_depth)
-
         return modules
 
 
@@ -219,6 +205,7 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
             'latent_image_distribution',
             'tokens_1', 'text_encoder_1_hidden_state',
             'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
+            'original_resolution', 'crop_offset',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -226,9 +213,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
 
         if args.model_type.has_conditioning_image_input():
             split_names.append('latent_conditioning_image_distribution')
-
-        if args.model_type.has_depth_input():
-            split_names.append('latent_depth')
 
         aggregate_names = ['crop_resolution', 'image_path']
 
@@ -250,6 +234,7 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
             'image_path', 'latent_image',
             'tokens_1', 'text_encoder_1_hidden_state',
             'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
+            'original_resolution', 'crop_resolution', 'crop_offset',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -257,9 +242,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
 
         if args.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
-
-        if args.model_type.has_depth_input():
-            output_names.append('latent_depth')
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
@@ -297,12 +279,10 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
         save_conditioning_image = SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         save_mask = SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1)
-        # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
         save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir)
 
         # These modules don't really work, since they are inserted after a sorting operation that does not include this data
         # SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
-        # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
         # SaveImage(image_in_name='image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
 
         modules = []

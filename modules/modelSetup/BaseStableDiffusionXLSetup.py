@@ -114,12 +114,14 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
 
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 
-        original_height = 1024
-        original_width = 1024
-        crops_coords_top = 0
-        crops_coords_left = 0
-        target_height = 1024
-        target_width = 1024
+        # original size of the image
+        original_height = batch['original_resolution'][0].item()
+        original_width = batch['original_resolution'][1].item()
+        crops_coords_top = batch['crop_offset'][0].item()
+        crops_coords_left = batch['crop_offset'][1].item()
+        target_height = batch['crop_resolution'][0].item()
+        target_width = batch['crop_resolution'][1].item()
+
         add_time_ids = list(
             (original_height, original_width)
             + (crops_coords_top, crops_coords_left)

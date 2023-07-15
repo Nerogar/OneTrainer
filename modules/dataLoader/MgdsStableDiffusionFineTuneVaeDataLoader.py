@@ -97,9 +97,13 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
 
     def __crop_modules(self, args: TrainArgs):
         scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution',
-                                          crop_resolution_in_name='crop_resolution', image_out_name='image')
+                                          crop_resolution_in_name='crop_resolution',
+                                          enable_crop_jitter_in_name='concept.enable_crop_jitter',
+                                          image_out_name='image', crop_offset_out_name='crop_offset')
         scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution',
-                                         crop_resolution_in_name='crop_resolution', image_out_name='mask')
+                                         crop_resolution_in_name='crop_resolution',
+                                         enable_crop_jitter_in_name='concept.enable_crop_jitter',
+                                         image_out_name='mask', crop_offset_out_name='crop_offset')
 
         modules = [scale_crop_image]
 
