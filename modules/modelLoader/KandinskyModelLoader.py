@@ -18,7 +18,7 @@ class KandinskyModelLoader(BaseModelLoader):
         super(KandinskyModelLoader, self).__init__()
 
     @staticmethod
-    def __load_internal(model_type: ModelType, base_model_name: str) -> KandinskyModel | None:
+    def __load_internal(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> KandinskyModel | None:
         try:
             with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
                 meta = json.load(meta_file)
@@ -33,7 +33,7 @@ class KandinskyModelLoader(BaseModelLoader):
             diffusion_model_name = os.path.join(base_model_name, "diffusion_model")
 
             # base model
-            model = KandinskyModelLoader.__load_diffusers(model_type, prior_model_name, diffusion_model_name)
+            model = KandinskyModelLoader.__load_diffusers(model_type, weight_dtype, prior_model_name, diffusion_model_name)
 
             # optimizer
             try:
@@ -55,7 +55,7 @@ class KandinskyModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_diffusers(model_type: ModelType, prior_model_name: str, diffusion_model_name: str) -> KandinskyModel | None:
+    def __load_diffusers(model_type: ModelType, weight_dtype: torch.dtype, prior_model_name: str, diffusion_model_name: str) -> KandinskyModel | None:
         try:
             # prior
             prior_tokenizer = CLIPTokenizer.from_pretrained(
@@ -66,19 +66,19 @@ class KandinskyModelLoader(BaseModelLoader):
             prior_text_encoder = CLIPTextModelWithProjection.from_pretrained(
                 prior_model_name,
                 subfolder="text_encoder",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             prior_image_encoder = CLIPVisionModelWithProjection.from_pretrained(
                 prior_model_name,
                 subfolder="image_encoder",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             prior_prior = PriorTransformer.from_pretrained(
                 prior_model_name,
                 subfolder="prior",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             prior_noise_scheduler = UnCLIPScheduler.from_pretrained(
@@ -106,7 +106,7 @@ class KandinskyModelLoader(BaseModelLoader):
             unet = UNet2DConditionModel.from_pretrained(
                 diffusion_model_name,
                 subfolder="unet",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             noise_scheduler = DDPMScheduler.from_pretrained(
@@ -117,7 +117,7 @@ class KandinskyModelLoader(BaseModelLoader):
             movq = VQModel.from_pretrained(
                 diffusion_model_name,
                 subfolder="movq",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             return KandinskyModel(
@@ -138,31 +138,37 @@ class KandinskyModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_ckpt(model_type: ModelType, base_model_name: str) -> KandinskyModel | None:
+    def __load_ckpt(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> KandinskyModel | None:
         return None
 
     @staticmethod
-    def __load_safetensors(model_type: ModelType, base_model_name: str) -> KandinskyModel | None:
+    def __load_safetensors(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> KandinskyModel | None:
         return None
 
-    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str | None) -> KandinskyModel | None:
+    def load(
+            self,
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str,
+            extra_model_name: str | None
+    ) -> KandinskyModel | None:
         split_base_model_name = base_model_name.split(';')
         if len(split_base_model_name) == 2:
             prior_model_name, diffusion_model_name = split_base_model_name
 
-            model = self.__load_diffusers(model_type, prior_model_name, diffusion_model_name)
+            model = self.__load_diffusers(model_type, weight_dtype, prior_model_name, diffusion_model_name)
             if model is not None:
                 return model
         else:
-            model = self.__load_internal(model_type, base_model_name)
+            model = self.__load_internal(model_type, weight_dtype, base_model_name)
             if model is not None:
                 return model
 
-            model = self.__load_safetensors(model_type, base_model_name)
+            model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
             if model is not None:
                 return model
 
-            model = self.__load_ckpt(model_type, base_model_name)
+            model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
             if model is not None:
                 return model
 

@@ -8,6 +8,7 @@
     "model_type": "STABLE_DIFFUSION_15",
     "base_model_name": "runwayml/stable-diffusion-v1-5",
     "extra_model_name": "",
+    "weight_dtype": "FLOAT_32",
     "output_dtype": "FLOAT_32",
     "output_model_format": "CKPT",
     "output_model_destination": "models/model.ckpt",

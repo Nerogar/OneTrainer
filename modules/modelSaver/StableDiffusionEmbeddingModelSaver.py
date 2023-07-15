@@ -56,11 +56,6 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
             model: StableDiffusionModel,
             destination: str,
     ):
-        if model.embeddings[0].vector.dtype != torch.float32:
-            # The internal model format requires float32 weights.
-            # Other formats don't have the required precision for training.
-            raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
-
         os.makedirs(destination, exist_ok=True)
 
         # embedding

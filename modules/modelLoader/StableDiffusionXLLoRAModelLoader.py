@@ -106,9 +106,15 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
         except:
             return False
 
-    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str | None) -> StableDiffusionXLModel | None:
+    def load(
+            self,
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str,
+            extra_model_name: str | None
+    ) -> StableDiffusionXLModel | None:
         base_model_loader = StableDiffusionXLModelLoader()
-        model = base_model_loader.load(model_type, base_model_name, None)
+        model = base_model_loader.load(model_type, weight_dtype, base_model_name, None)
 
         lora_loaded = self.__load_internal(model, extra_model_name)
 

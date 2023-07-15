@@ -71,16 +71,6 @@ class KandinskyModelSaver(BaseModelSaver):
             model: KandinskyModel,
             destination: str,
     ):
-        if model.prior_text_encoder.dtype != torch.float32 \
-                or model.prior_image_encoder.dtype != torch.float32 \
-                or model.prior_prior.dtype != torch.float32 \
-                or model.text_encoder.dtype != torch.float32 \
-                or model.unet.dtype != torch.float32 \
-                or model.movq.dtype != torch.float32:
-            # The internal model format requires float32 weights.
-            # Other formats don't have the required precision for training.
-            raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
-
         prior_destination = os.path.join(destination, "prior_model")
         diffusion_destination = os.path.join(destination, "diffusion_model")
 

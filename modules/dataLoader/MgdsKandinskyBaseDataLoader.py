@@ -3,17 +3,18 @@ import json
 from mgds.DebugDataLoaderModules import SaveImage, DecodeMoVQ
 from mgds.DiffusersDataLoaderModules import EncodeMoVQ
 from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
+from mgds.MGDS import TrainDataLoader, OutputPipelineModule
 from mgds.TransformersDataLoaderModules import *
 
 from modules.dataLoader.kandinsky.KandinskyPrior import KandinskyPrior
+from modules.dataLoader.MgdsBaseDataLoader import MgdsBaseDataLoader
 from modules.model.KandinskyModel import KandinskyModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsKandinskyBaseDataLoader:
+class MgdsKandinskyBaseDataLoader(MgdsBaseDataLoader):
     def __init__(
             self,
             args: TrainArgs,
@@ -36,7 +37,8 @@ class MgdsKandinskyBaseDataLoader:
         supported_extensions = path_util.supported_image_extensions()
 
         collect_paths = CollectPaths(
-            concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept', extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
+            concept_in_name='concept', path_in_name='path', name_in_name='name', path_out_name='image_path', concept_out_name='concept',
+            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel'], include_subdirectories_in_name='concept.include_subdirectories'
         )
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
@@ -324,17 +326,9 @@ class MgdsKandinskyBaseDataLoader:
 
         debug_modules = self._debug_modules(args, model)
 
-        settings = {
-            "enable_random_circular_mask_shrink": args.circular_mask_generation,
-            "enable_random_mask_rotate_crop": args.random_rotate_and_crop,
-        }
-
-        ds = MGDS(
-            torch.device(args.train_device),
-            args.train_dtype.torch_dtype(),
-            args.train_dtype.enable_mixed_precision(),
+        return self._create_mgds(
+            args,
             concepts,
-            settings,
             [
                 enumerate_input,
                 load_input,
@@ -348,10 +342,7 @@ class MgdsKandinskyBaseDataLoader:
                 output_modules,
 
                 debug_modules if args.debug_mode else None,
+                # inserted before output_modules, which contains a sorting operation
             ],
-            batch_size=args.batch_size,
-            initial_epoch=train_progress.epoch,
-            initial_epoch_sample=train_progress.epoch_sample,
+            train_progress
         )
-
-        return ds

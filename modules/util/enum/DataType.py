@@ -31,3 +31,6 @@ class DataType(Enum):
 
     def enable_tf(self):
         return self == DataType.TFLOAT_32
+
+    def enable_loss_scaling(self):
+        return self == DataType.FLOAT_16

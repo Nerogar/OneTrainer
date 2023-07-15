@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -29,6 +30,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 
@@ -75,7 +77,10 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("loading the model")
 
         self.model = self.model_loader.load(
-            self.args.model_type, self.args.base_model_name, self.args.extra_model_name
+            self.args.model_type,
+            self.args.weight_dtype.torch_dtype(),
+            self.args.base_model_name,
+            self.args.extra_model_name
         )
 
         self.callbacks.on_update_status("running model setup")
@@ -226,7 +231,10 @@ class GenericTrainer(BaseTrainer):
             global_step=train_progress.global_step
         )
 
-        scaler = GradScaler()
+        if self.args.train_dtype.enable_loss_scaling() and self.args.weight_dtype == DataType.FLOAT_32:
+            scaler = GradScaler()
+        else:
+            scaler = None
 
         # False if the model gradients are all None, True otherwise
         # This is used to schedule sampling only when the gradients don't take up any space
@@ -262,21 +270,34 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("training")
 
-                with torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype()):
+                if self.args.train_dtype.enable_mixed_precision() and self.args.weight_dtype == DataType.FLOAT_32:
+                    forward_context = torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype())
+                else:
+                    forward_context = nullcontext()
+
+                with forward_context:
                     model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
 
                 loss = loss / self.args.gradient_accumulation_steps
-                scaler.scale(loss).backward()
+                if scaler:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
                 has_gradient = True
                 accumulated_loss += loss.item()
 
                 if self.__is_update_step(train_progress):
-                    scaler.unscale_(self.model.optimizer)
-                    nn.utils.clip_grad_norm_(self.parameters, 1)
-                    scaler.step(self.model.optimizer)
-                    scaler.update()
+                    if scaler:
+                        scaler.unscale_(self.model.optimizer)
+                        nn.utils.clip_grad_norm_(self.parameters, 1)
+                        scaler.step(self.model.optimizer)
+                        scaler.update()
+                    else:
+                        nn.utils.clip_grad_norm_(self.parameters, 1)
+                        self.model.optimizer.step()
+
                     self.model.optimizer.zero_grad(set_to_none=True)
                     has_gradient = False
                     lr_scheduler.step()

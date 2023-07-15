@@ -17,7 +17,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
         super(StableDiffusionXLModelLoader, self).__init__()
 
     @staticmethod
-    def __load_internal(model_type: ModelType, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_internal(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
             with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
                 meta = json.load(meta_file)
@@ -29,7 +29,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 )
 
             # base model
-            model = StableDiffusionXLModelLoader.__load_diffusers(model_type, base_model_name)
+            model = StableDiffusionXLModelLoader.__load_diffusers(model_type, weight_dtype, base_model_name)
 
             # optimizer
             try:
@@ -51,7 +51,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_diffusers(model_type: ModelType, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_diffusers(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
             tokenizer_1 = CLIPTokenizer.from_pretrained(
                 base_model_name,
@@ -71,25 +71,25 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             text_encoder_1 = CLIPTextModel.from_pretrained(
                 base_model_name,
                 subfolder="text_encoder",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
                 base_model_name,
                 subfolder="text_encoder_2",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             vae = AutoencoderKL.from_pretrained(
                 base_model_name,
                 subfolder="vae",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             unet = UNet2DConditionModel.from_pretrained(
                 base_model_name,
                 subfolder="unet",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             return StableDiffusionXLModel(
@@ -106,12 +106,12 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_ckpt(model_type: ModelType, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_ckpt(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
                 load_safety_checker=False,
-            )
+            ).to(torch_device=weight_dtype)
 
             noise_scheduler = DDIMScheduler(
                 num_train_timesteps=1000,
@@ -139,13 +139,13 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_safetensors(model_type: ModelType, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_safetensors(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
                 load_safety_checker=False,
                 from_safetensors=True,
-            )
+            ).to(torch_device=weight_dtype)
 
             noise_scheduler = DDIMScheduler(
                 num_train_timesteps=1000,
@@ -175,22 +175,23 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     def load(
             self,
             model_type: ModelType,
+            weight_dtype: torch.dtype,
             base_model_name: str,
             extra_model_name: str | None
     ) -> StableDiffusionXLModel | None:
-        model = self.__load_internal(model_type, base_model_name)
+        model = self.__load_internal(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_diffusers(model_type, base_model_name)
+        model = self.__load_diffusers(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_safetensors(model_type, base_model_name)
+        model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_ckpt(model_type, base_model_name)
+        model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 

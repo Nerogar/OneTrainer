@@ -3,16 +3,17 @@ import json
 from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage, SaveText, DecodeTokens
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
+from mgds.MGDS import TrainDataLoader, OutputPipelineModule
 from mgds.TransformersDataLoaderModules import *
 
+from modules.dataLoader.MgdsBaseDataLoader import MgdsBaseDataLoader
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStablDiffusionXLBaseDataLoader:
+class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
     def __init__(
             self,
             args: TrainArgs,
@@ -343,17 +344,9 @@ class MgdsStablDiffusionXLBaseDataLoader:
 
         debug_modules = self._debug_modules(args, model)
 
-        settings = {
-            "enable_random_circular_mask_shrink": args.circular_mask_generation,
-            "enable_random_mask_rotate_crop": args.random_rotate_and_crop,
-        }
-
-        ds = MGDS(
-            torch.device(args.train_device),
-            args.train_dtype.torch_dtype(),
-            args.train_dtype.enable_mixed_precision(),
+        return self._create_mgds(
+            args,
             concepts,
-            settings,
             [
                 enumerate_input,
                 load_input,
@@ -366,11 +359,8 @@ class MgdsStablDiffusionXLBaseDataLoader:
                 cache_modules,
                 output_modules,
 
-                debug_modules if args.debug_mode else None,  # inserted before output_modules, which contains a sorting operation
+                debug_modules if args.debug_mode else None,
+                # inserted before output_modules, which contains a sorting operation
             ],
-            batch_size=args.batch_size,
-            initial_epoch=train_progress.epoch,
-            initial_epoch_sample=train_progress.epoch_sample,
+            train_progress
         )
-
-        return ds

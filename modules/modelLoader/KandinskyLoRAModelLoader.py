@@ -92,7 +92,13 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
         except:
             return False
 
-    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str | None) -> KandinskyModel | None:
+    def load(
+            self,
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str,
+            extra_model_name: str | None
+    ) -> KandinskyModel | None:
         base_model_loader = KandinskyModelLoader()
         model = base_model_loader.load(model_type, base_model_name, None)
 

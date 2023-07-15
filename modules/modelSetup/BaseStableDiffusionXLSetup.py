@@ -102,17 +102,17 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
         if args.offset_noise_weight > 0:
             normal_noise = torch.randn(
                 scaled_latent_image.shape, generator=generator, device=args.train_device,
-                dtype=args.train_dtype.torch_dtype()
+                dtype=scaled_latent_image.dtype
             )
             offset_noise = torch.randn(
                 scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1,
-                generator=generator, device=args.train_device, dtype=args.train_dtype.torch_dtype()
+                generator=generator, device=args.train_device, dtype=scaled_latent_image.dtype
             )
             latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
         else:
             latent_noise = torch.randn(
                 scaled_latent_image.shape, generator=generator, device=args.train_device,
-                dtype=args.train_dtype.torch_dtype()
+                dtype=scaled_latent_image.dtype
             )
 
         timestep = torch.randint(
@@ -186,57 +186,56 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
             }
 
         if args.debug_mode:
-            with torch.autocast(self.train_device.type, enabled=False):
-                with torch.no_grad():
-                    # noise
-                    self.save_image(
-                        self.project_latent_to_image(latent_noise).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
-                        "1-noise",
-                        train_progress.global_step
-                    )
+            with torch.no_grad():
+                # noise
+                self.save_image(
+                    self.project_latent_to_image(latent_noise).clamp(-1, 1),
+                    args.debug_dir + "/training_batches",
+                    "1-noise",
+                    train_progress.global_step
+                )
 
-                    # predicted noise
-                    self.save_image(
-                        self.project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
-                        "2-predicted_noise",
-                        train_progress.global_step
-                    )
+                # predicted noise
+                self.save_image(
+                    self.project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
+                    args.debug_dir + "/training_batches",
+                    "2-predicted_noise",
+                    train_progress.global_step
+                )
 
-                    # noisy image
-                    self.save_image(
-                        self.project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
-                        "3-noisy_image",
-                        train_progress.global_step
-                    )
+                # noisy image
+                self.save_image(
+                    self.project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
+                    args.debug_dir + "/training_batches",
+                    "3-noisy_image",
+                    train_progress.global_step
+                )
 
-                    # predicted image
-                    alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(args.train_device)
-                    sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
-                    sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
+                # predicted image
+                alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(args.train_device)
+                sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
+                sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
-                    sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
+                sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
+                sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    scaled_predicted_latent_image = \
-                        (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
-                        / sqrt_alpha_prod
-                    self.save_image(
-                        self.project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
-                        "4-predicted_image",
-                        model.train_progress.global_step
-                    )
+                scaled_predicted_latent_image = \
+                    (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
+                    / sqrt_alpha_prod
+                self.save_image(
+                    self.project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
+                    args.debug_dir + "/training_batches",
+                    "4-predicted_image",
+                    model.train_progress.global_step
+                )
 
-                    # image
-                    self.save_image(
-                        self.project_latent_to_image(scaled_latent_image).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
-                        "5-image",
-                        model.train_progress.global_step
-                    )
+                # image
+                self.save_image(
+                    self.project_latent_to_image(scaled_latent_image).clamp(-1, 1),
+                    args.debug_dir + "/training_batches",
+                    "5-image",
+                    model.train_progress.global_step
+                )
 
         return model_output_data
 

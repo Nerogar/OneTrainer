@@ -40,7 +40,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 return None
 
     @staticmethod
-    def __load_internal(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
+    def __load_internal(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
         try:
             with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
                 meta = json.load(meta_file)
@@ -52,7 +52,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 )
 
             # base model
-            model = StableDiffusionModelLoader.__load_diffusers(model_type, base_model_name)
+            model = StableDiffusionModelLoader.__load_diffusers(model_type, weight_dtype, base_model_name)
 
             # optimizer
             try:
@@ -77,7 +77,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_diffusers(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
+    def __load_diffusers(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
         try:
             tokenizer = CLIPTokenizer.from_pretrained(
                 base_model_name,
@@ -92,19 +92,19 @@ class StableDiffusionModelLoader(BaseModelLoader):
             text_encoder = CLIPTextModel.from_pretrained(
                 base_model_name,
                 subfolder="text_encoder",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             vae = AutoencoderKL.from_pretrained(
                 base_model_name,
                 subfolder="vae",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             unet = UNet2DConditionModel.from_pretrained(
                 base_model_name,
                 subfolder="unet",
-                torch_dtype=torch.float32,
+                torch_dtype=weight_dtype,
             )
 
             image_depth_processor = DPTImageProcessor.from_pretrained(
@@ -115,6 +115,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
             depth_estimator = DPTForDepthEstimation.from_pretrained(
                 base_model_name,
                 subfolder="depth_estimator",
+                torch_dtype=weight_dtype,
             ) if model_type.has_depth_input() else None
 
             with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
@@ -135,7 +136,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_ckpt(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
+    def __load_ckpt(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
         try:
             yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
             if not os.path.exists(yaml_name):
@@ -147,7 +148,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 checkpoint_path=base_model_name,
                 original_config_file=yaml_name,
                 load_safety_checker=False,
-            )
+            ).to(torch_device=weight_dtype)
 
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
@@ -167,7 +168,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_safetensors(model_type: ModelType, base_model_name: str) -> StableDiffusionModel | None:
+    def __load_safetensors(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
         try:
             yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
             if not os.path.exists(yaml_name):
@@ -180,7 +181,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 original_config_file=yaml_name,
                 load_safety_checker=False,
                 from_safetensors=True,
-            )
+            ).to(torch_device=weight_dtype)
 
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
@@ -199,20 +200,26 @@ class StableDiffusionModelLoader(BaseModelLoader):
         except:
             return None
 
-    def load(self, model_type: ModelType, base_model_name: str, extra_model_name: str | None) -> StableDiffusionModel | None:
-        model = self.__load_internal(model_type, base_model_name)
+    def load(
+            self,
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str,
+            extra_model_name: str | None
+    ) -> StableDiffusionModel | None:
+        model = self.__load_internal(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_diffusers(model_type, base_model_name)
+        model = self.__load_diffusers(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_safetensors(model_type, base_model_name)
+        model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 
-        model = self.__load_ckpt(model_type, base_model_name)
+        model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
         if model is not None:
             return model
 

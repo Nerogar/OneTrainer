@@ -81,14 +81,6 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
             model: StableDiffusionXLModel,
             destination: str,
     ):
-        if model.text_encoder_1.dtype != torch.float32 \
-                or model.text_encoder_2.dtype != torch.float32 \
-                or model.vae.dtype != torch.float32 \
-                or model.unet.dtype != torch.float32:
-            # The internal model format requires float32 weights.
-            # Other formats don't have the required precision for training.
-            raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
-
         # base model
         StableDiffusionXLModelSaver.__save_diffusers(model, destination, torch.float32)
 

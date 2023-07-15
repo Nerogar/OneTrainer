@@ -72,17 +72,17 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
         if args.offset_noise_weight > 0:
             normal_noise = torch.randn(
                 scaled_latent_image.shape, generator=generator, device=args.train_device,
-                dtype=args.train_dtype.torch_dtype()
+                dtype=scaled_latent_image.dtype
             )
             offset_noise = torch.randn(
                 scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1,
-                generator=generator, device=args.train_device, dtype=args.train_dtype.torch_dtype()
+                generator=generator, device=args.train_device, dtype=scaled_latent_image.dtype
             )
             latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
         else:
             latent_noise = torch.randn(
                 scaled_latent_image.shape, generator=generator, device=args.train_device,
-                dtype=args.train_dtype.torch_dtype()
+                dtype=scaled_latent_image.dtype
             )
 
         timestep = torch.randint(

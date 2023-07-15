@@ -54,14 +54,6 @@ class KandinskyLoRAModelSaver(BaseModelSaver):
             model: KandinskyModel,
             destination: str,
     ):
-        unet_dtype = None if model.unet_lora is None else \
-            model.unet_lora.parameters()[0].data.dtype
-
-        if unet_dtype is not None and unet_dtype != torch.float32:
-            # The internal model format requires float32 weights.
-            # Other formats don't have the required precision for training.
-            raise ValueError("Model weights need to be in float32 format. Something has gone wrong!")
-
         os.makedirs(destination, exist_ok=True)
 
         # lora

@@ -9,14 +9,14 @@ PyYAML==6.0
 --extra-index-url https://download.pytorch.org/whl/cu118
 torch==2.0.1+cu118
 torchvision==0.15.2+cu118
-accelerate==0.18.0
+accelerate==0.21.0
 safetensors==0.3.1
 tensorboard==2.13.0
 pytorch-lightning==2.0.3
 
 # stable diffusion
 git+https://github.com/huggingface/diffusers.git@78922ed#egg=diffusers
-git+https://github.com/huggingface/transformers.git@656e869#egg=transformers
+git+https://github.com/huggingface/transformers.git@5bb4430#egg=transformers
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 

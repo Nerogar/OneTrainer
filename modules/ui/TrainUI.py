@@ -354,10 +354,18 @@ class TrainUI(ctk.CTk):
                          tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
         components.switch(scroll_frame, 6, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
-        # train dtype
-        components.label(scroll_frame, 7, 3, "Train Data Type",
-                         tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
+        # weight dtype
+        components.label(scroll_frame, 7, 3, "Weight Data Type",
+                         tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
         components.options_kv(scroll_frame, 7, 4, [
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+        ], self.ui_state, "weight_dtype")
+
+        # train dtype
+        components.label(scroll_frame, 8, 3, "Train Data Type",
+                         tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
+        components.options_kv(scroll_frame, 8, 4, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
@@ -365,9 +373,9 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "train_dtype")
 
         # resolution
-        components.label(scroll_frame, 8, 3, "Resolution",
+        components.label(scroll_frame, 9, 3, "Resolution",
                          tooltip="The resolution used for training")
-        components.entry(scroll_frame, 8, 4, self.ui_state, "resolution")
+        components.entry(scroll_frame, 9, 4, self.ui_state, "resolution")
 
         # column 3
         # train unet
