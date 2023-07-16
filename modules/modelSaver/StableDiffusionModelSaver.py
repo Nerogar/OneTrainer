@@ -51,6 +51,9 @@ class StableDiffusionModelSaver(BaseModelSaver):
             model.text_encoder.state_dict(),
             model.noise_scheduler
         )
+
+        state_dict = {'state_dict': state_dict}
+
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
