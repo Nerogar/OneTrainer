@@ -88,6 +88,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
         self.model_setup.setup_eval_device(self.model)
+        self.__gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
 
@@ -103,8 +104,8 @@ class GenericTrainer(BaseTrainer):
         self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
 
     def __gc(self):
-        gc.collect()
         torch.cuda.synchronize()
+        gc.collect()
         torch.cuda.empty_cache()
 
     def __enqueue_sample_during_training(self, fun: Callable):
@@ -214,6 +215,8 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status("caching")
 
             self.model_setup.setup_eval_device(self.model)
+            self.__gc()
+
             cached_epochs = [False] * self.args.latent_caching_epochs
             for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
                 if not cached_epochs[epoch % self.args.latent_caching_epochs]:
@@ -245,6 +248,7 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status("starting epoch/caching")
 
             self.model_setup.setup_eval_device(self.model)
+            self.__gc()
             self.data_loader.ds.start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
             self.__gc()
