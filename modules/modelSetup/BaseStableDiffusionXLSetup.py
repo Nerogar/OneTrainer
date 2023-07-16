@@ -115,24 +115,26 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 
         # original size of the image
-        original_height = batch['original_resolution'][0].item()
-        original_width = batch['original_resolution'][1].item()
-        crops_coords_top = batch['crop_offset'][0].item()
-        crops_coords_left = batch['crop_offset'][1].item()
-        target_height = batch['crop_resolution'][0].item()
-        target_width = batch['crop_resolution'][1].item()
+        original_height = batch['original_resolution'][0]
+        original_width = batch['original_resolution'][1]
+        crops_coords_top = batch['crop_offset'][0]
+        crops_coords_left = batch['crop_offset'][1]
+        target_height = batch['crop_resolution'][0]
+        target_width = batch['crop_resolution'][1]
 
-        add_time_ids = list(
-            (original_height, original_width)
-            + (crops_coords_top, crops_coords_left)
-            + (target_height, target_width)
-        )
-        add_time_ids = torch.tensor(
-            [add_time_ids],
+        add_time_ids = torch.stack([
+            original_height,
+            original_width,
+            crops_coords_top,
+            crops_coords_left,
+            target_height,
+            target_width
+        ], dim=1)
+
+        add_time_ids = add_time_ids.to(
             dtype=scaled_noisy_latent_image.dtype,
             device=scaled_noisy_latent_image.device,
         )
-        add_time_ids = torch.concat([add_time_ids] * pooled_text_encoder_2_output.shape[0])
 
         latent_input = scaled_noisy_latent_image
         added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}

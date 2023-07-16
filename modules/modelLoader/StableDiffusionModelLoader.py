@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 
 import torch
 import yaml
@@ -74,6 +75,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
 
             return model
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
@@ -133,6 +135,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 sd_config=sd_config,
             )
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
@@ -165,6 +168,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 sd_config=sd_config,
             )
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
@@ -198,6 +202,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 sd_config=sd_config,
             )
         except:
+            traceback.print_exc()
             return None
 
     def load(

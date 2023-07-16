@@ -6,7 +6,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
 ## Features
 
-- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1 and inpainting models
+- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, SDXL and inpainting models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.
@@ -25,11 +25,9 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 While OneTrainer already has many useful features, it is still being developed and improved. Here are some features that
 are planned for the future:
 
-- **Different models**: Training on all currently released Stable Diffusion models, this includes the base models (1.x
-  and 2.x), inpainting models, the depth to image model, and SDXL once it is released. Other publicly released models
-  might also be supported in the future.
 - **VAE fine-tuning**: Already implemented, but with limited functionality
 - **Tooling around dataset management**: Automatic tagging, sorting of images, etc.
+- **Tools for model manipulation**: merging models, extracting LoRAs, etc.
 
 A more detailed list can be found [here](ThingsToAdd.md).
 

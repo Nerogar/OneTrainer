@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 
 import torch
 from diffusers import DDIMScheduler, PriorTransformer, UNet2DConditionModel, VQModel, UnCLIPScheduler, DDPMScheduler
@@ -52,6 +53,7 @@ class KandinskyModelLoader(BaseModelLoader):
 
             return model
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
@@ -134,7 +136,8 @@ class KandinskyModelLoader(BaseModelLoader):
                 noise_scheduler=noise_scheduler,
                 movq=movq,
             )
-        except Exception as e:
+        except:
+            traceback.print_exc()
             return None
 
     @staticmethod

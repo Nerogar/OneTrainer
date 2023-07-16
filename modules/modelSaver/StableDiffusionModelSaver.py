@@ -83,7 +83,6 @@ class StableDiffusionModelSaver(BaseModelSaver):
         with open(yaml_name, 'w', encoding='utf8') as f:
             yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
 
-
     @staticmethod
     def __save_internal(
             model: StableDiffusionModel,

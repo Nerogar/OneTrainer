@@ -27,6 +27,7 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
     def __init_lora(model: StableDiffusionXLModel, state_dict: dict[str, Tensor]):
         rank = StableDiffusionXLLoRAModelLoader.__get_rank(state_dict)
 
+        # TODO: only create the lora if state_dict contains the keys
         model.text_encoder_1_lora = LoRAModuleWrapper(
             orig_module=model.text_encoder_1,
             rank=rank,

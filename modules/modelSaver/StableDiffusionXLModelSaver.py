@@ -4,6 +4,7 @@ import os.path
 from pathlib import Path
 
 import torch
+import yaml
 from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
@@ -56,6 +57,10 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
 
+        yaml_name = os.path.splitext(destination)[0] + '.yaml'
+        with open(yaml_name, 'w', encoding='utf8') as f:
+            yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
+
     @staticmethod
     def __save_safetensors(
             model: StableDiffusionXLModel,
@@ -75,6 +80,10 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination)
+
+        yaml_name = os.path.splitext(destination)[0] + '.yaml'
+        with open(yaml_name, 'w', encoding='utf8') as f:
+            yaml.dump(model.sd_config, f, default_flow_style=False, allow_unicode=True)
 
     @staticmethod
     def __save_internal(

@@ -1,7 +1,9 @@
 import json
 import os
+import traceback
 
 import torch
+import yaml
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
@@ -15,6 +17,14 @@ from modules.util.enum.ModelType import ModelType
 class StableDiffusionXLModelLoader(BaseModelLoader):
     def __init__(self):
         super(StableDiffusionXLModelLoader, self).__init__()
+
+    @staticmethod
+    def __default_yaml_name(model_type: ModelType) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE:
+                return "resources/diffusers_model_config/sd_xl_base.yaml"
+            case _:
+                return None
 
     @staticmethod
     def __load_internal(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
@@ -43,11 +53,15 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             except FileNotFoundError:
                 pass
 
+            with open(StableDiffusionXLModelLoader.__default_yaml_name(model_type), "r") as f:
+                model.sd_config = yaml.safe_load(f)
+
             # meta
             model.train_progress = train_progress
 
             return model
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
@@ -92,6 +106,9 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 torch_dtype=weight_dtype,
             )
 
+            with open(StableDiffusionXLModelLoader.__default_yaml_name(model_type), "r") as f:
+                sd_config = yaml.safe_load(f)
+
             return StableDiffusionXLModel(
                 model_type=model_type,
                 tokenizer_1=tokenizer_1,
@@ -101,15 +118,24 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 text_encoder_2=text_encoder_2,
                 vae=vae,
                 unet=unet,
+                sd_config=sd_config,
             )
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
     def __load_ckpt(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
+            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+            if not os.path.exists(yaml_name):
+                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
+                if not os.path.exists(yaml_name):
+                    yaml_name = StableDiffusionXLModelLoader.__default_yaml_name(model_type)
+
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
+                original_config_file=yaml_name,
                 load_safety_checker=False,
             ).to(torch_device=weight_dtype)
 
@@ -125,6 +151,9 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 prediction_type="epsilon",
             )
 
+            with open(yaml_name, "r") as f:
+                sd_config = yaml.safe_load(f)
+
             return StableDiffusionXLModel(
                 model_type=model_type,
                 tokenizer_1=pipeline.tokenizer,
@@ -134,15 +163,24 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 text_encoder_2=pipeline.text_encoder_2.to(dtype=torch.float32),
                 vae=pipeline.vae.to(dtype=torch.float32),
                 unet=pipeline.unet.to(dtype=torch.float32),
+                sd_config=sd_config,
             )
         except:
+            traceback.print_exc()
             return None
 
     @staticmethod
     def __load_safetensors(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
         try:
+            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+            if not os.path.exists(yaml_name):
+                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
+                if not os.path.exists(yaml_name):
+                    yaml_name = StableDiffusionXLModelLoader.__default_yaml_name(model_type)
+
             pipeline = download_from_original_stable_diffusion_ckpt(
                 checkpoint_path=base_model_name,
+                original_config_file=yaml_name,
                 load_safety_checker=False,
                 from_safetensors=True,
             ).to(torch_device=weight_dtype)
@@ -159,6 +197,9 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 prediction_type="epsilon",
             )
 
+            with open(yaml_name, "r") as f:
+                sd_config = yaml.safe_load(f)
+
             return StableDiffusionXLModel(
                 model_type=model_type,
                 tokenizer_1=pipeline.tokenizer,
@@ -168,8 +209,10 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 text_encoder_2=pipeline.text_encoder_2.to(dtype=torch.float32),
                 vae=pipeline.vae.to(dtype=torch.float32),
                 unet=pipeline.unet.to(dtype=torch.float32),
+                sd_config=sd_config,
             )
         except:
+            traceback.print_exc()
             return None
 
     def load(

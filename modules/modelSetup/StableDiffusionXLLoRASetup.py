@@ -75,17 +75,17 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             model: StableDiffusionXLModel,
             args: TrainArgs,
     ):
-        if model.text_encoder_1_lora is None:
+        if model.text_encoder_1_lora is None and args.train_text_encoder:
             model.text_encoder_1_lora = LoRAModuleWrapper(
                 model.text_encoder_1, args.lora_rank, "lora_te", args.lora_alpha
             )
 
-        if model.text_encoder_2_lora is None:
+        if model.text_encoder_2_lora is None and args.train_text_encoder:
             model.text_encoder_2_lora = LoRAModuleWrapper(
                 model.text_encoder_2, args.lora_rank, "lora_te_2", args.lora_alpha
             )
 
-        if model.unet_lora is None:
+        if model.unet_lora is None and args.train_unet:
             model.unet_lora = LoRAModuleWrapper(
                 model.unet, args.lora_rank, "lora_unet", args.lora_alpha, ["attentions"]
             )
@@ -96,15 +96,21 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
         model.vae.requires_grad_(False)
 
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
-        model.text_encoder_1_lora.requires_grad_(train_text_encoder)
-        model.text_encoder_2_lora.requires_grad_(train_text_encoder)
+        if model.text_encoder_1_lora is not None:
+            model.text_encoder_1_lora.requires_grad_(train_text_encoder)
+        if model.text_encoder_2_lora is not None:
+            model.text_encoder_2_lora.requires_grad_(train_text_encoder)
 
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
-        model.unet_lora.requires_grad_(train_unet)
+        if model.unet_lora is not None:
+            model.unet_lora.requires_grad_(train_unet)
 
-        model.text_encoder_1_lora.hook_to_module()
-        model.text_encoder_2_lora.hook_to_module()
-        model.unet_lora.hook_to_module()
+        if model.text_encoder_1_lora is not None:
+            model.text_encoder_1_lora.hook_to_module()
+        if model.text_encoder_2_lora is not None:
+            model.text_encoder_2_lora.hook_to_module()
+        if model.unet_lora is not None:
+            model.unet_lora.hook_to_module()
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
@@ -167,7 +173,10 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             model.text_encoder_1.eval()
             model.text_encoder_2.eval()
         model.vae.eval()
-        model.unet.train()
+        if args.train_unet:
+            model.unet.train()
+        else:
+            model.unet.eval()
 
     def after_optimizer_step(
             self,
@@ -176,8 +185,11 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             train_progress: TrainProgress
     ):
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
-        model.text_encoder_1_lora.requires_grad_(train_text_encoder)
-        model.text_encoder_2_lora.requires_grad_(train_text_encoder)
+        if model.text_encoder_1_lora is not None:
+            model.text_encoder_1_lora.requires_grad_(train_text_encoder)
+        if model.text_encoder_2_lora is not None:
+            model.text_encoder_2_lora.requires_grad_(train_text_encoder)
 
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
-        model.unet_lora.requires_grad_(train_unet)
+        if model.unet_lora is not None:
+            model.unet_lora.requires_grad_(train_unet)
