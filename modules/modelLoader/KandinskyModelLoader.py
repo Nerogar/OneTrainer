@@ -1,9 +1,8 @@
 import json
 import os
-import traceback
 
 import torch
-from diffusers import DDIMScheduler, PriorTransformer, UNet2DConditionModel, VQModel, UnCLIPScheduler, DDPMScheduler
+from diffusers import PriorTransformer, UNet2DConditionModel, VQModel, UnCLIPScheduler, DDPMScheduler
 from diffusers.pipelines.kandinsky import MultilingualCLIP
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, CLIPVisionModelWithProjection, \
     CLIPImageProcessor, XLMRobertaTokenizerFast
@@ -53,7 +52,6 @@ class KandinskyModelLoader(BaseModelLoader):
 
             return model
         except:
-            traceback.print_exc()
             return None
 
     @staticmethod
@@ -137,7 +135,6 @@ class KandinskyModelLoader(BaseModelLoader):
                 movq=movq,
             )
         except:
-            traceback.print_exc()
             return None
 
     @staticmethod
