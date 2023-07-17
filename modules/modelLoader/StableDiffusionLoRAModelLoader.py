@@ -107,7 +107,7 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
             extra_model_name: str | None
     ) -> StableDiffusionModel | None:
         base_model_loader = StableDiffusionModelLoader()
-        model = base_model_loader.load(model_type, base_model_name, None)
+        model = base_model_loader.load(model_type, weight_dtype, base_model_name, None)
 
         lora_loaded = self.__load_internal(model, extra_model_name)
 
