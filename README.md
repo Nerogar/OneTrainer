@@ -19,6 +19,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **Noise Scheduler Rescaling**: From the paper
   [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
 - **EMA**: Train you own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
+- **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
+  resolutions, buckets are created automatically.
 
 ## Planned Features
 
@@ -63,7 +65,8 @@ Manual update
 
 ## Usage
 
-To start the UI, run `start-ui.bat`. [You can find a quick start guide here.](docs/QuickStartGuide.md)
+To start the UI, run `start-ui.bat`. [You can find a quick start guide here.](docs/QuickStartGuide.md), and a more
+detailed overview of different topics [here](docs/Overview.md).
 
 If you need more control, OneTrainer supports two modes of operation. Command line only, and a UI.
 All commands need to be run inside the active venv created during installation.
