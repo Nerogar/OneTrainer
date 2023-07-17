@@ -148,7 +148,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 checkpoint_path=base_model_name,
                 original_config_file=yaml_name,
                 load_safety_checker=False,
-            ).to(torch_device=weight_dtype)
+            ).to(torch_dtype=weight_dtype)
 
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
@@ -181,7 +181,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 original_config_file=yaml_name,
                 load_safety_checker=False,
                 from_safetensors=True,
-            ).to(torch_device=weight_dtype)
+            ).to(torch_dtype=weight_dtype)
 
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)

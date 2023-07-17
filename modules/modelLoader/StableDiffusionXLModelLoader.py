@@ -134,7 +134,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 checkpoint_path=base_model_name,
                 original_config_file=yaml_name,
                 load_safety_checker=False,
-            ).to(torch_device=weight_dtype)
+            ).to(torch_dtype=weight_dtype)
 
             noise_scheduler = DDIMScheduler(
                 num_train_timesteps=1000,
@@ -179,7 +179,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 original_config_file=yaml_name,
                 load_safety_checker=False,
                 from_safetensors=True,
-            ).to(torch_device=weight_dtype)
+            ).to(torch_dtype=weight_dtype)
 
             noise_scheduler = DDIMScheduler(
                 num_train_timesteps=1000,
