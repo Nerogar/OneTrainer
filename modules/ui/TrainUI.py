@@ -136,7 +136,7 @@ class TrainUI(ctk.CTk):
                          tooltip="The directory where cached data is saved")
         components.dir_entry(master, 1, 1, self.ui_state, "cache_dir")
 
-        # debug
+        # only cache
         components.label(master, 2, 0, "Only Cache",
                          tooltip="Only populate the cache, without any training")
         components.switch(master, 2, 1, self.ui_state, "only_cache")
@@ -148,7 +148,7 @@ class TrainUI(ctk.CTk):
 
         components.label(master, 4, 0, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.file_entry(master, 4, 1, self.ui_state, "debug_dir")
+        components.dir_entry(master, 4, 1, self.ui_state, "debug_dir")
 
         components.label(master, 5, 0, "Tensorboard",
                          tooltip="Starts the Tensorboard Web UI during training")
