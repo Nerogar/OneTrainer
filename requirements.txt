@@ -16,7 +16,7 @@ pytorch-lightning==2.0.3
 
 # stable diffusion
 git+https://github.com/huggingface/diffusers.git@3929954#egg=diffusers
-git+https://github.com/huggingface/transformers.git@5bb4430#egg=transformers
+transformers==4.31.0
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
