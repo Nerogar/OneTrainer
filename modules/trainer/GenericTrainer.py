@@ -62,7 +62,14 @@ class GenericTrainer(BaseTrainer):
             tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
 
             self.tensorboard_subprocess = subprocess.Popen(
-                f"{tensorboard_executable} --logdir {tensorboard_log_dir} --port 6006 --samples_per_plugin=images=100"
+                [
+                    tensorboard_executable,
+                    "--logdir",
+                    tensorboard_log_dir,
+                    "--port",
+                    "6006",
+                    "--samples_per_plugin=images=100"
+                ]
             )
         self.one_step_trained = False
 
