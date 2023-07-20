@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
@@ -57,7 +58,7 @@ class GenericTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(args.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        self.tensorboard = SummaryWriter(tensorboard_log_dir)
+        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f'{time.strftime("%Y-%m-%d-%H-%M-%S")}'))
         if args.tensorboard:
             tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
 
