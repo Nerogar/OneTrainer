@@ -242,42 +242,42 @@ def create_optimizer(
                 weight_decay=args.weight_decay,
                 eps=1e-8,
             )
-        case Optimizer.Lion:
+        case Optimizer.LION:
             import lion_pytorch as lp
             optimizer = lp.Lion(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
-        case Optimizer.DAdaptSGD:
+        case Optimizer.DADAPT_SGD:
             import dadaptation as da
             optimizer = da.DAdaptSGD(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
-        case Optimizer.DAdaptAdam:
+        case Optimizer.DADAPT_ADAM:
             import dadaptation as da
             optimizer = da.DAdaptAdam(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
-        case Optimizer.DAdaptAdan:
+        case Optimizer.DADAPT_ADAN:
             import dadaptation as da
             optimizer = da.DAdaptAdan(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
-        case Optimizer.DAdaptAdaGrad:
+        case Optimizer.DADAPT_ADA_GRAD:
             import dadaptation as da
             optimizer = da.DAdaptAdaGrad(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
-        case Optimizer.DAdaptLion:
+        case Optimizer.DADAPT_LION:
             import dadaptation as da
             optimizer = da.DAdaptLion(
                 params=parameters,
