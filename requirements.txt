@@ -26,12 +26,11 @@ git+https://github.com/Nerogar/mgds.git@1c4b031#egg=mgds
 # xformers
 xformers==0.0.20
 
-# bitsandbytes for 8-bit optimizers
-bitsandbytes-windows==0.37.5
-# dadaptation optimizers
-dadaptation==3.1
-# lion optimizer
-lion-pytorch==0.0.6
+# optimizers
+bitsandbytes-windows==0.37.5 # bitsandbytes for 8-bit optimizers
+dadaptation==3.1 # dadaptation optimizers
+lion-pytorch==0.0.6 # lion optimizer
+prodigyopt==1.0 # prodigy optimizer
 
 # ui
 customtkinter==5.1.2

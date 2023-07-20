@@ -284,6 +284,13 @@ def create_optimizer(
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
             )
+        case Optimizer.PRODIGY:
+            import prodigyopt
+            optimizer = prodigyopt.Prodigy(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
 
     if state_dict is not None:
         for i, params in enumerate(parameters):
