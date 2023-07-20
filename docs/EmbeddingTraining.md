@@ -7,7 +7,7 @@ training in the dropdown in the top right corner.
 
 ### Concepts
 
-To train an embedding, you need to use special prompts. Each prompt needs to include "<embedding>" in the place where
+To train an embedding, you need to use special prompts. Each prompt needs to include `<embedding>` in the place where
 you want to place your trained embedding. For example, if you want to train a style of a painting, your prompt could
 be `a painting in the style of <embedding>`. If you don't want to add a custom prompt for every training image, you can
 select "From single text file" as the prompt source of your concept. Then select a text file containing one prompt per
