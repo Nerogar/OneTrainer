@@ -28,6 +28,10 @@ xformers==0.0.20
 
 # bitsandbytes for 8-bit optimizers
 bitsandbytes-windows==0.37.5
+# dadaptation optimizers
+dadaptation==3.1
+# lion optimizer
+lion-pytorch==0.0.6
 
 # ui
 customtkinter==5.1.2
