@@ -7,3 +7,4 @@
 /training_samples
 debug.py
 train.bat
+*.pyc

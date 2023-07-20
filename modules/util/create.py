@@ -242,6 +242,48 @@ def create_optimizer(
                 weight_decay=args.weight_decay,
                 eps=1e-8,
             )
+        case Optimizer.Lion:
+            import lion_pytorch as lp
+            optimizer = lp.Lion(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
+        case Optimizer.DAdaptSGD:
+            import dadaptation as da
+            optimizer = da.DAdaptSGD(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
+        case Optimizer.DAdaptAdam:
+            import dadaptation as da
+            optimizer = da.DAdaptAdam(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
+        case Optimizer.DAdaptAdan:
+            import dadaptation as da
+            optimizer = da.DAdaptAdan(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
+        case Optimizer.DAdaptAdaGrad:
+            import dadaptation as da
+            optimizer = da.DAdaptAdaGrad(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
+        case Optimizer.DAdaptLion:
+            import dadaptation as da
+            optimizer = da.DAdaptLion(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+            )
 
     if state_dict is not None:
         for i, params in enumerate(parameters):
