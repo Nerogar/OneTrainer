@@ -6,6 +6,7 @@ from PIL import Image
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
+from modules.util.args import concept_defaults
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -23,25 +24,7 @@ class ConceptTab(ConfigList):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return {
-            "name": "",
-            "path": "",
-            "prompt_source": "sample",
-            "prompt_path": "",
-            "enable_crop_jitter": True,
-            "enable_random_flip": True,
-            "enable_random_rotate": False,
-            "random_rotate_max_angle": 0.0,
-            "enable_random_brightness": False,
-            "random_brightness_max_strength": 0.0,
-            "enable_random_contrast": False,
-            "random_contrast_max_strength": 0.0,
-            "enable_random_saturation": False,
-            "random_saturation_max_strength": 0.0,
-            "enable_random_hue": False,
-            "random_hue_max_strength": 0.0,
-            "include_subdirectories": False,
-        }
+        return concept_defaults.create_new_concept()
 
     def open_element_window(self, i) -> ctk.CTkToplevel:
         return ConceptWindow(self.master, self.current_config[i])

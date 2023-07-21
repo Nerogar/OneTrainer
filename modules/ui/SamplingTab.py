@@ -1,6 +1,7 @@
 import customtkinter as ctk
 
 from modules.ui.ConfigList import ConfigList
+from modules.util.args import sample_defaults
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -18,12 +19,7 @@ class SamplingTab(ConfigList):
         return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return {
-            "prompt": "",
-            "height": 512,
-            "width": 512,
-            "seed": 42,
-        }
+        return sample_defaults.create_new_sample()
 
     def open_element_window(self, i) -> ctk.CTkToplevel:
         pass

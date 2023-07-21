@@ -31,7 +31,7 @@ are planned for the future:
 - **Tooling around dataset management**: Automatic tagging, sorting of images, etc.
 - **Tools for model manipulation**: merging models, extracting LoRAs, etc.
 
-A more detailed list can be found [here](ThingsToAdd.md).
+A more detailed list can be found [here](docs/ThingsToAdd.md).
 
 ## Installation
 
@@ -77,6 +77,7 @@ All functionality is split into different scrips located in the `scripts` direct
 - `train_ui.py` A UI for training
 - `convert_model.py` A utility to convert between different model formats
 - `sample.py` A utility to sample any model
+- `create_train_files.py` A utility to create files needed when training only from the CLI
 
 To learn more about the different parameters, execute `<scipt-name> -h`. For example `python scripts\train.py -h`
 
