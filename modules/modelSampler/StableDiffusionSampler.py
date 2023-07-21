@@ -76,7 +76,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
             )
 
-            text_encoder_output = text_encoder(tokens, return_dict=True, output_hidden_states=True)
+            text_encoder_output = text_encoder(negative_tokens, return_dict=True, output_hidden_states=True)
             final_layer_norm = text_encoder.text_model.final_layer_norm
             negative_prompt_embedding = final_layer_norm(
                 text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
