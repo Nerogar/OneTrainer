@@ -235,6 +235,12 @@ class TrainUI(ctk.CTk):
                          tooltip="The number of epochs that are cached. Set this to a number higher than 1 and enable data augmentations if you want to add more diversity to your training data")
         components.entry(master, 4, 1, self.ui_state, "latent_caching_epochs")
 
+        # clear cache before training
+        components.label(master, 5, 0, "Clear cache before training",
+                         tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
+        components.switch(master, 5, 1, self.ui_state, "clear_cache_before_training")
+
+
     def concepts_tab(self, master):
         ConceptTab(master, self.train_args, self.ui_state)
 

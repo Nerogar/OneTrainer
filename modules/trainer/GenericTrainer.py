@@ -1,6 +1,7 @@
 import gc
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -75,6 +76,9 @@ class GenericTrainer(BaseTrainer):
         self.one_step_trained = False
 
     def start(self):
+        if self.args.clear_cache_before_training and self.args.latent_caching:
+            self.__clear_cache()
+
         if self.args.train_dtype.enable_tf():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
@@ -115,6 +119,17 @@ class GenericTrainer(BaseTrainer):
         torch.cuda.synchronize()
         gc.collect()
         torch.cuda.empty_cache()
+
+    def __clear_cache(self):
+        print(
+            f'Clearing cache directory {self.args.cache_dir}! '
+            f'You can disable this if you want to continue using the same cache.'
+        )
+
+        for filename in os.listdir(self.args.cache_dir):
+            path = os.path.join(self.args.cache_dir, filename)
+            if os.path.isdir(path) and filename.startswith('epoch-'):
+                shutil.rmtree(path)
 
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)

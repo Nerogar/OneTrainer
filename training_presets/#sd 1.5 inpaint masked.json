@@ -18,6 +18,7 @@
     "aspect_ratio_bucketing": true,
     "latent_caching": true,
     "latent_caching_epochs": 1,
+    "clear_cache_before_training": true,
     "optimizer": "ADAMW",
     "learning_rate_scheduler": "CONSTANT",
     "learning_rate": 3e-06,

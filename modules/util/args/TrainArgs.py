@@ -36,6 +36,7 @@ class TrainArgs:
     aspect_ratio_bucketing: bool
     latent_caching: bool
     latent_caching_epochs: int
+    clear_cache_before_training: bool
 
     # training settings
     optimizer: Optimizer
@@ -187,6 +188,7 @@ class TrainArgs:
         parser.add_argument("--aspect-ratio-bucketing", required=False, action='store_true', dest="aspect_ratio_bucketing", help="Enable aspect ratio bucketing")
         parser.add_argument("--latent-caching", required=False, action='store_true', dest="latent_caching", help="Enable latent caching")
         parser.add_argument("--latent-caching-epochs", type=int, required=False, default=1, dest="latent_caching_epochs", help="The amount of epochs to cache, to increase sample diversity")
+        parser.add_argument("--clear-cache-before-training", trequired=False, action='store_true', dest="clear_cache_before_training", help="Clears the latent cache before starting to train")
 
         # training settings
         parser.add_argument("--optimizer", type=Optimizer, required=False, default=Optimizer.ADAMW, dest="optimizer", help="The optimizer", choices=list(Optimizer))
@@ -269,6 +271,7 @@ class TrainArgs:
         args["aspect_ratio_bucketing"] = True
         args["latent_caching"] = True
         args["latent_caching_epochs"] = 1
+        args["clear_cache_before_training"] = True
 
         # training settings
         args["optimizer"] = Optimizer.ADAMW
