@@ -36,17 +36,6 @@ class Blip2Model:
             initial_caption: str = "",
             mode: str = 'fill',
     ):
-        """
-        Captions a sample
-
-        Parameters:
-            filename (`str`): a sample filename
-            initial_caption (`str`): an initial caption. the generated caption will start with this string
-            mode (`str`): can be one of
-                - replace: creates new caption for all samples, even if a caption already exists
-                - fill: creates new caption for all samples without a caption
-        """
-
         caption_sample = CaptionSample(filename)
 
         existing_caption = caption_sample.get_caption()
@@ -73,19 +62,6 @@ class Blip2Model:
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
     ):
-        """
-        Captions all samples in a list
-
-        Parameters:
-            filenames (`[str]`): a list of sample filenames
-            initial_caption (`str`): an initial caption. the generated caption will start with this string
-            mode (`str`): can be one of
-                - replace: creates new caption for all samples, even if a caption already exists
-                - fill: creates new caption for all samples without a caption
-            progress_callback (`Callable[[int, int], None]`): called after every processed image
-            error_callback (`Callable[[str], None]`): called for every exception
-        """
-
         if progress_callback is not None:
             progress_callback(0, len(filenames))
         for i, filename in enumerate(tqdm(filenames)):
@@ -105,19 +81,6 @@ class Blip2Model:
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
     ):
-        """
-        Captions all samples in a folder
-
-        Parameters:
-            sample_dir (`str`): directory where samples are located
-            initial_caption (`str`): an initial caption. the generated caption will start with this string
-            mode (`str`): can be one of
-                - replace: creates new caption for all samples, even if a caption already exists
-                - fill: creates new caption for all samples without a caption
-            progress_callback (`Callable[[int, int], None]`): called after every processed image
-            error_callback (`Callable[[str], None]`): called for every exception
-        """
-
         filenames = self.__get_sample_filenames(sample_dir)
         self.caption_images(
             filenames=filenames,
