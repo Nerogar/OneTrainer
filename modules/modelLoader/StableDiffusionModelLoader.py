@@ -150,13 +150,25 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 load_safety_checker=False,
             ).to(torch_dtype=weight_dtype)
 
+            noise_scheduler = DDIMScheduler(
+                num_train_timesteps=1000,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
+
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
 
             return StableDiffusionModel(
                 model_type=model_type,
                 tokenizer=pipeline.tokenizer,
-                noise_scheduler=pipeline.scheduler,
+                noise_scheduler=noise_scheduler,
                 text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
                 vae=pipeline.vae.to(dtype=torch.float32),
                 unet=pipeline.unet.to(dtype=torch.float32),
@@ -183,13 +195,25 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 from_safetensors=True,
             ).to(torch_dtype=weight_dtype)
 
+            noise_scheduler = DDIMScheduler(
+                num_train_timesteps=1000,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
+
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
 
             return StableDiffusionModel(
                 model_type=model_type,
                 tokenizer=pipeline.tokenizer,
-                noise_scheduler=pipeline.scheduler,
+                noise_scheduler=noise_scheduler,
                 text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
                 vae=pipeline.vae.to(dtype=torch.float32),
                 unet=pipeline.unet.to(dtype=torch.float32),

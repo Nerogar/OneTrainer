@@ -59,7 +59,7 @@ class GenericTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(args.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f'{time.strftime("%Y-%m-%d-%H-%M-%S")}'))
+        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, self.__get_string_timestamp()))
         if args.tensorboard:
             tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
 
@@ -120,6 +120,9 @@ class GenericTrainer(BaseTrainer):
         gc.collect()
         torch.cuda.empty_cache()
 
+    def __get_string_timestamp(self):
+        return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     def __clear_cache(self):
         print(
             f'Clearing cache directory {self.args.cache_dir}! '
@@ -151,7 +154,7 @@ class GenericTrainer(BaseTrainer):
 
             sample_path = os.path.join(
                 sample_dir,
-                f"training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
+                f"{self.__get_string_timestamp()}-training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
             )
 
             def on_sample(image: Image):
@@ -203,7 +206,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("creating backup")
 
-        path = os.path.join(self.args.workspace_dir, "backup", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+        path = os.path.join(self.args.workspace_dir, "backup", self.__get_string_timestamp())
         print("Creating Backup " + path)
         self.model_saver.save(
             self.model,

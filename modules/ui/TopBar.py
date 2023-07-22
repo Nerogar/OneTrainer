@@ -115,12 +115,16 @@ class TopBar:
             self.__create_configs_dropdown()
 
     def __save_config(self):
+        default_value = self.configs_dropdown.get()
+        while default_value.startswith('#'):
+            default_value = default_value[1:]
+
         dialogs.StringInputDialog(
             parent=self.master,
             title="name",
             question="Config Name",
             callback=self.__save_new_config,
-            default_value=self.configs_dropdown.get(),
+            default_value=default_value,
             validate_callback=lambda x: not x.startswith("#")
         )
 
