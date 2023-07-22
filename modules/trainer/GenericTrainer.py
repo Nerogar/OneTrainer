@@ -125,11 +125,11 @@ class GenericTrainer(BaseTrainer):
             f'Clearing cache directory {self.args.cache_dir}! '
             f'You can disable this if you want to continue using the same cache.'
         )
-
-        for filename in os.listdir(self.args.cache_dir):
-            path = os.path.join(self.args.cache_dir, filename)
-            if os.path.isdir(path) and filename.startswith('epoch-'):
-                shutil.rmtree(path)
+        if os.path.isdir(self.args.cache_dir):
+            for filename in os.listdir(self.args.cache_dir):
+                path = os.path.join(self.args.cache_dir, filename)
+                if os.path.isdir(path) and filename.startswith('epoch-'):
+                    shutil.rmtree(path)
 
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
