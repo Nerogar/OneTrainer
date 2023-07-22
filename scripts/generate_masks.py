@@ -1,10 +1,9 @@
 import os
 import sys
 
-from modules.util.args.GenerateMasksArgs import GenerateMasksArgs
-
 sys.path.append(os.getcwd())
 
+from modules.util.args.GenerateMasksArgs import GenerateMasksArgs
 from modules.module.ClipSegModel import ClipSegModel
 
 

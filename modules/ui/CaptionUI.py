@@ -9,6 +9,7 @@ from customtkinter import ThemeManager
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
+from modules.module.RembgModel import RembgModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
@@ -363,12 +364,17 @@ Mouse wheel: increase or decrease brush size"""
         self.wait_window(dialog)
         self.switch_image(self.current_image_index)
 
-    def load_masking_model(self):
+    def load_masking_model(self, model):
         self.captioning_model = None
 
-        if self.masking_model is None:
-            print("loading ClipSeg model, this may take a while")
-            self.masking_model = ClipSegModel()
+        if model == "ClipSeg":
+            if self.masking_model is None:
+                print("loading ClipSeg model, this may take a while")
+                self.masking_model = ClipSegModel()
+        elif model == "Rembg":
+            if self.masking_model is None:
+                print("loading Rembg model, this may take a while")
+                self.masking_model = RembgModel()
 
     def load_captioning_model(self, model):
         self.masking_model = None

@@ -24,35 +24,35 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
-        self.model_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
-        self.model_dropdown.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
         self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
-        self.path_label.grid(row=2, column=0, sticky="w",padx=5, pady=5)
+        self.path_label.grid(row=1, column=0, sticky="w",padx=5, pady=5)
         self.path_entry = ctk.CTkEntry(self.frame, width=150)
         self.path_entry.insert(0, path)
-        self.path_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.path_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.path_button = ctk.CTkButton(self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry))
-        self.path_button.grid(row=2, column=1, sticky="e", padx=5, pady=5)
+        self.path_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
 
         self.caption_label = ctk.CTkLabel(self.frame, text="Initial Caption", width=100)
-        self.caption_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.caption_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.caption_entry = ctk.CTkEntry(self.frame, width=200)
-        self.caption_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        self.caption_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
 
         self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
-        self.mode_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
-        self.mode_dropdown.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=5, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=4, column=1, sticky="w", padx=5, pady=5)
 
         self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self.create_captions)
-        self.create_captions_button.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_captions_button.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
 
