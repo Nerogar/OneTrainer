@@ -31,7 +31,7 @@ class SampleWidget(ctk.CTkFrame):
             master=master, corner_radius=10, bg_color="transparent"
         )
 
-        self.grid_rowconfigure(8, weight=1)
+        self.grid_rowconfigure(9, weight=1)
 
         self.ui_state = UIState(self, sample)
 

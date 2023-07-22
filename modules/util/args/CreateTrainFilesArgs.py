@@ -11,7 +11,7 @@ class CreateTrainFilesArgs:
 
     @staticmethod
     def parse_args() -> 'CreateTrainFilesArgs':
-        parser = argparse.ArgumentParser(description="One Trainer Sampling Script.")
+        parser = argparse.ArgumentParser(description="One Trainer Create Train Files Script.")
 
         parser.add_argument("--concepts-output-destination", type=str, required=False, default=None, dest="concepts_output_destination", help="The destination filename to save a default concepts file")
         parser.add_argument("--samples-output-destination", type=str, required=False, default=None, dest="samples_output_destination", help="The destination filename to save a default samples file")

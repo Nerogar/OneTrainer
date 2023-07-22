@@ -10,6 +10,7 @@ import torch
 from PIL.Image import Image
 
 from modules.trainer.GenericTrainer import GenericTrainer
+from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -114,7 +115,7 @@ class TrainUI(ctk.CTk):
         self.training_tab(self.tabview.add("training"))
         self.sampling_tab(self.tabview.add("sampling"))
         self.backup_tab(self.tabview.add("backup"))
-        #self.tools_tab(self.tabview.add("tools"))
+        self.tools_tab(self.tabview.add("tools"))
 
         self.change_training_method(self.train_args.training_method)
 
@@ -515,7 +516,18 @@ class TrainUI(ctk.CTk):
         return master
 
     def tools_tab(self, master):
-        pass
+        master.grid_columnconfigure(0, weight=0)
+        master.grid_columnconfigure(1, weight=1)
+        master.grid_columnconfigure(2, minsize=50)
+        master.grid_columnconfigure(3, weight=0)
+        master.grid_columnconfigure(4, weight=1)
+
+        # dataset
+        components.label(master, 0, 0, "Dataset Tools",
+                         tooltip="Open the captioning tool")
+        components.button(master, 0, 1, "Open", self.open_dataset_tool)
+
+        return master
 
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:
@@ -545,6 +557,10 @@ class TrainUI(ctk.CTk):
 
     def on_sample(self, sample: Image):
         pass
+
+    def open_dataset_tool(self):
+        window = CaptionUI(self, None)
+        self.wait_window(window)
 
     def training_thread_function(self):
         error_caught = False
