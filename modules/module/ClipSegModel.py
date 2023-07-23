@@ -56,7 +56,7 @@ class ClipSegModel(BaseImageMaskModel):
             mask = mask.unsqueeze(0)
 
         mask = torch.sigmoid(mask)
-        mask = mask.sum(1).unsqueeze(1)
+        mask = mask.mean(1).unsqueeze(1)
         if self.smoothing_kernel is not None:
             mask = self.smoothing_kernel(mask)
         mask = functional.resize(mask, [target_height, target_width])

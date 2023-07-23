@@ -21,6 +21,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **EMA**: Train you own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
 - **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
   resolutions, buckets are created automatically.
+- **Dataset Tooling**: Automatically caption your dataset, or create masks for masked training.
 
 ## Planned Features
 
@@ -75,9 +76,12 @@ All functionality is split into different scrips located in the `scripts` direct
 
 - `train.py` The central training script
 - `train_ui.py` A UI for training
+- `caption_ui.py` A UI for manual or automatic captioning and mask creation for masked training
 - `convert_model.py` A utility to convert between different model formats
 - `sample.py` A utility to sample any model
 - `create_train_files.py` A utility to create files needed when training only from the CLI
+- `generate_captions.py` A utility to automatically create captions for your dataset
+- `generate_masks.py` A utility to automatically create masks for your dataset
 
 To learn more about the different parameters, execute `<scipt-name> -h`. For example `python scripts\train.py -h`
 

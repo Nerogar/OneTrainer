@@ -16,7 +16,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.focus_set()
 
         self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = ["Replace all captions", "Create if absent", "Add to existing", "Subtract from existing"]
+        self.modes = ["Replace all captions", "Create if absent"]
         self.model_var = ctk.StringVar(self, "Blip")
         self.models = ["Blip", "Blip2"]
 
