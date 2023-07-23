@@ -368,11 +368,11 @@ Mouse wheel: increase or decrease brush size"""
         self.captioning_model = None
 
         if model == "ClipSeg":
-            if self.masking_model is None:
+            if self.masking_model is None or not isinstance(self.masking_model, ClipSegModel):
                 print("loading ClipSeg model, this may take a while")
                 self.masking_model = ClipSegModel()
         elif model == "Rembg":
-            if self.masking_model is None:
+            if self.masking_model is None or not isinstance(self.masking_model, RembgModel):
                 print("loading Rembg model, this may take a while")
                 self.masking_model = RembgModel()
 
