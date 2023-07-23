@@ -3,14 +3,23 @@ import sys
 
 sys.path.append(os.getcwd())
 
+import torch
+from modules.util.enum.GenerateMasksModel import GenerateMasksModel
 from modules.util.args.GenerateMasksArgs import GenerateMasksArgs
+from modules.module.RembgModel import RembgModel
 from modules.module.ClipSegModel import ClipSegModel
 
 
 def main():
     args = GenerateMasksArgs.parse_args()
-    clip_seg = ClipSegModel()
-    clip_seg.mask_folder(
+
+    model = None
+    if args.model == GenerateMasksModel.CLIPSEG:
+        model = ClipSegModel(torch.device(args.device), args.dtype.torch_dtype())
+    elif args.model == GenerateMasksModel.REMBG:
+        model = RembgModel(torch.device(args.device), args.dtype.torch_dtype())
+
+    model.mask_folder(
         sample_dir=args.sample_dir,
         prompts=args.prompts,
         mode=args.mode,

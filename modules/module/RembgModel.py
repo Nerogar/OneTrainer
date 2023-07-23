@@ -10,11 +10,12 @@ from tqdm.auto import tqdm
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 from modules.util import path_util
 
-DEVICE = "cuda"
-
 
 class RembgModel(BaseImageMaskModel):
-    def __init__(self):
+    def __init__(self, device: torch.device, dtype: torch.dtype):
+        self.device = device
+        self.dtype = dtype
+
         self.rembg_session = rembg.new_session()
 
         self.smoothing_kernel_radius = None
@@ -27,8 +28,7 @@ class RembgModel(BaseImageMaskModel):
             transforms.ToTensor(),
         ])
 
-    @staticmethod
-    def __create_average_kernel(kernel_radius: Optional[int]):
+    def __create_average_kernel(self, kernel_radius: Optional[int]):
         if kernel_radius is None:
             return None
 
@@ -38,7 +38,7 @@ class RembgModel(BaseImageMaskModel):
                            padding=kernel_radius)
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
-        kernel.to(DEVICE)
+        kernel.to(self.device)
         return kernel
 
     @staticmethod
@@ -75,7 +75,7 @@ class RembgModel(BaseImageMaskModel):
             smooth_pixels: int = 5,
             expand_pixels: int = 10
     ):
-        mask_sample = MaskSample(filename)
+        mask_sample = MaskSample(filename, self.device)
 
         if mode == 'fill' and mask_sample.get_mask_tensor() is not None:
             return
@@ -89,7 +89,7 @@ class RembgModel(BaseImageMaskModel):
             self.expand_kernel_radius = expand_pixels
 
         output = rembg.remove(mask_sample.get_image(), only_mask=True, session=self.rembg_session).convert("RGB")
-        output = self.image2Tensor(output).to(DEVICE)
+        output = self.image2Tensor(output).to(self.device)
 
         predicted_mask = self.__process_mask(output, mask_sample.height, mask_sample.width, threshold)
 

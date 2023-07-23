@@ -1,10 +1,9 @@
 import os
 import sys
 
-from modules.util.args.CaptionUIArgs import CaptionUIArgs
-
 sys.path.append(os.getcwd())
 
+from modules.util.args.CaptionUIArgs import CaptionUIArgs
 from modules.ui.CaptionUI import CaptionUI
 
 

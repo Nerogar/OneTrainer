@@ -3,6 +3,7 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 import numpy as np
+import torch
 from PIL import Image, ImageDraw
 from customtkinter import ThemeManager
 
@@ -370,11 +371,11 @@ Mouse wheel: increase or decrease brush size"""
         if model == "ClipSeg":
             if self.masking_model is None or not isinstance(self.masking_model, ClipSegModel):
                 print("loading ClipSeg model, this may take a while")
-                self.masking_model = ClipSegModel()
+                self.masking_model = ClipSegModel(torch.device("cuda"), torch.float32)
         elif model == "Rembg":
             if self.masking_model is None or not isinstance(self.masking_model, RembgModel):
                 print("loading Rembg model, this may take a while")
-                self.masking_model = RembgModel()
+                self.masking_model = RembgModel(torch.device("cuda"), torch.float32)
 
     def load_captioning_model(self, model):
         self.masking_model = None
@@ -382,11 +383,11 @@ Mouse wheel: increase or decrease brush size"""
         if model == "Blip":
             if self.captioning_model is None or not isinstance(self.captioning_model, BlipModel):
                 print("loading Blip model, this may take a while")
-                self.captioning_model = BlipModel()
+                self.captioning_model = BlipModel(torch.device("cuda"), torch.float16)
         elif model == "Blip2":
             if self.captioning_model is None or not isinstance(self.captioning_model, Blip2Model):
                 print("loading Blip2 model, this may take a while")
-                self.captioning_model = Blip2Model()
+                self.captioning_model = Blip2Model(torch.device("cuda"), torch.float16)
 
     def print_help(self):
         print(self.help_text)

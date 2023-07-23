@@ -10,16 +10,17 @@ from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 from modules.util import path_util
 
-DEVICE = "cuda"
-
 
 class ClipSegModel(BaseImageMaskModel):
-    def __init__(self):
+    def __init__(self, device: torch.device, dtype: torch.dtype):
+        self.device = device
+        self.dtype = dtype
+
         self.processor = CLIPSegProcessor.from_pretrained("CIDAS/clipseg-rd64-refined")
 
         self.model = CLIPSegForImageSegmentation.from_pretrained("CIDAS/clipseg-rd64-refined")
         self.model.eval()
-        self.model.to(DEVICE)
+        self.model.to(self.device)
 
         self.smoothing_kernel_radius = None
         self.smoothing_kernel = self.__create_average_kernel(self.smoothing_kernel_radius)
@@ -27,8 +28,7 @@ class ClipSegModel(BaseImageMaskModel):
         self.expand_kernel_radius = None
         self.expand_kernel = self.__create_average_kernel(self.expand_kernel_radius)
 
-    @staticmethod
-    def __create_average_kernel(kernel_radius: Optional[int]):
+    def __create_average_kernel(self, kernel_radius: Optional[int]):
         if kernel_radius is None:
             return None
 
@@ -38,7 +38,7 @@ class ClipSegModel(BaseImageMaskModel):
                            padding=kernel_radius)
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
-        kernel.to(DEVICE)
+        kernel.to(self.device)
         return kernel
 
     @staticmethod
@@ -76,7 +76,7 @@ class ClipSegModel(BaseImageMaskModel):
             smooth_pixels: int = 5,
             expand_pixels: int = 10
     ):
-        mask_sample = MaskSample(filename)
+        mask_sample = MaskSample(filename, self.device)
 
         if mode == 'fill' and mask_sample.get_mask_tensor() is not None:
             return
@@ -91,7 +91,7 @@ class ClipSegModel(BaseImageMaskModel):
 
         inputs = self.processor(text=prompts, images=[mask_sample.get_image()] * len(prompts), padding="max_length",
                                 return_tensors="pt")
-        inputs = inputs.to(DEVICE)
+        inputs = inputs.to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
         predicted_mask = self.__process_mask(outputs.logits, mask_sample.height, mask_sample.width, threshold)

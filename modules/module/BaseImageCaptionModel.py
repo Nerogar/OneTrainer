@@ -4,8 +4,6 @@ from typing import Callable
 
 from PIL import Image
 
-DEVICE = "cuda"
-
 
 class CaptionSample:
     def __init__(self, filename: str):

@@ -8,17 +8,20 @@ from transformers import AutoProcessor, Blip2ForConditionalGeneration
 from modules.module.BaseImageCaptionModel import CaptionSample
 from modules.util import path_util
 
-DEVICE = "cuda"
-DTYPE = torch.float16
-
 
 class Blip2Model:
-    def __init__(self):
+    def __init__(self, device: torch.device, dtype: torch.dtype):
+        self.device = device
+        self.dtype = dtype
+
         self.processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
 
-        self.model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", torch_dtype=DTYPE)
+        self.model = Blip2ForConditionalGeneration.from_pretrained(
+            "Salesforce/blip2-opt-2.7b",
+            torch_dtype=self.dtype
+        )
         self.model.eval()
-        self.model.to(DEVICE)
+        self.model.to(self.device)
 
     @staticmethod
     def __get_sample_filenames(sample_dir: str) -> [str]:
@@ -43,7 +46,7 @@ class Blip2Model:
             return
 
         inputs = self.processor(caption_sample.get_image(), initial_caption, return_tensors="pt")
-        inputs = inputs.to(DEVICE, DTYPE)
+        inputs = inputs.to(self.device, self.dtype)
         with torch.no_grad():
             outputs = self.model.generate(**inputs)
         predicted_caption = self.processor.decode(outputs[0], skip_special_tokens=True)

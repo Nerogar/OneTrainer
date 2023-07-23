@@ -23,7 +23,7 @@ Depending on the model you chose, this can take a while.
 
 Check the "Enable Mask Editing" checkbox at the top. Now you can draw a mask onto the image. Left click adds to the
 masked region, right click removes parts from the mask. With the mouse wheel you can increase or decrease the brush
-size. To save the mask, click into the caption input field, then press enter.
+size. Use Ctrl+M to only show the mask. To save the mask, click into the caption input field, then press enter.
 
 ### Automatic captioning
 

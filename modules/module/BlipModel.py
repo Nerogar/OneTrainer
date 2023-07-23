@@ -8,16 +8,20 @@ from transformers import BlipProcessor, BlipForConditionalGeneration
 from modules.module.BaseImageCaptionModel import CaptionSample
 from modules.util import path_util
 
-DEVICE = "cuda"
-
 
 class BlipModel:
-    def __init__(self):
+    def __init__(self, device: torch.device, dtype: torch.dtype):
+        self.device = device
+        self.dtype = dtype
+
         self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
 
-        self.model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
+        self.model = BlipForConditionalGeneration.from_pretrained(
+            "Salesforce/blip-image-captioning-large",
+            torch_dtype=self.dtype
+        )
         self.model.eval()
-        self.model.to(DEVICE)
+        self.model.to(self.device)
 
     @staticmethod
     def __get_sample_filenames(sample_dir: str) -> [str]:
@@ -42,7 +46,7 @@ class BlipModel:
             return
 
         inputs = self.processor(caption_sample.get_image(), initial_caption, return_tensors="pt")
-        inputs = inputs.to(DEVICE)
+        inputs = inputs.to(self.device, self.dtype)
         with torch.no_grad():
             outputs = self.model.generate(**inputs)
         predicted_caption = self.processor.decode(outputs[0], skip_special_tokens=True)

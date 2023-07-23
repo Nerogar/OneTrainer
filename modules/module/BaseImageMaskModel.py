@@ -7,13 +7,12 @@ from PIL import Image
 from torch import Tensor
 from torchvision.transforms import transforms
 
-DEVICE = "cuda"
-
 
 class MaskSample:
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, device: torch.device):
         self.image_filename = filename
         self.mask_filename = os.path.splitext(filename)[0] + "-masklabel.png"
+        self.device = device
 
         self.image = None
         self.mask_tensor = None
@@ -41,7 +40,7 @@ class MaskSample:
         if self.mask_tensor is None and os.path.exists(self.mask_filename):
             mask = Image.open(self.mask_filename).convert('L')
             mask = self.image2Tensor(mask)
-            mask = mask.to(DEVICE)
+            mask = mask.to(self.device)
             self.mask_tensor = mask.unsqueeze(0)
 
         return self.mask_tensor
