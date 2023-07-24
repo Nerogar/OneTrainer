@@ -77,12 +77,12 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
     ):
         if model.text_encoder_1_lora is None and args.train_text_encoder:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, args.lora_rank, "lora_te", args.lora_alpha
+                model.text_encoder_1, args.lora_rank, "lora_te1", args.lora_alpha
             )
 
         if model.text_encoder_2_lora is None and args.train_text_encoder:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, args.lora_rank, "lora_te_2", args.lora_alpha
+                model.text_encoder_2, args.lora_rank, "lora_te2", args.lora_alpha
             )
 
         if model.unet_lora is None and args.train_unet:

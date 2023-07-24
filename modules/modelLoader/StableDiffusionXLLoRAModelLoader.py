@@ -31,14 +31,14 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
         model.text_encoder_1_lora = LoRAModuleWrapper(
             orig_module=model.text_encoder_1,
             rank=rank,
-            prefix="lora_te",
+            prefix="lora_te1",
         ).to(dtype=torch.float32)
         model.text_encoder_1_lora.load_state_dict(state_dict)
 
         model.text_encoder_2_lora = LoRAModuleWrapper(
             orig_module=model.text_encoder_2,
             rank=rank,
-            prefix="lora_te_2",
+            prefix="lora_te2",
         ).to(dtype=torch.float32)
         model.text_encoder_2_lora.load_state_dict(state_dict)
 
