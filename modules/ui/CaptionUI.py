@@ -72,7 +72,7 @@ Mouse wheel: increase or decrease brush size"""
         self.pil_mask = None
         self.mask_draw_x = 0
         self.mask_draw_y = 0
-        self.mask_draw_radius = 20
+        self.mask_draw_radius = 0.01
         self.display_only_mask = False
         self.image = None
         self.image_label = None
@@ -253,7 +253,7 @@ Mouse wheel: increase or decrease brush size"""
             self.refresh_image()
             self.prompt_var.set(prompt)
         else:
-            image = Image.new("RGB", (512, 512), (255, 255, 255))
+            image = Image.new("RGB", (512, 512), (0, 0, 0))
             self.image.configure(light_image=image)
 
     def refresh_image(self):
@@ -280,8 +280,8 @@ Mouse wheel: increase or decrease brush size"""
         if event.widget != self.image_label.children["!label"]:
             return
 
-        delta = -np.sign(event.delta) * 5
-        self.mask_draw_radius += delta
+        delta = 1.0 + (-np.sign(event.delta) * 0.05)
+        self.mask_draw_radius *= delta
 
     def draw_mask(self, event):
         if not self.enable_mask_editing_var.get():
@@ -312,13 +312,15 @@ Mouse wheel: increase or decrease brush size"""
             if self.pil_mask is None:
                 self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(0, 0, 0))
 
+            radius = int(self.mask_draw_radius * max(self.pil_mask.width, self.pil_mask.height))
+
             draw = ImageDraw.Draw(self.pil_mask)
             draw.line((start_x, start_y, end_x, end_y), fill=color,
-                      width=self.mask_draw_radius + self.mask_draw_radius + 1)
-            draw.ellipse((start_x - self.mask_draw_radius, start_y - self.mask_draw_radius,
-                          start_x + self.mask_draw_radius, start_y + self.mask_draw_radius), fill=color, outline=None)
-            draw.ellipse((end_x - self.mask_draw_radius, end_y - self.mask_draw_radius, end_x + self.mask_draw_radius,
-                          end_y + self.mask_draw_radius), fill=color, outline=None)
+                      width=radius + radius + 1)
+            draw.ellipse((start_x - radius, start_y - radius,
+                          start_x + radius, start_y + radius), fill=color, outline=None)
+            draw.ellipse((end_x - radius, end_y - radius, end_x + radius,
+                          end_y + radius), fill=color, outline=None)
 
             self.refresh_image()
 

@@ -8,6 +8,9 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
+        if path is None:
+            path = ""
+
         self.title("Batch generate masks")
         self.geometry("320x340")
         self.resizable(False, False)
