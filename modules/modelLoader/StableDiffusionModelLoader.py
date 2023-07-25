@@ -169,9 +169,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 model_type=model_type,
                 tokenizer=pipeline.tokenizer,
                 noise_scheduler=noise_scheduler,
-                text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
-                vae=pipeline.vae.to(dtype=torch.float32),
-                unet=pipeline.unet.to(dtype=torch.float32),
+                text_encoder=pipeline.text_encoder,
+                vae=pipeline.vae,
+                unet=pipeline.unet,
                 image_depth_processor=None,  # TODO
                 depth_estimator=None,  # TODO
                 sd_config=sd_config,
@@ -214,9 +214,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
                 model_type=model_type,
                 tokenizer=pipeline.tokenizer,
                 noise_scheduler=noise_scheduler,
-                text_encoder=pipeline.text_encoder.to(dtype=torch.float32),
-                vae=pipeline.vae.to(dtype=torch.float32),
-                unet=pipeline.unet.to(dtype=torch.float32),
+                text_encoder=pipeline.text_encoder,
+                vae=pipeline.vae,
+                unet=pipeline.unet,
                 image_depth_processor=None,  # TODO
                 depth_estimator=None,  # TODO
                 sd_config=sd_config,
