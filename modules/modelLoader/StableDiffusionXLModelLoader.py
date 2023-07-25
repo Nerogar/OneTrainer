@@ -156,10 +156,10 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 tokenizer_1=pipeline.tokenizer,
                 tokenizer_2=pipeline.tokenizer_2,
                 noise_scheduler=noise_scheduler,
-                text_encoder_1=pipeline.text_encoder.to(dtype=torch.float32),
-                text_encoder_2=pipeline.text_encoder_2.to(dtype=torch.float32),
-                vae=pipeline.vae.to(dtype=torch.float32),
-                unet=pipeline.unet.to(dtype=torch.float32),
+                text_encoder_1=pipeline.text_encoder,
+                text_encoder_2=pipeline.text_encoder_2,
+                vae=pipeline.vae,
+                unet=pipeline.unet,
                 sd_config=sd_config,
             )
         except:
@@ -201,10 +201,10 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 tokenizer_1=pipeline.tokenizer,
                 tokenizer_2=pipeline.tokenizer_2,
                 noise_scheduler=noise_scheduler,
-                text_encoder_1=pipeline.text_encoder.to(dtype=torch.float32),
-                text_encoder_2=pipeline.text_encoder_2.to(dtype=torch.float32),
-                vae=pipeline.vae.to(dtype=torch.float32),
-                unet=pipeline.unet.to(dtype=torch.float32),
+                text_encoder_1=pipeline.text_encoder,
+                text_encoder_2=pipeline.text_encoder_2,
+                vae=pipeline.vae,
+                unet=pipeline.unet,
                 sd_config=sd_config,
             )
         except:
