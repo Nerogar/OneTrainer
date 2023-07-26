@@ -206,15 +206,26 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("creating backup")
 
-        path = os.path.join(self.args.workspace_dir, "backup", self.__get_string_timestamp())
-        print("Creating Backup " + path)
-        self.model_saver.save(
-            self.model,
-            self.args.model_type,
-            ModelFormat.INTERNAL,
-            path,
-            torch.float32
-        )
+        backup_path = os.path.join(self.args.workspace_dir, "backup", self.__get_string_timestamp())
+        print("Creating Backup " + backup_path)
+
+        try:
+            self.model_saver.save(
+                self.model,
+                self.args.model_type,
+                ModelFormat.INTERNAL,
+                backup_path,
+                torch.float32
+            )
+        except:
+            print("Could not save backup. Check your disk space!")
+            try:
+                if os.path.isdir(backup_path):
+                    shutil.rmtree(backup_path)
+            except:
+                print("Could not delete partial backup")
+                pass
+
         self.model_setup.setup_train_device(self.model, self.args)
 
         self.__gc()
