@@ -8,6 +8,7 @@ from modules.util.enum.ModelType import ModelType
 
 
 class BaseModelSaver(metaclass=ABCMeta):
+
     @staticmethod
     def _convert_state_dict_dtype(state_dict: dict, dtype: torch.dtype) -> dict:
         converted_state_dict = {}
@@ -19,6 +20,14 @@ class BaseModelSaver(metaclass=ABCMeta):
                 converted_state_dict[key] = value.to(dtype=dtype)
 
         return converted_state_dict
+
+    @staticmethod
+    def _convert_state_dict_to_contiguous(state_dict: dict):
+        for (key, value) in state_dict.items():
+            if isinstance(value, dict):
+                BaseModelSaver._convert_state_dict_to_contiguous(value)
+            else:
+                state_dict[key] = value.contiguous()
 
     @abstractmethod
     def save(

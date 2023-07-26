@@ -53,6 +53,7 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
             model.noise_scheduler
         )
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
+        BaseModelSaver._convert_state_dict_to_contiguous(save_state_dict)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
@@ -77,6 +78,7 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
             model.noise_scheduler
         )
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
+        BaseModelSaver._convert_state_dict_to_contiguous(save_state_dict)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination)
