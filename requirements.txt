@@ -1,6 +1,6 @@
 # base requirements
-numpy==1.23.5
-opencv-python==4.7.0.72
+numpy==1.24.4
+opencv-python==4.8.0.74
 pillow==9.3.0
 tqdm==4.64.1
 PyYAML==6.0
