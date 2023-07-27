@@ -25,7 +25,7 @@ class LoRAModule(metaclass=ABCMeta):
         self.orig_forward = self.orig_module.forward
 
     def forward(self, x):
-        return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (1.0 / self.rank)
+        return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
 
     def requires_grad_(self, requires_grad: bool):
         self.lora_down.requires_grad_(requires_grad)
