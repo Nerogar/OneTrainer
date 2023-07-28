@@ -6,7 +6,7 @@
     "cache_dir": "workspace-cache/run",
     "tensorboard": true,
     "model_type": "STABLE_DIFFUSION_XL_10_BASE",
-    "base_model_name": "stabilityai/stable-diffusion-xl-base-0.9",
+    "base_model_name": "stabilityai/stable-diffusion-xl-base-1.0",
     "extra_model_name": "",
     "weight_dtype": "FLOAT_32",
     "output_dtype": "FLOAT_32",
