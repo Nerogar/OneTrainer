@@ -23,6 +23,7 @@ class StableDiffusionXLModel(BaseModel):
     text_encoder_2_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
     sd_config: dict | None
+    model_spec: dict | None
 
     def __init__(
             self,
@@ -41,6 +42,7 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
             sd_config: dict | None = None,
+            model_spec: dict | None = None,
     ):
         super(StableDiffusionXLModel, self).__init__(model_type, optimizer_state_dict, ema_state_dict, train_progress)
 
@@ -56,6 +58,7 @@ class StableDiffusionXLModel(BaseModel):
         self.text_encoder_2_lora = text_encoder_2_lora
         self.unet_lora = unet_lora
         self.sd_config = sd_config
+        self.model_spec = model_spec
 
     def create_pipeline(self) -> DiffusionPipeline:
         return StableDiffusionXLPipeline(

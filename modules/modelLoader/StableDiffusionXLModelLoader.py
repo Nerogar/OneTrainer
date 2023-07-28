@@ -5,6 +5,7 @@ import torch
 import yaml
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
+from safetensors import safe_open
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
@@ -22,6 +23,14 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
                 return "resources/diffusers_model_config/sd_xl_base.yaml"
+            case _:
+                return None
+
+    @staticmethod
+    def __default_model_spec_name(model_type: ModelType) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE:
+                return "resources/sd_model_spec/sd_xl_base_1.0.json"
             case _:
                 return None
 
@@ -57,6 +66,14 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
 
             # meta
             model.train_progress = train_progress
+
+            # model spec
+            try:
+                with open(os.path.join(base_model_name, "model_spec.json"), "r") as model_spec_file:
+                    model.model_spec = json.load(model_spec_file)
+            except:
+                with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
+                    model.model_spec = json.load(model_spec_file)
 
             return model
         except:
@@ -107,6 +124,9 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             with open(StableDiffusionXLModelLoader.__default_yaml_name(model_type), "r") as f:
                 sd_config = yaml.safe_load(f)
 
+            with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
+                model_spec = json.load(model_spec_file)
+
             return StableDiffusionXLModel(
                 model_type=model_type,
                 tokenizer_1=tokenizer_1,
@@ -117,6 +137,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 vae=vae,
                 unet=unet,
                 sd_config=sd_config,
+                model_spec=model_spec,
             )
         except:
             return None
@@ -151,6 +172,9 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
 
+            with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
+                model_spec = json.load(model_spec_file)
+
             return StableDiffusionXLModel(
                 model_type=model_type,
                 tokenizer_1=pipeline.tokenizer,
@@ -161,6 +185,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 vae=pipeline.vae,
                 unet=pipeline.unet,
                 sd_config=sd_config,
+                model_spec=model_spec,
             )
         except:
             return None
@@ -196,6 +221,15 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
 
+            with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
+                model_spec = json.load(model_spec_file)
+            try:
+                with safe_open(base_model_name, framework="pt") as f:
+                    if "modelspec.sai_model_spec" in f.metadata():
+                        model_spec = f.metadata()
+            except:
+                pass
+
             return StableDiffusionXLModel(
                 model_type=model_type,
                 tokenizer_1=pipeline.tokenizer,
@@ -206,6 +240,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 vae=pipeline.vae,
                 unet=pipeline.unet,
                 sd_config=sd_config,
+                model_spec=model_spec,
             )
         except:
             return None
