@@ -238,6 +238,9 @@ class GenericTrainer(BaseTrainer):
             "backup", self.args.backup_after, self.args.backup_after_unit, train_progress, start_at_zero=False
         )
 
+    def __needs_gc(self, train_progress: TrainProgress):
+        return self.action_needed("gc", 5, TimeUnit.MINUTE, train_progress, start_at_zero=False)
+
     def __is_update_step(self, train_progress: TrainProgress) -> bool:
         return self.action_needed(
             "update_step", self.args.gradient_accumulation_steps, TimeUnit.STEP, train_progress, start_at_zero=False
@@ -296,6 +299,9 @@ class GenericTrainer(BaseTrainer):
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress)
                     )
+
+                if self.__needs_gc(train_progress):
+                    self.__gc()
 
                 sample_command = self.commands.get_and_reset_sample_command()
                 if sample_command:
