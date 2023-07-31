@@ -9,6 +9,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import \
     rescale_noise_scheduler_to_zero_terminal_snr
 from modules.util.enum.ModelType import ModelType
+from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
 class StableDiffusionModelEmbedding:
@@ -52,8 +53,15 @@ class StableDiffusionModel(BaseModel):
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
             sd_config: dict | None = None,
+            model_spec: ModelSpec | None = None,
     ):
-        super(StableDiffusionModel, self).__init__(model_type, optimizer_state_dict, ema_state_dict, train_progress)
+        super(StableDiffusionModel, self).__init__(
+            model_type=model_type,
+            optimizer_state_dict=optimizer_state_dict,
+            ema_state_dict=ema_state_dict,
+            train_progress=train_progress,
+            model_spec=model_spec,
+        )
 
         self.tokenizer = tokenizer
         self.noise_scheduler = noise_scheduler

@@ -82,8 +82,8 @@ class BaseTrainer(metaclass=ABCMeta):
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0
                 else:
                     # should actually be the last step of each epoch, but we don't know how many steps an epoch has
-                    return train_progress.epoch % int(
-                        interval) == 0 and train_progress.epoch_step == 0 and train_progress.epoch > 0
+                    return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
+                        and train_progress.epoch > 0
             case TimeUnit.STEP:
                 if start_at_zero:
                     return train_progress.global_step % int(interval) == 0

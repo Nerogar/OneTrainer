@@ -5,6 +5,7 @@ from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
+from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
 class StableDiffusionXLModel(BaseModel):
@@ -23,7 +24,6 @@ class StableDiffusionXLModel(BaseModel):
     text_encoder_2_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
     sd_config: dict | None
-    model_spec: dict | None
 
     def __init__(
             self,
@@ -42,9 +42,15 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
             sd_config: dict | None = None,
-            model_spec: dict | None = None,
+            model_spec: ModelSpec | None = None,
     ):
-        super(StableDiffusionXLModel, self).__init__(model_type, optimizer_state_dict, ema_state_dict, train_progress)
+        super(StableDiffusionXLModel, self).__init__(
+            model_type=model_type,
+            optimizer_state_dict=optimizer_state_dict,
+            ema_state_dict=ema_state_dict,
+            train_progress=train_progress,
+            model_spec=model_spec,
+        )
 
         self.tokenizer_1 = tokenizer_1
         self.tokenizer_2 = tokenizer_2
@@ -58,7 +64,6 @@ class StableDiffusionXLModel(BaseModel):
         self.text_encoder_2_lora = text_encoder_2_lora
         self.unet_lora = unet_lora
         self.sd_config = sd_config
-        self.model_spec = model_spec
 
     def create_pipeline(self) -> DiffusionPipeline:
         return StableDiffusionXLPipeline(

@@ -12,6 +12,7 @@ from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
+from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
 class StableDiffusionXLModelLoader(BaseModelLoader):
@@ -35,7 +36,18 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
                 return None
 
     @staticmethod
-    def __load_internal(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
+    def _create_default_model_spec(
+            model_type: ModelType,
+    ) -> ModelSpec:
+        with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
+            return ModelSpec.from_dict(json.load(model_spec_file))
+
+    @staticmethod
+    def __load_internal(
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str
+    ) -> StableDiffusionXLModel | None:
         try:
             with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
                 meta = json.load(meta_file)
@@ -68,19 +80,23 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             model.train_progress = train_progress
 
             # model spec
+            model.model_spec = StableDiffusionXLModelLoader._create_default_model_spec(model_type)
             try:
                 with open(os.path.join(base_model_name, "model_spec.json"), "r") as model_spec_file:
-                    model.model_spec = json.load(model_spec_file)
+                    model.model_spec = ModelSpec.from_dict(json.load(model_spec_file))
             except:
-                with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
-                    model.model_spec = json.load(model_spec_file)
+                pass
 
             return model
         except:
             return None
 
     @staticmethod
-    def __load_diffusers(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_diffusers(
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str
+    ) -> StableDiffusionXLModel | None:
         try:
             tokenizer_1 = CLIPTokenizer.from_pretrained(
                 base_model_name,
@@ -124,8 +140,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             with open(StableDiffusionXLModelLoader.__default_yaml_name(model_type), "r") as f:
                 sd_config = yaml.safe_load(f)
 
-            with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
-                model_spec = json.load(model_spec_file)
+            model_spec = StableDiffusionXLModelLoader._create_default_model_spec(model_type)
 
             return StableDiffusionXLModel(
                 model_type=model_type,
@@ -143,7 +158,11 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_ckpt(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_ckpt(
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str
+    ) -> StableDiffusionXLModel | None:
         try:
             yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
             if not os.path.exists(yaml_name):
@@ -172,8 +191,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
 
-            with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
-                model_spec = json.load(model_spec_file)
+            model_spec = StableDiffusionXLModelLoader._create_default_model_spec(model_type)
 
             return StableDiffusionXLModel(
                 model_type=model_type,
@@ -191,7 +209,11 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             return None
 
     @staticmethod
-    def __load_safetensors(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionXLModel | None:
+    def __load_safetensors(
+            model_type: ModelType,
+            weight_dtype: torch.dtype,
+            base_model_name: str
+    ) -> StableDiffusionXLModel | None:
         try:
             yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
             if not os.path.exists(yaml_name):
@@ -221,12 +243,11 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             with open(yaml_name, "r") as f:
                 sd_config = yaml.safe_load(f)
 
-            with open(StableDiffusionXLModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
-                model_spec = json.load(model_spec_file)
+            model_spec = StableDiffusionXLModelLoader._create_default_model_spec(model_type)
             try:
                 with safe_open(base_model_name, framework="pt") as f:
                     if "modelspec.sai_model_spec" in f.metadata():
-                        model_spec = f.metadata()
+                        model_spec = ModelSpec.from_dict(f.metadata())
             except:
                 pass
 

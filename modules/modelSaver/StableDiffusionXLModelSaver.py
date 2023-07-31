@@ -82,8 +82,7 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        # TODO: prepare model_spec before saving to calculate hashes
-        save_file(save_state_dict, destination, model.model_spec)
+        save_file(save_state_dict, destination, BaseModelSaver._create_safetensors_header(model, save_state_dict))
 
         yaml_name = os.path.splitext(destination)[0] + '.yaml'
         with open(yaml_name, 'w', encoding='utf8') as f:
@@ -119,7 +118,7 @@ class StableDiffusionXLModelSaver(BaseModelSaver):
 
         # model spec
         with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
-            json.dump(model.model_spec, model_spec_file)
+            json.dump(BaseModelSaver._create_safetensors_header(model), model_spec_file)
 
     def save(
             self,

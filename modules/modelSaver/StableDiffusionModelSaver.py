@@ -82,7 +82,8 @@ class StableDiffusionModelSaver(BaseModelSaver):
         BaseModelSaver._convert_state_dict_to_contiguous(save_state_dict)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination)
+
+        save_file(save_state_dict, destination, BaseModelSaver._create_safetensors_header(model, save_state_dict))
 
         yaml_name = os.path.splitext(destination)[0] + '.yaml'
         with open(yaml_name, 'w', encoding='utf8') as f:
@@ -115,6 +116,10 @@ class StableDiffusionModelSaver(BaseModelSaver):
                     'global_step': model.train_progress.global_step,
                 },
             }, meta_file)
+
+        # model spec
+        with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
+            json.dump(BaseModelSaver._create_safetensors_header(model), model_spec_file)
 
     def save(
             self,

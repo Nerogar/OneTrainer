@@ -49,7 +49,7 @@ class StableDiffusionXLLoRAModelSaver(BaseModelSaver):
         save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination)
+        save_file(save_state_dict, destination, BaseModelSaver._create_safetensors_header(model, save_state_dict))
 
     @staticmethod
     def __save_internal(
@@ -84,6 +84,10 @@ class StableDiffusionXLLoRAModelSaver(BaseModelSaver):
                     'global_step': model.train_progress.global_step,
                 },
             }, meta_file)
+
+        # model spec
+        with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
+            json.dump(BaseModelSaver._create_safetensors_header(model), model_spec_file)
 
     def save(
             self,

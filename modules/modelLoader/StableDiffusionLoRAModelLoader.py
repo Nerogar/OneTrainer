@@ -2,6 +2,7 @@ import json
 import os
 
 import torch
+from safetensors import safe_open
 from safetensors.torch import load_file
 from torch import Tensor
 
@@ -11,6 +12,7 @@ from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelL
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
+from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
 class StableDiffusionLoRAModelLoader(BaseModelLoader):
@@ -45,6 +47,12 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
     @staticmethod
     def __load_safetensors(model: StableDiffusionModel, lora_name: str) -> bool:
         try:
+            model.model_spec = ModelSpec()
+
+            with safe_open(lora_name, framework="pt") as f:
+                if "modelspec.sai_model_spec" in f.metadata():
+                    model.model_spec = ModelSpec.from_dict(f.metadata())
+
             state_dict = load_file(lora_name)
             StableDiffusionLoRAModelLoader.__init_lora(model, state_dict)
             return True
@@ -54,6 +62,8 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
     @staticmethod
     def __load_ckpt(model: StableDiffusionModel, lora_name: str) -> bool:
         try:
+            model.model_spec = ModelSpec()
+
             state_dict = torch.load(lora_name)
             StableDiffusionLoRAModelLoader.__init_lora(model, state_dict)
             return True
@@ -94,6 +104,14 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
 
             # meta
             model.train_progress = train_progress
+
+            # model spec
+            model.model_spec = ModelSpec()
+            try:
+                with open(os.path.join(lora_name, "model_spec.json"), "r") as model_spec_file:
+                    model.model_spec = ModelSpec.from_dict(json.load(model_spec_file))
+            except:
+                pass
 
             return True
         except:

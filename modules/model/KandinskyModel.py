@@ -56,7 +56,13 @@ class KandinskyModel(BaseModel):
 
             unet_lora: LoRAModuleWrapper | None = None,
     ):
-        super(KandinskyModel, self).__init__(model_type, optimizer_state_dict, ema_state_dict, train_progress)
+        super(KandinskyModel, self).__init__(
+            model_type=model_type,
+            optimizer_state_dict=optimizer_state_dict,
+            ema_state_dict=ema_state_dict,
+            train_progress=train_progress,
+            model_spec=None,
+        )
 
         # prior
         self.prior_tokenizer = prior_tokenizer

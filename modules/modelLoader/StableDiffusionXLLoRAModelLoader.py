@@ -2,6 +2,7 @@ import json
 import os
 
 import torch
+from safetensors import safe_open
 from safetensors.torch import load_file
 from torch import Tensor
 
@@ -11,6 +12,7 @@ from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLMo
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
+from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
 class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
@@ -51,8 +53,29 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
         model.unet_lora.load_state_dict(state_dict)
 
     @staticmethod
+    def __default_model_spec_name(model_type: ModelType) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE:
+                return "resources/sd_model_spec/sd_xl_base_1.0_lora.json"
+            case _:
+                return None
+
+    @staticmethod
+    def _create_default_model_spec(
+            model_type: ModelType,
+    ) -> ModelSpec:
+        with open(StableDiffusionXLLoRAModelLoader.__default_model_spec_name(model_type), "r") as model_spec_file:
+            return ModelSpec.from_dict(json.load(model_spec_file))
+
+    @staticmethod
     def __load_safetensors(model: StableDiffusionXLModel, lora_name: str) -> bool:
         try:
+            model.model_spec = StableDiffusionXLLoRAModelLoader._create_default_model_spec(model.model_type)
+
+            with safe_open(lora_name, framework="pt") as f:
+                if "modelspec.sai_model_spec" in f.metadata():
+                    model.model_spec = ModelSpec.from_dict(f.metadata())
+
             state_dict = load_file(lora_name)
             StableDiffusionXLLoRAModelLoader.__init_lora(model, state_dict)
             return True
@@ -62,6 +85,8 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
     @staticmethod
     def __load_ckpt(model: StableDiffusionXLModel, lora_name: str) -> bool:
         try:
+            model.model_spec = StableDiffusionXLLoRAModelLoader._create_default_model_spec(model.model_type)
+
             state_dict = torch.load(lora_name)
             StableDiffusionXLLoRAModelLoader.__init_lora(model, state_dict)
             return True
@@ -102,6 +127,14 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
 
             # meta
             model.train_progress = train_progress
+
+            # model spec
+            model.model_spec = StableDiffusionXLLoRAModelLoader._create_default_model_spec(model.model_type)
+            try:
+                with open(os.path.join(lora_name, "model_spec.json"), "r") as model_spec_file:
+                    model.model_spec = ModelSpec.from_dict(json.load(model_spec_file))
+            except:
+                pass
 
             return True
         except:

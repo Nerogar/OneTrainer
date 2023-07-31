@@ -132,8 +132,6 @@ class TrainArgs:
                 else:
                     print(f"Could not set {key}, not found.")
 
-        print("")
-
     def __to_arg_name(self, var_name: str) -> str:
         return "--" + var_name.replace('_', '-')
 
