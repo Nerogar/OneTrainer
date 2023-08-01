@@ -25,7 +25,7 @@ def main():
     except KeyboardInterrupt:
         canceled = True
 
-    if not canceled:
+    if not canceled or args.backup_before_save:
         trainer.end()
 
 
