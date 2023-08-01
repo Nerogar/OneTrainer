@@ -580,8 +580,7 @@ class TrainUI(ctk.CTk):
             error_caught = True
             traceback.print_exc()
 
-        if self.train_args.backup_before_save:
-            trainer.end()
+        trainer.end()
 
         torch.cuda.empty_cache()
 
