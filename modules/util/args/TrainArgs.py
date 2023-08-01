@@ -259,8 +259,8 @@ class TrainArgs:
         args["extra_model_name"] = ""
         args["weight_dtype"] = DataType.FLOAT_32
         args["output_dtype"] = DataType.FLOAT_32
-        args["output_model_format"] = ModelFormat.CKPT
-        args["output_model_destination"] = "models/model.ckpt"
+        args["output_model_format"] = ModelFormat.SAFETENSORS
+        args["output_model_destination"] = "models/model.safetensors"
 
         # data settings
         args["concept_file_name"] = "training_concepts/concepts.json"

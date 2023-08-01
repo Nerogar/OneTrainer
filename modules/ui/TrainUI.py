@@ -191,9 +191,9 @@ class TrainUI(ctk.CTk):
         components.label(master, 1, 3, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(master, 1, 4, [
+            ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
             ("Checkpoint", ModelFormat.CKPT),
-            ("Safetensors", ModelFormat.SAFETENSORS),
         ], self.ui_state, "output_model_format")
 
         # output data type
