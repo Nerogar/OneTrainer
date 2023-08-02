@@ -9,6 +9,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffu
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.TrainProgress import TrainProgress
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 
 
@@ -82,7 +83,7 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader):
     def load(
             self,
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str | None,
             extra_model_name: str | None
     ) -> StableDiffusionModel | None:
@@ -91,7 +92,7 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader):
         base_model_loader = StableDiffusionModelLoader()
 
         if base_model_name is not None:
-            model = base_model_loader.load(model_type, weight_dtype, base_model_name, None)
+            model = base_model_loader.load(model_type, weight_dtypes, base_model_name, None)
         else:
             model = StableDiffusionModel(model_type=model_type)
 

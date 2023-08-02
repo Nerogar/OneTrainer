@@ -18,14 +18,14 @@ def main():
     if args.training_method in [TrainingMethod.FINE_TUNE]:
         model = model_loader.load(
             model_type=args.model_type,
-            weight_dtype=args.output_dtype.torch_dtype(),
+            weight_dtypes=args.weight_dtypes(),
             base_model_name=args.input_name,
             extra_model_name=None,
         )
     elif args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
         model = model_loader.load(
             model_type=args.model_type,
-            weight_dtype=args.output_dtype.torch_dtype(),
+            weight_dtypes=args.weight_dtypes(),
             base_model_name=None,
             extra_model_name=args.input_name,
         )

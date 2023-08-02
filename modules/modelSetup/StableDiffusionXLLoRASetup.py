@@ -107,10 +107,13 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
 
         if model.text_encoder_1_lora is not None:
             model.text_encoder_1_lora.hook_to_module()
+            model.text_encoder_1_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
         if model.text_encoder_2_lora is not None:
             model.text_encoder_2_lora.hook_to_module()
+            model.text_encoder_2_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
         if model.unet_lora is not None:
             model.unet_lora.hook_to_module()
+            model.unet_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args

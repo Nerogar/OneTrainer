@@ -5,13 +5,14 @@ from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
 from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
 
+from modules.dataLoader.MgdsBaseDataLoader import MgdsBaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStableDiffusionFineTuneVaeDataLoader:
+class MgdsStableDiffusionFineTuneVaeDataLoader(MgdsBaseDataLoader):
     def __init__(
             self,
             args: TrainArgs,
@@ -209,14 +210,9 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
             # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         ]
 
-        settings = {}
-
-        ds = MGDS(
-            torch.device(args.train_device),
-            args.train_dtype.torch_dtype(),
-            args.train_dtype.enable_mixed_precision(),
+        return self._create_mgds(
+            args,
             concepts,
-            settings,
             [
                 enumerate_input,
                 load_input,
@@ -230,9 +226,5 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
 
                 debug_modules if args.debug_mode else None,
             ],
-            batch_size=args.batch_size,
-            initial_epoch=train_progress.epoch,
-            initial_epoch_sample=train_progress.epoch_sample,
+            train_progress
         )
-
-        return ds

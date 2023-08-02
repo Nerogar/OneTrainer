@@ -1,5 +1,6 @@
 import argparse
 
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
@@ -25,6 +26,9 @@ class TrainArgs(BaseArgs):
     base_model_name: str
     extra_model_name: str
     weight_dtype: DataType
+    text_encoder_weight_dtype: DataType
+    unet_weight_dtype: DataType
+    vae_weight_dtype: DataType
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
@@ -76,6 +80,7 @@ class TrainArgs(BaseArgs):
     initial_embedding_text: str
     lora_rank: int
     lora_alpha: float
+    lora_weight_dtype: DataType
     attention_mechanism: AttentionMechanism
 
     # sample settings
@@ -90,6 +95,14 @@ class TrainArgs(BaseArgs):
 
     def __init__(self, args: dict):
         super(TrainArgs, self).__init__(args)
+
+    def weight_dtypes(self) -> ModelWeightDtypes:
+        return ModelWeightDtypes(
+            self.text_encoder_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
+            self.unet_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
+            self.vae_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
+            self.lora_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
+        )
 
     @staticmethod
     def parse_args() -> 'TrainArgs':
@@ -109,6 +122,9 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
         parser.add_argument("--extra-model-name", type=str, required=False, default=None, dest="extra_model_name", help="The extra model to start training from")
         parser.add_argument("--weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="weight_dtype", help="The data type to use for weights during training", choices=list(DataType))
+        parser.add_argument("--text-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_weight_dtype", help="The data type to use for text encoder weights during training", choices=list(DataType))
+        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
+        parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
         parser.add_argument("--output-dtype", type=DataType, required=True, dest="output_dtype", help="The data type to use for saving weights", choices=list(DataType))
         parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.SAFETENSORS, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
@@ -160,6 +176,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
         parser.add_argument("--lora-rank", type=int, required=False, default=1, dest="lora_rank", help="The rank parameter used when initializing new LoRA networks")
         parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
+        parser.add_argument("--lora-weight-dtype", type=DataType, required=False, default=None, dest="lora_weight_dtype", help="The data type to use for training the LoRA", choices=list(DataType))
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
 
         # sample settings
@@ -192,6 +209,9 @@ class TrainArgs(BaseArgs):
         args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
         args["extra_model_name"] = ""
         args["weight_dtype"] = DataType.FLOAT_32
+        args["text_encoder_weight_dtype"] = DataType.NONE
+        args["unet_weight_dtype"] = DataType.NONE
+        args["vae_weight_dtype"] = DataType.FLOAT_32
         args["output_dtype"] = DataType.FLOAT_32
         args["output_model_format"] = ModelFormat.SAFETENSORS
         args["output_model_destination"] = "models/model.safetensors"
@@ -243,6 +263,7 @@ class TrainArgs(BaseArgs):
         args["initial_embedding_text"] = "*"
         args["lora_rank"] = 16
         args["lora_alpha"] = 1.0
+        args["lora_weight_dtype"] = DataType.FLOAT_32
         args["attention_mechanism"] = AttentionMechanism.XFORMERS
 
         # sample settings

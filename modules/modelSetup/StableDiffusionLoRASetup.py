@@ -89,6 +89,9 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
         model.unet_lora.requires_grad_(train_unet)
 
+        model.text_encoder_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
+        model.unet_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
+
         model.text_encoder_lora.hook_to_module()
         model.unet_lora.hook_to_module()
 

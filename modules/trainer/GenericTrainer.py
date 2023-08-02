@@ -32,9 +32,10 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.enum.DataType import DataType
+from modules.util.dtype_util import allow_mixed_precision
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class GenericTrainer(BaseTrainer):
@@ -89,10 +90,10 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("loading the model")
 
         self.model = self.model_loader.load(
-            self.args.model_type,
-            self.args.weight_dtype.torch_dtype(),
-            self.args.base_model_name,
-            self.args.extra_model_name
+            model_type=self.args.model_type,
+            weight_dtypes=self.args.weight_dtypes(),
+            base_model_name=self.args.base_model_name,
+            extra_model_name=self.args.extra_model_name,
         )
 
         self.callbacks.on_update_status("running model setup")
@@ -142,7 +143,13 @@ class GenericTrainer(BaseTrainer):
             fun()
         self.sample_queue = []
 
-    def __sample_loop(self, train_progress: TrainProgress, sample_definitions: list[dict], folder_postfix: str = ""):
+    def __sample_loop(
+            self,
+            train_progress: TrainProgress,
+            train_device: torch.device,
+            sample_definitions: list[dict],
+            folder_postfix: str = "",
+    ):
         for i, sample_definition in enumerate(sample_definitions):
             try:
                 safe_prompt = path_util.safe_filename(sample_definition['prompt'])
@@ -163,22 +170,33 @@ class GenericTrainer(BaseTrainer):
                                                train_progress.global_step)
                     self.callbacks.on_sample(image)
 
-                self.model_sampler.sample(
-                    prompt=sample_definition["prompt"],
-                    resolution=(sample_definition["height"], sample_definition["width"]),
-                    seed=sample_definition["seed"],
-                    destination=sample_path,
-                    text_encoder_layer_skip=self.args.text_encoder_layer_skip,
-                    force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
-                    on_sample=on_sample,
-                )
+                if allow_mixed_precision(self.args):
+                    forward_context = torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype())
+                else:
+                    forward_context = nullcontext()
+
+                with forward_context:
+                    self.model_sampler.sample(
+                        prompt=sample_definition["prompt"],
+                        resolution=(sample_definition["height"], sample_definition["width"]),
+                        seed=sample_definition["seed"],
+                        destination=sample_path,
+                        text_encoder_layer_skip=self.args.text_encoder_layer_skip,
+                        force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
+                        on_sample=on_sample,
+                    )
             except:
                 traceback.print_exc()
                 print("Error during sampling, proceeding without sampling")
 
             self.__gc()
 
-    def __sample_during_training(self, train_progress: TrainProgress, sample_definitions: list[dict] = None):
+    def __sample_during_training(
+            self,
+            train_progress: TrainProgress,
+            train_device: torch.device,
+            sample_definitions: list[dict] = None,
+    ):
         self.__gc()
 
         self.callbacks.on_update_status("sampling")
@@ -192,14 +210,14 @@ class GenericTrainer(BaseTrainer):
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
-        self.__sample_loop(train_progress, sample_definitions)
+        self.__sample_loop(train_progress, train_device, sample_definitions)
 
         if self.model.ema:
             self.model.ema.copy_temp_to(self.parameters)
 
         # ema-less sampling, if an ema model exists
         if self.model.ema:
-            self.__sample_loop(train_progress, sample_definitions, " - no-ema")
+            self.__sample_loop(train_progress, train_device, sample_definitions, " - no-ema")
 
         self.model_setup.setup_train_device(self.model, self.args)
 
@@ -280,7 +298,8 @@ class GenericTrainer(BaseTrainer):
             global_step=train_progress.global_step
         )
 
-        if self.args.train_dtype.enable_loss_scaling() and self.args.weight_dtype == DataType.FLOAT_32:
+        weight_dtype = self.args.lora_weight_dtype if self.args.training_method == TrainingMethod.LORA else self.args.weight_dtype
+        if self.args.train_dtype.enable_loss_scaling(weight_dtype):
             scaler = GradScaler()
         else:
             scaler = None
@@ -303,7 +322,7 @@ class GenericTrainer(BaseTrainer):
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
                 if self.__needs_sample(train_progress):
                     self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress)
+                        lambda: self.__sample_during_training(train_progress, train_device)
                     )
 
                 if self.__needs_gc(train_progress):
@@ -312,7 +331,7 @@ class GenericTrainer(BaseTrainer):
                 sample_command = self.commands.get_and_reset_sample_command()
                 if sample_command:
                     self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, [sample_command])
+                        lambda: self.__sample_during_training(train_progress, train_device, [sample_command])
                     )
 
                 if not has_gradient:
@@ -323,7 +342,7 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("training")
 
-                if self.args.train_dtype.enable_mixed_precision() and self.args.weight_dtype == DataType.FLOAT_32:
+                if allow_mixed_precision(self.args):
                     forward_context = torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype())
                 else:
                     forward_context = nullcontext()

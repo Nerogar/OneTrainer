@@ -74,6 +74,8 @@ class KandinskyLoRASetup(BaseKandinskySetup):
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
         model.unet_lora.requires_grad_(train_unet)
 
+        model.unet_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
+
         model.unet_lora.hook_to_module()
 
         model.optimizer = create.create_optimizer(

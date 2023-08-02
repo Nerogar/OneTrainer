@@ -206,6 +206,45 @@ class TrainUI(ctk.CTk):
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "output_dtype")
 
+        # weight dtype
+        components.label(master, 3, 0, "Weight Data Type",
+                         tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.options_kv(master, 3, 1, [
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+            ("float16", DataType.FLOAT_16),
+        ], self.ui_state, "weight_dtype")
+
+        # text encoder weight dtype
+        components.label(master, 4, 0, "Override Text Encoder Data Type",
+                         tooltip="Overrides the text encoder weight data type")
+        components.options_kv(master, 4, 1, [
+            ("", DataType.NONE),
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+            ("float16", DataType.FLOAT_16),
+        ], self.ui_state, "text_encoder_weight_dtype")
+
+        # unet weight dtype
+        components.label(master, 5, 0, "Override UNet Data Type",
+                         tooltip="Overrides the unet weight data type")
+        components.options_kv(master, 5, 1, [
+            ("", DataType.NONE),
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+            ("float16", DataType.FLOAT_16),
+        ], self.ui_state, "unet_weight_dtype")
+
+        # vae weight dtype
+        components.label(master, 6, 0, "Override VAE Data Type",
+                         tooltip="Overrides the vae weight data type")
+        components.options_kv(master, 6, 1, [
+            ("", DataType.NONE),
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+            ("float16", DataType.FLOAT_16),
+        ], self.ui_state, "vae_weight_dtype")
+
     def data_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
@@ -362,18 +401,10 @@ class TrainUI(ctk.CTk):
                          tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
         components.switch(scroll_frame, 6, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
-        # weight dtype
-        components.label(scroll_frame, 7, 3, "Weight Data Type",
-                         tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(scroll_frame, 7, 4, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "weight_dtype")
-
         # train dtype
-        components.label(scroll_frame, 8, 3, "Train Data Type",
+        components.label(scroll_frame, 7, 3, "Train Data Type",
                          tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
-        components.options_kv(scroll_frame, 8, 4, [
+        components.options_kv(scroll_frame, 7, 4, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
@@ -381,9 +412,9 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "train_dtype")
 
         # resolution
-        components.label(scroll_frame, 9, 3, "Resolution",
+        components.label(scroll_frame, 8, 3, "Resolution",
                          tooltip="The resolution used for training")
-        components.entry(scroll_frame, 9, 4, self.ui_state, "resolution")
+        components.entry(scroll_frame, 8, 4, self.ui_state, "resolution")
 
         # column 3
         # train unet
@@ -486,6 +517,14 @@ class TrainUI(ctk.CTk):
         components.label(master, 2, 0, "LoRA alpha",
                          tooltip="The alpha parameter used when creating a new LoRA")
         components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+
+        # lora weight dtype
+        components.label(master, 3, 0, "LoRA Weight Data Type",
+                         tooltip="The base LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.options_kv(master, 3, 1, [
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+        ], self.ui_state, "lora_weight_dtype")
 
         return master
 

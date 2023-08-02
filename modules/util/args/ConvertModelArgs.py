@@ -1,5 +1,6 @@
 import argparse
 
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -18,9 +19,19 @@ class ConvertModelArgs(BaseArgs):
     def __init__(self, args: dict):
         super(ConvertModelArgs, self).__init__(args)
 
+    def weight_dtypes(self) -> ModelWeightDtypes:
+        return ModelWeightDtypes(
+            self.output_dtype.torch_dtype(),
+            self.output_dtype.torch_dtype(),
+            self.output_dtype.torch_dtype(),
+            self.output_dtype.torch_dtype(),
+        )
+
     @staticmethod
     def parse_args() -> 'ConvertModelArgs':
         parser = argparse.ArgumentParser(description="One Trainer Converter Script.")
+
+        # @formatter:off
 
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--training-method", type=TrainingMethod, required=False, default=TrainingMethod.FINE_TUNE, dest="training_method", help="The training method", choices=list(TrainingMethod))
@@ -28,6 +39,8 @@ class ConvertModelArgs(BaseArgs):
         parser.add_argument("--output-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="output_dtype", help="The data type to save the output model", choices=list(DataType))
         parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.SAFETENSORS, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
+
+        # @formatter:on
 
         return ConvertModelArgs(vars(parser.parse_args()))
 

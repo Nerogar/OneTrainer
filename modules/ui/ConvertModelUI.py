@@ -111,14 +111,14 @@ class ConvertModelUI(ctk.CTkToplevel):
             if self.convert_model_args.training_method in [TrainingMethod.FINE_TUNE]:
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
-                    weight_dtype=self.convert_model_args.output_dtype.torch_dtype(),
+                    weight_dtypes=self.convert_model_args.weight_dtypes(),
                     base_model_name=self.convert_model_args.input_name,
                     extra_model_name=None,
                 )
             elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
-                    weight_dtype=self.convert_model_args.output_dtype.torch_dtype(),
+                    weight_dtypes=self.convert_model_args.weight_dtypes(),
                     base_model_name=None,
                     extra_model_name=self.convert_model_args.input_name,
                 )

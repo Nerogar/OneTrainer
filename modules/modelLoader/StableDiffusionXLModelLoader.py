@@ -12,6 +12,7 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.util.TrainProgress import TrainProgress
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -46,7 +47,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     @staticmethod
     def __load_internal(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str
     ) -> StableDiffusionXLModel | None:
         with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
@@ -59,7 +60,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             )
 
         # base model
-        model = StableDiffusionXLModelLoader.__load_diffusers(model_type, weight_dtype, base_model_name)
+        model = StableDiffusionXLModelLoader.__load_diffusers(model_type, weight_dtypes, base_model_name)
 
         # optimizer
         try:
@@ -92,7 +93,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     @staticmethod
     def __load_diffusers(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str
     ) -> StableDiffusionXLModel | None:
         tokenizer_1 = CLIPTokenizer.from_pretrained(
@@ -113,25 +114,26 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
         text_encoder_1 = CLIPTextModel.from_pretrained(
             base_model_name,
             subfolder="text_encoder",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.text_encoder,
         )
 
         text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
             base_model_name,
             subfolder="text_encoder_2",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.text_encoder,
         )
 
         vae = AutoencoderKL.from_pretrained(
             base_model_name,
             subfolder="vae",
-            torch_dtype=weight_dtype,
+            # The SDXL VAE produces NaN values when running in float16 mode
+            torch_dtype=weight_dtypes.vae,
         )
 
         unet = UNet2DConditionModel.from_pretrained(
             base_model_name,
             subfolder="unet",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.unet,
         )
 
         with open(StableDiffusionXLModelLoader.__default_yaml_name(model_type), "r") as f:
@@ -155,7 +157,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     @staticmethod
     def __load_ckpt(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str
     ) -> StableDiffusionXLModel | None:
         yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
@@ -168,7 +170,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             checkpoint_path=base_model_name,
             original_config_file=yaml_name,
             load_safety_checker=False,
-        ).to(torch_dtype=weight_dtype)
+        )
 
         noise_scheduler = DDIMScheduler(
             num_train_timesteps=1000,
@@ -192,10 +194,10 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             tokenizer_1=pipeline.tokenizer,
             tokenizer_2=pipeline.tokenizer_2,
             noise_scheduler=noise_scheduler,
-            text_encoder_1=pipeline.text_encoder,
-            text_encoder_2=pipeline.text_encoder_2,
-            vae=pipeline.vae,
-            unet=pipeline.unet,
+            text_encoder_1=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder),
+            text_encoder_2=pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder),
+            vae=pipeline.vae.to(dtype=weight_dtypes.vae),
+            unet=pipeline.unet.to(dtype=weight_dtypes.unet),
             sd_config=sd_config,
             model_spec=model_spec,
         )
@@ -203,7 +205,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     @staticmethod
     def __load_safetensors(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str
     ) -> StableDiffusionXLModel | None:
         yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
@@ -217,7 +219,7 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             original_config_file=yaml_name,
             load_safety_checker=False,
             from_safetensors=True,
-        ).to(torch_dtype=weight_dtype)
+        )
 
         noise_scheduler = DDIMScheduler(
             num_train_timesteps=1000,
@@ -247,10 +249,10 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             tokenizer_1=pipeline.tokenizer,
             tokenizer_2=pipeline.tokenizer_2,
             noise_scheduler=noise_scheduler,
-            text_encoder_1=pipeline.text_encoder,
-            text_encoder_2=pipeline.text_encoder_2,
-            vae=pipeline.vae,
-            unet=pipeline.unet,
+            text_encoder_1=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder),
+            text_encoder_2=pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder),
+            vae=pipeline.vae.to(dtype=weight_dtypes.vae),
+            unet=pipeline.unet.to(dtype=weight_dtypes.unet),
             sd_config=sd_config,
             model_spec=model_spec,
         )
@@ -258,35 +260,35 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     def load(
             self,
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str | None,
             extra_model_name: str | None
     ) -> StableDiffusionXLModel | None:
         stacktraces = []
 
         try:
-            model = self.__load_internal(model_type, weight_dtype, base_model_name)
+            model = self.__load_internal(model_type, weight_dtypes, base_model_name)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_diffusers(model_type, weight_dtype, base_model_name)
+            model = self.__load_diffusers(model_type, weight_dtypes, base_model_name)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
+            model = self.__load_safetensors(model_type, weight_dtypes, base_model_name)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
+            model = self.__load_ckpt(model_type, weight_dtypes, base_model_name)
             if model is not None:
                 return model
         except:

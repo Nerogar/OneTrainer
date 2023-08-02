@@ -3,7 +3,8 @@ from mgds.TransformersDataLoaderModules import *
 
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.enum.DataType import DataType
+from modules.util.dtype_util import allow_mixed_precision
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class MgdsBaseDataLoader:
@@ -23,7 +24,7 @@ class MgdsBaseDataLoader:
         ds = MGDS(
             torch.device(args.train_device),
             args.train_dtype.torch_dtype(),
-            args.train_dtype.enable_mixed_precision() and args.weight_dtype == DataType.FLOAT_32,
+            allow_mixed_precision(args),
             concepts,
             settings,
             definition,

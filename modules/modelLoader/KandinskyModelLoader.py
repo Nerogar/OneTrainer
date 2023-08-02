@@ -11,6 +11,7 @@ from transformers import CLIPTokenizer, CLIPTextModelWithProjection, CLIPVisionM
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.util.TrainProgress import TrainProgress
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 
 
@@ -19,8 +20,11 @@ class KandinskyModelLoader(BaseModelLoader):
         super(KandinskyModelLoader, self).__init__()
 
     @staticmethod
-    def __load_internal(model_type: ModelType, weight_dtype: torch.dtype,
-                        base_model_name: str) -> KandinskyModel | None:
+    def __load_internal(
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str
+    ) -> KandinskyModel | None:
         with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
             train_progress = TrainProgress(
@@ -35,7 +39,7 @@ class KandinskyModelLoader(BaseModelLoader):
 
         # base model
         model = KandinskyModelLoader.__load_diffusers(
-            model_type, weight_dtype, prior_model_name, diffusion_model_name
+            model_type, weight_dtypes, prior_model_name, diffusion_model_name
         )
 
         # optimizer
@@ -58,7 +62,7 @@ class KandinskyModelLoader(BaseModelLoader):
     @staticmethod
     def __load_diffusers(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             prior_model_name: str,
             diffusion_model_name: str
     ) -> KandinskyModel | None:
@@ -71,19 +75,19 @@ class KandinskyModelLoader(BaseModelLoader):
         prior_text_encoder = CLIPTextModelWithProjection.from_pretrained(
             prior_model_name,
             subfolder="text_encoder",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.text_encoder,
         )
 
         prior_image_encoder = CLIPVisionModelWithProjection.from_pretrained(
             prior_model_name,
             subfolder="image_encoder",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.unet,
         )
 
         prior_prior = PriorTransformer.from_pretrained(
             prior_model_name,
             subfolder="prior",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.unet,
         )
 
         prior_noise_scheduler = UnCLIPScheduler.from_pretrained(
@@ -105,13 +109,13 @@ class KandinskyModelLoader(BaseModelLoader):
         text_encoder = MultilingualCLIP.from_pretrained(
             diffusion_model_name,
             subfolder="text_encoder",
-            torch_dtype=torch.float32,
+            torch_dtype=weight_dtypes.text_encoder,
         )
 
         unet = UNet2DConditionModel.from_pretrained(
             diffusion_model_name,
             subfolder="unet",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.unet,
         )
 
         noise_scheduler = DDPMScheduler.from_pretrained(
@@ -122,7 +126,7 @@ class KandinskyModelLoader(BaseModelLoader):
         movq = VQModel.from_pretrained(
             diffusion_model_name,
             subfolder="movq",
-            torch_dtype=weight_dtype,
+            torch_dtype=weight_dtypes.vae,
         )
 
         return KandinskyModel(
@@ -143,7 +147,7 @@ class KandinskyModelLoader(BaseModelLoader):
     @staticmethod
     def __load_ckpt(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str
     ) -> KandinskyModel | None:
         return None
@@ -151,7 +155,7 @@ class KandinskyModelLoader(BaseModelLoader):
     @staticmethod
     def __load_safetensors(
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str
     ) -> KandinskyModel | None:
         return None
@@ -159,7 +163,7 @@ class KandinskyModelLoader(BaseModelLoader):
     def load(
             self,
             model_type: ModelType,
-            weight_dtype: torch.dtype,
+            weight_dtypes: ModelWeightDtypes,
             base_model_name: str | None,
             extra_model_name: str | None
     ) -> KandinskyModel | None:
@@ -170,7 +174,7 @@ class KandinskyModelLoader(BaseModelLoader):
             prior_model_name, diffusion_model_name = split_base_model_name
 
             try:
-                model = self.__load_diffusers(model_type, weight_dtype, prior_model_name, diffusion_model_name)
+                model = self.__load_diffusers(model_type, weight_dtypes, prior_model_name, diffusion_model_name)
                 if model is not None:
                     return model
             except:
@@ -178,21 +182,21 @@ class KandinskyModelLoader(BaseModelLoader):
 
         else:
             try:
-                model = self.__load_internal(model_type, weight_dtype, base_model_name)
+                model = self.__load_internal(model_type, weight_dtypes, base_model_name)
                 if model is not None:
                     return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
+                model = self.__load_safetensors(model_type, weight_dtypes, base_model_name)
                 if model is not None:
                     return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
+                model = self.__load_ckpt(model_type, weight_dtypes, base_model_name)
                 if model is not None:
                     return model
             except:
