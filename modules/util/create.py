@@ -207,6 +207,7 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
+                foreach=False,  # disabled, because it uses too much VRAM
             )
         case Optimizer.ADAM:
             optimizer = torch.optim.Adam(
