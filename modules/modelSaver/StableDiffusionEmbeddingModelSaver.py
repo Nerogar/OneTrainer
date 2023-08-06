@@ -59,9 +59,9 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
         os.makedirs(destination, exist_ok=True)
 
         # embedding
-        StableDiffusionEmbeddingModelSaver.__save_ckpt(
+        StableDiffusionEmbeddingModelSaver.__save_safetensors(
             model,
-            os.path.join(destination, "embedding", "embedding.pt"),
+            os.path.join(destination, "embedding", "embedding.safetensors"),
             torch.float32
         )
 

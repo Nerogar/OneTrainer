@@ -89,7 +89,11 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader):
         stacktraces = []
 
         base_model_loader = StableDiffusionModelLoader()
-        model = base_model_loader.load(model_type, weight_dtype, base_model_name, None)
+
+        if base_model_name is not None:
+            model = base_model_loader.load(model_type, weight_dtype, base_model_name, None)
+        else:
+            model = StableDiffusionModel(model_type=model_type)
 
         if extra_model_name:
             try:
