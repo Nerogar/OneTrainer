@@ -22,15 +22,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
   resolutions, buckets are created automatically.
 - **Dataset Tooling**: Automatically caption your dataset, or create masks for masked training.
-
-## Planned Features
-
-While OneTrainer already has many useful features, it is still being developed and improved. Here are some features that
-are planned for the future:
-
-- **VAE fine-tuning**: Already implemented, but with limited functionality
-- **Tooling around dataset management**: Automatic tagging, sorting of images, etc.
-- **Tools for model manipulation**: merging models, extracting LoRAs, etc.
+- **Model Tooling**: convert between different model formats from a simple UI.
 
 A more detailed list can be found [here](docs/ThingsToAdd.md).
 
