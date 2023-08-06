@@ -1,12 +1,13 @@
 import argparse
 
+from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
-class ConvertModelArgs:
+class ConvertModelArgs(BaseArgs):
     model_type: ModelType
     training_method: TrainingMethod
     input_name: str
@@ -15,8 +16,7 @@ class ConvertModelArgs:
     output_model_destination: str
 
     def __init__(self, args: dict):
-        for (key, value) in args.items():
-            setattr(self, key, value)
+        super(ConvertModelArgs, self).__init__(args)
 
     @staticmethod
     def parse_args() -> 'ConvertModelArgs':
@@ -30,3 +30,16 @@ class ConvertModelArgs:
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
 
         return ConvertModelArgs(vars(parser.parse_args()))
+
+    @staticmethod
+    def default_values():
+        args = {}
+
+        args["model_type"] = ModelType.STABLE_DIFFUSION_15
+        args["training_method"] = TrainingMethod.FINE_TUNE
+        args["input_name"] = ""
+        args["output_dtype"] = DataType.FLOAT_16
+        args["output_model_format"] = ModelFormat.SAFETENSORS
+        args["output_model_destination"] = ""
+
+        return ConvertModelArgs(args)

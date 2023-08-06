@@ -12,6 +12,7 @@ from PIL.Image import Image
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
+from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.util.TrainProgress import TrainProgress
@@ -240,7 +241,6 @@ class TrainUI(ctk.CTk):
         components.label(master, 5, 0, "Clear cache before training",
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
         components.switch(master, 5, 1, self.ui_state, "clear_cache_before_training")
-
 
     def concepts_tab(self, master):
         ConceptTab(master, self.train_args, self.ui_state)
@@ -527,6 +527,11 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the captioning tool")
         components.button(master, 0, 1, "Open", self.open_dataset_tool)
 
+        # convert model
+        components.label(master, 1, 0, "Convert Model Tools",
+                         tooltip="Open the model conversion tool")
+        components.button(master, 1, 1, "Open", self.open_convert_model_tool)
+
         return master
 
     def change_training_method(self, training_method: TrainingMethod):
@@ -560,6 +565,10 @@ class TrainUI(ctk.CTk):
 
     def open_dataset_tool(self):
         window = CaptionUI(self, None)
+        self.wait_window(window)
+
+    def open_convert_model_tool(self):
+        window = ConvertModelUI(self)
         self.wait_window(window)
 
     def training_thread_function(self):
