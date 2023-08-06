@@ -8,8 +8,8 @@ from torch import Tensor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.modelSetup.stableDiffusion.enable_checkpointing_for_transformer_blocks import \
-    enable_checkpointing_for_transformer_blocks
+from modules.modelSetup.stableDiffusion.checkpointing_util import \
+    enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -49,7 +49,7 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
 
         model.unet.enable_gradient_checkpointing()
         enable_checkpointing_for_transformer_blocks(model.unet)
-        model.text_encoder.gradient_checkpointing_enable()
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
 
     def predict(
             self,

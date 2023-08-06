@@ -36,19 +36,19 @@ class KandinskyModel(BaseModel):
             model_type: ModelType,
 
             # prior
-            prior_tokenizer: CLIPTokenizer,
-            prior_text_encoder: CLIPTextModelWithProjection,
-            prior_image_encoder: CLIPVisionModelWithProjection,
-            prior_prior: PriorTransformer,
-            prior_noise_scheduler: UnCLIPScheduler,
-            prior_image_processor: CLIPImageProcessor,
+            prior_tokenizer: CLIPTokenizer | None = None,
+            prior_text_encoder: CLIPTextModelWithProjection | None = None,
+            prior_image_encoder: CLIPVisionModelWithProjection | None = None,
+            prior_prior: PriorTransformer | None = None,
+            prior_noise_scheduler: UnCLIPScheduler | None = None,
+            prior_image_processor: CLIPImageProcessor | None = None,
 
             # diffusion model
-            tokenizer: XLMRobertaTokenizerFast,
-            text_encoder: MultilingualCLIP,
-            unet: UNet2DConditionModel,
-            noise_scheduler: DDPMScheduler,
-            movq: VQModel,
+            tokenizer: XLMRobertaTokenizerFast | None = None,
+            text_encoder: MultilingualCLIP | None = None,
+            unet: UNet2DConditionModel | None = None,
+            noise_scheduler: DDPMScheduler | None = None,
+            movq: VQModel | None = None,
 
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,

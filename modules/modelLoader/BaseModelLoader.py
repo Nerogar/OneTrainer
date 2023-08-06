@@ -19,7 +19,7 @@ class BaseModelLoader(metaclass=ABCMeta):
             self,
             model_type: ModelType,
             weight_dtype: torch.dtype,
-            base_model_name: str,
+            base_model_name: str | None,
             extra_model_name: str | None
     ) -> BaseModel | None:
         pass

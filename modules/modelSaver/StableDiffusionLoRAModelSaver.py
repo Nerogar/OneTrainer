@@ -57,9 +57,9 @@ class StableDiffusionLoRAModelSaver(BaseModelSaver):
         os.makedirs(destination, exist_ok=True)
 
         # lora
-        StableDiffusionLoRAModelSaver.__save_ckpt(
+        StableDiffusionLoRAModelSaver.__save_safetensors(
             model,
-            os.path.join(destination, "lora", "lora.pt"),
+            os.path.join(destination, "lora", "lora.safetensors"),
             torch.float32
         )
 

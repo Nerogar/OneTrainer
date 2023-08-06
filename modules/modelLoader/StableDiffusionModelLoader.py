@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 
 import torch
 import yaml
@@ -43,233 +44,237 @@ class StableDiffusionModelLoader(BaseModelLoader):
 
     @staticmethod
     def __load_internal(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
+        with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
+            meta = json.load(meta_file)
+            train_progress = TrainProgress(
+                epoch=meta['train_progress']['epoch'],
+                epoch_step=meta['train_progress']['epoch_step'],
+                epoch_sample=meta['train_progress']['epoch_sample'],
+                global_step=meta['train_progress']['global_step'],
+            )
+
+        # base model
+        model = StableDiffusionModelLoader.__load_diffusers(model_type, weight_dtype, base_model_name)
+
+        # optimizer
         try:
-            with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
-                meta = json.load(meta_file)
-                train_progress = TrainProgress(
-                    epoch=meta['train_progress']['epoch'],
-                    epoch_step=meta['train_progress']['epoch_step'],
-                    epoch_sample=meta['train_progress']['epoch_sample'],
-                    global_step=meta['train_progress']['global_step'],
-                )
+            model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
+        except FileNotFoundError:
+            pass
 
-            # base model
-            model = StableDiffusionModelLoader.__load_diffusers(model_type, weight_dtype, base_model_name)
+        # ema
+        try:
+            model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
+        except FileNotFoundError:
+            pass
 
-            # optimizer
-            try:
-                model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
-            except FileNotFoundError:
-                pass
+        with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
+            model.sd_config = yaml.safe_load(f)
 
-            # ema
-            try:
-                model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
-            except FileNotFoundError:
-                pass
+        # meta
+        model.train_progress = train_progress
 
-            with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
-                model.sd_config = yaml.safe_load(f)
-
-            # meta
-            model.train_progress = train_progress
-
-            # model spec
-            model.model_spec = ModelSpec()
-            try:
-                with open(os.path.join(base_model_name, "model_spec.json"), "r") as model_spec_file:
-                    model.model_spec = ModelSpec.from_dict(json.load(model_spec_file))
-            except:
-                pass
-
-            return model
+        # model spec
+        model.model_spec = ModelSpec()
+        try:
+            with open(os.path.join(base_model_name, "model_spec.json"), "r") as model_spec_file:
+                model.model_spec = ModelSpec.from_dict(json.load(model_spec_file))
         except:
-            return None
+            pass
+
+        return model
 
     @staticmethod
     def __load_diffusers(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
-        try:
-            tokenizer = CLIPTokenizer.from_pretrained(
-                base_model_name,
-                subfolder="tokenizer",
-            )
+        tokenizer = CLIPTokenizer.from_pretrained(
+            base_model_name,
+            subfolder="tokenizer",
+        )
 
-            noise_scheduler = DDIMScheduler.from_pretrained(
-                base_model_name,
-                subfolder="scheduler",
-            )
+        noise_scheduler = DDIMScheduler.from_pretrained(
+            base_model_name,
+            subfolder="scheduler",
+        )
 
-            text_encoder = CLIPTextModel.from_pretrained(
-                base_model_name,
-                subfolder="text_encoder",
-                torch_dtype=weight_dtype,
-            )
+        text_encoder = CLIPTextModel.from_pretrained(
+            base_model_name,
+            subfolder="text_encoder",
+            torch_dtype=weight_dtype,
+        )
 
-            vae = AutoencoderKL.from_pretrained(
-                base_model_name,
-                subfolder="vae",
-                torch_dtype=weight_dtype,
-            )
+        vae = AutoencoderKL.from_pretrained(
+            base_model_name,
+            subfolder="vae",
+            torch_dtype=weight_dtype,
+        )
 
-            unet = UNet2DConditionModel.from_pretrained(
-                base_model_name,
-                subfolder="unet",
-                torch_dtype=weight_dtype,
-            )
+        unet = UNet2DConditionModel.from_pretrained(
+            base_model_name,
+            subfolder="unet",
+            torch_dtype=weight_dtype,
+        )
 
-            image_depth_processor = DPTImageProcessor.from_pretrained(
-                base_model_name,
-                subfolder="feature_extractor",
-            ) if model_type.has_depth_input() else None
+        image_depth_processor = DPTImageProcessor.from_pretrained(
+            base_model_name,
+            subfolder="feature_extractor",
+        ) if model_type.has_depth_input() else None
 
-            depth_estimator = DPTForDepthEstimation.from_pretrained(
-                base_model_name,
-                subfolder="depth_estimator",
-                torch_dtype=weight_dtype,
-            ) if model_type.has_depth_input() else None
+        depth_estimator = DPTForDepthEstimation.from_pretrained(
+            base_model_name,
+            subfolder="depth_estimator",
+            torch_dtype=weight_dtype,
+        ) if model_type.has_depth_input() else None
 
-            with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
-                sd_config = yaml.safe_load(f)
+        with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
+            sd_config = yaml.safe_load(f)
 
-            model_spec = ModelSpec()
+        model_spec = ModelSpec()
 
-            return StableDiffusionModel(
-                model_type=model_type,
-                tokenizer=tokenizer,
-                noise_scheduler=noise_scheduler,
-                text_encoder=text_encoder,
-                vae=vae,
-                unet=unet,
-                image_depth_processor=image_depth_processor,
-                depth_estimator=depth_estimator,
-                sd_config=sd_config,
-                model_spec=model_spec,
-            )
-        except:
-            return None
+        return StableDiffusionModel(
+            model_type=model_type,
+            tokenizer=tokenizer,
+            noise_scheduler=noise_scheduler,
+            text_encoder=text_encoder,
+            vae=vae,
+            unet=unet,
+            image_depth_processor=image_depth_processor,
+            depth_estimator=depth_estimator,
+            sd_config=sd_config,
+            model_spec=model_spec,
+        )
 
     @staticmethod
     def __load_ckpt(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
-        try:
-            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+        yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+        if not os.path.exists(yaml_name):
+            yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
             if not os.path.exists(yaml_name):
-                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
-                if not os.path.exists(yaml_name):
-                    yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
+                yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
 
-            pipeline = download_from_original_stable_diffusion_ckpt(
-                checkpoint_path=base_model_name,
-                original_config_file=yaml_name,
-                load_safety_checker=False,
-            ).to(torch_dtype=weight_dtype)
+        pipeline = download_from_original_stable_diffusion_ckpt(
+            checkpoint_path=base_model_name,
+            original_config_file=yaml_name,
+            load_safety_checker=False,
+        ).to(torch_dtype=weight_dtype)
 
-            noise_scheduler = DDIMScheduler(
-                num_train_timesteps=1000,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
-                trained_betas=None,
-                clip_sample=False,
-                set_alpha_to_one=False,
-                steps_offset=1,
-                prediction_type="epsilon",
-            )
+        noise_scheduler = DDIMScheduler(
+            num_train_timesteps=1000,
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="scaled_linear",
+            trained_betas=None,
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
+            prediction_type="epsilon",
+        )
 
-            with open(yaml_name, "r") as f:
-                sd_config = yaml.safe_load(f)
+        with open(yaml_name, "r") as f:
+            sd_config = yaml.safe_load(f)
 
-            model_spec = ModelSpec()
+        model_spec = ModelSpec()
 
-            return StableDiffusionModel(
-                model_type=model_type,
-                tokenizer=pipeline.tokenizer,
-                noise_scheduler=noise_scheduler,
-                text_encoder=pipeline.text_encoder,
-                vae=pipeline.vae,
-                unet=pipeline.unet,
-                image_depth_processor=None,  # TODO
-                depth_estimator=None,  # TODO
-                sd_config=sd_config,
-                model_spec=model_spec,
-            )
-        except:
-            return None
+        return StableDiffusionModel(
+            model_type=model_type,
+            tokenizer=pipeline.tokenizer,
+            noise_scheduler=noise_scheduler,
+            text_encoder=pipeline.text_encoder,
+            vae=pipeline.vae,
+            unet=pipeline.unet,
+            image_depth_processor=None,  # TODO
+            depth_estimator=None,  # TODO
+            sd_config=sd_config,
+            model_spec=model_spec,
+        )
 
     @staticmethod
     def __load_safetensors(model_type: ModelType, weight_dtype: torch.dtype, base_model_name: str) -> StableDiffusionModel | None:
-        try:
-            yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+        yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+        if not os.path.exists(yaml_name):
+            yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
             if not os.path.exists(yaml_name):
-                yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
-                if not os.path.exists(yaml_name):
-                    yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
+                yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
 
-            pipeline = download_from_original_stable_diffusion_ckpt(
-                checkpoint_path=base_model_name,
-                original_config_file=yaml_name,
-                load_safety_checker=False,
-                from_safetensors=True,
-            ).to(torch_dtype=weight_dtype)
+        pipeline = download_from_original_stable_diffusion_ckpt(
+            checkpoint_path=base_model_name,
+            original_config_file=yaml_name,
+            load_safety_checker=False,
+            from_safetensors=True,
+        ).to(torch_dtype=weight_dtype)
 
-            noise_scheduler = DDIMScheduler(
-                num_train_timesteps=1000,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
-                trained_betas=None,
-                clip_sample=False,
-                set_alpha_to_one=False,
-                steps_offset=1,
-                prediction_type="epsilon",
-            )
+        noise_scheduler = DDIMScheduler(
+            num_train_timesteps=1000,
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="scaled_linear",
+            trained_betas=None,
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
+            prediction_type="epsilon",
+        )
 
-            with open(yaml_name, "r") as f:
-                sd_config = yaml.safe_load(f)
+        with open(yaml_name, "r") as f:
+            sd_config = yaml.safe_load(f)
 
-            model_spec = ModelSpec()
-            try:
-                with safe_open(base_model_name, framework="pt") as f:
-                    if "modelspec.sai_model_spec" in f.metadata():
-                        model_spec = ModelSpec.from_dict(f.metadata())
-            except:
-                pass
-
-            return StableDiffusionModel(
-                model_type=model_type,
-                tokenizer=pipeline.tokenizer,
-                noise_scheduler=noise_scheduler,
-                text_encoder=pipeline.text_encoder,
-                vae=pipeline.vae,
-                unet=pipeline.unet,
-                image_depth_processor=None,  # TODO
-                depth_estimator=None,  # TODO
-                sd_config=sd_config,
-                model_spec=model_spec,
-            )
+        model_spec = ModelSpec()
+        try:
+            with safe_open(base_model_name, framework="pt") as f:
+                if "modelspec.sai_model_spec" in f.metadata():
+                    model_spec = ModelSpec.from_dict(f.metadata())
         except:
-            return None
+            pass
+
+        return StableDiffusionModel(
+            model_type=model_type,
+            tokenizer=pipeline.tokenizer,
+            noise_scheduler=noise_scheduler,
+            text_encoder=pipeline.text_encoder,
+            vae=pipeline.vae,
+            unet=pipeline.unet,
+            image_depth_processor=None,  # TODO
+            depth_estimator=None,  # TODO
+            sd_config=sd_config,
+            model_spec=model_spec,
+        )
 
     def load(
             self,
             model_type: ModelType,
             weight_dtype: torch.dtype,
-            base_model_name: str,
+            base_model_name: str | None,
             extra_model_name: str | None
     ) -> StableDiffusionModel | None:
-        model = self.__load_internal(model_type, weight_dtype, base_model_name)
-        if model is not None:
-            return model
+        stacktraces = []
 
-        model = self.__load_diffusers(model_type, weight_dtype, base_model_name)
-        if model is not None:
-            return model
+        try:
+            model = self.__load_internal(model_type, weight_dtype, base_model_name)
+            if model is not None:
+                return model
+        except:
+            stacktraces.append(traceback.format_exc())
 
-        model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
-        if model is not None:
-            return model
+        try:
+            model = self.__load_diffusers(model_type, weight_dtype, base_model_name)
+            if model is not None:
+                return model
+        except:
+            stacktraces.append(traceback.format_exc())
 
-        model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
-        if model is not None:
-            return model
+        try:
+            model = self.__load_safetensors(model_type, weight_dtype, base_model_name)
+            if model is not None:
+                return model
+        except:
+            stacktraces.append(traceback.format_exc())
 
+        try:
+            model = self.__load_ckpt(model_type, weight_dtype, base_model_name)
+            if model is not None:
+                return model
+        except:
+            stacktraces.append(traceback.format_exc())
+
+        for stacktrace in stacktraces:
+            print(stacktrace)
         raise Exception("could not load model: " + base_model_name)

@@ -348,7 +348,7 @@ class TrainUI(ctk.CTk):
 
         # text encoder layer skip (clip skip)
         components.label(scroll_frame, 3, 3, "Clip Skip",
-                         tooltip="The number of clip layers to scip. 0 = disabled")
+                         tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(scroll_frame, 3, 4, self.ui_state, "text_encoder_layer_skip")
 
         # offset noise weight
