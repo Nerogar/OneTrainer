@@ -58,6 +58,11 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         )
         del model.optimizer_state_dict
 
+        model.ema = create.create_ema(
+            self.create_parameters(model, args), model.ema_state_dict, args
+        )
+        del model.ema_state_dict
+
         self.setup_optimizations(model, args)
 
     def setup_eval_device(

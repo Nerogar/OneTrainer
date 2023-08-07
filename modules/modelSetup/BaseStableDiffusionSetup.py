@@ -47,6 +47,7 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
                         f" correctly and a GPU is available: {e}"
                     )
 
+        model.vae.enable_gradient_checkpointing()
         model.unet.enable_gradient_checkpointing()
         enable_checkpointing_for_transformer_blocks(model.unet)
         enable_checkpointing_for_clip_encoder_layers(model.text_encoder)

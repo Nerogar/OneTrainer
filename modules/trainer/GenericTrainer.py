@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
-import time
+import traceback
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
@@ -144,33 +144,37 @@ class GenericTrainer(BaseTrainer):
 
     def __sample_loop(self, train_progress: TrainProgress, sample_definitions: list[dict], folder_postfix: str = ""):
         for i, sample_definition in enumerate(sample_definitions):
-            safe_prompt = path_util.safe_filename(sample_definition['prompt'])
+            try:
+                safe_prompt = path_util.safe_filename(sample_definition['prompt'])
 
-            sample_dir = os.path.join(
-                self.args.workspace_dir,
-                "samples",
-                f"{str(i)} - {safe_prompt}{folder_postfix}",
-            )
+                sample_dir = os.path.join(
+                    self.args.workspace_dir,
+                    "samples",
+                    f"{str(i)} - {safe_prompt}{folder_postfix}",
+                )
 
-            sample_path = os.path.join(
-                sample_dir,
-                f"{self.__get_string_timestamp()}-training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
-            )
+                sample_path = os.path.join(
+                    sample_dir,
+                    f"{self.__get_string_timestamp()}-training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
+                )
 
-            def on_sample(image: Image):
-                self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                           train_progress.global_step)
-                self.callbacks.on_sample(image)
+                def on_sample(image: Image):
+                    self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
+                                               train_progress.global_step)
+                    self.callbacks.on_sample(image)
 
-            self.model_sampler.sample(
-                prompt=sample_definition["prompt"],
-                resolution=(sample_definition["height"], sample_definition["width"]),
-                seed=sample_definition["seed"],
-                destination=sample_path,
-                text_encoder_layer_skip=self.args.text_encoder_layer_skip,
-                force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
-                on_sample=on_sample,
-            )
+                self.model_sampler.sample(
+                    prompt=sample_definition["prompt"],
+                    resolution=(sample_definition["height"], sample_definition["width"]),
+                    seed=sample_definition["seed"],
+                    destination=sample_path,
+                    text_encoder_layer_skip=self.args.text_encoder_layer_skip,
+                    force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
+                    on_sample=on_sample,
+                )
+            except:
+                traceback.print_exc()
+                print("Error during sampling, proceeding without sampling")
 
             self.__gc()
 

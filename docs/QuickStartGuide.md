@@ -128,3 +128,5 @@ On the backup tab, you can configure regular backups that will be created during
 saved in the workspace. Additionally, you can decide to create a backup at the end of the training run. A backup
 contains all the model data to continue the training run. To continue the training from a previous backup, just select
 the backup directory as your base model.
+
+A backup can be converted to a model file by using the model convert tool.

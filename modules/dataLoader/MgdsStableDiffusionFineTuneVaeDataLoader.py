@@ -65,7 +65,8 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
         inputs = ['image']
 
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution,
-                                                       min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20)
+                                                       min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20,
+                                                       enabled_in_name='settings.enable_random_circular_mask_shrink')
 
         modules = []
 
@@ -119,7 +120,7 @@ class MgdsStableDiffusionFineTuneVaeDataLoader:
         if args.masked_training:
             inputs.append('mask')
 
-        random_flip = RandomFlip(names=inputs)
+        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
 
         modules = [random_flip]
 
