@@ -30,7 +30,8 @@ git+https://github.com/Nerogar/mgds.git@cd1929a#egg=mgds
 xformers==0.0.20
 
 # optimizers
-bitsandbytes-windows==0.37.5 # bitsandbytes for 8-bit optimizers
+--extra-index-url=https://jllllll.github.io/bitsandbytes-windows-webui --prefer-binary
+bitsandbytes==0.40.2 # bitsandbytes for 8-bit optimizers
 dadaptation==3.1 # dadaptation optimizers
 lion-pytorch==0.0.6 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer
