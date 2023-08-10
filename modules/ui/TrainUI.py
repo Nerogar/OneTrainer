@@ -203,6 +203,7 @@ class TrainUI(ctk.CTk):
         components.options_kv(master, 2, 1, [
             ("float16", DataType.FLOAT_16),
             ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "output_dtype")
 
     def data_tab(self, master):
