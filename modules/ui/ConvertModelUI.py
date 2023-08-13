@@ -76,7 +76,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         components.options_kv(master, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "output_dtype")
 
         # output format
