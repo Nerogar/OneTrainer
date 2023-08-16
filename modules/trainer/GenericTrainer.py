@@ -222,11 +222,13 @@ class GenericTrainer(BaseTrainer):
                 torch.float32
             )
         except:
+            traceback.print_exc()
             print("Could not save backup. Check your disk space!")
             try:
                 if os.path.isdir(backup_path):
                     shutil.rmtree(backup_path)
             except:
+                traceback.print_exc()
                 print("Could not delete partial backup")
                 pass
 
