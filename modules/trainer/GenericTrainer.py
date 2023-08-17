@@ -170,21 +170,15 @@ class GenericTrainer(BaseTrainer):
                                                train_progress.global_step)
                     self.callbacks.on_sample(image)
 
-                if allow_mixed_precision(self.args):
-                    forward_context = torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype())
-                else:
-                    forward_context = nullcontext()
-
-                with forward_context:
-                    self.model_sampler.sample(
-                        prompt=sample_definition["prompt"],
-                        resolution=(sample_definition["height"], sample_definition["width"]),
-                        seed=sample_definition["seed"],
-                        destination=sample_path,
-                        text_encoder_layer_skip=self.args.text_encoder_layer_skip,
-                        force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
-                        on_sample=on_sample,
-                    )
+                self.model_sampler.sample(
+                    prompt=sample_definition["prompt"],
+                    resolution=(sample_definition["height"], sample_definition["width"]),
+                    seed=sample_definition["seed"],
+                    destination=sample_path,
+                    text_encoder_layer_skip=self.args.text_encoder_layer_skip,
+                    force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
+                    on_sample=on_sample,
+                )
             except:
                 traceback.print_exc()
                 print("Error during sampling, proceeding without sampling")

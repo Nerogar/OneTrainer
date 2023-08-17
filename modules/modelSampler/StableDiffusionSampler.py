@@ -69,32 +69,41 @@ class StableDiffusionSampler(BaseModelSampler):
         else:
             negative_tokens_attention_mask = None
 
-        if text_encoder_layer_skip > 0:
-            text_encoder_output = text_encoder(tokens, return_dict=True, output_hidden_states=True)
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
+        with torch.autocast(self.train_device.type):
+            if text_encoder_layer_skip > 0:
+                text_encoder_output = text_encoder(
+                    tokens,
+                    return_dict=True,
+                    output_hidden_states=True,
+                )
+                final_layer_norm = text_encoder.text_model.final_layer_norm
+                prompt_embedding = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
 
-            text_encoder_output = text_encoder(negative_tokens, return_dict=True, output_hidden_states=True)
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            negative_prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-        else:
-            text_encoder_output = text_encoder(
-                tokens,
-                attention_mask=tokens_attention_mask,
-                return_dict=True
-            )
-            prompt_embedding = text_encoder_output.last_hidden_state
+                text_encoder_output = text_encoder(
+                    negative_tokens,
+                    return_dict=True,
+                    output_hidden_states=True,
+                )
+                final_layer_norm = text_encoder.text_model.final_layer_norm
+                negative_prompt_embedding = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
+            else:
+                text_encoder_output = text_encoder(
+                    tokens,
+                    attention_mask=tokens_attention_mask,
+                    return_dict=True,
+                )
+                prompt_embedding = text_encoder_output.last_hidden_state
 
-            text_encoder_output = text_encoder(
-                negative_tokens,
-                attention_mask=negative_tokens_attention_mask,
-                return_dict=True
-            )
-            negative_prompt_embedding = text_encoder_output.last_hidden_state
+                text_encoder_output = text_encoder(
+                    negative_tokens,
+                    attention_mask=negative_tokens_attention_mask,
+                    return_dict=True,
+                )
+                negative_prompt_embedding = text_encoder_output.last_hidden_state
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
@@ -124,13 +133,14 @@ class StableDiffusionSampler(BaseModelSampler):
             latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
             # predict the noise residual
-            noise_pred = unet(
-                latent_model_input,
-                timestep,
-                encoder_hidden_states=combined_prompt_embedding,
-                cross_attention_kwargs=None,
-                return_dict=False,
-            )[0]
+            with torch.autocast(self.train_device.type):
+                noise_pred = unet(
+                    latent_model_input,
+                    timestep,
+                    encoder_hidden_states=combined_prompt_embedding,
+                    cross_attention_kwargs=None,
+                    return_dict=False,
+                )[0]
 
             # cfg
             noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -150,6 +160,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 noise_pred, timestep, latent_image, return_dict=False
             )[0]
 
+        latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
         do_denormalize = [True] * image.shape[0]
@@ -218,32 +229,41 @@ class StableDiffusionSampler(BaseModelSampler):
         else:
             negative_tokens_attention_mask = None
 
-        if text_encoder_layer_skip > 0:
-            text_encoder_output = text_encoder(tokens, return_dict=True, output_hidden_states=True)
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
+        with torch.autocast(self.train_device.type):
+            if text_encoder_layer_skip > 0:
+                text_encoder_output = text_encoder(
+                    tokens,
+                    return_dict=True,
+                    output_hidden_states=True,
+                )
+                final_layer_norm = text_encoder.text_model.final_layer_norm
+                prompt_embedding = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
 
-            text_encoder_output = text_encoder(negative_tokens, return_dict=True, output_hidden_states=True)
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            negative_prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-        else:
-            text_encoder_output = text_encoder(
-                tokens,
-                attention_mask=tokens_attention_mask,
-                return_dict=True
-            )
-            prompt_embedding = text_encoder_output.last_hidden_state
+                text_encoder_output = text_encoder(
+                    negative_tokens,
+                    return_dict=True,
+                    output_hidden_states=True,
+                )
+                final_layer_norm = text_encoder.text_model.final_layer_norm
+                negative_prompt_embedding = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
+            else:
+                text_encoder_output = text_encoder(
+                    tokens,
+                    attention_mask=tokens_attention_mask,
+                    return_dict=True,
+                )
+                prompt_embedding = text_encoder_output.last_hidden_state
 
-            text_encoder_output = text_encoder(
-                negative_tokens,
-                attention_mask=negative_tokens_attention_mask,
-                return_dict=True
-            )
-            negative_prompt_embedding = text_encoder_output.last_hidden_state
+                text_encoder_output = text_encoder(
+                    negative_tokens,
+                    attention_mask=negative_tokens_attention_mask,
+                    return_dict=True,
+                )
+                negative_prompt_embedding = text_encoder_output.last_hidden_state
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
@@ -276,13 +296,14 @@ class StableDiffusionSampler(BaseModelSampler):
             latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
             # predict the noise residual
-            noise_pred = unet(
-                latent_model_input,
-                timestep,
-                encoder_hidden_states=combined_prompt_embedding,
-                cross_attention_kwargs=None,
-                return_dict=False,
-            )[0]
+            with torch.autocast(self.train_device.type):
+                noise_pred = unet(
+                    latent_model_input,
+                    timestep,
+                    encoder_hidden_states=combined_prompt_embedding,
+                    cross_attention_kwargs=None,
+                    return_dict=False,
+                )[0]
 
             # cfg
             noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -302,6 +323,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 noise_pred, timestep, latent_image, return_dict=False
             )[0]
 
+        latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
         do_denormalize = [True] * image.shape[0]
