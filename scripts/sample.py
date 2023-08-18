@@ -22,7 +22,12 @@ def main():
     model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
 
     print("Loading model " + args.base_model_name)
-    model = model_loader.load(args.model_type, args.weight_dtype.torch_dtype(), args.base_model_name, args.embedding_name)
+    model = model_loader.load(
+        args.model_type,
+        args.weight_dtypes(),
+        args.base_model_name,
+        args.embedding_name
+    )
     model_setup.setup_eval_device(model)
 
     model_sampler = create.create_model_sampler(

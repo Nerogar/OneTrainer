@@ -59,6 +59,7 @@
     "initial_embedding_text": "*",
     "lora_rank": 16,
     "lora_alpha": 1.0,
+    "lora_weight_dtype": "FLOAT_32",
     "attention_mechanism": "XFORMERS",
     "sample_definition_file_name": "training_samples/samples.json",
     "sample_after": 10,

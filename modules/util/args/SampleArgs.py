@@ -1,5 +1,6 @@
 import argparse
 
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 
@@ -16,6 +17,14 @@ class SampleArgs:
     def __init__(self, args: dict):
         for (key, value) in args.items():
             setattr(self, key, value)
+
+    def weight_dtypes(self) -> ModelWeightDtypes:
+        return ModelWeightDtypes(
+            self.weight_dtype.torch_dtype(),
+            self.weight_dtype.torch_dtype(),
+            self.weight_dtype.torch_dtype(),
+            self.weight_dtype.torch_dtype(),
+        )
 
     @staticmethod
     def parse_args() -> 'SampleArgs':
