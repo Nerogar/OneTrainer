@@ -77,3 +77,26 @@ def lr_lambda_cosine_with_hard_restarts(
         return max(0.0, 0.5 * (1.0 + schedule))
 
     return lr_lambda
+
+
+def lr_lambda_rex(
+        warmup_steps: int,
+        max_epochs: int,
+        approximate_epoch_length: int,
+):
+    scheduler_steps = max_epochs * approximate_epoch_length - warmup_steps
+
+    def lr_lambda(current_step: int):
+        # https://arxiv.org/abs/2107.04197
+        max_lr = 1
+        min_lr = 0
+        d = 0.9
+
+        if current_step < scheduler_steps:
+            progress = (current_step / scheduler_steps)
+            div = (1 - d) + (d * (1 - progress))
+            return min_lr + (max_lr - min_lr) * ((1 - progress) / div)
+        else:
+            return min_lr
+
+    return lr_lambda

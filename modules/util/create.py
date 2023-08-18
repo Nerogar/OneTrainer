@@ -361,6 +361,10 @@ def create_lr_scheduler(
             lr_lambda = lr_lambda_cosine_with_hard_restarts(
                 warmup_steps, num_cycles, max_epochs, approximate_epoch_length
             )
+        case LearningRateScheduler.REX:
+            lr_lambda = lr_lambda_rex(
+                warmup_steps, max_epochs, approximate_epoch_length
+            )
         case _:
             lr_lambda = lr_lambda_constant()
 
