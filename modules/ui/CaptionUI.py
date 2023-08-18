@@ -1,4 +1,7 @@
 import os
+import platform
+import subprocess
+import traceback
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -94,9 +97,13 @@ Mouse wheel: increase or decrease brush size"""
         components.button(top_frame, 0, 2, "Generate Captions", self.open_caption_window,
                           tooltip="open a dialog to automatically generate captions")
 
-        top_frame.grid_columnconfigure(3, weight=1)
+        if platform.system() == "Windows":
+            components.button(top_frame, 0, 3, "Open in Explorer", self.open_in_explorer,
+                              tooltip="open the current image in Explorer")
 
-        components.button(top_frame, 0, 4, "Help", self.print_help,
+        top_frame.grid_columnconfigure(4, weight=1)
+
+        components.button(top_frame, 0, 5, "Help", self.print_help,
                           tooltip=self.help_text)
 
     def file_list_column(self, master):
@@ -366,6 +373,15 @@ Mouse wheel: increase or decrease brush size"""
         dialog = GenerateCaptionsWindow(self, self.dir)
         self.wait_window(dialog)
         self.switch_image(self.current_image_index)
+
+    def open_in_explorer(self):
+        try:
+            image_name = self.image_names[self.current_image_index]
+            image_name = os.path.realpath(os.path.join(self.dir, image_name))
+            subprocess.Popen(f"explorer /select,{image_name}")
+        except:
+            traceback.print_exc()
+            pass
 
     def load_masking_model(self, model):
         self.captioning_model = None
