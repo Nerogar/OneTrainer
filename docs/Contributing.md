@@ -18,7 +18,7 @@ check if one already exists for the same topic to avoid duplications.
 Before creating a bigger pull request for a new feature, please consider joining or creating a discussion. This can
 avoid situations where multiple people work on the same change. It also helps in keeping the changes aligned with the
 general project structure and vision. Please also take a look at
-the [project structure documentation](docs/ProjectStructure.md).
+the [project structure documentation](ProjectStructure.md).
 For smaller changes or fixes, this is not needed.
 
 If you need some ideas on what to add, [here](ThingsToAdd.md) is a regularly updated list on features that would be

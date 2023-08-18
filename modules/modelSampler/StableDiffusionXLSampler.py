@@ -98,54 +98,48 @@ class StableDiffusionXLSampler(BaseModelSampler):
             negative_tokens_2_attention_mask = None
 
         with torch.autocast(self.train_device.type):
-            if text_encoder_layer_skip > 0:
-                # TODO
-                prompt_embedding = None
-                pooled_text_encoder_2_output = None
-                negative_prompt_embedding = None
-                negative_pooled_text_encoder_2_output = None
-            else:
-                text_encoder_1_output = text_encoder_1(
-                    tokens_1,
-                    attention_mask=tokens_1_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                text_encoder_1_output = text_encoder_1_output.hidden_states[-2]
+            # TODO: support clip skip
+            text_encoder_1_output = text_encoder_1(
+                tokens_1,
+                attention_mask=tokens_1_attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-2]
 
-                text_encoder_2_output = text_encoder_2(
-                    tokens_2,
-                    attention_mask=tokens_2_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-                text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
+            text_encoder_2_output = text_encoder_2(
+                tokens_2,
+                attention_mask=tokens_2_attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
 
-                prompt_embedding = torch.concat(
-                    [text_encoder_1_output, text_encoder_2_output], dim=-1
-                )
+            prompt_embedding = torch.concat(
+                [text_encoder_1_output, text_encoder_2_output], dim=-1
+            )
 
-                negative_text_encoder_1_output = text_encoder_1(
-                    negative_tokens_1,
-                    attention_mask=negative_tokens_1_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                negative_text_encoder_1_output = negative_text_encoder_1_output.hidden_states[-2]
+            negative_text_encoder_1_output = text_encoder_1(
+                negative_tokens_1,
+                attention_mask=negative_tokens_1_attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            negative_text_encoder_1_output = negative_text_encoder_1_output.hidden_states[-2]
 
-                negative_text_encoder_2_output = text_encoder_2(
-                    negative_tokens_2,
-                    attention_mask=negative_tokens_2_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                negative_pooled_text_encoder_2_output = negative_text_encoder_2_output.text_embeds
-                negative_text_encoder_2_output = negative_text_encoder_2_output.hidden_states[-2]
+            negative_text_encoder_2_output = text_encoder_2(
+                negative_tokens_2,
+                attention_mask=negative_tokens_2_attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            negative_pooled_text_encoder_2_output = negative_text_encoder_2_output.text_embeds
+            negative_text_encoder_2_output = negative_text_encoder_2_output.hidden_states[-2]
 
-                negative_prompt_embedding = torch.concat(
-                    [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
-                )
+            negative_prompt_embedding = torch.concat(
+                [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
+            )
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
