@@ -289,6 +289,7 @@ class GenericTrainer(BaseTrainer):
             num_cycles=self.args.learning_rate_cycles,
             max_epochs=self.args.epochs,
             approximate_epoch_length=self.data_loader.ds.approximate_length(),
+            gradient_accumulation_steps=self.args.gradient_accumulation_steps,
             global_step=train_progress.global_step
         )
 

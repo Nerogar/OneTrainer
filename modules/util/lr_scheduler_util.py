@@ -20,12 +20,8 @@ def lr_lambda_constant():
 
 
 def lr_lambda_linear(
-        warmup_steps: int,
-        max_epochs: int,
-        approximate_epoch_length: int,
+        scheduler_steps: int,
 ):
-    scheduler_steps = max_epochs * approximate_epoch_length - warmup_steps
-
     def lr_lambda(current_step: int):
         return max(0.0, float(scheduler_steps - current_step) / float(scheduler_steps))
 
@@ -33,12 +29,8 @@ def lr_lambda_linear(
 
 
 def lr_lambda_cosine(
-        warmup_steps: int,
-        max_epochs: int,
-        approximate_epoch_length: int,
+        scheduler_steps: int,
 ):
-    scheduler_steps = max_epochs * approximate_epoch_length - warmup_steps
-
     def lr_lambda(current_step: int):
         progress = float(current_step) / float(scheduler_steps)
         schedule = math.cos(progress * math.pi)
@@ -48,13 +40,9 @@ def lr_lambda_cosine(
 
 
 def lr_lambda_cosine_with_restarts(
-        warmup_steps: int,
+        scheduler_steps: int,
         num_cycles: float,
-        max_epochs: int,
-        approximate_epoch_length: int,
 ):
-    scheduler_steps = max_epochs * approximate_epoch_length - warmup_steps
-
     def lr_lambda(current_step: int):
         progress = float(current_step) / float(scheduler_steps)
         schedule = math.cos(progress * 2.0 * math.pi * num_cycles)
@@ -64,13 +52,9 @@ def lr_lambda_cosine_with_restarts(
 
 
 def lr_lambda_cosine_with_hard_restarts(
-        warmup_steps: int,
+        scheduler_steps: int,
         num_cycles: float,
-        max_epochs: int,
-        approximate_epoch_length: int,
 ):
-    scheduler_steps = max_epochs * approximate_epoch_length - warmup_steps
-
     def lr_lambda(current_step: int):
         progress = float(current_step) / float(scheduler_steps)
         schedule = math.cos(((progress * num_cycles) % 1.0) * math.pi)
@@ -80,12 +64,8 @@ def lr_lambda_cosine_with_hard_restarts(
 
 
 def lr_lambda_rex(
-        warmup_steps: int,
-        max_epochs: int,
-        approximate_epoch_length: int,
+        scheduler_steps: int,
 ):
-    scheduler_steps = max_epochs * approximate_epoch_length - warmup_steps
-
     def lr_lambda(current_step: int):
         # https://arxiv.org/abs/2107.04197
         max_lr = 1

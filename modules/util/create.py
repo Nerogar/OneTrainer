@@ -336,34 +336,39 @@ def create_lr_scheduler(
         num_cycles: float,
         max_epochs: int,
         approximate_epoch_length: int,
+        gradient_accumulation_steps: int,
         global_step: int = 0,
 ) -> LRScheduler:
+    total_steps = int(approximate_epoch_length * max_epochs / gradient_accumulation_steps)
+    warmup_steps = int(warmup_steps / gradient_accumulation_steps)
+    scheduler_steps = total_steps - warmup_steps
+
     match learning_rate_scheduler:
         case LearningRateScheduler.CONSTANT:
             lr_lambda = lr_lambda_constant()
 
         case LearningRateScheduler.LINEAR:
             lr_lambda = lr_lambda_linear(
-                warmup_steps, max_epochs, approximate_epoch_length
+                scheduler_steps
             )
 
         case LearningRateScheduler.COSINE:
             lr_lambda = lr_lambda_cosine(
-                warmup_steps, max_epochs, approximate_epoch_length
+                scheduler_steps
             )
 
         case LearningRateScheduler.COSINE_WITH_RESTARTS:
             lr_lambda = lr_lambda_cosine_with_restarts(
-                warmup_steps, num_cycles, max_epochs, approximate_epoch_length
+                scheduler_steps, num_cycles
             )
 
         case LearningRateScheduler.COSINE_WITH_HARD_RESTARTS:
             lr_lambda = lr_lambda_cosine_with_hard_restarts(
-                warmup_steps, num_cycles, max_epochs, approximate_epoch_length
+                scheduler_steps, num_cycles
             )
         case LearningRateScheduler.REX:
             lr_lambda = lr_lambda_rex(
-                warmup_steps, max_epochs, approximate_epoch_length
+                scheduler_steps
             )
         case _:
             lr_lambda = lr_lambda_constant()
@@ -374,5 +379,5 @@ def create_lr_scheduler(
     return LambdaLR(
         optimizer=optimizer,
         lr_lambda=lr_lambda,
-        last_epoch=global_step - 1,
+        last_epoch=int(global_step / gradient_accumulation_steps) - 1,
     )
