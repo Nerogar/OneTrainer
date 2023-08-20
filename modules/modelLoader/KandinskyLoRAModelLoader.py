@@ -65,6 +65,8 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
             KandinskyLoRAModelLoader.__load_ckpt(model, pt_lora_name)
         elif os.path.exists(safetensors_lora_name):
             KandinskyLoRAModelLoader.__load_safetensors(model, safetensors_lora_name)
+        else:
+            raise Exception("no lora found")
 
         # optimizer
         try:

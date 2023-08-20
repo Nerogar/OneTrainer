@@ -94,6 +94,8 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
             StableDiffusionLoRAModelLoader.__load_ckpt(model, weight_dtypes, pt_lora_name)
         elif os.path.exists(safetensors_lora_name):
             StableDiffusionLoRAModelLoader.__load_safetensors(model, weight_dtypes, safetensors_lora_name)
+        else:
+            raise Exception("no lora found")
 
         # optimizer
         try:

@@ -8,6 +8,7 @@ from modules.dataLoader.MgdsKandinskyFineTuneDataLoader import MgdsKandinskyFine
 from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
 from modules.dataLoader.MgdsStableDiffusionFineTuneVaeDataLoader import MgdsStableDiffusionFineTuneVaeDataLoader
+from modules.dataLoader.MgdsStableDiffusionXLEmbeddingDataLoader import MgdsStableDiffusionXLEmbeddingDataLoader
 from modules.dataLoader.MgdsStableDiffusionXLFineTuneDataLoader import MgdsStableDiffusionXLFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -16,6 +17,7 @@ from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
+from modules.modelLoader.StableDiffusionXLEmbeddingModelLoader import StableDiffusionXLEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusionXLLoRAModelLoader
 from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
 from modules.modelSampler import BaseModelSampler
@@ -29,6 +31,7 @@ from modules.modelSaver.KandinskyLoRAModelSaver import KandinskyLoRAModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
+from modules.modelSaver.StableDiffusionXLEmbeddingModelSaver import StableDiffusionXLEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
 from modules.modelSaver.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
@@ -38,6 +41,7 @@ from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbe
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
 from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
+from modules.modelSetup.StableDiffusionXLEmbeddingSetup import StableDiffusionXLEmbeddingSetup
 from modules.modelSetup.StableDiffusionXLFineTuneSetup import StableDiffusionXLFineTuneSetup
 from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
@@ -76,6 +80,8 @@ def create_model_loader(
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLEmbeddingModelLoader()
 
 
 def create_model_saver(
@@ -103,6 +109,8 @@ def create_model_saver(
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLEmbeddingModelSaver()
 
 
 def create_model_setup(
@@ -133,6 +141,8 @@ def create_model_setup(
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLEmbeddingSetup(train_device, temp_device, debug_mode)
 
 
 def create_model_sampler(
@@ -162,6 +172,8 @@ def create_model_sampler(
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(model, model_type, train_device)
+            if model_type.is_stable_diffusion_xl():
+                return StableDiffusionXLSampler(model, model_type, train_device)
 
 
 def create_data_loader(
@@ -192,6 +204,8 @@ def create_data_loader(
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return MgdsStableDiffusionEmbeddingDataLoader(args, model, train_progress)
+            if model_type.is_stable_diffusion_xl():
+                return MgdsStableDiffusionXLEmbeddingDataLoader(args, model, train_progress)
 
 
 def create_optimizer(

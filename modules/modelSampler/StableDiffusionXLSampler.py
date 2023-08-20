@@ -239,6 +239,11 @@ class StableDiffusionXLSampler(BaseModelSampler):
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
+        if len(self.model.embeddings) > 0:
+            tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
+            embedding_string = ''.join(tokens)
+            prompt = prompt.replace("<embedding>", embedding_string)
+
         image = self.__sample_base(
             prompt=prompt,
             resolution=resolution,
