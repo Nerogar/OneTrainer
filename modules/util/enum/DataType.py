@@ -26,14 +26,8 @@ class DataType(Enum):
             case _:
                 return None
 
-    def enable_mixed_precision(self, weight_dtype: 'DataType'):
-        return self in [
-            DataType.FLOAT_16,
-            DataType.BFLOAT_16,
-        ] and self != weight_dtype
-
     def enable_tf(self):
         return self == DataType.TFLOAT_32
 
     def enable_loss_scaling(self, weight_dtype: 'DataType'):
-        return self == DataType.FLOAT_16 and weight_dtype in [DataType.FLOAT_32, DataType.BFLOAT_16]
+        return self == DataType.FLOAT_16 and weight_dtype == DataType.FLOAT_32

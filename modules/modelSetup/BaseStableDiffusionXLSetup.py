@@ -14,6 +14,7 @@ from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
@@ -96,7 +97,7 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
             original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
         )
 
-        if args.train_text_encoder:
+        if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
             text_encoder_1_output = model.text_encoder_1(
                 batch['tokens_1'], output_hidden_states=True, return_dict=True
             )

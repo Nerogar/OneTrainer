@@ -4,7 +4,6 @@ from mgds.TransformersDataLoaderModules import *
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.dtype_util import allow_mixed_precision
-from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class MgdsBaseDataLoader:
