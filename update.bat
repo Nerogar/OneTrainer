@@ -12,7 +12,7 @@ echo could not pull updates
 goto :end_error
 
 :check_venv
-dir %VENV_DIR% > NUL 2> NUL
+dir "%VENV_DIR%" > NUL 2> NUL
 if %ERRORLEVEL% == 0 goto :activate_venv
 echo venv not found, please run install.bat first
 goto :end_error

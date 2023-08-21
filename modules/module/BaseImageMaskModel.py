@@ -6,6 +6,9 @@ import torch
 from PIL import Image
 from torch import Tensor
 from torchvision.transforms import transforms
+from tqdm import tqdm
+
+from modules.util import path_util
 
 
 class MaskSample:
@@ -76,6 +79,17 @@ class MaskSample:
 
 
 class BaseImageMaskModel(metaclass=ABCMeta):
+    @staticmethod
+    def __get_sample_filenames(sample_dir: str) -> [str]:
+        filenames = []
+        for filename in os.listdir(sample_dir):
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in path_util.supported_image_extensions() and '-masklabel.png' not in filename:
+                filenames.append(os.path.join(sample_dir, filename))
+
+        return filenames
+
+    @abstractmethod
     def mask_image(
             self,
             filename: str,
@@ -102,7 +116,6 @@ class BaseImageMaskModel(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
     def mask_images(
             self,
             filenames: list[str],
@@ -131,9 +144,18 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
-        pass
 
-    @abstractmethod
+        if progress_callback is not None:
+            progress_callback(0, len(filenames))
+        for i, filename in enumerate(tqdm(filenames)):
+            try:
+                self.mask_image(filename, prompts, mode, threshold, smooth_pixels, expand_pixels)
+            except Exception as e:
+                if error_callback is not None:
+                    error_callback(filename)
+            if progress_callback is not None:
+                progress_callback(i + 1, len(filenames))
+
     def mask_folder(
             self,
             sample_dir: str,
@@ -162,4 +184,15 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
-        pass
+
+        filenames = self.__get_sample_filenames(sample_dir)
+        self.mask_images(
+            filenames=filenames,
+            prompts=prompts,
+            mode=mode,
+            threshold=threshold,
+            smooth_pixels=smooth_pixels,
+            expand_pixels=expand_pixels,
+            progress_callback=progress_callback,
+            error_callback=error_callback,
+        )

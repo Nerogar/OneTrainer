@@ -21,7 +21,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.mode_var = ctk.StringVar(self, "Create if absent")
         self.modes = ["Replace all captions", "Create if absent"]
         self.model_var = ctk.StringVar(self, "Blip")
-        self.models = ["Blip", "Blip2"]
+        self.models = ["Blip", "Blip2", "WD14 VIT v2"]
 
         self.frame = ctk.CTkFrame(self, width=600, height=300)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)

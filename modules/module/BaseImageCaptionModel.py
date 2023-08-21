@@ -3,6 +3,9 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable
 
 from PIL import Image
+from tqdm import tqdm
+
+from modules.util import path_util
 
 
 class CaptionSample:
@@ -47,6 +50,16 @@ class CaptionSample:
 
 
 class BaseImageCaptionModel(metaclass=ABCMeta):
+    @staticmethod
+    def __get_sample_filenames(sample_dir: str) -> [str]:
+        filenames = []
+        for filename in os.listdir(sample_dir):
+            ext = os.path.splitext(filename)[1]
+            if path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename:
+                filenames.append(os.path.join(sample_dir, filename))
+
+        return filenames
+
     @abstractmethod
     def caption_image(
             self,
@@ -66,7 +79,6 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
     def caption_images(
             self,
             filenames: [str],
@@ -87,9 +99,18 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
-        pass
 
-    @abstractmethod
+        if progress_callback is not None:
+            progress_callback(0, len(filenames))
+        for i, filename in enumerate(tqdm(filenames)):
+            try:
+                self.caption_image(filename, initial_caption, mode)
+            except Exception as e:
+                if error_callback is not None:
+                    error_callback(filename)
+            if progress_callback is not None:
+                progress_callback(i + 1, len(filenames))
+
     def caption_folder(
             self,
             sample_dir: str,
@@ -110,4 +131,12 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
-        pass
+
+        filenames = self.__get_sample_filenames(sample_dir)
+        self.caption_images(
+            filenames=filenames,
+            initial_caption=initial_caption,
+            mode=mode,
+            progress_callback=progress_callback,
+            error_callback=error_callback,
+        )

@@ -1,14 +1,11 @@
-import os
-from typing import Optional, Callable
+from typing import Optional
 
 import torch
 from torch import Tensor, nn
 from torchvision.transforms import functional
-from tqdm.auto import tqdm
 from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation
 
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
-from modules.util import path_util
 
 
 class ClipSegModel(BaseImageMaskModel):
@@ -34,22 +31,14 @@ class ClipSegModel(BaseImageMaskModel):
 
         kernel_size = kernel_radius * 2 + 1
         kernel_weights = torch.ones(1, 1, kernel_size, kernel_size) / (kernel_size * kernel_size)
-        kernel = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
-                           padding=kernel_radius)
+        kernel = nn.Conv2d(
+            in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
+            padding=kernel_radius
+        )
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
         kernel.to(self.device)
         return kernel
-
-    @staticmethod
-    def __get_sample_filenames(sample_dir: str) -> [str]:
-        filenames = []
-        for filename in os.listdir(sample_dir):
-            ext = os.path.splitext(filename)[1].lower()
-            if ext in path_util.supported_image_extensions() and '-masklabel.png' not in filename:
-                filenames.append(os.path.join(sample_dir, filename))
-
-        return filenames
 
     def __process_mask(self, mask: Tensor, target_height: int, target_width: int, threshold: float) -> Tensor:
         while len(mask.shape) < 4:
@@ -104,48 +93,3 @@ class ClipSegModel(BaseImageMaskModel):
             mask_sample.subtract_mask_tensor(predicted_mask)
 
         mask_sample.save_mask()
-
-    def mask_images(
-            self,
-            filenames: list[str],
-            prompts: list[str],
-            mode: str = 'fill',
-            threshold: float = 0.3,
-            smooth_pixels: int = 5,
-            expand_pixels: int = 10,
-            progress_callback: Callable[[int, int], None] = None,
-            error_callback: Callable[[str], None] = None,
-    ):
-        if progress_callback is not None:
-            progress_callback(0, len(filenames))
-        for i, filename in enumerate(tqdm(filenames)):
-            try:
-                self.mask_image(filename, prompts, mode, threshold, smooth_pixels, expand_pixels)
-            except Exception as e:
-                if error_callback is not None:
-                    error_callback(filename)
-            if progress_callback is not None:
-                progress_callback(i + 1, len(filenames))
-
-    def mask_folder(
-            self,
-            sample_dir: str,
-            prompts: list[str],
-            mode: str = 'fill',
-            threshold: float = 0.3,
-            smooth_pixels: int = 5,
-            expand_pixels: int = 10,
-            progress_callback: Callable[[int, int], None] = None,
-            error_callback: Callable[[str], None] = None,
-    ):
-        filenames = self.__get_sample_filenames(sample_dir)
-        self.mask_images(
-            filenames=filenames,
-            prompts=prompts,
-            mode=mode,
-            threshold=threshold,
-            smooth_pixels=smooth_pixels,
-            expand_pixels=expand_pixels,
-            progress_callback=progress_callback,
-            error_callback=error_callback,
-        )

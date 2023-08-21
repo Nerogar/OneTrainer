@@ -4,6 +4,7 @@ opencv-python==4.8.0.74
 pillow==9.3.0
 tqdm==4.64.1
 PyYAML==6.0
+huggingface-hub==0.16.4
 
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu118
@@ -21,6 +22,7 @@ omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # other models
+onnxruntime==1.15.1
 rembg[gpu]==2.0.50 # used for automatic mask creation
 
 # data loader

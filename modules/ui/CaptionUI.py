@@ -14,6 +14,7 @@ from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
 from modules.module.RembgModel import RembgModel
+from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
@@ -406,6 +407,10 @@ Mouse wheel: increase or decrease brush size"""
             if self.captioning_model is None or not isinstance(self.captioning_model, Blip2Model):
                 print("loading Blip2 model, this may take a while")
                 self.captioning_model = Blip2Model(torch.device("cuda"), torch.float16)
+        elif model == "WD14 VIT v2":
+            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
+                print("loading WD14_VIT_v2 model, this may take a while")
+                self.captioning_model = WDModel(torch.device("cuda"), torch.float16)
 
     def print_help(self):
         print(self.help_text)
