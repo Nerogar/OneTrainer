@@ -257,6 +257,38 @@ def create_optimizer(
                 weight_decay=args.weight_decay,
                 eps=1e-8,
             )
+        case Optimizer.ADAGRAD:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.Adagrad(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                eps=1e-8,
+            )
+        case Optimizer.ADAGRAD_8BIT:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.Adagrad8bit(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                eps=1e-8,
+            )
+        case Optimizer.RMSPROP:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.RMSprop(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                eps=1e-8,
+            )
+        case Optimizer.RMSPROP_8BIT:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.RMSprop8bit(
+                params=parameters,
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                eps=1e-8,
+            )
         case Optimizer.LION:
             import lion_pytorch as lp
             optimizer = lp.Lion(

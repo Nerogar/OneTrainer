@@ -5,9 +5,13 @@ class Optimizer(Enum):
     SGD = 'SGD'
     ADAM = 'ADAM'
     ADAMW = 'ADAMW'
+    ADAGRAD = 'ADAGRAD'
+    RMSPROP = 'RMSPROP'
 
     ADAM_8BIT = 'ADAM_8BIT'
     ADAMW_8BIT = 'ADAMW_8BIT'
+    ADAGRAD_8BIT = 'ADAGRAD_8BIT'
+    RMSPROP_8BIT = 'RMSPROP_8BIT'
 
     LION = 'LION'
 
