@@ -21,7 +21,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **EMA**: Train you own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
 - **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
   resolutions, buckets are created automatically.
-- **Dataset Tooling**: Automatically caption your dataset using BLIP and BLIP2, or create masks for masked training.
+- **Dataset Tooling**: Automatically caption your dataset using BLIP, BLIP2 and WD-1.4, or create masks for masked
+  training using ClipSeg or Rembg.
 - **Model Tooling**: convert between different model formats from a simple UI.
 
 A more detailed list can be found [here](docs/ThingsToAdd.md).
