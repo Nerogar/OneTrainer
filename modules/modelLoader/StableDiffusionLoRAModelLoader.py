@@ -10,9 +10,8 @@ from torch import Tensor
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
-from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -29,22 +28,22 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
 
     @staticmethod
     def __init_lora(model: StableDiffusionModel, state_dict: dict[str, Tensor], dtype: torch.dtype):
-        rank = StableDiffusionLoRAModelLoader.__get_rank(state_dict)
+        rank = BaseModelLoader._get_lora_rank(state_dict)
 
-        model.text_encoder_lora = LoRAModuleWrapper(
-            orig_module=model.text_encoder,
-            rank=rank,
+        model.text_encoder_lora = BaseModelLoader._load_lora_with_prefix(
+            module=model.text_encoder,
+            state_dict=state_dict,
             prefix="lora_te",
-        ).to(dtype=dtype)
-        model.text_encoder_lora.load_state_dict(state_dict)
-
-        model.unet_lora = LoRAModuleWrapper(
-            orig_module=model.unet,
             rank=rank,
+        )
+
+        model.unet_lora = BaseModelLoader._load_lora_with_prefix(
+            module=model.unet,
+            state_dict=state_dict,
             prefix="lora_unet",
+            rank=rank,
             module_filter=["attentions"],
-        ).to(dtype=dtype)
-        model.unet_lora.load_state_dict(state_dict)
+        )
 
     @staticmethod
     def __load_safetensors(

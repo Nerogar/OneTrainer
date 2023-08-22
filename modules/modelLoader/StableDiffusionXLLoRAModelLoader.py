@@ -10,9 +10,8 @@ from torch import Tensor
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
-from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -22,37 +21,30 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
         super(StableDiffusionXLLoRAModelLoader, self).__init__()
 
     @staticmethod
-    def __get_rank(state_dict: dict) -> int:
-        for name, state in state_dict.items():
-            if "lora_down.weight" in name:
-                return state.shape[0]
-
-    @staticmethod
     def __init_lora(model: StableDiffusionXLModel, state_dict: dict[str, Tensor]):
-        rank = StableDiffusionXLLoRAModelLoader.__get_rank(state_dict)
+        rank = BaseModelLoader._get_lora_rank(state_dict)
 
-        # TODO: only create the lora if state_dict contains the keys
-        model.text_encoder_1_lora = LoRAModuleWrapper(
-            orig_module=model.text_encoder_1,
-            rank=rank,
+        model.text_encoder_1_lora = BaseModelLoader._load_lora_with_prefix(
+            module=model.text_encoder_1,
+            state_dict=state_dict,
             prefix="lora_te1",
-        ).to(dtype=torch.float32)
-        model.text_encoder_1_lora.load_state_dict(state_dict)
-
-        model.text_encoder_2_lora = LoRAModuleWrapper(
-            orig_module=model.text_encoder_2,
             rank=rank,
+        )
+
+        model.text_encoder_2_lora = BaseModelLoader._load_lora_with_prefix(
+            module=model.text_encoder_2,
+            state_dict=state_dict,
             prefix="lora_te2",
-        ).to(dtype=torch.float32)
-        model.text_encoder_2_lora.load_state_dict(state_dict)
-
-        model.unet_lora = LoRAModuleWrapper(
-            orig_module=model.unet,
             rank=rank,
+        )
+
+        model.unet_lora = BaseModelLoader._load_lora_with_prefix(
+            module=model.unet,
+            state_dict=state_dict,
             prefix="lora_unet",
+            rank=rank,
             module_filter=["attentions"],
-        ).to(dtype=torch.float32)
-        model.unet_lora.load_state_dict(state_dict)
+        )
 
     @staticmethod
     def __default_model_spec_name(model_type: ModelType) -> str | None:

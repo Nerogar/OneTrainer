@@ -9,9 +9,8 @@ from torch import Tensor
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
-from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
@@ -27,15 +26,15 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
 
     @staticmethod
     def __init_lora(model: KandinskyModel, state_dict: dict[str, Tensor]):
-        rank = KandinskyLoRAModelLoader.__get_rank(state_dict)
+        rank = BaseModelLoader._get_lora_rank(state_dict)
 
-        model.unet_lora = LoRAModuleWrapper(
-            orig_module=model.unet,
-            rank=rank,
+        model.unet_lora = BaseModelLoader._load_lora_with_prefix(
+            module=model.unet,
+            state_dict=state_dict,
             prefix="lora_unet",
+            rank=rank,
             module_filter=["attentions"],
-        ).to(dtype=torch.float32)
-        model.unet_lora.load_state_dict(state_dict)
+        )
 
     @staticmethod
     def __load_safetensors(model: KandinskyModel, lora_name: str):
