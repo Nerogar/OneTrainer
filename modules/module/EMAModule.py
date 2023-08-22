@@ -28,7 +28,7 @@ class EMAModuleWrapper:
         # The decay needed to reach a specific impact after n steps is:
         #     decay = (1-impact)^(1/n)
 
-    def __get_current_decay(self, optimization_step) -> float:
+    def get_current_decay(self, optimization_step) -> float:
         return min(
             (1 + optimization_step) / (10 + optimization_step),
             self.decay
@@ -38,7 +38,7 @@ class EMAModuleWrapper:
     def step(self, parameters: Iterable[torch.nn.Parameter], optimization_step):
         parameters = list(parameters)
 
-        one_minus_decay = 1 - self.__get_current_decay(optimization_step)
+        one_minus_decay = 1 - self.get_current_decay(optimization_step)
 
         if (optimization_step + 1) % self.update_step_interval == 0:
             for ema_parameter, parameter in zip(self.ema_parameters, parameters):

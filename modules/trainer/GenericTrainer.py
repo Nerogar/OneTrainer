@@ -377,9 +377,15 @@ class GenericTrainer(BaseTrainer):
                     accumulated_loss = 0.0
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
                     if self.model.ema:
+                        update_step = train_progress.global_step // self.args.gradient_accumulation_steps
+                        self.tensorboard.add_scalar(
+                            "ema_decay",
+                            self.model.ema.get_current_decay(update_step),
+                            train_progress.global_step
+                        )
                         self.model.ema.step(
                             self.parameters,
-                            train_progress.global_step // self.args.gradient_accumulation_steps
+                            update_step
                         )
                     self.one_step_trained = True
 
