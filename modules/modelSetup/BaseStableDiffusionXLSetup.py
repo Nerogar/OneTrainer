@@ -15,6 +15,8 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+import torchvision.models as models
+
 
 
 class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
@@ -214,6 +216,18 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
 
         return model_output_data
 
+    def perceptual_loss(self, generated, target, vgg_model):
+        layers_to_use = ['0', '5', '10', '19', '28']  # These correspond to layers in VGG16 after each maxpool.
+        loss_per_image = torch.zeros(generated.size(0), device='cuda')  # For storing individual losses
+        x1, x2 = generated, target
+        for name, layer in vgg_model.named_children():
+            x1, x2 = layer(x1), layer(x2)
+            if name in layers_to_use:
+                layer_loss = F.mse_loss(x1, x2, reduction='none').mean([1, 2, 3])  # Mean over spatial dimensions
+                loss_per_image += layer_loss
+        return loss_per_image
+
+
     def calculate_loss(
             self,
             model: StableDiffusionXLModel,
@@ -223,6 +237,8 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
     ) -> Tensor:
         predicted = data['predicted']
         target = data['target']
+        predicted = predicted[:, :3, :, :]
+        target = target[:, :3, :, :]
 
         # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
         #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
@@ -236,11 +252,20 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
                 args.normalize_masked_area_loss
             ).mean([1, 2, 3])
         else:
-            losses = F.mse_loss(
+            mse_losses = F.mse_loss(
                 predicted,
                 target,
                 reduction='none'
             ).mean([1, 2, 3])
+
+            l1_losses = F.l1_loss(predicted, target, reduction='none').mean([1, 2, 3])
+            
+            vgg = models.vgg16(weights=models.VGG16_Weights.DEFAULT).features.to('cuda').eval()
+            
+            p_loss = self.perceptual_loss(predicted, target, vgg)
+            p_loss = p_loss / 255
+
+            losses = 0.2 * mse_losses + 0.5 * l1_losses + 0.3 * p_loss
 
             if args.normalize_masked_area_loss:
                 clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
