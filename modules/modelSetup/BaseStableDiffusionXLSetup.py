@@ -16,7 +16,9 @@ from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 import torchvision.models as models
-
+from skimage.color import rgb2lab
+from skimage import img_as_ubyte
+import numpy as np
 
 
 class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
@@ -217,16 +219,81 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
         return model_output_data
 
     def perceptual_loss(self, generated, target, vgg_model):
-        layers_to_use = ['0', '5', '10', '19', '28']  # These correspond to layers in VGG16 after each maxpool.
-        loss_per_image = torch.zeros(generated.size(0), device='cuda')  # For storing individual losses
+        layers_to_use = ['0', '5', '10', '19', '28']
+        loss_per_image = torch.zeros(generated.size(0), device='cuda')
         x1, x2 = generated, target
         for name, layer in vgg_model.named_children():
             x1, x2 = layer(x1), layer(x2)
             if name in layers_to_use:
-                layer_loss = F.mse_loss(x1, x2, reduction='none').mean([1, 2, 3])  # Mean over spatial dimensions
+                layer_loss = F.mse_loss(x1, x2, reduction='none').mean([1, 2, 3])  # 
                 loss_per_image += layer_loss
         return loss_per_image
+        
+    def rgb_to_lab(self, img):
+        np_img = img.permute(0, 2, 3, 1).cpu().detach().numpy()  # Add .detach() before .numpy()
+        print(np_img.min(), np_img.max())
+        lab_imgs = [img_as_ubyte(rgb2lab(image)) for image in np_img]
+        lab_imgs = np.stack(lab_imgs)
+        return torch.tensor(lab_imgs).permute(0, 3, 1, 2).to(img.device).float()
 
+
+    def gradient_loss(self, predicted, target):
+        dx_pred = torch.abs(predicted[:, :, 1:, :] - predicted[:, :, :-1, :])
+        dx_target = torch.abs(target[:, :, 1:, :] - target[:, :, :-1, :])
+        dx_diff = torch.abs(dx_pred - dx_target)
+
+        dy_pred = torch.abs(predicted[:, :, :, 1:] - predicted[:, :, :, :-1])
+        dy_target = torch.abs(target[:, :, :, 1:] - target[:, :, :, :-1])
+        dy_diff = torch.abs(dy_pred - dy_target)
+
+        return dx_diff.mean([1, 2, 3]) + dy_diff.mean([1, 2, 3])
+
+    def total_variation_loss(self, x):
+        height = x.size(2)
+        width = x.size(3)
+        tv_loss_x = torch.abs(x[:, :, :-1, :] - x[:, :, 1:, :])
+        tv_loss_y = torch.abs(x[:, :, :, :-1] - x[:, :, :, 1:])
+        tv_loss = tv_loss_x.mean([1, 2, 3]) + tv_loss_y.mean([1, 2, 3])
+        # Normalize to [0, 1]
+        max_tv = 2 * (width + height)
+        normalized_tv_loss = tv_loss / max_tv
+        return normalized_tv_loss
+
+
+    def ssim(self, img1, img2, C1=0.01**2, C2=0.03**2):
+        mu1 = img1.mean([1, 2, 3])
+        mu2 = img2.mean([1, 2, 3])
+        sigma1_sq = img1.var([1, 2, 3])
+        sigma2_sq = img2.var([1, 2, 3])
+        sigma12 = ((img1 - mu1.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)) * (img2 - mu2.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))).mean([1, 2, 3])
+        ssim_map = ((2 * mu1 * mu2 + C1) * (2 * sigma12 + C2)) / ((mu1**2 + mu2**2 + C1) * (sigma1_sq + sigma2_sq + C2))
+        return (1 - ssim_map) / 2
+        
+    def gaussian_pyramid(self, img, max_levels):
+        pyramid = [img]
+        for i in range(max_levels - 1):
+            img = F.avg_pool2d(img, 2)
+            pyramid.append(img)
+        return pyramid
+
+    def laplacian_pyramid(self, img, max_levels):
+        gaussian_pyrm = self.gaussian_pyramid(img, max_levels)  # Add self here
+        laplacian_pyrm = []
+        for i in range(max_levels - 1):
+            upsampled = F.interpolate(gaussian_pyrm[i + 1], size=gaussian_pyrm[i].size()[2:], mode='bilinear', align_corners=False)
+            laplacian_pyrm.append(gaussian_pyrm[i] - upsampled)
+        laplacian_pyrm.append(gaussian_pyrm[-1])  # The top of the Laplacian pyramid is just the last Gaussian image.
+        return laplacian_pyrm
+    
+    # max_levels can be adjusted to focus on finer details or larger structures
+    def laplacian_pyramid_loss(self, generated, target, max_levels=5):
+        gen_lap_pyrm = self.laplacian_pyramid(generated, max_levels)  # Add self here
+        target_lap_pyrm = self.laplacian_pyramid(target, max_levels)  # Add self here
+        
+        loss_per_image = torch.zeros(generated.size(0), device='cuda')
+        for gen_lap, tar_lap in zip(gen_lap_pyrm, target_lap_pyrm):
+            loss_per_image += F.mse_loss(gen_lap, tar_lap, reduction='none').mean([1, 2, 3])
+        return loss_per_image
 
     def calculate_loss(
             self,
@@ -252,20 +319,56 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
                 args.normalize_masked_area_loss
             ).mean([1, 2, 3])
         else:
-            mse_losses = F.mse_loss(
+            #MSE/L2 Loss
+            l2_losses = F.mse_loss(
                 predicted,
                 target,
                 reduction='none'
             ).mean([1, 2, 3])
-
-            l1_losses = F.l1_loss(predicted, target, reduction='none').mean([1, 2, 3])
             
+            #MAE/L1 Loss
+            l1_losses = F.l1_loss(
+                predicted, 
+                target, 
+                reduction='none'
+            ).mean([1, 2, 3])
+            
+            #Perceptual Loss (VGG Based)
             vgg = models.vgg16(weights=models.VGG16_Weights.DEFAULT).features.to('cuda').eval()
-            
             p_loss = self.perceptual_loss(predicted, target, vgg)
             p_loss = p_loss / 255
+            
+            #Color Loss (L1 Loss in Lab color space)
+            # l1_lab_losses = F.l1_loss(
+                # self.rgb_to_lab(predicted), 
+                # self.rgb_to_lab(target), 
+                # reduction='none'
+            # ).mean([1, 2, 3])
+            
+            #Structural Similarity Index (SSIM)
+            ssim_loss = self.ssim(predicted, target)
+            
+            #Gradient Loss
+            gradient_losses = self.gradient_loss(predicted, target)
+            
+            #Total Variation Loss
+            #tv_losses = self.total_variation_loss(predicted)
 
-            losses = 0.2 * mse_losses + 0.5 * l1_losses + 0.3 * p_loss
+            
+            #Laplacian Pyramid Loss
+            lap_pyrm_loss = self.laplacian_pyramid_loss(predicted, target)
+
+            losses = (
+                0.1 * l2_losses + 
+                0.2 * l1_losses + 
+                0.35 * p_loss + 
+                0.2 * ssim_loss + 
+                0.075 * gradient_losses + 
+                0.075 * lap_pyrm_loss
+            )
+            
+            #print(f"L1 Lab Loss: {l1_lab_losses.mean().item()}")
+            #print(f"TV Loss: {tv_losses}")
 
             if args.normalize_masked_area_loss:
                 clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
