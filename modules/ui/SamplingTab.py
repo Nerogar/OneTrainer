@@ -1,8 +1,9 @@
 import customtkinter as ctk
 
 from modules.ui.ConfigList import ConfigList
-from modules.util.args import sample_defaults
+from modules.ui.SampleWindow import SampleWindow
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.params.SampleParams import SampleParams
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -12,17 +13,18 @@ class SamplingTab(ConfigList):
     def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
         super(SamplingTab, self).__init__(
             master, train_args, ui_state, "sample_definition_file_name",
-            "training_samples", "samples.json", "add sample"
+            "training_samples", "samples.json", "add sample",
+            is_full_width=True,
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return sample_defaults.create_new_sample()
+        return SampleParams.default_values().to_json()
 
     def open_element_window(self, i) -> ctk.CTkToplevel:
-        pass
+        return SampleWindow(self.master, self.current_config[i])
 
 
 class SampleWidget(ctk.CTkFrame):
@@ -31,7 +33,7 @@ class SampleWidget(ctk.CTkFrame):
             master=master, corner_radius=10, bg_color="transparent"
         )
 
-        self.grid_rowconfigure(9, weight=1)
+        self.grid_columnconfigure(9, weight=1)
 
         self.ui_state = UIState(self, sample)
 
@@ -63,17 +65,17 @@ class SampleWidget(ctk.CTkFrame):
         )
         clone_button.grid(row=0, column=1, padx=5)
 
-        # height
-        components.label(self, 0, 2, "height:")
-        height_entry = components.entry(self, 0, 3, self.ui_state, "height")
-        height_entry.bind('<FocusOut>', lambda _: save_command())
-        height_entry.configure(width=50)
-
         # width
-        components.label(self, 0, 4, "width:")
-        width_entry = components.entry(self, 0, 5, self.ui_state, "width")
+        components.label(self, 0, 2, "width:")
+        width_entry = components.entry(self, 0, 3, self.ui_state, "width")
         width_entry.bind('<FocusOut>', lambda _: save_command())
         width_entry.configure(width=50)
+
+        # height
+        components.label(self, 0, 4, "height:")
+        height_entry = components.entry(self, 0, 5, self.ui_state, "height")
+        height_entry.bind('<FocusOut>', lambda _: save_command())
+        height_entry.configure(width=50)
 
         # seed
         components.label(self, 0, 6, "seed:")
@@ -85,6 +87,9 @@ class SampleWidget(ctk.CTkFrame):
         components.label(self, 0, 8, "prompt:")
         prompt_entry = components.entry(self, 0, 9, self.ui_state, "prompt")
         prompt_entry.bind('<FocusOut>', lambda _: save_command())
+
+        # button
+        components.icon_button(self, 0, 10, "...", lambda: self.command(self.i))
 
     def configure_element(self):
         pass

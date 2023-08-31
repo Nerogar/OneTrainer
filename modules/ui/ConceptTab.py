@@ -6,8 +6,8 @@ from PIL import Image
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
-from modules.util.args import concept_defaults
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.params.ConceptParams import create_new_concept
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -17,14 +17,15 @@ class ConceptTab(ConfigList):
     def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
         super(ConceptTab, self).__init__(
             master, train_args, ui_state, "concept_file_name",
-            "training_concepts", "concepts.json", "add concept"
+            "training_concepts", "concepts.json", "add concept",
+            is_full_width=False,
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return concept_defaults.create_new_concept()
+        return create_new_concept()
 
     def open_element_window(self, i) -> ctk.CTkToplevel:
         return ConceptWindow(self.master, self.current_config[i])

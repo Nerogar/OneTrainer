@@ -9,6 +9,7 @@ from tqdm import tqdm
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.enum.ModelType import ModelType
+from modules.util.params.SampleParams import SampleParams
 
 
 class StableDiffusionSampler(BaseModelSampler):
@@ -22,7 +23,8 @@ class StableDiffusionSampler(BaseModelSampler):
     def __sample_base(
             self,
             prompt: str,
-            resolution: tuple[int, int],
+            height: int,
+            width: int,
             seed: int,
             steps: int,
             cfg_scale: float,
@@ -39,8 +41,6 @@ class StableDiffusionSampler(BaseModelSampler):
         unet = self.pipeline.unet
         vae = self.pipeline.vae
         vae_scale_factor = self.pipeline.vae_scale_factor
-
-        height, width = resolution
 
         # prepare prompt
         tokenizer_output = tokenizer(
@@ -172,7 +172,8 @@ class StableDiffusionSampler(BaseModelSampler):
     def __sample_inpainting(
             self,
             prompt: str,
-            resolution: tuple[int, int],
+            height: int,
+            width: int,
             seed: int,
             steps: int,
             cfg_scale: float,
@@ -189,8 +190,6 @@ class StableDiffusionSampler(BaseModelSampler):
         unet = self.pipeline.unet
         vae = self.pipeline.vae
         vae_scale_factor = self.pipeline.vae_scale_factor
-
-        height, width = resolution
 
         # prepare conditioning image
         conditioning_image = torch.zeros((1, 3, height, width), dtype=torch.float32, device=self.train_device)
@@ -333,14 +332,14 @@ class StableDiffusionSampler(BaseModelSampler):
 
     def sample(
             self,
-            prompt: str,
-            resolution: tuple[int, int],
-            seed: int,
+            sample_params: SampleParams,
             destination: str,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
+        prompt = sample_params.prompt
+
         if len(self.model.embeddings) > 0:
             tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
             embedding_string = ''.join(tokens)
@@ -349,8 +348,9 @@ class StableDiffusionSampler(BaseModelSampler):
         if self.model_type.has_conditioning_image_input():
             image = self.__sample_inpainting(
                 prompt=prompt,
-                resolution=resolution,
-                seed=seed,
+                height=sample_params.height,
+                width=sample_params.width,
+                seed=sample_params.seed,
                 steps=20,
                 cfg_scale=7,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,
@@ -360,8 +360,9 @@ class StableDiffusionSampler(BaseModelSampler):
         else:
             image = self.__sample_base(
                 prompt=prompt,
-                resolution=resolution,
-                seed=seed,
+                height=sample_params.height,
+                width=sample_params.width,
+                seed=sample_params.seed,
                 steps=20,
                 cfg_scale=7,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,

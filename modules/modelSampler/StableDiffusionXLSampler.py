@@ -9,6 +9,7 @@ from tqdm import tqdm
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.enum.ModelType import ModelType
+from modules.util.params.SampleParams import SampleParams
 
 
 class StableDiffusionXLSampler(BaseModelSampler):
@@ -22,9 +23,11 @@ class StableDiffusionXLSampler(BaseModelSampler):
     def __sample_base(
             self,
             prompt: str,
-            resolution: tuple[int, int],
+            negative_prompt: str,
+            height: int,
+            width: int,
             seed: int,
-            steps: int,
+            diffusion_steps: int,
             cfg_scale: float,
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
@@ -41,8 +44,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
         unet = self.pipeline.unet
         vae = self.pipeline.vae
         vae_scale_factor = self.pipeline.vae_scale_factor
-
-        height, width = resolution
 
         # prepare prompt
         tokenizer_1_output = tokenizer_1(
@@ -72,7 +73,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             tokens_2_attention_mask = None
 
         negative_tokenizer_1_output = tokenizer_1(
-            "",
+            negative_prompt,
             padding='max_length',
             truncation=True,
             max_length=tokenizer_1.model_max_length,
@@ -85,7 +86,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             negative_tokens_1_attention_mask = None
 
         negative_tokenizer_2_output = tokenizer_2(
-            "",
+            negative_prompt,
             padding='max_length',
             truncation=True,
             max_length=tokenizer_2.model_max_length,
@@ -144,7 +145,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         # prepare timesteps
-        noise_scheduler.set_timesteps(steps, device=self.train_device)
+        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
 
         if force_last_timestep:
@@ -231,25 +232,29 @@ class StableDiffusionXLSampler(BaseModelSampler):
 
     def sample(
             self,
-            prompt: str,
-            resolution: tuple[int, int],
-            seed: int,
+            sample_params: SampleParams,
             destination: str,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
+        prompt = sample_params.prompt
+        negative_prompt = sample_params.negative_prompt
+
         if len(self.model.embeddings) > 0:
             tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
             embedding_string = ''.join(tokens)
             prompt = prompt.replace("<embedding>", embedding_string)
+            negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
 
         image = self.__sample_base(
             prompt=prompt,
-            resolution=resolution,
-            seed=seed,
-            steps=20,
-            cfg_scale=7,
+            negative_prompt=negative_prompt,
+            height=sample_params.height,
+            width=sample_params.width,
+            seed=sample_params.seed,
+            diffusion_steps=sample_params.diffusion_steps,
+            cfg_scale=sample_params.cfg_scale,
             cfg_rescale=0.7 if force_last_timestep else 0.0,
             text_encoder_layer_skip=text_encoder_layer_skip,
             force_last_timestep=force_last_timestep

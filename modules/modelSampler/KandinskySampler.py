@@ -4,11 +4,11 @@ from typing import Callable
 
 import torch
 from PIL.Image import Image
-from tqdm import tqdm
 
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.enum.ModelType import ModelType
+from modules.util.params.SampleParams import SampleParams
 
 
 class KandinskySampler(BaseModelSampler):
@@ -23,7 +23,8 @@ class KandinskySampler(BaseModelSampler):
     def __sample_base(
             self,
             prompt: str,
-            resolution: tuple[int, int],
+            height: int,
+            width: int,
             seed: int,
             prior_steps: int,
             steps: int,
@@ -46,8 +47,8 @@ class KandinskySampler(BaseModelSampler):
             negative_prompt="",
             image_embeds=image_embeds,
             negative_image_embeds=negative_image_embeds,
-            height=resolution[0],
-            width=resolution[1],
+            height=height,
+            width=width,
             num_inference_steps=steps,
             guidance_scale=cfg_scale,
             generator=generator,
@@ -151,18 +152,17 @@ class KandinskySampler(BaseModelSampler):
 
     def sample(
             self,
-            prompt: str,
-            resolution: tuple[int, int],
-            seed: int,
+            sample_params: SampleParams,
             destination: str,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
         image = self.__sample_base(
-            prompt=prompt,
-            resolution=resolution,
-            seed=seed,
+            prompt=sample_params.prompt,
+            height=sample_params.height,
+            width=sample_params.width,
+            seed=sample_params.seed,
             prior_steps=10,
             steps=20,
             prior_cfg_scale=4,

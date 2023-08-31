@@ -13,9 +13,17 @@ from modules.util.ui.UIState import UIState
 
 class ConfigList(metaclass=ABCMeta):
 
-    def __init__(self,
-                 master, train_args: TrainArgs, ui_state: UIState, element_attr_name: str,
-                 config_dir: str, default_config_name: str, add_button_text: str):
+    def __init__(
+            self,
+            master,
+            train_args: TrainArgs,
+            ui_state: UIState,
+            element_attr_name: str,
+            config_dir: str,
+            default_config_name: str,
+            add_button_text: str,
+            is_full_width: bool,
+    ):
         self.master = master
         self.train_args = train_args
         self.ui_state = ui_state
@@ -23,6 +31,8 @@ class ConfigList(metaclass=ABCMeta):
 
         self.config_dir = config_dir
         self.default_config_name = default_config_name
+
+        self.is_full_width = is_full_width
 
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(1, weight=1)
@@ -74,6 +84,9 @@ class ConfigList(metaclass=ABCMeta):
 
         self.element_list = ctk.CTkScrollableFrame(self.master, fg_color="transparent")
         self.element_list.grid(row=1, column=0, sticky="nsew")
+
+        if self.is_full_width:
+            self.element_list.grid_columnconfigure(0, weight=1)
 
         for i, element in enumerate(self.current_config):
             widget = self.create_widget(

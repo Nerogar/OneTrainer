@@ -36,6 +36,7 @@ from modules.util.dtype_util import allow_mixed_precision
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.params.SampleParams import SampleParams
 
 
 class GenericTrainer(BaseTrainer):
@@ -147,12 +148,12 @@ class GenericTrainer(BaseTrainer):
             self,
             train_progress: TrainProgress,
             train_device: torch.device,
-            sample_definitions: list[dict],
+            sample_params_list: list[SampleParams],
             folder_postfix: str = "",
     ):
-        for i, sample_definition in enumerate(sample_definitions):
+        for i, sample_params in enumerate(sample_params_list):
             try:
-                safe_prompt = path_util.safe_filename(sample_definition['prompt'])
+                safe_prompt = path_util.safe_filename(sample_params.prompt)
 
                 sample_dir = os.path.join(
                     self.args.workspace_dir,
@@ -171,9 +172,7 @@ class GenericTrainer(BaseTrainer):
                     self.callbacks.on_sample(image)
 
                 self.model_sampler.sample(
-                    prompt=sample_definition["prompt"],
-                    resolution=(sample_definition["height"], sample_definition["width"]),
-                    seed=sample_definition["seed"],
+                    sample_params=sample_params,
                     destination=sample_path,
                     text_encoder_layer_skip=self.args.text_encoder_layer_skip,
                     force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
@@ -189,7 +188,7 @@ class GenericTrainer(BaseTrainer):
             self,
             train_progress: TrainProgress,
             train_device: torch.device,
-            sample_definitions: list[dict] = None,
+            sample_params_list: list[SampleParams] = None,
     ):
         self.__gc()
 
@@ -197,21 +196,26 @@ class GenericTrainer(BaseTrainer):
 
         self.model_setup.setup_eval_device(self.model)
 
-        if not sample_definitions:
+        if not sample_params_list:
             with open(self.args.sample_definition_file_name, 'r') as f:
-                sample_definitions = json.load(f)
+                sample_params_json_list = json.load(f)
+                sample_params_list = []
+                for sample_params_json in sample_params_json_list:
+                    sample_params = SampleParams.default_values()
+                    sample_params.from_json(sample_params_json)
+                    sample_params_list.append(sample_params)
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
-        self.__sample_loop(train_progress, train_device, sample_definitions)
+        self.__sample_loop(train_progress, train_device, sample_params_list)
 
         if self.model.ema:
             self.model.ema.copy_temp_to(self.parameters)
 
         # ema-less sampling, if an ema model exists
         if self.model.ema:
-            self.__sample_loop(train_progress, train_device, sample_definitions, " - no-ema")
+            self.__sample_loop(train_progress, train_device, sample_params_list, " - no-ema")
 
         self.model_setup.setup_train_device(self.model, self.args)
 

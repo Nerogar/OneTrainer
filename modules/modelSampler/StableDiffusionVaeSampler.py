@@ -9,6 +9,7 @@ from torchvision.transforms import transforms
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.enum.ModelType import ModelType
+from modules.util.params.SampleParams import SampleParams
 
 
 class StableDiffusionVaeSampler(BaseModelSampler):
@@ -19,9 +20,7 @@ class StableDiffusionVaeSampler(BaseModelSampler):
 
     def sample(
             self,
-            prompt: str,
-            resolution: tuple[int, int],
-            seed: int,
+            sample_params: SampleParams,
             destination: str,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
@@ -30,9 +29,9 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
 
         generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(seed)
+        generator.manual_seed(sample_params.seed)
 
-        image = Image.open(prompt)
+        image = Image.open(sample_params.prompt)
         image = image.convert("RGB")
 
         t_in = transforms.ToTensor()
