@@ -45,3 +45,5 @@ class BaseParams:
                     print(f"Could not set {key} as {str(data[key])}")
                 else:
                     print(f"Could not set {key}, not found.")
+
+        return self

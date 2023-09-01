@@ -1,3 +1,4 @@
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.params.BaseParams import BaseParams
 
 
@@ -9,6 +10,7 @@ class SampleParams(BaseParams):
     seed: int
     diffusion_steps: int
     cfg_scale: float
+    noise_scheduler: NoiseScheduler
 
     def __init__(self, args: dict):
         super(SampleParams, self).__init__(args)
@@ -24,5 +26,6 @@ class SampleParams(BaseParams):
         args["seed"] = 42
         args["diffusion_steps"] = 20
         args["cfg_scale"] = 7.0
+        args["noise_scheduler"] = NoiseScheduler.DDIM
 
         return SampleParams(args)

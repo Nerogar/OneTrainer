@@ -7,7 +7,7 @@ from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.params.ConceptParams import create_new_concept
+from modules.util.params.ConceptParams import ConceptParams
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -25,10 +25,10 @@ class ConceptTab(ConfigList):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return create_new_concept()
+        return ConceptParams.default_values()
 
-    def open_element_window(self, i) -> ctk.CTkToplevel:
-        return ConceptWindow(self.master, self.current_config[i])
+    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
+        return ConceptWindow(self.master, self.current_config[i], ui_state)
 
 
 class ConceptWidget(ctk.CTkFrame):
@@ -38,8 +38,8 @@ class ConceptWidget(ctk.CTkFrame):
         )
 
         self.concept = concept
+        self.ui_state = UIState(self, concept)
         self.i = i
-        self.command = open_command
 
         self.grid_rowconfigure(1, weight=1)
 
@@ -52,7 +52,7 @@ class ConceptWidget(ctk.CTkFrame):
         image_label.grid(row=0, column=0)
 
         # name
-        self.name_label = components.label(self, 1, 0, self.concept["name"], pad=5)
+        self.name_label = components.label(self, 1, 0, self.concept.name, pad=5)
 
         # close button
         close_button = ctk.CTkButton(
@@ -78,23 +78,23 @@ class ConceptWidget(ctk.CTkFrame):
         )
         clone_button.place(x=25, y=0)
 
-        image_label.bind("<Button-1>", lambda event: self.command(self.i))
+        image_label.bind("<Button-1>", lambda event: open_command(self.i, self.ui_state))
 
     def configure_element(self):
-        self.name_label.configure(text=self.concept["name"])
+        self.name_label.configure(text=self.concept.name)
 
         self.image.configure(light_image=self.__get_preview_image())
 
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
 
-        if os.path.isdir(self.concept["path"]):
-            for path in os.scandir(self.concept["path"]):
+        if os.path.isdir(self.concept.path):
+            for path in os.scandir(self.concept.path):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() \
                         and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
-                    preview_path = path_util.canonical_join(self.concept["path"], path.name)
+                    preview_path = path_util.canonical_join(self.concept.path, path.name)
                     break
 
         image = Image.open(preview_path)

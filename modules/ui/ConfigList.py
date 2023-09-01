@@ -7,6 +7,7 @@ import customtkinter as ctk
 
 from modules.util import path_util
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.params.BaseParams import BaseParams
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -62,11 +63,11 @@ class ConfigList(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def create_new_element(self) -> dict:
+    def create_new_element(self) -> BaseParams:
         pass
 
     @abstractmethod
-    def open_element_window(self, i) -> ctk.CTkToplevel:
+    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         pass
 
     def __create_configs_dropdown(self):
@@ -174,9 +175,9 @@ class ConfigList(metaclass=ABCMeta):
             with open(filename, "r") as f:
                 self.current_config = []
 
-                loaded_config = json.load(f)
-                for element in loaded_config:
-                    element = self.create_new_element() | element
+                loaded_config_json = json.load(f)
+                for element_json in loaded_config_json:
+                    element = self.create_new_element().from_json(element_json)
                     self.current_config.append(element)
         except:
             self.current_config = []
@@ -189,12 +190,15 @@ class ConfigList(metaclass=ABCMeta):
                 os.mkdir(self.config_dir)
 
             with open(getattr(self.train_args, self.element_attr_name), "w") as f:
-                json.dump(self.current_config, f, indent=4)
+                json.dump(
+                    [element.to_json() for element in self.current_config],
+                    f, indent=4
+                )
         except:
             pass
 
-    def __open_element_window(self, i):
-        window = self.open_element_window(i)
+    def __open_element_window(self, i, ui_state):
+        window = self.open_element_window(i, ui_state)
         self.master.wait_window(window)
         self.widgets[i].configure_element()
         self.__save_current_config()

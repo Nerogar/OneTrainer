@@ -21,25 +21,22 @@ class SamplingTab(ConfigList):
         return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return SampleParams.default_values().to_json()
+        return SampleParams.default_values()
 
-    def open_element_window(self, i) -> ctk.CTkToplevel:
-        return SampleWindow(self.master, self.current_config[i])
+    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
+        return SampleWindow(self.master, self.current_config[i], ui_state)
 
 
 class SampleWidget(ctk.CTkFrame):
-    def __init__(self, master, sample, i, open_command, remove_command, clone_command, save_command):
+    def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
         super(SampleWidget, self).__init__(
             master=master, corner_radius=10, bg_color="transparent"
         )
 
-        self.grid_columnconfigure(9, weight=1)
-
-        self.ui_state = UIState(self, sample)
-
-        self.sample = sample
+        self.ui_state = UIState(self, element)
         self.i = i
-        self.command = open_command
+
+        self.grid_columnconfigure(9, weight=1)
 
         # close button
         close_button = ctk.CTkButton(
@@ -89,7 +86,7 @@ class SampleWidget(ctk.CTkFrame):
         prompt_entry.bind('<FocusOut>', lambda _: save_command())
 
         # button
-        components.icon_button(self, 0, 10, "...", lambda: self.command(self.i))
+        components.icon_button(self, 0, 10, "...", lambda: open_command(self.i, self.ui_state))
 
     def configure_element(self):
         pass

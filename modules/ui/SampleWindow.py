@@ -1,17 +1,17 @@
 import customtkinter as ctk
 
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.params.SampleParams import SampleParams
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
 class SampleWindow(ctk.CTkToplevel):
-    def __init__(self, parent, sample_params: SampleParams, *args, **kwargs):
+    def __init__(self, parent, sample: SampleParams, ui_state: UIState, *args, **kwargs):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
-        self.ui_state = UIState(self, sample_params)
-
-        self.sample_params = sample_params
+        self.sample = sample
+        self.ui_state = ui_state
 
         self.title("Sample")
         self.geometry("800x450")
@@ -65,6 +65,14 @@ class SampleWindow(ctk.CTkToplevel):
         # cfg scale
         components.label(bottom_frame, 2, 0, "cfg scale:")
         components.entry(bottom_frame, 2, 1, self.ui_state, "cfg_scale")
+
+        # sampler
+        components.label(bottom_frame, 2, 2, "sampler:")
+        components.options_kv(bottom_frame, 2, 3, [
+            ("DDIM", NoiseScheduler.DDIM),
+            ("Euler", NoiseScheduler.EULER),
+            ("Euler A", NoiseScheduler.EULER_A),
+        ], self.ui_state, "noise_scheduler")
 
         components.button(self, 2, 0, "ok", self.__ok)
 

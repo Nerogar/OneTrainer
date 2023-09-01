@@ -6,17 +6,16 @@ from PIL import Image
 from torchvision.transforms import functional, InterpolationMode
 
 from modules.util import path_util
+from modules.util.params.ConceptParams import ConceptParams
 from modules.util.ui import components
-from modules.util.ui.UIState import UIState
 
 
 class ConceptWindow(ctk.CTkToplevel):
-    def __init__(self, parent, concept, *args, **kwargs):
+    def __init__(self, parent, concept: ConceptParams, ui_state, *args, **kwargs):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
-        self.ui_state = UIState(self, concept)
-
         self.concept = concept
+        self.ui_state = ui_state
 
         self.title("Concept")
         self.geometry("800x450")
@@ -68,7 +67,7 @@ class ConceptWindow(ctk.CTkToplevel):
             ("From single text file", 'concept'),
             ("From image file name", 'filename'),
         ], self.ui_state, "prompt_source", command=set_prompt_path_entry_enabled)
-        set_prompt_path_entry_enabled(concept["prompt_source"])
+        set_prompt_path_entry_enabled(concept.prompt_source)
 
         # include subdirectories
         components.label(master, 3, 0, "Include Subdirectories",
@@ -138,13 +137,13 @@ class ConceptWindow(ctk.CTkToplevel):
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
 
-        if os.path.isdir(self.concept["path"]):
-            for path in os.scandir(self.concept["path"]):
+        if os.path.isdir(self.concept.path):
+            for path in os.scandir(self.concept.path):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() \
                         and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
-                    preview_path = path_util.canonical_join(self.concept["path"], path.name)
+                    preview_path = path_util.canonical_join(self.concept.path, path.name)
                     break
 
         image = Image.open(preview_path)
@@ -152,35 +151,35 @@ class ConceptWindow(ctk.CTkToplevel):
         image_tensor = functional.to_tensor(image)
         rand = random.Random()
 
-        if self.concept['enable_random_flip']:
+        if self.concept.enable_random_flip:
             if rand.random() < 0.5:
                 image_tensor = functional.hflip(image_tensor)
 
-        if self.concept['enable_random_rotate']:
-            max_angle = self.concept['random_rotate_max_angle']
+        if self.concept.enable_random_rotate:
+            max_angle = self.concept.random_rotate_max_angle
             angle = rand.uniform(-max_angle, max_angle)
             image_tensor = functional.rotate(image_tensor, angle, interpolation=InterpolationMode.BILINEAR)
 
-        if self.concept['enable_random_brightness']:
-            max_strength = self.concept['random_brightness_max_strength']
+        if self.concept.enable_random_brightness:
+            max_strength = self.concept.random_brightness_max_strength
             strength = rand.uniform(1 - max_strength, 1 + max_strength)
             strength = max(0.0, strength)
             image_tensor = functional.adjust_brightness(image_tensor, strength)
 
-        if self.concept['enable_random_contrast']:
-            max_strength = self.concept['random_contrast_max_strength']
+        if self.concept.enable_random_contrast:
+            max_strength = self.concept.random_contrast_max_strength
             strength = rand.uniform(1 - max_strength, 1 + max_strength)
             strength = max(0.0, strength)
             image_tensor = functional.adjust_contrast(image_tensor, strength)
 
-        if self.concept['enable_random_saturation']:
-            max_strength = self.concept['random_saturation_max_strength']
+        if self.concept.enable_random_saturation:
+            max_strength = self.concept.random_saturation_max_strength
             strength = rand.uniform(1 - max_strength, 1 + max_strength)
             strength = max(0.0, strength)
             image_tensor = functional.adjust_contrast(image_tensor, strength)
 
-        if self.concept['enable_random_hue']:
-            max_strength = self.concept['random_hue_max_strength']
+        if self.concept.enable_random_hue:
+            max_strength = self.concept.random_hue_max_strength
             strength = rand.uniform(-max_strength * 0.5, max_strength * 0.5)
             strength = max(-0.5, min(0.5, strength))
             image_tensor = functional.adjust_hue(image_tensor, strength)

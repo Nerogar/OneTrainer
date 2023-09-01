@@ -1,6 +1,7 @@
 from typing import Iterable
 
 import torch
+from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
@@ -47,6 +48,7 @@ from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRAS
 from modules.module.EMAModule import EMAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelType import ModelType
@@ -337,6 +339,8 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.weight_decay,
+                use_bias_correction=True,
+                safeguard_warmup=True,
             )
 
     if state_dict is not None:
@@ -429,3 +433,50 @@ def create_lr_scheduler(
         lr_lambda=lr_lambda,
         last_epoch=int(global_step / gradient_accumulation_steps) - 1,
     )
+
+
+def create_noise_scheduler(
+        noise_scheduler: NoiseScheduler,
+        num_inference_timesteps: int,
+        num_train_timesteps: int = 1000,
+):
+    scheduler = None
+
+    match noise_scheduler:
+        case NoiseScheduler.DDIM:
+            scheduler = DDIMScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
+        case NoiseScheduler.EULER:
+            scheduler = EulerDiscreteScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
+        case NoiseScheduler.EULER_A:
+            scheduler = EulerAncestralDiscreteScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+            )
+
+    if scheduler:
+        scheduler.set_timesteps(num_inference_timesteps)
+
+    return scheduler

@@ -4,11 +4,14 @@ from typing import Callable
 
 import torch
 from PIL.Image import Image
+from diffusers import StableDiffusionXLPipeline
 from tqdm import tqdm
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.util import create
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.params.SampleParams import SampleParams
 
 
@@ -20,6 +23,48 @@ class StableDiffusionXLSampler(BaseModelSampler):
         self.pipeline = model.create_pipeline()
 
     @torch.no_grad()
+    def __sample_base_test(
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            cfg_rescale: float = 0.7,
+            text_encoder_layer_skip: int = 0,
+            force_last_timestep: bool = False,
+    ):
+        generator = torch.Generator(device=self.train_device)
+        generator.manual_seed(seed)
+
+        noise_scheduler = create.create_noise_scheduler(noise_scheduler, diffusion_steps)
+
+        pipe = StableDiffusionXLPipeline(
+            vae=self.model.vae,
+            text_encoder=self.model.text_encoder_1,
+            text_encoder_2=self.model.text_encoder_2,
+            tokenizer=self.model.tokenizer_1,
+            tokenizer_2=self.model.tokenizer_2,
+            unet=self.model.unet,
+            scheduler=noise_scheduler,
+        )
+
+        output = pipe(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            height=height,
+            width=width,
+            generator=generator,
+            num_inference_steps=diffusion_steps,
+            guidance_scale=cfg_scale,
+        )
+
+        return output.images[0]
+
+    @torch.no_grad()
     def __sample_base(
             self,
             prompt: str,
@@ -29,6 +74,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             seed: int,
             diffusion_steps: int,
             cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
@@ -39,7 +85,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         tokenizer_2 = self.model.tokenizer_2
         text_encoder_1 = self.model.text_encoder_1
         text_encoder_2 = self.model.text_encoder_2
-        noise_scheduler = self.pipeline.scheduler
+        noise_scheduler = create.create_noise_scheduler(noise_scheduler, diffusion_steps)
         image_processor = self.pipeline.image_processor
         unet = self.pipeline.unet
         vae = self.pipeline.vae
@@ -145,7 +191,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         # prepare timesteps
-        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
 
         if force_last_timestep:
@@ -222,6 +267,9 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 noise_pred, timestep, latent_image, return_dict=False
             )[0]
 
+            if i == 10:
+                break
+
         latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
@@ -247,7 +295,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             prompt = prompt.replace("<embedding>", embedding_string)
             negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
 
-        image = self.__sample_base(
+        image = self.__sample_base_test(
             prompt=prompt,
             negative_prompt=negative_prompt,
             height=sample_params.height,
@@ -255,6 +303,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             seed=sample_params.seed,
             diffusion_steps=sample_params.diffusion_steps,
             cfg_scale=sample_params.cfg_scale,
+            noise_scheduler=sample_params.noise_scheduler,
             cfg_rescale=0.7 if force_last_timestep else 0.0,
             text_encoder_layer_skip=text_encoder_layer_skip,
             force_last_timestep=force_last_timestep

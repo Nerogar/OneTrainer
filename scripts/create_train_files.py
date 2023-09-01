@@ -1,7 +1,7 @@
 import os
 import sys
 
-from modules.util.params.ConceptParams import create_new_concept
+from modules.util.params.ConceptParams import ConceptParams
 from modules.util.params.SampleParams import SampleParams
 
 sys.path.append(os.getcwd())
@@ -16,7 +16,7 @@ def main():
     args = CreateTrainFilesArgs.parse_args()
 
     if args.concepts_output_destination:
-        data = [create_new_concept()]
+        data = [ConceptParams.default_values().to_json()]
         os.makedirs(Path(path=args.concepts_output_destination).parent.absolute(), exist_ok=True)
 
         with open(args.concepts_output_destination, "w") as f:
