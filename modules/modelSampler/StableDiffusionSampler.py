@@ -125,7 +125,7 @@ class StableDiffusionSampler(BaseModelSampler):
             generator=generator,
             device=self.train_device,
             dtype=torch.float32
-        )
+        ) * noise_scheduler.init_noise_sigma
 
         # denoising loop
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
@@ -284,7 +284,7 @@ class StableDiffusionSampler(BaseModelSampler):
             generator=generator,
             device=self.train_device,
             dtype=torch.float32
-        )
+        ) * noise_scheduler.init_noise_sigma
 
         # denoising loop
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):

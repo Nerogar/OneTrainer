@@ -228,7 +228,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             generator=generator,
             device=self.train_device,
             dtype=unet.dtype
-        )
+        ) * noise_scheduler.init_noise_sigma
 
         added_cond_kwargs = {
             "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
@@ -267,9 +267,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 noise_pred, timestep, latent_image, return_dict=False
             )[0]
 
-            if i == 10:
-                break
-
         latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
@@ -295,7 +292,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             prompt = prompt.replace("<embedding>", embedding_string)
             negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
 
-        image = self.__sample_base_test(
+        image = self.__sample_base(
             prompt=prompt,
             negative_prompt=negative_prompt,
             height=sample_params.height,
