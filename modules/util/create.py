@@ -1,7 +1,8 @@
 from typing import Iterable
 
 import torch
-from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler
+from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
+    DPMSolverMultistepScheduler, UniPCMultistepScheduler
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
@@ -464,6 +465,7 @@ def create_noise_scheduler(
                 trained_betas=None,
                 steps_offset=1,
                 prediction_type="epsilon",
+                use_karras_sigmas=False,
             )
         case NoiseScheduler.EULER_A:
             scheduler = EulerAncestralDiscreteScheduler(
@@ -474,6 +476,87 @@ def create_noise_scheduler(
                 trained_betas=None,
                 steps_offset=1,
                 prediction_type="epsilon",
+            )
+        case NoiseScheduler.DPMPP:
+            scheduler = DPMSolverMultistepScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=0,
+                prediction_type="epsilon",
+                use_karras_sigmas=False,
+                algorithm_type="dpmsolver++"
+            )
+        case NoiseScheduler.DPMPP_SDE:
+            scheduler = DPMSolverMultistepScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=0,
+                prediction_type="epsilon",
+                use_karras_sigmas=False,
+                algorithm_type="sde-dpmsolver++"
+            )
+        case NoiseScheduler.UNIPC:
+            scheduler = UniPCMultistepScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+                use_karras_sigmas=False,
+            )
+        case NoiseScheduler.EULER_KARRAS:
+            scheduler = EulerDiscreteScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+                use_karras_sigmas=True,
+            )
+        case NoiseScheduler.DPMPP_KARRAS:
+            scheduler = DPMSolverMultistepScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+                use_karras_sigmas=True,
+                algorithm_type="dpmsolver++"
+            )
+        case NoiseScheduler.DPMPP_SDE_KARRAS:
+            scheduler = DPMSolverMultistepScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+                use_karras_sigmas=True,
+                algorithm_type="sde-dpmsolver++"
+            )
+        case NoiseScheduler.UNIPC_KARRAS:
+            scheduler = UniPCMultistepScheduler(
+                num_train_timesteps=num_train_timesteps,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                trained_betas=None,
+                steps_offset=1,
+                prediction_type="epsilon",
+                use_karras_sigmas=True,
             )
 
     if scheduler:
