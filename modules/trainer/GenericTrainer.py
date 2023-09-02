@@ -323,7 +323,7 @@ class GenericTrainer(BaseTrainer):
 
             current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
             for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
-                if self.__needs_sample(train_progress):
+                if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )
@@ -331,10 +331,10 @@ class GenericTrainer(BaseTrainer):
                 if self.__needs_gc(train_progress):
                     self.__gc()
 
-                sample_command = self.commands.get_and_reset_sample_command()
-                if sample_command:
+                sample_commands = self.commands.get_and_reset_sample_custom_commands()
+                if sample_commands:
                     self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, train_device, [sample_command])
+                        lambda: self.__sample_during_training(train_progress, train_device, sample_commands)
                     )
 
                 if not has_gradient:

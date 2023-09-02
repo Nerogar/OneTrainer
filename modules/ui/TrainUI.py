@@ -478,6 +478,8 @@ class TrainUI(ctk.CTk):
             ("JPG", ImageFormat.JPG),
         ], self.ui_state, "sample_image_format")
 
+        components.button(top_frame, 0, 4, "sample now", self.sample_now)
+
         # table
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
@@ -619,7 +621,7 @@ class TrainUI(ctk.CTk):
         window = ConvertModelUI(self)
         self.wait_window(window)
 
-    def training_thread_function(self):
+    def __training_thread_function(self):
         error_caught = False
 
         callbacks = TrainCallbacks(
@@ -647,6 +649,7 @@ class TrainUI(ctk.CTk):
             self.on_update_status("stopped")
 
         self.training_thread = None
+        self.training_commands = None
         self.training_button.configure(text="Start Training", state="normal")
 
     def start_training(self):
@@ -657,7 +660,7 @@ class TrainUI(ctk.CTk):
 
             self.training_commands = TrainCommands()
 
-            self.training_thread = threading.Thread(target=self.training_thread_function)
+            self.training_thread = threading.Thread(target=self.__training_thread_function)
             self.training_thread.start()
         else:
             self.training_button.configure(state="disabled")
@@ -677,3 +680,8 @@ class TrainUI(ctk.CTk):
         if file_path:
             with open(file_path, "w") as f:
                 f.write(command)
+
+    def sample_now(self):
+        train_commands = self.training_commands
+        if train_commands:
+            train_commands.sample_default()

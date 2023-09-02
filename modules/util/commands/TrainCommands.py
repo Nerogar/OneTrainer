@@ -4,7 +4,8 @@ from modules.util.params.SampleParams import SampleParams
 class TrainCommands:
     def __init__(self):
         self.__stop_command = False
-        self.__sample_command = None
+        self.__sample_custom_commands = []
+        self.__sample_default_command = False
 
     def stop(self):
         self.__stop_command = True
@@ -12,8 +13,18 @@ class TrainCommands:
     def get_stop_command(self) -> bool:
         return self.__stop_command
 
-    def sample(self, sample_params: SampleParams):
-        pass
+    def sample_custom(self, sample_params: SampleParams):
+        self.__sample_custom_commands.append(sample_params)
 
-    def get_and_reset_sample_command(self) -> SampleParams:
-        return self.__sample_command
+    def get_and_reset_sample_custom_commands(self) -> list[SampleParams]:
+        sample_custom_commands = self.__sample_custom_commands
+        self.__sample_custom_commands = []
+        return sample_custom_commands
+
+    def sample_default(self):
+        self.__sample_default_command = True
+
+    def get_and_reset_sample_default_command(self) -> bool:
+        sample_default_command = self.__sample_default_command
+        self.__sample_default_command = False
+        return sample_default_command
