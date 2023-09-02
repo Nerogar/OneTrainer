@@ -5,6 +5,7 @@ from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
+from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -87,6 +88,7 @@ class TrainArgs(BaseArgs):
     sample_definition_file_name: str
     sample_after: float
     sample_after_unit: TimeUnit
+    sample_image_format: ImageFormat
 
     # backup settings
     backup_after: float
@@ -183,6 +185,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--sample-definition-file-name", type=str, required=True, dest="sample_definition_file_name", help="The json file containing the sample definition")
         parser.add_argument("--sample-after", type=float, required=True, dest="sample_after", help="The interval to sample")
         parser.add_argument("--sample-after-unit", type=TimeUnit, required=True, dest="sample_after_unit", help="The unit applied to the sample-after option")
+        parser.add_argument("--sample-image-format", type=ImageFormat, required=False, default=ImageFormat.JPG, dest="sample_image_format", help="The file format used when saving samples", choices=list(ImageFormat))
 
         # backup settings
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
@@ -270,6 +273,7 @@ class TrainArgs(BaseArgs):
         args["sample_definition_file_name"] = "training_samples/samples.json"
         args["sample_after"] = 10
         args["sample_after_unit"] = TimeUnit.MINUTE
+        args["sample_image_format"] = ImageFormat.JPG
 
         # backup settings
         args["backup_after"] = 30

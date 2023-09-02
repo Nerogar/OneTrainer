@@ -1,3 +1,4 @@
+import inspect
 import os
 from pathlib import Path
 from typing import Callable
@@ -8,6 +9,7 @@ from tqdm import tqdm
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.params.SampleParams import SampleParams
 
@@ -127,6 +129,10 @@ class StableDiffusionSampler(BaseModelSampler):
             dtype=torch.float32
         ) * noise_scheduler.init_noise_sigma
 
+        extra_step_kwargs = {}
+        if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
+            extra_step_kwargs["generator"] = generator
+
         # denoising loop
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
             latent_model_input = torch.cat([latent_image] * 2)
@@ -157,7 +163,7 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # compute the previous noisy sample x_t -> x_t-1
             latent_image = noise_scheduler.step(
-                noise_pred, timestep, latent_image, return_dict=False
+                noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
             )[0]
 
         latent_image = latent_image.to(dtype=vae.dtype)
@@ -286,6 +292,10 @@ class StableDiffusionSampler(BaseModelSampler):
             dtype=torch.float32
         ) * noise_scheduler.init_noise_sigma
 
+        extra_step_kwargs = {}
+        if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
+            extra_step_kwargs["generator"] = generator
+
         # denoising loop
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
             latent_model_input = torch.concat(
@@ -319,7 +329,7 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # compute the previous noisy sample x_t -> x_t-1
             latent_image = noise_scheduler.step(
-                noise_pred, timestep, latent_image, return_dict=False
+                noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
             )[0]
 
         latent_image = latent_image.to(dtype=vae.dtype)
@@ -334,6 +344,7 @@ class StableDiffusionSampler(BaseModelSampler):
             self,
             sample_params: SampleParams,
             destination: str,
+            image_format: ImageFormat,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,

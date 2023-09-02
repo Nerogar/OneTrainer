@@ -33,6 +33,7 @@ from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.dtype_util import allow_mixed_precision
+from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -150,6 +151,7 @@ class GenericTrainer(BaseTrainer):
             train_device: torch.device,
             sample_params_list: list[SampleParams],
             folder_postfix: str = "",
+            image_format: ImageFormat = ImageFormat.JPG,
     ):
         for i, sample_params in enumerate(sample_params_list):
             try:
@@ -163,7 +165,7 @@ class GenericTrainer(BaseTrainer):
 
                 sample_path = os.path.join(
                     sample_dir,
-                    f"{self.__get_string_timestamp()}-training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}.png"
+                    f"{self.__get_string_timestamp()}-training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}{image_format.extension()}"
                 )
 
                 def on_sample(image: Image):
@@ -174,6 +176,7 @@ class GenericTrainer(BaseTrainer):
                 self.model_sampler.sample(
                     sample_params=sample_params,
                     destination=sample_path,
+                    image_format=self.args.sample_image_format,
                     text_encoder_layer_skip=self.args.text_encoder_layer_skip,
                     force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
                     on_sample=on_sample,

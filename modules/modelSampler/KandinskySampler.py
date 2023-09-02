@@ -7,6 +7,7 @@ from PIL.Image import Image
 
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.params.SampleParams import SampleParams
 
@@ -154,6 +155,7 @@ class KandinskySampler(BaseModelSampler):
             self,
             sample_params: SampleParams,
             destination: str,
+            image_format: ImageFormat,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,

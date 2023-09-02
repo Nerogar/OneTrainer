@@ -22,6 +22,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
+from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -469,6 +470,13 @@ class TrainUI(ctk.CTk):
         components.label(top_frame, 0, 0, "Sample After",
                          tooltip="The interval used when automatically sampling from the model during training")
         components.time_entry(top_frame, 0, 1, self.ui_state, "sample_after", "sample_after_unit")
+
+        components.label(top_frame, 0, 2, "Format",
+                         tooltip="File Format used when saving samples")
+        components.options_kv(top_frame, 0, 3, [
+            ("PNG", ImageFormat.PNG),
+            ("JPG", ImageFormat.JPG),
+        ], self.ui_state, "sample_image_format")
 
         # table
         frame = ctk.CTkFrame(master=master, corner_radius=0)

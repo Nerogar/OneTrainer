@@ -1,6 +1,9 @@
 import os
 import sys
 
+from modules.util.enum.ImageFormat import ImageFormat
+from modules.util.params.SampleParams import SampleParams
+
 sys.path.append(os.getcwd())
 
 import torch
@@ -38,9 +41,16 @@ def main():
 
     print("Sampling " + args.destination)
     model_sampler.sample(
-        prompt=args.prompt,
-        size=(512, 512),
-        seed=42,
+        sample_params=SampleParams.default_values().from_json(
+            {
+                "prompt": args.prompt,
+                "negative_prompt": args.negative_prompt,
+                "height": 512,
+                "width": 512,
+                "seed": 42,
+            }
+        ),
+        image_format=ImageFormat.JPG,
         destination=args.destination,
         text_encoder_layer_skip=args.text_encoder_layer_skip,
     )
