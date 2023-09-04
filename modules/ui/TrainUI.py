@@ -182,6 +182,7 @@ class TrainUI(ctk.CTk):
             ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
             ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
             ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+            ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
         ], self.ui_state, "model_type")
 
         # output model destination

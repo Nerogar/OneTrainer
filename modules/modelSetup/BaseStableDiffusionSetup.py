@@ -124,7 +124,9 @@ class BaseStableDiffusionSetup(BaseModelSetup, metaclass=ABCMeta):
                 latent_input, timestep, text_encoder_output, batch['latent_depth']
             ).sample
         else:
-            predicted_latent_noise = model.unet(latent_input, timestep, text_encoder_output).sample
+            predicted_latent_noise = model.unet(
+                latent_input, timestep, text_encoder_output
+            ).sample
 
         model_output_data = {}
 

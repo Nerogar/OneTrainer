@@ -298,11 +298,11 @@ class StableDiffusionSampler(BaseModelSampler):
 
         # denoising loop
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
+            latent_model_input = noise_scheduler.scale_model_input(latent_image, timestep)
             latent_model_input = torch.concat(
-                [latent_image, latent_mask, latent_conditioning_image], 1
+                [latent_model_input, latent_mask, latent_conditioning_image], 1
             )
             latent_model_input = torch.cat([latent_model_input] * 2)
-            latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
             # predict the noise residual
             with torch.autocast(self.train_device.type):

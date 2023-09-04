@@ -64,6 +64,7 @@
     "sample_definition_file_name": "training_samples/samples.json",
     "sample_after": 10,
     "sample_after_unit": "MINUTE",
+    "sample_image_format": "JPG",
     "backup_after": 30,
     "backup_after_unit": "MINUTE",
     "backup_before_save": true

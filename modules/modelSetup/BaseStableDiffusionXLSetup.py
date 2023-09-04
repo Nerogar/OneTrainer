@@ -19,7 +19,6 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 
 class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
 
-
     def setup_optimizations(
             self,
             model: StableDiffusionXLModel,
@@ -66,6 +65,10 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
 
         latent_image = batch['latent_image']
         scaled_latent_image = latent_image * vae_scaling_factor
+
+        scaled_latent_conditioning_image = None
+        if args.model_type.has_conditioning_image_input():
+            scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
@@ -137,7 +140,13 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
             device=scaled_noisy_latent_image.device,
         )
 
-        latent_input = scaled_noisy_latent_image
+        if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
+            latent_input = torch.concat(
+                [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
+            )
+        else:
+            latent_input = scaled_noisy_latent_image
+
         added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
         predicted_latent_noise = model.unet(
             sample=latent_input,

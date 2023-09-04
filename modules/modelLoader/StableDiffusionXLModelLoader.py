@@ -4,15 +4,14 @@ import traceback
 
 import torch
 import yaml
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
-from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, StableDiffusionXLPipeline
 from safetensors import safe_open
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -26,6 +25,8 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
                 return "resources/diffusers_model_config/sd_xl_base.yaml"
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: # TODO: find the actual yml file
+                return "resources/diffusers_model_config/sd_xl_base.yaml"
             case _:
                 return None
 
@@ -33,6 +34,8 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
     def __default_model_spec_name(model_type: ModelType) -> str | None:
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
+                return "resources/sd_model_spec/sd_xl_base_1.0.json"
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: # TODO: find the actual json file
                 return "resources/sd_model_spec/sd_xl_base_1.0.json"
             case _:
                 return None
@@ -166,9 +169,8 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             if not os.path.exists(yaml_name):
                 yaml_name = StableDiffusionXLModelLoader.__default_yaml_name(model_type)
 
-        pipeline = download_from_original_stable_diffusion_ckpt(
-            checkpoint_path=base_model_name,
-            original_config_file=yaml_name,
+        pipeline = StableDiffusionXLPipeline.from_single_file(
+            pretrained_model_link_or_path=base_model_name,
             load_safety_checker=False,
         )
 
@@ -214,11 +216,10 @@ class StableDiffusionXLModelLoader(BaseModelLoader):
             if not os.path.exists(yaml_name):
                 yaml_name = StableDiffusionXLModelLoader.__default_yaml_name(model_type)
 
-        pipeline = download_from_original_stable_diffusion_ckpt(
-            checkpoint_path=base_model_name,
-            original_config_file=yaml_name,
+        pipeline = StableDiffusionXLPipeline.from_single_file(
+            pretrained_model_link_or_path=base_model_name,
             load_safety_checker=False,
-            from_safetensors=True,
+            use_safetensors=True,
         )
 
         noise_scheduler = DDIMScheduler(
