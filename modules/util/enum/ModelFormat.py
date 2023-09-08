@@ -10,3 +10,15 @@ class ModelFormat(Enum):
 
     def __str__(self):
         return self.value
+
+
+    def file_extension(self) -> str:
+        match self:
+            case ModelFormat.DIFFUSERS:
+                return ''
+            case ModelFormat.CKPT:
+                return '.ckpt'
+            case ModelFormat.SAFETENSORS:
+                return '.safetensors'
+            case _:
+                return ''

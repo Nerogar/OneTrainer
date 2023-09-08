@@ -165,7 +165,7 @@ class GenericTrainer(BaseTrainer):
 
                 sample_path = os.path.join(
                     sample_dir,
-                    f"{self.__get_string_timestamp()}-training-sample-{train_progress.global_step}-{train_progress.epoch}-{train_progress.epoch_step}{image_format.extension()}"
+                    f"{self.__get_string_timestamp()}-training-sample-{train_progress.filename_string()}{image_format.extension()}"
                 )
 
                 def on_sample(image: Image):
@@ -255,12 +255,56 @@ class GenericTrainer(BaseTrainer):
 
         self.__gc()
 
+    def save(self, train_progress: TrainProgress):
+        self.__gc()
+
+        self.callbacks.on_update_status("saving")
+
+        save_path = os.path.join(
+            self.args.workspace_dir,
+            "save",
+            f"{self.__get_string_timestamp()}-save-{train_progress.filename_string()}{self.args.output_model_format.file_extension()}"
+        )
+        print("Saving " + save_path)
+
+        try:
+            if self.model.ema:
+                self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+
+            self.model_saver.save(
+                model=self.model,
+                model_type=self.args.model_type,
+                output_model_format=self.args.output_model_format,
+                output_model_destination=save_path,
+                dtype=self.args.output_dtype.torch_dtype()
+            )
+        except:
+            traceback.print_exc()
+            print("Could not save model. Check your disk space!")
+            try:
+                if os.path.isfile(save_path):
+                    shutil.rmtree(save_path)
+            except:
+                traceback.print_exc()
+                print("Could not delete partial save")
+                pass
+        finally:
+            if self.model.ema:
+                self.model.ema.copy_temp_to(self.parameters)
+
+        self.__gc()
+
     def __needs_sample(self, train_progress: TrainProgress):
         return self.action_needed("sample", self.args.sample_after, self.args.sample_after_unit, train_progress)
 
     def __needs_backup(self, train_progress: TrainProgress):
         return self.action_needed(
             "backup", self.args.backup_after, self.args.backup_after_unit, train_progress, start_at_zero=False
+        )
+
+    def __needs_save(self, train_progress: TrainProgress):
+        return self.action_needed(
+            "save", self.args.save_after, self.args.save_after_unit, train_progress, start_at_zero=False
         )
 
     def __needs_gc(self, train_progress: TrainProgress):
@@ -343,6 +387,9 @@ class GenericTrainer(BaseTrainer):
                 if self.__needs_backup(train_progress):
                     self.backup()
 
+                if self.__needs_save(train_progress):
+                    self.save(train_progress)
+
                 self.callbacks.on_update_status("training")
 
                 if allow_mixed_precision(self.args):
@@ -416,7 +463,7 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status("saving the final model")
 
             if self.model.ema:
-                self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+                self.model.ema.copy_ema_to(self.parameters, store_temp=False)
 
             self.model_saver.save(
                 model=self.model,

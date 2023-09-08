@@ -494,15 +494,20 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=0)
         master.grid_columnconfigure(4, weight=1)
 
-        # sample after
+        # backup after
         components.label(master, 0, 0, "Backup After",
                          tooltip="The interval used when automatically creating model backups during training")
         components.time_entry(master, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
-        # optimizer
+        # backup before save
         components.label(master, 1, 0, "Backup Before Save",
                          tooltip="Create a full backup before saving the final model")
         components.switch(master, 1, 1, self.ui_state, "backup_before_save")
+
+        # save after
+        components.label(master, 2, 0, "Save After",
+                         tooltip="The interval used when automatically saving the model during training")
+        components.time_entry(master, 2, 1, self.ui_state, "save_after", "save_after_unit")
 
     def lora_tab(self, master):
         master.grid_columnconfigure(0, weight=0)

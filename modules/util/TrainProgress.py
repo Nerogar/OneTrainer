@@ -20,3 +20,6 @@ class TrainProgress:
         self.epoch_step = 0
         self.epoch_sample = 0
         self.epoch += 1
+
+    def filename_string(self):
+        return f"{self.global_step}-{self.epoch}-{self.epoch_step}"

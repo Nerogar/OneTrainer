@@ -67,5 +67,7 @@
     "sample_image_format": "JPG",
     "backup_after": 10,
     "backup_after_unit": "MINUTE",
-    "backup_before_save": true
+    "backup_before_save": true,
+    "save_after": 0,
+    "save_after_unit": "MINUTE"
 }

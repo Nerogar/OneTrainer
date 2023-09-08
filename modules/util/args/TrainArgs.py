@@ -94,6 +94,8 @@ class TrainArgs(BaseArgs):
     backup_after: float
     backup_after_unit: TimeUnit
     backup_before_save: bool
+    save_after: float
+    save_after_unit: TimeUnit
 
     def __init__(self, args: dict):
         super(TrainArgs, self).__init__(args)
@@ -191,6 +193,8 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
         parser.add_argument("--backup-after-unit", type=TimeUnit, required=True, dest="backup_after_unit", help="The unit applied to the backup-after option")
         parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
+        parser.add_argument("--save-after", type=float, required=False, default=0, dest="save_after", help="The interval for backups")
+        parser.add_argument("--save-after-unit", type=TimeUnit, required=False, default=TimeUnit.NEVER, dest="save_after_unit", help="The unit applied to the backup-after option")
 
         # @formatter:on
 
@@ -279,5 +283,7 @@ class TrainArgs(BaseArgs):
         args["backup_after"] = 30
         args["backup_after_unit"] = TimeUnit.MINUTE
         args["backup_before_save"] = True
+        args["save_after"] = 0
+        args["save_after_unit"] = TimeUnit.NEVER
 
         return TrainArgs(args)
