@@ -84,17 +84,23 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
 
         if args.offset_noise_weight > 0:
             normal_noise = torch.randn(
-                scaled_latent_image.shape, generator=generator, device=args.train_device,
+                scaled_latent_image.shape,
+                generator=generator,
+                device=args.train_device,
                 dtype=scaled_latent_image.dtype
             )
             offset_noise = torch.randn(
-                scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1,
-                generator=generator, device=args.train_device, dtype=scaled_latent_image.dtype
+                (scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1),
+                generator=generator,
+                device=args.train_device,
+                dtype=scaled_latent_image.dtype
             )
             latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
         else:
             latent_noise = torch.randn(
-                scaled_latent_image.shape, generator=generator, device=args.train_device,
+                scaled_latent_image.shape,
+                generator=generator,
+                device=args.train_device,
                 dtype=scaled_latent_image.dtype
             )
 
@@ -102,6 +108,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
             low=0,
             high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
             size=(scaled_latent_image.shape[0],),
+            generator=generator,
             device=scaled_latent_image.device,
         ).long()
 
