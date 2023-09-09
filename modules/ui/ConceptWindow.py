@@ -146,7 +146,7 @@ class ConceptWindow(ctk.CTkToplevel):
                     preview_path = path_util.canonical_join(self.concept.path, path.name)
                     break
 
-        image = Image.open(preview_path)
+        image = Image.open(preview_path).convert("RGB")
 
         image_tensor = functional.to_tensor(image)
         rand = random.Random()
