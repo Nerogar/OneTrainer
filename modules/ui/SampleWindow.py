@@ -54,13 +54,13 @@ class SampleWindow(ctk.CTkToplevel):
         components.label(bottom_frame, 0, 2, "height:")
         components.entry(bottom_frame, 0, 3, self.ui_state, "height")
 
-        # steps
-        components.label(bottom_frame, 1, 0, "steps:")
-        components.entry(bottom_frame, 1, 1, self.ui_state, "diffusion_steps")
-
         # seed
-        components.label(bottom_frame, 1, 2, "seed:")
-        components.entry(bottom_frame, 1, 3, self.ui_state, "seed")
+        components.label(bottom_frame, 1, 0, "seed:")
+        components.entry(bottom_frame, 1, 1, self.ui_state, "seed")
+
+        # random seed
+        components.label(bottom_frame, 1, 2, "random seed:")
+        components.switch(bottom_frame, 1, 3, self.ui_state, "random_seed")
 
         # cfg scale
         components.label(bottom_frame, 2, 0, "cfg scale:")
@@ -80,6 +80,10 @@ class SampleWindow(ctk.CTkToplevel):
             ("DPM++ SDE Karras", NoiseScheduler.DPMPP_SDE_KARRAS),
             # ("UniPC Karras", NoiseScheduler.UNIPC_KARRAS),# TODO: update diffusers to fix UNIPC_KARRAS (see https://github.com/huggingface/diffusers/pull/4581)
         ], self.ui_state, "noise_scheduler")
+
+        # steps
+        components.label(bottom_frame, 3, 0, "steps:")
+        components.entry(bottom_frame, 3, 1, self.ui_state, "diffusion_steps")
 
         components.button(self, 2, 0, "ok", self.__ok)
 

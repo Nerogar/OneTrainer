@@ -9,8 +9,10 @@ from tqdm import tqdm
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.util import create
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.params.SampleParams import SampleParams
 
 
@@ -28,17 +30,23 @@ class StableDiffusionSampler(BaseModelSampler):
             height: int,
             width: int,
             seed: int,
-            steps: int,
+            random_seed: bool,
+            diffusion_steps: int,
             cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(seed)
+        if random_seed:
+            generator.seed()
+        else:
+            generator.manual_seed(seed)
+
         tokenizer = self.pipeline.tokenizer
         text_encoder = self.pipeline.text_encoder
-        noise_scheduler = self.pipeline.scheduler
+        noise_scheduler = create.create_noise_scheduler(noise_scheduler, diffusion_steps)
         image_processor = self.pipeline.image_processor
         unet = self.pipeline.unet
         vae = self.pipeline.vae
@@ -110,7 +118,7 @@ class StableDiffusionSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         # prepare timesteps
-        noise_scheduler.set_timesteps(steps, device=self.train_device)
+        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
 
         if force_last_timestep:
@@ -181,17 +189,23 @@ class StableDiffusionSampler(BaseModelSampler):
             height: int,
             width: int,
             seed: int,
-            steps: int,
+            random_seed: bool,
+            diffusion_steps: int,
             cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(seed)
+        if random_seed:
+            generator.seed()
+        else:
+            generator.manual_seed(seed)
+
         tokenizer = self.pipeline.tokenizer
         text_encoder = self.pipeline.text_encoder
-        noise_scheduler = self.pipeline.scheduler
+        noise_scheduler = create.create_noise_scheduler(noise_scheduler, diffusion_steps)
         image_processor = self.pipeline.image_processor
         unet = self.pipeline.unet
         vae = self.pipeline.vae
@@ -273,7 +287,7 @@ class StableDiffusionSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         # prepare timesteps
-        noise_scheduler.set_timesteps(steps, device=self.train_device)
+        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
 
         if force_last_timestep:
@@ -362,8 +376,10 @@ class StableDiffusionSampler(BaseModelSampler):
                 height=sample_params.height,
                 width=sample_params.width,
                 seed=sample_params.seed,
-                steps=20,
-                cfg_scale=7,
+                random_seed=sample_params.random_seed,
+                diffusion_steps=sample_params.diffusion_steps,
+                cfg_scale=sample_params.cfg_scale,
+                noise_scheduler=sample_params.noise_scheduler,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,
                 text_encoder_layer_skip=text_encoder_layer_skip,
                 force_last_timestep=force_last_timestep
@@ -374,8 +390,10 @@ class StableDiffusionSampler(BaseModelSampler):
                 height=sample_params.height,
                 width=sample_params.width,
                 seed=sample_params.seed,
-                steps=20,
-                cfg_scale=7,
+                random_seed=sample_params.random_seed,
+                diffusion_steps=sample_params.diffusion_steps,
+                cfg_scale=sample_params.cfg_scale,
+                noise_scheduler=sample_params.noise_scheduler,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,
                 text_encoder_layer_skip=text_encoder_layer_skip,
                 force_last_timestep=force_last_timestep

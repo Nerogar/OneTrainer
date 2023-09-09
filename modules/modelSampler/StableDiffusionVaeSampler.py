@@ -29,10 +29,6 @@ class StableDiffusionVaeSampler(BaseModelSampler):
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
-
-        generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(sample_params.seed)
-
         image = Image.open(sample_params.prompt)
         image = image.convert("RGB")
 

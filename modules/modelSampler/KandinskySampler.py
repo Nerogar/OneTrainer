@@ -27,13 +27,17 @@ class KandinskySampler(BaseModelSampler):
             height: int,
             width: int,
             seed: int,
+            random_seed: bool,
             prior_steps: int,
             steps: int,
             prior_cfg_scale: float,
             cfg_scale: float,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(seed)
+        if random_seed:
+            generator.seed()
+        else:
+            generator.manual_seed(seed)
 
         image_embeds, negative_image_embeds = self.prior_pipeline(
             prompt=prompt,
@@ -165,6 +169,7 @@ class KandinskySampler(BaseModelSampler):
             height=sample_params.height,
             width=sample_params.width,
             seed=sample_params.seed,
+            random_seed=sample_params.random_seed,
             prior_steps=10,
             steps=20,
             prior_cfg_scale=4,

@@ -31,6 +31,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             height: int,
             width: int,
             seed: int,
+            random_seed: bool,
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
@@ -39,7 +40,11 @@ class StableDiffusionXLSampler(BaseModelSampler):
             force_last_timestep: bool = False,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(seed)
+        if random_seed:
+            generator.seed()
+        else:
+            generator.manual_seed(seed)
+
         tokenizer_1 = self.model.tokenizer_1
         tokenizer_2 = self.model.tokenizer_2
         text_encoder_1 = self.model.text_encoder_1
@@ -246,6 +251,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             height: int,
             width: int,
             seed: int,
+            random_seed: bool,
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
@@ -254,7 +260,11 @@ class StableDiffusionXLSampler(BaseModelSampler):
             force_last_timestep: bool = False,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
-        generator.manual_seed(seed)
+        if random_seed:
+            generator.seed()
+        else:
+            generator.manual_seed(seed)
+
         tokenizer_1 = self.model.tokenizer_1
         tokenizer_2 = self.model.tokenizer_2
         text_encoder_1 = self.model.text_encoder_1
@@ -491,6 +501,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 height=sample_params.height,
                 width=sample_params.width,
                 seed=sample_params.seed,
+                random_seed=sample_params.random_seed,
                 diffusion_steps=sample_params.diffusion_steps,
                 cfg_scale=sample_params.cfg_scale,
                 noise_scheduler=sample_params.noise_scheduler,
@@ -505,6 +516,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 height=sample_params.height,
                 width=sample_params.width,
                 seed=sample_params.seed,
+                random_seed=sample_params.random_seed,
                 diffusion_steps=sample_params.diffusion_steps,
                 cfg_scale=sample_params.cfg_scale,
                 noise_scheduler=sample_params.noise_scheduler,

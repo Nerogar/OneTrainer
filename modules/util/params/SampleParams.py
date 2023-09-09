@@ -8,6 +8,7 @@ class SampleParams(BaseParams):
     height: int
     width: int
     seed: int
+    random_seed: bool
     diffusion_steps: int
     cfg_scale: float
     noise_scheduler: NoiseScheduler
@@ -24,6 +25,7 @@ class SampleParams(BaseParams):
         args["height"] = 512
         args["width"] = 512
         args["seed"] = 42
+        args["random_seed"] = False
         args["diffusion_steps"] = 20
         args["cfg_scale"] = 7.0
         args["noise_scheduler"] = NoiseScheduler.DDIM
