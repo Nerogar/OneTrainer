@@ -27,6 +27,7 @@ class StableDiffusionSampler(BaseModelSampler):
     def __sample_base(
             self,
             prompt: str,
+            negative_prompt: str,
             height: int,
             width: int,
             seed: int,
@@ -67,7 +68,7 @@ class StableDiffusionSampler(BaseModelSampler):
             tokens_attention_mask = None
 
         negative_tokenizer_output = tokenizer(
-            "",
+            negative_prompt,
             padding='max_length',
             truncation=True,
             max_length=tokenizer.model_max_length,
@@ -186,6 +187,7 @@ class StableDiffusionSampler(BaseModelSampler):
     def __sample_inpainting(
             self,
             prompt: str,
+            negative_prompt: str,
             height: int,
             width: int,
             seed: int,
@@ -236,7 +238,7 @@ class StableDiffusionSampler(BaseModelSampler):
             tokens_attention_mask = None
 
         negative_tokenizer_output = tokenizer(
-            "",
+            negative_prompt,
             padding='max_length',
             truncation=True,
             max_length=tokenizer.model_max_length,
@@ -364,15 +366,18 @@ class StableDiffusionSampler(BaseModelSampler):
             on_sample: Callable[[Image], None] = lambda _: None,
     ):
         prompt = sample_params.prompt
+        negative_prompt = sample_params.negative_prompt
 
         if len(self.model.embeddings) > 0:
             tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
             embedding_string = ''.join(tokens)
             prompt = prompt.replace("<embedding>", embedding_string)
+            negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
 
         if self.model_type.has_conditioning_image_input():
             image = self.__sample_inpainting(
                 prompt=prompt,
+                negative_prompt=negative_prompt,
                 height=sample_params.height,
                 width=sample_params.width,
                 seed=sample_params.seed,
@@ -387,6 +392,7 @@ class StableDiffusionSampler(BaseModelSampler):
         else:
             image = self.__sample_base(
                 prompt=prompt,
+                negative_prompt=negative_prompt,
                 height=sample_params.height,
                 width=sample_params.width,
                 seed=sample_params.seed,

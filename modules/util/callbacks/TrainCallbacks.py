@@ -10,11 +10,19 @@ class TrainCallbacks:
             self,
             on_update_progress: Callable[[TrainProgress, int, int], None] = lambda _: None,
             on_update_status: Callable[[str], None] = lambda _: None,
-            on_sample: Callable[[Image], None] = lambda _: None,
+            on_sample_default: Callable[[Image], None] = lambda _: None,
+            on_sample_custom: Callable[[Image], None] = lambda _: None,
     ):
         self.__on_update_progress = on_update_progress
         self.__on_update_status = on_update_status
-        self.__on_sample = on_sample
+        self.__on_sample_default = on_sample_default
+        self.__on_sample_custom = on_sample_custom
+
+    def set_on_update_progress(
+            self,
+            on_update_progress: Callable[[TrainProgress, int, int], None] = lambda _: None,
+    ):
+        self.__on_update_progress = on_update_progress
 
     def on_update_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
         try:
@@ -23,6 +31,12 @@ class TrainCallbacks:
         except:
             pass
 
+    def set_on_update_status(
+            self,
+            on_update_status: Callable[[str], None] = lambda _: None,
+    ):
+        self.__on_update_status = on_update_status
+
     def on_update_status(self, status: str):
         try:
             if self.__on_update_status:
@@ -30,9 +44,28 @@ class TrainCallbacks:
         except:
             pass
 
-    def on_sample(self, sample: Image):
+    def set_on_sample_default(
+            self,
+            on_sample_default: Callable[[Image], None] = lambda _: None,
+    ):
+        self.__on_sample_default = on_sample_default
+
+    def on_sample_default(self, sample: Image):
         try:
-            if self.__on_sample:
-                self.__on_sample(sample)
+            if self.__on_sample_default:
+                self.__on_sample_default(sample)
+        except:
+            pass
+
+    def set_on_sample_custom(
+            self,
+            on_sample_custom: Callable[[Image], None] = lambda _: None,
+    ):
+        self.__on_sample_custom = on_sample_custom
+
+    def on_sample_custom(self, sample: Image):
+        try:
+            if self.__on_sample_custom:
+                self.__on_sample_custom(sample)
         except:
             pass

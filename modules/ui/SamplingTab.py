@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 from modules.ui.ConfigList import ConfigList
-from modules.ui.SampleWindow import SampleWindow
+from modules.ui.SampleParamsWindow import SampleParamsWindow
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.params.SampleParams import SampleParams
 from modules.util.ui import components
@@ -24,7 +24,7 @@ class SamplingTab(ConfigList):
         return SampleParams.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return SampleWindow(self.master, self.current_config[i], ui_state)
+        return SampleParamsWindow(self.master, self.current_config[i], ui_state)
 
 
 class SampleWidget(ctk.CTkFrame):

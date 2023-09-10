@@ -7,12 +7,12 @@ from typing import Callable
 
 import customtkinter as ctk
 import torch
-from PIL.Image import Image
 
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
+from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.util.TrainProgress import TrainProgress
@@ -481,6 +481,8 @@ class TrainUI(ctk.CTk):
 
         components.button(top_frame, 0, 4, "sample now", self.sample_now)
 
+        components.button(top_frame, 0, 5, "manual sample", self.open_sample_ui)
+
         # table
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
@@ -616,9 +618,6 @@ class TrainUI(ctk.CTk):
         self.status_label.configure(text=status)
         pass
 
-    def on_sample(self, sample: Image):
-        pass
-
     def open_dataset_tool(self):
         window = CaptionUI(self, None)
         self.wait_window(window)
@@ -627,16 +626,25 @@ class TrainUI(ctk.CTk):
         window = ConvertModelUI(self)
         self.wait_window(window)
 
+    def open_sample_ui(self):
+        training_callbacks = self.training_callbacks
+        training_commands = self.training_commands
+
+        if training_callbacks and training_commands:
+            window = SampleWindow(self, training_callbacks, training_commands)
+            training_callbacks.set_on_sample_custom(window.update_preview)
+            self.wait_window(window)
+            training_callbacks.set_on_sample_custom()
+
     def __training_thread_function(self):
         error_caught = False
 
-        callbacks = TrainCallbacks(
+        self.training_callbacks = TrainCallbacks(
             on_update_progress=self.on_update_progress,
             on_update_status=self.on_update_status,
-            on_sample=self.on_sample,
         )
 
-        trainer = GenericTrainer(self.train_args, callbacks, self.training_commands)
+        trainer = GenericTrainer(self.train_args, self.training_callbacks, self.training_commands)
 
         try:
             trainer.start()
