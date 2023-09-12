@@ -69,5 +69,5 @@
     "backup_after_unit": "MINUTE",
     "backup_before_save": true,
     "save_after": 0,
-    "save_after_unit": "MINUTE"
+    "save_after_unit": "NEVER"
 }
