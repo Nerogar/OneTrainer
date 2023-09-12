@@ -24,6 +24,9 @@ class SampleWindow(ctk.CTkToplevel):
         self.callbacks = callbacks
         self.commands = commands
 
+        self.callbacks.set_on_sample_custom(self.update_preview)
+        self.callbacks.set_on_update_sample_custom_progress(self.update_progress)
+
         self.sample = SampleParams.default_values()
         self.ui_state = UIState(self, self.sample)
 
@@ -48,15 +51,19 @@ class SampleWindow(ctk.CTkToplevel):
         )
 
         image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=512, width=512)
-        image_label.grid(row=0, column=1, rowspan=2, sticky="nsew")
+        image_label.grid(row=0, column=1, rowspan=3, sticky="nsew")
 
-        components.button(self, 1, 0, "sample", self.__sample)
+        self.progress = components.progress(self, 1, 0)
+        components.button(self, 2, 0, "sample", self.__sample)
 
     def update_preview(self, image: Image):
         self.image.configure(
             light_image=image,
             size=(image.width, image.height),
         )
+
+    def update_progress(self, progress: int, max_progress: int):
+        self.progress.set(progress / max_progress)
 
     def __dummy_image(self) -> Image:
         return Image.new(mode="RGB", size=(512, 512), color=(0, 0, 0))

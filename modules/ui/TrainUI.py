@@ -609,7 +609,7 @@ class TrainUI(ctk.CTk):
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)
 
-    def on_update_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
+    def on_update_train_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
         self.set_step_progress(train_progress.epoch_step, max_sample)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
         pass
@@ -632,7 +632,6 @@ class TrainUI(ctk.CTk):
 
         if training_callbacks and training_commands:
             window = SampleWindow(self, training_callbacks, training_commands)
-            training_callbacks.set_on_sample_custom(window.update_preview)
             self.wait_window(window)
             training_callbacks.set_on_sample_custom()
 
@@ -640,7 +639,7 @@ class TrainUI(ctk.CTk):
         error_caught = False
 
         self.training_callbacks = TrainCallbacks(
-            on_update_progress=self.on_update_progress,
+            on_update_train_progress=self.on_update_train_progress,
             on_update_status=self.on_update_status,
         )
 

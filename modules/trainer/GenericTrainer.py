@@ -185,6 +185,7 @@ class GenericTrainer(BaseTrainer):
                     self.callbacks.on_sample_custom(image)
 
                 on_sample = on_sample_custom if is_custom_sample else on_sample_default
+                on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
                 self.model_sampler.sample(
                     sample_params=sample_params,
@@ -193,6 +194,7 @@ class GenericTrainer(BaseTrainer):
                     text_encoder_layer_skip=self.args.text_encoder_layer_skip,
                     force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
                     on_sample=on_sample,
+                    on_update_progress=on_update_progress,
                 )
             except:
                 traceback.print_exc()
@@ -470,13 +472,13 @@ class GenericTrainer(BaseTrainer):
                     self.one_step_trained = True
 
                 train_progress.next_step(self.args.batch_size)
-                self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
+                self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.args.epochs)
 
                 if self.commands.get_stop_command():
                     return
 
             train_progress.next_epoch()
-            self.callbacks.on_update_progress(train_progress, current_epoch_length, self.args.epochs)
+            self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.args.epochs)
 
             if self.commands.get_stop_command():
                 return

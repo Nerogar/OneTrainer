@@ -163,6 +163,7 @@ class KandinskySampler(BaseModelSampler):
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         image = self.__sample_base(
             prompt=sample_params.prompt,

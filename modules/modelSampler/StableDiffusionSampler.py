@@ -38,6 +38,7 @@ class StableDiffusionSampler(BaseModelSampler):
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
         if random_seed:
@@ -175,6 +176,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
             )[0]
 
+            on_update_progress(i + 1, len(timesteps))
+
         latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
@@ -198,6 +201,7 @@ class StableDiffusionSampler(BaseModelSampler):
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image:
         generator = torch.Generator(device=self.train_device)
         if random_seed:
@@ -348,6 +352,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
             )[0]
 
+            on_update_progress(i + 1, len(timesteps))
+
         latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
@@ -364,6 +370,7 @@ class StableDiffusionSampler(BaseModelSampler):
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         prompt = sample_params.prompt
         negative_prompt = sample_params.negative_prompt
@@ -387,7 +394,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 noise_scheduler=sample_params.noise_scheduler,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,
                 text_encoder_layer_skip=text_encoder_layer_skip,
-                force_last_timestep=force_last_timestep
+                force_last_timestep=force_last_timestep,
+                on_update_progress=on_update_progress,
             )
         else:
             image = self.__sample_base(
@@ -402,7 +410,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 noise_scheduler=sample_params.noise_scheduler,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,
                 text_encoder_layer_skip=text_encoder_layer_skip,
-                force_last_timestep=force_last_timestep
+                force_last_timestep=force_last_timestep,
+                on_update_progress=on_update_progress,
             )
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)

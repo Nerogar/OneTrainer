@@ -27,6 +27,7 @@ class StableDiffusionVaeSampler(BaseModelSampler):
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
         image = Image.open(sample_params.prompt)
