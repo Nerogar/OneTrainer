@@ -37,12 +37,18 @@ class SampleWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
 
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
+        self.grid_rowconfigure(3, weight=0)
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
 
-        frame = SampleFrame(self, self.sample, self.ui_state)
-        frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+        prompt_frame = SampleFrame(self, self.sample, self.ui_state, include_settings=False)
+        prompt_frame.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
+
+        settings_frame = SampleFrame(self, self.sample, self.ui_state, include_prompt=False)
+        settings_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
         # image
         self.image = ctk.CTkImage(
@@ -51,10 +57,10 @@ class SampleWindow(ctk.CTkToplevel):
         )
 
         image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=512, width=512)
-        image_label.grid(row=0, column=1, rowspan=3, sticky="nsew")
+        image_label.grid(row=1, column=1, rowspan=3, sticky="nsew")
 
-        self.progress = components.progress(self, 1, 0)
-        components.button(self, 2, 0, "sample", self.__sample)
+        self.progress = components.progress(self, 2, 0)
+        components.button(self, 3, 0, "sample", self.__sample)
 
     def update_preview(self, image: Image):
         self.image.configure(
