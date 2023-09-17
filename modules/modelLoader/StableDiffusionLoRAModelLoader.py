@@ -58,7 +58,7 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
                 model.model_spec = ModelSpec.from_dict(f.metadata())
 
         state_dict = load_file(lora_name)
-        StableDiffusionLoRAModelLoader.__init_lora(model, state_dict, weight_dtypes.lora)
+        StableDiffusionLoRAModelLoader.__init_lora(model, state_dict, weight_dtypes.lora.torch_dtype())
 
     @staticmethod
     def __load_ckpt(
@@ -69,7 +69,7 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader):
         model.model_spec = ModelSpec()
 
         state_dict = torch.load(lora_name)
-        StableDiffusionLoRAModelLoader.__init_lora(model, state_dict, weight_dtypes.lora)
+        StableDiffusionLoRAModelLoader.__init_lora(model, state_dict, weight_dtypes.lora.torch_dtype())
 
     @staticmethod
     def __load_internal(

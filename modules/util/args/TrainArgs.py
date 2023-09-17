@@ -79,6 +79,7 @@ class TrainArgs(BaseArgs):
     max_noising_strength: float
     token_count: int
     initial_embedding_text: str
+    embedding_weight_dtype: DataType
     lora_rank: int
     lora_alpha: float
     lora_weight_dtype: DataType
@@ -102,11 +103,29 @@ class TrainArgs(BaseArgs):
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
-            self.text_encoder_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
-            self.unet_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
-            self.vae_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
-            self.lora_weight_dtype.torch_dtype() or self.weight_dtype.torch_dtype(),
+            self.weight_dtype if self.text_encoder_weight_dtype == DataType.NONE else self.text_encoder_weight_dtype,
+            self.weight_dtype if self.unet_weight_dtype == DataType.NONE else self.unet_weight_dtype,
+            self.weight_dtype if self.vae_weight_dtype == DataType.NONE else self.vae_weight_dtype,
+            self.weight_dtype if self.lora_weight_dtype == DataType.NONE else self.lora_weight_dtype,
+            self.weight_dtype if self.embedding_weight_dtype == DataType.NONE else self.embedding_weight_dtype,
         )
+
+    def trainable_weight_dtypes(self) -> list[DataType]:
+        weight_dtypes = self.weight_dtypes()
+
+        if self.training_method == TrainingMethod.LORA:
+            return [weight_dtypes.lora]
+        elif self.training_method == TrainingMethod.EMBEDDING:
+            return [weight_dtypes.embedding]
+        elif self.training_method == TrainingMethod.FINE_TUNE_VAE:
+            return [weight_dtypes.vae]
+        elif self.training_method == TrainingMethod.FINE_TUNE:
+            dtypes = []
+            if self.train_text_encoder:
+                dtypes.append(weight_dtypes.text_encoder)
+            elif self.unet_weight_dtype:
+                dtypes.append(weight_dtypes.unet)
+            return dtypes
 
     @staticmethod
     def parse_args() -> 'TrainArgs':
@@ -178,9 +197,10 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
         parser.add_argument("--token-count", type=int, required=False, default=1, dest="token_count", help="The number of tokens to train")
         parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
+        parser.add_argument("--embedding-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="embedding_weight_dtype", help="The data type to use for training the Embedding", choices=list(DataType))
         parser.add_argument("--lora-rank", type=int, required=False, default=1, dest="lora_rank", help="The rank parameter used when initializing new LoRA networks")
         parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
-        parser.add_argument("--lora-weight-dtype", type=DataType, required=False, default=None, dest="lora_weight_dtype", help="The data type to use for training the LoRA", choices=list(DataType))
+        parser.add_argument("--lora-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="lora_weight_dtype", help="The data type to use for training the LoRA", choices=list(DataType))
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
 
         # sample settings
@@ -268,6 +288,7 @@ class TrainArgs(BaseArgs):
         args["max_noising_strength"] = 1.0
         args["token_count"] = 1
         args["initial_embedding_text"] = "*"
+        args["embedding_weight_dtype"] = DataType.FLOAT_32
         args["lora_rank"] = 16
         args["lora_alpha"] = 1.0
         args["lora_weight_dtype"] = DataType.FLOAT_32

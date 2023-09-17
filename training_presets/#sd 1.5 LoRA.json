@@ -57,6 +57,7 @@
     "max_noising_strength": 1.0,
     "token_count": 1,
     "initial_embedding_text": "*",
+    "embedding_weight_dtype": "FLOAT_32",
     "lora_rank": 16,
     "lora_alpha": 1.0,
     "lora_weight_dtype": "FLOAT_32",

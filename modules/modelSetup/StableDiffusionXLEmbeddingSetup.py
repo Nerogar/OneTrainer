@@ -85,6 +85,9 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
         model.text_encoder_1.resize_token_embeddings(len(model.tokenizer_1))
         model.text_encoder_2.resize_token_embeddings(len(model.tokenizer_2))
 
+        model.text_encoder_1.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+        model.text_encoder_2.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+
         with torch.no_grad():
             text_encoder_1_token_ids = model.tokenizer_1.encode(
                 tokens,

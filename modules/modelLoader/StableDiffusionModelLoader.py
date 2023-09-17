@@ -108,19 +108,19 @@ class StableDiffusionModelLoader(BaseModelLoader):
         text_encoder = CLIPTextModel.from_pretrained(
             base_model_name,
             subfolder="text_encoder",
-            torch_dtype=weight_dtypes.text_encoder,
+            torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
 
         vae = AutoencoderKL.from_pretrained(
             base_model_name,
             subfolder="vae",
-            torch_dtype=weight_dtypes.vae,
+            torch_dtype=weight_dtypes.vae.torch_dtype(),
         )
 
         unet = UNet2DConditionModel.from_pretrained(
             base_model_name,
             subfolder="unet",
-            torch_dtype=weight_dtypes.unet,
+            torch_dtype=weight_dtypes.unet.torch_dtype(),
         )
 
         image_depth_processor = DPTImageProcessor.from_pretrained(
@@ -131,7 +131,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
         depth_estimator = DPTForDepthEstimation.from_pretrained(
             base_model_name,
             subfolder="depth_estimator",
-            torch_dtype=weight_dtypes.unet,  # TODO: use depth estimator dtype
+            torch_dtype=weight_dtypes.unet.torch_dtype(),  # TODO: use depth estimator dtype
         ) if model_type.has_depth_input() else None
 
         with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
@@ -191,9 +191,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             model_type=model_type,
             tokenizer=pipeline.tokenizer,
             noise_scheduler=noise_scheduler,
-            text_encoder=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder),
-            vae=pipeline.vae.to(dtype=weight_dtypes.vae),
-            unet=pipeline.unet.to(dtype=weight_dtypes.unet),
+            text_encoder=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype()),
+            vae=pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype()),
+            unet=pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype()),
             image_depth_processor=None,  # TODO
             depth_estimator=None,  # TODO
             sd_config=sd_config,
@@ -246,9 +246,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             model_type=model_type,
             tokenizer=pipeline.tokenizer,
             noise_scheduler=noise_scheduler,
-            text_encoder=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder),
-            vae=pipeline.vae.to(dtype=weight_dtypes.vae),
-            unet=pipeline.unet.to(dtype=weight_dtypes.unet),
+            text_encoder=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype()),
+            vae=pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype()),
+            unet=pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype()),
             image_depth_processor=None,  # TODO
             depth_estimator=None,  # TODO
             sd_config=sd_config,

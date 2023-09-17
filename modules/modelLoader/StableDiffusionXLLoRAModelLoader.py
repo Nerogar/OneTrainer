@@ -51,6 +51,8 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader):
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
                 return "resources/sd_model_spec/sd_xl_base_1.0_lora.json"
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: # TODO: find the actual json file
+                return "resources/sd_model_spec/sd_xl_base_1.0_lora.json"
             case _:
                 return None
 

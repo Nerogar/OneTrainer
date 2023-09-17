@@ -65,6 +65,8 @@ class StableDiffusionEmbeddingSetup(BaseStableDiffusionSetup):
         model.tokenizer.add_tokens(tokens)
         model.text_encoder.resize_token_embeddings(len(model.tokenizer))
 
+        model.text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+
         with torch.no_grad():
             token_ids = model.tokenizer.encode(
                 tokens,

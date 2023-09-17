@@ -36,7 +36,6 @@ from modules.util.dtype_util import allow_mixed_precision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
-from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.params.SampleParams import SampleParams
 
 
@@ -373,8 +372,8 @@ class GenericTrainer(BaseTrainer):
             global_step=train_progress.global_step
         )
 
-        weight_dtype = self.args.lora_weight_dtype if self.args.training_method == TrainingMethod.LORA else self.args.weight_dtype
-        if self.args.train_dtype.enable_loss_scaling(weight_dtype):
+        weight_dtypes = self.args.trainable_weight_dtypes()
+        if self.args.train_dtype.enable_loss_scaling(weight_dtypes):
             scaler = GradScaler()
         else:
             scaler = None

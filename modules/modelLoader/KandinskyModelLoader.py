@@ -75,19 +75,19 @@ class KandinskyModelLoader(BaseModelLoader):
         prior_text_encoder = CLIPTextModelWithProjection.from_pretrained(
             prior_model_name,
             subfolder="text_encoder",
-            torch_dtype=weight_dtypes.text_encoder,
+            torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
 
         prior_image_encoder = CLIPVisionModelWithProjection.from_pretrained(
             prior_model_name,
             subfolder="image_encoder",
-            torch_dtype=weight_dtypes.unet,
+            torch_dtype=weight_dtypes.unet.torch_dtype(),
         )
 
         prior_prior = PriorTransformer.from_pretrained(
             prior_model_name,
             subfolder="prior",
-            torch_dtype=weight_dtypes.unet,
+            torch_dtype=weight_dtypes.unet.torch_dtype(),
         )
 
         prior_noise_scheduler = UnCLIPScheduler.from_pretrained(
@@ -109,13 +109,13 @@ class KandinskyModelLoader(BaseModelLoader):
         text_encoder = MultilingualCLIP.from_pretrained(
             diffusion_model_name,
             subfolder="text_encoder",
-            torch_dtype=weight_dtypes.text_encoder,
+            torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
 
         unet = UNet2DConditionModel.from_pretrained(
             diffusion_model_name,
             subfolder="unet",
-            torch_dtype=weight_dtypes.unet,
+            torch_dtype=weight_dtypes.unet.torch_dtype(),
         )
 
         noise_scheduler = DDPMScheduler.from_pretrained(
@@ -126,7 +126,7 @@ class KandinskyModelLoader(BaseModelLoader):
         movq = VQModel.from_pretrained(
             diffusion_model_name,
             subfolder="movq",
-            torch_dtype=weight_dtypes.vae,
+            torch_dtype=weight_dtypes.vae.torch_dtype(),
         )
 
         return KandinskyModel(

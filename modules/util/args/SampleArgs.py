@@ -21,10 +21,11 @@ class SampleArgs:
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
-            self.weight_dtype.torch_dtype(),
-            self.weight_dtype.torch_dtype(),
-            self.weight_dtype.torch_dtype(),
-            self.weight_dtype.torch_dtype(),
+            self.weight_dtype,
+            self.weight_dtype,
+            self.weight_dtype,
+            self.weight_dtype,
+            self.weight_dtype,
         )
 
     @staticmethod

@@ -21,10 +21,11 @@ class ConvertModelArgs(BaseArgs):
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
-            self.output_dtype.torch_dtype(),
-            self.output_dtype.torch_dtype(),
-            self.output_dtype.torch_dtype(),
-            self.output_dtype.torch_dtype(),
+            self.output_dtype,
+            self.output_dtype,
+            self.output_dtype,
+            self.output_dtype,
+            self.output_dtype,
         )
 
     @staticmethod
