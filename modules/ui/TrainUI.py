@@ -538,7 +538,7 @@ class TrainUI(ctk.CTk):
 
         # lora weight dtype
         components.label(master, 3, 0, "LoRA Weight Data Type",
-                         tooltip="The base LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
+                         tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
         components.options_kv(master, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -570,6 +570,14 @@ class TrainUI(ctk.CTk):
         components.label(master, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
         components.entry(master, 2, 1, self.ui_state, "initial_embedding_text")
+
+        # embedding weight dtype
+        components.label(master, 3, 0, "Embedding Weight Data Type",
+                         tooltip="The Embedding weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.options_kv(master, 3, 1, [
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+        ], self.ui_state, "embedding_weight_dtype")
 
         return master
 
