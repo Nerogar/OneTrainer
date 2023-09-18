@@ -154,52 +154,53 @@ class GenericTrainer(BaseTrainer):
             is_custom_sample: bool = False,
     ):
         for i, sample_params in enumerate(sample_params_list):
-            try:
-                safe_prompt = path_util.safe_filename(sample_params.prompt)
+            if sample_params.enabled:
+                try:
+                    safe_prompt = path_util.safe_filename(sample_params.prompt)
 
-                if is_custom_sample:
-                    sample_dir = os.path.join(
-                        self.args.workspace_dir,
-                        "samples",
-                        "custom",
+                    if is_custom_sample:
+                        sample_dir = os.path.join(
+                            self.args.workspace_dir,
+                            "samples",
+                            "custom",
+                        )
+                    else:
+                        sample_dir = os.path.join(
+                            self.args.workspace_dir,
+                            "samples",
+                            f"{str(i)} - {safe_prompt}{folder_postfix}",
+                        )
+
+                    sample_path = os.path.join(
+                        sample_dir,
+                        f"{self.__get_string_timestamp()}-training-sample-{train_progress.filename_string()}{image_format.extension()}"
                     )
-                else:
-                    sample_dir = os.path.join(
-                        self.args.workspace_dir,
-                        "samples",
-                        f"{str(i)} - {safe_prompt}{folder_postfix}",
+
+                    def on_sample_default(image: Image):
+                        self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
+                                                   train_progress.global_step)
+                        self.callbacks.on_sample_default(image)
+
+                    def on_sample_custom(image: Image):
+                        self.callbacks.on_sample_custom(image)
+
+                    on_sample = on_sample_custom if is_custom_sample else on_sample_default
+                    on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
+
+                    self.model_sampler.sample(
+                        sample_params=sample_params,
+                        destination=sample_path,
+                        image_format=self.args.sample_image_format,
+                        text_encoder_layer_skip=self.args.text_encoder_layer_skip,
+                        force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
+                        on_sample=on_sample,
+                        on_update_progress=on_update_progress,
                     )
+                except:
+                    traceback.print_exc()
+                    print("Error during sampling, proceeding without sampling")
 
-                sample_path = os.path.join(
-                    sample_dir,
-                    f"{self.__get_string_timestamp()}-training-sample-{train_progress.filename_string()}{image_format.extension()}"
-                )
-
-                def on_sample_default(image: Image):
-                    self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                               train_progress.global_step)
-                    self.callbacks.on_sample_default(image)
-
-                def on_sample_custom(image: Image):
-                    self.callbacks.on_sample_custom(image)
-
-                on_sample = on_sample_custom if is_custom_sample else on_sample_default
-                on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
-
-                self.model_sampler.sample(
-                    sample_params=sample_params,
-                    destination=sample_path,
-                    image_format=self.args.sample_image_format,
-                    text_encoder_layer_skip=self.args.text_encoder_layer_skip,
-                    force_last_timestep=self.args.rescale_noise_scheduler_to_zero_terminal_snr,
-                    on_sample=on_sample,
-                    on_update_progress=on_update_progress,
-                )
-            except:
-                traceback.print_exc()
-                print("Error during sampling, proceeding without sampling")
-
-            self.__gc()
+                self.__gc()
 
     def __sample_during_training(
             self,

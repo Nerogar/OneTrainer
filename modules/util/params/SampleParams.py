@@ -3,6 +3,7 @@ from modules.util.params.BaseParams import BaseParams
 
 
 class SampleParams(BaseParams):
+    enabled: bool
     prompt: str
     negative_prompt: str
     height: int
@@ -20,6 +21,7 @@ class SampleParams(BaseParams):
     def default_values():
         args = {}
 
+        args["enabled"] = True
         args["prompt"] = ""
         args["negative_prompt"] = ""
         args["height"] = 512

@@ -33,10 +33,12 @@ class SampleWidget(ctk.CTkFrame):
             master=master, corner_radius=10, bg_color="transparent"
         )
 
+        self.element = element
         self.ui_state = UIState(self, element)
         self.i = i
+        self.save_command = save_command
 
-        self.grid_columnconfigure(9, weight=1)
+        self.grid_columnconfigure(10, weight=1)
 
         # close button
         close_button = ctk.CTkButton(
@@ -62,31 +64,49 @@ class SampleWidget(ctk.CTkFrame):
         )
         clone_button.grid(row=0, column=1, padx=5)
 
+        # enabled
+        self.enabled_switch = components.switch(self, 0, 2, self.ui_state, "enabled", self.__switch_enabled)
+        self.enabled_switch.configure(width=40)
+
         # width
-        components.label(self, 0, 2, "width:")
-        width_entry = components.entry(self, 0, 3, self.ui_state, "width")
-        width_entry.bind('<FocusOut>', lambda _: save_command())
-        width_entry.configure(width=50)
+        components.label(self, 0, 3, "width:")
+        self.width_entry = components.entry(self, 0, 4, self.ui_state, "width")
+        self.width_entry.bind('<FocusOut>', lambda _: save_command())
+        self.width_entry.configure(width=50)
 
         # height
-        components.label(self, 0, 4, "height:")
-        height_entry = components.entry(self, 0, 5, self.ui_state, "height")
-        height_entry.bind('<FocusOut>', lambda _: save_command())
-        height_entry.configure(width=50)
+        components.label(self, 0, 5, "height:")
+        self.height_entry = components.entry(self, 0, 6, self.ui_state, "height")
+        self.height_entry.bind('<FocusOut>', lambda _: save_command())
+        self.height_entry.configure(width=50)
 
         # seed
-        components.label(self, 0, 6, "seed:")
-        seed_entry = components.entry(self, 0, 7, self.ui_state, "seed")
-        seed_entry.bind('<FocusOut>', lambda _: save_command())
-        seed_entry.configure(width=80)
+        components.label(self, 0, 7, "seed:")
+        self.seed_entry = components.entry(self, 0, 8, self.ui_state, "seed")
+        self.seed_entry.bind('<FocusOut>', lambda _: save_command())
+        self.seed_entry.configure(width=80)
 
         # prompt
-        components.label(self, 0, 8, "prompt:")
-        prompt_entry = components.entry(self, 0, 9, self.ui_state, "prompt")
-        prompt_entry.bind('<FocusOut>', lambda _: save_command())
+        components.label(self, 0, 9, "prompt:")
+        self.prompt_entry = components.entry(self, 0, 10, self.ui_state, "prompt")
+        self.prompt_entry.bind('<FocusOut>', lambda _: save_command())
 
         # button
-        components.icon_button(self, 0, 10, "...", lambda: open_command(self.i, self.ui_state))
+        self.button = components.icon_button(self, 0, 11, "...", lambda: open_command(self.i, self.ui_state))
+
+        self.__set_enabled()
+
+    def __switch_enabled(self):
+        self.save_command()
+        self.__set_enabled()
+
+    def __set_enabled(self):
+        enabled = self.element.enabled
+        self.width_entry.configure(state="normal" if enabled else "disabled")
+        self.height_entry.configure(state="normal" if enabled else "disabled")
+        self.prompt_entry.configure(state="normal" if enabled else "disabled")
+        self.seed_entry.configure(state="normal" if enabled else "disabled")
+        self.button.configure(state="normal" if enabled else "disabled")
 
     def configure_element(self):
         pass
