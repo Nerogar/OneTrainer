@@ -23,7 +23,7 @@ invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # other models
 onnxruntime==1.15.1
-rembg[gpu]==2.0.50 # used for automatic mask creation
+pooch==1.7.0
 
 # data loader
 git+https://github.com/Nerogar/mgds.git@d96f261#egg=mgds

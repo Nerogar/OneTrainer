@@ -5,6 +5,7 @@
 /models*
 /training_concepts
 /training_samples
+/external
 debug.py
 train.bat
 *.pyc
