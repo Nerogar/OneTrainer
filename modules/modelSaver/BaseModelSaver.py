@@ -68,7 +68,12 @@ class BaseModelSaver(metaclass=ABCMeta):
             "ot_branch": git_util.get_git_branch(),
             "ot_revision": git_util.get_git_revision(),
         }
-        return model_spec_dict | one_trainer_header
+        kohya_header = {} # needed for the Automatic1111 webui to pick up model versions
+        if model.model_type.is_stable_diffusion_xl():
+            kohya_header["ss_base_model_version"] = "sdxl_"
+        elif model.model_type.is_sd_v2():
+            kohya_header["ss_v2"] = "True"
+        return model_spec_dict | one_trainer_header | kohya_header
 
     @abstractmethod
     def save(

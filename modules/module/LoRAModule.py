@@ -26,7 +26,7 @@ class LoRAModule(metaclass=ABCMeta):
         self.is_applied = False
         self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
 
-    def forward(self, x):
+    def forward(self, x, *args, **kwargs):
         return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
 
     def requires_grad_(self, requires_grad: bool):
