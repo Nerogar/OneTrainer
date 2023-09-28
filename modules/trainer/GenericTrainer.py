@@ -384,6 +384,7 @@ class GenericTrainer(BaseTrainer):
         has_gradient = False
 
         accumulated_loss = 0.0
+        ema_loss = None
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -394,7 +395,8 @@ class GenericTrainer(BaseTrainer):
             self.__gc()
 
             current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
-            for epoch_step, batch in enumerate(tqdm(self.data_loader.dl, desc="step")):
+            step_tqdm = tqdm(self.data_loader.dl, desc="step")
+            for epoch_step, batch in enumerate(step_tqdm):
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
@@ -456,7 +458,14 @@ class GenericTrainer(BaseTrainer):
                         "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
                     )
                     self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
+                    ema_loss = ema_loss or accumulated_loss
+                    ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
+                    step_tqdm.set_postfix({
+                        'loss': accumulated_loss,
+                        'smooth loss': ema_loss,
+                    })
                     accumulated_loss = 0.0
+
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
                     if self.model.ema:
                         update_step = train_progress.global_step // self.args.gradient_accumulation_steps
