@@ -139,23 +139,28 @@ class TrainUI(ctk.CTk):
                          tooltip="The directory where cached data is saved")
         components.dir_entry(master, 1, 1, self.ui_state, "cache_dir")
 
+        # continue from previous backup
+        components.label(master, 2, 0, "Continue from last backup",
+                         tooltip="Automatically continues training from the last backup saved in <workspace>/run/backup")
+        components.switch(master, 2, 1, self.ui_state, "continue_last_backup")
+
         # only cache
-        components.label(master, 2, 0, "Only Cache",
+        components.label(master, 3, 0, "Only Cache",
                          tooltip="Only populate the cache, without any training")
-        components.switch(master, 2, 1, self.ui_state, "only_cache")
+        components.switch(master, 3, 1, self.ui_state, "only_cache")
 
         # debug
-        components.label(master, 3, 0, "Debug mode",
+        components.label(master, 4, 0, "Debug mode",
                          tooltip="Save debug information during the training into the debug directory")
-        components.switch(master, 3, 1, self.ui_state, "debug_mode")
+        components.switch(master, 4, 1, self.ui_state, "debug_mode")
 
-        components.label(master, 4, 0, "Debug Directory",
+        components.label(master, 5, 0, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(master, 4, 1, self.ui_state, "debug_dir")
+        components.dir_entry(master, 5, 1, self.ui_state, "debug_dir")
 
-        components.label(master, 5, 0, "Tensorboard",
+        components.label(master, 6, 0, "Tensorboard",
                          tooltip="Starts the Tensorboard Web UI during training")
-        components.switch(master, 5, 1, self.ui_state, "tensorboard")
+        components.switch(master, 6, 1, self.ui_state, "tensorboard")
 
     def model_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
