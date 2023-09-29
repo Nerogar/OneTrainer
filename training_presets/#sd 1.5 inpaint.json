@@ -5,6 +5,7 @@
     "workspace_dir": "workspace/run",
     "cache_dir": "workspace-cache/run",
     "tensorboard": true,
+    "continue_last_backup": false,
     "model_type": "STABLE_DIFFUSION_15_INPAINTING",
     "base_model_name": "runwayml/stable-diffusion-inpainting",
     "extra_model_name": "",

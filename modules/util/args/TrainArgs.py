@@ -22,6 +22,7 @@ class TrainArgs(BaseArgs):
     workspace_dir: str
     cache_dir: str
     tensorboard: bool
+    continue_last_backup: bool
 
     # model settings
     base_model_name: str
@@ -140,6 +141,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--workspace-dir", type=str, required=True, dest="workspace_dir", help="directory to use as a workspace")
         parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
         parser.add_argument("--tensorboard", required=False, action='store_true', dest="tensorboard", help="Start a tensorboard interface during training. The web server will run on port 6006")
+        parser.add_argument("--continue-last-backup", required=False, action='store_true', dest="continue_last_backup", help="Continues training from the last backup in <workspace>/run/backup")
 
         # model settings
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
@@ -231,6 +233,7 @@ class TrainArgs(BaseArgs):
         args["workspace_dir"] = "workspace/run"
         args["cache_dir"] = "workspace-cache/run"
         args["tensorboard"] = True
+        args["continue_last_backup"] = False
 
         # model settings
         args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
