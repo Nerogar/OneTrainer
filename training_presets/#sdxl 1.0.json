@@ -5,6 +5,7 @@
     "workspace_dir": "workspace/run",
     "cache_dir": "workspace-cache/run",
     "tensorboard": true,
+    "continue_last_backup": false,
     "model_type": "STABLE_DIFFUSION_XL_10_BASE",
     "base_model_name": "stabilityai/stable-diffusion-xl-base-1.0",
     "extra_model_name": "",

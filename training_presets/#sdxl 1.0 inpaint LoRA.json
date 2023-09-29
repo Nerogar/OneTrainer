@@ -5,6 +5,7 @@
     "workspace_dir": "workspace/run",
     "cache_dir": "workspace-cache/run",
     "tensorboard": true,
+    "continue_last_backup": false,
     "model_type": "STABLE_DIFFUSION_XL_10_BASE_INPAINTING",
     "base_model_name": "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
     "extra_model_name": "",

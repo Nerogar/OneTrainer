@@ -104,6 +104,10 @@ class GenericTrainer(BaseTrainer):
                 else:  # fine-tunes
                     base_model_name = last_backup_path
 
+                print(f"Continuing training from backup '{last_backup_path}'...")
+            else:
+                print(f"No backup found, continuing without backup...")
+
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
             model_type=self.args.model_type,
@@ -156,13 +160,11 @@ class GenericTrainer(BaseTrainer):
         if os.path.exists(backup_dirpath):
             backup_directories = sorted(
                 [dirpath for dirpath in os.listdir(backup_dirpath) if os.path.isdir(os.path.join(backup_dirpath, dirpath))],
-                key=lambda x: datetime.strptime(x, '%Y-%m-%d_%H-%M-%S'),
                 reverse=True,
             )
-        
+
             if backup_directories:
                 last_backup_dirpath = backup_directories[0]
-                print(f"Continuing training on backup '{last_backup_dirpath}'...")
                 return os.path.join(backup_dirpath, last_backup_dirpath)
             
         return None
