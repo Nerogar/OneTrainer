@@ -214,6 +214,11 @@ class TrainUI(ctk.CTk):
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "output_dtype")
 
+        # gradient checkpointing
+        components.label(master, 2, 3, "Gradient checkpointing",
+                         tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
+        components.switch(master, 2, 4, self.ui_state, "gradient_checkpointing")
+
         # weight dtype
         components.label(master, 3, 0, "Weight Data Type",
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")

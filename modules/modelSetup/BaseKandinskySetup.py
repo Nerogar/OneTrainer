@@ -56,10 +56,10 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
                         f" correctly and a GPU is available: {e}"
                     )
 
-        model.prior_text_encoder.gradient_checkpointing_enable()
-        model.prior_image_encoder.gradient_checkpointing_enable()
-
-        model.unet.enable_gradient_checkpointing()
+        if args.gradient_checkpointing:
+            model.prior_text_encoder.gradient_checkpointing_enable()
+            model.prior_image_encoder.gradient_checkpointing_enable()
+            model.unet.enable_gradient_checkpointing()
 
     def predict(
             self,

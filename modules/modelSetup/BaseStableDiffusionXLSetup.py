@@ -48,10 +48,11 @@ class BaseStableDiffusionXLSetup(BaseModelSetup, metaclass=ABCMeta):
                         f" correctly and a GPU is available: {e}"
                     )
 
-        model.unet.enable_gradient_checkpointing()
-        enable_checkpointing_for_transformer_blocks(model.unet)
-        enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1)
-        enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
+        if args.gradient_checkpointing:
+            model.unet.enable_gradient_checkpointing()
+            enable_checkpointing_for_transformer_blocks(model.unet)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
 
     def predict(
             self,

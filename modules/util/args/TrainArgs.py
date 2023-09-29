@@ -34,6 +34,7 @@ class TrainArgs(BaseArgs):
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
+    gradient_checkpointing: bool
 
     # data settings
     concept_file_name: str
@@ -153,6 +154,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--output-dtype", type=DataType, required=True, dest="output_dtype", help="The data type to use for saving weights", choices=list(DataType))
         parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.SAFETENSORS, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
+        parser.add_argument("--gradient-checkpointing", required=False, action='store_true', dest="gradient_checkpointing", help="Enable gradient checkpointing to reduce memory usage")
 
         # data settings
         parser.add_argument("--concept-file-name", type=str, required=True, dest="concept_file_name", help="The json file containing the concept definition")
@@ -245,6 +247,7 @@ class TrainArgs(BaseArgs):
         args["output_dtype"] = DataType.FLOAT_32
         args["output_model_format"] = ModelFormat.SAFETENSORS
         args["output_model_destination"] = "models/model.safetensors"
+        args["gradient_checkpointing"] = True
 
         # data settings
         args["concept_file_name"] = "training_concepts/concepts.json"
