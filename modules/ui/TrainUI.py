@@ -1,3 +1,4 @@
+import gc
 import threading
 import traceback
 import webbrowser
@@ -667,6 +668,9 @@ class TrainUI(ctk.CTk):
 
         trainer.end()
 
+        # clear gpu memory
+        torch.cuda.synchronize()
+        gc.collect()
         torch.cuda.empty_cache()
 
         if error_caught:
