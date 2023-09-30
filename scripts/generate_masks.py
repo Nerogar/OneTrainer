@@ -8,6 +8,7 @@ from modules.util.enum.GenerateMasksModel import GenerateMasksModel
 from modules.util.args.GenerateMasksArgs import GenerateMasksArgs
 from modules.module.RembgModel import RembgModel
 from modules.module.ClipSegModel import ClipSegModel
+from modules.module.MaskByColor import MaskByColor
 
 
 def main():
@@ -18,6 +19,8 @@ def main():
         model = ClipSegModel(torch.device(args.device), args.dtype.torch_dtype())
     elif args.model == GenerateMasksModel.REMBG:
         model = RembgModel(torch.device(args.device), args.dtype.torch_dtype())
+    elif args.model == GenerateMasksModel.COLOR:
+        model = MaskByColor(torch.device(args.device), args.dtype.torch_dtype())
 
     model.mask_folder(
         sample_dir=args.sample_dir,

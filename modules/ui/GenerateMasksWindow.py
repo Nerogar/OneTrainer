@@ -21,7 +21,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.mode_var = ctk.StringVar(self, "Create if absent")
         self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing"]
         self.model_var = ctk.StringVar(self, "ClipSeg")
-        self.models = ["ClipSeg", "Rembg"]
+        self.models = ["ClipSeg", "Rembg", "Hex Color"]
 
         self.frame = ctk.CTkFrame(self, width=600, height=300)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
