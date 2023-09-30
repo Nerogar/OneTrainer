@@ -96,6 +96,8 @@ class TrainArgs(BaseArgs):
     # backup settings
     backup_after: float
     backup_after_unit: TimeUnit
+    rolling_backup: bool
+    rolling_backup_count: int
     backup_before_save: bool
     save_after: float
     save_after_unit: TimeUnit
@@ -216,6 +218,8 @@ class TrainArgs(BaseArgs):
         # backup settings
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
         parser.add_argument("--backup-after-unit", type=TimeUnit, required=True, dest="backup_after_unit", help="The unit applied to the backup-after option")
+        parser.add_argument("--rolling-backup", required=False, action='store_true', dest="rolling_backup", help="Enable rolling backups")
+        parser.add_argument("--rolling-backup-count", type=int, required=False, default=3, dest="rolling_backup_count", help="The number of backups to keep if rolling backups are enabled")
         parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
         parser.add_argument("--save-after", type=float, required=False, default=0, dest="save_after", help="The interval for backups")
         parser.add_argument("--save-after-unit", type=TimeUnit, required=False, default=TimeUnit.NEVER, dest="save_after_unit", help="The unit applied to the backup-after option")
@@ -309,6 +313,8 @@ class TrainArgs(BaseArgs):
         # backup settings
         args["backup_after"] = 30
         args["backup_after_unit"] = TimeUnit.MINUTE
+        args["rolling_backup"] = False
+        args["rolling_backup_count"] = 3
         args["backup_before_save"] = True
         args["save_after"] = 0
         args["save_after_unit"] = TimeUnit.NEVER

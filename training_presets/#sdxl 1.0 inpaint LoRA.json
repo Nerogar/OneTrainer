@@ -70,6 +70,8 @@
     "sample_image_format": "JPG",
     "backup_after": 30,
     "backup_after_unit": "MINUTE",
+    "rolling_backup": false,
+    "rolling_backup_count": 3,
     "backup_before_save": true,
     "save_after": 0,
     "save_after_unit": "NEVER"

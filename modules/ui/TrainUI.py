@@ -512,15 +512,25 @@ class TrainUI(ctk.CTk):
                          tooltip="The interval used when automatically creating model backups during training")
         components.time_entry(master, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
+        # rolling backup
+        components.label(master, 1, 0, "Rolling Backup",
+                         tooltip="If rolling backups are enabled, older backups are deleted automatically")
+        components.switch(master, 1, 1, self.ui_state, "rolling_backup")
+
+        # rolling backup count
+        components.label(master, 1, 3, "Rolling Backup Count",
+                         tooltip="Defines the number of backups to keep if rolling backups are enabled")
+        components.entry(master, 1, 4, self.ui_state, "rolling_backup_count")
+
         # backup before save
-        components.label(master, 1, 0, "Backup Before Save",
+        components.label(master, 2, 0, "Backup Before Save",
                          tooltip="Create a full backup before saving the final model")
-        components.switch(master, 1, 1, self.ui_state, "backup_before_save")
+        components.switch(master, 2, 1, self.ui_state, "backup_before_save")
 
         # save after
-        components.label(master, 2, 0, "Save After",
+        components.label(master, 3, 0, "Save After",
                          tooltip="The interval used when automatically saving the model during training")
-        components.time_entry(master, 2, 1, self.ui_state, "save_after", "save_after_unit")
+        components.time_entry(master, 3, 1, self.ui_state, "save_after", "save_after_unit")
 
     def lora_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
