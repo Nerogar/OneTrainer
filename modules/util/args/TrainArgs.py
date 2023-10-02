@@ -66,6 +66,7 @@ class TrainArgs(BaseArgs):
     train_unet_epochs: int
     unet_learning_rate: float
     offset_noise_weight: float
+    perturbation_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
     force_epsilon_prediction: bool
@@ -188,6 +189,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
+        parser.add_argument("--perturbation-noise-weight", type=float, required=False, default=0.0, dest="perturbation_noise_weight", help="The weight for perturbation noise")
         parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
         parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
         parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
@@ -283,6 +285,7 @@ class TrainArgs(BaseArgs):
         args["train_unet_epochs"] = 10000
         args["unet_learning_rate"] = 3e-6
         args["offset_noise_weight"] = 0.0
+        args["perturbation_noise_weight"] = 0.0
         args["rescale_noise_scheduler_to_zero_terminal_snr"] = False
         args["force_v_prediction"] = False
         args["force_epsilon_prediction"] = False

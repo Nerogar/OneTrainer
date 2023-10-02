@@ -44,6 +44,7 @@
     "train_unet_epochs": 100000,
     "unet_learning_rate": 3e-06,
     "offset_noise_weight": 0.05,
+    "perturbation_noise_weight": 0.0,
     "rescale_noise_scheduler_to_zero_terminal_snr": false,
     "force_v_prediction": false,
     "force_epsilon_prediction": false,

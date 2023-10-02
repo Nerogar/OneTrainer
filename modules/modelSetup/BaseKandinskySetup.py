@@ -7,7 +7,7 @@ from diffusers.utils import is_xformers_available
 from torch import Tensor
 
 from modules.model.KandinskyModel import KandinskyModel
-from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.BaseDiffusionModelSetup import BaseDiffusionModelSetup
 from modules.modelSetup.kandinsky.kandinsky import KandinskyLoss
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
@@ -15,7 +15,7 @@ from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 
 
-class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
+class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
 
     def __init__(
             self,
@@ -82,27 +82,7 @@ class BaseKandinskySetup(BaseModelSetup, metaclass=ABCMeta):
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
 
-        if args.offset_noise_weight > 0:
-            normal_noise = torch.randn(
-                scaled_latent_image.shape,
-                generator=generator,
-                device=args.train_device,
-                dtype=scaled_latent_image.dtype
-            )
-            offset_noise = torch.randn(
-                (scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1),
-                generator=generator,
-                device=args.train_device,
-                dtype=scaled_latent_image.dtype
-            )
-            latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
-        else:
-            latent_noise = torch.randn(
-                scaled_latent_image.shape,
-                generator=generator,
-                device=args.train_device,
-                dtype=scaled_latent_image.dtype
-            )
+        latent_noise = self.create_noise(scaled_latent_image, args, generator)
 
         timestep = torch.randint(
             low=0,
