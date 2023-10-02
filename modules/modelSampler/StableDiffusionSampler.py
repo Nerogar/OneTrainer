@@ -139,6 +139,7 @@ class StableDiffusionSampler(BaseModelSampler):
             dtype=torch.float32
         ) * noise_scheduler.init_noise_sigma
 
+        # denoising loop
         extra_step_kwargs = {}
         if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
@@ -315,6 +316,7 @@ class StableDiffusionSampler(BaseModelSampler):
             dtype=torch.float32
         ) * noise_scheduler.init_noise_sigma
 
+        # denoising loop
         extra_step_kwargs = {}
         if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator

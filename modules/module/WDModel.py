@@ -18,14 +18,14 @@ class WDModel(BaseImageCaptionModel):
         )
         self.model = onnxruntime.InferenceSession(model_path)
 
-        labeL_path = huggingface_hub.hf_hub_download(
+        label_path = huggingface_hub.hf_hub_download(
             "SmilingWolf/wd-v1-4-vit-tagger-v2", "selected_tags.csv"
         )
         self.tag_names = []
         self.rating_indexes = []
         self.general_indexes = []
         self.character_indexes = []
-        with open(labeL_path, newline='') as file:
+        with open(label_path, newline='') as file:
             reader = csv.DictReader(file, delimiter=',', quotechar='\"')
             for i, row in enumerate(reader):
                 if row["category"] == "9":

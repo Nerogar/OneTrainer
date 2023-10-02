@@ -42,7 +42,6 @@ class BaseKandinskySetup(
     ):
         if args.attention_mechanism == AttentionMechanism.DEFAULT:
             model.unet.set_attn_processor(AttnProcessor())
-            pass
         elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
                 model.unet.set_attn_processor(XFormersAttnAddedKVProcessor())

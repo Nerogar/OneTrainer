@@ -199,7 +199,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
-        downscale_mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
+        downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
@@ -228,7 +228,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         return modules
 
     def _cache_modules(self, args: TrainArgs):
-        image_split_names = ['latent_image_distribution', 'original_resolution', 'crop_offset']
+        image_split_names = ['latent_image_distribution']
 
         if args.masked_training or args.model_type.has_mask_input():
             image_split_names.append('latent_mask')
@@ -272,7 +272,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         output_names = [
             'image_path', 'latent_image',
             'tokens_1', 'tokens_2',
-            'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
+            'crop_resolution', 'crop_offset', 'prompt',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -317,7 +317,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, override_allow_mixed_precision=False)
         decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, override_allow_mixed_precision=False)
-        upscale_mask = Upscale(in_name='latent_mask', out_name='decoded_mask', factor=8)
+        upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
         decode_prompt = DecodeTokens(in_name='tokens_1', out_name='decoded_prompt', tokenizer=model.tokenizer_1)
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)
         save_conditioning_image = SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)

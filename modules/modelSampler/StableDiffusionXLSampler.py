@@ -214,6 +214,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             "time_ids": torch.concat([add_time_ids] * 2, dim=0),
         }
 
+        # denoising loop
         extra_step_kwargs = {}
         if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
@@ -465,6 +466,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             "time_ids": torch.concat([add_time_ids] * 2, dim=0),
         }
 
+        # denoising loop
         extra_step_kwargs = {}
         if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator

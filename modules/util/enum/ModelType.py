@@ -16,6 +16,8 @@ class ModelType(Enum):
 
     KANDINSKY_21 = 'KANDINSKY_21'
 
+    WUERSTCHEN_2 = 'WUERSTCHEN_2'
+
     def __str__(self):
         return self.value
 
@@ -35,6 +37,9 @@ class ModelType(Enum):
 
     def is_kandinsky(self):
         return self == ModelType.KANDINSKY_21
+
+    def is_wuerstchen(self):
+        return self == ModelType.WUERSTCHEN_2
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \

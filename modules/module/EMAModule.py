@@ -44,12 +44,12 @@ class EMAModuleWrapper:
             for ema_parameter, parameter in zip(self.ema_parameters, parameters):
                 if parameter.requires_grad:
                     if ema_parameter.device == parameter.device:
-                        ema_parameter.add_((one_minus_decay * self.update_step_interval) * (parameter - ema_parameter))
+                        ema_parameter.add_(one_minus_decay * (parameter - ema_parameter))
                     else:
                         # in place calculations to save memory
                         parameter_copy = parameter.detach().to(ema_parameter.device)
                         parameter_copy.sub_(ema_parameter)
-                        parameter_copy.mul_(one_minus_decay * self.update_step_interval)
+                        parameter_copy.mul_(one_minus_decay)
                         ema_parameter.add_(parameter_copy)
                         del parameter_copy
 
