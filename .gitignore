@@ -9,3 +9,5 @@
 debug.py
 train.bat
 *.pyc
+
+*.bak
