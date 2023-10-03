@@ -46,12 +46,10 @@ class TrainArgs(BaseArgs):
     clear_cache_before_training: bool
 
     # training settings
-    optimizer: Optimizer
     learning_rate_scheduler: LearningRateScheduler
     learning_rate: float
     learning_rate_warmup_steps: int
     learning_rate_cycles: float
-    weight_decay: float
     epochs: int
     batch_size: int
     gradient_accumulation_steps: int
@@ -87,6 +85,44 @@ class TrainArgs(BaseArgs):
     lora_alpha: float
     lora_weight_dtype: DataType
     attention_mechanism: AttentionMechanism
+    
+    # optimizer settings
+    optimizer: Optimizer
+    weight_decay: float
+    momentum: float
+    dampening: float
+    nesterov: bool
+    eps: float
+    foreach: bool
+    fused: bool
+    min_8bit_size: int
+    percentile_clipping: int
+    block_wise: bool
+    is_paged: bool
+    lr_decay: int
+    initial_accumulator_value: int
+    alpha: float
+    centered: bool
+    max_unorm: float
+    betas: Tuple[float, float]
+    bias_correction: bool
+    amsgrad: bool
+    adam_w_mode: bool
+    use_bias_correction: bool
+    safeguard_warmup: bool
+    beta3: float
+    decouple: bool
+    d0: float
+    d_coef: float
+    growth_rate: float
+    fsdp_in_use: bool
+    clip_threshold: float
+    decay_rate: float
+    beta1: float
+    scale_parameter: bool
+    relative_step: bool
+    warmup_init: bool
+    eps_tuple: Tuple[float, float]
 
     # sample settings
     sample_definition_file_name: str
@@ -328,11 +364,11 @@ class TrainArgs(BaseArgs):
         args["clip_threshold"] = 1.0
         args["decay_rate"] = -0.8
         args["beta1"] = None
-        args["weight_decay"] = 0.0
         args["scale_parameter"] = True
         args["relative_step"] = True
         args["warmup_init"] = False
         args["eps_tuple"] = (1e-30, 1e-3)
+        
         # sample settings
         args["sample_definition_file_name"] = "training_samples/samples.json"
         args["sample_after"] = 10

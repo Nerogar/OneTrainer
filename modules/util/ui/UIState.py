@@ -50,8 +50,12 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "":
+                if string_var == "" or string_var == "None":
                     obj[name] = None
+                elif string_var == "inf":
+                    obj[name] = int("inf")
+                elif string_var == "-inf":
+                    obj[name] = int("-inf")
                 else:
                     try:
                         obj[name] = int(string_var)
@@ -60,8 +64,12 @@ class UIState:
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "":
+                if string_var == "" or string_var == "None":
                     setattr(obj, name, None)
+                elif string_var == "inf":
+                    setattr(obj, name, int("inf"))
+                elif string_var == "-inf":
+                    setattr(obj, name, int("-inf"))
                 else:
                     try:
                         setattr(obj, name, int(string_var))
@@ -74,8 +82,12 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "":
+                if string_var == "" or string_var == "None":
                     obj[name] = None
+                elif string_var == "inf":
+                    obj[name] = float("inf")
+                elif string_var == "-inf":
+                    obj[name] = float("-inf")
                 else:
                     try:
                         obj[name] = float(string_var)
@@ -84,13 +96,37 @@ class UIState:
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "":
+                if string_var == "" or string_var == "None":
                     setattr(obj, name, None)
+                elif string_var == "inf":
+                    setattr(obj, name, float("inf"))
+                elif string_var == "-inf":
+                    setattr(obj, name, float("-inf"))
                 else:
                     try:
                         setattr(obj, name, float(string_var))
                     except ValueError:
                         pass
+                        
+    def __set_tuple_var(self, obj, is_dict, name, var):
+        if is_dict:
+            def update(_0, _1, _2):
+                string_var = var.get().replace('(', '').replace(')', '').replace(' ', '')
+                try:
+                    values = tuple(map(float, string_var.split(',')))
+                    if len(values) == 2:
+                        obj[name] = values
+                except ValueError:
+                    pass
+        else:
+            def update(_0, _1, _2):
+                string_var = var.get().replace('(', '').replace(')', '').replace(' ', '')
+                try:
+                    values = tuple(map(float, string_var.split(',')))
+                    if len(values) == 2:
+                        setattr(obj, name, values)
+                except ValueError:
+                    pass
 
         return update
 
@@ -126,6 +162,11 @@ class UIState:
                 var.set(str(obj_var))
                 var.trace_add("write", self.__set_float_var(obj, is_dict, name, var))
                 self.vars[name] = var
+            elif isinstance(obj_var, tuple) and len(obj_var) == 2 and all(isinstance(i, float) for i in obj_var):
+                var = tk.StringVar(master=self.master)
+                var.set(str(obj_var))
+                var.trace_add("write", self.__set_tuple_var(obj, is_dict, name, var))
+                self.vars[name] = var
             else:
                 var = tk.StringVar(master=self.master)
                 var.set(obj_var)
@@ -150,6 +191,9 @@ class UIState:
                 var = self.vars[name]
                 var.set(str(obj_var))
             elif isinstance(obj_var, float):
+                var = self.vars[name]
+                var.set(str(obj_var))
+            elif isinstance(obj_var, tuple) and len(obj_var) == 2 and all(isinstance(i, float) for i in obj_var):
                 var = self.vars[name]
                 var.set(str(obj_var))
             else:
