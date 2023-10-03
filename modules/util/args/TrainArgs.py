@@ -104,7 +104,7 @@ class TrainArgs(BaseArgs):
     alpha: float
     centered: bool
     max_unorm: float
-    betas: Tuple[float, float]
+    betas: tuple[float, float]
     bias_correction: bool
     amsgrad: bool
     adam_w_mode: bool
@@ -122,7 +122,7 @@ class TrainArgs(BaseArgs):
     scale_parameter: bool
     relative_step: bool
     warmup_init: bool
-    eps_tuple: Tuple[float, float]
+    eps_tuple: tuple[float, float]
 
     # sample settings
     sample_definition_file_name: str
