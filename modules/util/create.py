@@ -500,10 +500,10 @@ def create_optimizer(
             if args.relative_step:
                 optimizer = Adafactor(
                     params=parameters,
-                    # eps=args.eps_tuple,
+                    eps=args.eps_tuple,
                     clip_threshold=args.clip_threshold,
                     decay_rate=args.decay_rate,
-                    # beta1=args.beta1,
+                    beta1=args.beta1,
                     weight_decay=args.weight_decay,
                     scale_parameter=args.scale_parameter,
                     relative_step=args.relative_step,
@@ -513,10 +513,10 @@ def create_optimizer(
                 optimizer = Adafactor(
                     params=parameters,
                     lr=args.learning_rate,
-                    # eps=args.eps_tuple,
+                    eps=args.eps_tuple,
                     clip_threshold=args.clip_threshold,
                     decay_rate=args.decay_rate,
-                    # beta1=args.beta1,
+                    beta1=args.beta1,
                     weight_decay=args.weight_decay,
                     scale_parameter=args.scale_parameter,
                     relative_step=args.relative_step,
