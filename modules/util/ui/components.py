@@ -160,7 +160,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str, c
     component = ctk.CTkOptionMenu(frame, values=values, variable=ui_state.vars[var_name])
     component.grid(row=0, column=0, padx=PAD, pady=(PAD, PAD), sticky="new")
 
-    button_component = ctk.CTkButton(frame, text="…", width=20, command=command)
+    button_component = ctk.CTkButton(frame, text="â€¦", width=20, command=command)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
     return frame

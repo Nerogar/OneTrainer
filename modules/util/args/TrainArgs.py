@@ -301,13 +301,24 @@ class TrainArgs(BaseArgs):
         args["clear_cache_before_training"] = True
 
         # training settings
+        args["learning_rate_scheduler"] = LearningRateScheduler.CONSTANT
+        args["learning_rate"] = 3e-6
+        args["learning_rate_warmup_steps"] = 200
+        args["learning_rate_cycles"] = 1
+        args["weight_decay"] = 1e-2
         args["epochs"] = 100
         args["batch_size"] = 1
         args["gradient_accumulation_steps"] = 1
         args["ema"] = EMAMode.OFF
         args["ema_decay"] = 0.999
         args["ema_update_step_interval"] = 5
+        args["train_text_encoder"] = True
+        args["train_text_encoder_epochs"] = 30
+        args["text_encoder_learning_rate"] = 3e-6
         args["text_encoder_layer_skip"] = 0
+        args["train_unet"] = True
+        args["train_unet_epochs"] = 10000
+        args["unet_learning_rate"] = 3e-6
         args["offset_noise_weight"] = 0.0
         args["perturbation_noise_weight"] = 0.0
         args["rescale_noise_scheduler_to_zero_terminal_snr"] = False
