@@ -8,7 +8,7 @@ from diffusers.utils import is_xformers_available
 from torch import Tensor
 
 from modules.model.WuerstchenModel import WuerstchenModel
-from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.BaseDiffusionModelSetup import BaseDiffusionModelSetup
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -16,7 +16,7 @@ from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
-class BaseWuerstchenSetup(BaseModelSetup, metaclass=ABCMeta):
+class BaseWuerstchenSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
 
     def setup_optimizations(
             self,
@@ -84,27 +84,7 @@ class BaseWuerstchenSetup(BaseModelSetup, metaclass=ABCMeta):
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
 
-        if args.offset_noise_weight > 0:
-            normal_noise = torch.randn(
-                scaled_latent_image.shape,
-                generator=generator,
-                device=args.train_device,
-                dtype=scaled_latent_image.dtype
-            )
-            offset_noise = torch.randn(
-                (scaled_latent_image.shape[0], scaled_latent_image.shape[1], 1, 1),
-                generator=generator,
-                device=args.train_device,
-                dtype=scaled_latent_image.dtype
-            )
-            latent_noise = normal_noise + (args.offset_noise_weight * offset_noise)
-        else:
-            latent_noise = torch.randn(
-                scaled_latent_image.shape,
-                generator=generator,
-                device=args.train_device,
-                dtype=scaled_latent_image.dtype
-            )
+        latent_noise = self.create_noise(scaled_latent_image, args, generator)
 
         timestep = (1 - torch.rand(
             size=(scaled_latent_image.shape[0],),
