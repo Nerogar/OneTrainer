@@ -8,7 +8,7 @@ import customtkinter as ctk
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
-from customtkinter import ThemeManager
+from customtkinter import ThemeManager, ScalingTracker
 
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
@@ -302,13 +302,18 @@ Mouse wheel: increase or decrease brush size"""
         if len(self.image_names) == 0 or self.current_image_index >= len(self.image_names):
             return
 
-        start_x = int(event.x / self.pil_image.width * self.image_width)
-        start_y = int(event.y / self.pil_image.height * self.image_height)
+        display_scaling = ScalingTracker.get_window_scaling(self)
+
+        event_x = event.x / display_scaling
+        event_y = event.y / display_scaling
+
+        start_x = int(event_x / self.pil_image.width * self.image_width)
+        start_y = int(event_y / self.pil_image.height * self.image_height)
         end_x = int(self.mask_draw_x / self.pil_image.width * self.image_width)
         end_y = int(self.mask_draw_y / self.pil_image.height * self.image_height)
 
-        self.mask_draw_x = event.x
-        self.mask_draw_y = event.y
+        self.mask_draw_x = event_x
+        self.mask_draw_y = event_y
 
         color = None
 
