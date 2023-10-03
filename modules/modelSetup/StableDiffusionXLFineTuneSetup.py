@@ -76,8 +76,6 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
     ):
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         model.text_encoder_1.requires_grad_(train_text_encoder)
-
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         model.text_encoder_2.requires_grad_(train_text_encoder)
 
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
@@ -116,8 +114,8 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             model: StableDiffusionXLModel,
             args: TrainArgs,
     ):
-        model.text_encoder_1.to(self.train_device if args.train_text_encoder else self.temp_device)
-        model.text_encoder_2.to(self.train_device if args.train_text_encoder else self.temp_device)
+        model.text_encoder_1.to(self.train_device)
+        model.text_encoder_2.to(self.train_device)
         model.vae.to(self.temp_device)
         model.unet.to(self.train_device)
 

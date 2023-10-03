@@ -31,7 +31,8 @@ class ConceptWindow(ctk.CTkToplevel):
         tabview.grid(row=0, column=0, sticky="nsew")
 
         self.__general_tab(tabview.add("general"), concept)
-        self.__augmentation_tab(tabview.add("augmentation"))
+        self.__image_augmentation_tab(tabview.add("image augmentation"))
+        self.__text_augmentation_tab(tabview.add("text augmentation"))
 
         components.button(self, 1, 0, "ok", self.__ok)
 
@@ -74,7 +75,7 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Includes images from subdirectories into the dataset")
         components.switch(master, 3, 1, self.ui_state, "include_subdirectories")
 
-    def __augmentation_tab(self, master):
+    def __image_augmentation_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=0)
         master.grid_columnconfigure(2, weight=0)
@@ -129,9 +130,30 @@ class ConceptWindow(ctk.CTkToplevel):
         image_label.grid(row=0, column=3, rowspan=6)
 
         # refresh preview
-        components.button(master, 6, 3, "Update Preview", command=self.__update_preview)
+        components.button(master, 6, 3, "Update Preview", command=self.__update_image_preview)
 
-    def __update_preview(self):
+    def __text_augmentation_tab(self, master):
+        master.grid_columnconfigure(0, weight=0)
+        master.grid_columnconfigure(1, weight=0)
+        master.grid_columnconfigure(2, weight=0)
+        master.grid_columnconfigure(3, weight=1)
+
+        # tag shuffling
+        components.label(master, 0, 0, "Tag Shuffling",
+                         tooltip="Enables tag shuffling")
+        components.switch(master, 0, 1, self.ui_state, "enable_tag_shuffling")
+
+        # keep tag count
+        components.label(master, 1, 0, "Tag Delimiter",
+                         tooltip="The delimiter between tags")
+        components.entry(master, 1, 1, self.ui_state, "tag_delimiter")
+
+        # keep tag count
+        components.label(master, 2, 0, "Keep Tag Count",
+                         tooltip="The number of tags at the start of the caption that are not shuffled")
+        components.entry(master, 2, 1, self.ui_state, "keep_tags_count")
+
+    def __update_image_preview(self):
         self.image.configure(light_image=self.__get_preview_image())
 
     def __get_preview_image(self):

@@ -149,6 +149,7 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
         random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.enable_random_contrast', max_strength_in_name='concept.random_contrast_max_strength')
         random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.enable_random_saturation', max_strength_in_name='concept.random_saturation_max_strength')
         random_hue = RandomHue(names=['image'], enabled_in_name='concept.enable_random_hue', max_strength_in_name='concept.random_hue_max_strength')
+        shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.enable_tag_shuffling', delimiter_in_name='concept.tag_delimiter', keep_tags_count_in_name='concept.keep_tags_count', text_out_name='prompt')
 
         modules = [
             random_flip,
@@ -157,6 +158,7 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
             random_contrast,
             random_saturation,
             random_hue,
+            shuffle_tags,
         ]
 
         return modules
@@ -181,13 +183,11 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
-        encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, text_encoder=model.text_encoder_1, hidden_state_output_index=-2)
-        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', text_encoder=model.text_encoder_2, hidden_state_output_index=-2)
 
         modules = [
             rescale_image, encode_image,
-            tokenize_prompt_1, encode_prompt_1,
-            tokenize_prompt_2, encode_prompt_2,
+            tokenize_prompt_1,
+            tokenize_prompt_2,
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -203,8 +203,6 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
     def _cache_modules(self, args: TrainArgs):
         split_names = [
             'latent_image_distribution',
-            'tokens_1', 'text_encoder_1_hidden_state',
-            'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
             'original_resolution', 'crop_offset',
         ]
 
@@ -232,8 +230,7 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
     def _output_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
         output_names = [
             'image_path', 'latent_image',
-            'tokens_1', 'text_encoder_1_hidden_state',
-            'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
+            'tokens_1', 'tokens_2',
             'original_resolution', 'crop_resolution', 'crop_offset',
         ]
 

@@ -155,8 +155,8 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             model: StableDiffusionXLModel,
             args: TrainArgs,
     ):
-        model.text_encoder_1.to(self.train_device if args.train_text_encoder else self.temp_device)
-        model.text_encoder_2.to(self.train_device if args.train_text_encoder else self.temp_device)
+        model.text_encoder_1.to(self.train_device)
+        model.text_encoder_2.to(self.train_device)
         model.vae.to(self.temp_device)
         model.unet.to(self.train_device)
 

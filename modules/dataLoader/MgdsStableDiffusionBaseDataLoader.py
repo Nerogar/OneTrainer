@@ -164,6 +164,7 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
         random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.enable_random_contrast', max_strength_in_name='concept.random_contrast_max_strength')
         random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.enable_random_saturation', max_strength_in_name='concept.random_saturation_max_strength')
         random_hue = RandomHue(names=['image'], enabled_in_name='concept.enable_random_hue', max_strength_in_name='concept.random_hue_max_strength')
+        shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.enable_tag_shuffling', delimiter_in_name='concept.tag_delimiter', keep_tags_count_in_name='concept.keep_tags_count', text_out_name='prompt')
 
         modules = [
             random_flip,
@@ -172,6 +173,7 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
             random_contrast,
             random_saturation,
             random_hue,
+            shuffle_tags,
         ]
 
         return modules

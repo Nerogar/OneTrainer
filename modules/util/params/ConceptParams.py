@@ -19,6 +19,9 @@ class ConceptParams(BaseParams):
     enable_random_hue: bool
     random_hue_max_strength: float
     include_subdirectories: bool
+    enable_tag_shuffling: bool
+    tag_delimiter: str
+    keep_tags_count: int
 
     def __init__(self, args: dict):
         super(ConceptParams, self).__init__(args)
@@ -44,5 +47,8 @@ class ConceptParams(BaseParams):
         args["enable_random_hue"] = False
         args["random_hue_max_strength"] = 0.0
         args["include_subdirectories"] = False
+        args["enable_tag_shuffling"] = False
+        args["tag_delimiter"] = ","
+        args["keep_tags_count"] = 1
 
         return ConceptParams(args)
