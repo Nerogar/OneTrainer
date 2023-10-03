@@ -1,3 +1,4 @@
+import copy
 import gc
 import json
 import os
@@ -304,15 +305,32 @@ class GenericTrainer(BaseTrainer):
 
         self.__gc()
 
+    def __save_backup_config(self, backup_path):
+        config_path = os.path.join(backup_path, "onetrainer_config")
+        args_path = path_util.canonical_join(config_path, "args.json")
+        concepts_path = path_util.canonical_join(config_path, "concepts.json")
+        samples_path = path_util.canonical_join(config_path, "samples.json")
+
+        os.makedirs(Path(config_path).absolute(), exist_ok=True)
+
+        with open(args_path, "w") as f:
+            args = copy.copy(self.args)
+            args.concept_file_name = concepts_path
+            args.sample_definition_file_name = samples_path
+            json.dump(args.to_json(), f, indent=4)
+        shutil.copy2(self.args.concept_file_name, concepts_path)
+        shutil.copy2(self.args.sample_definition_file_name, samples_path)
+
     def backup(self):
         self.__gc()
 
         self.callbacks.on_update_status("creating backup")
 
         backup_path = os.path.join(self.args.workspace_dir, "backup", self.__get_string_timestamp())
-        print("Creating Backup " + backup_path)
 
         try:
+            print("Creating Backup " + backup_path)
+
             self.model_saver.save(
                 self.model,
                 self.args.model_type,
@@ -320,6 +338,8 @@ class GenericTrainer(BaseTrainer):
                 backup_path,
                 torch.float32
             )
+
+            self.__save_backup_config(backup_path)
         except:
             traceback.print_exc()
             print("Could not save backup. Check your disk space!")
