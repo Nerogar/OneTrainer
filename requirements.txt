@@ -27,7 +27,7 @@ onnxruntime==1.15.1
 pooch==1.7.0
 
 # data loader
-git+https://github.com/Nerogar/mgds.git@c8c5c10#egg=mgds
+git+https://github.com/Nerogar/mgds.git@848436a#egg=mgds
 
 # xformers
 xformers==0.0.20
