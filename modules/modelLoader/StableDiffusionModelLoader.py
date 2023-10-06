@@ -11,9 +11,11 @@ from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTFor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
@@ -104,6 +106,10 @@ class StableDiffusionModelLoader(BaseModelLoader):
             base_model_name,
             subfolder="scheduler",
         )
+        noise_scheduler = create.create_noise_scheduler(
+            noise_scheduler=NoiseScheduler.DDIM,
+            original_noise_scheduler=noise_scheduler,
+        )
 
         text_encoder = CLIPTextModel.from_pretrained(
             base_model_name,
@@ -170,16 +176,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             load_safety_checker=False,
         )
 
-        noise_scheduler = DDIMScheduler(
-            num_train_timesteps=1000,
-            beta_start=0.00085,
-            beta_end=0.012,
-            beta_schedule="scaled_linear",
-            trained_betas=None,
-            clip_sample=False,
-            set_alpha_to_one=False,
-            steps_offset=1,
-            prediction_type="epsilon",
+        noise_scheduler = create.create_noise_scheduler(
+            noise_scheduler=NoiseScheduler.DDIM,
+            original_noise_scheduler=pipeline.scheduler,
         )
 
         with open(yaml_name, "r") as f:
@@ -219,16 +218,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             from_safetensors=True,
         )
 
-        noise_scheduler = DDIMScheduler(
-            num_train_timesteps=1000,
-            beta_start=0.00085,
-            beta_end=0.012,
-            beta_schedule="scaled_linear",
-            trained_betas=None,
-            clip_sample=False,
-            set_alpha_to_one=False,
-            steps_offset=1,
-            prediction_type="epsilon",
+        noise_scheduler = create.create_noise_scheduler(
+            noise_scheduler=NoiseScheduler.DDIM,
+            original_noise_scheduler=pipeline.scheduler,
         )
 
         with open(yaml_name, "r") as f:

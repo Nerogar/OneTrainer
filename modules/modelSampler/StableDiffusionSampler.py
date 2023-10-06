@@ -48,7 +48,7 @@ class StableDiffusionSampler(BaseModelSampler):
 
         tokenizer = self.pipeline.tokenizer
         text_encoder = self.pipeline.text_encoder
-        noise_scheduler = create.create_noise_scheduler(noise_scheduler, diffusion_steps)
+        noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.pipeline.scheduler, diffusion_steps)
         image_processor = self.pipeline.image_processor
         unet = self.pipeline.unet
         vae = self.pipeline.vae
@@ -211,7 +211,7 @@ class StableDiffusionSampler(BaseModelSampler):
 
         tokenizer = self.pipeline.tokenizer
         text_encoder = self.pipeline.text_encoder
-        noise_scheduler = create.create_noise_scheduler(noise_scheduler, diffusion_steps)
+        noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.pipeline.scheduler, diffusion_steps)
         image_processor = self.pipeline.image_processor
         unet = self.pipeline.unet
         vae = self.pipeline.vae
