@@ -90,13 +90,13 @@ class BaseStableDiffusionXLSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
         text_encoder_1_output = model.text_encoder_1(
             batch['tokens_1'], output_hidden_states=True, return_dict=True
         )
-        text_encoder_1_output = text_encoder_1_output.hidden_states[-2]
+        text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + args.text_encoder_layer_skip)]
 
         text_encoder_2_output = model.text_encoder_2(
             batch['tokens_2'], output_hidden_states=True, return_dict=True
         )
         pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-        text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
+        text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + args.text_encoder_layer_skip)]
 
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 

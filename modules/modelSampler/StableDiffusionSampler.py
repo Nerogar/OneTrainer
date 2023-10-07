@@ -82,40 +82,27 @@ class StableDiffusionSampler(BaseModelSampler):
             negative_tokens_attention_mask = None
 
         with torch.autocast(self.train_device.type):
-            if text_encoder_layer_skip > 0:
-                text_encoder_output = text_encoder(
-                    tokens,
-                    return_dict=True,
-                    output_hidden_states=True,
-                )
-                final_layer_norm = text_encoder.text_model.final_layer_norm
-                prompt_embedding = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
+            text_encoder_output = text_encoder(
+                tokens,
+                attention_mask=tokens_attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+            final_layer_norm = text_encoder.text_model.final_layer_norm
+            prompt_embedding = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            )
 
-                text_encoder_output = text_encoder(
-                    negative_tokens,
-                    return_dict=True,
-                    output_hidden_states=True,
-                )
-                final_layer_norm = text_encoder.text_model.final_layer_norm
-                negative_prompt_embedding = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
-            else:
-                text_encoder_output = text_encoder(
-                    tokens,
-                    attention_mask=tokens_attention_mask,
-                    return_dict=True,
-                )
-                prompt_embedding = text_encoder_output.last_hidden_state
-
-                text_encoder_output = text_encoder(
-                    negative_tokens,
-                    attention_mask=negative_tokens_attention_mask,
-                    return_dict=True,
-                )
-                negative_prompt_embedding = text_encoder_output.last_hidden_state
+            text_encoder_output = text_encoder(
+                negative_tokens,
+                attention_mask=negative_tokens_attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+            final_layer_norm = text_encoder.text_model.final_layer_norm
+            negative_prompt_embedding = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            )
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
@@ -255,40 +242,27 @@ class StableDiffusionSampler(BaseModelSampler):
             negative_tokens_attention_mask = None
 
         with torch.autocast(self.train_device.type):
-            if text_encoder_layer_skip > 0:
-                text_encoder_output = text_encoder(
-                    tokens,
-                    return_dict=True,
-                    output_hidden_states=True,
-                )
-                final_layer_norm = text_encoder.text_model.final_layer_norm
-                prompt_embedding = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
+            text_encoder_output = text_encoder(
+                tokens,
+                attention_mask=tokens_attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+            final_layer_norm = text_encoder.text_model.final_layer_norm
+            prompt_embedding = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            )
 
-                text_encoder_output = text_encoder(
-                    negative_tokens,
-                    return_dict=True,
-                    output_hidden_states=True,
-                )
-                final_layer_norm = text_encoder.text_model.final_layer_norm
-                negative_prompt_embedding = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
-            else:
-                text_encoder_output = text_encoder(
-                    tokens,
-                    attention_mask=tokens_attention_mask,
-                    return_dict=True,
-                )
-                prompt_embedding = text_encoder_output.last_hidden_state
-
-                text_encoder_output = text_encoder(
-                    negative_tokens,
-                    attention_mask=negative_tokens_attention_mask,
-                    return_dict=True,
-                )
-                negative_prompt_embedding = text_encoder_output.last_hidden_state
+            text_encoder_output = text_encoder(
+                negative_tokens,
+                attention_mask=negative_tokens_attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+            final_layer_norm = text_encoder.text_model.final_layer_norm
+            negative_prompt_embedding = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            )
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 

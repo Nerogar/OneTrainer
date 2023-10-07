@@ -110,14 +110,13 @@ class StableDiffusionXLSampler(BaseModelSampler):
             negative_tokens_2_attention_mask = None
 
         with torch.autocast(self.train_device.type):
-            # TODO: support clip skip
             text_encoder_1_output = text_encoder_1(
                 tokens_1,
                 attention_mask=tokens_1_attention_mask,
                 output_hidden_states=True,
                 return_dict=True,
             )
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-2]
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             text_encoder_2_output = text_encoder_2(
                 tokens_2,
@@ -126,7 +125,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 return_dict=True,
             )
             pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             prompt_embedding = torch.concat(
                 [text_encoder_1_output, text_encoder_2_output], dim=-1
@@ -138,7 +137,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 output_hidden_states=True,
                 return_dict=True,
             )
-            negative_text_encoder_1_output = negative_text_encoder_1_output.hidden_states[-2]
+            negative_text_encoder_1_output = \
+                negative_text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             negative_text_encoder_2_output = text_encoder_2(
                 negative_tokens_2,
@@ -147,7 +147,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 return_dict=True,
             )
             negative_pooled_text_encoder_2_output = negative_text_encoder_2_output.text_embeds
-            negative_text_encoder_2_output = negative_text_encoder_2_output.hidden_states[-2]
+            negative_text_encoder_2_output = \
+                negative_text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             negative_prompt_embedding = torch.concat(
                 [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
@@ -343,14 +344,13 @@ class StableDiffusionXLSampler(BaseModelSampler):
             negative_tokens_2_attention_mask = None
 
         with torch.autocast(self.train_device.type):
-            # TODO: support clip skip
             text_encoder_1_output = text_encoder_1(
                 tokens_1,
                 attention_mask=tokens_1_attention_mask,
                 output_hidden_states=True,
                 return_dict=True,
             )
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-2]
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             text_encoder_2_output = text_encoder_2(
                 tokens_2,
@@ -359,7 +359,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 return_dict=True,
             )
             pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             prompt_embedding = torch.concat(
                 [text_encoder_1_output, text_encoder_2_output], dim=-1
@@ -371,7 +371,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 output_hidden_states=True,
                 return_dict=True,
             )
-            negative_text_encoder_1_output = negative_text_encoder_1_output.hidden_states[-2]
+            negative_text_encoder_1_output = \
+                negative_text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             negative_text_encoder_2_output = text_encoder_2(
                 negative_tokens_2,
@@ -380,7 +381,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 return_dict=True,
             )
             negative_pooled_text_encoder_2_output = negative_text_encoder_2_output.text_embeds
-            negative_text_encoder_2_output = negative_text_encoder_2_output.hidden_states[-2]
+            negative_text_encoder_2_output = \
+                negative_text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
             negative_prompt_embedding = torch.concat(
                 [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
