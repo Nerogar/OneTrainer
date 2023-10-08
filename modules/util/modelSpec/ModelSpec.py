@@ -11,7 +11,7 @@ class ModelSpec:
             author: str = "",
             date: str = datetime.now().strftime("%Y-%m-%d"),
             hash_sha256: str = "",
-            license: str = "CreativeML Open RAIL++-M License",
+            license: str = "",
             thumbnail: str = "",
             resolution: str = "",
             prediction_type: str = "",

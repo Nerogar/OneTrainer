@@ -3,28 +3,29 @@ import os
 import traceback
 
 import torch
-import yaml
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
-from safetensors import safe_open
 from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.util import create
-from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
-from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
-class StableDiffusionModelLoader(BaseModelLoader):
+class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderSDConfigMixin):
     def __init__(self):
         super(StableDiffusionModelLoader, self).__init__()
 
-    @staticmethod
-    def __default_yaml_name(model_type: ModelType) -> str | None:
+    def _default_sd_config_name(
+            self,
+            model_type: ModelType,
+    ) -> str | None:
         match model_type:
             case ModelType.STABLE_DIFFUSION_15:
                 return "resources/diffusers_model_config/v1-inference.yaml"
@@ -45,8 +46,32 @@ class StableDiffusionModelLoader(BaseModelLoader):
             case _:
                 return None
 
-    @staticmethod
+    def _default_model_spec_name(
+            self,
+            model_type: ModelType,
+    ) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_15:
+                return "resources/sd_model_spec/sd_1.5.json"
+            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
+                return "resources/sd_model_spec/sd_1.5_inpainting.json"
+            case ModelType.STABLE_DIFFUSION_20:
+                return "resources/sd_model_spec/sd_2.0.json"
+            case ModelType.STABLE_DIFFUSION_20_BASE:
+                return "resources/sd_model_spec/sd_2.0.json"
+            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
+                return "resources/sd_model_spec/sd_2.0_inpainting.json"
+            case ModelType.STABLE_DIFFUSION_20_DEPTH:
+                return "resources/sd_model_spec/sd_2.0_depth.json"
+            case ModelType.STABLE_DIFFUSION_21:
+                return "resources/sd_model_spec/sd_2.1.json"
+            case ModelType.STABLE_DIFFUSION_21_BASE:
+                return "resources/sd_model_spec/sd_2.1.json"
+            case _:
+                return None
+
     def __load_internal(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
@@ -61,7 +86,7 @@ class StableDiffusionModelLoader(BaseModelLoader):
             )
 
         # base model
-        model = StableDiffusionModelLoader.__load_diffusers(model_type, weight_dtypes, base_model_name)
+        model = self.__load_diffusers(model_type, weight_dtypes, base_model_name)
 
         # optimizer
         try:
@@ -75,24 +100,18 @@ class StableDiffusionModelLoader(BaseModelLoader):
         except FileNotFoundError:
             pass
 
-        with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
-            model.sd_config = yaml.safe_load(f)
+        model.sd_config = self._load_sd_config(model_type)
 
         # meta
         model.train_progress = train_progress
 
         # model spec
-        model.model_spec = ModelSpec()
-        try:
-            with open(os.path.join(base_model_name, "model_spec.json"), "r") as model_spec_file:
-                model.model_spec = ModelSpec.from_dict(json.load(model_spec_file))
-        except:
-            pass
+        model.model_spec = self._load_default_model_spec(model_type)
 
         return model
 
-    @staticmethod
     def __load_diffusers(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
@@ -140,10 +159,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             torch_dtype=weight_dtypes.unet.torch_dtype(),  # TODO: use depth estimator dtype
         ) if model_type.has_depth_input() else None
 
-        with open(StableDiffusionModelLoader.__default_yaml_name(model_type), "r") as f:
-            sd_config = yaml.safe_load(f)
+        sd_config = self._load_sd_config(model_type)
 
-        model_spec = ModelSpec()
+        model_spec = self._load_default_model_spec(model_type)
 
         return StableDiffusionModel(
             model_type=model_type,
@@ -158,17 +176,13 @@ class StableDiffusionModelLoader(BaseModelLoader):
             model_spec=model_spec,
         )
 
-    @staticmethod
     def __load_ckpt(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
     ) -> StableDiffusionModel | None:
-        yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
-        if not os.path.exists(yaml_name):
-            yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
-            if not os.path.exists(yaml_name):
-                yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
+        yaml_name = self._get_sd_config_name(model_type, base_model_name)
 
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path=base_model_name,
@@ -181,10 +195,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             original_noise_scheduler=pipeline.scheduler,
         )
 
-        with open(yaml_name, "r") as f:
-            sd_config = yaml.safe_load(f)
+        sd_config = self._load_sd_config(model_type, base_model_name)
 
-        model_spec = ModelSpec()
+        model_spec = self._load_default_model_spec(model_type)
 
         return StableDiffusionModel(
             model_type=model_type,
@@ -199,17 +212,13 @@ class StableDiffusionModelLoader(BaseModelLoader):
             model_spec=model_spec,
         )
 
-    @staticmethod
     def __load_safetensors(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
     ) -> StableDiffusionModel | None:
-        yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
-        if not os.path.exists(yaml_name):
-            yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
-            if not os.path.exists(yaml_name):
-                yaml_name = StableDiffusionModelLoader.__default_yaml_name(model_type)
+        yaml_name = self._get_sd_config_name(model_type, base_model_name)
 
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path=base_model_name,
@@ -223,16 +232,9 @@ class StableDiffusionModelLoader(BaseModelLoader):
             original_noise_scheduler=pipeline.scheduler,
         )
 
-        with open(yaml_name, "r") as f:
-            sd_config = yaml.safe_load(f)
+        sd_config = self._load_sd_config(model_type)
 
-        model_spec = ModelSpec()
-        try:
-            with safe_open(base_model_name, framework="pt") as f:
-                if "modelspec.sai_model_spec" in f.metadata():
-                    model_spec = ModelSpec.from_dict(f.metadata())
-        except:
-            pass
+        model_spec = self._load_default_model_spec(model_type, base_model_name)
 
         return StableDiffusionModel(
             model_type=model_type,
