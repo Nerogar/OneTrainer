@@ -338,41 +338,41 @@ class TrainUI(ctk.CTk):
         components.entry(scroll_frame, 4, 1, self.ui_state, "learning_rate_cycles")
 
         # epochs
-        components.label(scroll_frame, 6, 0, "Epochs",
+        components.label(scroll_frame, 5, 0, "Epochs",
                          tooltip="The number of epochs for a full training run")
-        components.entry(scroll_frame, 6, 1, self.ui_state, "epochs")
+        components.entry(scroll_frame, 5, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(scroll_frame, 7, 0, "Batch Size",
+        components.label(scroll_frame, 6, 0, "Batch Size",
                          tooltip="The batch size of one training step")
-        components.entry(scroll_frame, 7, 1, self.ui_state, "batch_size")
+        components.entry(scroll_frame, 6, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(scroll_frame, 8, 0, "Accumulation Steps",
+        components.label(scroll_frame, 7, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(scroll_frame, 8, 1, self.ui_state, "gradient_accumulation_steps")
+        components.entry(scroll_frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
 
         # attention mechanism
-        components.label(scroll_frame, 9, 0, "Attention",
+        components.label(scroll_frame, 8, 0, "Attention",
                          tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(scroll_frame, 9, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
+        components.options(scroll_frame, 8, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
                            "attention_mechanism")
 
         # ema
-        components.label(scroll_frame, 10, 0, "EMA",
+        components.label(scroll_frame, 9, 0, "EMA",
                          tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
-        components.options(scroll_frame, 10, 1, [str(x) for x in list(EMAMode)], self.ui_state,
+        components.options(scroll_frame, 9, 1, [str(x) for x in list(EMAMode)], self.ui_state,
                            "ema")
 
         # ema decay
-        components.label(scroll_frame, 11, 0, "EMA Decay",
+        components.label(scroll_frame, 10, 0, "EMA Decay",
                          tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
-        components.entry(scroll_frame, 11, 1, self.ui_state, "ema_decay")
+        components.entry(scroll_frame, 10, 1, self.ui_state, "ema_decay")
 
         # ema update step interval
-        components.label(scroll_frame, 12, 0, "EMA Update Step Interval",
+        components.label(scroll_frame, 11, 0, "EMA Update Step Interval",
                          tooltip="Number of steps between EMA update steps")
-        components.entry(scroll_frame, 12, 1, self.ui_state, "ema_update_step_interval")
+        components.entry(scroll_frame, 11, 1, self.ui_state, "ema_update_step_interval")
 
         # column 2
         # train text encoder

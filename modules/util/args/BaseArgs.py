@@ -19,6 +19,12 @@ class BaseArgs:
                 data[key] = value
             elif isinstance(value, float):
                 data[key] = value
+            elif isinstance(value, tuple) and len(value) == 2:
+                data[key] = {"x": value[0], "y": value[1]}
+            elif value is None:
+                data[key] = "None"
+            elif value in [float('inf'), float('-inf'), int('inf'), int('-inf')]:
+                data[key] = str(value)
             else:
                 data[key] = value
 
@@ -38,6 +44,15 @@ class BaseArgs:
                     setattr(self, key, int(data[key]))
                 elif isinstance(value, float):
                     setattr(self, key, float(data[key]))
+                elif isinstance(value, tuple) and "x" in data[key] and "y" in data[key]:
+                    setattr(self, key, (data[key]["x"], data[key]["y"]))
+                elif data[key] == "None":
+                    setattr(self, key, data[key])
+                elif data[key] in ["inf", "-inf"]:
+                    if isinstance(value, int):
+                        setattr(self, key, int(float(data[key])))
+                    else:
+                        setattr(self, key, float(data[key]))
                 else:
                     setattr(self, key, data[key])
             except Exception as e:
@@ -67,6 +82,14 @@ class BaseArgs:
             elif isinstance(value, int):
                 data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
             elif isinstance(value, float):
+                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
+            elif value is not None:
+                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
+            elif isinstance(value, tuple) and len(value) == 2:
+                data.append(f"{self.__to_arg_name(key)}=\"({value[0]}, {value[1]})\"")
+            elif value is None:
+                data.append(f"{self.__to_arg_name(key)}=\"None\"")
+            elif value in [float('inf'), float('-inf'), int('inf'), int('-inf')]:
                 data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
             elif value is not None:
                 data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")

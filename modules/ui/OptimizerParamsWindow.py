@@ -107,6 +107,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'weight_decay': {'title': 'Weight Decay', 'tooltip': 'Regularization to prevent overfitting.', 'type': 'float'},
         }
         
+        if not self.winfo_exists():  # check if this window isn't open
+            return
+            
         for idx, key in enumerate(OPTIMIZER_KEY_MAP[selected_optimizer]):
             arg_info = KEY_DETAIL_MAP[key]
             
@@ -137,6 +140,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.create_dynamic_ui(selected_optimizer, master, components, self.ui_state)
         
     def on_optimizer_change(self, *args):
+        if not self.winfo_exists():  # check if this window isn't open
+            return
         selected_optimizer = self.ui_state.vars['optimizer'].get()
         self.clear_dynamic_ui(self.frame)
         self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state)
