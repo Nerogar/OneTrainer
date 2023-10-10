@@ -1,4 +1,5 @@
 import argparse
+from typing import Any
 
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
@@ -103,8 +104,8 @@ class TrainArgs(BaseArgs):
     save_after: float
     save_after_unit: TimeUnit
 
-    def __init__(self, args: dict):
-        super(TrainArgs, self).__init__(args)
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super(TrainArgs, self).__init__(data)
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -228,98 +229,103 @@ class TrainArgs(BaseArgs):
 
         # @formatter:on
 
-        return TrainArgs(vars(parser.parse_args()))
+        args = TrainArgs.default_values()
+        args.from_dict(parser.parse_args())
+        return args
 
     @staticmethod
-    def default_values():
-        args = {}
+    def default_values() -> 'TrainArgs':
+        data = []
 
-        args["training_method"] = TrainingMethod.FINE_TUNE
-        args["model_type"] = ModelType.STABLE_DIFFUSION_15
-        args["debug_mode"] = False
-        args["debug_dir"] = "debug"
-        args["workspace_dir"] = "workspace/run"
-        args["cache_dir"] = "workspace-cache/run"
-        args["tensorboard"] = True
-        args["continue_last_backup"] = False
+        # name, default value, data type, nullable
+
+        # general settings
+        data.append(("training_method", TrainingMethod.FINE_TUNE, TrainingMethod, False))
+        data.append(("model_type", ModelType.STABLE_DIFFUSION_15, ModelType, False))
+        data.append(("debug_mode", False, bool, False))
+        data.append(("debug_dir", "debug", str, False))
+        data.append(("workspace_dir", "workspace/run", str, False))
+        data.append(("cache_dir", "workspace-cache/run", str, False))
+        data.append(("tensorboard", True, bool, False))
+        data.append(("continue_last_backup", False, bool, False))
 
         # model settings
-        args["base_model_name"] = "runwayml/stable-diffusion-v1-5"
-        args["extra_model_name"] = ""
-        args["weight_dtype"] = DataType.FLOAT_32
-        args["text_encoder_weight_dtype"] = DataType.NONE
-        args["unet_weight_dtype"] = DataType.NONE
-        args["vae_weight_dtype"] = DataType.FLOAT_32
-        args["output_dtype"] = DataType.FLOAT_32
-        args["output_model_format"] = ModelFormat.SAFETENSORS
-        args["output_model_destination"] = "models/model.safetensors"
-        args["gradient_checkpointing"] = True
+        data.append(("base_model_name", "runwayml/stable-diffusion-v1-5", str, False))
+        data.append(("extra_model_name", "", str, False))
+        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
+        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+        data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
+        data.append(("output_model_destination", "models/model.safetensors", str, False))
+        data.append(("gradient_checkpointing", True, bool, False))
 
         # data settings
-        args["concept_file_name"] = "training_concepts/concepts.json"
-        args["circular_mask_generation"] = False
-        args["random_rotate_and_crop"] = False
-        args["aspect_ratio_bucketing"] = True
-        args["latent_caching"] = True
-        args["latent_caching_epochs"] = 1
-        args["clear_cache_before_training"] = True
+        data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
+        data.append(("circular_mask_generation", False, bool, False))
+        data.append(("random_rotate_and_crop", False, bool, False))
+        data.append(("aspect_ratio_bucketing", True, bool, False))
+        data.append(("latent_caching", True, bool, False))
+        data.append(("latent_caching_epochs", 1, int, False))
+        data.append(("clear_cache_before_training", True, bool, False))
 
         # training settings
-        args["optimizer"] = Optimizer.ADAMW
-        args["learning_rate_scheduler"] = LearningRateScheduler.CONSTANT
-        args["learning_rate"] = 3e-6
-        args["learning_rate_warmup_steps"] = 200
-        args["learning_rate_cycles"] = 1
-        args["weight_decay"] = 1e-2
-        args["epochs"] = 100
-        args["batch_size"] = 1
-        args["gradient_accumulation_steps"] = 1
-        args["ema"] = EMAMode.OFF
-        args["ema_decay"] = 0.999
-        args["ema_update_step_interval"] = 5
-        args["train_text_encoder"] = True
-        args["train_text_encoder_epochs"] = 30
-        args["text_encoder_learning_rate"] = 3e-6
-        args["text_encoder_layer_skip"] = 0
-        args["train_unet"] = True
-        args["train_unet_epochs"] = 10000
-        args["unet_learning_rate"] = 3e-6
-        args["offset_noise_weight"] = 0.0
-        args["perturbation_noise_weight"] = 0.0
-        args["rescale_noise_scheduler_to_zero_terminal_snr"] = False
-        args["force_v_prediction"] = False
-        args["force_epsilon_prediction"] = False
-        args["train_device"] = "cuda"
-        args["temp_device"] = "cpu"
-        args["train_dtype"] = DataType.FLOAT_16
-        args["only_cache"] = False
-        args["resolution"] = 512
-        args["masked_training"] = False
-        args["unmasked_probability"] = 0.1
-        args["unmasked_weight"] = 0.1
-        args["normalize_masked_area_loss"] = False
-        args["max_noising_strength"] = 1.0
-        args["token_count"] = 1
-        args["initial_embedding_text"] = "*"
-        args["embedding_weight_dtype"] = DataType.FLOAT_32
-        args["lora_rank"] = 16
-        args["lora_alpha"] = 1.0
-        args["lora_weight_dtype"] = DataType.FLOAT_32
-        args["attention_mechanism"] = AttentionMechanism.XFORMERS
+        data.append(("optimizer", Optimizer.ADAMW, Optimizer, False))
+        data.append(("learning_rate_scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
+        data.append(("learning_rate", 3e-6, float, False))
+        data.append(("learning_rate_warmup_steps", 200, int, False))
+        data.append(("learning_rate_cycles", 1, int, False))
+        data.append(("weight_decay", 1e-2, float, False))
+        data.append(("epochs", 100, int, False))
+        data.append(("batch_size", 1, int, False))
+        data.append(("gradient_accumulation_steps", 1, int, False))
+        data.append(("ema", EMAMode.OFF, EMAMode, False))
+        data.append(("ema_decay", 0.999, float, False))
+        data.append(("ema_update_step_interval", 5, int, False))
+        data.append(("train_text_encoder", True, bool, False))
+        data.append(("train_text_encoder_epochs", 30, int, False))
+        data.append(("text_encoder_learning_rate", 3e-6, float, True))
+        data.append(("text_encoder_layer_skip", 0, int, False))
+        data.append(("train_unet", True, bool, False))
+        data.append(("train_unet_epochs", 10000, int, False))
+        data.append(("unet_learning_rate", 3e-6, float, True))
+        data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("perturbation_noise_weight", 0.0, float, False))
+        data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
+        data.append(("force_v_prediction", False, bool, False))
+        data.append(("force_epsilon_prediction", False, bool, False))
+        data.append(("train_device", "cuda", str, False))
+        data.append(("temp_device", "cpu", str, False))
+        data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
+        data.append(("only_cache", False, bool, False))
+        data.append(("resolution", 512, int, False))
+        data.append(("masked_training", False, bool, False))
+        data.append(("unmasked_probability", 0.1, float, False))
+        data.append(("unmasked_weight", 0.1, float, False))
+        data.append(("normalize_masked_area_loss", False, bool, False))
+        data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("token_count", 1, int, False))
+        data.append(("initial_embedding_text", "*", str, False))
+        data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("lora_rank", 16, int, False))
+        data.append(("lora_alpha", 1.0, float, False))
+        data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
 
         # sample settings
-        args["sample_definition_file_name"] = "training_samples/samples.json"
-        args["sample_after"] = 10
-        args["sample_after_unit"] = TimeUnit.MINUTE
-        args["sample_image_format"] = ImageFormat.JPG
+        data.append(("sample_definition_file_name", "training_samples/samples.json", str, False))
+        data.append(("sample_after", 10, int, False))
+        data.append(("sample_after_unit", TimeUnit.MINUTE, TimeUnit, False))
+        data.append(("sample_image_format", ImageFormat.JPG, ImageFormat, False))
 
         # backup settings
-        args["backup_after"] = 30
-        args["backup_after_unit"] = TimeUnit.MINUTE
-        args["rolling_backup"] = False
-        args["rolling_backup_count"] = 3
-        args["backup_before_save"] = True
-        args["save_after"] = 0
-        args["save_after_unit"] = TimeUnit.NEVER
+        data.append(("backup_after", 30, int, False))
+        data.append(("backup_after_unit", TimeUnit.MINUTE, TimeUnit, False))
+        data.append(("rolling_backup", False, bool, False))
+        data.append(("rolling_backup_count", 3, int, False))
+        data.append(("backup_before_save", True, bool, False))
+        data.append(("save_after", 0, int, False))
+        data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
 
-        return TrainArgs(args)
+        return TrainArgs(data)

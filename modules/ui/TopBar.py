@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 from typing import Callable
 
 import customtkinter as ctk
@@ -96,7 +97,7 @@ class TopBar:
         name = path_util.safe_filename(name)
         path = path_util.canonical_join("training_presets", f"{name}.json")
         with open(path, "w") as f:
-            json.dump(self.train_args.to_json(), f, indent=4)
+            json.dump(self.train_args.to_dict(), f, indent=4)
 
         return path
 
@@ -131,10 +132,10 @@ class TopBar:
     def __load_current_config(self, filename):
         try:
             with open(filename, "r") as f:
-                self.train_args.from_json(json.load(f))
+                self.train_args.from_dict(json.load(f))
                 self.ui_state.update(self.train_args)
-        except Exception as e:
-            print(e)
+        except Exception:
+            print(traceback.format_exc())
 
     def __remove_config(self):
         # TODO

@@ -6,7 +6,7 @@ class BaseParams:
         for (key, value) in args.items():
             setattr(self, key, value)
 
-    def to_json(self):
+    def to_dict(self):
         data = {}
         for (key, value) in vars(self).items():
             if isinstance(value, str):
@@ -24,7 +24,7 @@ class BaseParams:
 
         return data
 
-    def from_json(self, data):
+    def from_dict(self, data):
         for (key, value) in vars(self).items():
             try:
                 if isinstance(value, str):

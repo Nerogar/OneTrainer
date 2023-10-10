@@ -1,4 +1,5 @@
 import argparse
+from typing import Any
 
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
@@ -16,8 +17,8 @@ class ConvertModelArgs(BaseArgs):
     output_model_format: ModelFormat
     output_model_destination: str
 
-    def __init__(self, args: dict):
-        super(ConvertModelArgs, self).__init__(args)
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super(ConvertModelArgs, self).__init__(data)
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -43,17 +44,19 @@ class ConvertModelArgs(BaseArgs):
 
         # @formatter:on
 
-        return ConvertModelArgs(vars(parser.parse_args()))
+        args = ConvertModelArgs.default_values()
+        args.from_dict(parser.parse_args())
+        return args
 
     @staticmethod
     def default_values():
-        args = {}
+        data = []
 
-        args["model_type"] = ModelType.STABLE_DIFFUSION_15
-        args["training_method"] = TrainingMethod.FINE_TUNE
-        args["input_name"] = ""
-        args["output_dtype"] = DataType.FLOAT_16
-        args["output_model_format"] = ModelFormat.SAFETENSORS
-        args["output_model_destination"] = ""
+        data.append(("model_type", ModelType.STABLE_DIFFUSION_15, ModelType, False))
+        data.append(("training_method", TrainingMethod.FINE_TUNE, TrainingMethod, False))
+        data.append(("input_name", "", str, False))
+        data.append(("output_dtype", DataType.FLOAT_16, DataType, False))
+        data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
+        data.append(("output_model_destination", "", str, False))
 
-        return ConvertModelArgs(args)
+        return ConvertModelArgs(data)
