@@ -486,7 +486,7 @@ def create_optimizer(
             optimizer = da.DAdaptAdan(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=tuple(args.optimizer_beta1, args.optimizer_beta2, args.optimizer_beta3),
                 eps=args.optimizer_eps,
                 weight_decay=args.optimizer_weight_decay,
                 no_prox=args.optimizer_no_prox,
