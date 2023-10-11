@@ -274,7 +274,7 @@ class GenericTrainer(BaseTrainer):
                 sample_params_list = []
                 for sample_params_json in sample_params_json_list:
                     sample_params = SampleParams.default_values()
-                    sample_params.from_json(sample_params_json)
+                    sample_params.from_dict(sample_params_json)
                     sample_params_list.append(sample_params)
         else:
             is_custom_sample = True
@@ -314,7 +314,7 @@ class GenericTrainer(BaseTrainer):
         os.makedirs(Path(config_path).absolute(), exist_ok=True)
 
         with open(args_path, "w") as f:
-            json.dump(self.args.to_json(), f, indent=4)
+            json.dump(self.args.to_dict(), f, indent=4)
         shutil.copy2(self.args.concept_file_name, concepts_path)
         shutil.copy2(self.args.sample_definition_file_name, samples_path)
 

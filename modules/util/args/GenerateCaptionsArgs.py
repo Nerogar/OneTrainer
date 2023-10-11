@@ -1,10 +1,12 @@
 import argparse
+from typing import Any
 
+from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
 
 
-class GenerateCaptionsArgs:
+class GenerateCaptionsArgs(BaseArgs):
     model: GenerateCaptionsModel
     sample_dir: str
     initial_caption: str
@@ -12,13 +14,14 @@ class GenerateCaptionsArgs:
     device: str
     dtype: DataType
 
-    def __init__(self, args: dict):
-        for (key, value) in args.items():
-            setattr(self, key, value)
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super(GenerateCaptionsArgs, self).__init__(data)
 
     @staticmethod
     def parse_args() -> 'GenerateCaptionsArgs':
         parser = argparse.ArgumentParser(description="One Trainer Generate Captions Script.")
+
+        # @formatter:off
 
         parser.add_argument("--model", type=GenerateCaptionsModel, required=True, dest="model", help="The model to use when generating captions")
         parser.add_argument("--sample-dir", type=str, required=True, dest="sample_dir", help="Directory where samples are located")
@@ -27,4 +30,21 @@ class GenerateCaptionsArgs:
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
 
-        return GenerateCaptionsArgs(vars(parser.parse_args()))
+        # @formatter:on
+
+        args = GenerateCaptionsArgs.default_values()
+        args.from_dict(vars(parser.parse_args()))
+        return args
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        data.append(("model", GenerateCaptionsModel.BLIP, GenerateCaptionsModel, False))
+        data.append(("sample_dir", "", str, False))
+        data.append(("initial_caption", "", str, False))
+        data.append(("mode", "fill", str, False))
+        data.append(("device", "cuda", str, False))
+        data.append(("dtype", DataType.FLOAT_16, DataType, False))
+
+        return GenerateCaptionsArgs(data)

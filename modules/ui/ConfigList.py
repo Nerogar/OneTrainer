@@ -177,7 +177,7 @@ class ConfigList(metaclass=ABCMeta):
 
                 loaded_config_json = json.load(f)
                 for element_json in loaded_config_json:
-                    element = self.create_new_element().from_json(element_json)
+                    element = self.create_new_element().from_dict(element_json)
                     self.current_config.append(element)
         except:
             self.current_config = []
@@ -191,7 +191,7 @@ class ConfigList(metaclass=ABCMeta):
 
             with open(getattr(self.train_args, self.element_attr_name), "w") as f:
                 json.dump(
-                    [element.to_json() for element in self.current_config],
+                    [element.to_dict() for element in self.current_config],
                     f, indent=4
                 )
         except:
