@@ -219,13 +219,19 @@ def create_optimizer(
     optimizer = None
     
     match args.optimizer:
+    
         # SGD Optimizer
         case Optimizer.SGD:
             optimizer = torch.optim.SGD(
                 params=parameters,
                 lr=args.learning_rate,
+                momentum=args.momentum,
+                dampening=args.dampening,
                 weight_decay=args.weight_decay,
+                nesterov=args.nesterov,
                 foreach=args.foreach,
+                maximize=args.maximize,
+                differentiable=args.differentiable
             )
 
         # SGD_8BIT Optimizer
@@ -245,10 +251,15 @@ def create_optimizer(
             optimizer = torch.optim.Adam(
                 params=parameters,
                 lr=args.learning_rate,
+                betas=args.betas,
                 weight_decay=args.weight_decay,
                 eps=args.eps,
+                amsgrad=args.amsgrad,
                 foreach=args.foreach,
-                fused=args.fused,
+                maximize=args.maximize,
+                capturable=args.capturable,
+                differentiable=args.differentiable,
+                fused=args.fused
             )
 
         # ADAMW Optimizer
@@ -256,10 +267,15 @@ def create_optimizer(
             optimizer = torch.optim.AdamW(
                 params=parameters,
                 lr=args.learning_rate,
+                betas=args.betas,
                 weight_decay=args.weight_decay,
                 eps=args.eps,
+                amsgrad=args.amsgrad,
                 foreach=args.foreach,
-                fused=args.fused,
+                maximize=args.maximize,
+                capturable=args.capturable,
+                differentiable=args.differentiable,
+                fused=args.fused
             )
 
         # ADAM_8BIT Optimizer

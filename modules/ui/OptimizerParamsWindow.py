@@ -298,6 +298,37 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 "d0": 1e-6,
                 "fsdp_in_use": False,
             },
+            "ADAM": {
+                "betas": (0.9, 0.999),
+                "eps": 1e-8,
+                "weight_decay": 0,
+                "amsgrad": False,
+                "foreach": None,
+                "maximize": False,
+                "capturable": False,
+                "differentiable": False,
+                "fused": None
+            },
+            "ADAMW": {
+                "betas": (0.9, 0.999),
+                "eps": 1e-8,
+                "weight_decay": 1e-2,
+                "amsgrad": False,
+                "foreach": None,
+                "maximize": False,
+                "capturable": False,
+                "differentiable": False,
+                "fused": None
+            },
+            "SGD": {
+                "momentum": 0,
+                "dampening": 0,
+                "weight_decay": 0,
+                "nesterov": False,
+                "foreach": None,
+                "maximize": False,
+                "differentiable": False
+            }
      
         }
 
