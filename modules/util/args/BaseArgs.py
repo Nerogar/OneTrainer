@@ -36,10 +36,13 @@ class BaseArgs:
                 if self.types[name] == str:
                     setattr(self, name, data[name])
                 elif issubclass(self.types[name], Enum):
-                    if self.nullables[name]:
-                        setattr(self, name, None if data[name] is None else self.types[name][data[name]])
+                    if isinstance(data[name], str):
+                        if self.nullables[name]:
+                            setattr(self, name, None if data[name] is None else self.types[name][data[name]])
+                        else:
+                            setattr(self, name, self.types[name][data[name]])
                     else:
-                        setattr(self, name, self.types[name][data[name]])
+                        setattr(self, name, data[name])
                 elif self.types[name] == bool:
                     setattr(self, name, data[name])
                 elif self.types[name] == int:
@@ -70,19 +73,20 @@ class BaseArgs:
 
     def to_args(self) -> str:
         data = []
-        for (key, value) in vars(self).items():
+        for (name, _) in self.types.items():
+            value = getattr(self, name)
             if isinstance(value, str):
-                data.append(f"{self.__to_arg_name(key)}=\"{value}\"")
+                data.append(f"{self.__to_arg_name(name)}=\"{value}\"")
             elif isinstance(value, Enum):
-                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
+                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
             elif isinstance(value, bool):
                 if value:
-                    data.append(self.__to_arg_name(key))
+                    data.append(self.__to_arg_name(name))
             elif isinstance(value, int):
-                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
+                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
             elif isinstance(value, float):
-                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
+                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
             elif value is not None:
-                data.append(f"{self.__to_arg_name(key)}=\"{str(value)}\"")
+                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
 
         return ' '.join(data)

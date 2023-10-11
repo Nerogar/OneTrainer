@@ -33,7 +33,7 @@ class GenerateCaptionsArgs(BaseArgs):
         # @formatter:on
 
         args = GenerateCaptionsArgs.default_values()
-        args.from_dict(parser.parse_args())
+        args.from_dict(vars(parser.parse_args()))
         return args
 
     @staticmethod
