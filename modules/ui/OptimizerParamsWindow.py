@@ -84,6 +84,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'optimizer_maximize': {'title': 'Maximize', 'tooltip': 'Whether to optimizer_maximize the optimization function.', 'type': 'bool'},
             'optimizer_capturable': {'title': 'Capturable', 'tooltip': 'Whether some property of the optimizer can be captured.', 'type': 'bool'},
             'optimizer_differentiable': {'title': 'Differentiable', 'tooltip': 'Whether the optimization function is optimizer_differentiable.', 'type': 'bool'},
+            'optimizer_use_triton': {'title': 'Use Triton', 'tooltip': 'Whether Triton optimization should be used.', 'type': 'bool'},
         }
         
         # Optimizer Key map with defaults

@@ -390,6 +390,7 @@ class TrainArgs(BaseArgs):
         data.append(("optimizer_maximize", False, bool, False))
         data.append(("optimizer_capturable", False, bool, False))
         data.append(("optimizer_differentiable", True, bool, False))
+        data.append(("optimizer_use_triton", False, bool, False))
 
         # sample settings
         data.append(("sample_definition_file_name", "training_samples/samples.json", str, False))
