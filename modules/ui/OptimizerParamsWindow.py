@@ -147,12 +147,13 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 components.switch(master, row, col+1, ui_state, key, override_value=override_value)
         
     def main_frame(self, master):
-        #TODO: Add code to set all options to the optimizer's default. 
-        #Requirements: button, lookups for defaults, value updater
    
         # Optimizer
         components.label(master, 0, 0, "Optimizer", tooltip="The type of optimizer")
         components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
+        
+        # Defaults Button
+        components.label(master, 0, 0, "Optimizer Defaults", tooltip="Load default settings for the selected optimizer")
         components.button(self.frame, 0, 4, "Load Defaults", self.load_defaults, tooltip="Load default settings for the selected optimizer")
 
         selected_optimizer = self.ui_state.vars['optimizer'].get()
