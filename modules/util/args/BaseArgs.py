@@ -60,7 +60,7 @@ class BaseArgs:
                     print(f"Could not set {key} as {str(data[key])}")
                 else:
                     print(f"Could not set {key}, not found.")
-
+        print("Finished reading JSON")
         return self
 
     def __to_arg_name(self, var_name: str) -> str:

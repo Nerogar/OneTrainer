@@ -77,7 +77,7 @@ class UIState:
                         pass
 
         return update
-
+                     
     def __set_float_var(self, obj, is_dict, name, var):
         if is_dict:
             def update(_0, _1, _2):
@@ -107,26 +107,34 @@ class UIState:
                         setattr(obj, name, float(string_var))
                     except ValueError:
                         pass
+
+        return update
                         
     def __set_tuple_var(self, obj, is_dict, name, var):
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get().replace('(', '').replace(')', '').replace(' ', '')
-                try:
-                    values = tuple(map(float, string_var.split(',')))
-                    if len(values) == 2:
-                        obj[name] = values
-                except ValueError:
-                    pass
+                if string_var == "" or string_var == "None":
+                    obj[name] = None
+                else:
+                    try:
+                        values = tuple(map(float, string_var.split(',')))
+                        if len(values) == 2:
+                            obj[name] = values
+                    except ValueError:
+                        pass
         else:
             def update(_0, _1, _2):
                 string_var = var.get().replace('(', '').replace(')', '').replace(' ', '')
-                try:
-                    values = tuple(map(float, string_var.split(',')))
-                    if len(values) == 2:
-                        setattr(obj, name, values)
-                except ValueError:
-                    pass
+                if string_var == "" or string_var == "None":
+                    setattr(obj, name, None)
+                else:
+                    try:
+                        values = tuple(map(float, string_var.split(',')))
+                        if len(values) == 2:
+                            setattr(obj, name, values)
+                    except ValueError:
+                        pass
 
         return update
 
