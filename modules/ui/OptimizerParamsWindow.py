@@ -40,33 +40,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.destroy()
         
     def create_dynamic_ui(self, selected_optimizer, master, components, ui_state, defaults=False):
-        # Lookup for keys that belong to each optimizer.
-        OPTIMIZER_KEY_MAP = {
-            'RMSPROP_8BIT': ['weight_decay', 'alpha', 'momentum', 'centered', 'min_8bit_size', 'percentile_clipping', 'block_wise'],
-            'SGD': ['weight_decay', 'foreach'],
-            'SGD_8BIT': ['momentum', 'dampening', 'weight_decay', 'nesterov'],
-            'ADAM': ['weight_decay', 'eps', 'foreach', 'fused'],
-            'ADAMW': ['weight_decay', 'eps', 'foreach', 'fused'],
-            'ADAM_8BIT': ['weight_decay', 'eps', 'min_8bit_size', 'percentile_clipping', 'block_wise', 'is_paged'],
-            'ADAMW_8BIT': ['weight_decay', 'eps', 'min_8bit_size', 'percentile_clipping', 'block_wise', 'is_paged'],
-            'ADAGRAD': ['weight_decay', 'eps', 'lr_decay', 'initial_accumulator_value'],
-            'ADAGRAD_8BIT': ['weight_decay', 'eps', 'lr_decay', 'initial_accumulator_value', 'min_8bit_size', 'percentile_clipping', 'block_wise'],
-            'RMSPROP': ['weight_decay', 'eps', 'alpha', 'momentum', 'centered'],
-            'RMSPROP_8BIT': ['weight_decay', 'eps', 'alpha', 'momentum', 'centered', 'min_8bit_size', 'percentile_clipping', 'block_wise'],
-            'LION': ['weight_decay'],
-            'LARS': ['weight_decay', 'momentum', 'dampening', 'nesterov', 'max_unorm'],
-            'LARS_8BIT': ['weight_decay', 'momentum', 'dampening', 'nesterov', 'min_8bit_size', 'percentile_clipping', 'max_unorm'],
-            'LAMB': ['weight_decay', 'betas', 'bias_correction', 'amsgrad', 'adam_w_mode', 'percentile_clipping', 'block_wise', 'max_unorm'],
-            'LAMB_8BIT': ['weight_decay', 'betas', 'bias_correction', 'amsgrad', 'adam_w_mode', 'min_8bit_size', 'percentile_clipping', 'block_wise', 'max_unorm'],
-            'LION_8BIT': ['weight_decay', 'betas', 'min_8bit_size', 'percentile_clipping', 'block_wise', 'is_paged'],
-            'DADAPT_SGD': ['weight_decay'],
-            'DADAPT_ADAM': ['weight_decay'],
-            'DADAPT_ADAN': ['weight_decay'],
-            'DADAPT_ADA_GRAD': ['weight_decay'],
-            'DADAPT_LION': ['weight_decay'],
-            'PRODIGY': ['betas', 'beta3', 'eps', 'weight_decay', 'decouple', 'use_bias_correction', 'safeguard_warmup', 'd0', 'd_coef', 'growth_rate', 'fsdp_in_use'],
-            'ADAFACTOR': ['eps_tuple', 'clip_threshold', 'decay_rate', 'beta1', 'weight_decay', 'scale_parameter', 'relative_step', 'warmup_init']
-        }
 
         #Lookup for the title and tooltip for a key
         KEY_DETAIL_MAP = {
@@ -105,9 +78,16 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_bias_correction': {'title': 'Bias Correction', 'tooltip': 'Turn on Adam\'s bias correction.', 'type': 'bool'},
             'warmup_init': {'title': 'Warmup Initialization', 'tooltip': 'Whether to warm-up the optimizer initialization.', 'type': 'bool'},
             'weight_decay': {'title': 'Weight Decay', 'tooltip': 'Regularization to prevent overfitting.', 'type': 'float'},
+            'optim_bits': {'title': 'Optim Bits', 'tooltip': 'Number of bits used for optimization.', 'type': 'int'},
+            'log_every': {'title': 'Log Every', 'tooltip': 'Intervals at which logging should occur.', 'type': 'int'},
+            'no_prox': {'title': 'No Prox', 'tooltip': 'Whether to use proximity updates or not.', 'type': 'bool'},
+            'maximize': {'title': 'Maximize', 'tooltip': 'Whether to maximize the optimization function.', 'type': 'bool'},
+            'capturable': {'title': 'Capturable', 'tooltip': 'Whether some property of the optimizer can be captured.', 'type': 'bool'},
+            'differentiable': {'title': 'Differentiable', 'tooltip': 'Whether the optimization function is differentiable.', 'type': 'bool'},
         }
         
-        optimizers_defaults = {
+        # Optimizer Key map with defaults
+        OPTIMIZER_KEY_MAP = {
             "ADAFACTOR": {
                 "eps_tuple": (1e-30, 1e-3),
                 "clip_threshold": 1.0,
@@ -331,31 +311,32 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             }
      
         }
-
         
         if not self.winfo_exists():  # check if this window isn't open
             return
-            
-        for idx, key in enumerate(OPTIMIZER_KEY_MAP[selected_optimizer]):
+
+        optimizer_keys = list(OPTIMIZER_KEY_MAP[selected_optimizer].keys())  # Extract the keys for the selected optimizer
+        for idx, key in enumerate(optimizer_keys):
             arg_info = KEY_DETAIL_MAP[key]
-            
+
             title = arg_info['title']
             tooltip = arg_info['tooltip']
             type = arg_info['type']
-            
+
             row = math.floor(idx / 2) + 1
             col = 3 * (idx % 2) 
-            
+
             components.label(master, row, col, title, tooltip=tooltip)
             override_value = None
-            
-            if defaults and key in optimizers_defaults[selected_optimizer]:
-                override_value = optimizers_defaults[selected_optimizer][key]
+
+            if defaults and key in OPTIMIZER_KEY_MAP[selected_optimizer]:
+                override_value = OPTIMIZER_KEY_MAP[selected_optimizer][key]
 
             if type != 'bool':
                 components.entry(master, row, col+1, ui_state, key, override_value=override_value)
             else:
                 components.switch(master, row, col+1, ui_state, key, override_value=override_value)
+
         
     def main_frame(self, master):
    

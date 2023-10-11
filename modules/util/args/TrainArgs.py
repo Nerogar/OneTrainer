@@ -379,6 +379,14 @@ class TrainArgs(BaseArgs):
         args["relative_step"] = True
         args["warmup_init"] = False
         args["eps_tuple"] = (1e-30, 1e-3)
+        args["optim_bits"] = 32 
+        args["log_every"] = 100 
+        args["no_prox"] = False 
+        args["maximize"] = False 
+        args["capturable"] = False 
+        args["differentiable"] = True 
+        
+        
         
         # sample settings
         args["sample_definition_file_name"] = "training_samples/samples.json"
