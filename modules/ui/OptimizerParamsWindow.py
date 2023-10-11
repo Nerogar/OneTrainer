@@ -39,7 +39,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
     def __ok(self):
         self.destroy()
         
-    def create_dynamic_ui(self, selected_optimizer, master, components, ui_state):
+    def create_dynamic_ui(self, selected_optimizer, master, components, ui_state, defaults=False):
         # Lookup for keys that belong to each optimizer.
         OPTIMIZER_KEY_MAP = {
             'RMSPROP_8BIT': ['weight_decay', 'alpha', 'momentum', 'centered', 'min_8bit_size', 'percentile_clipping', 'block_wise'],
@@ -107,6 +107,21 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'weight_decay': {'title': 'Weight Decay', 'tooltip': 'Regularization to prevent overfitting.', 'type': 'float'},
         }
         
+        optimizers_defaults = {
+            "ADAFACTOR": {
+            "eps_tuple": (1e-30, 1e-3),
+            "clip_threshold": 1.0,
+            "decay_rate": -0.8,
+            "beta1": None,
+            "weight_decay": 0.0,
+            "scale_parameter": True,
+            "relative_step": True,
+            "warmup_init": False,
+            }
+     
+        }
+
+        
         if not self.winfo_exists():  # check if this window isn't open
             return
             
@@ -121,10 +136,15 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             col = 3 * (idx % 2) 
             
             components.label(master, row, col, title, tooltip=tooltip)
+            override_value = None
+            
+            if defaults and key in optimizers_defaults[selected_optimizer]:
+                override_value = optimizers_defaults[selected_optimizer][key]
+
             if type != 'bool':
-                components.entry(master, row, col+1, ui_state, key)
-            else: 
-                components.switch(master, row, col+1, ui_state, key)
+                components.entry(master, row, col+1, ui_state, key, override_value=override_value)
+            else:
+                components.switch(master, row, col+1, ui_state, key, override_value=override_value)
         
     def main_frame(self, master):
         #TODO: Add code to set all options to the optimizer's default. 
@@ -133,6 +153,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         # Optimizer
         components.label(master, 0, 0, "Optimizer", tooltip="The type of optimizer")
         components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
+        components.button(self.frame, 0, 4, "Load Defaults", self.load_defaults, tooltip="Load default settings for the selected optimizer")
 
         selected_optimizer = self.ui_state.vars['optimizer'].get()
         
@@ -145,6 +166,14 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         selected_optimizer = self.ui_state.vars['optimizer'].get()
         self.clear_dynamic_ui(self.frame)
         self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state)
+        
+    def load_defaults(self):
+        if not self.winfo_exists():  # check if this window isn't open
+            return
+        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        self.clear_dynamic_ui(self.frame)
+        self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state, defaults=True)
+
             
     def clear_dynamic_ui(self, master):
         try:
