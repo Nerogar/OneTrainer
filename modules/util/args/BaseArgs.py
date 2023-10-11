@@ -25,8 +25,6 @@ class BaseArgs:
                 data[name] = value
             elif isinstance(value, float):
                 data[name] = value
-            elif isinstance(value, tuple) and len(value) == 2:
-                data[name] = {"x": value[0], "y": value[1]}
             elif value is None:
                 data[name] = "None"
             elif value in [float('inf'), float('-inf'), int('inf'), int('-inf')]:
@@ -61,8 +59,6 @@ class BaseArgs:
                         setattr(self, name, None if data[name] is None else float(data[name]))
                     else:
                         setattr(self, name, float(data[name]))
-                elif isinstance(data[name], tuple) and "x" in data[name] and "y" in data[name]:
-                    setattr(self, name, (data[name]["x"], data[name]["y"]))
                 elif data[name] == "None":
                     setattr(self, name, data[name])
                 elif data[name] in ["inf", "-inf"]:
@@ -102,8 +98,6 @@ class BaseArgs:
                 data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
             elif value is not None:
                 data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
-            elif isinstance(value, tuple) and len(value) == 2:
-                data.append(f"{self.__to_arg_name(name)}=\"({value[0]}, {value[1]})\"")
             elif value is None:
                 data.append(f"{self.__to_arg_name(name)}=\"None\"")
             elif value in [float('inf'), float('-inf'), int('inf'), int('-inf')]:
