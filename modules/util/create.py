@@ -436,7 +436,13 @@ def create_optimizer(
             optimizer = da.DAdaptSGD(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.weight_decay
+                momentum=args.momentum,
+                dampening=args.dampening,
+                weight_decay=args.weight_decay,
+                log_every=args.log_every,
+                d0=args.d0,
+                growth_rate=args.growth_rate,
+                fsdp_in_use=args.fsdp_in_use
             )
 
         # DADAPT_ADAM Optimizer
@@ -445,7 +451,15 @@ def create_optimizer(
             optimizer = da.DAdaptAdam(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.weight_decay
+                betas=args.betas,
+                eps=args.eps,
+                weight_decay=args.weight_decay,
+                log_every=args.log_every,
+                decouple=args.decouple,
+                use_bias_correction=args.use_bias_correction,
+                d0=args.d0,
+                growth_rate=args.growth_rate,
+                fsdp_in_use=args.fsdp_in_use
             )
 
         # DADAPT_ADAN Optimizer
@@ -454,7 +468,13 @@ def create_optimizer(
             optimizer = da.DAdaptAdan(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.weight_decay
+                betas=args.betas,
+                eps=args.eps,
+                weight_decay=args.weight_decay,
+                no_prox=args.no_prox,
+                log_every=args.log_every,
+                d0=args.d0,
+                growth_rate=args.growth_rate
             )
 
         # DADAPT_ADA_GRAD Optimizer
@@ -463,7 +483,12 @@ def create_optimizer(
             optimizer = da.DAdaptAdaGrad(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.weight_decay
+                momentum=args.momentum,
+                log_every=args.log_every,
+                weight_decay=args.weight_decay,
+                eps=args.eps,
+                d0=args.d0,
+                growth_rate=args.growth_rate
             )
 
         # DADAPT_LION Optimizer
@@ -472,8 +497,13 @@ def create_optimizer(
             optimizer = da.DAdaptLion(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.weight_decay
+                betas=args.betas,
+                weight_decay=args.weight_decay,
+                log_every=args.log_every,
+                d0=args.d0,
+                fsdp_in_use=args.fsdp_in_use
             )
+
 
         # PRODIGY Optimizer
         case Optimizer.PRODIGY:
