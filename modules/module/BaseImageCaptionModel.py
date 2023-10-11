@@ -43,7 +43,7 @@ class CaptionSample:
     def save_caption(self):
         if self.caption is not None:
             try:
-                with open(self.caption_filename, "w") as f:
+                with open(self.caption_filename, "w", encoding='utf-8') as f:
                     f.write(self.caption)
             except:
                 pass

@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "stable-diffusion-v2",
+    "modelspec.implementation": "https://github.com/Stability-AI/StableDiffusion",
+    "modelspec.title": "Stable Diffusion 2.1"
+}

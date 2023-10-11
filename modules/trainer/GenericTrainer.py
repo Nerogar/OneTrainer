@@ -314,10 +314,7 @@ class GenericTrainer(BaseTrainer):
         os.makedirs(Path(config_path).absolute(), exist_ok=True)
 
         with open(args_path, "w") as f:
-            args = copy.copy(self.args)
-            args.concept_file_name = concepts_path
-            args.sample_definition_file_name = samples_path
-            json.dump(args.to_json(), f, indent=4)
+            json.dump(self.args.to_json(), f, indent=4)
         shutil.copy2(self.args.concept_file_name, concepts_path)
         shutil.copy2(self.args.sample_definition_file_name, samples_path)
 

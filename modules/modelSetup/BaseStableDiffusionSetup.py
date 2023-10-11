@@ -88,17 +88,13 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
             original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
         )
 
-        if args.text_encoder_layer_skip > 0:
-            # TODO: use attention mask if this is true:
-            # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-            text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True, output_hidden_states=True)
-            final_layer_norm = model.text_encoder.text_model.final_layer_norm
-            text_encoder_output = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
-            )
-        else:
-            text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True)
-            text_encoder_output = text_encoder_output.last_hidden_state
+        # TODO: use attention mask if this is true:
+        # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
+        text_encoder_output = model.text_encoder(batch['tokens'], return_dict=True, output_hidden_states=True)
+        final_layer_norm = model.text_encoder.text_model.final_layer_norm
+        text_encoder_output = final_layer_norm(
+            text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
+        )
 
         if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
             latent_input = torch.concat(

@@ -8,17 +8,33 @@ from safetensors.torch import load_file
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
+from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader):
+class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
     def __init__(self):
         super(StableDiffusionXLEmbeddingModelLoader, self).__init__()
 
-    @staticmethod
-    def __load_ckpt(model: StableDiffusionXLModel, embedding_name: str):
+    def _default_model_spec_name(
+            self,
+            model_type: ModelType,
+    ) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE:
+                return "resources/sd_model_spec/sd_xl_base_1.0-embedding.json"
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING:
+                return "resources/sd_model_spec/sd_xl_base_1.0_inpainting-embedding.json"
+            case _:
+                return None
+
+    def __load_ckpt(
+            self,
+            model: StableDiffusionXLModel,
+            embedding_name: str,
+    ):
         embedding_state = torch.load(embedding_name)
 
         text_encoder_1_vector = embedding_state['clip_l']
@@ -33,9 +49,13 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader):
         )
 
         model.embeddings = [embedding]
+        model.model_spec = self._load_default_model_spec(model.model_type)
 
-    @staticmethod
-    def __load_safetensors(model: StableDiffusionXLModel, embedding_name: str):
+    def __load_safetensors(
+            self,
+            model: StableDiffusionXLModel,
+            embedding_name: str,
+    ):
         embedding_state = load_file(embedding_name)
 
         text_encoder_1_vector = embedding_state['clip_l']
@@ -49,9 +69,13 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader):
         )
 
         model.embeddings = [embedding]
+        model.model_spec = self._load_default_model_spec(model.model_type, embedding_name)
 
-    @staticmethod
-    def __load_internal(model: StableDiffusionXLModel, embedding_name: str):
+    def __load_internal(
+            self,
+            model: StableDiffusionXLModel,
+            embedding_name: str,
+    ):
         with open(os.path.join(embedding_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
             train_progress = TrainProgress(
@@ -65,9 +89,9 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader):
         pt_embedding_name = os.path.join(embedding_name, "embedding", "embedding.pt")
         safetensors_embedding_name = os.path.join(embedding_name, "embedding", "embedding.safetensors")
         if os.path.exists(pt_embedding_name):
-            StableDiffusionXLEmbeddingModelLoader.__load_ckpt(model, pt_embedding_name)
+            self.__load_ckpt(model, pt_embedding_name)
         elif os.path.exists(safetensors_embedding_name):
-            StableDiffusionXLEmbeddingModelLoader.__load_safetensors(model, safetensors_embedding_name)
+            self.__load_safetensors(model, safetensors_embedding_name)
         else:
             raise Exception("no embedding found")
 
@@ -85,6 +109,7 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader):
 
         # meta
         model.train_progress = train_progress
+        model.model_spec = self._load_default_model_spec(model.model_type)
 
     def load(
             self,

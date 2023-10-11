@@ -9,26 +9,24 @@ from torch import Tensor
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
+from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class KandinskyLoRAModelLoader(BaseModelLoader):
+class KandinskyLoRAModelLoader(BaseModelLoader, ModelLoaderLoRAMixin):
     def __init__(self):
         super(KandinskyLoRAModelLoader, self).__init__()
 
-    @staticmethod
-    def __get_rank(state_dict: dict) -> int:
-        for name, state in state_dict.items():
-            if "lora_down.weight" in name:
-                return state.shape[0]
+    def __init_lora(
+            self,
+            model: KandinskyModel,
+            state_dict: dict[str, Tensor],
+    ):
+        rank = self._get_lora_rank(state_dict)
 
-    @staticmethod
-    def __init_lora(model: KandinskyModel, state_dict: dict[str, Tensor]):
-        rank = BaseModelLoader._get_lora_rank(state_dict)
-
-        model.unet_lora = BaseModelLoader._load_lora_with_prefix(
+        model.unet_lora = self._load_lora_with_prefix(
             module=model.unet,
             state_dict=state_dict,
             prefix="lora_unet",
@@ -36,18 +34,27 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
             module_filter=["attentions"],
         )
 
-    @staticmethod
-    def __load_safetensors(model: KandinskyModel, lora_name: str):
+    def __load_safetensors(
+            self,
+            model: KandinskyModel,
+            lora_name: str,
+    ):
         state_dict = load_file(lora_name)
-        KandinskyLoRAModelLoader.__init_lora(model, state_dict)
+        self.__init_lora(model, state_dict)
 
-    @staticmethod
-    def __load_ckpt(model: KandinskyModel, lora_name: str):
+    def __load_ckpt(
+            self,
+            model: KandinskyModel,
+            lora_name: str,
+    ):
         state_dict = torch.load(lora_name)
-        KandinskyLoRAModelLoader.__init_lora(model, state_dict)
+        self.__init_lora(model, state_dict)
 
-    @staticmethod
-    def __load_internal(model: KandinskyModel, lora_name: str):
+    def __load_internal(
+            self,
+            model: KandinskyModel,
+            lora_name: str,
+    ):
         with open(os.path.join(lora_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
             train_progress = TrainProgress(
@@ -61,9 +68,9 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
         pt_lora_name = os.path.join(lora_name, "lora", "lora.pt")
         safetensors_lora_name = os.path.join(lora_name, "lora", "lora.safetensors")
         if os.path.exists(pt_lora_name):
-            KandinskyLoRAModelLoader.__load_ckpt(model, pt_lora_name)
+            self.__load_ckpt(model, pt_lora_name)
         elif os.path.exists(safetensors_lora_name):
-            KandinskyLoRAModelLoader.__load_safetensors(model, safetensors_lora_name)
+            self.__load_safetensors(model, safetensors_lora_name)
         else:
             raise Exception("no lora found")
 
@@ -87,7 +94,7 @@ class KandinskyLoRAModelLoader(BaseModelLoader):
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str | None,
-            extra_model_name: str | None
+            extra_model_name: str | None,
     ) -> KandinskyModel | None:
         stacktraces = []
 

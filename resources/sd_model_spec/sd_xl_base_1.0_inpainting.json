@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "stable-diffusion-xl-v1-base-inpainting",
+    "modelspec.implementation": "https://github.com/Stability-AI/generative-models",
+    "modelspec.title": "Stable Diffusion XL 1.0 Base Inpainting"
+}

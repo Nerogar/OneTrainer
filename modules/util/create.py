@@ -2,7 +2,7 @@ from typing import Iterable
 
 import torch
 from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
-    DPMSolverMultistepScheduler, UniPCMultistepScheduler
+    DPMSolverMultistepScheduler, UniPCMultistepScheduler, SchedulerMixin
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
@@ -49,10 +49,10 @@ from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRAS
 from modules.module.EMAModule import EMAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
@@ -617,124 +617,131 @@ def create_lr_scheduler(
 
 def create_noise_scheduler(
         noise_scheduler: NoiseScheduler,
-        num_inference_timesteps: int,
-        num_train_timesteps: int = 1000,
+        original_noise_scheduler: SchedulerMixin = None,
+        num_inference_timesteps: int = None,
 ):
     scheduler = None
+
+    num_inference_timesteps = num_inference_timesteps or 20
+    num_train_timesteps = original_noise_scheduler.config.num_train_timesteps if hasattr(original_noise_scheduler.config, "num_train_timesteps") else 1000
+    beta_start = original_noise_scheduler.config.beta_start if hasattr(original_noise_scheduler.config, "beta_start") else 0.00085
+    beta_end = original_noise_scheduler.config.beta_end if hasattr(original_noise_scheduler.config, "beta_end") else 0.012
+    beta_schedule = original_noise_scheduler.config.beta_schedule if hasattr(original_noise_scheduler.config, "beta_schedule") else "scaled_linear"
+    prediction_type = original_noise_scheduler.config.prediction_type if hasattr(original_noise_scheduler.config, "prediction_type") else "epsilon"
 
     match noise_scheduler:
         case NoiseScheduler.DDIM:
             scheduler = DDIMScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 clip_sample=False,
                 set_alpha_to_one=False,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
             )
         case NoiseScheduler.EULER:
             scheduler = EulerDiscreteScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=False,
             )
         case NoiseScheduler.EULER_A:
             scheduler = EulerAncestralDiscreteScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
             )
         case NoiseScheduler.DPMPP:
             scheduler = DPMSolverMultistepScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=0,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=False,
                 algorithm_type="dpmsolver++"
             )
         case NoiseScheduler.DPMPP_SDE:
             scheduler = DPMSolverMultistepScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=0,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=False,
                 algorithm_type="sde-dpmsolver++"
             )
         case NoiseScheduler.UNIPC:
             scheduler = UniPCMultistepScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=False,
             )
         case NoiseScheduler.EULER_KARRAS:
             scheduler = EulerDiscreteScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=True,
             )
         case NoiseScheduler.DPMPP_KARRAS:
             scheduler = DPMSolverMultistepScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=True,
                 algorithm_type="dpmsolver++"
             )
         case NoiseScheduler.DPMPP_SDE_KARRAS:
             scheduler = DPMSolverMultistepScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=True,
                 algorithm_type="sde-dpmsolver++"
             )
         case NoiseScheduler.UNIPC_KARRAS:
             scheduler = UniPCMultistepScheduler(
                 num_train_timesteps=num_train_timesteps,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
+                beta_start=beta_start,
+                beta_end=beta_end,
+                beta_schedule=beta_schedule,
                 trained_betas=None,
                 steps_offset=1,
-                prediction_type="epsilon",
+                prediction_type=prediction_type,
                 use_karras_sigmas=True,
             )
 

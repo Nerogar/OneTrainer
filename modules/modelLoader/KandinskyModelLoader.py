@@ -19,11 +19,11 @@ class KandinskyModelLoader(BaseModelLoader):
     def __init__(self):
         super(KandinskyModelLoader, self).__init__()
 
-    @staticmethod
     def __load_internal(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str
+            base_model_name: str,
     ) -> KandinskyModel | None:
         with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
@@ -38,7 +38,7 @@ class KandinskyModelLoader(BaseModelLoader):
         diffusion_model_name = os.path.join(base_model_name, "diffusion_model")
 
         # base model
-        model = KandinskyModelLoader.__load_diffusers(
+        model = self.__load_diffusers(
             model_type, weight_dtypes, prior_model_name, diffusion_model_name
         )
 
@@ -59,12 +59,12 @@ class KandinskyModelLoader(BaseModelLoader):
 
         return model
 
-    @staticmethod
     def __load_diffusers(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             prior_model_name: str,
-            diffusion_model_name: str
+            diffusion_model_name: str,
     ) -> KandinskyModel | None:
         # prior
         prior_tokenizer = CLIPTokenizer.from_pretrained(
@@ -144,19 +144,19 @@ class KandinskyModelLoader(BaseModelLoader):
             movq=movq,
         )
 
-    @staticmethod
     def __load_ckpt(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str
+            base_model_name: str,
     ) -> KandinskyModel | None:
         return None
 
-    @staticmethod
     def __load_safetensors(
+            self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str
+            base_model_name: str,
     ) -> KandinskyModel | None:
         return None
 
