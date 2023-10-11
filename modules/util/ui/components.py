@@ -34,7 +34,10 @@ def label(master, row, column, text, pad=PAD, tooltip=None):
     return component
 
 
-def entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None):
+def entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, override_value=None):
+    if override_value is not None:
+        ui_state.vars[var_name].set(override_value)
+
     var = ui_state.vars[var_name]
     if command:
         var.trace_add("write", lambda _0, _1, _2: command())
@@ -202,7 +205,9 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     return component
 
 
-def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None):
+def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, override_value=None):
+    if override_value is not None:
+        ui_state.vars[var_name].set(override_value)
     component = ctk.CTkSwitch(master, variable=ui_state.vars[var_name], text="", command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
     return component
