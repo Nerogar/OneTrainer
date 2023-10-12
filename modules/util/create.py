@@ -251,7 +251,7 @@ def create_optimizer(
             optimizer = torch.optim.Adam(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 weight_decay=args.optimizer_weight_decay,
                 eps=args.optimizer_eps,
                 amsgrad=args.optimizer_amsgrad,
@@ -267,7 +267,7 @@ def create_optimizer(
             optimizer = torch.optim.AdamW(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 weight_decay=args.optimizer_weight_decay,
                 eps=args.optimizer_eps,
                 amsgrad=args.optimizer_amsgrad,
@@ -408,7 +408,7 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.optimizer_weight_decay,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 bias_correction=args.optimizer_bias_correction,
                 amsgrad=args.optimizer_amsgrad,
                 adam_w_mode=args.optimizer_adam_w_mode,
@@ -424,7 +424,7 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.optimizer_weight_decay,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 bias_correction=args.optimizer_bias_correction,
                 amsgrad=args.optimizer_amsgrad,
                 adam_w_mode=args.optimizer_adam_w_mode,
@@ -441,7 +441,7 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.optimizer_weight_decay,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 min_8bit_size=args.optimizer_min_8bit_size,
                 percentile_clipping=args.optimizer_percentile_clipping,
                 block_wise=args.optimizer_block_wise,
@@ -469,7 +469,7 @@ def create_optimizer(
             optimizer = da.DAdaptAdam(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 eps=args.optimizer_eps,
                 weight_decay=args.optimizer_weight_decay,
                 log_every=args.optimizer_log_every,
@@ -486,7 +486,7 @@ def create_optimizer(
             optimizer = da.DAdaptAdan(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2, args.optimizer_beta3),
+                betas=(args.optimizer_beta1, args.optimizer_beta2, args.optimizer_beta3),
                 eps=args.optimizer_eps,
                 weight_decay=args.optimizer_weight_decay,
                 no_prox=args.optimizer_no_prox,
@@ -515,7 +515,7 @@ def create_optimizer(
             optimizer = da.DAdaptLion(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 weight_decay=args.optimizer_weight_decay,
                 log_every=args.optimizer_log_every,
                 d0=args.optimizer_d0,
@@ -529,7 +529,7 @@ def create_optimizer(
             optimizer = prodigyopt.Prodigy(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=tuple(args.optimizer_beta1, args.optimizer_beta2),
+                betas=(args.optimizer_beta1, args.optimizer_beta2),
                 beta3=args.optimizer_beta3,
                 eps=args.optimizer_eps,
                 weight_decay=args.optimizer_weight_decay,
@@ -548,7 +548,7 @@ def create_optimizer(
             if args.optimizer_relative_step:
                 optimizer = Adafactor(
                     params=parameters,
-                    eps=tuple(args.optimizer_eps2,args.optimizer_eps2),
+                    eps=(args.optimizer_eps2,args.optimizer_eps2),
                     clip_threshold=args.optimizer_clip_threshold,
                     decay_rate=args.optimizer_decay_rate,
                     beta1=args.optimizer_beta1,
@@ -561,7 +561,7 @@ def create_optimizer(
                 optimizer = Adafactor(
                     params=parameters,
                     lr=args.learning_rate,
-                    eps=tuple(args.optimizer_eps2,args.optimizer_eps2),
+                    eps=(args.optimizer_eps2,args.optimizer_eps2),
                     clip_threshold=args.optimizer_clip_threshold,
                     decay_rate=args.optimizer_decay_rate,
                     beta1=args.optimizer_beta1,
