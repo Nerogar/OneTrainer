@@ -11,3 +11,5 @@ train.bat
 *.pyc
 
 *.bak
+
+training_user_settings/
