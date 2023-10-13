@@ -433,9 +433,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             else:
                 value_to_set = user_prefs.get(key, default_value)
 
-            if value_to_set is None:
-                value_to_set = "None"
-
             self.ui_state.vars[key].set(value_to_set)
 
         if not self.winfo_exists():  # check if this window isn't open

@@ -154,16 +154,17 @@ def options(master, row, column, values, ui_state: UIState, var_name: str, comma
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
     return component
     
-def options_adv(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
+                command: Callable[[str], None] = None, adv_command: Callable[[str], None] = None):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    component = ctk.CTkOptionMenu(frame, values=values, variable=ui_state.vars[var_name])
+    component = ctk.CTkOptionMenu(frame, values=values, variable=ui_state.vars[var_name], command=command)
     component.grid(row=0, column=0, padx=PAD, pady=(PAD, PAD), sticky="new")
 
-    button_component = ctk.CTkButton(frame, text="…", width=20, command=command)
+    button_component = ctk.CTkButton(frame, text="…", width=20, command=adv_command)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
     return frame

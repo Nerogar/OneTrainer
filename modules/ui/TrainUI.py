@@ -13,8 +13,8 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
-from modules.ui.SampleWindow import SampleWindow
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
+from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.util.TrainProgress import TrainProgress
@@ -314,8 +314,9 @@ class TrainUI(ctk.CTk):
         # optimizer
         components.label(scroll_frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
-        components.options_adv(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer", self.open_optimizer_params_window)
-        
+        components.options_adv(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer",
+                               command=self.restore_optimizer_defaults, adv_command=self.open_optimizer_params_window)
+
         # learning rate scheduler
         components.label(scroll_frame, 1, 0, "Learning Rate Scheduler",
                          tooltip="Learning rate scheduler that automatically changes the learning rate during training")
@@ -655,9 +656,14 @@ class TrainUI(ctk.CTk):
     def open_convert_model_tool(self):
         window = ConvertModelUI(self)
         self.wait_window(window)
+
     def open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self, self.ui_state)
         self.wait_window(window)
+
+    def restore_optimizer_defaults(self, optimizer):
+        # TODO
+        pass
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
