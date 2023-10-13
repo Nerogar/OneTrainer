@@ -270,7 +270,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 "optimizer_maximize": False,
                 "optimizer_capturable": False,
                 "optimizer_differentiable": False,
-                "optimizer_fused": False
+                "optimizer_fused": True
             },
             "ADAMW": {
                 "optimizer_beta1": 0.9,
@@ -282,7 +282,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 "optimizer_maximize": False,
                 "optimizer_capturable": False,
                 "optimizer_differentiable": False,
-                "optimizer_fused": False
+                "optimizer_fused": True
             },
             "SGD": {
                 "optimizer_momentum": 0,
