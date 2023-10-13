@@ -231,7 +231,7 @@ def create_optimizer(
                 nesterov=args.optimizer_nesterov or False,
                 foreach=args.optimizer_foreach or False,
                 maximize=args.optimizer_maximize or False,
-                differentiable=args.optimizer_differentiable or False
+                differentiable=args.optimizer_differentiable or False,
             )
 
         # SGD_8BIT Optimizer
@@ -243,7 +243,7 @@ def create_optimizer(
                 momentum=args.optimizer_momentum or 0,
                 dampening=args.optimizer_dampening or 0,
                 weight_decay=args.optimizer_weight_decay or 0,
-                nesterov=args.optimizer_nesterov or False
+                nesterov=args.optimizer_nesterov or False,
             )
 
         # ADAM Optimizer
@@ -259,7 +259,7 @@ def create_optimizer(
                 maximize=args.optimizer_maximize or False,
                 capturable=args.optimizer_capturable or False,
                 differentiable=args.optimizer_differentiable or False,
-                fused=args.optimizer_fused or False
+                fused=args.optimizer_fused or False,
             )
 
         # ADAMW Optimizer
@@ -275,7 +275,7 @@ def create_optimizer(
                 maximize=args.optimizer_maximize or False,
                 capturable=args.optimizer_capturable or False,
                 differentiable=args.optimizer_differentiable or False,
-                fused=args.optimizer_fused or False
+                fused=args.optimizer_fused or False,
             )
 
         # ADAM_8BIT Optimizer
@@ -289,7 +289,7 @@ def create_optimizer(
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
                 block_wise=args.optimizer_block_wise or True,
-                is_paged=args.optimizer_is_paged or False
+                is_paged=args.optimizer_is_paged or False,
             )
 
         # ADAMW_8BIT Optimizer
@@ -303,7 +303,7 @@ def create_optimizer(
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
                 block_wise=args.optimizer_block_wise or True,
-                is_paged=args.optimizer_is_paged or False
+                is_paged=args.optimizer_is_paged or False,
             )
 
         # ADAGRAD Optimizer
@@ -315,7 +315,7 @@ def create_optimizer(
                 weight_decay=args.optimizer_weight_decay or 0,
                 eps=args.optimizer_eps or 1e-10,
                 lr_decay=args.optimizer_lr_decay or 0,
-                initial_accumulator_value=args.optimizer_initial_accumulator_value or 0
+                initial_accumulator_value=args.optimizer_initial_accumulator_value or 0,
             )
 
         # ADAGRAD_8BIT Optimizer
@@ -330,7 +330,7 @@ def create_optimizer(
                 initial_accumulator_value=args.optimizer_initial_accumulator_value or 0,
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True
+                block_wise=args.optimizer_block_wise or True,
             )
 
         # RMSPROP Optimizer
@@ -343,7 +343,7 @@ def create_optimizer(
                 eps=args.optimizer_eps or 1e-8,
                 alpha=args.optimizer_alpha or 0.99,
                 momentum=args.optimizer_momentum or 0,
-                centered=args.optimizer_centered or False
+                centered=args.optimizer_centered or False,
             )
 
         # RMSPROP_8BIT Optimizer
@@ -359,7 +359,7 @@ def create_optimizer(
                 centered=args.optimizer_centered or False,
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True
+                block_wise=args.optimizer_block_wise or True,
             )
 
         # LION Optimizer
@@ -370,7 +370,7 @@ def create_optimizer(
                 lr=args.learning_rate,
                 betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.99),
                 weight_decay=args.optimizer_weight_decay or 0,
-                use_triton=args.optimizer_use_triton or False
+                use_triton=args.optimizer_use_triton or False,
             )
 
         # LARS Optimizer
@@ -383,7 +383,7 @@ def create_optimizer(
                 momentum=args.optimizer_momentum or 0,
                 dampening=args.optimizer_dampening or 0,
                 nesterov=args.optimizer_nesterov or False,
-                max_unorm=args.optimizer_max_unorm or 0.02
+                max_unorm=args.optimizer_max_unorm or 0.02,
             )
 
         # LARS_8BIT Optimizer
@@ -398,7 +398,7 @@ def create_optimizer(
                 nesterov=args.optimizer_nesterov or False,
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
-                max_unorm=args.optimizer_max_unorm or 0.02
+                max_unorm=args.optimizer_max_unorm or 0.02,
             )
 
         # LAMB Optimizer
@@ -414,7 +414,7 @@ def create_optimizer(
                 adam_w_mode=args.optimizer_adam_w_mode or True,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
                 block_wise=args.optimizer_block_wise or False,
-                max_unorm=args.optimizer_max_unorm or 1.0
+                max_unorm=args.optimizer_max_unorm or 1.0,
             )
 
         # LAMB_8BIT Optimizer
@@ -431,7 +431,7 @@ def create_optimizer(
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
                 block_wise=args.optimizer_block_wise or False,
-                max_unorm=args.optimizer_max_unorm or 1.0
+                max_unorm=args.optimizer_max_unorm or 1.0,
             )
 
         # LION_8BIT Optimizer
@@ -445,7 +445,7 @@ def create_optimizer(
                 min_8bit_size=args.optimizer_min_8bit_size or 4096,
                 percentile_clipping=args.optimizer_percentile_clipping or 100,
                 block_wise=args.optimizer_block_wise or True,
-                is_paged=args.optimizer_is_paged or False
+                is_paged=args.optimizer_is_paged or False,
             )
 
         # DADAPT_SGD Optimizer
@@ -459,7 +459,7 @@ def create_optimizer(
                 log_every=args.optimizer_log_every or 0,
                 d0=args.optimizer_d0 or 1e-6,
                 growth_rate=args.optimizer_growth_rate or float('inf'),
-                fsdp_in_use=args.optimizer_fsdp_in_use or False
+                fsdp_in_use=args.optimizer_fsdp_in_use or False,
             )
 
         # DADAPT_ADAM Optimizer
@@ -476,7 +476,7 @@ def create_optimizer(
                 use_bias_correction=args.optimizer_use_bias_correction or False,
                 d0=args.optimizer_d0 or 1e-6,
                 growth_rate=args.optimizer_growth_rate or float('inf'),
-                fsdp_in_use=args.optimizer_fsdp_in_use or False
+                fsdp_in_use=args.optimizer_fsdp_in_use or False,
             )
 
         # DADAPT_ADAN Optimizer
@@ -491,7 +491,7 @@ def create_optimizer(
                 no_prox=args.optimizer_no_prox or False,
                 log_every=args.optimizer_log_every or 0,
                 d0=args.optimizer_d0 or 1e-6,
-                growth_rate=args.optimizer_growth_rate or float('inf')
+                growth_rate=args.optimizer_growth_rate or float('inf'),
             )
 
         # DADAPT_ADA_GRAD Optimizer
@@ -505,7 +505,7 @@ def create_optimizer(
                 weight_decay=args.optimizer_weight_decay or 0.0,
                 eps=args.optimizer_eps or 0.0,
                 d0=args.optimizer_d0 or 1e-6,
-                growth_rate=args.optimizer_growth_rate or float('inf')
+                growth_rate=args.optimizer_growth_rate or float('inf'),
             )
 
         # DADAPT_LION Optimizer
@@ -518,7 +518,7 @@ def create_optimizer(
                 weight_decay=args.optimizer_weight_decay or 0.0,
                 log_every=args.optimizer_log_every or 0,
                 d0=args.optimizer_d0 or 1e-6,
-                fsdp_in_use=args.optimizer_fsdp_in_use or False
+                fsdp_in_use=args.optimizer_fsdp_in_use or False,
             )
 
         # PRODIGY Optimizer
@@ -537,7 +537,7 @@ def create_optimizer(
                 d0=args.optimizer_d0 or 1e-6,
                 d_coef=args.optimizer_d_coef or 1.0,
                 growth_rate=args.optimizer_growth_rate or float('inf'),
-                fsdp_in_use=args.optimizer_fsdp_in_use or False
+                fsdp_in_use=args.optimizer_fsdp_in_use or False,
             )
 
         # ADAFactor Optimizer
@@ -553,7 +553,7 @@ def create_optimizer(
                     weight_decay=args.optimizer_weight_decay or 0.0,
                     scale_parameter=args.optimizer_scale_parameter or True,
                     relative_step=args.optimizer_relative_step or True,
-                    warmup_init=args.optimizer_warmup_init or False
+                    warmup_init=args.optimizer_warmup_init or False,
                 )
             else:
                 optimizer = Adafactor(
@@ -566,7 +566,7 @@ def create_optimizer(
                     weight_decay=args.optimizer_weight_decay or 0.0,
                     scale_parameter=args.optimizer_scale_parameter or True,
                     relative_step=args.optimizer_relative_step or True,
-                    warmup_init=args.optimizer_warmup_init or False
+                    warmup_init=args.optimizer_warmup_init or False,
                 )
 
     if state_dict is not None:

@@ -5,11 +5,9 @@
 /models*
 /training_concepts
 /training_samples
+/training_user_settings
 /external
 debug.py
 train.bat
 *.pyc
-
 *.bak
-
-training_user_settings/
