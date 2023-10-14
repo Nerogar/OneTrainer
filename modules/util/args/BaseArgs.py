@@ -1,5 +1,3 @@
-import math
-
 from enum import Enum
 from typing import Any
 
@@ -26,8 +24,8 @@ class BaseArgs:
             elif self.types[name] == int:
                 data[name] = value
             elif self.types[name] == float:
-                if isinstance(value, float) and math.isinf(value):
-                    data[name] = 'inf' if value > 0 else '-inf'
+                if value in [float('inf'), float('-inf')]:
+                    data[name] = str(value)
                 else:
                     data[name] = value
             else:
@@ -56,7 +54,8 @@ class BaseArgs:
                     else:
                         setattr(self, name, int(data[name]))
                 elif self.types[name] == float:
-                    if data[name] in ["inf", "-inf"]:
+                    # check for strings to support dicts loaded from json
+                    if data[name] in [float('inf'), float('-inf'), 'inf', '-inf']:
                         setattr(self, name, float(data[name]))
                     if self.nullables[name]:
                         setattr(self, name, None if data[name] is None else float(data[name]))
@@ -68,7 +67,8 @@ class BaseArgs:
                 if name in data:
                     print(f"Could not set {name} as {str(data[name])}")
                 else:
-                    print(f"Could not set {name}, not found.")
+                    #print(f"Could not set {name}, not found.")
+                    pass
         return self
 
     def __to_arg_name(self, var_name: str) -> str:
