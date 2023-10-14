@@ -149,7 +149,7 @@ class UIState:
                     self.vars[name] = var
                 elif var_type == bool:
                     var = tk.BooleanVar(master=self.master)
-                    var.set(obj_var)
+                    var.set(obj_var or False)
                     var.trace_add("write", self.__set_bool_var(obj, is_dict, name, var))
                     self.vars[name] = var
                 elif var_type == int:

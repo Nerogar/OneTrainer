@@ -48,7 +48,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
     def __ok(self):
         self.destroy()
 
-    def create_dynamic_ui(self, selected_optimizer, master, components, ui_state, defaults=False):
+    def create_dynamic_ui(self, selected_optimizer, master, components, ui_state):
 
         # Lookup for the title and tooltip for a key
         # @formatter:off
@@ -119,7 +119,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             user_prefs = self.pref_util.load_preferences(selected_optimizer)
             if user_prefs and key in user_prefs:
                 override_value = user_prefs[key]
-            elif defaults and key in OPTIMIZER_KEY_MAP[selected_optimizer]:
+            elif key in OPTIMIZER_KEY_MAP[selected_optimizer]:
                 override_value = OPTIMIZER_KEY_MAP[selected_optimizer][key]
 
             if type != 'bool':
@@ -177,7 +177,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         selected_optimizer = self.ui_state.vars['optimizer'].get()
         self.clear_dynamic_ui(self.frame)
         self.remove_user_pref(selected_optimizer)
-        self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state, defaults=True)
+        self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state)
 
     def clear_dynamic_ui(self, master):
         try:
