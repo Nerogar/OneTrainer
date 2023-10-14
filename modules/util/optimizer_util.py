@@ -31,6 +31,19 @@ class UserPreferenceUtility:
         with open(self.file_path, 'w') as f:
             json.dump(prefs, f, indent=4)
 
+    def remove_preference(self, optimizer_name):
+        if os.path.exists(self.file_path):
+            with open(self.file_path, 'r') as f:
+                prefs = json.load(f)
+        else:
+            prefs = {}
+
+        if optimizer_name in prefs:
+            prefs.pop(optimizer_name)
+
+        with open(self.file_path, 'w') as f:
+            json.dump(prefs, f, indent=4)
+
 # Optimizer Key map with defaults
 OPTIMIZER_KEY_MAP = {
     "ADAFACTOR": {
