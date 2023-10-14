@@ -20,6 +20,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         self.train_args = TrainArgs.default_values()
         self.ui_state = ui_state
+        self.protocol("WM_DELETE_WINDOW", self.on_window_close)
 
         self.title("Optimizer Settings")
         self.geometry("800x400")
@@ -41,11 +42,16 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.frame.grid_columnconfigure(3, weight=0)
         self.frame.grid_columnconfigure(4, weight=1)
 
-        components.button(self, 1, 0, "ok", self.__ok)
+        components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.button = None
         self.main_frame(self.frame)
 
-    def __ok(self):
+    def on_window_close(self):
+        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        for key in OPTIMIZER_KEY_MAP[selected_optimizer]:
+            value = self.ui_state.vars[key].get()
+            self.update_user_pref(selected_optimizer, key, value)
+
         self.destroy()
 
     def create_dynamic_ui(self, selected_optimizer, master, components, ui_state):
