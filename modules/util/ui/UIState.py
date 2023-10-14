@@ -21,7 +21,7 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     obj[name] = None
                 else:
                     obj[name] = string_var
@@ -29,7 +29,7 @@ class UIState:
             def update(_0, _1, _2):
 
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     setattr(obj, name, None)
                 else:
                     setattr(obj, name, string_var)
@@ -40,14 +40,14 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     obj[name] = None
                 else:
                     obj[name] = var_type[string_var]
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     setattr(obj, name, None)
                 else:
                     setattr(obj, name, var_type[string_var])
@@ -68,8 +68,12 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     obj[name] = None
+                elif string_var == "inf":
+                    obj[name] = int("inf")
+                elif string_var == "-inf":
+                    obj[name] = int("-inf")
                 else:
                     try:
                         obj[name] = int(string_var)
@@ -78,8 +82,12 @@ class UIState:
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     setattr(obj, name, None)
+                elif string_var == "inf":
+                    setattr(obj, name, int("inf"))
+                elif string_var == "-inf":
+                    setattr(obj, name, int("-inf"))
                 else:
                     try:
                         setattr(obj, name, int(string_var))
@@ -92,8 +100,12 @@ class UIState:
         if is_dict:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     obj[name] = None
+                elif string_var == "inf":
+                    obj[name] = float("inf")
+                elif string_var == "-inf":
+                    obj[name] = float("-inf")
                 else:
                     try:
                         obj[name] = float(string_var)
@@ -102,8 +114,12 @@ class UIState:
         else:
             def update(_0, _1, _2):
                 string_var = var.get()
-                if string_var == "" and nullable:
+                if (string_var == "" or string_var == "None") and nullable:
                     setattr(obj, name, None)
+                elif string_var == "inf":
+                    setattr(obj, name, float("inf"))
+                elif string_var == "-inf":
+                    setattr(obj, name, float("-inf"))
                 else:
                     try:
                         setattr(obj, name, float(string_var))
@@ -133,7 +149,7 @@ class UIState:
                     self.vars[name] = var
                 elif var_type == bool:
                     var = tk.BooleanVar(master=self.master)
-                    var.set(obj_var)
+                    var.set(obj_var or False)
                     var.trace_add("write", self.__set_bool_var(obj, is_dict, name, var))
                     self.vars[name] = var
                 elif var_type == int:

@@ -15,16 +15,19 @@ class BaseArgs:
         data = {}
         for (name, _) in self.types.items():
             value = getattr(self, name)
-            if isinstance(value, str):
+            if self.types[name] == str:
                 data[name] = value
-            elif isinstance(value, Enum):
+            elif issubclass(self.types[name], Enum):
                 data[name] = str(value)
-            elif isinstance(value, bool):
+            elif self.types[name] == bool:
                 data[name] = value
-            elif isinstance(value, int):
+            elif self.types[name] == int:
                 data[name] = value
-            elif isinstance(value, float):
-                data[name] = value
+            elif self.types[name] == float:
+                if value in [float('inf'), float('-inf')]:
+                    data[name] = str(value)
+                else:
+                    data[name] = value
             else:
                 data[name] = value
 
@@ -51,6 +54,9 @@ class BaseArgs:
                     else:
                         setattr(self, name, int(data[name]))
                 elif self.types[name] == float:
+                    # check for strings to support dicts loaded from json
+                    if data[name] in [float('inf'), float('-inf'), 'inf', '-inf']:
+                        setattr(self, name, float(data[name]))
                     if self.nullables[name]:
                         setattr(self, name, None if data[name] is None else float(data[name]))
                     else:
@@ -61,8 +67,8 @@ class BaseArgs:
                 if name in data:
                     print(f"Could not set {name} as {str(data[name])}")
                 else:
-                    print(f"Could not set {name}, not found.")
-
+                    #print(f"Could not set {name}, not found.")
+                    pass
         return self
 
     def __to_arg_name(self, var_name: str) -> str:
@@ -75,18 +81,25 @@ class BaseArgs:
         data = []
         for (name, _) in self.types.items():
             value = getattr(self, name)
-            if isinstance(value, str):
-                data.append(f"{self.__to_arg_name(name)}=\"{value}\"")
-            elif isinstance(value, Enum):
-                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
-            elif isinstance(value, bool):
-                if value:
-                    data.append(self.__to_arg_name(name))
-            elif isinstance(value, int):
-                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
-            elif isinstance(value, float):
-                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
-            elif value is not None:
-                data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+            if value is not None:
+                if self.types[name] == str:
+                    data.append(f"{self.__to_arg_name(name)}=\"{value}\"")
+                elif issubclass(self.types[name], Enum):
+                    data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+                elif self.types[name] == bool:
+                    if self.nullables[name]:
+                        data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+                    else:
+                        if value:
+                            data.append(self.__to_arg_name(name))
+                elif self.types[name] == int:
+                    data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+                elif self.types[name] == float:
+                    if value in [float('inf'), float('-inf')]:
+                        data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+                    else:
+                        data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+                else:
+                    data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
 
         return ' '.join(data)

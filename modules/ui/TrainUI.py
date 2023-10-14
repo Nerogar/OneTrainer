@@ -13,10 +13,12 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
+from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.util.TrainProgress import TrainProgress
+from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -302,10 +304,10 @@ class TrainUI(ctk.CTk):
 
         scroll_frame.grid_columnconfigure(0, weight=0)
         scroll_frame.grid_columnconfigure(1, weight=1)
-        scroll_frame.grid_columnconfigure(2, minsize=50)
+        scroll_frame.grid_columnconfigure(2, minsize=20)
         scroll_frame.grid_columnconfigure(3, weight=0)
         scroll_frame.grid_columnconfigure(4, weight=1)
-        scroll_frame.grid_columnconfigure(5, minsize=50)
+        scroll_frame.grid_columnconfigure(5, minsize=20)
         scroll_frame.grid_columnconfigure(6, weight=0)
         scroll_frame.grid_columnconfigure(7, weight=1)
 
@@ -313,7 +315,8 @@ class TrainUI(ctk.CTk):
         # optimizer
         components.label(scroll_frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
-        components.options(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer")
+        components.options_adv(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer",
+                               command=self.restore_optimizer_prefs, adv_command=self.open_optimizer_params_window)
 
         # learning rate scheduler
         components.label(scroll_frame, 1, 0, "Learning Rate Scheduler",
@@ -336,47 +339,42 @@ class TrainUI(ctk.CTk):
                          tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
         components.entry(scroll_frame, 4, 1, self.ui_state, "learning_rate_cycles")
 
-        # weight decay
-        components.label(scroll_frame, 5, 0, "Weight Decay",
-                         tooltip="The weight decay parameter of the optimizer")
-        components.entry(scroll_frame, 5, 1, self.ui_state, "weight_decay")
-
         # epochs
-        components.label(scroll_frame, 6, 0, "Epochs",
+        components.label(scroll_frame, 5, 0, "Epochs",
                          tooltip="The number of epochs for a full training run")
-        components.entry(scroll_frame, 6, 1, self.ui_state, "epochs")
+        components.entry(scroll_frame, 5, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(scroll_frame, 7, 0, "Batch Size",
+        components.label(scroll_frame, 6, 0, "Batch Size",
                          tooltip="The batch size of one training step")
-        components.entry(scroll_frame, 7, 1, self.ui_state, "batch_size")
+        components.entry(scroll_frame, 6, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(scroll_frame, 8, 0, "Accumulation Steps",
+        components.label(scroll_frame, 7, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(scroll_frame, 8, 1, self.ui_state, "gradient_accumulation_steps")
+        components.entry(scroll_frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
 
         # attention mechanism
-        components.label(scroll_frame, 9, 0, "Attention",
+        components.label(scroll_frame, 8, 0, "Attention",
                          tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(scroll_frame, 9, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
+        components.options(scroll_frame, 8, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
                            "attention_mechanism")
 
         # ema
-        components.label(scroll_frame, 10, 0, "EMA",
+        components.label(scroll_frame, 9, 0, "EMA",
                          tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
-        components.options(scroll_frame, 10, 1, [str(x) for x in list(EMAMode)], self.ui_state,
+        components.options(scroll_frame, 9, 1, [str(x) for x in list(EMAMode)], self.ui_state,
                            "ema")
 
         # ema decay
-        components.label(scroll_frame, 11, 0, "EMA Decay",
+        components.label(scroll_frame, 10, 0, "EMA Decay",
                          tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
-        components.entry(scroll_frame, 11, 1, self.ui_state, "ema_decay")
+        components.entry(scroll_frame, 10, 1, self.ui_state, "ema_decay")
 
         # ema update step interval
-        components.label(scroll_frame, 12, 0, "EMA Update Step Interval",
+        components.label(scroll_frame, 11, 0, "EMA Update Step Interval",
                          tooltip="Number of steps between EMA update steps")
-        components.entry(scroll_frame, 12, 1, self.ui_state, "ema_update_step_interval")
+        components.entry(scroll_frame, 11, 1, self.ui_state, "ema_update_step_interval")
 
         # column 2
         # train text encoder
@@ -659,6 +657,22 @@ class TrainUI(ctk.CTk):
     def open_convert_model_tool(self):
         window = ConvertModelUI(self)
         self.wait_window(window)
+
+    def open_optimizer_params_window(self):
+        window = OptimizerParamsWindow(self, self.ui_state)
+        self.wait_window(window)
+
+    def restore_optimizer_prefs(self, optimizer):
+        pref_util = UserPreferenceUtility()
+        user_prefs = pref_util.load_preferences(optimizer)
+
+        for key, default_value in OPTIMIZER_KEY_MAP[optimizer].items():
+            if user_prefs == "Use_Default":
+                value_to_set = default_value
+            else:
+                value_to_set = user_prefs.get(key, default_value)
+
+            self.ui_state.vars[key].set(value_to_set)
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
