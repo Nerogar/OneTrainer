@@ -20,6 +20,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         self.train_args = TrainArgs.default_values()
         self.ui_state = ui_state
+        self.protocol("WM_DELETE_WINDOW", self.on_window_close)
 
         self.title("Optimizer Settings")
         self.geometry("800x400")
@@ -41,14 +42,19 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.frame.grid_columnconfigure(3, weight=0)
         self.frame.grid_columnconfigure(4, weight=1)
 
-        components.button(self, 1, 0, "ok", self.__ok)
+        components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.button = None
         self.main_frame(self.frame)
 
-    def __ok(self):
+    def on_window_close(self):
+        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        for key in OPTIMIZER_KEY_MAP[selected_optimizer]:
+            value = self.ui_state.vars[key].get()
+            self.update_user_pref(selected_optimizer, key, value)
+
         self.destroy()
 
-    def create_dynamic_ui(self, selected_optimizer, master, components, ui_state, defaults=False):
+    def create_dynamic_ui(self, selected_optimizer, master, components, ui_state):
 
         # Lookup for the title and tooltip for a key
         # @formatter:off
@@ -119,7 +125,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             user_prefs = self.pref_util.load_preferences(selected_optimizer)
             if user_prefs and key in user_prefs:
                 override_value = user_prefs[key]
-            elif defaults and key in OPTIMIZER_KEY_MAP[selected_optimizer]:
+            elif key in OPTIMIZER_KEY_MAP[selected_optimizer]:
                 override_value = OPTIMIZER_KEY_MAP[selected_optimizer][key]
 
             if type != 'bool':
@@ -131,6 +137,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def update_user_pref(self, optimizer, key, value):
         self.pref_util.save_preference(optimizer, key, value)
+
+    def remove_user_pref(self, optimizer):
+        self.pref_util.remove_preference(optimizer)
 
     def main_frame(self, master):
         # Optimizer
@@ -173,7 +182,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             return
         selected_optimizer = self.ui_state.vars['optimizer'].get()
         self.clear_dynamic_ui(self.frame)
-        self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state, defaults=True)
+        self.remove_user_pref(selected_optimizer)
+        self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state)
 
     def clear_dynamic_ui(self, master):
         try:
