@@ -218,7 +218,7 @@ class UIState:
                     var.set("" if obj_var is None else str(obj_var))
                 elif var_type == bool:
                     var = self.vars[name]
-                    var.set(obj_var)
+                    var.set(obj_var or False)
                 elif var_type == int:
                     var = self.vars[name]
                     var.set("" if obj_var is None else str(obj_var))
