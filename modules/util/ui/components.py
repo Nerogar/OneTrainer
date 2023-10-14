@@ -167,6 +167,9 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
     button_component = ctk.CTkButton(frame, text="…", width=20, command=adv_command)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
+    if command:
+        command(ui_state.vars[var_name].get())  # call command once to set the initial value
+
     return frame
 
 def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
