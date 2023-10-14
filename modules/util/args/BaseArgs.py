@@ -1,3 +1,5 @@
+import math
+
 from enum import Enum
 from typing import Any
 
@@ -24,8 +26,8 @@ class BaseArgs:
             elif self.types[name] == int:
                 data[name] = value
             elif self.types[name] == float:
-                if value in [float('inf'), float('-inf'), int('inf'), int('-inf')]:
-                    data[name] = str(value)
+                if isinstance(value, float) and math.isinf(value):
+                    data[name] = 'inf' if value > 0 else '-inf'
                 else:
                     data[name] = value
             else:

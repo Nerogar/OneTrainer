@@ -18,6 +18,7 @@ from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.util.TrainProgress import TrainProgress
+from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -315,7 +316,7 @@ class TrainUI(ctk.CTk):
         components.label(scroll_frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
         components.options_adv(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer",
-                               command=self.restore_optimizer_defaults, adv_command=self.open_optimizer_params_window)
+                               command=self.restore_optimizer_prefs, adv_command=self.open_optimizer_params_window)
 
         # learning rate scheduler
         components.label(scroll_frame, 1, 0, "Learning Rate Scheduler",
@@ -661,9 +662,17 @@ class TrainUI(ctk.CTk):
         window = OptimizerParamsWindow(self, self.ui_state)
         self.wait_window(window)
 
-    def restore_optimizer_defaults(self, optimizer):
-        # TODO
-        pass
+    def restore_optimizer_prefs(self, optimizer):
+        pref_util = UserPreferenceUtility()
+        user_prefs = pref_util.load_preferences(optimizer)
+
+        for key, default_value in OPTIMIZER_KEY_MAP[optimizer].items():
+            if user_prefs == "Use_Default":
+                value_to_set = default_value
+            else:
+                value_to_set = user_prefs.get(key, default_value)
+
+            self.ui_state.vars[key].set(value_to_set)
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
