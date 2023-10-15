@@ -225,13 +225,13 @@ def create_optimizer(
             optimizer = torch.optim.SGD(
                 params=parameters,
                 lr=args.learning_rate,
-                momentum=args.optimizer_momentum or 0,
-                dampening=args.optimizer_dampening or 0,
-                weight_decay=args.optimizer_weight_decay or 0,
-                nesterov=args.optimizer_nesterov or False,
-                foreach=args.optimizer_foreach or False,
-                maximize=args.optimizer_maximize or False,
-                differentiable=args.optimizer_differentiable or False,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                dampening=args.optimizer_dampening if args.optimizer_dampening else 0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                nesterov=args.optimizer_nesterov if args.optimizer_nesterov else False,
+                foreach=args.optimizer_foreach if args.optimizer_foreach else False,
+                maximize=args.optimizer_maximize if args.optimizer_maximize else False,
+                differentiable=args.optimizer_differentiable if args.optimizer_differentiable else False,
             )
 
         # SGD_8BIT Optimizer
@@ -240,10 +240,10 @@ def create_optimizer(
             optimizer = bnb.optim.SGD8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                momentum=args.optimizer_momentum or 0,
-                dampening=args.optimizer_dampening or 0,
-                weight_decay=args.optimizer_weight_decay or 0,
-                nesterov=args.optimizer_nesterov or False,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                dampening=args.optimizer_dampening if args.optimizer_dampening else 0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                nesterov=args.optimizer_nesterov if args.optimizer_nesterov else False,
             )
 
         # ADAM Optimizer
@@ -251,15 +251,15 @@ def create_optimizer(
             optimizer = torch.optim.Adam(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                weight_decay=args.optimizer_weight_decay or 0,
-                eps=args.optimizer_eps or 1e-8,
-                amsgrad=args.optimizer_amsgrad or False,
-                foreach=args.optimizer_foreach or False,
-                maximize=args.optimizer_maximize or False,
-                capturable=args.optimizer_capturable or False,
-                differentiable=args.optimizer_differentiable or False,
-                fused=args.optimizer_fused or False,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad else False,
+                foreach=args.optimizer_foreach if args.optimizer_foreach else False,
+                maximize=args.optimizer_maximize if args.optimizer_maximize else False,
+                capturable=args.optimizer_capturable if args.optimizer_capturable else False,
+                differentiable=args.optimizer_differentiable if args.optimizer_differentiable else False,
+                fused=args.optimizer_fused if args.optimizer_fused else False,
             )
 
         # ADAMW Optimizer
@@ -267,15 +267,15 @@ def create_optimizer(
             optimizer = torch.optim.AdamW(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                weight_decay=args.optimizer_weight_decay or 1e-2,
-                eps=args.optimizer_eps or 1e-8,
-                amsgrad=args.optimizer_amsgrad or False,
-                foreach=args.optimizer_foreach or False,
-                maximize=args.optimizer_maximize or False,
-                capturable=args.optimizer_capturable or False,
-                differentiable=args.optimizer_differentiable or False,
-                fused=args.optimizer_fused or False,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 1e-2,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad else False,
+                foreach=args.optimizer_foreach if args.optimizer_foreach else False,
+                maximize=args.optimizer_maximize if args.optimizer_maximize else False,
+                capturable=args.optimizer_capturable if args.optimizer_capturable else False,
+                differentiable=args.optimizer_differentiable if args.optimizer_differentiable else False,
+                fused=args.optimizer_fused if args.optimizer_fused else False,
             )
 
         # ADAM_8BIT Optimizer
@@ -284,12 +284,12 @@ def create_optimizer(
             optimizer = bnb.optim.Adam8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                eps=args.optimizer_eps or 1e-8,
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True,
-                is_paged=args.optimizer_is_paged or False,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else True,
+                is_paged=args.optimizer_is_paged if args.optimizer_is_paged else False,
             )
 
         # ADAMW_8BIT Optimizer
@@ -298,12 +298,12 @@ def create_optimizer(
             optimizer = bnb.optim.AdamW8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 1e-2,
-                eps=args.optimizer_eps or 1e-8,
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True,
-                is_paged=args.optimizer_is_paged or False,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 1e-2,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else True,
+                is_paged=args.optimizer_is_paged if args.optimizer_is_paged else False,
             )
 
         # ADAGRAD Optimizer
@@ -312,10 +312,10 @@ def create_optimizer(
             optimizer = bnb.optim.Adagrad(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                eps=args.optimizer_eps or 1e-10,
-                lr_decay=args.optimizer_lr_decay or 0,
-                initial_accumulator_value=args.optimizer_initial_accumulator_value or 0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-10,
+                lr_decay=args.optimizer_lr_decay if args.optimizer_lr_decay else 0,
+                initial_accumulator_value=args.optimizer_initial_accumulator_value if args.optimizer_initial_accumulator_value else 0,
             )
 
         # ADAGRAD_8BIT Optimizer
@@ -324,13 +324,13 @@ def create_optimizer(
             optimizer = bnb.optim.Adagrad8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                eps=args.optimizer_eps or 1e-10,
-                lr_decay=args.optimizer_lr_decay or 0,
-                initial_accumulator_value=args.optimizer_initial_accumulator_value or 0,
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-10,
+                lr_decay=args.optimizer_lr_decay if args.optimizer_lr_decay else 0,
+                initial_accumulator_value=args.optimizer_initial_accumulator_value if args.optimizer_initial_accumulator_value else 0,
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else True,
             )
 
         # RMSPROP Optimizer
@@ -339,11 +339,11 @@ def create_optimizer(
             optimizer = bnb.optim.RMSprop(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                eps=args.optimizer_eps or 1e-8,
-                alpha=args.optimizer_alpha or 0.99,
-                momentum=args.optimizer_momentum or 0,
-                centered=args.optimizer_centered or False,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                alpha=args.optimizer_alpha if args.optimizer_alpha else 0.99,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                centered=args.optimizer_centered if args.optimizer_centered else False,
             )
 
         # RMSPROP_8BIT Optimizer
@@ -352,14 +352,14 @@ def create_optimizer(
             optimizer = bnb.optim.RMSprop8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                eps=args.optimizer_eps or 1e-8,
-                alpha=args.optimizer_alpha or 0.99,
-                momentum=args.optimizer_momentum or 0,
-                centered=args.optimizer_centered or False,
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                alpha=args.optimizer_alpha if args.optimizer_alpha else 0.99,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                centered=args.optimizer_centered if args.optimizer_centered else False,
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else True,
             )
 
         # LION Optimizer
@@ -368,9 +368,9 @@ def create_optimizer(
             optimizer = lp.Lion(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.99),
-                weight_decay=args.optimizer_weight_decay or 0,
-                use_triton=args.optimizer_use_triton or False,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.99),
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                use_triton=args.optimizer_use_triton if args.optimizer_use_triton else False,
             )
 
         # LARS Optimizer
@@ -379,11 +379,11 @@ def create_optimizer(
             optimizer = bnb.optim.LARS(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                momentum=args.optimizer_momentum or 0,
-                dampening=args.optimizer_dampening or 0,
-                nesterov=args.optimizer_nesterov or False,
-                max_unorm=args.optimizer_max_unorm or 0.02,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                dampening=args.optimizer_dampening if args.optimizer_dampening else 0,
+                nesterov=args.optimizer_nesterov if args.optimizer_nesterov else False,
+                max_unorm=args.optimizer_max_unorm if args.optimizer_max_unorm else 0.02,
             )
 
         # LARS_8BIT Optimizer
@@ -392,13 +392,13 @@ def create_optimizer(
             optimizer = bnb.optim.LARS8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                momentum=args.optimizer_momentum or 0,
-                dampening=args.optimizer_dampening or 0,
-                nesterov=args.optimizer_nesterov or False,
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                max_unorm=args.optimizer_max_unorm or 0.02,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                dampening=args.optimizer_dampening if args.optimizer_dampening else 0,
+                nesterov=args.optimizer_nesterov if args.optimizer_nesterov else False,
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                max_unorm=args.optimizer_max_unorm if args.optimizer_max_unorm else 0.02,
             )
 
         # LAMB Optimizer
@@ -407,14 +407,14 @@ def create_optimizer(
             optimizer = bnb.optim.LAMB(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                bias_correction=args.optimizer_bias_correction or True,
-                amsgrad=args.optimizer_amsgrad or False,
-                adam_w_mode=args.optimizer_adam_w_mode or True,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or False,
-                max_unorm=args.optimizer_max_unorm or 1.0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                bias_correction=args.optimizer_bias_correction if args.optimizer_bias_correction else True,
+                amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad else False,
+                adam_w_mode=args.optimizer_adam_w_mode if args.optimizer_adam_w_mode else True,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else False,
+                max_unorm=args.optimizer_max_unorm if args.optimizer_max_unorm else 1.0,
             )
 
         # LAMB_8BIT Optimizer
@@ -423,15 +423,15 @@ def create_optimizer(
             optimizer = bnb.optim.LAMB8bit(
                 params=parameters,
                 lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                bias_correction=args.optimizer_bias_correction or True,
-                amsgrad=args.optimizer_amsgrad or False,
-                adam_w_mode=args.optimizer_adam_w_mode or True,
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or False,
-                max_unorm=args.optimizer_max_unorm or 1.0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                bias_correction=args.optimizer_bias_correction if args.optimizer_bias_correction else True,
+                amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad else False,
+                adam_w_mode=args.optimizer_adam_w_mode if args.optimizer_adam_w_mode else True,
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else False,
+                max_unorm=args.optimizer_max_unorm if args.optimizer_max_unorm else 1.0,
             )
 
         # LION_8BIT Optimizer
@@ -439,13 +439,13 @@ def create_optimizer(
             import bitsandbytes as bnb
             optimizer = bnb.optim.Lion8bit(
                 params=parameters,
-                lr=args.learning_rate,
-                weight_decay=args.optimizer_weight_decay or 0,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                min_8bit_size=args.optimizer_min_8bit_size or 4096,
-                percentile_clipping=args.optimizer_percentile_clipping or 100,
-                block_wise=args.optimizer_block_wise or True,
-                is_paged=args.optimizer_is_paged or False,
+                lr=args.learning_rate if args.learning_rate else 0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size else 4096,
+                percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping else 100,
+                block_wise=args.optimizer_block_wise if args.optimizer_block_wise else True,
+                is_paged=args.optimizer_is_paged if args.optimizer_is_paged else False,
             )
 
         # DADAPT_SGD Optimizer
@@ -454,12 +454,12 @@ def create_optimizer(
             optimizer = da.DAdaptSGD(
                 params=parameters,
                 lr=args.learning_rate,
-                momentum=args.optimizer_momentum or 0.0,
-                weight_decay=args.optimizer_weight_decay or 0,
-                log_every=args.optimizer_log_every or 0,
-                d0=args.optimizer_d0 or 1e-6,
-                growth_rate=args.optimizer_growth_rate or float('inf'),
-                fsdp_in_use=args.optimizer_fsdp_in_use or False,
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0.0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                log_every=args.optimizer_log_every if args.optimizer_log_every else 0,
+                d0=args.optimizer_d0 if args.optimizer_d0 else 1e-6,
+                growth_rate=args.optimizer_growth_rate if args.optimizer_growth_rate else float('inf'),
+                fsdp_in_use=args.optimizer_fsdp_in_use if args.optimizer_fsdp_in_use else False,
             )
 
         # DADAPT_ADAM Optimizer
@@ -468,15 +468,15 @@ def create_optimizer(
             optimizer = da.DAdaptAdam(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                eps=args.optimizer_eps or 1e-8,
-                weight_decay=args.optimizer_weight_decay or 0,
-                log_every=args.optimizer_log_every or 0,
-                decouple=args.optimizer_decouple or False,
-                use_bias_correction=args.optimizer_use_bias_correction or False,
-                d0=args.optimizer_d0 or 1e-6,
-                growth_rate=args.optimizer_growth_rate or float('inf'),
-                fsdp_in_use=args.optimizer_fsdp_in_use or False,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                log_every=args.optimizer_log_every if args.optimizer_log_every else 0,
+                decouple=args.optimizer_decouple if args.optimizer_decouple else False,
+                use_bias_correction=args.optimizer_use_bias_correction if args.optimizer_use_bias_correction else False,
+                d0=args.optimizer_d0 if args.optimizer_d0 else 1e-6,
+                growth_rate=args.optimizer_growth_rate if args.optimizer_growth_rate else float('inf'),
+                fsdp_in_use=args.optimizer_fsdp_in_use if args.optimizer_fsdp_in_use else False,
             )
 
         # DADAPT_ADAN Optimizer
@@ -485,13 +485,13 @@ def create_optimizer(
             optimizer = da.DAdaptAdan(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.98, args.optimizer_beta2 or 0.92, args.optimizer_beta3 or 0.99),
-                eps=args.optimizer_eps or 1e-8,
-                weight_decay=args.optimizer_weight_decay or 0.02,
-                no_prox=args.optimizer_no_prox or False,
-                log_every=args.optimizer_log_every or 0,
-                d0=args.optimizer_d0 or 1e-6,
-                growth_rate=args.optimizer_growth_rate or float('inf'),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.98, args.optimizer_beta2 if args.optimizer_beta2 else 0.92, args.optimizer_beta3 if args.optimizer_beta3 else 0.99),
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0.02,
+                no_prox=args.optimizer_no_prox if args.optimizer_no_prox else False,
+                log_every=args.optimizer_log_every if args.optimizer_log_every else 0,
+                d0=args.optimizer_d0 if args.optimizer_d0 else 1e-6,
+                growth_rate=args.optimizer_growth_rate if args.optimizer_growth_rate else float('inf'),
             )
 
         # DADAPT_ADA_GRAD Optimizer
@@ -500,12 +500,12 @@ def create_optimizer(
             optimizer = da.DAdaptAdaGrad(
                 params=parameters,
                 lr=args.learning_rate,
-                momentum=args.optimizer_momentum or 0,
-                log_every=args.optimizer_log_every or 0,
-                weight_decay=args.optimizer_weight_decay or 0.0,
-                eps=args.optimizer_eps or 0.0,
-                d0=args.optimizer_d0 or 1e-6,
-                growth_rate=args.optimizer_growth_rate or float('inf'),
+                momentum=args.optimizer_momentum if args.optimizer_momentum else 0,
+                log_every=args.optimizer_log_every if args.optimizer_log_every else 0,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0.0,
+                eps=args.optimizer_eps if args.optimizer_eps else 0.0,
+                d0=args.optimizer_d0 if args.optimizer_d0 else 1e-6,
+                growth_rate=args.optimizer_growth_rate if args.optimizer_growth_rate else float('inf'),
             )
 
         # DADAPT_LION Optimizer
@@ -514,59 +514,59 @@ def create_optimizer(
             optimizer = da.DAdaptLion(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                weight_decay=args.optimizer_weight_decay or 0.0,
-                log_every=args.optimizer_log_every or 0,
-                d0=args.optimizer_d0 or 1e-6,
-                fsdp_in_use=args.optimizer_fsdp_in_use or False,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0.0,
+                log_every=args.optimizer_log_every if args.optimizer_log_every else 0,
+                d0=args.optimizer_d0 if args.optimizer_d0 else 1e-6,
+                fsdp_in_use=args.optimizer_fsdp_in_use if args.optimizer_fsdp_in_use else False,
             )
-
+            
         # PRODIGY Optimizer
         case Optimizer.PRODIGY:
             import prodigyopt
             optimizer = prodigyopt.Prodigy(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 or 0.9, args.optimizer_beta2 or 0.999),
-                beta3=args.optimizer_beta3 or None,
-                eps=args.optimizer_eps or 1e-8,
-                weight_decay=args.optimizer_weight_decay or 0,
-                decouple=args.optimizer_decouple or True,
-                use_bias_correction=args.optimizer_use_bias_correction or False,
-                safeguard_warmup=args.optimizer_safeguard_warmup or False,
-                d0=args.optimizer_d0 or 1e-6,
-                d_coef=args.optimizer_d_coef or 1.0,
-                growth_rate=args.optimizer_growth_rate or float('inf'),
-                fsdp_in_use=args.optimizer_fsdp_in_use or False,
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 else 0.9, args.optimizer_beta2 if args.optimizer_beta2 else 0.999),
+                beta3=args.optimizer_beta3 if args.optimizer_beta3 else None,
+                eps=args.optimizer_eps if args.optimizer_eps else 1e-8,
+                weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0,
+                decouple=args.optimizer_decouple if args.optimizer_decouple else True,
+                use_bias_correction=args.optimizer_use_bias_correction if args.optimizer_use_bias_correction else False,
+                safeguard_warmup=args.optimizer_safeguard_warmup if args.optimizer_safeguard_warmup else False,
+                d0=args.optimizer_d0 if args.optimizer_d0 else 1e-6,
+                d_coef=args.optimizer_d_coef if args.optimizer_d_coef else 1.0,
+                growth_rate=args.optimizer_growth_rate if args.optimizer_growth_rate else float('inf'),
+                fsdp_in_use=args.optimizer_fsdp_in_use if args.optimizer_fsdp_in_use else False,
             )
-
+    
         # ADAFactor Optimizer
         case Optimizer.ADAFACTOR:
             from transformers.optimization import Adafactor
             if args.optimizer_relative_step:
                 optimizer = Adafactor(
                     params=parameters,
-                    eps=(args.optimizer_eps2 or 1e-3, args.optimizer_eps2 or 1e-3),
-                    clip_threshold=args.optimizer_clip_threshold or 1.0,
-                    decay_rate=args.optimizer_decay_rate or -0.8,
-                    beta1=args.optimizer_beta1 or None,
-                    weight_decay=args.optimizer_weight_decay or 0.0,
-                    scale_parameter=args.optimizer_scale_parameter or True,
-                    relative_step=args.optimizer_relative_step or True,
-                    warmup_init=args.optimizer_warmup_init or False,
+                    eps=(args.optimizer_eps2 if args.optimizer_eps2 else 1e-3, args.optimizer_eps2 if args.optimizer_eps2 else 1e-3),
+                    clip_threshold=args.optimizer_clip_threshold if args.optimizer_clip_threshold else 1.0,
+                    decay_rate=args.optimizer_decay_rate if args.optimizer_decay_rate else -0.8,
+                    beta1=args.optimizer_beta1 if args.optimizer_beta1 else None,
+                    weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0.0,
+                    scale_parameter=args.optimizer_scale_parameter if args.optimizer_scale_parameter else True,
+                    relative_step=args.optimizer_relative_step if args.optimizer_relative_step else True,
+                    warmup_init=args.optimizer_warmup_init if args.optimizer_warmup_init else False,
                 )
             else:
                 optimizer = Adafactor(
                     params=parameters,
                     lr=args.learning_rate,
-                    eps=(args.optimizer_eps2 or 1e-3, args.optimizer_eps2 or 1e-3),
-                    clip_threshold=args.optimizer_clip_threshold or 1.0,
-                    decay_rate=args.optimizer_decay_rate or -0.8,
-                    beta1=args.optimizer_beta1 or None,
-                    weight_decay=args.optimizer_weight_decay or 0.0,
-                    scale_parameter=args.optimizer_scale_parameter or True,
-                    relative_step=args.optimizer_relative_step or True,
-                    warmup_init=args.optimizer_warmup_init or False,
+                    eps=(args.optimizer_eps2 if args.optimizer_eps2 else 1e-3, args.optimizer_eps2 if args.optimizer_eps2 else 1e-3),
+                    clip_threshold=args.optimizer_clip_threshold if args.optimizer_clip_threshold else 1.0,
+                    decay_rate=args.optimizer_decay_rate if args.optimizer_decay_rate else -0.8,
+                    beta1=args.optimizer_beta1 if args.optimizer_beta1 else None,
+                    weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay else 0.0,
+                    scale_parameter=args.optimizer_scale_parameter if args.optimizer_scale_parameter else True,
+                    relative_step=args.optimizer_relative_step if args.optimizer_relative_step else True,
+                    warmup_init=args.optimizer_warmup_init if args.optimizer_warmup_init else False,
                 )
 
     if state_dict is not None:
