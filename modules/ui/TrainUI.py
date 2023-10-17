@@ -18,6 +18,7 @@ from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.util.TrainProgress import TrainProgress
+from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
@@ -472,6 +473,26 @@ class TrainUI(ctk.CTk):
         components.label(scroll_frame, 9, 6, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(scroll_frame, 9, 7, self.ui_state, "max_noising_strength")
+
+        # align prop
+        components.label(scroll_frame, 11, 6, "AlignProp",
+                         tooltip="Enables AlignProp training")
+        components.switch(scroll_frame, 11, 7, self.ui_state, "align_prop")
+
+        # align prop probability
+        components.label(scroll_frame, 12, 6, "AlignProp Probability",
+                         tooltip="When AlignProp is enabled, specifies the number of training steps done using AlignProp calculations")
+        components.entry(scroll_frame, 12, 7, self.ui_state, "align_prop_probability")
+
+        # align prop loss
+        components.label(scroll_frame, 13, 6, "AlignProp Loss",
+                         tooltip="Specifies the loss function used for AlignProp calculations")
+        components.options(scroll_frame, 13, 7, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
+
+        # align prop weight
+        components.label(scroll_frame, 14, 6, "AlignProp Weight",
+                         tooltip="A weight multiplier for the AlignProp loss")
+        components.entry(scroll_frame, 14, 7, self.ui_state, "align_prop_weight")
 
     def sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)

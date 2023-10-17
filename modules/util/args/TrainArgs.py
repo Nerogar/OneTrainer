@@ -4,6 +4,7 @@ from typing import Any
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.args.arg_type_util import nullable_bool
+from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
@@ -87,6 +88,10 @@ class TrainArgs(BaseArgs):
     lora_alpha: float
     lora_weight_dtype: DataType
     attention_mechanism: AttentionMechanism
+    align_prop: bool
+    align_prop_probability: float
+    align_prop_loss: AlignPropLoss
+    align_prop_weight: float
 
     # optimizer settings
     optimizer: Optimizer
@@ -254,6 +259,10 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
         parser.add_argument("--lora-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="lora_weight_dtype", help="The data type to use for training the LoRA", choices=list(DataType))
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
+        parser.add_argument("--align-prop", required=False, action='store_true', dest="align_prop", help="Enable AlignProp loss calculations")
+        parser.add_argument("--align-prop-probability", type=float, required=False, default=0.1, dest="align_prop_probability", help="If AlignProp is active, defines the number of steps that use the AlignProp loss")
+        parser.add_argument("--align-prop-loss", type=AlignPropLoss, required=False, default=AlignPropLoss.AESTHETIC, dest="align_prop_loss", help="The AlignProp loss function", choices=list(AlignPropLoss))
+        parser.add_argument("--align-prop-weight", type=float, required=False, default=0.01, dest="align_prop_weight", help="A weight multiplier for the AlignProp loss")
 
         # optimizer settings
         parser.add_argument("--optimizer-adam-w-mode", type=nullable_bool, default=None, dest="optimizer_adam_w_mode", help='Whether to use weight decay correction for Adam optimizer.')
@@ -397,6 +406,10 @@ class TrainArgs(BaseArgs):
         data.append(("lora_alpha", 1.0, float, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
+        data.append(("align_prop", False, bool, False))
+        data.append(("align_prop_probability", 0.1, float, False))
+        data.append(("align_prop_loss", AlignPropLoss.AESTHETIC, AlignPropLoss, False))
+        data.append(("align_prop_weight", 0.01, float, False))
 
         # optimizer settings
         data.append(("optimizer", Optimizer.ADAMW, Optimizer, False))
