@@ -60,7 +60,7 @@ class MaskSample:
             mask += mask_tensor
             mask = torch.clamp(mask, 0, 1)
         else:
-            mask += alpha * mask_tensor
+            torch.add(mask, mask_tensor, alpha=alpha, out=mask)
             if alpha < 0:
                 mask += alpha
             mask /= 1 + alpha
@@ -76,7 +76,7 @@ class MaskSample:
             mask -= mask_tensor
             mask = torch.clamp(mask, 0, 1)
         else:
-            mask -= alpha * mask_tensor
+            torch.add(mask, mask_tensor, alpha=-alpha, out=mask)
             if alpha > 0:
                 mask -= alpha
             mask /= 1 - alpha
