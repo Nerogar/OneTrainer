@@ -61,9 +61,9 @@ class MaskSample:
             mask = torch.clamp(mask, 0, 1)
         else:
             mask += alpha * mask_tensor
-            mask_max = torch.max(mask)
-            mask_min = torch.min(mask)
-            mask = mask / (mask_max - mask_min) + mask_min
+            if alpha < 0:
+                mask += alpha
+            mask /= 1 + alpha
 
         self.mask_tensor = mask
 
@@ -77,9 +77,9 @@ class MaskSample:
             mask = torch.clamp(mask, 0, 1)
         else:
             mask -= alpha * mask_tensor
-            mask_max = torch.max(mask)
-            mask_min = torch.min(mask)
-            mask = mask / (mask_max - mask_min) + mask_min
+            if alpha > 0:
+                mask -= alpha
+            mask /= 1 - alpha
 
         self.mask_tensor = mask
 
