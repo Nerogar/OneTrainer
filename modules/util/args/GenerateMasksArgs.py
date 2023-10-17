@@ -16,6 +16,7 @@ class GenerateMasksArgs(BaseArgs):
     expand_pixels: int
     device: str
     dtype: DataType
+    alpha: float | None
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(GenerateMasksArgs, self).__init__(data)
@@ -35,6 +36,7 @@ class GenerateMasksArgs(BaseArgs):
         parser.add_argument("--expand-pixels", type=int, default=10, required=False, dest="expand_pixels", help="Amount of expansion of the generated mask in all directions")
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
+        parser.add_argument("--alpha", type=float, required=False, default=None, dest="alpha", help="The ratio to use when doing addition/subtraction. Default is to add/subtract images completely.")
 
         # @formatter:on
 
@@ -55,5 +57,6 @@ class GenerateMasksArgs(BaseArgs):
         data.append(("expand_pixels", 10, int, False))
         data.append(("device", "cuda", str, False))
         data.append(("dtype", DataType.FLOAT_16, DataType, False))
+        data.append(("alpha", None, float, True))
 
         return GenerateMasksArgs(data)

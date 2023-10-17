@@ -51,23 +51,35 @@ class MaskSample:
     def set_mask_tensor(self, mask_tensor: Tensor):
         self.mask_tensor = mask_tensor
 
-    def add_mask_tensor(self, mask_tensor: Tensor):
+    def add_mask_tensor(self, mask_tensor: Tensor, alpha: float | None):
         mask = self.get_mask_tensor()
         if mask is None:
             mask = mask_tensor
-        else:
+            mask = torch.clamp(mask, 0, 1)
+        elif alpha is None:
             mask += mask_tensor
-        mask = torch.clamp(mask, 0, 1)
+            mask = torch.clamp(mask, 0, 1)
+        else:
+            mask += alpha * mask_tensor
+            mask_max = torch.max(mask)
+            mask_min = torch.min(mask)
+            mask = mask / (mask_max - mask_min) + mask_min
 
         self.mask_tensor = mask
 
-    def subtract_mask_tensor(self, mask_tensor: Tensor):
+    def subtract_mask_tensor(self, mask_tensor: Tensor, alpha: float | None):
         mask = self.get_mask_tensor()
         if mask is None:
             mask = mask_tensor
-        else:
+            mask = torch.clamp(mask, 0, 1)
+        elif alpha is None:
             mask -= mask_tensor
-        mask = torch.clamp(mask, 0, 1)
+            mask = torch.clamp(mask, 0, 1)
+        else:
+            mask -= alpha * mask_tensor
+            mask_max = torch.max(mask)
+            mask_min = torch.min(mask)
+            mask = mask / (mask_max - mask_min) + mask_min
 
         self.mask_tensor = mask
 
@@ -95,6 +107,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             filename: str,
             prompts: [str],
             mode: str = 'fill',
+            alpha: float | None = None,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10
@@ -121,6 +134,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             filenames: list[str],
             prompts: list[str],
             mode: str = 'fill',
+            alpha: float | None = None,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10,
@@ -149,7 +163,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             progress_callback(0, len(filenames))
         for i, filename in enumerate(tqdm(filenames)):
             try:
-                self.mask_image(filename, prompts, mode, threshold, smooth_pixels, expand_pixels)
+                self.mask_image(filename, prompts, mode, alpha, threshold, smooth_pixels, expand_pixels)
             except Exception as e:
                 if error_callback is not None:
                     error_callback(filename)
@@ -164,6 +178,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10,
+            alpha: float | None = None,
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
     ):
@@ -190,6 +205,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             filenames=filenames,
             prompts=prompts,
             mode=mode,
+            alpha=alpha,
             threshold=threshold,
             smooth_pixels=smooth_pixels,
             expand_pixels=expand_pixels,

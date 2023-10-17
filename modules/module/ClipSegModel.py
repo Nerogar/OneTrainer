@@ -61,6 +61,7 @@ class ClipSegModel(BaseImageMaskModel):
             filename: str,
             prompts: [str],
             mode: str = 'fill',
+            alpha: float | None = None,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10
@@ -88,8 +89,8 @@ class ClipSegModel(BaseImageMaskModel):
         if mode == 'replace' or mode == 'fill':
             mask_sample.set_mask_tensor(predicted_mask)
         elif mode == 'add':
-            mask_sample.add_mask_tensor(predicted_mask)
+            mask_sample.add_mask_tensor(predicted_mask, alpha=alpha)
         elif mode == 'subtract':
-            mask_sample.subtract_mask_tensor(predicted_mask)
+            mask_sample.subtract_mask_tensor(predicted_mask, alpha=alpha)
 
         mask_sample.save_mask()
