@@ -211,6 +211,7 @@ class BaseStableDiffusionXLSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
             batch: dict,
             data: dict,
             args: TrainArgs,
+            train_progress: TrainProgress,
     ) -> Tensor:
         predicted = data['predicted']
         target = data['target']

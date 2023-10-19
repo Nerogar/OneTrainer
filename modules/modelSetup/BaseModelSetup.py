@@ -35,6 +35,7 @@ class BaseModelSetup(metaclass=ABCMeta):
         range_min = -1
         range_max = 1
         image_tensor = (image_tensor - range_min) / (range_max - range_min)
+        image_tensor = image_tensor.clamp(0.0, 1.0)
 
         image = t(image_tensor.squeeze())
         image.save(path)
@@ -102,6 +103,7 @@ class BaseModelSetup(metaclass=ABCMeta):
             batch: dict,
             data: dict,
             args: TrainArgs,
+            train_progress: TrainProgress,
     ) -> Tensor:
         pass
 

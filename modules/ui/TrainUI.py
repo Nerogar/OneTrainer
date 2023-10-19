@@ -487,12 +487,28 @@ class TrainUI(ctk.CTk):
         # align prop loss
         components.label(scroll_frame, 13, 6, "AlignProp Loss",
                          tooltip="Specifies the loss function used for AlignProp calculations")
-        components.options(scroll_frame, 13, 7, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
+        #components.options(scroll_frame, 13, 7, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
+        components.options(scroll_frame, 13, 7, [str(AlignPropLoss.AESTHETIC)], self.ui_state, "align_prop_loss")
 
         # align prop weight
         components.label(scroll_frame, 14, 6, "AlignProp Weight",
                          tooltip="A weight multiplier for the AlignProp loss")
         components.entry(scroll_frame, 14, 7, self.ui_state, "align_prop_weight")
+
+        # align prop steps
+        components.label(scroll_frame, 15, 6, "AlignProp Steps",
+                         tooltip="Number of inference steps for each AlignProp step")
+        components.entry(scroll_frame, 15, 7, self.ui_state, "align_prop_steps")
+
+        # align prop truncate steps
+        components.label(scroll_frame, 16, 6, "AlignProp Truncate Steps",
+                         tooltip="Fraction of steps to randomly truncate when using AlignProp. This is needed to increase model diversity.")
+        components.entry(scroll_frame, 16, 7, self.ui_state, "align_prop_truncate_steps")
+
+        # align prop truncate steps
+        components.label(scroll_frame, 17, 6, "AlignProp CFG Scale",
+                         tooltip="CFG Scale for inference steps of AlignProp calculations")
+        components.entry(scroll_frame, 17, 7, self.ui_state, "align_prop_cfg_scale")
 
     def sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)

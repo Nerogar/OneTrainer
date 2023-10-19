@@ -92,6 +92,9 @@ class TrainArgs(BaseArgs):
     align_prop_probability: float
     align_prop_loss: AlignPropLoss
     align_prop_weight: float
+    align_prop_steps: int
+    align_prop_truncate_steps: float
+    align_prop_cfg_scale: float
 
     # optimizer settings
     optimizer: Optimizer
@@ -263,6 +266,9 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--align-prop-probability", type=float, required=False, default=0.1, dest="align_prop_probability", help="If AlignProp is active, defines the number of steps that use the AlignProp loss")
         parser.add_argument("--align-prop-loss", type=AlignPropLoss, required=False, default=AlignPropLoss.AESTHETIC, dest="align_prop_loss", help="The AlignProp loss function", choices=list(AlignPropLoss))
         parser.add_argument("--align-prop-weight", type=float, required=False, default=0.01, dest="align_prop_weight", help="A weight multiplier for the AlignProp loss")
+        parser.add_argument("--align-prop-steps", type=int, required=False, default=20, dest="align_prop_steps", help="Number of inference steps for each AlignProp step")
+        parser.add_argument("--align-prop-truncate-steps", type=float, required=False, default=0.5, dest="align_prop_truncate_steps", help="Fraction of steps to randomly truncate when using AlignProp")
+        parser.add_argument("--align-prop-cfg-scale", type=float, required=False, default=7.0, dest="align_prop_cfg_scale", help="CFG Scale for inference steps of AlignProp calculations")
 
         # optimizer settings
         parser.add_argument("--optimizer-adam-w-mode", type=nullable_bool, default=None, dest="optimizer_adam_w_mode", help='Whether to use weight decay correction for Adam optimizer.')
@@ -410,6 +416,9 @@ class TrainArgs(BaseArgs):
         data.append(("align_prop_probability", 0.1, float, False))
         data.append(("align_prop_loss", AlignPropLoss.AESTHETIC, AlignPropLoss, False))
         data.append(("align_prop_weight", 0.01, float, False))
+        data.append(("align_prop_steps", 20, int, False))
+        data.append(("align_prop_truncate_steps", 0.5, float, False))
+        data.append(("align_prop_cfg_scale", 7.0, float, False))
 
         # optimizer settings
         data.append(("optimizer", Optimizer.ADAMW, Optimizer, False))

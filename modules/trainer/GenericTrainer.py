@@ -502,7 +502,7 @@ class GenericTrainer(BaseTrainer):
                 with forward_context:
                     model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
-                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
+                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args, train_progress)
 
                 loss = loss / self.args.gradient_accumulation_steps
                 if scaler:

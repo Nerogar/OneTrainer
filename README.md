@@ -25,6 +25,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
   training using ClipSeg or Rembg.
 - **Model Tooling**: Convert between different model formats from a simple UI.
 - **Sampling UI**: Sample the model during training without switching to a different application.
+- **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper
+  [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)
 
 A more detailed list can be found [here](docs/ThingsToAdd.md).
 

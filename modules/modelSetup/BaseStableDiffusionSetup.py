@@ -66,11 +66,6 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
             args: TrainArgs,
             train_progress: TrainProgress
     ) -> dict:
-        # alignProp args
-        num_timesteps = 20
-        truncate_timesteps = 0.3
-        cfg_scale = 7.0
-
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
         rand = Random(train_progress.global_step)
@@ -99,6 +94,9 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
         latent_noise = self.create_noise(scaled_latent_image, args, generator)
 
         if is_align_prop_step:
+            dummy = torch.zeros((1,), device=self.train_device)
+            dummy.requires_grad_(True)
+
             negative_tokenizer_output = model.tokenizer(
                 "",
                 padding='max_length',
@@ -115,27 +113,18 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 negative_text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
             ).expand((scaled_latent_image.shape[0], -1, -1))
 
-            model.noise_scheduler.set_timesteps(num_timesteps)
+            model.noise_scheduler.set_timesteps(args.align_prop_steps)
 
-            timestep_high = int(num_timesteps * args.max_noising_strength)
-            timestep_low = int(num_timesteps * args.max_noising_strength * (1.0 - truncate_timesteps))
+            scaled_noisy_latent_image = latent_noise
 
-            timestep_index = torch.randint(
-                low=timestep_low,
-                high=timestep_high,
-                size=(1,),
-                generator=generator,
-                device=scaled_latent_image.device,
-            ).long().cpu().item()
+            timestep_high = int(args.align_prop_steps * args.max_noising_strength)
+            timestep_low = \
+                int(args.align_prop_steps * args.max_noising_strength * (1.0 - args.align_prop_truncate_steps))
 
-            timestep = model.noise_scheduler.timesteps[-timestep_index - 1].expand((scaled_latent_image.shape[0],))
+            truncate_timestep_index = args.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-            scaled_noisy_latent_image = model.noise_scheduler.add_noise(
-                original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
-            )
-
-            for step in range(timestep_index, -1, -1):
-                timestep = model.noise_scheduler.timesteps[-step - 1] \
+            for step in range(args.align_prop_steps):
+                timestep = model.noise_scheduler.timesteps[step] \
                     .expand((scaled_latent_image.shape[0],)) \
                     .to(device=model.unet.device)
 
@@ -153,6 +142,7 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                         timestep,
                         text_encoder_output,
                         batch['latent_depth'],
+                        dummy,
                         use_reentrant=False
                     ).sample
 
@@ -162,6 +152,7 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                         timestep,
                         negative_text_encoder_output,
                         batch['latent_depth'],
+                        dummy,
                         use_reentrant=False
                     ).sample
                 else:
@@ -170,6 +161,7 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                         latent_input,
                         timestep,
                         text_encoder_output,
+                        dummy,
                         use_reentrant=False
                     ).sample
 
@@ -178,15 +170,19 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                         latent_input,
                         timestep,
                         negative_text_encoder_output,
+                        dummy,
                         use_reentrant=False
                     ).sample
 
                 cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
-                cfg_predicted_latent_noise = negative_predicted_latent_noise + cfg_scale * cfg_grad
+                cfg_predicted_latent_noise = negative_predicted_latent_noise + args.align_prop_cfg_scale * cfg_grad
 
                 scaled_noisy_latent_image = model.noise_scheduler \
                     .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
                     .prev_sample
+
+                if step < truncate_timestep_index:
+                    scaled_noisy_latent_image = scaled_noisy_latent_image.detach()
 
                 if self.debug_mode:
                     with torch.no_grad():
@@ -366,10 +362,18 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
             batch: dict,
             data: dict,
             args: TrainArgs,
+            train_progress: TrainProgress,
     ) -> Tensor:
         loss_type = data['loss_type']
         if loss_type == 'align_prop':
             predicted = data['predicted']
+
+            self.save_image(
+                predicted,
+                args.debug_dir + "/training_batches",
+                "6-loss",
+                train_progress.global_step
+            )
 
             if self.aesthetic_score_model is None:
                 self.aesthetic_score_model = AestheticScoreModel()

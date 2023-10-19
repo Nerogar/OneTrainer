@@ -217,6 +217,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
             batch: dict,
             data: dict,
             args: TrainArgs,
+            train_progress: TrainProgress,
     ) -> Tensor:
         if self.kandinsky_loss is None:
             self.kandinsky_loss = KandinskyLoss(model.noise_scheduler)
