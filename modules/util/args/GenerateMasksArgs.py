@@ -26,7 +26,7 @@ class GenerateMasksArgs(BaseArgs):
 
         # @formatter:off
 
-        parser.add_argument("--model", type=GenerateMasksModel, required=True, dest="model", help="The model to use when generating masks")
+        parser.add_argument("--model", type=GenerateMasksModel, required=True, dest="model", help="The model to use when generating masks", choices=list(GenerateMasksModel))
         parser.add_argument("--sample-dir", type=str, required=True, dest="sample_dir", help="Directory where samples are located")
         parser.add_argument("--add-prompt", type=str, required=True, action="append", dest="prompts", help="A prompt used to create a mask")
         parser.add_argument("--mode", type=str, default='fill', required=False, dest="mode", help="Either replace, fill, add or subtract")
