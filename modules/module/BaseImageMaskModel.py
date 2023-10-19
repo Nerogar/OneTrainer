@@ -123,6 +123,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 - fill: creates new masks for all samples without a mask
                 - add: adds the new region to existing masks
                 - subtract: subtracts the new region from existing masks
+            alpha (`float | None`): the blending factor to use for modes add and subtract
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
@@ -152,6 +153,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 - fill: creates new masks for all samples without a mask
                 - add: adds the new region to existing masks
                 - subtract: subtracts the new region from existing masks
+            alpha (`float | None`): the blending factor to use for modes add and subtract
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
@@ -193,6 +195,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 - fill: creates new masks for all samples without a mask
                 - add: adds the new region to existing masks
                 - subtract: subtracts the new region from existing masks
+            alpha (`float | None`): the blending factor to use for modes add and subtract
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
