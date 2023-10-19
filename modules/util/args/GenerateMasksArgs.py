@@ -36,7 +36,7 @@ class GenerateMasksArgs(BaseArgs):
         parser.add_argument("--expand-pixels", type=int, default=10, required=False, dest="expand_pixels", help="Amount of expansion of the generated mask in all directions")
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
-        parser.add_argument("--alpha", type=float, required=False, default=None, dest="alpha", help="The ratio to use when doing addition/subtraction. Default is to add/subtract images completely.")
+        parser.add_argument("--alpha", type=float, required=False, default=None, dest="alpha", help="The blending ratio to use (old:new::1:alpha) when doing addition/subtraction. Default is to add/subtract images completely.")
 
         # @formatter:on
 
