@@ -23,7 +23,7 @@ class GenerateCaptionsArgs(BaseArgs):
 
         # @formatter:off
 
-        parser.add_argument("--model", type=GenerateCaptionsModel, required=True, dest="model", help="The model to use when generating captions")
+        parser.add_argument("--model", type=GenerateCaptionsModel, required=True, dest="model", help="The model to use when generating captions", choices=list(GenerateCaptionsModel))
         parser.add_argument("--sample-dir", type=str, required=True, dest="sample_dir", help="Directory where samples are located")
         parser.add_argument("--initial-caption", type=str, default='', required=False, dest="initial_caption", help="An initial caption to start generating from")
         parser.add_argument("--mode", type=str, default='fill', required=False, dest="mode", help="Either replace, fill, add or subtract")
