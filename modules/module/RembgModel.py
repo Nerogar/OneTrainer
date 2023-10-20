@@ -100,7 +100,7 @@ class RembgModel(BaseImageMaskModel):
             filename: str,
             prompts: [str],
             mode: str = 'fill',
-            alpha: float | None = None,
+            alpha: float = 1.0,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10
@@ -141,12 +141,6 @@ class RembgModel(BaseImageMaskModel):
         output = torch.from_numpy(mask).to(self.device)
 
         predicted_mask = self.__process_mask(output, mask_sample.height, mask_sample.width, threshold)
-
-        if mode == 'replace' or mode == 'fill':
-            mask_sample.set_mask_tensor(predicted_mask)
-        elif mode == 'add':
-            mask_sample.add_mask_tensor(predicted_mask, alpha=alpha)
-        elif mode == 'subtract':
-            mask_sample.subtract_mask_tensor(predicted_mask, alpha=alpha)
+        mask_sample.apply_mask(mode, predicted_mask, alpha)
 
         mask_sample.save_mask()

@@ -51,37 +51,50 @@ class MaskSample:
     def set_mask_tensor(self, mask_tensor: Tensor):
         self.mask_tensor = mask_tensor
 
-    def add_mask_tensor(self, mask_tensor: Tensor, alpha: float | None):
+    def add_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         mask = self.get_mask_tensor()
         if mask is None:
             mask = mask_tensor
-            mask = torch.clamp(mask, 0, 1)
-        elif alpha is None:
-            mask += mask_tensor
-            mask = torch.clamp(mask, 0, 1)
         else:
             torch.add(mask, mask_tensor, alpha=alpha, out=mask)
-            if alpha < 0:
-                mask += alpha
+
+        torch.clamp(mask, 0, 1, out=mask)
+
+        self.mask_tensor = mask
+
+    def subtract_mask_tensor(self, mask_tensor: Tensor, alpha: float):
+        mask = self.get_mask_tensor()
+        if mask is None:
+            mask = mask_tensor
+        else:
+            torch.subtract(mask, mask_tensor, alpha=alpha, out=mask)
+
+        torch.clamp(mask, 0, 1, out=mask)
+
+        self.mask_tensor = mask
+    
+    def blend_mask_tensor(self, mask_tensor: Tensor, alpha: float):
+        mask = self.get_mask_tensor()
+        if mask is None:
+            mask = mask_tensor
+        else:
+            if alpha < 0.0:
+                mask -= alpha
             mask /= 1 + alpha
 
         self.mask_tensor = mask
-
-    def subtract_mask_tensor(self, mask_tensor: Tensor, alpha: float | None):
-        mask = self.get_mask_tensor()
-        if mask is None:
-            mask = mask_tensor
-            mask = torch.clamp(mask, 0, 1)
-        elif alpha is None:
-            mask -= mask_tensor
-            mask = torch.clamp(mask, 0, 1)
+    
+    def apply_mask(self, mode: str, mask_tensor: Tensor, alpha: float):
+        if mode in {'replace', 'fill'}:
+            self.set_mask_tensor(mask_tensor)
+        elif mode == 'add':
+            self.add_mask_tensor(mask_tensor, alpha)
+        elif mode == 'subtract':
+            self.subtract_mask_tensor(mask_tensor, alpha)
+        elif mode == 'blend':
+            self.blend_mask_tensor(mask_tensor, alpha)
         else:
-            torch.add(mask, mask_tensor, alpha=-alpha, out=mask)
-            if alpha > 0:
-                mask -= alpha
-            mask /= 1 - alpha
-
-        self.mask_tensor = mask
+            raise ValueError("invalid mode")
 
     def save_mask(self):
         if self.mask_tensor is not None:
@@ -107,7 +120,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             filename: str,
             prompts: [str],
             mode: str = 'fill',
-            alpha: float | None = None,
+            alpha: float = 1.0,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10
@@ -123,7 +136,8 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 - fill: creates new masks for all samples without a mask
                 - add: adds the new region to existing masks
                 - subtract: subtracts the new region from existing masks
-            alpha (`float | None`): the blending factor to use for modes add and subtract
+                - blend: blends the new mask with the old one
+            alpha (`float`): the blending factor to use for modes add, subtract and blend
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
@@ -135,7 +149,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             filenames: list[str],
             prompts: list[str],
             mode: str = 'fill',
-            alpha: float | None = None,
+            alpha: float = 1.0,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10,
@@ -153,7 +167,8 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 - fill: creates new masks for all samples without a mask
                 - add: adds the new region to existing masks
                 - subtract: subtracts the new region from existing masks
-            alpha (`float | None`): the blending factor to use for modes add and subtract
+                - blend: blends the new mask with the old one
+            alpha (`float`): the blending factor to use for modes add, subtract and blend
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
@@ -180,7 +195,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10,
-            alpha: float | None = None,
+            alpha: float = 1.0,
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
     ):
@@ -195,7 +210,8 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 - fill: creates new masks for all samples without a mask
                 - add: adds the new region to existing masks
                 - subtract: subtracts the new region from existing masks
-            alpha (`float | None`): the blending factor to use for modes add and subtract
+                - blend: blends the new mask with the old one
+            alpha (`float`): the blending factor to use for modes add, subtract and blend
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
