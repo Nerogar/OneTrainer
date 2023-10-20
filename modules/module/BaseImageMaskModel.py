@@ -48,8 +48,8 @@ class MaskSample:
 
         return self.mask_tensor
 
-    def set_mask_tensor(self, mask_tensor: Tensor):
-        self.mask_tensor = mask_tensor
+    def set_mask_tensor(self, mask_tensor: Tensor, alpha: float):
+        self.mask_tensor = alpha * mask_tensor
 
     def add_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         mask = self.get_mask_tensor()
@@ -87,7 +87,7 @@ class MaskSample:
     
     def apply_mask(self, mode: str, mask_tensor: Tensor, alpha: float):
         if mode in {'replace', 'fill'}:
-            self.set_mask_tensor(mask_tensor)
+            self.set_mask_tensor(mask_tensor, alpha)
         elif mode == 'add':
             self.add_mask_tensor(mask_tensor, alpha)
         elif mode == 'subtract':
