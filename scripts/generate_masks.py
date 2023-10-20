@@ -29,6 +29,7 @@ def main():
         threshold=args.threshold,
         smooth_pixels=args.smooth_pixels,
         expand_pixels=args.expand_pixels,
+        alpha=args.alpha,
         error_callback=lambda filename: print("Error while processing image " + filename)
     )
 

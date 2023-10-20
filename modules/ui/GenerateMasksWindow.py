@@ -12,14 +12,14 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate masks")
-        self.geometry("320x340")
+        self.geometry("320x380")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
 
         self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing"]
+        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing", "Blend with existing"]
         self.model_var = ctk.StringVar(self, "ClipSeg")
         self.models = ["ClipSeg", "Rembg", "Hex Color"]
 
@@ -67,13 +67,19 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.expand_entry.insert(0, 10)
         self.expand_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
 
+        self.alpha_label = ctk.CTkLabel(self.frame, text="Factor", width=100)
+        self.alpha_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
+        self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="1")
+        self.alpha_entry.insert(0, 1)
+        self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
+
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=7, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
         self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
-        self.create_masks_button.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_masks_button.grid(row=9, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
 
@@ -100,13 +106,15 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             "Replace all masks": "replace",
             "Create if absent": "fill",
             "Add to existing": "add",
-            "Subtract from existing": "subtract"
+            "Subtract from existing": "subtract",
+            "Blend with existing": "blend",
         }[self.mode_var.get()]
 
         self.parent.masking_model.mask_folder(
             sample_dir=self.path_entry.get(),
             prompts=[self.prompt_entry.get()],
             mode=mode,
+            alpha=float(self.alpha_entry.get()),
             threshold=float(self.threshold_entry.get()),
             smooth_pixels=int(self.smooth_entry.get()),
             expand_pixels=int(self.expand_entry.get()),
