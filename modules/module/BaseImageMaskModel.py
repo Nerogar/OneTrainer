@@ -54,7 +54,7 @@ class MaskSample:
     def add_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         mask = self.get_mask_tensor()
         if mask is None:
-            mask = mask_tensor
+            mask = alpha * mask_tensor
         else:
             torch.add(mask, mask_tensor, alpha=alpha, out=mask)
 
@@ -65,7 +65,7 @@ class MaskSample:
     def subtract_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         mask = self.get_mask_tensor()
         if mask is None:
-            mask = mask_tensor
+            mask = alpha * mask_tensor
         else:
             torch.subtract(mask, mask_tensor, alpha=alpha, out=mask)
 
@@ -76,8 +76,9 @@ class MaskSample:
     def blend_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         mask = self.get_mask_tensor()
         if mask is None:
-            mask = mask_tensor
+            mask = alpha * mask_tensor
         else:
+            torch.add(mask, mask_tensor, alpha=alpha, out=mask)
             if alpha < 0.0:
                 mask -= alpha
             mask /= 1 + alpha
