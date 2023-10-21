@@ -547,7 +547,7 @@ def create_optimizer(
             optimizer = Adafactor(
                 params=parameters,
                 lr= None if args.optimizer_relative_step == True else args.learning_rate,
-                eps=(args.optimizer_eps2 if args.optimizer_eps2 is not None else 1e-3, args.optimizer_eps2 if args.optimizer_eps2 is not None else 1e-3),
+                eps=(args.optimizer_eps if args.optimizer_eps is not None else 1e-30, args.optimizer_eps2 if args.optimizer_eps2 is not None else 1e-3),
                 clip_threshold=args.optimizer_clip_threshold if args.optimizer_clip_threshold is not None else 1.0,
                 decay_rate=args.optimizer_decay_rate if args.optimizer_decay_rate is not None else -0.8,
                 beta1=args.optimizer_beta1 if args.optimizer_beta1 is not None else None,
