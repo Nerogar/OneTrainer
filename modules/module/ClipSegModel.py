@@ -61,6 +61,7 @@ class ClipSegModel(BaseImageMaskModel):
             filename: str,
             prompts: [str],
             mode: str = 'fill',
+            alpha: float = 1.0,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10
@@ -84,12 +85,6 @@ class ClipSegModel(BaseImageMaskModel):
         with torch.no_grad():
             outputs = self.model(**inputs)
         predicted_mask = self.__process_mask(outputs.logits, mask_sample.height, mask_sample.width, threshold)
-
-        if mode == 'replace' or mode == 'fill':
-            mask_sample.set_mask_tensor(predicted_mask)
-        elif mode == 'add':
-            mask_sample.add_mask_tensor(predicted_mask)
-        elif mode == 'subtract':
-            mask_sample.subtract_mask_tensor(predicted_mask)
+        mask_sample.apply_mask(mode, predicted_mask, alpha)
 
         mask_sample.save_mask()
