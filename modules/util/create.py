@@ -638,7 +638,10 @@ def create_lr_scheduler(
             )
         case LearningRateScheduler.ADAFACTOR:
             from transformers.optimization import AdafactorSchedule
-            return AdafactorSchedule(optimizer)
+            return AdafactorSchedule(
+                optimizer,
+                initial_lr=optimizer.state_dict()['param_groups'][0]['lr'],
+            )
         case _:
             lr_lambda = lr_lambda_constant()
 
