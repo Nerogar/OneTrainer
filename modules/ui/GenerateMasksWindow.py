@@ -67,7 +67,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.expand_entry.insert(0, 10)
         self.expand_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
 
-        self.alpha_label = ctk.CTkLabel(self.frame, text="Factor", width=100)
+        self.alpha_label = ctk.CTkLabel(self.frame, text="Alpha", width=100)
         self.alpha_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
         self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="1")
         self.alpha_entry.insert(0, 1)
