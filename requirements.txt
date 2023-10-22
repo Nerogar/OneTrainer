@@ -24,6 +24,7 @@ invisible-watermark==0.2.0 # needed for the SDXL pipeline
 # other models
 onnxruntime==1.15.1
 pooch==1.7.0
+open-clip-torch==2.22.0
 
 # data loader
 git+https://github.com/Nerogar/mgds.git@848436a#egg=mgds

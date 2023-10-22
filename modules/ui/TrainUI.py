@@ -487,8 +487,7 @@ class TrainUI(ctk.CTk):
         # align prop loss
         components.label(scroll_frame, 13, 6, "AlignProp Loss",
                          tooltip="Specifies the loss function used for AlignProp calculations")
-        #components.options(scroll_frame, 13, 7, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
-        components.options(scroll_frame, 13, 7, [str(AlignPropLoss.AESTHETIC)], self.ui_state, "align_prop_loss")
+        components.options(scroll_frame, 13, 7, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
 
         # align prop weight
         components.label(scroll_frame, 14, 6, "AlignProp Weight",

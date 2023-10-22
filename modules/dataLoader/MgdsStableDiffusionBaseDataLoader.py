@@ -242,7 +242,7 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
 
     def _output_modules(self, args: TrainArgs, model: StableDiffusionModel):
-        output_names = ['latent_image', 'tokens', 'image_path']
+        output_names = ['latent_image', 'tokens', 'image_path', 'prompt']
 
         if args.masked_training or args.model_type.has_mask_input():
             output_names.append('latent_mask')

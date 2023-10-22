@@ -28,8 +28,6 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 - **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper
   [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)
 
-A more detailed list can be found [here](docs/ThingsToAdd.md).
-
 ## Installation
 
 Installing OneTrainer requires Python 3.10. You can download Python here https://www.python.org/downloads/windows/.

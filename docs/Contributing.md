@@ -20,6 +20,3 @@ avoid situations where multiple people work on the same change. It also helps in
 general project structure and vision. Please also take a look at
 the [project structure documentation](ProjectStructure.md).
 For smaller changes or fixes, this is not needed.
-
-If you need some ideas on what to add, [here](ThingsToAdd.md) is a regularly updated list on features that would be
-nice, but aren't implemented yet.

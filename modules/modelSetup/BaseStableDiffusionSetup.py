@@ -12,9 +12,11 @@ from modules.modelSetup.BaseDiffusionModelSetup import BaseDiffusionModelSetup
 from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers
 from modules.module.AestheticScoreModel import AestheticScoreModel
+from modules.module.HPSv2ScoreModel import HPSv2ScoreModel
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 
 
@@ -22,7 +24,7 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
         super(BaseStableDiffusionSetup, self).__init__(train_device, temp_device, debug_mode)
-        self.aesthetic_score_model = None
+        self.align_prop_loss_fn = None
 
     def setup_optimizations(
             self,
@@ -366,6 +368,17 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
     ) -> Tensor:
         loss_type = data['loss_type']
         if loss_type == 'align_prop':
+            if self.align_prop_loss_fn is None:
+                match args.align_prop_loss:
+                    case AlignPropLoss.HPS:
+                        self.align_prop_loss_fn = HPSv2ScoreModel()
+                    case AlignPropLoss.AESTHETIC:
+                        self.align_prop_loss_fn = AestheticScoreModel()
+
+                self.align_prop_loss_fn.to(device=self.train_device)
+                self.align_prop_loss_fn.requires_grad_(False)
+                self.align_prop_loss_fn.eval()
+
             predicted = data['predicted']
 
             self.save_image(
@@ -375,12 +388,13 @@ class BaseStableDiffusionSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 train_progress.global_step
             )
 
-            if self.aesthetic_score_model is None:
-                self.aesthetic_score_model = AestheticScoreModel()
-                self.aesthetic_score_model.to(device=self.train_device)
-                self.aesthetic_score_model.requires_grad_(False)
+            match args.align_prop_loss:
+                case AlignPropLoss.HPS:
+                    losses = self.align_prop_loss_fn(predicted, batch['prompt'], self.train_device)
+                case AlignPropLoss.AESTHETIC:
+                    losses = self.align_prop_loss_fn(predicted)
 
-            losses = self.aesthetic_score_model(predicted) * args.align_prop_weight
+            losses = losses * args.align_prop_weight
         else:
             predicted = data['predicted']
             target = data['target']
