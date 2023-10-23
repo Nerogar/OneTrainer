@@ -155,9 +155,11 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             model: StableDiffusionXLModel,
             args: TrainArgs,
     ):
+        vae_on_train_device = args.align_prop_loss
+
         model.text_encoder_1.to(self.train_device)
         model.text_encoder_2.to(self.train_device)
-        model.vae.to(self.temp_device)
+        model.vae.to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet.to(self.train_device)
 
         if model.text_encoder_1_lora is not None and args.train_text_encoder:

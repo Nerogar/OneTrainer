@@ -3,13 +3,20 @@ from abc import ABCMeta
 import torch
 from torch import Tensor, Generator
 
-from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class BaseDiffusionModelSetup(BaseModelSetup, metaclass=ABCMeta):
+class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
 
-    def create_noise(self, source_tensor: Tensor, args: TrainArgs, generator: Generator):
+    def __init__(self):
+        super(ModelSetupDiffusionNoiseMixin, self).__init__()
+
+    def _create_noise(
+            self,
+            source_tensor: Tensor,
+            args: TrainArgs,
+            generator: Generator
+    ):
         noise = torch.randn(
             source_tensor.shape,
             generator=generator,

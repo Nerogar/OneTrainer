@@ -7,15 +7,24 @@ from diffusers.utils import is_xformers_available
 from torch import Tensor
 
 from modules.model.KandinskyModel import KandinskyModel
-from modules.modelSetup.BaseDiffusionModelSetup import BaseDiffusionModelSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.kandinsky.kandinsky import KandinskyLoss
+from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
+from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
+from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 
 
-class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
+class BaseKandinskySetup(
+    BaseModelSetup,
+    ModelSetupDiffusionLossMixin,
+    ModelSetupDebugMixin,
+    ModelSetupDiffusionNoiseMixin,
+    metaclass=ABCMeta,
+):
 
     def __init__(
             self,
@@ -82,7 +91,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
 
-        latent_noise = self.create_noise(scaled_latent_image, args, generator)
+        latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
         timestep = torch.randint(
             low=0,
@@ -139,7 +148,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 # noise
                 noise = model.movq.decode(latent_noise / movq_scaling_factor).sample
                 noise = noise.clamp(-1, 1)
-                self.save_image(
+                self._save_image(
                     noise,
                     args.debug_dir + "/training_batches",
                     "1-noise",
@@ -149,7 +158,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 # predicted noise
                 predicted_noise = model.movq.decode(predicted_latent_noise / movq_scaling_factor).sample
                 predicted_noise = predicted_noise.clamp(-1, 1)
-                self.save_image(
+                self._save_image(
                     predicted_noise,
                     args.debug_dir + "/training_batches",
                     "2-predicted_noise",
@@ -160,7 +169,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 noisy_latent_image = scaled_noisy_latent_image / movq_scaling_factor
                 noisy_image = model.movq.decode(noisy_latent_image).sample
                 noisy_image = noisy_image.clamp(-1, 1)
-                self.save_image(
+                self._save_image(
                     noisy_image,
                     args.debug_dir + "/training_batches",
                     "3-noisy_image",
@@ -177,11 +186,11 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
 
                 scaled_predicted_latent_image = \
                     (
-                                scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
+                            scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
                 predicted_latent_image = scaled_predicted_latent_image / movq_scaling_factor
                 predicted_image = model.movq.decode(predicted_latent_image).sample
                 predicted_image = predicted_image.clamp(-1, 1)
-                self.save_image(
+                self._save_image(
                     predicted_image,
                     args.debug_dir + "/training_batches",
                     "4-predicted_image",
@@ -191,7 +200,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 # image
                 image = model.movq.decode(latent_image).sample
                 image = image.clamp(-1, 1)
-                self.save_image(
+                self._save_image(
                     image,
                     args.debug_dir + "/training_batches",
                     "5-image",
@@ -202,7 +211,7 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
                 if args.model_type.has_conditioning_image_input():
                     conditioning_image = model.movq.decode(latent_conditioning_image).sample
                     conditioning_image = conditioning_image.clamp(-1, 1)
-                    self.save_image(
+                    self._save_image(
                         conditioning_image,
                         args.debug_dir + "/training_batches",
                         "6-conditioning_image",
@@ -217,7 +226,6 @@ class BaseKandinskySetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
             batch: dict,
             data: dict,
             args: TrainArgs,
-            train_progress: TrainProgress,
     ) -> Tensor:
         if self.kandinsky_loss is None:
             self.kandinsky_loss = KandinskyLoss(model.noise_scheduler)

@@ -116,11 +116,9 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             model: StableDiffusionModel,
             args: TrainArgs,
     ):
-        enable_multi_timestep_training = True
-        vae_on_train_device = self.debug_mode or enable_multi_timestep_training
+        vae_on_train_device = self.debug_mode or args.align_prop_loss
 
         model.text_encoder.to(self.train_device)
-
         model.vae.to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet.to(self.train_device)
         if model.depth_estimator is not None:

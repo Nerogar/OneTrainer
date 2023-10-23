@@ -231,7 +231,7 @@ class MgdsStablDiffusionXLBaseDataLoader(MgdsBaseDataLoader):
         output_names = [
             'image_path', 'latent_image',
             'tokens_1', 'tokens_2',
-            'original_resolution', 'crop_resolution', 'crop_offset',
+            'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
