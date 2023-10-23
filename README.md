@@ -77,6 +77,7 @@ All functionality is split into different scrips located in the `scripts` direct
 - `create_train_files.py` A utility to create files needed when training only from the CLI
 - `generate_captions.py` A utility to automatically create captions for your dataset
 - `generate_masks.py` A utility to automatically create masks for your dataset
+- `train_from_config.py` A utility to start training from a config json file
 
 To learn more about the different parameters, execute `<scipt-name> -h`. For example `python scripts\train.py -h`
 
