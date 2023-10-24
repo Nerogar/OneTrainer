@@ -117,6 +117,6 @@ class MaskByColor(BaseImageMaskModel):
         output = similarity.to(dtype=torch.float32)
 
         predicted_mask = self.__process_mask(output, mask_sample.height, mask_sample.width, threshold)
-        mask_sample.apply_mask(mode, predicted_mask, alpha)
+        mask_sample.apply_mask(mode, predicted_mask, alpha, True)
 
         mask_sample.save_mask()

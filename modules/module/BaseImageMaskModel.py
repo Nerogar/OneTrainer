@@ -51,8 +51,12 @@ class MaskSample:
     def set_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         self.mask_tensor = alpha * mask_tensor
 
-    def add_mask_tensor(self, mask_tensor: Tensor, alpha: float):
+    def add_mask_tensor(self, mask_tensor: Tensor, alpha: float, inverted: bool):
         mask = self.get_mask_tensor()
+
+        if inverted:
+            mask_tensor = 1.0 - mask_tensor
+
         if mask is None:
             mask = alpha * mask_tensor
         else:
@@ -62,8 +66,12 @@ class MaskSample:
 
         self.mask_tensor = mask
 
-    def subtract_mask_tensor(self, mask_tensor: Tensor, alpha: float):
+    def subtract_mask_tensor(self, mask_tensor: Tensor, alpha: float, inverted: bool):
         mask = self.get_mask_tensor()
+
+        if inverted:
+            mask_tensor = 1.0 - mask_tensor
+
         if mask is None:
             mask = alpha * mask_tensor
         else:
@@ -72,7 +80,7 @@ class MaskSample:
         torch.clamp(mask, 0, 1, out=mask)
 
         self.mask_tensor = mask
-    
+
     def blend_mask_tensor(self, mask_tensor: Tensor, alpha: float):
         mask = self.get_mask_tensor()
         if mask is None:
@@ -84,14 +92,14 @@ class MaskSample:
             mask /= 1 + alpha
 
         self.mask_tensor = mask
-    
-    def apply_mask(self, mode: str, mask_tensor: Tensor, alpha: float):
+
+    def apply_mask(self, mode: str, mask_tensor: Tensor, alpha: float, inverted: bool):
         if mode in {'replace', 'fill'}:
             self.set_mask_tensor(mask_tensor, alpha)
         elif mode == 'add':
-            self.add_mask_tensor(mask_tensor, alpha)
+            self.add_mask_tensor(mask_tensor, alpha, inverted)
         elif mode == 'subtract':
-            self.subtract_mask_tensor(mask_tensor, alpha)
+            self.subtract_mask_tensor(mask_tensor, alpha, inverted)
         elif mode == 'blend':
             self.blend_mask_tensor(mask_tensor, alpha)
         else:

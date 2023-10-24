@@ -85,6 +85,6 @@ class ClipSegModel(BaseImageMaskModel):
         with torch.no_grad():
             outputs = self.model(**inputs)
         predicted_mask = self.__process_mask(outputs.logits, mask_sample.height, mask_sample.width, threshold)
-        mask_sample.apply_mask(mode, predicted_mask, alpha)
+        mask_sample.apply_mask(mode, predicted_mask, alpha, False)
 
         mask_sample.save_mask()

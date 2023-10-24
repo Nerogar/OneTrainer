@@ -141,6 +141,6 @@ class RembgModel(BaseImageMaskModel):
         output = torch.from_numpy(mask).to(self.device)
 
         predicted_mask = self.__process_mask(output, mask_sample.height, mask_sample.width, threshold)
-        mask_sample.apply_mask(mode, predicted_mask, alpha)
+        mask_sample.apply_mask(mode, predicted_mask, alpha, False)
 
         mask_sample.save_mask()
