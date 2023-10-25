@@ -8,8 +8,11 @@ from torchvision.transforms import transforms
 class HPSv2ScoreModel(nn.Module):
     def __init__(
             self,
+            dtype: torch.dtype,
     ):
         super(HPSv2ScoreModel, self).__init__()
+        self.dtype = dtype
+
         self.model = self.__load_open_clip_model()
         self.tokenizer = self.__load_tokenizer()
 
@@ -18,12 +21,21 @@ class HPSv2ScoreModel(nn.Module):
         self.resize = transforms.Resize(224)
         self.crop = transforms.CenterCrop(224)
 
+
     def __load_open_clip_model(self):
         model_name = "ViT-H-14"
+
+        precision = "fp32"
+        match self.dtype:
+            case torch.float16:
+                precision = "fp16"
+            case torch.bfloat16:
+                precision = "bf16"
+
         open_clip_model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms(
             model_name,
             'laion2B-s32B-b79K',
-            precision="fp16",
+            precision=precision,
             jit=False,
             force_quick_gelu=False,
             force_custom_text=False,
