@@ -305,12 +305,14 @@ class BaseStableDiffusionXLSetup(
 
             if model.noise_scheduler.config.prediction_type == 'epsilon':
                 model_output_data = {
+                    'loss_type': 'target',
                     'predicted': predicted_latent_noise,
                     'target': latent_noise,
                 }
             elif model.noise_scheduler.config.prediction_type == 'v_prediction':
                 target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
                 model_output_data = {
+                    'loss_type': 'target',
                     'predicted': predicted_latent_noise,
                     'target': target_velocity,
                 }
