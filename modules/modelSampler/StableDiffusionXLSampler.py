@@ -157,6 +157,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         # prepare timesteps
+        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
 
         if force_last_timestep:
@@ -391,6 +392,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         # prepare timesteps
+        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
 
         if force_last_timestep:
