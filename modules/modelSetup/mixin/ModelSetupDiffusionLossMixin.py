@@ -45,7 +45,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
             match args.align_prop_loss:
                 case AlignPropLoss.HPS:
-                    losses = self.align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
+                    with torch.autocast(device_type=train_device.type, dtype=data['predicted'].dtype):
+                        losses = self.align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
                 case AlignPropLoss.AESTHETIC:
                     losses = self.align_prop_loss_fn(data['predicted'])
 
