@@ -39,7 +39,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     case AlignPropLoss.AESTHETIC:
                         self.align_prop_loss_fn = AestheticScoreModel()
 
-                self.align_prop_loss_fn.to(device=train_device)
+                self.align_prop_loss_fn.to(device=train_device, dtype=data['predicted'].dtype)
                 self.align_prop_loss_fn.requires_grad_(False)
                 self.align_prop_loss_fn.eval()
 
