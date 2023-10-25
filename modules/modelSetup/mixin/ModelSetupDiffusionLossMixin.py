@@ -33,19 +33,22 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     ) -> Tensor:
         if data['loss_type'] == 'align_prop':
             if self.align_prop_loss_fn is None:
+                dtype = data['predicted'].dtype
+
                 match args.align_prop_loss:
                     case AlignPropLoss.HPS:
-                        self.align_prop_loss_fn = HPSv2ScoreModel()
+                        self.align_prop_loss_fn = HPSv2ScoreModel(dtype)
                     case AlignPropLoss.AESTHETIC:
                         self.align_prop_loss_fn = AestheticScoreModel()
 
-                self.align_prop_loss_fn.to(device=train_device)
+                self.align_prop_loss_fn.to(device=train_device, dtype=dtype)
                 self.align_prop_loss_fn.requires_grad_(False)
                 self.align_prop_loss_fn.eval()
 
             match args.align_prop_loss:
                 case AlignPropLoss.HPS:
-                    losses = self.align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
+                    with torch.autocast(device_type=train_device.type, dtype=data['predicted'].dtype):
+                        losses = self.align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
                 case AlignPropLoss.AESTHETIC:
                     losses = self.align_prop_loss_fn(data['predicted'])
 
