@@ -1,3 +1,4 @@
+import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline, StableDiffusionXLPipeline, DDIMScheduler
 from torch import Tensor
 from transformers import CLIPTextModel, CLIPTokenizer
@@ -82,6 +83,36 @@ class StableDiffusionXLModel(BaseModel):
         self.text_encoder_2_lora = text_encoder_2_lora
         self.unet_lora = unet_lora
         self.sd_config = sd_config
+
+    def vae_to(self, device: torch.device):
+        self.vae.to(device=device)
+
+    def text_encoder_to(self, device: torch.device):
+        self.text_encoder_1.to(device=device)
+        self.text_encoder_2.to(device=device)
+
+        if self.text_encoder_1_lora is not None:
+            self.text_encoder_1_lora.to(device)
+
+        if self.text_encoder_2_lora is not None:
+            self.text_encoder_2_lora.to(device)
+
+    def unet_to(self, device: torch.device):
+        self.unet.to(device=device)
+
+        if self.unet_lora is not None:
+            self.unet_lora.to(device)
+
+    def to(self, device: torch.device):
+        self.vae_to(device)
+        self.text_encoder_to(device)
+        self.unet_to(device)
+
+    def eval(self):
+        self.vae.eval()
+        self.text_encoder_1.eval()
+        self.text_encoder_2.eval()
+        self.unet.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
         return StableDiffusionXLPipeline(

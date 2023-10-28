@@ -1,12 +1,14 @@
+from abc import ABCMeta
+
+import torch
 from mgds.MGDS import MGDS
-from mgds.TransformersDataLoaderModules import *
 
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.dtype_util import allow_mixed_precision
 
 
-class MgdsBaseDataLoader:
+class DataLoaderMgdsMixin(metaclass=ABCMeta):
 
     def _create_mgds(
             self,

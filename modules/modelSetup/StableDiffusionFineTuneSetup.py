@@ -97,20 +97,6 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
 
         self.setup_optimizations(model, args)
 
-    def setup_eval_device(
-            self,
-            model: StableDiffusionModel
-    ):
-        model.text_encoder.to(self.train_device)
-        model.vae.to(self.train_device)
-        model.unet.to(self.train_device)
-        if model.depth_estimator is not None:
-            model.depth_estimator.to(self.train_device)
-
-        model.text_encoder.eval()
-        model.vae.eval()
-        model.unet.eval()
-
     def setup_train_device(
             self,
             model: StableDiffusionModel,

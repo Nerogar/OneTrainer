@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Callable
 
+import torch
 from PIL.Image import Image
 
 from modules.util.enum.ImageFormat import ImageFormat
@@ -8,6 +9,16 @@ from modules.util.params.SampleParams import SampleParams
 
 
 class BaseModelSampler(metaclass=ABCMeta):
+
+    def __init__(
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+    ):
+        super(BaseModelSampler, self).__init__()
+
+        self.train_device = train_device
+        self.temp_device = temp_device
 
     @abstractmethod
     def sample(

@@ -1,3 +1,4 @@
+import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
     StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline, DDIMScheduler
 from torch import Tensor
@@ -75,6 +76,38 @@ class StableDiffusionModel(BaseModel):
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
         self.sd_config = sd_config
+
+    def vae_to(self, device: torch.device):
+        self.vae.to(device=device)
+
+    def depth_estimator_to(self, device: torch.device):
+        if self.depth_estimator is not None:
+            self.depth_estimator.to(device=device)
+
+    def text_encoder_to(self, device: torch.device):
+        self.text_encoder.to(device=device)
+
+        if self.text_encoder_lora is not None:
+            self.text_encoder_lora.to(device)
+
+    def unet_to(self, device: torch.device):
+        self.unet.to(device=device)
+
+        if self.unet_lora is not None:
+            self.unet_lora.to(device)
+
+    def to(self, device: torch.device):
+        self.vae_to(device)
+        self.depth_estimator_to(device)
+        self.text_encoder_to(device)
+        self.unet_to(device)
+
+    def eval(self):
+        self.vae.eval()
+        if self.depth_estimator is not None:
+            self.depth_estimator.eval()
+        self.text_encoder.eval()
+        self.unet.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
         if self.model_type.has_depth_input():

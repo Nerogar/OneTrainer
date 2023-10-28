@@ -22,6 +22,8 @@ class BaseTrainer(metaclass=ABCMeta):
         self.callbacks = callbacks
         self.commands = commands
         self.previous_action = {}
+        self.train_device = torch.device(self.args.train_device)
+        self.temp_device = torch.device(self.args.temp_device)
 
     @abstractmethod
     def start(self):
@@ -45,14 +47,16 @@ class BaseTrainer(metaclass=ABCMeta):
     def create_model_setup(self) -> BaseModelSetup:
         return create.create_model_setup(
             self.args.model_type,
-            torch.device(self.args.train_device),
-            torch.device(self.args.temp_device),
+            self.train_device,
+            self.temp_device,
             self.args.training_method,
             self.args.debug_mode,
         )
 
     def create_data_loader(self, model: BaseModel, train_progress: TrainProgress):
         return create.create_data_loader(
+            self.train_device,
+            self.temp_device,
             model,
             self.args.model_type,
             self.args.training_method,
@@ -65,9 +69,10 @@ class BaseTrainer(metaclass=ABCMeta):
 
     def create_model_sampler(self, model: BaseModel) -> BaseModelSampler:
         return create.create_model_sampler(
+            self.train_device,
+            self.temp_device,
             model,
             self.args.model_type,
-            torch.device(self.args.train_device),
             self.args.training_method
         )
 

@@ -6,12 +6,12 @@ from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscr
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
-from modules.dataLoader.MgdsKandinskyFineTuneDataLoader import MgdsKandinskyFineTuneDataLoader
-from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
-from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
-from modules.dataLoader.MgdsStableDiffusionFineTuneVaeDataLoader import MgdsStableDiffusionFineTuneVaeDataLoader
-from modules.dataLoader.MgdsStableDiffusionXLEmbeddingDataLoader import MgdsStableDiffusionXLEmbeddingDataLoader
-from modules.dataLoader.MgdsStableDiffusionXLFineTuneDataLoader import MgdsStableDiffusionXLFineTuneDataLoader
+from modules.dataLoader.KandinskyFineTuneDataLoader import KandinskyFineTuneDataLoader
+from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
+from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
+from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
+from modules.dataLoader.StableDiffusionXLEmbeddingDataLoader import StableDiffusionXLEmbeddingDataLoader
+from modules.dataLoader.StableDiffusionXLFineTuneDataLoader import StableDiffusionXLFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyLoRAModelLoader import KandinskyLoRAModelLoader
@@ -149,37 +149,40 @@ def create_model_setup(
 
 
 def create_model_sampler(
+        train_device: torch.device,
+        temp_device: torch.device,
         model: BaseModel,
         model_type: ModelType,
-        train_device: torch.device,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
 ) -> BaseModelSampler:
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionSampler(model, model_type, train_device)
+                return StableDiffusionSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLSampler(model, model_type, train_device)
+                return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
             if model_type.is_kandinsky():
-                return KandinskySampler(model, model_type, train_device)
+                return KandinskySampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionVaeSampler(model, model_type, train_device)
+                return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
-                return StableDiffusionSampler(model, model_type, train_device)
+                return StableDiffusionSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLSampler(model, model_type, train_device)
+                return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
             if model_type.is_kandinsky():
-                return KandinskySampler(model, model_type, train_device)
+                return KandinskySampler(train_device, temp_device, model, model_type)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
-                return StableDiffusionSampler(model, model_type, train_device)
+                return StableDiffusionSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLSampler(model, model_type, train_device)
+                return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
 
 
 def create_data_loader(
+        train_device: torch.device,
+        temp_device: torch.device,
         model: BaseModel,
         model_type: ModelType,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
@@ -189,26 +192,26 @@ def create_data_loader(
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
+                return StableDiffusionFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
-                return MgdsStableDiffusionXLFineTuneDataLoader(args, model, train_progress)
+                return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             elif model_type.is_kandinsky():
-                return MgdsKandinskyFineTuneDataLoader(args, model, train_progress)
+                return KandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
-                return MgdsStableDiffusionFineTuneVaeDataLoader(args, model, train_progress)
+                return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
-                return MgdsStableDiffusionFineTuneDataLoader(args, model, train_progress)
+                return StableDiffusionFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
-                return MgdsStableDiffusionXLFineTuneDataLoader(args, model, train_progress)
+                return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_kandinsky():
-                return MgdsKandinskyFineTuneDataLoader(args, model, train_progress)
+                return KandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
-                return MgdsStableDiffusionEmbeddingDataLoader(args, model, train_progress)
+                return StableDiffusionEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
-                return MgdsStableDiffusionXLEmbeddingDataLoader(args, model, train_progress)
+                return StableDiffusionXLEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
 
 
 def create_optimizer(

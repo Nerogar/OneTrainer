@@ -47,13 +47,6 @@ class BaseModelSetup(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def setup_eval_device(
-            self,
-            model: BaseModel,
-    ):
-        pass
-
-    @abstractmethod
     def setup_train_device(
             self,
             model: BaseModel,

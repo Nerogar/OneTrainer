@@ -5,20 +5,27 @@ from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
 from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
 
-from modules.dataLoader.MgdsBaseDataLoader import MgdsBaseDataLoader
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStableDiffusionFineTuneVaeDataLoader(MgdsBaseDataLoader):
+class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __init__(
             self,
+            train_device: torch.device,
+            temp_device: torch.device,
             args: TrainArgs,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
     ):
+        super(StableDiffusionFineTuneVaeDataLoader, self).__init__(
+            train_device,
+            temp_device,
+        )
+
         with open(args.concept_file_name, 'r') as f:
             concepts = json.load(f)
 
@@ -209,6 +216,8 @@ class MgdsStableDiffusionFineTuneVaeDataLoader(MgdsBaseDataLoader):
                       in_range_max=1),
             # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         ]
+
+        self.setup_cache_device(model, self.train_device, self.temp_device)
 
         return self._create_mgds(
             args,

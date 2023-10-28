@@ -1,13 +1,12 @@
 import os
 import sys
 
-from modules.util.enum.ImageFormat import ImageFormat
-from modules.util.params.SampleParams import SampleParams
-
 sys.path.append(os.getcwd())
 
 import torch
 
+from modules.util.params.SampleParams import SampleParams
+from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
 from modules.util.args.SampleArgs import SampleArgs
@@ -31,12 +30,14 @@ def main():
         args.base_model_name,
         args.embedding_name
     )
-    model_setup.setup_eval_device(model)
+    model.to(device)
+    model.eval()
 
     model_sampler = create.create_model_sampler(
+        train_device=device,
+        temp_device=device,
         model=model,
         model_type=args.model_type,
-        train_device=device
     )
 
     print("Sampling " + args.destination)

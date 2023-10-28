@@ -3,34 +3,54 @@ import json
 from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage, SaveText, DecodeTokens
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import TrainDataLoader, OutputPipelineModule
+from mgds.MGDS import TrainDataLoader, OutputPipelineModule, MGDS
 from mgds.TransformersDataLoaderModules import *
 
-from modules.dataLoader.MgdsBaseDataLoader import MgdsBaseDataLoader
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
+class StablDiffusionXLBaseDataLoader(BaseDataLoader):
     def __init__(
             self,
+            train_device: torch.device,
+            temp_device: torch.device,
             args: TrainArgs,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             train_progress: TrainProgress,
     ):
+        super(StablDiffusionXLBaseDataLoader, self).__init__(
+            train_device,
+            temp_device,
+        )
+
         with open(args.concept_file_name, 'r') as f:
             concepts = json.load(f)
 
-        self.ds = self.create_dataset(
+        self.__ds = self.create_dataset(
             args=args,
             model=model,
             concepts=concepts,
             train_progress=train_progress,
         )
-        self.dl = TrainDataLoader(self.ds, args.batch_size)
+        self.__dl = TrainDataLoader(self.__ds, args.batch_size)
 
+    def get_data_set(self) -> MGDS:
+        return self.__ds
+
+    def get_data_loader(self) -> TrainDataLoader:
+        return self.__dl
+
+    def setup_cache_device(
+            self,
+            model: StableDiffusionXLModel,
+            train_device: torch.device,
+            temp_device: torch.device,
+    ):
+        model.vae.to(train_device)
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -50,14 +70,11 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
-    def _load_input_modules(self, args: TrainArgs, model: StableDiffusionModel) -> list:
+    def _load_input_modules(self, args: TrainArgs, model: StableDiffusionXLModel) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1)
 
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
-
-        generate_depth = GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=model.image_depth_processor, depth_estimator=model.depth_estimator)
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.prompt_path', texts_out_name='concept_prompts')
@@ -77,17 +94,10 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
         elif args.model_type.has_mask_input():
             modules.append(generate_mask)
 
-        if args.model_type.has_depth_input():
-            modules.append(generate_depth)
-
         return modules
-
 
     def _mask_augmentation_modules(self, args: TrainArgs) -> list:
         inputs = ['image']
-
-        if args.model_type.has_depth_input():
-            inputs.append('depth')
 
         circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='settings.enable_random_circular_mask_shrink')
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='settings.enable_random_mask_rotate_crop')
@@ -102,13 +112,12 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
     def _aspect_bucketing_in(self, args: TrainArgs):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
         aspect_bucketing = AspectBucketing(
             target_resolution=args.resolution,
-            quantization=8,
+            quantization=64,
             resolution_in_name='original_resolution',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
@@ -132,31 +141,22 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
     def _crop_modules(self, args: TrainArgs):
         scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='image', crop_offset_out_name='crop_offset')
         scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='mask', crop_offset_out_name='crop_offset')
-        scale_crop_depth = ScaleCropImage(image_in_name='depth', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='depth', crop_offset_out_name='crop_offset')
 
         modules = [scale_crop_image]
 
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(scale_crop_mask)
 
-        if args.model_type.has_depth_input():
-            modules.append(scale_crop_depth)
-
         return modules
-
 
     def _augmentation_modules(self, args: TrainArgs):
         inputs = ['image']
 
         if args.masked_training or args.model_type.has_mask_input():
             inputs.append('mask')
-
-        if args.model_type.has_depth_input():
-            inputs.append('depth')
 
         random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
         random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.enable_random_rotate', max_angle_in_name='concept.random_rotate_max_angle')
@@ -178,7 +178,6 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
     def _inpainting_modules(self, args: TrainArgs):
         conditioning_image = GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image', image_range_min=0, image_range_max=1)
 
@@ -189,17 +188,20 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
-    def _preparation_modules(self, args: TrainArgs, model: StableDiffusionModel):
+    def _preparation_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
         downscale_mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
-        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
-        downscale_depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
-        tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=model.tokenizer.model_max_length)
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
+        tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
+        tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
 
-        modules = [rescale_image, encode_image, tokenize_prompt]
+        modules = [
+            rescale_image, encode_image,
+            tokenize_prompt_1,
+            tokenize_prompt_2,
+        ]
 
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -208,23 +210,19 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if args.model_type.has_depth_input():
-            modules.append(downscale_depth)
-
         return modules
 
-
     def _cache_modules(self, args: TrainArgs):
-        split_names = ['latent_image_distribution']
+        split_names = [
+            'latent_image_distribution',
+            'original_resolution', 'crop_offset',
+        ]
 
         if args.masked_training or args.model_type.has_mask_input():
             split_names.append('latent_mask')
 
         if args.model_type.has_conditioning_image_input():
             split_names.append('latent_conditioning_image_distribution')
-
-        if args.model_type.has_depth_input():
-            split_names.append('latent_depth')
 
         aggregate_names = ['crop_resolution', 'image_path']
 
@@ -240,18 +238,18 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
-    def _output_modules(self, args: TrainArgs, model: StableDiffusionModel):
-        output_names = ['latent_image', 'tokens', 'image_path', 'prompt']
+    def _output_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
+        output_names = [
+            'image_path', 'latent_image',
+            'tokens_1', 'tokens_2',
+            'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
+        ]
 
         if args.masked_training or args.model_type.has_mask_input():
             output_names.append('latent_mask')
 
         if args.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
-
-        if args.model_type.has_depth_input():
-            output_names.append('latent_depth')
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
@@ -277,24 +275,21 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
-    def _debug_modules(self, args: TrainArgs, model: StableDiffusionModel):
+    def _debug_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
         debug_dir = os.path.join(args.debug_dir, "dataloader")
 
-        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae)
-        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae)
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, override_allow_mixed_precision=False)
+        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, override_allow_mixed_precision=False)
         upscale_mask = Upscale(in_name='latent_mask', out_name='decoded_mask', factor=8)
-        decode_prompt = DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer)
+        decode_prompt = DecodeTokens(in_name='tokens_1', out_name='decoded_prompt', tokenizer=model.tokenizer_1)
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)
         save_conditioning_image = SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1)
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         save_mask = SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1)
-        # SaveImage(image_in_name='latent_depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
         save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir)
 
         # These modules don't really work, since they are inserted after a sorting operation that does not include this data
         # SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
-        # SaveImage(image_in_name='depth', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
         # SaveImage(image_in_name='image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
 
         modules = []
@@ -315,11 +310,10 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
 
         return modules
 
-
     def create_dataset(
             self,
             args: TrainArgs,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             concepts: list[dict],
             train_progress: TrainProgress,
     ):
@@ -335,6 +329,8 @@ class MgdsStablDiffusionBaseDataLoader(MgdsBaseDataLoader):
         output_modules = self._output_modules(args, model)
 
         debug_modules = self._debug_modules(args, model)
+
+        self.setup_cache_device(model, self.train_device, self.temp_device)
 
         return self._create_mgds(
             args,

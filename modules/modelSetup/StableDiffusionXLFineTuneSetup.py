@@ -95,20 +95,6 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
 
         self.setup_optimizations(model, args)
 
-    def setup_eval_device(
-            self,
-            model: StableDiffusionXLModel
-    ):
-        model.text_encoder_1.to(self.train_device)
-        model.text_encoder_2.to(self.train_device)
-        model.vae.to(self.train_device)
-        model.unet.to(self.train_device)
-
-        model.text_encoder_1.eval()
-        model.text_encoder_2.eval()
-        model.vae.eval()
-        model.unet.eval()
-
     def setup_train_device(
             self,
             model: StableDiffusionXLModel,

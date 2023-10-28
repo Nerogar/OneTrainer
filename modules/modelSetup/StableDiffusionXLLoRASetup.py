@@ -127,29 +127,6 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
 
         self.setup_optimizations(model, args)
 
-    def setup_eval_device(
-            self,
-            model: StableDiffusionXLModel
-    ):
-        model.text_encoder_1.to(self.train_device)
-        model.text_encoder_2.to(self.train_device)
-        model.vae.to(self.train_device)
-        model.unet.to(self.train_device)
-
-        if model.text_encoder_1_lora is not None:
-            model.text_encoder_1_lora.to(self.train_device)
-
-        if model.text_encoder_2_lora is not None:
-            model.text_encoder_2_lora.to(self.train_device)
-
-        if model.unet_lora is not None:
-            model.unet_lora.to(self.train_device)
-
-        model.text_encoder_1.eval()
-        model.text_encoder_2.eval()
-        model.vae.eval()
-        model.unet.eval()
-
     def setup_train_device(
             self,
             model: StableDiffusionXLModel,

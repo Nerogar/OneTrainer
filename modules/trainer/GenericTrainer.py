@@ -21,7 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 from tqdm import tqdm
 
-from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
+from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -44,7 +44,7 @@ from modules.util.params.SampleParams import SampleParams
 class GenericTrainer(BaseTrainer):
     model_loader: BaseModelLoader
     model_setup: BaseModelSetup
-    data_loader: MgdsStableDiffusionFineTuneDataLoader
+    data_loader: StableDiffusionFineTuneDataLoader
     model_saver: BaseModelSaver
     model_sampler: BaseModelSampler
     model: BaseModel
@@ -121,7 +121,8 @@ class GenericTrainer(BaseTrainer):
 
         self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
-        self.model_setup.setup_eval_device(self.model)
+        self.model.to(self.temp_device)
+        self.model.eval()
         self.__gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
@@ -240,6 +241,9 @@ class GenericTrainer(BaseTrainer):
                     on_sample = on_sample_custom if is_custom_sample else on_sample_default
                     on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
+                    self.model.to(self.temp_device)
+                    self.model.eval()
+
                     self.model_sampler.sample(
                         sample_params=sample_params,
                         destination=sample_path,
@@ -264,8 +268,6 @@ class GenericTrainer(BaseTrainer):
         self.__gc()
 
         self.callbacks.on_update_status("sampling")
-
-        self.model_setup.setup_eval_device(self.model)
 
         is_custom_sample = False
         if not sample_params_list:
@@ -423,13 +425,15 @@ class GenericTrainer(BaseTrainer):
         if self.args.only_cache:
             self.callbacks.on_update_status("caching")
 
-            self.model_setup.setup_eval_device(self.model)
+            self.model.to(self.temp_device)
+            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device)
+            self.model.eval()
             self.__gc()
 
             cached_epochs = [False] * self.args.latent_caching_epochs
             for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
                 if not cached_epochs[epoch % self.args.latent_caching_epochs]:
-                    self.data_loader.ds.start_next_epoch()
+                    self.data_loader.get_data_set().start_next_epoch()
                     cached_epochs[epoch % self.args.latent_caching_epochs] = True
             return
 
@@ -439,7 +443,7 @@ class GenericTrainer(BaseTrainer):
             warmup_steps=self.args.learning_rate_warmup_steps,
             num_cycles=self.args.learning_rate_cycles,
             num_epochs=self.args.epochs,
-            approximate_epoch_length=self.data_loader.ds.approximate_length(),
+            approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
             batch_size=self.args.batch_size,
             gradient_accumulation_steps=self.args.gradient_accumulation_steps,
             global_step=train_progress.global_step
@@ -460,14 +464,16 @@ class GenericTrainer(BaseTrainer):
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
-            self.model_setup.setup_eval_device(self.model)
+            self.model.to(self.temp_device)
+            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device)
+            self.model.eval()
             self.__gc()
-            self.data_loader.ds.start_next_epoch()
+            self.data_loader.get_data_set().start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
             self.__gc()
 
-            current_epoch_length = len(self.data_loader.dl) + train_progress.epoch_step
-            step_tqdm = tqdm(self.data_loader.dl, desc="step")
+            current_epoch_length = len(self.data_loader.get_data_loader()) + train_progress.epoch_step
+            step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
             for epoch_step, batch in enumerate(step_tqdm):
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(

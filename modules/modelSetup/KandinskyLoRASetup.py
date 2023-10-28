@@ -90,29 +90,6 @@ class KandinskyLoRASetup(BaseKandinskySetup):
 
         self.setup_optimizations(model, args)
 
-    def setup_eval_device(
-            self,
-            model: KandinskyModel
-    ):
-        model.prior_text_encoder.to(self.train_device)
-        model.prior_image_encoder.to(self.train_device)
-        model.prior_prior.to(self.train_device)
-
-        model.text_encoder.to(self.train_device)
-        model.unet.to(self.train_device)
-        model.movq.to(self.train_device)
-
-        if model.unet_lora is not None:
-            model.unet_lora.to(self.train_device)
-
-        model.prior_text_encoder.eval()
-        model.prior_image_encoder.eval()
-        model.prior_prior.eval()
-
-        model.text_encoder.eval()
-        model.unet.eval()
-        model.movq.eval()
-
     def setup_train_device(
             self,
             model: KandinskyModel,

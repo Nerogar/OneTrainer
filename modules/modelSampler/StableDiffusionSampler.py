@@ -17,10 +17,17 @@ from modules.util.params.SampleParams import SampleParams
 
 
 class StableDiffusionSampler(BaseModelSampler):
-    def __init__(self, model: StableDiffusionModel, model_type: ModelType, train_device: torch.device):
+    def __init__(
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: StableDiffusionModel,
+            model_type: ModelType,
+    ):
+        super(StableDiffusionSampler, self).__init__(train_device, temp_device)
+
         self.model = model
         self.model_type = model_type
-        self.train_device = train_device
         self.pipeline = model.create_pipeline()
 
     @torch.no_grad()
@@ -55,6 +62,7 @@ class StableDiffusionSampler(BaseModelSampler):
         vae_scale_factor = self.pipeline.vae_scale_factor
 
         # prepare prompt
+        self.model.text_encoder_to(self.train_device)
         tokenizer_output = tokenizer(
             prompt,
             padding='max_length',
@@ -104,7 +112,10 @@ class StableDiffusionSampler(BaseModelSampler):
                 text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
             )
 
+
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
+
+        self.model.text_encoder_to(self.temp_device)
 
         # prepare timesteps
         noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
@@ -131,6 +142,7 @@ class StableDiffusionSampler(BaseModelSampler):
             extra_step_kwargs["generator"] = generator
 
         # denoising loop
+        self.model.unet_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
             latent_model_input = torch.cat([latent_image] * 2)
             latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
@@ -165,11 +177,18 @@ class StableDiffusionSampler(BaseModelSampler):
 
             on_update_progress(i + 1, len(timesteps))
 
+        self.model.unet_to(self.temp_device)
+
+        # decode
+        self.model.vae_to(self.train_device)
+
         latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
         do_denormalize = [True] * image.shape[0]
         image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+
+        self.model.vae_to(self.temp_device)
 
         return image[0]
 
@@ -205,6 +224,7 @@ class StableDiffusionSampler(BaseModelSampler):
         vae_scale_factor = self.pipeline.vae_scale_factor
 
         # prepare conditioning image
+        self.model.vae_to(self.train_device)
         conditioning_image = torch.zeros((1, 3, height, width), dtype=torch.float32, device=self.train_device)
         conditioning_image = conditioning_image
         latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
@@ -213,8 +233,10 @@ class StableDiffusionSampler(BaseModelSampler):
             dtype=torch.float32,
             device=self.train_device
         )
+        self.model.vae_to(self.temp_device)
 
         # prepare prompt
+        self.model.text_encoder_to(self.train_device)
         tokenizer_output = tokenizer(
             prompt,
             padding='max_length',
@@ -266,6 +288,8 @@ class StableDiffusionSampler(BaseModelSampler):
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
+        self.model.text_encoder_to(self.temp_device)
+
         # prepare timesteps
         noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = noise_scheduler.timesteps
@@ -291,6 +315,7 @@ class StableDiffusionSampler(BaseModelSampler):
             extra_step_kwargs["generator"] = generator
 
         # denoising loop
+        self.model.unet_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
             latent_model_input = noise_scheduler.scale_model_input(latent_image, timestep)
             latent_model_input = torch.concat(
@@ -328,11 +353,18 @@ class StableDiffusionSampler(BaseModelSampler):
 
             on_update_progress(i + 1, len(timesteps))
 
+        self.model.unet_to(self.temp_device)
+
+        #decode
+        self.model.vae_to(self.train_device)
+
         latent_image = latent_image.to(dtype=vae.dtype)
         image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
         do_denormalize = [True] * image.shape[0]
         image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+
+        self.model.vae_to(self.temp_device)
 
         return image[0]
 

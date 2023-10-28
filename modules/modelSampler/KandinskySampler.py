@@ -13,10 +13,17 @@ from modules.util.params.SampleParams import SampleParams
 
 
 class KandinskySampler(BaseModelSampler):
-    def __init__(self, model: KandinskyModel, model_type: ModelType, train_device: torch.device):
+    def __init__(
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: KandinskyModel,
+            model_type: ModelType,
+    ):
+        super(KandinskySampler, self).__init__(train_device, temp_device)
+
         self.model = model
         self.model_type = model_type
-        self.train_device = train_device
         self.prior_pipeline = self.model.create_prior_pipeline()
         self.diffusion_pipeline = model.create_diffusion_pipeline()
 

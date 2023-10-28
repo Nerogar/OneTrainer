@@ -1,22 +1,30 @@
 from mgds.GenericDataLoaderModules import *
 
-from modules.dataLoader.MgdsStableDiffusionBaseDataLoader import MgdsStablDiffusionBaseDataLoader
+from modules.dataLoader.StableDiffusionBaseDataLoader import StablDiffusionBaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsStableDiffusionEmbeddingDataLoader(MgdsStablDiffusionBaseDataLoader):
+class StableDiffusionEmbeddingDataLoader(StablDiffusionBaseDataLoader):
     def __init__(
             self,
+            train_device: torch.device,
+            temp_device: torch.device,
             args: TrainArgs,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
     ):
-        super(MgdsStableDiffusionEmbeddingDataLoader, self).__init__(args, model, train_progress)
+        super(StableDiffusionEmbeddingDataLoader, self).__init__(
+            train_device,
+            temp_device,
+            args,
+            model,
+            train_progress,
+        )
 
     def _load_input_modules(self, args: TrainArgs, model: StableDiffusionModel) -> list:
-        modules = super(MgdsStableDiffusionEmbeddingDataLoader, self)._load_input_modules(args, model)
+        modules = super(StableDiffusionEmbeddingDataLoader, self)._load_input_modules(args, model)
 
         tokens = [f"<embedding_{i}>" for i in range(model.embeddings[0].token_count)]
         all_token_string = ''.join(tokens)

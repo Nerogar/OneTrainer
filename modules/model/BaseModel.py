@@ -1,5 +1,6 @@
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 
+import torch
 from torch.optim import Optimizer
 
 from modules.module.EMAModule import EMAModuleWrapper
@@ -31,3 +32,11 @@ class BaseModel(metaclass=ABCMeta):
         self.ema_state_dict = ema_state_dict
         self.train_progress = train_progress if train_progress is not None else TrainProgress()
         self.model_spec = model_spec
+
+    @abstractmethod
+    def to(self, device: torch.device):
+        pass
+
+    @abstractmethod
+    def eval(self):
+        pass

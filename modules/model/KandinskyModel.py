@@ -1,3 +1,4 @@
+import torch
 from diffusers import UNet2DConditionModel, DDPMScheduler, PriorTransformer, VQModel, \
     KandinskyPriorPipeline, KandinskyPipeline, UnCLIPScheduler
 from diffusers.pipelines.kandinsky import MultilingualCLIP
@@ -13,6 +14,7 @@ from modules.util.enum.ModelType import ModelType
 class KandinskyModel(BaseModel):
     # base model data
     model_type: ModelType
+
     # prior
     prior_tokenizer: CLIPTokenizer
     prior_text_encoder: CLIPTextModelWithProjection
@@ -80,6 +82,45 @@ class KandinskyModel(BaseModel):
         self.movq = movq
 
         self.unet_lora = unet_lora
+
+    def prior_text_encoder_to(self, device: torch.device):
+        self.prior_text_encoder.to(device)
+
+    def prior_image_encoder_to(self, device: torch.device):
+        self.prior_image_encoder.to(device)
+
+    def prior_prior_to(self, device: torch.device):
+        self.prior_prior.to(device)
+
+    def text_encoder_to(self, device: torch.device):
+        self.text_encoder.to(device)
+
+    def unet_to(self, device: torch.device):
+        self.unet.to(device)
+
+        if self.unet_lora is not None:
+            self.unet_lora.to(device)
+
+    def movq_to(self, device: torch.device):
+        self.movq.to(device)
+
+    def to(self, device: torch.device):
+        self.prior_text_encoder_to(device)
+        self.prior_text_encoder_to(device)
+        self.prior_image_encoder_to(device)
+        self.prior_prior_to(device)
+        self.text_encoder_to(device)
+        self.unet_to(device)
+        self.movq_to(device)
+
+    def eval(self):
+        self.prior_text_encoder.eval()
+        self.prior_text_encoder.eval()
+        self.prior_image_encoder.eval()
+        self.prior_prior.eval()
+        self.text_encoder.eval()
+        self.unet.eval()
+        self.movq.eval()
 
     def create_prior_pipeline(self) -> KandinskyPriorPipeline:
         return KandinskyPriorPipeline(
