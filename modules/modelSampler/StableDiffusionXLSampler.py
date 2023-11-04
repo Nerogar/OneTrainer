@@ -14,6 +14,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.params.SampleParams import SampleParams
+from modules.util.torch_util import torch_gc
 
 
 class StableDiffusionXLSampler(BaseModelSampler):
@@ -165,6 +166,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         self.model.text_encoder_to(self.temp_device)
+        torch_gc()
 
         # prepare timesteps
         noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
@@ -252,6 +254,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             on_update_progress(i + 1, len(timesteps))
 
         self.model.unet_to(self.temp_device)
+        torch_gc()
 
         # decode
         self.model.vae_to(self.train_device)
@@ -310,6 +313,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             device=self.train_device
         )
         self.model.vae_to(self.temp_device)
+        torch_gc()
 
         # prepare prompt
         self.model.text_encoder_to(self.train_device)
@@ -413,6 +417,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
         self.model.text_encoder_to(self.temp_device)
+        torch_gc()
 
         # prepare timesteps
         noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
@@ -503,6 +508,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             on_update_progress(i + 1, len(timesteps))
 
         self.model.unet_to(self.temp_device)
+        torch_gc()
 
         # decode
         self.model.vae_to(self.train_device)

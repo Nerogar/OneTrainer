@@ -93,6 +93,7 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         predicted_image = model.vae.decode(latent_image, return_dict=True).sample
 
         model_output_data = {
+            'loss_type': 'target',
             'predicted': predicted_image,
             'target': image,
         }

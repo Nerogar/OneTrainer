@@ -37,6 +37,14 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         )
         self.dl = TrainDataLoader(self.ds, args.batch_size)
 
+    def setup_cache_device(
+            self,
+            model: StableDiffusionModel,
+            train_device: torch.device,
+            temp_device: torch.device,
+            args: TrainArgs,
+    ):
+        model.vae_to(train_device)
 
     def __enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -217,7 +225,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         ]
 
-        self.setup_cache_device(model, self.train_device, self.temp_device)
+        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,

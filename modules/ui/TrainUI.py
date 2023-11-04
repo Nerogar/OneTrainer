@@ -32,6 +32,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.torch_util import torch_gc
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -739,9 +740,7 @@ class TrainUI(ctk.CTk):
         trainer.end()
 
         # clear gpu memory
-        torch.cuda.synchronize()
-        gc.collect()
-        torch.cuda.empty_cache()
+        torch_gc()
 
         if error_caught:
             self.on_update_status("error: check the console for more information")

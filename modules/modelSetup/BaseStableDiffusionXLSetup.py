@@ -120,12 +120,18 @@ class BaseStableDiffusionXLSetup(
 
         vae_scaling_factor = model.vae.config['scaling_factor']
 
-        text_encoder_output, pooled_text_encoder_2_output = self.__encode_text(
-            model,
-            args.text_encoder_layer_skip,
-            tokens_1=batch['tokens_1'],
-            tokens_2=batch['tokens_2'],
-        )
+        if args.train_text_encoder:
+            text_encoder_output, pooled_text_encoder_2_output = self.__encode_text(
+                model,
+                args.text_encoder_layer_skip,
+                tokens_1=batch['tokens_1'],
+                tokens_2=batch['tokens_2'],
+            )
+        else:
+            text_encoder_1_hidden_state = batch['text_encoder_1_hidden_state']
+            text_encoder_2_hidden_state = batch['text_encoder_2_hidden_state']
+            text_encoder_output = torch.concat([text_encoder_1_hidden_state, text_encoder_2_hidden_state], dim=-1)
+            pooled_text_encoder_2_output = batch['text_encoder_2_pooled_state']
 
         latent_image = batch['latent_image']
         scaled_latent_image = latent_image * vae_scaling_factor

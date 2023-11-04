@@ -39,6 +39,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.params.SampleParams import SampleParams
+from modules.util.torch_util import torch_gc
 
 
 class GenericTrainer(BaseTrainer):
@@ -123,7 +124,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_model(self.model, self.args)
         self.model.to(self.temp_device)
         self.model.eval()
-        self.__gc()
+        torch_gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
 
@@ -137,11 +138,6 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue = []
 
         self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
-
-    def __gc(self):
-        torch.cuda.synchronize()
-        gc.collect()
-        torch.cuda.empty_cache()
 
     def __get_string_timestamp(self):
         return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -257,7 +253,7 @@ class GenericTrainer(BaseTrainer):
                     traceback.print_exc()
                     print("Error during sampling, proceeding without sampling")
 
-                self.__gc()
+                torch_gc()
 
     def __sample_during_training(
             self,
@@ -265,7 +261,7 @@ class GenericTrainer(BaseTrainer):
             train_device: torch.device,
             sample_params_list: list[SampleParams] = None,
     ):
-        self.__gc()
+        torch_gc()
 
         self.callbacks.on_update_status("sampling")
 
@@ -305,7 +301,7 @@ class GenericTrainer(BaseTrainer):
 
         self.model_setup.setup_train_device(self.model, self.args)
 
-        self.__gc()
+        torch_gc()
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -321,7 +317,7 @@ class GenericTrainer(BaseTrainer):
         shutil.copy2(self.args.sample_definition_file_name, samples_path)
 
     def backup(self):
-        self.__gc()
+        torch_gc()
 
         self.callbacks.on_update_status("creating backup")
 
@@ -355,10 +351,10 @@ class GenericTrainer(BaseTrainer):
 
         self.model_setup.setup_train_device(self.model, self.args)
 
-        self.__gc()
+        torch_gc()
 
     def save(self, train_progress: TrainProgress):
-        self.__gc()
+        torch_gc()
 
         self.callbacks.on_update_status("saving")
 
@@ -394,7 +390,7 @@ class GenericTrainer(BaseTrainer):
             if self.model.ema:
                 self.model.ema.copy_temp_to(self.parameters)
 
-        self.__gc()
+        torch_gc()
 
     def __needs_sample(self, train_progress: TrainProgress):
         return self.action_needed("sample", self.args.sample_after, self.args.sample_after_unit, train_progress)
@@ -428,7 +424,7 @@ class GenericTrainer(BaseTrainer):
             self.model.to(self.temp_device)
             self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device)
             self.model.eval()
-            self.__gc()
+            torch_gc()
 
             cached_epochs = [False] * self.args.latent_caching_epochs
             for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
@@ -465,12 +461,12 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status("starting epoch/caching")
 
             self.model.to(self.temp_device)
-            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device)
+            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device, self.args)
             self.model.eval()
-            self.__gc()
+            torch_gc()
             self.data_loader.get_data_set().start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
-            self.__gc()
+            torch_gc()
 
             current_epoch_length = len(self.data_loader.get_data_loader()) + train_progress.epoch_step
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
@@ -487,7 +483,7 @@ class GenericTrainer(BaseTrainer):
                     )
 
                 if self.__needs_gc(train_progress):
-                    self.__gc()
+                    torch_gc()
 
                 if not has_gradient:
                     self.__execute_sample_during_training()

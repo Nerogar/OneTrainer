@@ -3,7 +3,7 @@ import json
 from mgds.DebugDataLoaderModules import SaveImage, DecodeMoVQ
 from mgds.DiffusersDataLoaderModules import EncodeMoVQ
 from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import TrainDataLoader, OutputPipelineModule
+from mgds.MGDS import TrainDataLoader, OutputPipelineModule, MGDS
 from mgds.TransformersDataLoaderModules import *
 
 from modules.dataLoader.kandinsky.KandinskyPrior import KandinskyPrior
@@ -39,6 +39,20 @@ class KandinskyBaseDataLoader(BaseDataLoader):
         )
         self.__dl = TrainDataLoader(self.__ds, args.batch_size)
 
+    def get_data_set(self) -> MGDS:
+        return self.__ds
+
+    def get_data_loader(self) -> TrainDataLoader:
+        return self.__dl
+
+    def setup_cache_device(
+            self,
+            model: KandinskyModel,
+            train_device: torch.device,
+            temp_device: torch.device,
+            args: TrainArgs,
+    ):
+        pass
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -335,7 +349,7 @@ class KandinskyBaseDataLoader(BaseDataLoader):
 
         debug_modules = self._debug_modules(args, model)
 
-        self.setup_cache_device(model, self.train_device, self.temp_device)
+        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,

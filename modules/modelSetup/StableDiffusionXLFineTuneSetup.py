@@ -100,12 +100,12 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             model: StableDiffusionXLModel,
             args: TrainArgs,
     ):
-        vae_on_train_device = args.align_prop_loss
+        vae_on_train_device = args.align_prop
+        text_encoder_on_train_device = args.train_text_encoder or args.align_prop
 
-        model.text_encoder_1.to(self.train_device)
-        model.text_encoder_2.to(self.train_device)
-        model.vae.to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet.to(self.train_device)
+        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
+        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
+        model.unet_to(self.train_device)
 
         if args.train_text_encoder:
             model.text_encoder_1.train()
@@ -115,7 +115,11 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             model.text_encoder_2.eval()
 
         model.vae.train()
-        model.unet.train()
+
+        if args.train_unet:
+            model.unet.train()
+        else:
+            model.unet.eval()
 
     def after_optimizer_step(
             self,

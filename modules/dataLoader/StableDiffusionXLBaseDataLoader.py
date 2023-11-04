@@ -49,8 +49,11 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             model: StableDiffusionXLModel,
             train_device: torch.device,
             temp_device: torch.device,
+            args: TrainArgs,
     ):
-        model.vae.to(train_device)
+        model.vae_to(train_device)
+        if not args.train_text_encoder:
+            model.text_encoder_to(train_device)
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -196,11 +199,13 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
+        encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, text_encoder=model.text_encoder_1, hidden_state_output_index=-(2+args.text_encoder_layer_skip))
+        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', text_encoder=model.text_encoder_2, hidden_state_output_index=-(2+args.text_encoder_layer_skip))
 
         modules = [
             rescale_image, encode_image,
-            tokenize_prompt_1,
-            tokenize_prompt_2,
+            tokenize_prompt_1, encode_prompt_1,
+            tokenize_prompt_2, encode_prompt_2,
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -213,28 +218,38 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         return modules
 
     def _cache_modules(self, args: TrainArgs):
-        split_names = [
-            'latent_image_distribution',
-            'original_resolution', 'crop_offset',
-        ]
+        image_split_names = ['latent_image_distribution', 'original_resolution', 'crop_offset']
 
         if args.masked_training or args.model_type.has_mask_input():
-            split_names.append('latent_mask')
+            image_split_names.append('latent_mask')
 
         if args.model_type.has_conditioning_image_input():
-            split_names.append('latent_conditioning_image_distribution')
+            image_split_names.append('latent_conditioning_image_distribution')
 
-        aggregate_names = ['crop_resolution', 'image_path']
+        image_aggregate_names = ['crop_resolution', 'image_path']
 
-        disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, cached_epochs=args.latent_caching_epochs)
-        ram_cache = RamCache(names=split_names + aggregate_names)
+        text_split_names = [
+            'tokens_1', 'text_encoder_1_hidden_state',
+            'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
+        ]
+
+        image_cache_dir = os.path.join(args.cache_dir, "image")
+        text_cache_dir = os.path.join(args.cache_dir, "text")
+
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, cached_epochs=args.latent_caching_epochs)
+        image_ram_cache = RamCache(names=image_split_names + image_aggregate_names)
+
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], cached_epochs=args.latent_caching_epochs)
 
         modules = []
 
         if args.latent_caching:
-            modules.append(disk_cache)
+            modules.append(image_disk_cache)
         else:
-            modules.append(ram_cache)
+            modules.append(image_ram_cache)
+
+        if not args.train_text_encoder:
+            modules.append(text_disk_cache)
 
         return modules
 
@@ -250,6 +265,11 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         if args.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
+
+        if not args.train_text_encoder:
+            output_names.append('text_encoder_1_hidden_state')
+            output_names.append('text_encoder_2_hidden_state')
+            output_names.append('text_encoder_2_pooled_state')
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
@@ -330,7 +350,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         debug_modules = self._debug_modules(args, model)
 
-        self.setup_cache_device(model, self.train_device, self.temp_device)
+        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,
