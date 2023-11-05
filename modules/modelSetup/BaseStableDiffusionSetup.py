@@ -17,6 +17,7 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import \
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class BaseStableDiffusionSetup(
@@ -105,7 +106,7 @@ class BaseStableDiffusionSetup(
 
         vae_scaling_factor = model.vae.config['scaling_factor']
 
-        if args.train_text_encoder:
+        if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
             text_encoder_output = self.__encode_text(
                 model,
                 args.text_encoder_layer_skip,

@@ -11,6 +11,7 @@ from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class StablDiffusionXLBaseDataLoader(BaseDataLoader):
@@ -52,7 +53,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             args: TrainArgs,
     ):
         model.vae_to(train_device)
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             model.text_encoder_to(train_device)
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
@@ -204,8 +205,8 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         modules = [
             rescale_image, encode_image,
-            tokenize_prompt_1, encode_prompt_1,
-            tokenize_prompt_2, encode_prompt_2,
+            tokenize_prompt_1,
+            tokenize_prompt_2,
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -214,6 +215,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if args.model_type.has_conditioning_image_input():
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
+
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+            modules.append(encode_prompt_1)
+            modules.append(encode_prompt_2)
 
         return modules
 
@@ -248,7 +253,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(text_disk_cache)
 
         return modules

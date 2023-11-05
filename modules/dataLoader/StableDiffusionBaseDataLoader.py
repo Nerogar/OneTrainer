@@ -11,6 +11,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class StablDiffusionBaseDataLoader(BaseDataLoader):
@@ -52,7 +53,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             args: TrainArgs,
     ):
         model.vae_to(train_device)
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             model.text_encoder_to(train_device)
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
@@ -72,7 +73,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             modules.append(mask_path)
 
         return modules
-
 
     def _load_input_modules(self, args: TrainArgs, model: StableDiffusionModel) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1)
@@ -105,7 +105,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         return modules
 
-
     def _mask_augmentation_modules(self, args: TrainArgs) -> list:
         inputs = ['image']
 
@@ -124,7 +123,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             modules.append(random_mask_rotate_crop)
 
         return modules
-
 
     def _aspect_bucketing_in(self, args: TrainArgs):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
@@ -155,7 +153,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         return modules
 
-
     def _crop_modules(self, args: TrainArgs):
         scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='image', crop_offset_out_name='crop_offset')
         scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='mask', crop_offset_out_name='crop_offset')
@@ -170,7 +167,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             modules.append(scale_crop_depth)
 
         return modules
-
 
     def _augmentation_modules(self, args: TrainArgs):
         inputs = ['image']
@@ -200,7 +196,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         ]
 
         return modules
-
 
     def _inpainting_modules(self, args: TrainArgs):
         conditioning_image = GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image', image_range_min=0, image_range_max=1)
@@ -235,7 +230,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         if args.model_type.has_depth_input():
             modules.append(downscale_depth)
 
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(encode_prompt)
 
         return modules
@@ -272,7 +267,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(text_disk_cache)
 
         return modules

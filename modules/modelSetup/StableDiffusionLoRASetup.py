@@ -117,13 +117,12 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             args: TrainArgs,
     ):
         vae_on_train_device = self.debug_mode or args.align_prop
-        text_encoder_on_train_device = args.train_text_encoder or args.align_prop
+        text_encoder_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
-        if model.depth_estimator is not None:
-            model.depth_estimator.to(self.temp_device)
+        model.depth_estimator_to(self.temp_device)
 
         model.text_encoder.train()
         model.vae.eval()

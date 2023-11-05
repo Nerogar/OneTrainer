@@ -150,7 +150,7 @@ class GenericTrainer(BaseTrainer):
         if os.path.isdir(self.args.cache_dir):
             for filename in os.listdir(self.args.cache_dir):
                 path = os.path.join(self.args.cache_dir, filename)
-                if os.path.isdir(path) and filename.startswith('epoch-'):
+                if os.path.isdir(path):
                     shutil.rmtree(path)
 
     def __get_last_backup_dirpath(self):
@@ -422,7 +422,7 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status("caching")
 
             self.model.to(self.temp_device)
-            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device)
+            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device, self.args)
             self.model.eval()
             torch_gc()
 

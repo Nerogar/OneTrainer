@@ -127,8 +127,7 @@ class StableDiffusionEmbeddingSetup(BaseStableDiffusionSetup):
         model.text_encoder.to(self.train_device)
         model.vae.to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet.to(self.train_device)
-        if model.depth_estimator is not None:
-            model.depth_estimator.to(self.temp_device)
+        model.depth_estimator_to(self.temp_device)
 
         model.text_encoder.train()
         model.vae.eval()
