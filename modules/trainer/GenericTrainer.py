@@ -148,7 +148,7 @@ class GenericTrainer(BaseTrainer):
         if os.path.isdir(self.args.cache_dir):
             for filename in os.listdir(self.args.cache_dir):
                 path = os.path.join(self.args.cache_dir, filename)
-                if os.path.isdir(path):
+                if os.path.isdir(path) and (filename.startswith('epoch-') or filename in ['image', 'text']):
                     shutil.rmtree(path)
 
     def __get_last_backup_dirpath(self):
