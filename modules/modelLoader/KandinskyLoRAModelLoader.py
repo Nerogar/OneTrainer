@@ -10,6 +10,7 @@ from modules.model.KandinskyModel import KandinskyModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
 from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
@@ -92,34 +93,33 @@ class KandinskyLoRAModelLoader(BaseModelLoader, ModelLoaderLoRAMixin):
     def load(
             self,
             model_type: ModelType,
+            model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str | None,
-            extra_model_name: str | None,
     ) -> KandinskyModel | None:
         stacktraces = []
 
         base_model_loader = KandinskyModelLoader()
 
-        if base_model_name:
-            model = base_model_loader.load(model_type, weight_dtypes, base_model_name, None)
+        if model_names.base_model:
+            model = base_model_loader.load(model_type, model_names, weight_dtypes)
         else:
             model = KandinskyModel(model_type=model_type)
 
-        if extra_model_name:
+        if model_names.lora:
             try:
-                self.__load_internal(model, extra_model_name)
+                self.__load_internal(model, model_names.lora)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                self.__load_ckpt(model, extra_model_name)
+                self.__load_ckpt(model, model_names.lora)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                self.__load_safetensors(model, extra_model_name)
+                self.__load_safetensors(model, model_names.lora)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())

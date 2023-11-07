@@ -27,7 +27,6 @@ class UIState:
                     obj[name] = string_var
         else:
             def update(_0, _1, _2):
-
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
                     setattr(obj, name, None)
@@ -128,6 +127,24 @@ class UIState:
 
         return update
 
+    def __set_str_list_var(self, obj, is_dict, name, var):
+        if is_dict:
+            def update(_0, _1, _2):
+                string_var = var.get()
+                if string_var == "":
+                    obj[name] = []
+                else:
+                    obj[name] = [string_var]
+        else:
+            def update(_0, _1, _2):
+                string_var = var.get()
+                if string_var == "":
+                    setattr(obj, name, [])
+                else:
+                    setattr(obj, name, [string_var])
+
+        return update
+
     def __create_vars(self, obj):
         self.vars = {}
 
@@ -145,7 +162,8 @@ class UIState:
                 elif issubclass(var_type, Enum):
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
-                    var.trace_add("write", self.__set_enum_var(obj, is_dict, name, var, type(obj_var), obj.nullables[name]))
+                    var.trace_add("write",
+                                  self.__set_enum_var(obj, is_dict, name, var, type(obj_var), obj.nullables[name]))
                     self.vars[name] = var
                 elif var_type == bool:
                     var = tk.BooleanVar(master=self.master)
@@ -161,6 +179,11 @@ class UIState:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, obj.nullables[name]))
+                    self.vars[name] = var
+                elif var_type == list[str]:
+                    var = tk.StringVar(master=self.master)
+                    var.set("" if len(obj_var) == 0 else obj_var[0])
+                    var.trace_add("write", self.__set_str_list_var(obj, is_dict, name, var))
                     self.vars[name] = var
                 else:
                     var = tk.StringVar(master=self.master)
@@ -225,6 +248,9 @@ class UIState:
                 elif var_type == float:
                     var = self.vars[name]
                     var.set("" if obj_var is None else str(obj_var))
+                elif var_type == list[str]:
+                    var = self.vars[name]
+                    var.set("" if len(obj_var) == 0 else obj_var[0])
                 else:
                     var = self.vars[name]
                     var.set("" if obj_var is None else obj_var)

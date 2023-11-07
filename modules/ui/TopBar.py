@@ -7,6 +7,7 @@ import customtkinter as ctk
 
 from modules.util import path_util
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
@@ -59,11 +60,22 @@ class TopBar:
         # padding
         self.frame.grid_columnconfigure(4, weight=1)
 
+        # model type
+        components.options_kv(self.frame, 0, 5, [
+            ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
+            ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+            ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
+            ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+            ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
+            ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+            ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+        ], self.ui_state, "model_type")
+
         # training method
         components.options_kv(
             self.frame,
             row=0,
-            column=5,
+            column=6,
             values=[
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

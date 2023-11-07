@@ -12,6 +12,7 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
 from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.util import create
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
@@ -222,35 +223,34 @@ class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, M
     def load(
             self,
             model_type: ModelType,
+            model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str | None,
-            extra_model_name: str | None
     ) -> StableDiffusionXLModel | None:
         stacktraces = []
 
         try:
-            model = self.__load_internal(model_type, weight_dtypes, base_model_name)
+            model = self.__load_internal(model_type, weight_dtypes, model_names.base_model)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_diffusers(model_type, weight_dtypes, base_model_name)
+            model = self.__load_diffusers(model_type, weight_dtypes, model_names.base_model)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_safetensors(model_type, weight_dtypes, base_model_name)
+            model = self.__load_safetensors(model_type, weight_dtypes, model_names.base_model)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_ckpt(model_type, weight_dtypes, base_model_name)
+            model = self.__load_ckpt(model_type, weight_dtypes, model_names.base_model)
             if model is not None:
                 return model
         except:
@@ -258,4 +258,4 @@ class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, M
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load model: " + base_model_name)
+        raise Exception("could not load model: " + model_names.base_model)

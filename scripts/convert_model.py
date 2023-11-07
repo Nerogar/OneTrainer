@@ -3,6 +3,7 @@ import sys
 
 sys.path.append(os.getcwd())
 
+from modules.util.ModelNames import ModelNames
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
@@ -18,16 +19,19 @@ def main():
     if args.training_method in [TrainingMethod.FINE_TUNE]:
         model = model_loader.load(
             model_type=args.model_type,
+            model_names=ModelNames(
+                base_model=args.input_name,
+            ),
             weight_dtypes=args.weight_dtypes(),
-            base_model_name=args.input_name,
-            extra_model_name=None,
         )
     elif args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
         model = model_loader.load(
             model_type=args.model_type,
+            model_names=ModelNames(
+                lora=args.input_name,
+                embedding=[args.input_name],
+            ),
             weight_dtypes=args.weight_dtypes(),
-            base_model_name=None,
-            extra_model_name=args.input_name,
         )
     else:
         raise Exception("could not load model: " + args.input_name)

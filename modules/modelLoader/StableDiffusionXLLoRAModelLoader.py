@@ -11,6 +11,7 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
 from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
@@ -126,34 +127,33 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixi
     def load(
             self,
             model_type: ModelType,
+            model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str | None,
-            extra_model_name: str | None
     ) -> StableDiffusionXLModel | None:
         stacktraces = []
 
         base_model_loader = StableDiffusionXLModelLoader()
 
-        if base_model_name is not None:
-            model = base_model_loader.load(model_type, weight_dtypes, base_model_name, None)
+        if model_names.base_model is not None:
+            model = base_model_loader.load(model_type, model_names, weight_dtypes)
         else:
             model = StableDiffusionXLModel(model_type=model_type)
 
-        if extra_model_name:
+        if model_names.lora:
             try:
-                self.__load_internal(model, extra_model_name)
+                self.__load_internal(model, model_names.lora)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                self.__load_ckpt(model, extra_model_name)
+                self.__load_ckpt(model, model_names.lora)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                self.__load_safetensors(model, extra_model_name)
+                self.__load_safetensors(model, model_names.lora)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
@@ -162,4 +162,4 @@ class StableDiffusionXLLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixi
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load LoRA: " + extra_model_name)
+        raise Exception("could not load LoRA: " + model_names.lora)

@@ -1,6 +1,7 @@
 import argparse
 from typing import Any
 
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.args.arg_type_util import nullable_bool
@@ -29,11 +30,7 @@ class TrainArgs(BaseArgs):
 
     # model settings
     base_model_name: str
-    extra_model_name: str
     weight_dtype: DataType
-    text_encoder_weight_dtype: DataType
-    unet_weight_dtype: DataType
-    vae_weight_dtype: DataType
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
@@ -59,34 +56,11 @@ class TrainArgs(BaseArgs):
     ema: EMAMode
     ema_decay: float
     ema_update_step_interval: int
-    train_text_encoder: bool
-    train_text_encoder_epochs: int
-    text_encoder_learning_rate: float
-    text_encoder_layer_skip: int
-    train_unet: bool
-    train_unet_epochs: int
-    unet_learning_rate: float
-    offset_noise_weight: float
-    perturbation_noise_weight: float
-    rescale_noise_scheduler_to_zero_terminal_snr: bool
-    force_v_prediction: bool
-    force_epsilon_prediction: bool
     train_device: str
     temp_device: str
     train_dtype: DataType
     only_cache: bool
     resolution: int
-    masked_training: bool
-    unmasked_probability: float
-    unmasked_weight: float
-    normalize_masked_area_loss: bool
-    max_noising_strength: float
-    token_count: int
-    initial_embedding_text: str
-    embedding_weight_dtype: DataType
-    lora_rank: int
-    lora_alpha: float
-    lora_weight_dtype: DataType
     attention_mechanism: AttentionMechanism
     align_prop: bool
     align_prop_probability: float
@@ -95,6 +69,44 @@ class TrainArgs(BaseArgs):
     align_prop_steps: int
     align_prop_truncate_steps: float
     align_prop_cfg_scale: float
+
+    # vae
+    vae_weight_dtype: DataType
+
+    # text encoder
+    train_text_encoder: bool
+    train_text_encoder_epochs: int
+    text_encoder_learning_rate: float
+    text_encoder_layer_skip: int
+    text_encoder_weight_dtype: DataType
+
+    # unet
+    train_unet: bool
+    train_unet_epochs: int
+    unet_learning_rate: float
+    offset_noise_weight: float
+    perturbation_noise_weight: float
+    rescale_noise_scheduler_to_zero_terminal_snr: bool
+    force_v_prediction: bool
+    force_epsilon_prediction: bool
+    masked_training: bool
+    unmasked_probability: float
+    unmasked_weight: float
+    normalize_masked_area_loss: bool
+    max_noising_strength: float
+    unet_weight_dtype: DataType
+
+    # embedding
+    embedding_model_names: list[str]
+    token_count: int
+    initial_embedding_text: str
+    embedding_weight_dtype: DataType
+
+    # lora
+    lora_model_name: str
+    lora_rank: int
+    lora_alpha: float
+    lora_weight_dtype: DataType
 
     # optimizer settings
     optimizer: Optimizer
@@ -185,6 +197,14 @@ class TrainArgs(BaseArgs):
                 dtypes.append(weight_dtypes.unet)
             return dtypes
 
+    def model_names(self) -> ModelNames:
+        return ModelNames(
+            base_model=self.base_model_name,
+            lora=self.lora_model_name,
+            embedding=self.embedding_model_names,
+        )
+
+
     @staticmethod
     def parse_args() -> 'TrainArgs':
         parser = argparse.ArgumentParser(description="One Trainer Training Script.")
@@ -202,11 +222,7 @@ class TrainArgs(BaseArgs):
 
         # model settings
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to start training from")
-        parser.add_argument("--extra-model-name", type=str, required=False, default=None, dest="extra_model_name", help="The extra model to start training from")
         parser.add_argument("--weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="weight_dtype", help="The data type to use for weights during training", choices=list(DataType))
-        parser.add_argument("--text-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_weight_dtype", help="The data type to use for text encoder weights during training", choices=list(DataType))
-        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
-        parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
         parser.add_argument("--output-dtype", type=DataType, required=True, dest="output_dtype", help="The data type to use for saving weights", choices=list(DataType))
         parser.add_argument("--output-model-format", type=ModelFormat, required=False, default=ModelFormat.SAFETENSORS, dest="output_model_format", help="The format to save the final output model", choices=list(ModelFormat))
         parser.add_argument("--output-model-destination", type=str, required=True, dest="output_model_destination", help="The destination to save the final output model")
@@ -233,34 +249,11 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--ema", type=EMAMode, required=False, default=EMAMode.OFF, dest="ema", help="Activate EMA during training", choices=list(EMAMode))
         parser.add_argument("--ema-decay", type=float, required=False, default=0.999, dest="ema_decay", help="Decay parameter of the EMA model")
         parser.add_argument("--ema-update-step-interval", type=int, required=False, default=5, dest="ema_update_step_interval", help="")
-        parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
-        parser.add_argument("--train-text-encoder-epochs", type=int, required=False, default=2 ** 30, dest="train_text_encoder_epochs", help="Number of epochs to train the text encoder for")
-        parser.add_argument("--text-encoder-learning-rate", type=float, required=False, default=None, dest="text_encoder_learning_rate", help="Learning rate for the text encoder")
-        parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
-        parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
-        parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
-        parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
-        parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
-        parser.add_argument("--perturbation-noise-weight", type=float, required=False, default=0.0, dest="perturbation_noise_weight", help="The weight for perturbation noise")
-        parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
-        parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
-        parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
         parser.add_argument("--train-device", type=str, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
-        parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
-        parser.add_argument("--unmasked-probability", type=float, required=False, default=0.0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
-        parser.add_argument("--unmasked-weight", type=float, required=False, default=0.0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
-        parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
-        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
-        parser.add_argument("--token-count", type=int, required=False, default=1, dest="token_count", help="The number of tokens to train")
-        parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
-        parser.add_argument("--embedding-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="embedding_weight_dtype", help="The data type to use for training the Embedding", choices=list(DataType))
-        parser.add_argument("--lora-rank", type=int, required=False, default=1, dest="lora_rank", help="The rank parameter used when initializing new LoRA networks")
-        parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
-        parser.add_argument("--lora-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="lora_weight_dtype", help="The data type to use for training the LoRA", choices=list(DataType))
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
         parser.add_argument("--align-prop", required=False, action='store_true', dest="align_prop", help="Enable AlignProp loss calculations")
         parser.add_argument("--align-prop-probability", type=float, required=False, default=0.1, dest="align_prop_probability", help="If AlignProp is active, defines the number of steps that use the AlignProp loss")
@@ -269,6 +262,44 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--align-prop-steps", type=int, required=False, default=20, dest="align_prop_steps", help="Number of inference steps for each AlignProp step")
         parser.add_argument("--align-prop-truncate-steps", type=float, required=False, default=0.5, dest="align_prop_truncate_steps", help="Fraction of steps to randomly truncate when using AlignProp")
         parser.add_argument("--align-prop-cfg-scale", type=float, required=False, default=7.0, dest="align_prop_cfg_scale", help="CFG Scale for inference steps of AlignProp calculations")
+
+        # vae
+        parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
+
+        # text encoder
+        parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
+        parser.add_argument("--train-text-encoder-epochs", type=int, required=False, default=2 ** 30, dest="train_text_encoder_epochs", help="Number of epochs to train the text encoder for")
+        parser.add_argument("--text-encoder-learning-rate", type=float, required=False, default=None, dest="text_encoder_learning_rate", help="Learning rate for the text encoder")
+        parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
+        parser.add_argument("--text-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_weight_dtype", help="The data type to use for text encoder weights during training", choices=list(DataType))
+
+        # unet
+        parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
+        parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
+        parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
+        parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
+        parser.add_argument("--perturbation-noise-weight", type=float, required=False, default=0.0, dest="perturbation_noise_weight", help="The weight for perturbation noise")
+        parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
+        parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
+        parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
+        parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
+        parser.add_argument("--unmasked-probability", type=float, required=False, default=0.0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
+        parser.add_argument("--unmasked-weight", type=float, required=False, default=0.0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
+        parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
+        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
+        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
+
+        # embedding
+        parser.add_argument("--embedding-model-name", type=str, required=False, action="append", default=[], dest="embedding_model_names", help="The embedding to start training from")
+        parser.add_argument("--token-count", type=int, required=False, default=1, dest="token_count", help="The number of tokens to train")
+        parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
+        parser.add_argument("--embedding-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="embedding_weight_dtype", help="The data type to use for training the Embedding", choices=list(DataType))
+
+        # lora
+        parser.add_argument("--lora-model-name", type=str, required=False, default=None, dest="lora_model_name", help="The LoRA to start training from")
+        parser.add_argument("--lora-rank", type=int, required=False, default=1, dest="lora_rank", help="The rank parameter used when initializing new LoRA networks")
+        parser.add_argument("--lora-alpha", type=float, required=False, default=1.0, dest="lora_alpha", help="The alpha parameter used when initializing new LoRA networks")
+        parser.add_argument("--lora-weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="lora_weight_dtype", help="The data type to use for training the LoRA", choices=list(DataType))
 
         # optimizer settings
         parser.add_argument("--optimizer-adam-w-mode", type=nullable_bool, default=None, dest="optimizer_adam_w_mode", help='Whether to use weight decay correction for Adam optimizer.')
@@ -353,11 +384,7 @@ class TrainArgs(BaseArgs):
 
         # model settings
         data.append(("base_model_name", "runwayml/stable-diffusion-v1-5", str, False))
-        data.append(("extra_model_name", "", str, False))
         data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
-        data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
-        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
-        data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
@@ -383,34 +410,11 @@ class TrainArgs(BaseArgs):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
-        data.append(("train_text_encoder", True, bool, False))
-        data.append(("train_text_encoder_epochs", 30, int, False))
-        data.append(("text_encoder_learning_rate", 3e-6, float, True))
-        data.append(("text_encoder_layer_skip", 0, int, False))
-        data.append(("train_unet", True, bool, False))
-        data.append(("train_unet_epochs", 10000, int, False))
-        data.append(("unet_learning_rate", 3e-6, float, True))
-        data.append(("offset_noise_weight", 0.0, float, False))
-        data.append(("perturbation_noise_weight", 0.0, float, False))
-        data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
-        data.append(("force_v_prediction", False, bool, False))
-        data.append(("force_epsilon_prediction", False, bool, False))
         data.append(("train_device", "cuda", str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", 512, int, False))
-        data.append(("masked_training", False, bool, False))
-        data.append(("unmasked_probability", 0.1, float, False))
-        data.append(("unmasked_weight", 0.1, float, False))
-        data.append(("normalize_masked_area_loss", False, bool, False))
-        data.append(("max_noising_strength", 1.0, float, False))
-        data.append(("token_count", 1, int, False))
-        data.append(("initial_embedding_text", "*", str, False))
-        data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
-        data.append(("lora_rank", 16, int, False))
-        data.append(("lora_alpha", 1.0, float, False))
-        data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
         data.append(("align_prop", False, bool, False))
         data.append(("align_prop_probability", 0.1, float, False))
@@ -419,6 +423,44 @@ class TrainArgs(BaseArgs):
         data.append(("align_prop_steps", 20, int, False))
         data.append(("align_prop_truncate_steps", 0.5, float, False))
         data.append(("align_prop_cfg_scale", 7.0, float, False))
+
+        # vae
+        data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
+
+        # text encoder
+        data.append(("train_text_encoder", True, bool, False))
+        data.append(("train_text_encoder_epochs", 30, int, False))
+        data.append(("text_encoder_learning_rate", 3e-6, float, True))
+        data.append(("text_encoder_layer_skip", 0, int, False))
+        data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
+
+        # unet
+        data.append(("train_unet", True, bool, False))
+        data.append(("train_unet_epochs", 10000, int, False))
+        data.append(("unet_learning_rate", 3e-6, float, True))
+        data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("perturbation_noise_weight", 0.0, float, False))
+        data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
+        data.append(("force_v_prediction", False, bool, False))
+        data.append(("force_epsilon_prediction", False, bool, False))
+        data.append(("masked_training", False, bool, False))
+        data.append(("unmasked_probability", 0.1, float, False))
+        data.append(("unmasked_weight", 0.1, float, False))
+        data.append(("normalize_masked_area_loss", False, bool, False))
+        data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+
+        # embedding
+        data.append(("embedding_model_names", [], list[str], False))
+        data.append(("token_count", 1, int, False))
+        data.append(("initial_embedding_text", "*", str, False))
+        data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
+
+        # lora
+        data.append(("lora_model_name", "", str, False))
+        data.append(("lora_rank", 16, int, False))
+        data.append(("lora_alpha", 1.0, float, False))
+        data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # optimizer settings
         data.append(("optimizer", Optimizer.ADAMW, Optimizer, False))

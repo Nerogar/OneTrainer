@@ -10,6 +10,7 @@ from transformers import CLIPTokenizer, CLIPTextModelWithProjection, CLIPVisionM
 
 from modules.model.KandinskyModel import KandinskyModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.util.ModelNames import ModelNames
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
@@ -163,13 +164,12 @@ class KandinskyModelLoader(BaseModelLoader):
     def load(
             self,
             model_type: ModelType,
+            model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str | None,
-            extra_model_name: str | None
     ) -> KandinskyModel | None:
         stacktraces = []
 
-        split_base_model_name = base_model_name.split(';')
+        split_base_model_name = model_names.base_model.split(';')
         if len(split_base_model_name) == 2:
             prior_model_name, diffusion_model_name = split_base_model_name
 
@@ -182,21 +182,21 @@ class KandinskyModelLoader(BaseModelLoader):
 
         else:
             try:
-                model = self.__load_internal(model_type, weight_dtypes, base_model_name)
+                model = self.__load_internal(model_type, weight_dtypes, model_names.base_model)
                 if model is not None:
                     return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                model = self.__load_safetensors(model_type, weight_dtypes, base_model_name)
+                model = self.__load_safetensors(model_type, weight_dtypes, model_names.base_model)
                 if model is not None:
                     return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                model = self.__load_ckpt(model_type, weight_dtypes, base_model_name)
+                model = self.__load_ckpt(model_type, weight_dtypes, model_names.base_model)
                 if model is not None:
                     return model
             except:
@@ -204,4 +204,4 @@ class KandinskyModelLoader(BaseModelLoader):
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load model: " + base_model_name)
+        raise Exception("could not load model: " + model_names.base_model)

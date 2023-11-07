@@ -9,6 +9,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffu
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
@@ -45,8 +46,10 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
     def __load_ckpt(
             self,
             model: StableDiffusionModel,
-            embedding_name: str,
+            embedding_names: list[str],
     ):
+        embedding_name = embedding_names[0]
+
         embedding_state = torch.load(embedding_name)
 
         string_to_param_dict = embedding_state['string_to_param']
@@ -64,8 +67,10 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
     def __load_safetensors(
             self,
             model: StableDiffusionModel,
-            embedding_name: str,
+            embedding_names: list[str],
     ):
+        embedding_name = embedding_names[0]
+
         embedding_state = load_file(embedding_name)
 
         tensor = embedding_state["emp_params"]
@@ -82,8 +87,10 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
     def __load_internal(
             self,
             model: StableDiffusionModel,
-            embedding_name: str,
+            embedding_names: list[str],
     ):
+        embedding_name = embedding_names[0]
+
         with open(os.path.join(embedding_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
             train_progress = TrainProgress(
@@ -97,9 +104,9 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
         pt_embedding_name = os.path.join(embedding_name, "embedding", "embedding.pt")
         safetensors_embedding_name = os.path.join(embedding_name, "embedding", "embedding.safetensors")
         if os.path.exists(pt_embedding_name):
-            self.__load_ckpt(model, pt_embedding_name)
+            self.__load_ckpt(model, [pt_embedding_name])
         elif os.path.exists(safetensors_embedding_name):
-            self.__load_safetensors(model, safetensors_embedding_name)
+            self.__load_safetensors(model, [safetensors_embedding_name])
         else:
             raise Exception("no embedding found")
 
@@ -122,34 +129,33 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
     def load(
             self,
             model_type: ModelType,
+            model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-            base_model_name: str | None,
-            extra_model_name: str | None
     ) -> StableDiffusionModel | None:
         stacktraces = []
 
         base_model_loader = StableDiffusionModelLoader()
 
-        if base_model_name is not None:
-            model = base_model_loader.load(model_type, weight_dtypes, base_model_name, None)
+        if model_names.base_model is not None:
+            model = base_model_loader.load(model_type, model_names, weight_dtypes)
         else:
             model = StableDiffusionModel(model_type=model_type)
 
-        if extra_model_name:
+        if model_names.embedding:
             try:
-                self.__load_internal(model, extra_model_name)
+                self.__load_internal(model, model_names.embedding)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                self.__load_safetensors(model, extra_model_name)
+                self.__load_safetensors(model, model_names.embedding)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
-                self.__load_ckpt(model, extra_model_name)
+                self.__load_ckpt(model, model_names.embedding)
                 return model
             except:
                 stacktraces.append(traceback.format_exc())
@@ -158,4 +164,4 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load LoRA: " + extra_model_name)
+        raise Exception("could not load LoRA: " + str(model_names.embedding))

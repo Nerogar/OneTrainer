@@ -182,19 +182,6 @@ class TrainUI(ctk.CTk):
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
-        # model type
-        components.label(master, 0, 3, "Model Type",
-                         tooltip="Type of the base model")
-        components.options_kv(master, 0, 4, [
-            ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
-            ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
-            ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
-            ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
-            ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
-            ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
-            ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
-        ], self.ui_state, "model_type")
-
         # output model destination
         components.label(master, 1, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
@@ -582,11 +569,11 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=0)
         master.grid_columnconfigure(4, weight=1)
 
-        # extra model
+        # lora model name
         components.label(master, 0, 0, "LoRA base model",
                          tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
         components.file_entry(
-            master, 0, 1, self.ui_state, "extra_model_name",
+            master, 0, 1, self.ui_state, "lora_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -617,11 +604,11 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=0)
         master.grid_columnconfigure(4, weight=1)
 
-        # extra model
+        # embedding model names
         components.label(master, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "extra_model_name",
+            master, 0, 1, self.ui_state, "embedding_model_names",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 

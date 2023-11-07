@@ -1,6 +1,7 @@
 import argparse
 from typing import Any
 
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
@@ -27,6 +28,13 @@ class ConvertModelArgs(BaseArgs):
             self.output_dtype,
             self.output_dtype,
             self.output_dtype,
+        )
+
+    def model_names(self) -> ModelNames:
+        return ModelNames(
+            base_model=self.input_name,
+            lora=self.input_name,
+            embedding=[self.input_name],
         )
 
     @staticmethod

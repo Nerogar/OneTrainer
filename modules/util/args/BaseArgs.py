@@ -28,6 +28,8 @@ class BaseArgs:
                     data[name] = str(value)
                 else:
                     data[name] = value
+            elif self.types[name] == list[str]:
+                data[name] = value
             else:
                 data[name] = value
 
@@ -61,6 +63,8 @@ class BaseArgs:
                         setattr(self, name, None if data[name] is None else float(data[name]))
                     else:
                         setattr(self, name, float(data[name]))
+                elif self.types[name] == list[str]:
+                    setattr(self, name, data[name])
                 else:
                     setattr(self, name, data[name])
             except Exception:
@@ -99,6 +103,9 @@ class BaseArgs:
                         data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                     else:
                         data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
+                elif self.types[name] == list[str]:
+                    for val in value:
+                        data.append(f"{self.__to_arg_name(name)}=\"{val}\"")
                 else:
                     data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
 

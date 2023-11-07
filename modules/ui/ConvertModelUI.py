@@ -5,6 +5,7 @@ import customtkinter as ctk
 import torch
 
 from modules.util import create
+from modules.util.ModelNames import ModelNames
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -111,16 +112,19 @@ class ConvertModelUI(ctk.CTkToplevel):
             if self.convert_model_args.training_method in [TrainingMethod.FINE_TUNE]:
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
+                    model_names=ModelNames(
+                        base_model=self.convert_model_args.input_name,
+                    ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    base_model_name=self.convert_model_args.input_name,
-                    extra_model_name=None,
                 )
             elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
+                    model_names=ModelNames(
+                        lora=self.convert_model_args.input_name,
+                        embedding=[self.convert_model_args.input_name],
+                    ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    base_model_name=None,
-                    extra_model_name=self.convert_model_args.input_name,
                 )
             else:
                 raise Exception("could not load model: " + self.convert_model_args.input_name)

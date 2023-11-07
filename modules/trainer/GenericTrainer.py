@@ -111,9 +111,8 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
             model_type=self.args.model_type,
+            model_names=self.args.model_names(),
             weight_dtypes=self.args.weight_dtypes(),
-            base_model_name=base_model_name,
-            extra_model_name=extra_model_name,
         )
 
         self.callbacks.on_update_status("running model setup")

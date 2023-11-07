@@ -1,6 +1,7 @@
 import argparse
 from typing import Any
 
+from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
@@ -28,6 +29,13 @@ class SampleArgs(BaseArgs):
             self.weight_dtype,
             self.weight_dtype,
             self.weight_dtype,
+        )
+
+    def model_names(self) -> ModelNames:
+        return ModelNames(
+            base_model=self.base_model_name,
+            lora="",
+            embedding=[self.embedding_name],
         )
 
     @staticmethod

@@ -25,10 +25,9 @@ def main():
 
     print("Loading model " + args.base_model_name)
     model = model_loader.load(
-        args.model_type,
-        args.weight_dtypes(),
-        args.base_model_name,
-        args.embedding_name
+        model_type=args.model_type,
+
+        weight_dtypes=args.weight_dtypes(),
     )
     model.to(device)
     model.eval()
