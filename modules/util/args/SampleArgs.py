@@ -47,7 +47,7 @@ class SampleArgs(BaseArgs):
         parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
         parser.add_argument("--weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="weight_dtype", help="The data type to use for weights during sampling", choices=list(DataType))
         parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to sample from")
-        parser.add_argument("--embedding-name", type=str, required=False, default="", dest="extra_model_name", help="An embedding to use during sampling")
+        parser.add_argument("--embedding-name", type=str, required=False, default="", dest="embedding_name", help="An embedding to use during sampling")
         parser.add_argument("--prompt", type=str, required=True, dest="prompt", help="The prompt for sampling")
         parser.add_argument("--negative-prompt", type=str, required=False, default="", dest="negative_prompt", help="The negative prompt for sampling")
         parser.add_argument("--destination", type=str, required=True, dest="destination", help="The destination to save the output")

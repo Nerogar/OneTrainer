@@ -90,19 +90,20 @@ class GenericTrainer(BaseTrainer):
         self.model_setup = self.create_model_setup()
 
         self.callbacks.on_update_status("loading the model")
-
-        base_model_name = self.args.base_model_name
-        extra_model_name = self.args.extra_model_name
+        
+        model_names = self.args.model_names()
 
         if self.args.continue_last_backup:
             self.callbacks.on_update_status("searching for previous backups")
             last_backup_path = self.__get_last_backup_dirpath()
 
             if last_backup_path:
-                if self.args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
-                    extra_model_name = last_backup_path
+                if self.args.training_method == TrainingMethod.LORA:
+                    model_names.embedding = last_backup_path
+                elif self.args.training_method == TrainingMethod.LORA:
+                    model_names.embedding = [last_backup_path]
                 else:  # fine-tunes
-                    base_model_name = last_backup_path
+                    model_names.base_model = last_backup_path
 
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
@@ -111,7 +112,7 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
             model_type=self.args.model_type,
-            model_names=self.args.model_names(),
+            model_names=model_names,
             weight_dtypes=self.args.weight_dtypes(),
         )
 
