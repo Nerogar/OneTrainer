@@ -285,7 +285,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         if args.model_type.has_depth_input():
             output_names.append('latent_depth')
 
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_hidden_state')
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')

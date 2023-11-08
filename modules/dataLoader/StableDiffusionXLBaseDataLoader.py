@@ -271,7 +271,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if args.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_1_hidden_state')
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
