@@ -6,6 +6,7 @@ class TrainCommands:
         self.__stop_command = False
         self.__sample_custom_commands = []
         self.__sample_default_command = False
+        self.__backup_command = False
 
     def stop(self):
         self.__stop_command = True
@@ -28,3 +29,11 @@ class TrainCommands:
         sample_default_command = self.__sample_default_command
         self.__sample_default_command = False
         return sample_default_command
+
+    def backup(self):
+        self.__backup_command = True
+
+    def get_and_reset_backup_command(self) -> bool:
+        backup_command = self.__backup_command
+        self.__backup_command = False
+        return backup_command

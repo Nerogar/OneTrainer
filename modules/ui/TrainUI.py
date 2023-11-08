@@ -552,6 +552,9 @@ class TrainUI(ctk.CTk):
                          tooltip="The interval used when automatically creating model backups during training")
         components.time_entry(master, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
+        # backup now
+        components.button(master, 0, 2, "backup now", self.backup_now)
+
         # rolling backup
         components.label(master, 1, 0, "Rolling Backup",
                          tooltip="If rolling backups are enabled, older backups are deleted automatically")
@@ -784,3 +787,8 @@ class TrainUI(ctk.CTk):
         train_commands = self.training_commands
         if train_commands:
             train_commands.sample_default()
+
+    def backup_now(self):
+        train_commands = self.training_commands
+        if train_commands:
+            train_commands.backup()
