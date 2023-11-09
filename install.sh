@@ -1,10 +1,8 @@
 #/bin/bash
 
-#change the environment name conda use
+#change the environment name conda for conda to use
 conda_env=ot
 
-
-venv_available=false
 if ! [ -x "$(command -v python)" ]; then
 	echo 'error: python not installed or found!'
 	break
