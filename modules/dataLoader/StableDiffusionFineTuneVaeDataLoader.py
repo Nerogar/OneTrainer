@@ -29,13 +29,19 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         with open(args.concept_file_name, 'r') as f:
             concepts = json.load(f)
 
-        self.ds = self.create_dataset(
+        self.__ds = self.create_dataset(
             args=args,
             model=model,
             concepts=concepts,
             train_progress=train_progress,
         )
-        self.dl = TrainDataLoader(self.ds, args.batch_size)
+        self.__dl = TrainDataLoader(self.__ds, args.batch_size)
+
+    def get_data_set(self) -> MGDS:
+        return self.__ds
+
+    def get_data_loader(self) -> TrainDataLoader:
+        return self.__dl
 
     def setup_cache_device(
             self,
@@ -67,7 +73,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
     def __load_input_modules(self, args: TrainArgs) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='latent_mask', range_min=0, range_max=1, channels=1)
 
         modules = [load_image]
 
@@ -80,7 +86,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __mask_augmentation_modules(self, args: TrainArgs) -> list:
         inputs = ['image']
 
-        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution,
+        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='latent_mask', additional_names=inputs, min_size=args.resolution,
                                                        min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20,
                                                        enabled_in_name='settings.enable_random_circular_mask_shrink')
 
@@ -117,10 +123,10 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
                                           crop_resolution_in_name='crop_resolution',
                                           enable_crop_jitter_in_name='concept.enable_crop_jitter',
                                           image_out_name='image', crop_offset_out_name='crop_offset')
-        scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution',
+        scale_crop_mask = ScaleCropImage(image_in_name='latent_mask', scale_resolution_in_name='scale_resolution',
                                          crop_resolution_in_name='crop_resolution',
                                          enable_crop_jitter_in_name='concept.enable_crop_jitter',
-                                         image_out_name='mask', crop_offset_out_name='crop_offset')
+                                         image_out_name='latent_mask', crop_offset_out_name='crop_offset')
 
         modules = [scale_crop_image]
 
@@ -134,7 +140,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         inputs = ['image']
 
         if args.masked_training:
-            inputs.append('mask')
+            inputs.append('latent_mask')
 
         random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
 
@@ -145,12 +151,8 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
     def __preparation_modules(self, args: TrainArgs, model: StableDiffusionModel):
         image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
-        mask = Downscale(in_name='mask', out_name='latent_mask', factor=8)
 
         modules = [image]
-
-        if args.masked_training:
-            modules.append(mask)
 
         return modules
 
@@ -220,7 +222,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae),
             SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1,
                       in_range_max=1),
-            SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0,
+            SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0,
                       in_range_max=1),
             # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         ]
