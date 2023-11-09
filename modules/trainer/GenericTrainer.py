@@ -282,7 +282,8 @@ class GenericTrainer(BaseTrainer):
             train_progress=train_progress,
             train_device=train_device,
             sample_params_list=sample_params_list,
-            is_custom_sample=is_custom_sample
+            image_format=self.args.sample_image_format,
+            is_custom_sample=is_custom_sample,
         )
 
         if self.model.ema:
@@ -294,6 +295,7 @@ class GenericTrainer(BaseTrainer):
                 train_progress=train_progress,
                 train_device=train_device,
                 sample_params_list=sample_params_list,
+                image_format=self.args.sample_image_format,
                 folder_postfix=" - no-ema",
             )
 
