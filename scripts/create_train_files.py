@@ -1,16 +1,14 @@
 import os
 import sys
 
-from modules.util.params.ConceptParams import ConceptParams
-from modules.util.params.SampleParams import SampleParams
-
 sys.path.append(os.getcwd())
 
 import json
 from pathlib import Path
 
 from modules.util.args.CreateTrainFilesArgs import CreateTrainFilesArgs
-
+from modules.util.params.ConceptParams import ConceptParams
+from modules.util.params.SampleParams import SampleParams
 
 def main():
     args = CreateTrainFilesArgs.parse_args()
