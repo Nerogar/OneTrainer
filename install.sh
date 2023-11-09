@@ -24,6 +24,7 @@ elif [ -x "$(command -v python)" ]; then
 							python -m venv $python_venv
 						fi
 						source $python_venv/bin/activate
+						python -m pip install -r requirements.txt
 					elif [ -x "$(command -v conda)" ]; then
 						#check for venv
 						if conda info --envs | grep -q ${conda_env}; 
