@@ -20,11 +20,13 @@ class TopBar:
             train_args:
             TrainArgs,
             ui_state: UIState,
-            change_training_method_callback: Callable[[TrainingMethod], None]
+            change_model_type: Callable[[TrainingMethod], None],
+            change_training_method_callback: Callable[[TrainingMethod], None],
     ):
         self.master = master
         self.train_args = train_args
         self.ui_state = ui_state
+        self.change_model_type = change_model_type
         self.change_training_method_callback = change_training_method_callback
 
         self.dir = "training_presets"
@@ -51,7 +53,7 @@ class TopBar:
 
         # remove button
         # TODO
-        #components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
+        # components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
         # save button
         components.button(self.frame, 0, 3, "save current config", self.__save_config,
@@ -61,19 +63,27 @@ class TopBar:
         self.frame.grid_columnconfigure(4, weight=1)
 
         # model type
-        components.options_kv(self.frame, 0, 5, [
-            ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
-            ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
-            ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
-            ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
-            ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
-            ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
-            ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
-        ], self.ui_state, "model_type")
+        components.options_kv(
+            master=self.frame,
+            row=0,
+            column=5,
+            values=[
+                ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
+                ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+                ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
+                ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+                ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
+                ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+                ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+            ],
+            ui_state=self.ui_state,
+            var_name="model_type",
+            command=self.change_model_type,
+        )
 
         # training method
         components.options_kv(
-            self.frame,
+            master=self.frame,
             row=0,
             column=6,
             values=[
@@ -84,7 +94,7 @@ class TopBar:
             ],
             ui_state=self.ui_state,
             var_name="training_method",
-            command=self.change_training_method_callback
+            command=self.change_training_method_callback,
         )
 
     def __create_configs_dropdown(self):

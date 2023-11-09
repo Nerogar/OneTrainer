@@ -80,6 +80,13 @@ class TrainArgs(BaseArgs):
     text_encoder_layer_skip: int
     text_encoder_weight_dtype: DataType
 
+    # text encoder 2
+    train_text_encoder_2: bool
+    train_text_encoder_2_epochs: int
+    text_encoder_2_learning_rate: float
+    text_encoder_2_layer_skip: int
+    text_encoder_2_weight_dtype: DataType
+
     # unet
     train_unet: bool
     train_unet_epochs: int
@@ -89,12 +96,14 @@ class TrainArgs(BaseArgs):
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
     force_epsilon_prediction: bool
+    max_noising_strength: float
+    unet_weight_dtype: DataType
+
+    # masked training
     masked_training: bool
     unmasked_probability: float
     unmasked_weight: float
     normalize_masked_area_loss: bool
-    max_noising_strength: float
-    unet_weight_dtype: DataType
 
     # embedding
     embedding_model_names: list[str]
@@ -273,6 +282,13 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
         parser.add_argument("--text-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_weight_dtype", help="The data type to use for text encoder weights during training", choices=list(DataType))
 
+        # text encoder 2
+        parser.add_argument("--train-text-encoder-2", required=False, action='store_true', dest="train_text_encoder_2", help="Whether the text encoder 2 should be trained")
+        parser.add_argument("--train-text-encoder-2-epochs", type=int, required=False, default=2 ** 30, dest="train_text_encoder_2_epochs", help="Number of epochs to train the text encoder 2 for")
+        parser.add_argument("--text-encoder-2-learning-rate", type=float, required=False, default=None, dest="text_encoder_2_learning_rate", help="Learning rate for the text encoder 2")
+        parser.add_argument("--text-encoder-2-layer-skip", type=int, required=False, default=0, dest="text_encoder_2_layer_skip", help="Skip last layers of the text encoder 2")
+        parser.add_argument("--text-encoder-2-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_2_weight_dtype", help="The data type to use for text encoder 2 weights during training", choices=list(DataType))
+
         # unet
         parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
         parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
@@ -282,12 +298,14 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
         parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
         parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
+        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
+        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
+
+        # masked training
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
         parser.add_argument("--unmasked-probability", type=float, required=False, default=0.0, dest="unmasked_probability", help="If masked training is active, defines the number of steps to train on unmasked samples")
         parser.add_argument("--unmasked-weight", type=float, required=False, default=0.0, dest="unmasked_weight", help="If masked training is active, defines the loss weight of the unmasked parts of the image")
         parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
-        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
-        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
 
         # embedding
         parser.add_argument("--embedding-model-name", type=str, required=False, action="append", default=[], dest="embedding_model_names", help="The embedding to start training from")
@@ -434,6 +452,13 @@ class TrainArgs(BaseArgs):
         data.append(("text_encoder_layer_skip", 0, int, False))
         data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
 
+        # text encoder 2
+        data.append(("train_text_encoder_2", True, bool, False))
+        data.append(("train_text_encoder_2_epochs", 30, int, False))
+        data.append(("text_encoder_2_learning_rate", 3e-6, float, True))
+        data.append(("text_encoder_2_layer_skip", 0, int, False))
+        data.append(("text_encoder_2_weight_dtype", DataType.NONE, DataType, False))
+
         # unet
         data.append(("train_unet", True, bool, False))
         data.append(("train_unet_epochs", 10000, int, False))
@@ -443,12 +468,14 @@ class TrainArgs(BaseArgs):
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
         data.append(("force_epsilon_prediction", False, bool, False))
+        data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+
+        # masked training
         data.append(("masked_training", False, bool, False))
         data.append(("unmasked_probability", 0.1, float, False))
         data.append(("unmasked_weight", 0.1, float, False))
         data.append(("normalize_masked_area_loss", False, bool, False))
-        data.append(("max_noising_strength", 1.0, float, False))
-        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
 
         # embedding
         data.append(("embedding_model_names", [], list[str], False))

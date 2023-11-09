@@ -1,4 +1,3 @@
-import gc
 import threading
 import traceback
 import webbrowser
@@ -7,30 +6,23 @@ from tkinter import filedialog
 from typing import Callable
 
 import customtkinter as ctk
-import torch
 
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
-from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
+from modules.ui.TrainingTab import TrainingTab
 from modules.util.TrainProgress import TrainProgress
-from modules.util.enum.AlignPropLoss import AlignPropLoss
-from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
-from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.ImageFormat import ImageFormat
-from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.ui import components
@@ -65,7 +57,10 @@ class TrainUI(ctk.CTk):
 
         self.status_label = None
         self.training_button = None
+        self.export_button = None
         self.tabview = None
+
+        self.training_tab = None
 
         self.top_bar_component = self.top_bar(self)
         self.content_frame(self)
@@ -79,7 +74,7 @@ class TrainUI(ctk.CTk):
         self.top_bar_component.save_default()
 
     def top_bar(self, master):
-        return TopBar(master, self.train_args, self.ui_state, self.change_training_method)
+        return TopBar(master, self.train_args, self.ui_state, self.change_model_type, self.change_training_method)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -115,20 +110,20 @@ class TrainUI(ctk.CTk):
         self.tabview = ctk.CTkTabview(frame)
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
-        self.general_tab(self.tabview.add("general"))
-        self.model_tab(self.tabview.add("model"))
-        self.data_tab(self.tabview.add("data"))
-        self.concepts_tab(self.tabview.add("concepts"))
-        self.training_tab(self.tabview.add("training"))
-        self.sampling_tab(self.tabview.add("sampling"))
-        self.backup_tab(self.tabview.add("backup"))
-        self.tools_tab(self.tabview.add("tools"))
+        self.create_general_tab(self.tabview.add("general"))
+        self.create_model_tab(self.tabview.add("model"))
+        self.create_data_tab(self.tabview.add("data"))
+        self.create_concepts_tab(self.tabview.add("concepts"))
+        self.training_tab = self.create_training_tab(self.tabview.add("training"))
+        self.create_sampling_tab(self.tabview.add("sampling"))
+        self.create_backup_tab(self.tabview.add("backup"))
+        self.create_tools_tab(self.tabview.add("tools"))
 
         self.change_training_method(self.train_args.training_method)
 
         return frame
 
-    def general_tab(self, master):
+    def create_general_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
         master.grid_columnconfigure(2, weight=0)
@@ -167,7 +162,7 @@ class TrainUI(ctk.CTk):
                          tooltip="Starts the Tensorboard Web UI during training")
         components.switch(master, 6, 1, self.ui_state, "tensorboard")
 
-    def model_tab(self, master):
+    def create_model_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
         master.grid_columnconfigure(2, minsize=50)
@@ -244,7 +239,7 @@ class TrainUI(ctk.CTk):
             ("float16", DataType.FLOAT_16),
         ], self.ui_state, "vae_weight_dtype")
 
-    def data_tab(self, master):
+    def create_data_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
         master.grid_columnconfigure(2, minsize=50)
@@ -281,223 +276,13 @@ class TrainUI(ctk.CTk):
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
         components.switch(master, 5, 1, self.ui_state, "clear_cache_before_training")
 
-    def concepts_tab(self, master):
+    def create_concepts_tab(self, master):
         ConceptTab(master, self.train_args, self.ui_state)
 
-    def training_tab(self, master):
-        master.grid_rowconfigure(0, weight=1)
-        master.grid_columnconfigure(0, weight=1)
+    def create_training_tab(self, master) -> TrainingTab:
+        return TrainingTab(master, self.train_args, self.ui_state)
 
-        scroll_frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        scroll_frame.grid(row=0, column=0, sticky="nsew")
-
-        scroll_frame.grid_columnconfigure(0, weight=0)
-        scroll_frame.grid_columnconfigure(1, weight=1)
-        scroll_frame.grid_columnconfigure(2, minsize=20)
-        scroll_frame.grid_columnconfigure(3, weight=0)
-        scroll_frame.grid_columnconfigure(4, weight=1)
-        scroll_frame.grid_columnconfigure(5, minsize=20)
-        scroll_frame.grid_columnconfigure(6, weight=0)
-        scroll_frame.grid_columnconfigure(7, weight=1)
-
-        # column 1
-        # optimizer
-        components.label(scroll_frame, 0, 0, "Optimizer",
-                         tooltip="The type of optimizer")
-        components.options_adv(scroll_frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer",
-                               command=self.restore_optimizer_prefs, adv_command=self.open_optimizer_params_window)
-
-        # learning rate scheduler
-        components.label(scroll_frame, 1, 0, "Learning Rate Scheduler",
-                         tooltip="Learning rate scheduler that automatically changes the learning rate during training")
-        components.options(scroll_frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
-                           "learning_rate_scheduler")
-
-        # learning rate
-        components.label(scroll_frame, 2, 0, "Learning Rate",
-                         tooltip="The base learning rate")
-        components.entry(scroll_frame, 2, 1, self.ui_state, "learning_rate")
-
-        # learning rate warmup steps
-        components.label(scroll_frame, 3, 0, "Learning Rate Warmup Steps",
-                         tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate")
-        components.entry(scroll_frame, 3, 1, self.ui_state, "learning_rate_warmup_steps")
-
-        # learning rate cycles
-        components.label(scroll_frame, 4, 0, "Learning Rate Cycles",
-                         tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
-        components.entry(scroll_frame, 4, 1, self.ui_state, "learning_rate_cycles")
-
-        # epochs
-        components.label(scroll_frame, 5, 0, "Epochs",
-                         tooltip="The number of epochs for a full training run")
-        components.entry(scroll_frame, 5, 1, self.ui_state, "epochs")
-
-        # batch size
-        components.label(scroll_frame, 6, 0, "Batch Size",
-                         tooltip="The batch size of one training step")
-        components.entry(scroll_frame, 6, 1, self.ui_state, "batch_size")
-
-        # accumulation steps
-        components.label(scroll_frame, 7, 0, "Accumulation Steps",
-                         tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(scroll_frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
-
-        # attention mechanism
-        components.label(scroll_frame, 8, 0, "Attention",
-                         tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(scroll_frame, 8, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
-                           "attention_mechanism")
-
-        # ema
-        components.label(scroll_frame, 9, 0, "EMA",
-                         tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
-        components.options(scroll_frame, 9, 1, [str(x) for x in list(EMAMode)], self.ui_state,
-                           "ema")
-
-        # ema decay
-        components.label(scroll_frame, 10, 0, "EMA Decay",
-                         tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
-        components.entry(scroll_frame, 10, 1, self.ui_state, "ema_decay")
-
-        # ema update step interval
-        components.label(scroll_frame, 11, 0, "EMA Update Step Interval",
-                         tooltip="Number of steps between EMA update steps")
-        components.entry(scroll_frame, 11, 1, self.ui_state, "ema_update_step_interval")
-
-        # column 2
-        # train text encoder
-        components.label(scroll_frame, 0, 3, "Train Text Encoder",
-                         tooltip="Enables training the text encoder model")
-        components.switch(scroll_frame, 0, 4, self.ui_state, "train_text_encoder")
-
-        # train text encoder epochs
-        components.label(scroll_frame, 1, 3, "Train Text Encoder Epochs",
-                         tooltip="Number of epochs to train the text encoder")
-        components.entry(scroll_frame, 1, 4, self.ui_state, "train_text_encoder_epochs")
-
-        # text encoder learning rate
-        components.label(scroll_frame, 2, 3, "Text Encoder Learning Rate",
-                         tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-        components.entry(scroll_frame, 2, 4, self.ui_state, "text_encoder_learning_rate")
-
-        # text encoder layer skip (clip skip)
-        components.label(scroll_frame, 3, 3, "Clip Skip",
-                         tooltip="The number of clip layers to skip. 0 = disabled")
-        components.entry(scroll_frame, 3, 4, self.ui_state, "text_encoder_layer_skip")
-
-        # offset noise weight
-        components.label(scroll_frame, 5, 3, "Offset Noise Weight",
-                         tooltip="The weight of offset noise added to each training step")
-        components.entry(scroll_frame, 5, 4, self.ui_state, "offset_noise_weight")
-
-        # perturbation noise weight
-        components.label(scroll_frame, 6, 3, "Perturbation Noise Weight",
-                         tooltip="The weight of perturbation noise added to each training step")
-        components.entry(scroll_frame, 6, 4, self.ui_state, "perturbation_noise_weight")
-
-        # gradient checkpointing
-        components.label(scroll_frame, 7, 3, "Gradient checkpointing",
-                         tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        components.switch(scroll_frame, 7, 4, self.ui_state, "gradient_checkpointing")
-
-        # rescale noise scheduler to zero terminal SNR
-        components.label(scroll_frame, 8, 3, "Rescale Noise Scheduler",
-                         tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
-        components.switch(scroll_frame, 8, 4, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
-
-        # train dtype
-        components.label(scroll_frame, 9, 3, "Train Data Type",
-                         tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
-        components.options_kv(scroll_frame, 9, 4, [
-            ("float32", DataType.FLOAT_32),
-            ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("tfloat32", DataType.TFLOAT_32),
-        ], self.ui_state, "train_dtype")
-
-        # resolution
-        components.label(scroll_frame, 10, 3, "Resolution",
-                         tooltip="The resolution used for training")
-        components.entry(scroll_frame, 10, 4, self.ui_state, "resolution")
-
-        # column 3
-        # train unet
-        components.label(scroll_frame, 0, 6, "Train UNet",
-                         tooltip="Enables training the U-Net model")
-        components.switch(scroll_frame, 0, 7, self.ui_state, "train_unet")
-
-        # train unet epochs
-        components.label(scroll_frame, 1, 6, "Train UNet Epochs",
-                         tooltip="Number of epochs to train the U-Net")
-        components.entry(scroll_frame, 1, 7, self.ui_state, "train_unet_epochs")
-
-        # unet learning rate
-        components.label(scroll_frame, 2, 6, "Unet Learning Rate",
-                         tooltip="The learning rate of the U-Net. Overrides the base learning rate")
-        components.entry(scroll_frame, 2, 7, self.ui_state, "unet_learning_rate")
-
-        # Masked Training
-        components.label(scroll_frame, 5, 6, "Masked Training",
-                         tooltip="Masks the training samples to let the model focus on certain parts of the image. When enabled, one mask image is loaded for each training sample.")
-        components.switch(scroll_frame, 5, 7, self.ui_state, "masked_training")
-
-        # unmasked probability
-        components.label(scroll_frame, 6, 6, "Unmasked Probability",
-                         tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
-        components.entry(scroll_frame, 6, 7, self.ui_state, "unmasked_probability")
-
-        # unmasked weight
-        components.label(scroll_frame, 7, 6, "Unmasked Weight",
-                         tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
-        components.entry(scroll_frame, 7, 7, self.ui_state, "unmasked_weight")
-
-        # normalize masked area loss
-        components.label(scroll_frame, 8, 6, "Normalize Masked Area Loss",
-                         tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
-        components.switch(scroll_frame, 8, 7, self.ui_state, "normalize_masked_area_loss")
-
-        # max noising strength
-        components.label(scroll_frame, 9, 6, "Max Noising Strength",
-                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(scroll_frame, 9, 7, self.ui_state, "max_noising_strength")
-
-        # align prop
-        components.label(scroll_frame, 11, 6, "AlignProp",
-                         tooltip="Enables AlignProp training")
-        components.switch(scroll_frame, 11, 7, self.ui_state, "align_prop")
-
-        # align prop probability
-        components.label(scroll_frame, 12, 6, "AlignProp Probability",
-                         tooltip="When AlignProp is enabled, specifies the number of training steps done using AlignProp calculations")
-        components.entry(scroll_frame, 12, 7, self.ui_state, "align_prop_probability")
-
-        # align prop loss
-        components.label(scroll_frame, 13, 6, "AlignProp Loss",
-                         tooltip="Specifies the loss function used for AlignProp calculations")
-        components.options(scroll_frame, 13, 7, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
-
-        # align prop weight
-        components.label(scroll_frame, 14, 6, "AlignProp Weight",
-                         tooltip="A weight multiplier for the AlignProp loss")
-        components.entry(scroll_frame, 14, 7, self.ui_state, "align_prop_weight")
-
-        # align prop steps
-        components.label(scroll_frame, 15, 6, "AlignProp Steps",
-                         tooltip="Number of inference steps for each AlignProp step")
-        components.entry(scroll_frame, 15, 7, self.ui_state, "align_prop_steps")
-
-        # align prop truncate steps
-        components.label(scroll_frame, 16, 6, "AlignProp Truncate Steps",
-                         tooltip="Fraction of steps to randomly truncate when using AlignProp. This is needed to increase model diversity.")
-        components.entry(scroll_frame, 16, 7, self.ui_state, "align_prop_truncate_steps")
-
-        # align prop truncate steps
-        components.label(scroll_frame, 17, 6, "AlignProp CFG Scale",
-                         tooltip="CFG Scale for inference steps of AlignProp calculations")
-        components.entry(scroll_frame, 17, 7, self.ui_state, "align_prop_cfg_scale")
-
-    def sampling_tab(self, master):
+    def create_sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
         master.grid_rowconfigure(1, weight=1)
         master.grid_columnconfigure(0, weight=1)
@@ -527,7 +312,7 @@ class TrainUI(ctk.CTk):
 
         SamplingTab(frame, self.train_args, self.ui_state)
 
-    def backup_tab(self, master):
+    def create_backup_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
         master.grid_columnconfigure(2, minsize=50)
@@ -632,7 +417,7 @@ class TrainUI(ctk.CTk):
 
         return master
 
-    def tools_tab(self, master):
+    def create_tools_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
         master.grid_columnconfigure(2, minsize=50)
@@ -650,6 +435,10 @@ class TrainUI(ctk.CTk):
         components.button(master, 1, 1, "Open", self.open_convert_model_tool)
 
         return master
+
+    def change_model_type(self, model_type: ModelType):
+        if self.training_tab:
+            self.training_tab.refresh_ui()
 
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:
@@ -684,22 +473,6 @@ class TrainUI(ctk.CTk):
     def open_convert_model_tool(self):
         window = ConvertModelUI(self)
         self.wait_window(window)
-
-    def open_optimizer_params_window(self):
-        window = OptimizerParamsWindow(self, self.ui_state)
-        self.wait_window(window)
-
-    def restore_optimizer_prefs(self, optimizer):
-        pref_util = UserPreferenceUtility()
-        user_prefs = pref_util.load_preferences(optimizer)
-
-        for key, default_value in OPTIMIZER_KEY_MAP[optimizer].items():
-            if user_prefs == "Use_Default":
-                value_to_set = default_value
-            else:
-                value_to_set = user_prefs.get(key, default_value)
-
-            self.ui_state.vars[key].set(value_to_set)
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
