@@ -8,7 +8,6 @@ use_alloc_args=false
 
 if "$use_alloc_args"; then
 	export PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128
-	echo 'test'
 fi
 
 if ! [ -x "$(command -v python)" ]; then
