@@ -7,7 +7,6 @@ python_venv=venv
 
 if ! [ -x "$(command -v python)" ]; then
 	echo 'error: python not installed or found!'
-	break
 elif [ -x "$(command -v python)" ]; then
 	major=$(python -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(major)')
 	minor=$(python -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(minor)')
@@ -38,12 +37,10 @@ elif [ -x "$(command -v python)" ]; then
 				else
 					echo 'error: wrong python version installed:'$major'.'$minor
 					echo 'OneTrainer requires the use of python 3.10, please refer to the anaconda project to setup a virtual environment with that version. https://anaconda.org/anaconda/python'
-					break
 			fi
 		else
 			echo 'error: wrong python version installed:'$major'.'$minor
 			echo 'OneTrainer requires the use of python 3.10, either install python3 on your system or refer to the anaconda project to setup a virtual environment with that version. https://anaconda.org/anaconda/python'
-			break
 	fi
 fi
 
