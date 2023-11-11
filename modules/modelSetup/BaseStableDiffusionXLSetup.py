@@ -67,11 +67,15 @@ class BaseStableDiffusionXLSetup(
             self,
             model: StableDiffusionXLModel,
             text_encoder_layer_skip: int,
+            text_encoder_2_layer_skip: int,
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
+            text_encoder_1_output: Tensor = None,
+            text_encoder_2_output: Tensor = None,
+            pooled_text_encoder_2_output: Tensor = None,
             text: str = None,
     ):
-        if tokens_1 is None:
+        if tokens_1 is None and text is not None:
             tokenizer_output = model.tokenizer_1(
                 text,
                 padding='max_length',
@@ -81,7 +85,7 @@ class BaseStableDiffusionXLSetup(
             )
             tokens_1 = tokenizer_output.input_ids.to(model.text_encoder_1.device)
 
-        if tokens_2 is None:
+        if tokens_2 is None and text is not None:
             tokenizer_output = model.tokenizer_2(
                 text,
                 padding='max_length',
@@ -91,16 +95,18 @@ class BaseStableDiffusionXLSetup(
             )
             tokens_2 = tokenizer_output.input_ids.to(model.text_encoder_2.device)
 
-        text_encoder_1_output = model.text_encoder_1(
-            tokens_1, output_hidden_states=True, return_dict=True
-        )
-        text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+        if text_encoder_1_output is None:
+            text_encoder_1_output = model.text_encoder_1(
+                tokens_1, output_hidden_states=True, return_dict=True
+            )
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
-        text_encoder_2_output = model.text_encoder_2(
-            tokens_2, output_hidden_states=True, return_dict=True
-        )
-        pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-        text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
+        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
+            text_encoder_2_output = model.text_encoder_2(
+                tokens_2, output_hidden_states=True, return_dict=True
+            )
+            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
 
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 
@@ -121,18 +127,19 @@ class BaseStableDiffusionXLSetup(
 
         vae_scaling_factor = model.vae.config['scaling_factor']
 
-        if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
-            text_encoder_output, pooled_text_encoder_2_output = self.__encode_text(
-                model,
-                args.text_encoder_layer_skip,
-                tokens_1=batch['tokens_1'],
-                tokens_2=batch['tokens_2'],
-            )
-        else:
-            text_encoder_1_hidden_state = batch['text_encoder_1_hidden_state']
-            text_encoder_2_hidden_state = batch['text_encoder_2_hidden_state']
-            text_encoder_output = torch.concat([text_encoder_1_hidden_state, text_encoder_2_hidden_state], dim=-1)
-            pooled_text_encoder_2_output = batch['text_encoder_2_pooled_state']
+        text_encoder_output, pooled_text_encoder_2_output = self.__encode_text(
+            model,
+            args.text_encoder_layer_skip,
+            args.text_encoder_2_layer_skip,
+            tokens_1=batch['tokens_1'],
+            tokens_2=batch['tokens_2'],
+            text_encoder_1_output=batch[
+                'text_encoder_1_hidden_state'] if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING else None,
+            text_encoder_2_output=batch[
+                'text_encoder_2_hidden_state'] if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING else None,
+            pooled_text_encoder_2_output=batch[
+                'text_encoder_2_pooled_state'] if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING else None,
+        )
 
         latent_image = batch['latent_image']
         scaled_latent_image = latent_image * vae_scaling_factor
@@ -150,6 +157,7 @@ class BaseStableDiffusionXLSetup(
             negative_text_encoder_output, negative_pooled_text_encoder_2_output = self.__encode_text(
                 model,
                 args.text_encoder_layer_skip,
+                args.text_encoder_2_layer_skip,
                 text="",
             )
             negative_text_encoder_output = negative_text_encoder_output \

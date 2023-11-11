@@ -33,6 +33,8 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
 
         if args.train_text_encoder:
             params += list(model.text_encoder_1_lora.parameters())
+
+        if args.train_text_encoder_2:
             params += list(model.text_encoder_2_lora.parameters())
 
         if args.train_unet:
@@ -54,6 +56,9 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
                 'lr': lr,
                 'initial_lr': lr,
             })
+
+        if args.train_text_encoder_2:
+            lr = args.text_encoder_2_learning_rate if args.text_encoder_2_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.text_encoder_2_lora.parameters(),
                 'lr': lr,
@@ -80,7 +85,7 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
                 model.text_encoder_1, args.lora_rank, "lora_te1", args.lora_alpha
             )
 
-        if model.text_encoder_2_lora is None and args.train_text_encoder:
+        if model.text_encoder_2_lora is None and args.train_text_encoder_2:
             model.text_encoder_2_lora = LoRAModuleWrapper(
                 model.text_encoder_2, args.lora_rank, "lora_te2", args.lora_alpha
             )
@@ -95,14 +100,14 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
         model.unet.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         if model.text_encoder_1_lora is not None:
-            model.text_encoder_1_lora.requires_grad_(train_text_encoder)
+            train_text_encoder_1 = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+            model.text_encoder_1_lora.requires_grad_(train_text_encoder_1)
         if model.text_encoder_2_lora is not None:
-            model.text_encoder_2_lora.requires_grad_(train_text_encoder)
-
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+            train_text_encoder_2 = args.train_text_encoder_2 and (model.train_progress.epoch < args.train_text_encoder_2_epochs)
+            model.text_encoder_2_lora.requires_grad_(train_text_encoder_2)
         if model.unet_lora is not None:
+            train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
             model.unet_lora.requires_grad_(train_unet)
 
         if model.text_encoder_1_lora is not None:
@@ -133,18 +138,24 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             args: TrainArgs,
     ):
         vae_on_train_device = args.align_prop
-        text_encoder_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
+        text_encoder_1_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
+        text_encoder_2_on_train_device = args.train_text_encoder_2 or args.align_prop or not args.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
+        model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
+        model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
 
         if args.train_text_encoder:
             model.text_encoder_1.train()
-            model.text_encoder_2.train()
         else:
             model.text_encoder_1.eval()
+
+        if args.train_text_encoder_2:
+            model.text_encoder_2.train()
+        else:
             model.text_encoder_2.eval()
+
         model.vae.eval()
 
         if args.train_unet:
@@ -158,12 +169,14 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             args: TrainArgs,
             train_progress: TrainProgress
     ):
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         if model.text_encoder_1_lora is not None:
-            model.text_encoder_1_lora.requires_grad_(train_text_encoder)
-        if model.text_encoder_2_lora is not None:
-            model.text_encoder_2_lora.requires_grad_(train_text_encoder)
+            train_text_encoder_1 = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+            model.text_encoder_1_lora.requires_grad_(train_text_encoder_1)
 
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        if model.text_encoder_2_lora is not None:
+            train_text_encoder_2 = args.train_text_encoder_2 and (model.train_progress.epoch < args.train_text_encoder_2_epochs)
+            model.text_encoder_2_lora.requires_grad_(train_text_encoder_2)
+
         if model.unet_lora is not None:
+            train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
             model.unet_lora.requires_grad_(train_unet)

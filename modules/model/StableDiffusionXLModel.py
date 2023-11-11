@@ -97,6 +97,18 @@ class StableDiffusionXLModel(BaseModel):
         if self.text_encoder_2_lora is not None:
             self.text_encoder_2_lora.to(device)
 
+    def text_encoder_1_to(self, device: torch.device):
+        self.text_encoder_1.to(device=device)
+
+        if self.text_encoder_1_lora is not None:
+            self.text_encoder_1_lora.to(device)
+
+    def text_encoder_2_to(self, device: torch.device):
+        self.text_encoder_2.to(device=device)
+
+        if self.text_encoder_2_lora is not None:
+            self.text_encoder_2_lora.to(device)
+
     def unet_to(self, device: torch.device):
         self.unet.to(device=device)
 

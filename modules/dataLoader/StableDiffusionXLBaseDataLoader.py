@@ -54,7 +54,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
     ):
         model.vae_to(train_device)
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            model.text_encoder_to(train_device)
+            model.text_encoder_1_to(train_device)
+
+        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
+            model.text_encoder_2_to(train_device)
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -201,7 +204,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
         encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, text_encoder=model.text_encoder_1, hidden_state_output_index=-(2+args.text_encoder_layer_skip))
-        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', text_encoder=model.text_encoder_2, hidden_state_output_index=-(2+args.text_encoder_layer_skip))
+        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', text_encoder=model.text_encoder_2, hidden_state_output_index=-(2+args.text_encoder_2_layer_skip))
 
         modules = [
             rescale_image, encode_image,
@@ -218,6 +221,8 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(encode_prompt_1)
+
+        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(encode_prompt_2)
 
         return modules
@@ -233,18 +238,22 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
-        text_split_names = [
-            'tokens_1', 'text_encoder_1_hidden_state',
-            'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
-        ]
+        text_split_names = []
+
+        if not args.train_text_encoder:
+            text_split_names.append('tokens_1')
+            text_split_names.append('text_encoder_1_hidden_state')
+
+        if not args.train_text_encoder_2:
+            text_split_names.append('tokens_2')
+            text_split_names.append('text_encoder_2_hidden_state')
+            text_split_names.append('text_encoder_2_pooled_state')
 
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
 
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, cached_epochs=args.latent_caching_epochs)
         image_ram_cache = RamCache(names=image_split_names + image_aggregate_names)
-
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], cached_epochs=args.latent_caching_epochs)
 
         modules = []
 
@@ -253,7 +262,8 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
+        if (not args.train_text_encoder or not args.train_text_encoder_2) and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
+            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], cached_epochs=args.latent_caching_epochs)
             modules.append(text_disk_cache)
 
         return modules
@@ -273,6 +283,8 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_1_hidden_state')
+
+        if not args.train_text_encoder_2:
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
 
