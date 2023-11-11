@@ -228,7 +228,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         return modules
 
     def _cache_modules(self, args: TrainArgs):
-        image_split_names = ['latent_image_distribution']
+        image_split_names = ['latent_image_distribution', 'original_resolution']
 
         if args.masked_training or args.model_type.has_mask_input():
             image_split_names.append('latent_mask')
@@ -272,7 +272,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         output_names = [
             'image_path', 'latent_image',
             'tokens_1', 'tokens_2',
-            'crop_resolution', 'crop_offset', 'prompt',
+            'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():

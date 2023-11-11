@@ -75,6 +75,7 @@ class TopBar:
                 ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
                 ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
                 ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+                ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
             ],
             ui_state=self.ui_state,
             var_name="model_type",

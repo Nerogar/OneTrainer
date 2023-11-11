@@ -22,7 +22,6 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         range_min = -1
         range_max = 1
         image_tensor = (image_tensor - range_min) / (range_max - range_min)
-        image_tensor = image_tensor.clamp(0.0, 1.0)
 
         image = t(image_tensor.squeeze())
         image.save(path)
@@ -30,7 +29,17 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
     def _project_latent_to_image(self, latent_tensor: Tensor):
         generator = torch.Generator(device=latent_tensor.device)
         generator.manual_seed(42)
-        weight = torch.randn((3, 4, 1, 1), generator=generator, device=latent_tensor.device, dtype=latent_tensor.dtype)
+        channels = latent_tensor.shape[1]
+        weight = torch.randn(
+            size=(3, channels, 1, 1),
+            generator=generator,
+            device=latent_tensor.device,
+            dtype=latent_tensor.dtype,
+        )
 
         with torch.no_grad():
-            return torch.nn.functional.conv2d(latent_tensor, weight) / 3.0
+            result = torch.nn.functional.conv2d(latent_tensor, weight)
+            result_min = result.min()
+            result_max = result.max()
+            result = (result - result_min) / (result_max - result_min)
+            return result * 2 - 1
