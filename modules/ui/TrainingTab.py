@@ -338,7 +338,7 @@ class TrainingTab:
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
 
     def __open_optimizer_params_window(self):
-        window = OptimizerParamsWindow(self, self.ui_state)
+        window = OptimizerParamsWindow(self.master, self.ui_state)
         self.master.wait_window(window)
 
     def __restore_optimizer_prefs(self, optimizer):
