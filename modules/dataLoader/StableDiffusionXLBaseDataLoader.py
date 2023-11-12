@@ -240,11 +240,11 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         text_split_names = []
 
-        if not args.train_text_encoder:
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             text_split_names.append('tokens_1')
             text_split_names.append('text_encoder_1_hidden_state')
 
-        if not args.train_text_encoder_2:
+        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
             text_split_names.append('tokens_2')
             text_split_names.append('text_encoder_2_hidden_state')
             text_split_names.append('text_encoder_2_pooled_state')
@@ -284,7 +284,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_1_hidden_state')
 
-        if not args.train_text_encoder_2:
+        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
 
