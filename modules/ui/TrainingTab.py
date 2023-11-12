@@ -66,7 +66,7 @@ class TrainingTab:
         self.__create_base_frame(column_0, 0)
         self.__create_base2_frame(column_1, 0)
         self.__create_align_prop_frame(column_2, 0)
-        self.__create_text_encoder_frame(column_0, 1)
+        self.__create_text_encoder_1_frame(column_0, 1)
         self.__create_unet_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
         self.__create_text_encoder_2_frame(column_0, 2)
@@ -226,6 +226,30 @@ class TrainingTab:
                          tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
 
+    def __create_text_encoder_1_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+
+        # train text encoder
+        components.label(frame, 0, 0, "Train Text Encoder 1",
+                         tooltip="Enables training the text encoder 1 model")
+        components.switch(frame, 0, 1, self.ui_state, "train_text_encoder")
+
+        # train text encoder epochs
+        components.label(frame, 1, 0, "Train Text Encoder 1 Epochs",
+                         tooltip="Number of epochs to train the text encoder 1")
+        components.entry(frame, 1, 1, self.ui_state, "train_text_encoder_epochs")
+
+        # text encoder learning rate
+        components.label(frame, 2, 0, "Text Encoder 1 Learning Rate",
+                         tooltip="The learning rate of the text encoder 1. Overrides the base learning rate")
+        components.entry(frame, 2, 1, self.ui_state, "text_encoder_learning_rate")
+
+        # text encoder layer skip (clip skip)
+        components.label(frame, 3, 0, "Clip Skip 1",
+                         tooltip="The number of clip layers to skip. 0 = disabled")
+        components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
+
     def __create_text_encoder_2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -237,7 +261,7 @@ class TrainingTab:
 
         # train text encoder epochs
         components.label(frame, 1, 0, "Train Text Encoder 2 Epochs",
-                         tooltip="Number of epochs to train the text 2 encoder")
+                         tooltip="Number of epochs to train the text encoder 1")
         components.entry(frame, 1, 1, self.ui_state, "train_text_encoder_2_epochs")
 
         # text encoder learning rate
