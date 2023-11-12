@@ -8,18 +8,12 @@ from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from modules.dataLoader.KandinskyFineTuneDataLoader import KandinskyFineTuneDataLoader
+from modules.dataLoader.WuerstchenFineTuneDataLoader import WuerstchenFineTuneDataLoader
 from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLEmbeddingDataLoader import StableDiffusionXLEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionXLFineTuneDataLoader import StableDiffusionXLFineTuneDataLoader
-from modules.dataLoader.MgdsKandinskyFineTuneDataLoader import MgdsKandinskyFineTuneDataLoader
-from modules.dataLoader.MgdsStableDiffusionEmbeddingDataLoader import MgdsStableDiffusionEmbeddingDataLoader
-from modules.dataLoader.MgdsStableDiffusionFineTuneDataLoader import MgdsStableDiffusionFineTuneDataLoader
-from modules.dataLoader.MgdsStableDiffusionFineTuneVaeDataLoader import MgdsStableDiffusionFineTuneVaeDataLoader
-from modules.dataLoader.MgdsStableDiffusionXLEmbeddingDataLoader import MgdsStableDiffusionXLEmbeddingDataLoader
-from modules.dataLoader.MgdsStableDiffusionXLFineTuneDataLoader import MgdsStableDiffusionXLFineTuneDataLoader
-from modules.dataLoader.MgdsWuerstchenFineTuneDataLoader import MgdsWuerstchenFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyLoRAModelLoader import KandinskyLoRAModelLoader
@@ -225,7 +219,7 @@ def create_data_loader(
             if model_type.is_kandinsky():
                 return KandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_wuerstchen():
-                return MgdsWuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
+                return WuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, args, model, train_progress)
@@ -235,9 +229,9 @@ def create_data_loader(
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_kandinsky():
-                return MgdsKandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
+                return KandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_wuerstchen():
-                return MgdsWuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
+                return WuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)

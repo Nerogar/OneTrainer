@@ -1,14 +1,14 @@
-from modules.dataLoader.MgdsWuerstchenBaseDataLoader import MgdsWuerstchenBaseDataLoader
+from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsWuerstchenFineTuneDataLoader(MgdsWuerstchenBaseDataLoader):
+class WuerstchenFineTuneDataLoader(WuerstchenBaseDataLoader):
     def __init__(
             self,
             args: TrainArgs,
             model: StableDiffusionXLModel,
             train_progress: TrainProgress,
     ):
-        super(MgdsWuerstchenFineTuneDataLoader, self).__init__(args, model, train_progress)
+        super(WuerstchenFineTuneDataLoader, self).__init__(args, model, train_progress)

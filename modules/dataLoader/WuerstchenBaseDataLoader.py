@@ -1,12 +1,12 @@
 import json
 
-from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage, SaveText, DecodeTokens
+from mgds.DebugDataLoaderModules import SaveImage, SaveText, DecodeTokens
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
 from mgds.MGDS import TrainDataLoader, OutputPipelineModule
 from mgds.TransformersDataLoaderModules import *
 
-from modules.dataLoader.MgdsBaseDataLoader import MgdsBaseDataLoader
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
 from modules.dataLoader.wuerstchen.NormalizeImageChannels import NormalizeImageChannels
 from modules.model.WuerstchenModel import WuerstchenModel
@@ -15,24 +15,34 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class MgdsWuerstchenBaseDataLoader(MgdsBaseDataLoader):
+class WuerstchenBaseDataLoader(BaseDataLoader):
     def __init__(
             self,
             args: TrainArgs,
             model: WuerstchenModel,
             train_progress: TrainProgress,
     ):
+        super(WuerstchenBaseDataLoader, self).__init__(
+            train_device,
+            temp_device,
+        )
+
         with open(args.concept_file_name, 'r') as f:
             concepts = json.load(f)
 
-        self.ds = self.create_dataset(
+        self.__ds = self.create_dataset(
             args=args,
             model=model,
             concepts=concepts,
             train_progress=train_progress,
         )
-        self.dl = TrainDataLoader(self.ds, args.batch_size)
+        self.__dl = TrainDataLoader(self.__ds, args.batch_size)
 
+    def get_data_set(self) -> MGDS:
+        return self.__ds
+
+    def get_data_loader(self) -> TrainDataLoader:
+        return self.__dl
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
