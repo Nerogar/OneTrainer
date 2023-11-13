@@ -27,11 +27,15 @@ elif [ -x "$(command -v python)" ]; then
 				then
 					if ! [ -x "$(command -v conda)" ]; then
 						echo 'conda not found; python version correct; use native python'
-						if [ -d $python_venv ]; then
+						if ! [ -d $python_venv ]; then
 							python -m venv $python_venv
 						fi
 						source $python_venv/bin/activate
-						python scripts/train_ui.py
+						if [[ -z "$VIRTUAL_ENV" ]]; then
+    							echo "warning: No VIRTUAL_ENV set. exiting."
+						else
+							python scripts/train_ui.py
+						fi
 					elif [ -x "$(command -v conda)" ]; then
 						#check for venv
 						if conda info --envs | grep -q ${conda_env}; 
