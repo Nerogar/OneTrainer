@@ -13,9 +13,10 @@ from modules.util.ui import components
 
 class OptimizerParamsWindow(ctk.CTkToplevel):
     def __init__(self, parent, ui_state, *args, **kwargs):
+        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+
         self.pref_util = UserPreferenceUtility()
 
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
         self.train_args = TrainArgs.default_values()

@@ -5,6 +5,7 @@ pillow==10.0.1
 tqdm==4.64.1
 PyYAML==6.0
 huggingface-hub==0.16.4
+scipy==1.11.3; sys_platform != 'win32'
 
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu118
