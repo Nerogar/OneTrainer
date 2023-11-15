@@ -13,13 +13,21 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.params.SampleParams import SampleParams
+from modules.util.torch_util import torch_gc
 
 
 class WuerstchenSampler(BaseModelSampler):
-    def __init__(self, model: WuerstchenModel, model_type: ModelType, train_device: torch.device):
+    def __init__(
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: WuerstchenModel,
+            model_type: ModelType,
+    ):
+        super(WuerstchenSampler, self).__init__(train_device, temp_device)
+
         self.model = model
         self.model_type = model_type
-        self.train_device = train_device
         self.pipeline = model.create_pipeline()
 
     def __sample_prior(
@@ -40,6 +48,7 @@ class WuerstchenSampler(BaseModelSampler):
             on_update_progress,
     ):
         # prepare prompt
+        self.model.prior_text_encoder_to(self.train_device)
         tokenizer_output = prior_tokenizer(
             prompt,
             padding='max_length',
@@ -98,6 +107,9 @@ class WuerstchenSampler(BaseModelSampler):
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
+        self.model.prior_text_encoder_to(self.temp_device)
+        torch_gc()
+
         # prepare timesteps
         prior_noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
         timesteps = prior_noise_scheduler.timesteps
@@ -118,6 +130,7 @@ class WuerstchenSampler(BaseModelSampler):
         if "generator" in set(inspect.signature(prior_noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
 
+        self.model.prior_prior_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
             timestep = torch.stack([timestep])
 
@@ -151,6 +164,9 @@ class WuerstchenSampler(BaseModelSampler):
 
             on_update_progress(i + 1, len(timesteps))
 
+        self.model.prior_prior_to(self.temp_device)
+        torch_gc()
+
         latent_image = latent_image * 42.0 - 1.0
         latent_image = latent_image.to(dtype=torch.float32)
 
@@ -172,6 +188,7 @@ class WuerstchenSampler(BaseModelSampler):
             on_update_progress,
     ):
         # prepare prompt
+        self.model.decoder_text_encoder_to(self.train_device)
         tokenizer_output = decoder_tokenizer(
             prompt,
             padding='max_length',
@@ -201,6 +218,9 @@ class WuerstchenSampler(BaseModelSampler):
                 )
                 prompt_embedding = text_encoder_output.last_hidden_state
 
+        self.model.decoder_text_encoder_to(self.temp_device)
+        torch_gc()
+
         # prepare timesteps
         decoder_noise_scheduler.set_timesteps(10, device=self.train_device)
         timesteps = decoder_noise_scheduler.timesteps
@@ -221,6 +241,7 @@ class WuerstchenSampler(BaseModelSampler):
         if "generator" in set(inspect.signature(decoder_noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
 
+        self.model.decoder_decoder_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
             timestep = torch.stack([timestep])
 
@@ -242,6 +263,9 @@ class WuerstchenSampler(BaseModelSampler):
             ).prev_sample
 
             on_update_progress(i + 1, len(timesteps))
+
+        self.model.decoder_decoder_to(self.temp_device)
+        torch_gc()
 
         return latent_image
 
@@ -315,10 +339,15 @@ class WuerstchenSampler(BaseModelSampler):
         )
 
         # decode vqgan
+        self.model.decoder_vqgan_to(self.train_device)
         latents = decoder_vqgan.config.scale_factor * latent_image
         image_tensor = decoder_vqgan.decode(latents).sample.clamp(0, 1)
         image_array = image_tensor.permute(0, 2, 3, 1).cpu().squeeze().numpy()
         image_array = (image_array * 255).round().astype("uint8")
+
+        self.model.decoder_vqgan_to(self.temp_device)
+        torch_gc()
+
         return Image.fromarray(image_array)
 
     def sample(

@@ -1,3 +1,4 @@
+import torch
 import torchvision
 from diffusers import DiffusionPipeline, DDPMWuerstchenScheduler, WuerstchenCombinedPipeline, ModelMixin, ConfigMixin
 from diffusers.configuration_utils import register_to_config
@@ -94,6 +95,46 @@ class WuerstchenModel(BaseModel):
         self.prior_prior = prior_prior
         self.prior_text_encoder_lora = prior_text_encoder_lora
         self.prior_prior_lora = prior_prior_lora
+
+    def decoder_text_encoder_to(self, device: torch.device):
+        self.decoder_text_encoder.to(device=device)
+
+    def decoder_decoder_to(self, device: torch.device):
+        self.decoder_decoder.to(device=device)
+
+    def decoder_vqgan_to(self, device: torch.device):
+        self.decoder_vqgan.to(device=device)
+
+    def effnet_encoder_to(self, device: torch.device):
+        self.effnet_encoder.to(device=device)
+
+    def prior_text_encoder_to(self, device: torch.device):
+        self.prior_text_encoder.to(device=device)
+
+        if self.prior_text_encoder_lora is not None:
+            self.prior_text_encoder_lora.to(device)
+
+    def prior_prior_to(self, device: torch.device):
+        self.prior_prior.to(device=device)
+
+        if self.prior_prior_lora is not None:
+            self.prior_prior_lora.to(device)
+
+    def to(self, device: torch.device):
+        self.decoder_text_encoder_to(device)
+        self.decoder_decoder_to(device)
+        self.decoder_vqgan_to(device)
+        self.effnet_encoder_to(device)
+        self.prior_text_encoder_to(device)
+        self.prior_prior_to(device)
+
+    def eval(self):
+        self.decoder_text_encoder.eval()
+        self.decoder_decoder.eval()
+        self.decoder_vqgan.eval()
+        self.effnet_encoder.eval()
+        self.prior_text_encoder.eval()
+        self.prior_prior.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
         return WuerstchenCombinedPipeline(

@@ -177,42 +177,58 @@ class TrainUI(ctk.CTk):
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
+        # effnet encoder model
+        components.label(master, 1, 0, "Effnet Encoder Model",
+                         tooltip="Filename, directory or hugging face repository of the effnet encoder model")
+        components.file_entry(
+            master, 1, 1, self.ui_state, "effnet_encoder_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
+        # decoder model
+        components.label(master, 2, 0, "Decoder Model",
+                         tooltip="Filename, directory or hugging face repository of the decoder model")
+        components.file_entry(
+            master, 2, 1, self.ui_state, "decoder_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
         # output model destination
-        components.label(master, 1, 0, "Model Output Destination",
+        components.label(master, 3, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.file_entry(master, 1, 1, self.ui_state, "output_model_destination", is_output=True)
+        components.file_entry(master, 3, 1, self.ui_state, "output_model_destination", is_output=True)
 
         # output format
-        components.label(master, 1, 3, "Output Format",
+        components.label(master, 3, 3, "Output Format",
                          tooltip="Format to use when saving the output model")
-        components.options_kv(master, 1, 4, [
+        components.options_kv(master, 3, 4, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
             ("Checkpoint", ModelFormat.CKPT),
         ], self.ui_state, "output_model_format")
 
         # output data type
-        components.label(master, 2, 0, "Output Data Type",
+        components.label(master, 4, 0, "Output Data Type",
                          tooltip="Precision to use when saving the output model")
-        components.options_kv(master, 2, 1, [
+        components.options_kv(master, 4, 1, [
             ("float16", DataType.FLOAT_16),
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "output_dtype")
 
         # weight dtype
-        components.label(master, 3, 0, "Weight Data Type",
+        components.label(master, 5, 0, "Weight Data Type",
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 3, 1, [
+        components.options_kv(master, 5, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
         ], self.ui_state, "weight_dtype")
 
         # text encoder weight dtype
-        components.label(master, 4, 0, "Override Text Encoder Data Type",
+        components.label(master, 6, 0, "Override Text Encoder Data Type",
                          tooltip="Overrides the text encoder weight data type")
-        components.options_kv(master, 4, 1, [
+        components.options_kv(master, 6, 1, [
             ("", DataType.NONE),
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -220,9 +236,9 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "text_encoder_weight_dtype")
 
         # unet weight dtype
-        components.label(master, 5, 0, "Override UNet Data Type",
+        components.label(master, 7, 0, "Override UNet Data Type",
                          tooltip="Overrides the unet weight data type")
-        components.options_kv(master, 5, 1, [
+        components.options_kv(master, 7, 1, [
             ("", DataType.NONE),
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -230,9 +246,9 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "unet_weight_dtype")
 
         # vae weight dtype
-        components.label(master, 6, 0, "Override VAE Data Type",
+        components.label(master, 8, 0, "Override VAE Data Type",
                          tooltip="Overrides the vae weight data type")
-        components.options_kv(master, 6, 1, [
+        components.options_kv(master, 8, 1, [
             ("", DataType.NONE),
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -325,7 +341,7 @@ class TrainUI(ctk.CTk):
         components.time_entry(master, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
         # backup now
-        components.button(master, 0, 2, "backup now", self.backup_now)
+        components.button(master, 0, 3, "backup now", self.backup_now)
 
         # rolling backup
         components.label(master, 1, 0, "Rolling Backup",

@@ -8,7 +8,10 @@ from diffusers.utils import is_xformers_available
 from torch import Tensor
 
 from modules.model.WuerstchenModel import WuerstchenModel
-from modules.modelSetup.BaseDiffusionModelSetup import BaseDiffusionModelSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
+from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
+from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -16,7 +19,13 @@ from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
-class BaseWuerstchenSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
+class BaseWuerstchenSetup(
+    BaseModelSetup,
+    ModelSetupDiffusionLossMixin,
+    ModelSetupDebugMixin,
+    ModelSetupDiffusionNoiseMixin,
+    metaclass=ABCMeta,
+):
 
     def setup_optimizations(
             self,
@@ -84,7 +93,7 @@ class BaseWuerstchenSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
 
-        latent_noise = self.create_noise(scaled_latent_image, args, generator)
+        latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
         timestep = (1 - torch.rand(
             size=(scaled_latent_image.shape[0],),
@@ -97,25 +106,14 @@ class BaseWuerstchenSetup(BaseDiffusionModelSetup, metaclass=ABCMeta):
         )
 
         if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
-            text_encoder_1_output = model.text_encoder_1(
+            text_encoder_output = model.prior_text_encoder(
                 batch['tokens_1'], output_hidden_states=True, return_dict=True
             )
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-2]
-
-            text_encoder_2_output = model.text_encoder_2(
-                batch['tokens_2'], output_hidden_states=True, return_dict=True
-            )
-            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-2]
+            text_encoder_output = text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
         else:
             text_encoder_output = batch['text_encoder_hidden_state']
 
-        if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
-            latent_input = torch.concat(
-                [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
-            )
-        else:
-            latent_input = scaled_noisy_latent_image
+        latent_input = scaled_noisy_latent_image
 
         predicted_latent_noise = model.prior_prior(latent_input, timestep, text_encoder_output)
 

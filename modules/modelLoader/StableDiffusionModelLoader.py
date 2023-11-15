@@ -186,7 +186,7 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
         yaml_name = self._get_sd_config_name(model_type, base_model_name)
 
         pipeline = download_from_original_stable_diffusion_ckpt(
-            checkpoint_path=base_model_name,
+            checkpoint_path_or_dict=base_model_name,
             original_config_file=yaml_name,
             load_safety_checker=False,
         )
@@ -222,7 +222,7 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
         yaml_name = self._get_sd_config_name(model_type, base_model_name)
 
         pipeline = download_from_original_stable_diffusion_ckpt(
-            checkpoint_path=base_model_name,
+            checkpoint_path_or_dict=base_model_name,
             original_config_file=yaml_name,
             load_safety_checker=False,
             from_safetensors=True,

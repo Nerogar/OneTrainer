@@ -53,6 +53,8 @@ class TrainingTab:
             self.__setup_stable_diffusion_ui(column_0, column_1, column_2)
         elif self.train_args.model_type.is_stable_diffusion_xl():
             self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2)
+        elif self.train_args.model_type.is_wuerstchen():
+            self.__setup_wuerstchen_ui(column_0, column_1, column_2)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -70,6 +72,14 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
         self.__create_text_encoder_2_frame(column_0, 2)
+
+    def __setup_wuerstchen_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_base2_frame(column_1, 0)
+        self.__create_align_prop_frame(column_2, 0)
+        self.__create_text_encoder_frame(column_0, 1)
+        self.__create_unet_frame(column_1, 1)
+        self.__create_masked_frame(column_2, 1)
 
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

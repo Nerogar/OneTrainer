@@ -99,6 +99,12 @@ class TrainArgs(BaseArgs):
     max_noising_strength: float
     unet_weight_dtype: DataType
 
+    # effnet encoder
+    effnet_encoder_model_name: str
+
+    # decoder
+    decoder_model_name: str
+
     # masked training
     masked_training: bool
     unmasked_probability: float
@@ -209,6 +215,8 @@ class TrainArgs(BaseArgs):
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
+            effnet_encoder_model=self.effnet_encoder_model_name,
+            decoder_model=self.decoder_model_name,
             lora=self.lora_model_name,
             embedding=self.embedding_model_names,
         )
@@ -300,6 +308,12 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
         parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
         parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
+
+        # effnet encoder
+        parser.add_argument("--effnet-encoder-model-name", type=str, required=False, dest="effnet_encoder_model_name", default="", help="The effnet encoder model to start training from")
+
+        # decoder
+        parser.add_argument("--decoder-model-name", type=str, required=True, dest="decoder_model_name", default="", help="The decoder model to start training from")
 
         # masked training
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
@@ -470,6 +484,12 @@ class TrainArgs(BaseArgs):
         data.append(("force_epsilon_prediction", False, bool, False))
         data.append(("max_noising_strength", 1.0, float, False))
         data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+
+        # effnet encoder
+        data.append(("effnet_encoder_model_name", "", str, False))
+
+        # decoder
+        data.append(("decoder_model_name", "", str, False))
 
         # masked training
         data.append(("masked_training", False, bool, False))

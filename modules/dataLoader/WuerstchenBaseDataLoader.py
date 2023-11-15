@@ -3,7 +3,7 @@ import json
 from mgds.DebugDataLoaderModules import SaveImage, SaveText, DecodeTokens
 from mgds.DiffusersDataLoaderModules import *
 from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import TrainDataLoader, OutputPipelineModule
+from mgds.MGDS import TrainDataLoader, OutputPipelineModule, MGDS
 from mgds.TransformersDataLoaderModules import *
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -13,11 +13,14 @@ from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class WuerstchenBaseDataLoader(BaseDataLoader):
     def __init__(
             self,
+            train_device: torch.device,
+            temp_device: torch.device,
             args: TrainArgs,
             model: WuerstchenModel,
             train_progress: TrainProgress,
@@ -43,6 +46,17 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
 
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
+
+    def setup_cache_device(
+            self,
+            model: WuerstchenModel,
+            train_device: torch.device,
+            temp_device: torch.device,
+            args: TrainArgs,
+    ):
+        model.effnet_encoder_to(train_device)
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+            model.prior_text_encoder_to(train_device)
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -291,6 +305,8 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         output_modules = self._output_modules(args, model)
 
         debug_modules = self._debug_modules(args, model)
+
+        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,
