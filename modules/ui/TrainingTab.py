@@ -76,10 +76,8 @@ class TrainingTab:
     def __setup_wuerstchen_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_base2_frame(column_1, 0)
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_unet_frame(column_1, 1)
-        self.__create_masked_frame(column_2, 1)
 
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
