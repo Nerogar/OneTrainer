@@ -216,7 +216,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
         downscale_depth = Downscale(in_name='depth', out_name='latent_depth', factor=8)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=model.tokenizer.model_max_length)
-        encode_prompt = EncodeClipText(in_name='tokens', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, text_encoder=model.text_encoder, hidden_state_output_index=-(1+args.text_encoder_layer_skip))
+        encode_prompt = EncodeClipText(in_name='tokens', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1+args.text_encoder_layer_skip))
 
         modules = [rescale_image, encode_image, tokenize_prompt]
 
