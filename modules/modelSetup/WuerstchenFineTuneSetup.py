@@ -79,50 +79,36 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
 
         self.setup_optimizations(model, args)
 
-    def setup_eval_device(
-            self,
-            model: WuerstchenModel
-    ):
-        model.decoder_text_encoder.to(self.train_device)
-        model.decoder_decoder.to(self.train_device)
-        model.decoder_vqgan.to(self.train_device)
-        model.effnet_encoder.to(self.train_device)
-        model.prior_text_encoder.to(self.train_device)
-        model.prior_prior.to(self.train_device)
-
-        model.decoder_text_encoder.eval()
-        model.decoder_decoder.eval()
-        model.decoder_vqgan.eval()
-        model.effnet_encoder.eval()
-        model.prior_text_encoder.eval()
-        model.prior_prior.eval()
-
     def setup_train_device(
             self,
             model: WuerstchenModel,
             args: TrainArgs,
     ):
-        model.decoder_text_encoder.to(self.temp_device)
-        model.decoder_decoder.to(self.temp_device)
-        model.decoder_vqgan.to(self.temp_device)
-        model.effnet_encoder.to(self.temp_device)
-        model.prior_text_encoder.to(self.train_device)
-        model.prior_prior.to(self.train_device)
+        model.decoder_text_encoder_to(self.temp_device)
+        model.decoder_decoder_to(self.temp_device)
+        model.decoder_vqgan_to(self.temp_device)
+        model.effnet_encoder_to(self.temp_device)
+
+        text_encoder_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
+
+        model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
+        model.prior_prior_to(self.train_device)
+
+        model.decoder_text_encoder.eval()
+        model.decoder_decoder.eval()
+        model.decoder_vqgan.eval()
+        model.effnet_encoder.eval()
 
         if args.train_text_encoder:
             model.prior_text_encoder.train()
         else:
             model.prior_text_encoder.eval()
 
-        model.decoder_text_encoder.eval()
-        model.decoder_decoder.eval()
-        model.decoder_vqgan.eval()
-        model.effnet_encoder.eval()
-
         if args.train_unet:
             model.prior_prior.train()
         else:
             model.prior_prior.eval()
+
 
     def after_optimizer_step(
             self,

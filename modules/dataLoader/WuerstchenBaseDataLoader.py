@@ -194,40 +194,55 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         encode_image = EncodeWuerstchenEffnet(in_name='image', out_name='latent_image', effnet_encoder=model.effnet_encoder, override_allow_mixed_precision=False)
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.75)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.prior_tokenizer, max_token_length=model.prior_tokenizer.model_max_length)
-        encode_prompt = EncodeClipText(in_name='tokens', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1)
+        encode_prompt = EncodeClipText(in_name='tokens', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1)
 
         modules = [
             downscale_image, normalize_image, encode_image,
-            tokenize_prompt, encode_prompt,
+            tokenize_prompt,
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(downscale_mask)
 
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+            modules.append(encode_prompt)
+
         return modules
 
 
     def _cache_modules(self, args: TrainArgs):
-        split_names = [
+        image_split_names = [
             'latent_image',
-            'tokens', 'text_encoder_hidden_state',
             'original_resolution', 'crop_offset',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
-            split_names.append('latent_mask')
+            image_split_names.append('latent_mask')
 
-        aggregate_names = ['crop_resolution', 'image_path']
+        image_aggregate_names = ['crop_resolution', 'image_path']
 
-        disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, cached_epochs=args.latent_caching_epochs)
-        ram_cache = RamCache(names=split_names + aggregate_names)
+        text_split_names = []
+
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+            text_split_names.append('tokens')
+            text_split_names.append('text_encoder_hidden_state')
+
+        image_cache_dir = os.path.join(args.cache_dir, "image")
+        text_cache_dir = os.path.join(args.cache_dir, "text")
+
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, cached_epochs=args.latent_caching_epochs)
+        image_ram_cache = RamCache(names=image_split_names + image_aggregate_names)
 
         modules = []
 
         if args.latent_caching:
-            modules.append(disk_cache)
+            modules.append(image_disk_cache)
         else:
-            modules.append(ram_cache)
+            modules.append(image_ram_cache)
+
+        if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
+            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], cached_epochs=args.latent_caching_epochs)
+            modules.append(text_disk_cache)
 
         return modules
 
@@ -235,12 +250,15 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
     def _output_modules(self, args: TrainArgs, model: WuerstchenModel):
         output_names = [
             'image_path', 'latent_image',
-            'tokens', 'text_encoder_hidden_state',
+            'tokens',
             'original_resolution', 'crop_resolution', 'crop_offset',
         ]
 
         if args.masked_training or args.model_type.has_mask_input():
             output_names.append('latent_mask')
+
+        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+            output_names.append('text_encoder_hidden_state')
 
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name=None,

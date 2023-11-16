@@ -107,9 +107,12 @@ class BaseWuerstchenSetup(
 
         if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
             text_encoder_output = model.prior_text_encoder(
-                batch['tokens_1'], output_hidden_states=True, return_dict=True
+                batch['tokens'], output_hidden_states=True, return_dict=True
             )
-            text_encoder_output = text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
+            final_layer_norm = model.prior_text_encoder.text_model.final_layer_norm
+            text_encoder_output = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
+            )
         else:
             text_encoder_output = batch['text_encoder_hidden_state']
 
