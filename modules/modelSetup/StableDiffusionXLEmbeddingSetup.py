@@ -13,12 +13,10 @@ from modules.util.args.TrainArgs import TrainArgs
 
 
 class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
-    all_text_encoder_1_token_embeds: Tensor
     all_text_encoder_1_original_token_embeds: Tensor
     text_encoder_1_trainable_token_embeds_mask: list[bool]
     text_encoder_1_untrainable_token_embeds_mask: list[bool]
 
-    all_text_encoder_2_token_embeds: Tensor
     all_text_encoder_2_original_token_embeds: Tensor
     text_encoder_2_trainable_token_embeds_mask: list[bool]
     text_encoder_2_untrainable_token_embeds_mask: list[bool]
@@ -94,8 +92,8 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
                 add_special_tokens=False,
             )
 
-            self.all_text_encoder_1_token_embeds = model.text_encoder_1.get_input_embeddings().weight.data
-            self.all_text_encoder_1_original_token_embeds = self.all_text_encoder_1_token_embeds.clone()
+            all_text_encoder_1_token_embeds = model.text_encoder_1.get_input_embeddings().weight.data
+            self.all_text_encoder_1_original_token_embeds = all_text_encoder_1_token_embeds.clone()
             self.text_encoder_1_trainable_token_embeds_mask = \
                 [(i in text_encoder_1_token_ids) for i in range(len(self.all_text_encoder_1_original_token_embeds))]
             self.text_encoder_1_untrainable_token_embeds_mask = [
@@ -107,8 +105,8 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
                 add_special_tokens=False,
             )
 
-            self.all_text_encoder_2_token_embeds = model.text_encoder_2.get_input_embeddings().weight.data
-            self.all_text_encoder_2_original_token_embeds = self.all_text_encoder_2_token_embeds.clone()
+            all_text_encoder_2_token_embeds = model.text_encoder_2.get_input_embeddings().weight.data
+            self.all_text_encoder_2_original_token_embeds = all_text_encoder_2_token_embeds.clone()
             self.text_encoder_2_trainable_token_embeds_mask = \
                 [(i in text_encoder_2_token_ids) for i in range(len(self.all_text_encoder_2_original_token_embeds))]
             self.text_encoder_2_untrainable_token_embeds_mask = [
@@ -118,9 +116,9 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
             if len(model.embeddings) > 0:
                 # an embedding was loaded
                 for i, token_id in enumerate(text_encoder_1_token_ids):
-                    self.all_text_encoder_1_token_embeds[token_id] = model.embeddings[0].text_encoder_1_vector[i]
+                    all_text_encoder_1_token_embeds[token_id] = model.embeddings[0].text_encoder_1_vector[i]
                 for i, token_id in enumerate(text_encoder_2_token_ids):
-                    self.all_text_encoder_2_token_embeds[token_id] = model.embeddings[0].text_encoder_2_vector[i]
+                    all_text_encoder_2_token_embeds[token_id] = model.embeddings[0].text_encoder_2_vector[i]
             else:
                 # create a new embedding
                 text_encoder_1_initial_token_ids = model.tokenizer_1.encode(
@@ -136,12 +134,11 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
                 text_encoder_1_initial_token_ids += [text_encoder_1_pad_token_id] * (
                         token_count - len(text_encoder_1_initial_token_ids))
                 for token_id, initial_token_id in zip(text_encoder_1_token_ids, text_encoder_1_initial_token_ids):
-                    self.all_text_encoder_1_token_embeds[token_id] = self.all_text_encoder_1_token_embeds[
-                        initial_token_id]
+                    all_text_encoder_1_token_embeds[token_id] = all_text_encoder_1_token_embeds[initial_token_id]
 
                 model.embeddings = [
                     StableDiffusionModelEmbedding(
-                        "*", self.all_text_encoder_1_token_embeds[self.text_encoder_1_trainable_token_embeds_mask],
+                        "*", all_text_encoder_1_token_embeds[self.text_encoder_1_trainable_token_embeds_mask],
                         token_count)]
 
                 text_encoder_2_initial_token_ids = model.tokenizer_2.encode(
@@ -157,12 +154,11 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
                 text_encoder_2_initial_token_ids += [text_encoder_2_pad_token_id] * (
                         token_count - len(text_encoder_2_initial_token_ids))
                 for token_id, initial_token_id in zip(text_encoder_2_token_ids, text_encoder_2_initial_token_ids):
-                    self.all_text_encoder_2_token_embeds[token_id] = self.all_text_encoder_2_token_embeds[
-                        initial_token_id]
+                    all_text_encoder_2_token_embeds[token_id] = all_text_encoder_2_token_embeds[initial_token_id]
 
                 model.embeddings = [
                     StableDiffusionModelEmbedding(
-                        "*", self.all_text_encoder_2_token_embeds[self.text_encoder_2_trainable_token_embeds_mask],
+                        "*", all_text_encoder_2_token_embeds[self.text_encoder_2_trainable_token_embeds_mask],
                         token_count)]
 
         model.optimizer = create.create_optimizer(
@@ -212,7 +208,7 @@ class StableDiffusionXLEmbeddingSetup(BaseStableDiffusionXLSetup):
         # save back to model
         model.embeddings = [StableDiffusionXLModelEmbedding(
             "*",
-            self.all_text_encoder_1_token_embeds[self.text_encoder_1_trainable_token_embeds_mask],
-            self.all_text_encoder_2_token_embeds[self.text_encoder_2_trainable_token_embeds_mask],
+            model.text_encoder_1.get_input_embeddings().weight[self.text_encoder_1_trainable_token_embeds_mask],
+            model.text_encoder_2.get_input_embeddings().weight[self.text_encoder_2_trainable_token_embeds_mask],
             model.embeddings[0].token_count
         )]
