@@ -41,6 +41,7 @@ from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSav
 from modules.modelSaver.StableDiffusionXLEmbeddingModelSaver import StableDiffusionXLEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
 from modules.modelSaver.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
+from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.KandinskyFineTuneSetup import KandinskyFineTuneSetup
 from modules.modelSetup.KandinskyLoRASetup import KandinskyLoRASetup
@@ -120,6 +121,8 @@ def create_model_saver(
                 return StableDiffusionXLLoRAModelSaver()
             if model_type.is_kandinsky():
                 return KandinskyLoRAModelSaver()
+            if model_type.is_wuerstchen():
+                return WuerstchenLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()

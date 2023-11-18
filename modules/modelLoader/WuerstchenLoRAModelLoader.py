@@ -41,7 +41,7 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
             state_dict=state_dict,
             prefix="lora_prior_prior",
             rank=rank,
-            # module_filter=["attentions"],
+            module_filter=["attention"],
         )
 
     def __default_model_spec_name(
@@ -49,10 +49,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
             model_type: ModelType,
     ) -> str | None:
         match model_type:
-            case ModelType.STABLE_DIFFUSION_XL_10_BASE:
-                return "resources/sd_model_spec/sd_xl_base_1.0_lora.json"
-            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING:  # TODO: find the actual json file
-                return "resources/sd_model_spec/sd_xl_base_1.0_lora.json"
+            case ModelType.WUERSTCHEN_2:
+                return "resources/sd_model_spec/wuerstchen_2.0-lora.json"
             case _:
                 return None
 

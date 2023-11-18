@@ -25,10 +25,9 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoa
             self,
             model_type: ModelType,
     ) -> str | None:
-        # TODO: replace with actual Wuerstchen config
         match model_type:
             case ModelType.WUERSTCHEN_2:
-                return "resources/sd_model_spec/sd_xl_base_1.0.json"
+                return "resources/sd_model_spec/wuerstchen_2.0.json"
             case _:
                 return None
 

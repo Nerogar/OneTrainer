@@ -76,7 +76,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
 
         if model.prior_prior_lora is None and args.train_unet:
             model.prior_prior_lora = LoRAModuleWrapper(
-                model.prior_prior, args.lora_rank, "lora_prior_prior", args.lora_alpha,  # ["attentions"]
+                model.prior_prior, args.lora_rank, "lora_prior_prior", args.lora_alpha, ["attention"]
             )
 
         model.prior_text_encoder.requires_grad_(False)
