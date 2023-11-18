@@ -99,8 +99,8 @@ class GenericTrainer(BaseTrainer):
 
             if last_backup_path:
                 if self.args.training_method == TrainingMethod.LORA:
-                    model_names.embedding = last_backup_path
-                elif self.args.training_method == TrainingMethod.LORA:
+                    model_names.lora = last_backup_path
+                elif self.args.training_method == TrainingMethod.EMBEDDING:
                     model_names.embedding = [last_backup_path]
                 else:  # fine-tunes
                     model_names.base_model = last_backup_path
