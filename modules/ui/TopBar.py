@@ -17,10 +17,9 @@ class TopBar:
     def __init__(
             self,
             master,
-            train_args:
-            TrainArgs,
+            train_args: TrainArgs,
             ui_state: UIState,
-            change_model_type: Callable[[TrainingMethod], None],
+            change_model_type: Callable[[ModelType], None],
             change_training_method_callback: Callable[[TrainingMethod], None],
     ):
         self.master = master
@@ -43,6 +42,8 @@ class TopBar:
 
         self.frame = ctk.CTkFrame(master=master, corner_radius=0)
         self.frame.grid(row=0, column=0, sticky="nsew")
+
+        self.training_method = None
 
         # title
         components.app_title(self.frame, 0, 0)
@@ -79,24 +80,49 @@ class TopBar:
             ],
             ui_state=self.ui_state,
             var_name="model_type",
-            command=self.change_model_type,
+            command=self.__change_model_type,
         )
 
-        # training method
-        components.options_kv(
-            master=self.frame,
-            row=0,
-            column=6,
-            values=[
+    def __create_training_method(self):
+        if self.training_method:
+            self.training_method.destroy()
+
+        values = []
+
+        if self.train_args.model_type.is_stable_diffusion():
+            values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
                 ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
-            ],
+            ]
+        elif self.train_args.model_type.is_stable_diffusion_xl():
+            values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_args.model_type.is_wuerstchen():
+            values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+
+        # training method
+        self.training_method = components.options_kv(
+            master=self.frame,
+            row=0,
+            column=6,
+            values=values,
             ui_state=self.ui_state,
             var_name="training_method",
             command=self.change_training_method_callback,
         )
+
+    def __change_model_type(self, model_type: ModelType):
+        self.change_model_type(model_type)
+        self.__create_training_method()
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:

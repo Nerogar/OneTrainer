@@ -70,8 +70,23 @@ class TrainArgs(BaseArgs):
     align_prop_truncate_steps: float
     align_prop_cfg_scale: float
 
-    # vae
-    vae_weight_dtype: DataType
+    # unet
+    train_unet: bool
+    train_unet_epochs: int
+    unet_learning_rate: float
+    offset_noise_weight: float
+    perturbation_noise_weight: float
+    rescale_noise_scheduler_to_zero_terminal_snr: bool
+    force_v_prediction: bool
+    force_epsilon_prediction: bool
+    max_noising_strength: float
+    unet_weight_dtype: DataType
+
+    # prior
+    train_prior: bool
+    train_prior_epochs: int
+    prior_learning_rate: float
+    prior_weight_dtype: DataType
 
     # text encoder
     train_text_encoder: bool
@@ -87,23 +102,22 @@ class TrainArgs(BaseArgs):
     text_encoder_2_layer_skip: int
     text_encoder_2_weight_dtype: DataType
 
-    # unet
-    train_unet: bool
-    train_unet_epochs: int
-    unet_learning_rate: float
-    offset_noise_weight: float
-    perturbation_noise_weight: float
-    rescale_noise_scheduler_to_zero_terminal_snr: bool
-    force_v_prediction: bool
-    force_epsilon_prediction: bool
-    max_noising_strength: float
-    unet_weight_dtype: DataType
+    # vae
+    vae_weight_dtype: DataType
 
     # effnet encoder
     effnet_encoder_model_name: str
+    effnet_encoder_weight_dtype: DataType
 
     # decoder
     decoder_model_name: str
+    decoder_weight_dtype: DataType
+
+    # decoder text encoder
+    decoder_text_encoder_weight_dtype: DataType
+
+    # decoder vqgan
+    decoder_vqgan_weight_dtype: DataType
 
     # masked training
     masked_training: bool
@@ -188,9 +202,15 @@ class TrainArgs(BaseArgs):
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
-            self.weight_dtype if self.text_encoder_weight_dtype == DataType.NONE else self.text_encoder_weight_dtype,
             self.weight_dtype if self.unet_weight_dtype == DataType.NONE else self.unet_weight_dtype,
+            self.weight_dtype if self.prior_weight_dtype == DataType.NONE else self.prior_weight_dtype,
+            self.weight_dtype if self.text_encoder_weight_dtype == DataType.NONE else self.text_encoder_weight_dtype,
+            self.weight_dtype if self.text_encoder_2_weight_dtype == DataType.NONE else self.text_encoder_2_weight_dtype,
             self.weight_dtype if self.vae_weight_dtype == DataType.NONE else self.vae_weight_dtype,
+            self.weight_dtype if self.effnet_encoder_weight_dtype == DataType.NONE else self.effnet_encoder_weight_dtype,
+            self.weight_dtype if self.decoder_weight_dtype == DataType.NONE else self.decoder_weight_dtype,
+            self.weight_dtype if self.decoder_text_encoder_weight_dtype == DataType.NONE else self.decoder_text_encoder_weight_dtype,
+            self.weight_dtype if self.decoder_vqgan_weight_dtype == DataType.NONE else self.decoder_vqgan_weight_dtype,
             self.weight_dtype if self.lora_weight_dtype == DataType.NONE else self.lora_weight_dtype,
             self.weight_dtype if self.embedding_weight_dtype == DataType.NONE else self.embedding_weight_dtype,
         )
@@ -220,7 +240,6 @@ class TrainArgs(BaseArgs):
             lora=self.lora_model_name,
             embedding=self.embedding_model_names,
         )
-
 
     @staticmethod
     def parse_args() -> 'TrainArgs':
@@ -280,8 +299,23 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--align-prop-truncate-steps", type=float, required=False, default=0.5, dest="align_prop_truncate_steps", help="Fraction of steps to randomly truncate when using AlignProp")
         parser.add_argument("--align-prop-cfg-scale", type=float, required=False, default=7.0, dest="align_prop_cfg_scale", help="CFG Scale for inference steps of AlignProp calculations")
 
-        # vae
-        parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
+        # unet
+        parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
+        parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
+        parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
+        parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
+        parser.add_argument("--perturbation-noise-weight", type=float, required=False, default=0.0, dest="perturbation_noise_weight", help="The weight for perturbation noise")
+        parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
+        parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
+        parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
+        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
+        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
+
+        # prior
+        parser.add_argument("--train-prior", required=False, action='store_true', dest="train_prior", help="Whether the unet should be trained")
+        parser.add_argument("--train-prior-epochs", type=int, required=False, default=2 ** 30, dest="train_prior_epochs", help="Number of epochs to train the unet for")
+        parser.add_argument("--prior-learning-rate", type=float, required=False, default=None, dest="prior_learning_rate", help="Learning rate for the unet")
+        parser.add_argument("--prior-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="prior_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
 
         # text encoder
         parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
@@ -297,23 +331,22 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--text-encoder-2-layer-skip", type=int, required=False, default=0, dest="text_encoder_2_layer_skip", help="Skip last layers of the text encoder 2")
         parser.add_argument("--text-encoder-2-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_2_weight_dtype", help="The data type to use for text encoder 2 weights during training", choices=list(DataType))
 
-        # unet
-        parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
-        parser.add_argument("--train-unet-epochs", type=int, required=False, default=2 ** 30, dest="train_unet_epochs", help="Number of epochs to train the unet for")
-        parser.add_argument("--unet-learning-rate", type=float, required=False, default=None, dest="unet_learning_rate", help="Learning rate for the unet")
-        parser.add_argument("--offset-noise-weight", type=float, required=False, default=0.0, dest="offset_noise_weight", help="The weight for offset noise prediction")
-        parser.add_argument("--perturbation-noise-weight", type=float, required=False, default=0.0, dest="perturbation_noise_weight", help="The weight for perturbation noise")
-        parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
-        parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
-        parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
-        parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
-        parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
+        # vae
+        parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
 
         # effnet encoder
         parser.add_argument("--effnet-encoder-model-name", type=str, required=False, dest="effnet_encoder_model_name", default="", help="The effnet encoder model to start training from")
+        parser.add_argument("--effnet-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="effnet_encoder_weight_dtype", help="The data type to use for effnet encoder weights during training", choices=list(DataType))
 
         # decoder
         parser.add_argument("--decoder-model-name", type=str, required=True, dest="decoder_model_name", default="", help="The decoder model to start training from")
+        parser.add_argument("--decoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="decoder_weight_dtype", help="The data type to use for decoder weights during training", choices=list(DataType))
+
+        # decoder text encoder
+        parser.add_argument("--decoder-text-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="decoder_text_encoder_weight_dtype", help="The data type to use for decoder text encoder weights during training", choices=list(DataType))
+
+        # decoder vqgan
+        parser.add_argument("--decoder-vqgan-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="decoder_vqgan_weight_dtype", help="The data type to use for decoder vqgan weights during training", choices=list(DataType))
 
         # masked training
         parser.add_argument("--masked-training", required=False, action='store_true', dest="masked_training", help="Activates masked training to let the model focus on certain parts of the training sample")
@@ -456,8 +489,23 @@ class TrainArgs(BaseArgs):
         data.append(("align_prop_truncate_steps", 0.5, float, False))
         data.append(("align_prop_cfg_scale", 7.0, float, False))
 
-        # vae
-        data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
+        # unet
+        data.append(("train_unet", True, bool, False))
+        data.append(("train_unet_epochs", 10000, int, False))
+        data.append(("unet_learning_rate", 3e-6, float, True))
+        data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("perturbation_noise_weight", 0.0, float, False))
+        data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
+        data.append(("force_v_prediction", False, bool, False))
+        data.append(("force_epsilon_prediction", False, bool, False))
+        data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+
+        # prior
+        data.append(("train_prior", True, bool, False))
+        data.append(("train_prior_epochs", 10000, int, False))
+        data.append(("prior_learning_rate", 3e-6, float, True))
+        data.append(("prior_weight_dtype", DataType.NONE, DataType, False))
 
         # text encoder
         data.append(("train_text_encoder", True, bool, False))
@@ -473,23 +521,22 @@ class TrainArgs(BaseArgs):
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_2_weight_dtype", DataType.NONE, DataType, False))
 
-        # unet
-        data.append(("train_unet", True, bool, False))
-        data.append(("train_unet_epochs", 10000, int, False))
-        data.append(("unet_learning_rate", 3e-6, float, True))
-        data.append(("offset_noise_weight", 0.0, float, False))
-        data.append(("perturbation_noise_weight", 0.0, float, False))
-        data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
-        data.append(("force_v_prediction", False, bool, False))
-        data.append(("force_epsilon_prediction", False, bool, False))
-        data.append(("max_noising_strength", 1.0, float, False))
-        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+        # vae
+        data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # effnet encoder
         data.append(("effnet_encoder_model_name", "", str, False))
+        data.append(("effnet_encoder_weight_dtype", DataType.NONE, DataType, False))
 
         # decoder
         data.append(("decoder_model_name", "", str, False))
+        data.append(("decoder_weight_dtype", DataType.NONE, DataType, False))
+
+        # decoder text encoder
+        data.append(("decoder_text_encoder_weight_dtype", DataType.NONE, DataType, False))
+
+        # decoder vqgan
+        data.append(("decoder_vqgan_weight_dtype", DataType.NONE, DataType, False))
 
         # masked training
         data.append(("masked_training", False, bool, False))

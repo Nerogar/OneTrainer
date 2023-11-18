@@ -99,30 +99,30 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoa
         decoder_text_encoder = CLIPTextModel.from_pretrained(
             decoder_model_name,
             subfolder="text_encoder",
-            torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+            torch_dtype=weight_dtypes.decoder_text_encoder.torch_dtype(),
         )
 
         decoder_decoder = WuerstchenDiffNeXt.from_pretrained(
             decoder_model_name,
             subfolder="decoder",
-            torch_dtype=weight_dtypes.unet.torch_dtype(),
+            torch_dtype=weight_dtypes.decoder.torch_dtype(),
         )
 
         decoder_vqgan = PaellaVQModel.from_pretrained(
             decoder_model_name,
             subfolder="vqgan",
-            torch_dtype=weight_dtypes.vae.torch_dtype(),
+            torch_dtype=weight_dtypes.decoder_vqgan.torch_dtype(),
         )
 
         effnet_encoder = WuerstchenEfficientNetEncoder.from_pretrained(
             effnet_encoder_model_name,
-            torch_dtype=weight_dtypes.unet.torch_dtype(),
+            torch_dtype=weight_dtypes.effnet_encoder.torch_dtype(),
         )
 
         prior_prior = WuerstchenPrior.from_pretrained(
             prior_model_name,
             subfolder="prior",
-            torch_dtype=weight_dtypes.unet.torch_dtype(),
+            torch_dtype=weight_dtypes.prior.torch_dtype(),
         )
 
         prior_tokenizer = CLIPTokenizer.from_pretrained(

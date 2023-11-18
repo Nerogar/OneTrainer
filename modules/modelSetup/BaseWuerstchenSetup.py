@@ -3,6 +3,7 @@ from abc import ABCMeta
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
+from diffusers.pipelines.wuerstchen.modeling_wuerstchen_common import AttnBlock
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
@@ -11,7 +12,8 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers
+from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_transformer_blocks, \
+    enable_checkpointing_for_clip_encoder_layers
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -185,26 +187,11 @@ class BaseWuerstchenSetup(
         target = data['target']
         timestep = data['timestep']
 
-        if args.masked_training and not args.model_type.has_conditioning_image_input():
-            losses = loss_util.masked_loss(
-                F.mse_loss,
-                predicted,
-                target,
-                batch['latent_mask'],
-                args.unmasked_weight,
-                args.normalize_masked_area_loss
-            ).mean([1, 2, 3])
-        else:
-            losses = F.mse_loss(
-                predicted,
-                target,
-                reduction='none'
-            ).mean([1, 2, 3])
-
-            if args.normalize_masked_area_loss:
-                clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
-                losses = losses / clamped_mask.mean(dim=(1, 2, 3))
-
+        losses = F.mse_loss(
+            predicted,
+            target,
+            reduction='none'
+        ).mean([1, 2, 3])
 
         k = 1.0
         gamma = 1.0

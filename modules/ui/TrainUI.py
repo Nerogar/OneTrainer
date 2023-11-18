@@ -11,6 +11,7 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
+from modules.ui.ModelTab import ModelTab
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -21,7 +22,6 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
-from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
@@ -60,6 +60,7 @@ class TrainUI(ctk.CTk):
         self.export_button = None
         self.tabview = None
 
+        self.model_tab = None
         self.training_tab = None
 
         self.top_bar_component = self.top_bar(self)
@@ -111,7 +112,7 @@ class TrainUI(ctk.CTk):
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
         self.create_general_tab(self.tabview.add("general"))
-        self.create_model_tab(self.tabview.add("model"))
+        self.model_tab = self.create_model_tab(self.tabview.add("model"))
         self.create_data_tab(self.tabview.add("data"))
         self.create_concepts_tab(self.tabview.add("concepts"))
         self.training_tab = self.create_training_tab(self.tabview.add("training"))
@@ -163,97 +164,7 @@ class TrainUI(ctk.CTk):
         components.switch(master, 6, 1, self.ui_state, "tensorboard")
 
     def create_model_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
-
-        # base model
-        components.label(master, 0, 0, "Base Model",
-                         tooltip="Filename, directory or hugging face repository of the base model")
-        components.file_entry(
-            master, 0, 1, self.ui_state, "base_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # effnet encoder model
-        components.label(master, 1, 0, "Effnet Encoder Model",
-                         tooltip="Filename, directory or hugging face repository of the effnet encoder model")
-        components.file_entry(
-            master, 1, 1, self.ui_state, "effnet_encoder_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # decoder model
-        components.label(master, 2, 0, "Decoder Model",
-                         tooltip="Filename, directory or hugging face repository of the decoder model")
-        components.file_entry(
-            master, 2, 1, self.ui_state, "decoder_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # output model destination
-        components.label(master, 3, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
-        components.file_entry(master, 3, 1, self.ui_state, "output_model_destination", is_output=True)
-
-        # output format
-        components.label(master, 3, 3, "Output Format",
-                         tooltip="Format to use when saving the output model")
-        components.options_kv(master, 3, 4, [
-            ("Safetensors", ModelFormat.SAFETENSORS),
-            ("Diffusers", ModelFormat.DIFFUSERS),
-            ("Checkpoint", ModelFormat.CKPT),
-        ], self.ui_state, "output_model_format")
-
-        # output data type
-        components.label(master, 4, 0, "Output Data Type",
-                         tooltip="Precision to use when saving the output model")
-        components.options_kv(master, 4, 1, [
-            ("float16", DataType.FLOAT_16),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "output_dtype")
-
-        # weight dtype
-        components.label(master, 5, 0, "Weight Data Type",
-                         tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 5, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "weight_dtype")
-
-        # text encoder weight dtype
-        components.label(master, 6, 0, "Override Text Encoder Data Type",
-                         tooltip="Overrides the text encoder weight data type")
-        components.options_kv(master, 6, 1, [
-            ("", DataType.NONE),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "text_encoder_weight_dtype")
-
-        # unet weight dtype
-        components.label(master, 7, 0, "Override UNet Data Type",
-                         tooltip="Overrides the unet weight data type")
-        components.options_kv(master, 7, 1, [
-            ("", DataType.NONE),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "unet_weight_dtype")
-
-        # vae weight dtype
-        components.label(master, 8, 0, "Override VAE Data Type",
-                         tooltip="Overrides the vae weight data type")
-        components.options_kv(master, 8, 1, [
-            ("", DataType.NONE),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "vae_weight_dtype")
+        return ModelTab(master, self.train_args, self.ui_state)
 
     def create_data_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -453,6 +364,9 @@ class TrainUI(ctk.CTk):
         return master
 
     def change_model_type(self, model_type: ModelType):
+        if self.model_tab:
+            self.model_tab.refresh_ui()
+
         if self.training_tab:
             self.training_tab.refresh_ui()
 
