@@ -3,7 +3,6 @@ from abc import ABCMeta
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
-from diffusers.pipelines.wuerstchen.modeling_wuerstchen_common import AttnBlock
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
@@ -12,6 +11,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
+from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers
 from modules.util import loss_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -36,24 +36,18 @@ class BaseWuerstchenSetup(
             model.prior_prior.set_attn_processor(AttnProcessor())
         elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                prior_attention_blocks = [x for x in model.prior_prior.blocks if isinstance(x, AttnBlock)]
-                for prior_attention_block in prior_attention_blocks:
-                    prior_attention_block.attention.set_processor(XFormersAttnProcessor())
+                model.prior_prior.set_attn_processor(XFormersAttnProcessor())
             except Exception as e:
                 print(
                     "Could not enable memory efficient attention. Make sure xformers is installed"
                     f" correctly and a GPU is available: {e}"
                 )
         elif args.attention_mechanism == AttentionMechanism.SDP:
-            prior_attention_blocks = [x for x in model.prior_prior.blocks if isinstance(x, AttnBlock)]
-            for prior_attention_block in prior_attention_blocks:
-                prior_attention_block.attention.set_processor(AttnProcessor2_0())
+            model.prior_prior.set_attn_processor(AttnProcessor2_0())
 
-        # if args.gradient_checkpointing:
-        #     model.unet.enable_gradient_checkpointing()
-        #     enable_checkpointing_for_transformer_blocks(model.unet)
-        #     enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1)
-        #     enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
+        if args.gradient_checkpointing:
+            model.prior_prior.enable_gradient_checkpointing()
+            enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder)
 
     def __alpha_cumprod(
             self,
