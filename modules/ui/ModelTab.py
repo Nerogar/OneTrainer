@@ -5,6 +5,7 @@ import customtkinter as ctk
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -57,7 +58,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=True,
+            allow_diffusers=self.train_args.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
             allow_checkpoint=True,
         )
 
@@ -74,7 +75,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=True,
+            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
 
@@ -90,7 +91,9 @@ class ModelTab:
         row = self.__create_decoder_components(row)
         row = self.__create_output_components(
             row,
-            allow_diffusers=True,
+            allow_safetensors=self.train_args.training_method != TrainingMethod.FINE_TUNE,
+            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
+            allow_checkpoint=self.train_args.training_method != TrainingMethod.FINE_TUNE,
         )
 
     def __create_base_dtype_components(self, row: int) -> int:

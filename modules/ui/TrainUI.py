@@ -374,6 +374,9 @@ class TrainUI(ctk.CTk):
         if not self.tabview:
             return
 
+        if self.model_tab:
+            self.model_tab.refresh_ui()
+
         if training_method != TrainingMethod.LORA and "LoRA" in self.tabview._tab_dict:
             self.tabview.delete("LoRA")
         if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:

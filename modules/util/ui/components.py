@@ -205,6 +205,10 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     var = ui_state.vars[var_name]
     keys = [key for key, value in values]
 
+    # if the current value is not valid, select the first option
+    if var.get() not in [str(value) for key, value in values] and len(keys) > 0:
+        var.set(values[0][1])
+
     deactivate_update_var = False
 
     def update_component(text):

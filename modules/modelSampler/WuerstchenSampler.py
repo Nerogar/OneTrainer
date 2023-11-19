@@ -340,10 +340,12 @@ class WuerstchenSampler(BaseModelSampler):
 
         # decode vqgan
         self.model.decoder_vqgan_to(self.train_device)
-        latents = decoder_vqgan.config.scale_factor * latent_image
-        image_tensor = decoder_vqgan.decode(latents).sample.clamp(0, 1)
-        image_array = image_tensor.permute(0, 2, 3, 1).cpu().squeeze().numpy()
-        image_array = (image_array * 255).round().astype("uint8")
+
+        with torch.autocast(self.train_device.type):
+            latents = decoder_vqgan.config.scale_factor * latent_image
+            image_tensor = decoder_vqgan.decode(latents).sample.clamp(0, 1)
+            image_array = image_tensor.permute(0, 2, 3, 1).cpu().squeeze().numpy()
+            image_array = (image_array * 255).round().astype("uint8")
 
         self.model.decoder_vqgan_to(self.temp_device)
         torch_gc()
