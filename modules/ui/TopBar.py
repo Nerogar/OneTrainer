@@ -179,9 +179,16 @@ class TopBar:
 
     def __load_current_config(self, filename):
         try:
+            load_dict = {}
+
+            if os.path.basename(filename).startswith("#"):
+                load_dict = TrainArgs.default_values().to_dict()
+
             with open(filename, "r") as f:
-                self.train_args.from_dict(json.load(f))
-                self.ui_state.update(self.train_args)
+                load_dict |= json.load(f)
+
+            self.train_args.from_dict(load_dict)
+            self.ui_state.update(self.train_args)
         except Exception:
             print(traceback.format_exc())
 

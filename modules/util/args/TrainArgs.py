@@ -492,7 +492,7 @@ class TrainArgs(BaseArgs):
         # unet
         data.append(("train_unet", True, bool, False))
         data.append(("train_unet_epochs", 10000, int, False))
-        data.append(("unet_learning_rate", 3e-6, float, True))
+        data.append(("unet_learning_rate", None, float, True))
         data.append(("offset_noise_weight", 0.0, float, False))
         data.append(("perturbation_noise_weight", 0.0, float, False))
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
@@ -504,20 +504,20 @@ class TrainArgs(BaseArgs):
         # prior
         data.append(("train_prior", True, bool, False))
         data.append(("train_prior_epochs", 10000, int, False))
-        data.append(("prior_learning_rate", 3e-6, float, True))
+        data.append(("prior_learning_rate", None, float, True))
         data.append(("prior_weight_dtype", DataType.NONE, DataType, False))
 
         # text encoder
         data.append(("train_text_encoder", True, bool, False))
         data.append(("train_text_encoder_epochs", 30, int, False))
-        data.append(("text_encoder_learning_rate", 3e-6, float, True))
+        data.append(("text_encoder_learning_rate", None, float, True))
         data.append(("text_encoder_layer_skip", 0, int, False))
         data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
 
         # text encoder 2
         data.append(("train_text_encoder_2", True, bool, False))
         data.append(("train_text_encoder_2_epochs", 30, int, False))
-        data.append(("text_encoder_2_learning_rate", 3e-6, float, True))
+        data.append(("text_encoder_2_learning_rate", None, float, True))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_2_weight_dtype", DataType.NONE, DataType, False))
 
