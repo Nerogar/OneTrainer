@@ -37,6 +37,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.params.SampleParams import SampleParams
+from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 
 
@@ -62,7 +63,7 @@ class GenericTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(args.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, self.__get_string_timestamp()))
+        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, get_string_timestamp()))
         if args.tensorboard:
             tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
 
@@ -136,9 +137,6 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue = []
 
         self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
-
-    def __get_string_timestamp(self):
-        return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     def __clear_cache(self):
         print(
@@ -221,7 +219,7 @@ class GenericTrainer(BaseTrainer):
 
                     sample_path = os.path.join(
                         sample_dir,
-                        f"{self.__get_string_timestamp()}-training-sample-{train_progress.filename_string()}{image_format.extension()}"
+                        f"{get_string_timestamp()}-training-sample-{train_progress.filename_string()}{image_format.extension()}"
                     )
 
                     def on_sample_default(image: Image):
@@ -321,7 +319,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("creating backup")
 
-        backup_path = os.path.join(self.args.workspace_dir, "backup", self.__get_string_timestamp())
+        backup_path = os.path.join(self.args.workspace_dir, "backup", get_string_timestamp())
 
         try:
             print("Creating Backup " + backup_path)
@@ -361,7 +359,7 @@ class GenericTrainer(BaseTrainer):
         save_path = os.path.join(
             self.args.workspace_dir,
             "save",
-            f"{self.__get_string_timestamp()}-save-{train_progress.filename_string()}{self.args.output_model_format.file_extension()}"
+            f"{get_string_timestamp()}-save-{train_progress.filename_string()}{self.args.output_model_format.file_extension()}"
         )
         print("Saving " + save_path)
 

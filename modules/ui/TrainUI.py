@@ -361,6 +361,11 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the model conversion tool")
         components.button(master, 1, 1, "Open", self.open_convert_model_tool)
 
+        # sample
+        components.label(master, 2, 0, "Sampling Tool",
+                         tooltip="Open the model sampling tool")
+        components.button(master, 2, 1, "Open", self.open_sampling_tool)
+
         return master
 
     def change_model_type(self, model_type: ModelType):
@@ -407,12 +412,24 @@ class TrainUI(ctk.CTk):
         window = ConvertModelUI(self)
         self.wait_window(window)
 
+    def open_sampling_tool(self):
+        window = SampleWindow(
+            self,
+            train_args=self.train_args,
+        )
+        self.wait_window(window)
+        torch_gc()
+
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
 
         if training_callbacks and training_commands:
-            window = SampleWindow(self, training_callbacks, training_commands)
+            window = SampleWindow(
+                self,
+                callbacks=training_callbacks,
+                commands=training_commands,
+            )
             self.wait_window(window)
             training_callbacks.set_on_sample_custom()
 
