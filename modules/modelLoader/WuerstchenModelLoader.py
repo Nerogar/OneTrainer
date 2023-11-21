@@ -190,7 +190,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoa
         decoder_model_name = model_names.decoder_model
 
         try:
-            model = self.__load_diffusers(
+            model = self.__load_internal(
                 model_type,
                 weight_dtypes,
                 prior_model_name,
@@ -203,7 +203,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoa
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_internal(
+            model = self.__load_diffusers(
                 model_type,
                 weight_dtypes,
                 prior_model_name,
