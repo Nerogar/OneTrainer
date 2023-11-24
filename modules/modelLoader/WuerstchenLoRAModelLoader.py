@@ -44,7 +44,7 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
             module_filter=["attention"],
         )
 
-    def __default_model_spec_name(
+    def _default_model_spec_name(
             self,
             model_type: ModelType,
     ) -> str | None:

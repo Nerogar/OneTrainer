@@ -1,0 +1,18 @@
+{
+    "backup_after": 10,
+    "base_model_name": "warp-ai/wuerstchen-prior",
+    "decoder_model_name": "warp-ai/wuerstchen",
+    "effnet_encoder_model_name": "warp-ai/EfficientNetEncoder",
+    "latent_caching": false,
+    "learning_rate": 0.0003,
+    "learning_rate_warmup_steps": 20,
+    "model_type": "WUERSTCHEN_2",
+    "output_model_destination": "models/embedding.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": 1024,
+    "sample_after": 1,
+    "train_text_encoder_epochs": 30,
+    "train_unet_epochs": 100000,
+    "training_method": "EMBEDDING",
+    "weight_dtype": "FLOAT_16"
+}

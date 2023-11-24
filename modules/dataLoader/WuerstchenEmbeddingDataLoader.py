@@ -1,21 +1,21 @@
 from mgds.GenericDataLoaderModules import *
 
-from modules.dataLoader.StableDiffusionXLBaseDataLoader import StablDiffusionXLBaseDataLoader
-from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
+from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class StableDiffusionXLEmbeddingDataLoader(StablDiffusionXLBaseDataLoader):
+class WuerstchenEmbeddingDataLoader(WuerstchenBaseDataLoader):
     def __init__(
             self,
             train_device: torch.device,
             temp_device: torch.device,
             args: TrainArgs,
-            model: StableDiffusionXLModel,
+            model: WuerstchenModel,
             train_progress: TrainProgress,
     ):
-        super(StableDiffusionXLEmbeddingDataLoader, self).__init__(
+        super(WuerstchenEmbeddingDataLoader, self).__init__(
             train_device,
             temp_device,
             args,
@@ -23,8 +23,8 @@ class StableDiffusionXLEmbeddingDataLoader(StablDiffusionXLBaseDataLoader):
             train_progress,
         )
 
-    def _load_input_modules(self, args: TrainArgs, model: StableDiffusionXLModel) -> list:
-        modules = super(StableDiffusionXLEmbeddingDataLoader, self)._load_input_modules(args, model)
+    def _load_input_modules(self, args: TrainArgs, model: WuerstchenModel) -> list:
+        modules = super(WuerstchenEmbeddingDataLoader, self)._load_input_modules(args, model)
 
         tokens = [f"<embedding_{i}>" for i in range(model.embeddings[0].token_count)]
         all_token_string = ''.join(tokens)

@@ -365,6 +365,13 @@ class WuerstchenSampler(BaseModelSampler):
         prompt = sample_params.prompt
         negative_prompt = sample_params.negative_prompt
 
+        if len(self.model.embeddings) > 0:
+            tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
+            embedding_string = ''.join(tokens)
+            prompt = prompt.replace("<embedding>", embedding_string)
+            negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
+
+
         image = self.__sample_base(
             prompt=prompt,
             negative_prompt=negative_prompt,

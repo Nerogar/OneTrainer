@@ -8,12 +8,13 @@ from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from modules.dataLoader.KandinskyFineTuneDataLoader import KandinskyFineTuneDataLoader
-from modules.dataLoader.WuerstchenFineTuneDataLoader import WuerstchenFineTuneDataLoader
 from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLEmbeddingDataLoader import StableDiffusionXLEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionXLFineTuneDataLoader import StableDiffusionXLFineTuneDataLoader
+from modules.dataLoader.WuerstchenEmbeddingDataLoader import WuerstchenEmbeddingDataLoader
+from modules.dataLoader.WuerstchenFineTuneDataLoader import WuerstchenFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.KandinskyLoRAModelLoader import KandinskyLoRAModelLoader
@@ -24,6 +25,7 @@ from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelL
 from modules.modelLoader.StableDiffusionXLEmbeddingModelLoader import StableDiffusionXLEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusionXLLoRAModelLoader
 from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
+from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddingModelLoader
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelLoader.WuerstchenModelLoader import WuerstchenModelLoader
 from modules.modelSampler import BaseModelSampler
@@ -41,6 +43,7 @@ from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSav
 from modules.modelSaver.StableDiffusionXLEmbeddingModelSaver import StableDiffusionXLEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
 from modules.modelSaver.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
+from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbeddingModelSaver
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSaver.WuerstchenModelSaver import WuerstchenModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
@@ -53,6 +56,7 @@ from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
 from modules.modelSetup.StableDiffusionXLEmbeddingSetup import StableDiffusionXLEmbeddingSetup
 from modules.modelSetup.StableDiffusionXLFineTuneSetup import StableDiffusionXLFineTuneSetup
 from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRASetup
+from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
@@ -98,6 +102,8 @@ def create_model_loader(
                 return StableDiffusionEmbeddingModelLoader()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLEmbeddingModelLoader()
+            if model_type.is_wuerstchen():
+                return WuerstchenEmbeddingModelLoader()
 
 
 def create_model_saver(
@@ -131,6 +137,8 @@ def create_model_saver(
                 return StableDiffusionEmbeddingModelSaver()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLEmbeddingModelSaver()
+            if model_type.is_wuerstchen():
+                return WuerstchenEmbeddingModelSaver()
 
 
 def create_model_setup(
@@ -167,6 +175,8 @@ def create_model_setup(
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_wuerstchen():
+                return WuerstchenEmbeddingSetup(train_device, temp_device, debug_mode)
 
 
 def create_model_sampler(
@@ -243,6 +253,8 @@ def create_data_loader(
                 return StableDiffusionEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
+            if model_type.is_wuerstchen():
+                return WuerstchenEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
 
 
 def create_optimizer(
@@ -285,7 +297,8 @@ def create_optimizer(
             optimizer = torch.optim.Adam(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
                 eps=args.optimizer_eps if args.optimizer_eps is not None else 1e-8,
                 amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad is not None else False,
@@ -301,7 +314,8 @@ def create_optimizer(
             optimizer = torch.optim.AdamW(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 1e-2,
                 eps=args.optimizer_eps if args.optimizer_eps is not None else 1e-8,
                 amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad is not None else False,
@@ -402,7 +416,8 @@ def create_optimizer(
             optimizer = lp.Lion(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.99),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.99),
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
                 use_triton=args.optimizer_use_triton if args.optimizer_use_triton is not None else False,
             )
@@ -442,7 +457,8 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 bias_correction=args.optimizer_bias_correction if args.optimizer_bias_correction is not None else True,
                 amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad is not None else False,
                 adam_w_mode=args.optimizer_adam_w_mode if args.optimizer_adam_w_mode is not None else True,
@@ -458,7 +474,8 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate,
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 bias_correction=args.optimizer_bias_correction if args.optimizer_bias_correction is not None else True,
                 amsgrad=args.optimizer_amsgrad if args.optimizer_amsgrad is not None else False,
                 adam_w_mode=args.optimizer_adam_w_mode if args.optimizer_adam_w_mode is not None else True,
@@ -475,7 +492,8 @@ def create_optimizer(
                 params=parameters,
                 lr=args.learning_rate if args.learning_rate is not None else 0,
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 min_8bit_size=args.optimizer_min_8bit_size if args.optimizer_min_8bit_size is not None else 4096,
                 percentile_clipping=args.optimizer_percentile_clipping if args.optimizer_percentile_clipping is not None else 100,
                 block_wise=args.optimizer_block_wise if args.optimizer_block_wise is not None else True,
@@ -502,7 +520,8 @@ def create_optimizer(
             optimizer = da.DAdaptAdam(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 eps=args.optimizer_eps if args.optimizer_eps is not None else 1e-8,
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
                 log_every=args.optimizer_log_every if args.optimizer_log_every is not None else 0,
@@ -519,7 +538,9 @@ def create_optimizer(
             optimizer = da.DAdaptAdan(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.98, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.92, args.optimizer_beta3 if args.optimizer_beta3 is not None else 0.99),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.98,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.92,
+                       args.optimizer_beta3 if args.optimizer_beta3 is not None else 0.99),
                 eps=args.optimizer_eps if args.optimizer_eps is not None else 1e-8,
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0.02,
                 no_prox=args.optimizer_no_prox if args.optimizer_no_prox is not None else False,
@@ -548,20 +569,22 @@ def create_optimizer(
             optimizer = da.DAdaptLion(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0.0,
                 log_every=args.optimizer_log_every if args.optimizer_log_every is not None else 0,
                 d0=args.optimizer_d0 if args.optimizer_d0 is not None else 1e-6,
                 fsdp_in_use=args.optimizer_fsdp_in_use if args.optimizer_fsdp_in_use is not None else False,
             )
-            
+
         # PRODIGY Optimizer
         case Optimizer.PRODIGY:
             import prodigyopt
             optimizer = prodigyopt.Prodigy(
                 params=parameters,
                 lr=args.learning_rate,
-                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9, args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
+                betas=(args.optimizer_beta1 if args.optimizer_beta1 is not None else 0.9,
+                       args.optimizer_beta2 if args.optimizer_beta2 is not None else 0.999),
                 beta3=args.optimizer_beta3 if args.optimizer_beta3 is not None else None,
                 eps=args.optimizer_eps if args.optimizer_eps is not None else 1e-8,
                 weight_decay=args.optimizer_weight_decay if args.optimizer_weight_decay is not None else 0,
@@ -573,15 +596,16 @@ def create_optimizer(
                 growth_rate=args.optimizer_growth_rate if args.optimizer_growth_rate is not None else float('inf'),
                 fsdp_in_use=args.optimizer_fsdp_in_use if args.optimizer_fsdp_in_use is not None else False,
             )
-    
+
         # ADAFactor Optimizer
         case Optimizer.ADAFACTOR:
             from transformers.optimization import Adafactor
-            
+
             optimizer = Adafactor(
                 params=parameters,
-                lr= None if args.optimizer_relative_step == True else args.learning_rate,
-                eps=(args.optimizer_eps if args.optimizer_eps is not None else 1e-30, args.optimizer_eps2 if args.optimizer_eps2 is not None else 1e-3),
+                lr=None if args.optimizer_relative_step == True else args.learning_rate,
+                eps=(args.optimizer_eps if args.optimizer_eps is not None else 1e-30,
+                     args.optimizer_eps2 if args.optimizer_eps2 is not None else 1e-3),
                 clip_threshold=args.optimizer_clip_threshold if args.optimizer_clip_threshold is not None else 1.0,
                 decay_rate=args.optimizer_decay_rate if args.optimizer_decay_rate is not None else -0.8,
                 beta1=args.optimizer_beta1 if args.optimizer_beta1 is not None else None,

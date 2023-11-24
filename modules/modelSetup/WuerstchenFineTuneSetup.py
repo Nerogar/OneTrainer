@@ -41,8 +41,8 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
 
-        if args.train_unet:
-            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+        if args.train_prior:
+            lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.prior_prior.parameters(),
                 'lr': lr,
@@ -59,8 +59,8 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         model.prior_text_encoder.requires_grad_(train_text_encoder)
 
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
-        model.prior_prior.requires_grad_(train_unet)
+        train_prior = args.train_prior and (model.train_progress.epoch < args.train_prior_epochs)
+        model.prior_prior.requires_grad_(train_prior)
 
         model.decoder_text_encoder.requires_grad_(False)
         model.decoder_decoder.requires_grad_(False)
@@ -104,7 +104,7 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
         else:
             model.prior_text_encoder.eval()
 
-        if args.train_unet:
+        if args.train_prior:
             model.prior_prior.train()
         else:
             model.prior_prior.eval()

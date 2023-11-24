@@ -34,7 +34,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         if args.train_text_encoder:
             params += list(model.prior_text_encoder_lora.parameters())
 
-        if args.train_unet:
+        if args.train_prior:
             params += list(model.prior_prior_lora.parameters())
 
         return params
@@ -54,8 +54,8 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
                 'initial_lr': lr,
             })
 
-        if args.train_unet:
-            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+        if args.train_prior:
+            lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.prior_prior_lora.parameters(),
                 'lr': lr,
@@ -74,7 +74,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
                 model.prior_text_encoder, args.lora_rank, "lora_prior_te", args.lora_alpha
             )
 
-        if model.prior_prior_lora is None and args.train_unet:
+        if model.prior_prior_lora is None and args.train_prior:
             model.prior_prior_lora = LoRAModuleWrapper(
                 model.prior_prior, args.lora_rank, "lora_prior_prior", args.lora_alpha, ["attention"]
             )
@@ -90,9 +90,9 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         if model.prior_text_encoder_lora is not None:
             model.prior_text_encoder_lora.requires_grad_(train_text_encoder)
 
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        train_prior = args.train_prior and (model.train_progress.epoch < args.train_prior_epochs)
         if model.prior_prior_lora is not None:
-            model.prior_prior_lora.requires_grad_(train_unet)
+            model.prior_prior_lora.requires_grad_(train_prior)
 
         if model.prior_text_encoder_lora is not None:
             model.prior_text_encoder_lora.hook_to_module()
@@ -138,7 +138,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         else:
             model.prior_text_encoder.eval()
 
-        if args.train_unet:
+        if args.train_prior:
             model.prior_prior.train()
         else:
             model.prior_prior.eval()

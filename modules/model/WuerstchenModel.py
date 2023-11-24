@@ -3,7 +3,7 @@ import torchvision
 from diffusers import DiffusionPipeline, DDPMWuerstchenScheduler, WuerstchenCombinedPipeline, ModelMixin, ConfigMixin
 from diffusers.configuration_utils import register_to_config
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
-from torch import nn
+from torch import nn, Tensor
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from modules.model.BaseModel import BaseModel
@@ -37,6 +37,12 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
         return self.mapper(self.backbone(x))
 
 
+class WuerstchenModelEmbedding:
+    def __init__(self, name: str, prior_text_encoder_vector: Tensor, token_count: int):
+        self.name = name
+        self.prior_text_encoder_vector = prior_text_encoder_vector
+        self.token_count = token_count
+
 class WuerstchenModel(BaseModel):
     # base model data
     model_type: ModelType
@@ -52,6 +58,7 @@ class WuerstchenModel(BaseModel):
     prior_prior: WuerstchenPrior
 
     # persistent training data
+    embeddings: list[WuerstchenModelEmbedding] | None
     prior_text_encoder_lora: LoRAModuleWrapper | None
     prior_prior_lora: LoRAModuleWrapper | None
 
@@ -71,6 +78,7 @@ class WuerstchenModel(BaseModel):
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
+            embeddings: list[WuerstchenModelEmbedding] | None = None,
             prior_text_encoder_lora: LoRAModuleWrapper | None = None,
             prior_prior_lora: LoRAModuleWrapper | None = None,
             model_spec: ModelSpec | None = None,
@@ -93,6 +101,8 @@ class WuerstchenModel(BaseModel):
         self.prior_text_encoder = prior_text_encoder
         self.prior_noise_scheduler = prior_noise_scheduler
         self.prior_prior = prior_prior
+
+        self.embeddings = embeddings if embeddings is not None else []
         self.prior_text_encoder_lora = prior_text_encoder_lora
         self.prior_prior_lora = prior_prior_lora
 

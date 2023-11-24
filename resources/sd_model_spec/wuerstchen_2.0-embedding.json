@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "wuerstchen-v2-prior/embedding",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "Wuerstchen 2.0 Embedding"
+}
