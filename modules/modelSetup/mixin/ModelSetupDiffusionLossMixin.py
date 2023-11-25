@@ -72,7 +72,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     reduction='none'
                 ).mean([1, 2, 3])
 
-                if args.normalize_masked_area_loss:
+                if args.masked_training and args.normalize_masked_area_loss:
                     clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
                     losses = losses / clamped_mask.mean(dim=(1, 2, 3))
 
