@@ -7,7 +7,7 @@
 /training_samples
 /training_user_settings
 /external
-debug.py
+debug*.py
 train.bat
 *.pyc
 *.bak

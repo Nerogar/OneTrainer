@@ -1,3 +1,5 @@
+import inspect
+
 from modules.util.enum.DataType import DataType
 
 
@@ -42,3 +44,8 @@ class ModelWeightDtypes:
             self.lora,
             self.embedding,
         ]
+
+    @staticmethod
+    def from_single_dtype(dtype:DataType):
+        params = [dtype for _ in set(inspect.signature(ModelWeightDtypes).parameters.keys())]
+        return ModelWeightDtypes(*params)

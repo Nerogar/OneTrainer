@@ -22,13 +22,7 @@ class ConvertModelArgs(BaseArgs):
         super(ConvertModelArgs, self).__init__(data)
 
     def weight_dtypes(self) -> ModelWeightDtypes:
-        return ModelWeightDtypes(
-            self.output_dtype,
-            self.output_dtype,
-            self.output_dtype,
-            self.output_dtype,
-            self.output_dtype,
-        )
+        return ModelWeightDtypes.from_single_dtype(self.output_dtype)
 
     def model_names(self) -> ModelNames:
         return ModelNames(
