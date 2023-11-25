@@ -228,7 +228,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         return modules
 
     def _cache_modules(self, args: TrainArgs):
-        image_split_names = ['latent_image_distribution', 'original_resolution']
+        image_split_names = ['latent_image_distribution', 'original_resolution', 'crop_offset']
 
         if args.masked_training or args.model_type.has_mask_input():
             image_split_names.append('latent_mask')
