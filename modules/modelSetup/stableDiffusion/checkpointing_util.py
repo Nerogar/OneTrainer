@@ -1,7 +1,6 @@
 from typing import Callable, Optional, Dict, Any, Union, Tuple
 
 import torch
-from diffusers import UNet2DConditionModel
 from diffusers.models.attention import BasicTransformerBlock
 from torch import nn
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
@@ -99,6 +98,7 @@ def create_checkpointed_unet_forward(orig_module) -> Callable:
             added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None,
             down_block_additional_residuals: Optional[Tuple[torch.Tensor]] = None,
             mid_block_additional_residual: Optional[torch.Tensor] = None,
+            down_intrablock_additional_residuals: Optional[Tuple[torch.Tensor]] = None,
             encoder_attention_mask: Optional[torch.Tensor] = None,
             return_dict: bool = True,
             # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
@@ -115,6 +115,7 @@ def create_checkpointed_unet_forward(orig_module) -> Callable:
             added_cond_kwargs,
             down_block_additional_residuals,
             mid_block_additional_residual,
+            down_intrablock_additional_residuals,
             encoder_attention_mask,
             return_dict,
         )
@@ -130,6 +131,7 @@ def create_checkpointed_unet_forward(orig_module) -> Callable:
             added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None,
             down_block_additional_residuals: Optional[Tuple[torch.Tensor]] = None,
             mid_block_additional_residual: Optional[torch.Tensor] = None,
+            down_intrablock_additional_residuals: Optional[Tuple[torch.Tensor]] = None,
             encoder_attention_mask: Optional[torch.Tensor] = None,
             return_dict: bool = True,
     ):
@@ -148,6 +150,7 @@ def create_checkpointed_unet_forward(orig_module) -> Callable:
             added_cond_kwargs,
             down_block_additional_residuals,
             mid_block_additional_residual,
+            down_intrablock_additional_residuals,
             encoder_attention_mask,
             return_dict,
             dummy,
