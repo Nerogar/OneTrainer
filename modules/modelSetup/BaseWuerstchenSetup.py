@@ -19,6 +19,8 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class BaseWuerstchenSetup(
