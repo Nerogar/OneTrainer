@@ -16,6 +16,8 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class TrainArgs(BaseArgs):
