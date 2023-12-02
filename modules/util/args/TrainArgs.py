@@ -69,6 +69,10 @@ class TrainArgs(BaseArgs):
     align_prop_steps: int
     align_prop_truncate_steps: float
     align_prop_cfg_scale: float
+    mse_strength: float
+    mae_strength: float
+    scale_loss_type: LossScaler
+    scale_lr_type: LearningRateScaler
 
     # unet
     train_unet: bool
@@ -298,6 +302,10 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--align-prop-steps", type=int, required=False, default=20, dest="align_prop_steps", help="Number of inference steps for each AlignProp step")
         parser.add_argument("--align-prop-truncate-steps", type=float, required=False, default=0.5, dest="align_prop_truncate_steps", help="Fraction of steps to randomly truncate when using AlignProp")
         parser.add_argument("--align-prop-cfg-scale", type=float, required=False, default=7.0, dest="align_prop_cfg_scale", help="CFG Scale for inference steps of AlignProp calculations")
+        parser.add_argument("--mse-strength", type=float, required=False, default=1.0, dest="mse_strength", help="Mean squared Error strength for custom loss settings")
+        parser.add_argument("--mae-strength", type=float, required=False, default=0.0, dest="mae_strength", help="Mean Absolute Error strength for custom loss settings")
+        parser.add_argument("--scale-loss-type", type=LossScaler, required=False, default=LossScaler.NONE, dest="scale_loss_type", help="Type of Loss Scaler", choices=list(LossScaler))
+        parser.add_argument("--scale-lr-type", type=LearningRateScaler, required=False, default=LearningRateScaler.NONE, dest="scale_lr_type", help="Type of Learning Rate Scaler", choices=list(LearningRateScaler))
 
         # unet
         parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
@@ -488,6 +496,10 @@ class TrainArgs(BaseArgs):
         data.append(("align_prop_steps", 20, int, False))
         data.append(("align_prop_truncate_steps", 0.5, float, False))
         data.append(("align_prop_cfg_scale", 7.0, float, False))
+        data.append(("mse_strength", 1.0, float, False))
+        data.append(("mae_strength", 0.0, float, False))
+        data.append(("scale_loss_type", LossScaler.NONE, LossScaler, False))
+        data.append(("scale_lr_type", LearningRateScaler.NONE, LearningRateScaler, False))
 
         # unet
         data.append(("train_unet", True, bool, False))
