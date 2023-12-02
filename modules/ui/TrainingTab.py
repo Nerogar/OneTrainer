@@ -8,6 +8,8 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -387,18 +389,18 @@ class TrainingTab:
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
 
-    def __create_loss_related_frame(self, master, row):
+    def __create_loss_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
 
         # MSE Strength
         components.label(frame, 0, 0, "MSE Strength",
-                         tooltip="Mean Squared Error strength for custom loss settings")
+                         tooltip="Mean Squared Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
         components.entry(frame, 0, 1, self.ui_state, "mse_strength")
 
         # MAE Strength
         components.label(frame, 1, 0, "MAE Strength",
-                         tooltip="Mean Absolute Error strength for custom loss settings")
+                         tooltip="Mean Absolute Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
         components.entry(frame, 1, 1, self.ui_state, "mae_strength")
 
         # Loss Scaler
