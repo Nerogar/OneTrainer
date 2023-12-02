@@ -186,12 +186,37 @@ class BaseWuerstchenSetup(
         predicted = data['predicted']
         target = data['target']
         timestep = data['timestep']
+        mse_strength = args.mse_strength
+        mae_strength = args.mae_strength
+        batch_size = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] else args.batch_size
+        gradient_accumulation_steps = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] else args.gradient_accumulation_steps
+        mae_losses, mse_losses = 0, 0
 
-        losses = F.mse_loss(
-            predicted,
-            target,
-            reduction='none'
-        ).mean([1, 2, 3])
+        #MSE/L2 Loss
+        if mse_strength != 0:
+            mse_losses = F.mse_loss(
+                predicted,
+                target,
+                reduction='none'
+            ).mean([1, 2, 3])
+            
+        
+        #MAE/L1 Loss
+        if mae_strength != 0:
+            mae_losses = F.l1_loss(
+                predicted, 
+                target, 
+                reduction='none'
+            ).mean([1, 2, 3])
+            
+        # Add MSE and MAE losses scaled by strength
+        losses = (
+            mse_strength * mse_losses +          
+            mae_strength * mae_losses
+        )
+        
+        # Scale Losses by Batch and/or GA (if enabled)
+        losses = losses * batch_size * gradient_accumulation_steps
 
         k = 1.0
         gamma = 1.0

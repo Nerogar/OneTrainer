@@ -33,6 +33,12 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             args: TrainArgs,
             train_device: torch.device,
     ) -> Tensor:
+        mse_strength = args.mse_strength
+        mae_strength = args.mae_strength
+        batch_size = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] else args.batch_size
+        gradient_accumulation_steps = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] else args.gradient_accumulation_steps
+        mae_losses, mse_losses = 0, 0
+            
         if data['loss_type'] == 'align_prop':
             if self.align_prop_loss_fn is None:
                 dtype = data['predicted'].dtype
@@ -55,14 +61,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     losses = self.align_prop_loss_fn(data['predicted'])
 
             losses = losses * args.align_prop_weight
-        else:
-            mse_strength = args.mse_strength
-            mae_strength = args.mae_strength
-            batch_size = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] else args.batch_size
-            gradient_accumulation_steps = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] else args.gradient_accumulation_steps
-
-            mae_losses, mse_losses = 0, 0
-            
+        else:            
             # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
             #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
             if args.masked_training and not args.model_type.has_conditioning_image_input():
@@ -98,7 +97,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                         reduction='none'
                     ).mean([1, 2, 3])
                     
-                
+
                 #MAE/L1 Loss
                 if mae_strength != 0:
                     mae_losses = F.l1_loss(
