@@ -132,7 +132,7 @@ class TrainingTab:
         
         # Learning Rate Scaler
         components.label(frame, 8, 0, "Learning Rate Scaler",
-                         tooltip="Selects the type of learning rate scaling to use during training")
+                         tooltip="Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)")
         components.options(frame, 8, 1, [str(x) for x in list(LearningRateScaler)], self.ui_state, "learning_rate_scaler")
 
     def __create_base2_frame(self, master, row):
@@ -405,7 +405,7 @@ class TrainingTab:
 
         # Loss Scaler
         components.label(frame, 2, 0, "Loss Scaler",
-                         tooltip="Selects the type of loss scaling to use during training")
+                         tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
         components.options(frame, 2, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __open_optimizer_params_window(self):

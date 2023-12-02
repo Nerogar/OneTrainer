@@ -9,6 +9,7 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class KandinskyLoRASetup(BaseKandinskySetup):
@@ -42,9 +43,13 @@ class KandinskyLoRASetup(BaseKandinskySetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
+        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
+        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
         if args.train_unet:
             lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
+            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+
             param_groups.append({
                 'params': model.unet_lora.parameters(),
                 'lr': lr,

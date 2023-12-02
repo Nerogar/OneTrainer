@@ -8,6 +8,7 @@ from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
@@ -40,9 +41,13 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
+        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
+        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
         if args.train_prior:
             lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
+            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+
             param_groups.append({
                 'params': model.prior_prior.parameters(),
                 'lr': lr,

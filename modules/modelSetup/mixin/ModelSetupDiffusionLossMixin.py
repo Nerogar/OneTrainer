@@ -10,7 +10,6 @@ from modules.util import loss_util
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.LossScaler import LossScaler
-from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
