@@ -9,6 +9,8 @@ from modules.module.HPSv2ScoreModel import HPSv2ScoreModel
 from modules.util import loss_util
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AlignPropLoss import AlignPropLoss
+from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
@@ -54,26 +56,68 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
             losses = losses * args.align_prop_weight
         else:
+            mse_strength = args.mse_strength
+            mae_strength = args.mae_strength
+            batch_size = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] else args.batch_size
+            gradient_accumulation_steps = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] else args.gradient_accumulation_steps
+
+            mae_losses, mse_losses = 0, 0
+            
             # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
             #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
             if args.masked_training and not args.model_type.has_conditioning_image_input():
-                losses = loss_util.masked_loss(
-                    F.mse_loss,
-                    data['predicted'],
-                    data['target'],
-                    batch['latent_mask'],
-                    args.unmasked_weight,
-                    args.normalize_masked_area_loss
-                ).mean([1, 2, 3])
+            
+                #MSE/L2 Loss
+                if mse_strength != 0:
+                    losses = loss_util.masked_loss(
+                        F.mse_loss,
+                        data['predicted'],
+                        data['target'],
+                        batch['latent_mask'],
+                        args.unmasked_weight,
+                        args.normalize_masked_area_loss
+                    ).mean([1, 2, 3])
+                    
+                #MAE/L1 Loss
+                if mae_strength != 0:
+                    losses = loss_util.masked_loss(
+                        F.l1_loss,
+                        data['predicted'],
+                        data['target'],
+                        batch['latent_mask'],
+                        args.unmasked_weight,
+                        args.normalize_masked_area_loss
+                    ).mean([1, 2, 3])
             else:
-                losses = F.mse_loss(
-                    data['predicted'],
-                    data['target'],
-                    reduction='none'
-                ).mean([1, 2, 3])
+                
+                #MSE/L2 Loss
+                if mse_strength != 0:
+                    mse_losses = F.mse_loss(
+                        data['predicted'],
+                        data['target'],
+                        reduction='none'
+                    ).mean([1, 2, 3])
+                    
+                
+                #MAE/L1 Loss
+                if mae_strength != 0:
+                    mae_losses = F.l1_loss(
+                        data['predicted'],
+                        data['target'],
+                        reduction='none'
+                    ).mean([1, 2, 3])
 
                 if args.masked_training and args.normalize_masked_area_loss:
                     clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
                     losses = losses / clamped_mask.mean(dim=(1, 2, 3))
+            
+            # Add MSE and MAE losses scaled by strength
+            losses = (
+                mse_strength * mse_losses +          
+                mae_strength * mae_losses
+            )
+            
+            # Scale Losses by Batch and/or GA (if enabled)
+            losses = losses * batch_size * gradient_accumulation_steps
 
         return losses.mean()
