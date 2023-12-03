@@ -77,6 +77,7 @@ class GenerateLossesModel:
 
         self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
 
+        self.data_loader.get_data_set().start_next_epoch()
         step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
 
         if allow_mixed_precision(self.args):
