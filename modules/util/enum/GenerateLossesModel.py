@@ -61,7 +61,6 @@ class GenerateLossesModel:
 
         self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
-        self.model.to(self.train_device)
         self.model.eval()
         torch_gc()
 
