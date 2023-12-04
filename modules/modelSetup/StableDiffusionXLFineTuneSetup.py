@@ -41,6 +41,23 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             params += list(model.unet.parameters())
 
         return params
+        
+    def create_param_groups(self, args, params, lr_arg):
+        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
+        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
+
+        # Determine the learning rate
+        lr = lr_arg if lr_arg is not None else args.learning_rate
+        lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+
+        # Create a parameter group for the text encoder
+        param_group = {
+            'params': params,
+            'lr': lr,
+            'initial_lr': lr,
+        }
+
+        return param_group
 
     def create_parameters_for_optimizer(
             self,
@@ -48,39 +65,15 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
-        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
         if args.train_text_encoder:
-            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.text_encoder_1.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
-
+            self.create_param_groups(args, model.text_encoder_1.parameters(), args.text_encoder_learning_rate)
+            
         if args.train_text_encoder_2:
-            lr = args.text_encoder_2_learning_rate if args.text_encoder_2_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.text_encoder_2.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            self.create_param_groups(args, model.text_encoder_2.parameters(), args.text_encoder_2_learning_rate)
 
         if args.train_unet:
-            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.unet.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
-
+            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate)
         return param_groups
 
     def setup_model(
