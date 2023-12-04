@@ -53,7 +53,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
 
         if args.train_text_encoder:
             lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
             param_groups.append({
                 'params': model.text_encoder_1.parameters(),
@@ -63,7 +63,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
 
         if args.train_text_encoder_2:
             lr = args.text_encoder_2_learning_rate if args.text_encoder_2_learning_rate is not None else args.learning_rate
-            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
             param_groups.append({
                 'params': model.text_encoder_2.parameters(),
@@ -73,7 +73,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
 
         if args.train_unet:
             lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
-            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
             param_groups.append({
                 'params': model.unet.parameters(),

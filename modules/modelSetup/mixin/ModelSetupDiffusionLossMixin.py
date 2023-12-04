@@ -67,7 +67,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             
                 #MSE/L2 Loss
                 if mse_strength != 0:
-                    losses = loss_util.masked_loss(
+                    mse_losses = loss_util.masked_loss(
                         F.mse_loss,
                         data['predicted'],
                         data['target'],
@@ -78,7 +78,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     
                 #MAE/L1 Loss
                 if mae_strength != 0:
-                    losses = loss_util.masked_loss(
+                    mae_losses = loss_util.masked_loss(
                         F.l1_loss,
                         data['predicted'],
                         data['target'],

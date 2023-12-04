@@ -51,7 +51,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
 
         if args.train_text_encoder:
             lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
             param_groups.append({
                 'params': model.prior_text_encoder_lora.parameters(),
@@ -61,7 +61,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
 
         if args.train_prior:
             lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
-            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
             param_groups.append({
                 'params': model.prior_prior_lora.parameters(),

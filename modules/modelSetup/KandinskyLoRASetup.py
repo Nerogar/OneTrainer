@@ -48,7 +48,7 @@ class KandinskyLoRASetup(BaseKandinskySetup):
 
         if args.train_unet:
             lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
-            lr = lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
             param_groups.append({
                 'params': model.unet_lora.parameters(),
