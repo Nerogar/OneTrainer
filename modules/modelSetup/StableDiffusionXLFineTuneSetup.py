@@ -42,7 +42,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
 
         return params
         
-    def create_param_groups(self, args, params, lr_arg):
+    def create_param_groups(self, args, params, lr_arg, param_groups):
         batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
         gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
@@ -57,7 +57,8 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             'initial_lr': lr,
         }
 
-        return param_group
+        # Append to param_groups
+        param_groups.append(param_group)
 
     def create_parameters_for_optimizer(
             self,
@@ -67,13 +68,14 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
         param_groups = list()
 
         if args.train_text_encoder:
-            self.create_param_groups(args, model.text_encoder_1.parameters(), args.text_encoder_learning_rate)
+            self.create_param_groups(args, model.text_encoder_1.parameters(), args.text_encoder_learning_rate, param_groups)
             
         if args.train_text_encoder_2:
-            self.create_param_groups(args, model.text_encoder_2.parameters(), args.text_encoder_2_learning_rate)
+            self.create_param_groups(args, model.text_encoder_2.parameters(), args.text_encoder_2_learning_rate, param_groups)
 
         if args.train_unet:
-            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate)
+            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate, param_groups)
+
         return param_groups
 
     def setup_model(
