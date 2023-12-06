@@ -30,7 +30,11 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
     ) -> Iterable[Parameter]:
         params = list()
 
-        params += list(model.prior_prior.parameters())
+        if args.train_prior:
+            params += list(model.prior_prior.parameters())
+
+        if args.train_text_encoder:
+            params += list(model.prior_text_encoder.parameters())
 
         return params
 
@@ -45,6 +49,14 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
             lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
             param_groups.append({
                 'params': model.prior_prior.parameters(),
+                'lr': lr,
+                'initial_lr': lr,
+            })
+
+        if args.train_prior:
+            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
+            param_groups.append({
+                'params': model.prior_text_encoder.parameters(),
                 'lr': lr,
                 'initial_lr': lr,
             })

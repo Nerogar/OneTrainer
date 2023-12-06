@@ -458,10 +458,12 @@ class GenericTrainer(BaseTrainer):
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
-            self.model.to(self.temp_device)
-            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device, self.args)
-            self.model.eval()
-            torch_gc()
+            if self.data_loader.needs_setup_cache_device(train_progress, self.args):
+                self.model.to(self.temp_device)
+                self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device, self.args)
+                self.model.eval()
+                torch_gc()
+
             self.data_loader.get_data_set().start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
             torch_gc()
