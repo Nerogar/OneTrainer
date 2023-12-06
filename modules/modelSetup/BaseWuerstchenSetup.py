@@ -93,13 +93,20 @@ class BaseWuerstchenSetup(
 
         latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
-        timestep = 0.5 if deterministic else (
-            1 - torch.rand(
+        if not deterministic:
+            timestep = (
+                1 - torch.rand(
+                    size=(scaled_latent_image.shape[0],),
+                    generator=generator,
+                    device=scaled_latent_image.device,
+                )
+            ).mul(1.08).add(0.001).clamp(0.001, 1.0)
+        else:
+            timestep = torch.full(
                 size=(scaled_latent_image.shape[0],),
-                generator=generator,
+                fill_value=0.5,
                 device=scaled_latent_image.device,
             )
-        ).mul(1.08).add(0.001).clamp(0.001, 1.0)
 
         scaled_noisy_latent_image = self.__add_noise(
             original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep

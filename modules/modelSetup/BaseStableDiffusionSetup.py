@@ -236,7 +236,11 @@ class BaseStableDiffusionSetup(
                 ).long()
             else:
                 # -1 is for zero-based indexing
-                timestep = int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1
+                timestep = torch.tensor(
+                    int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
+                    dtype=torch.long,
+                    device=scaled_latent_image.device,
+                )
 
             scaled_noisy_latent_image = model.noise_scheduler.add_noise(
                 original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
