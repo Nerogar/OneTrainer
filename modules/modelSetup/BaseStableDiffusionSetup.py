@@ -95,7 +95,9 @@ class BaseStableDiffusionSetup(
             model: StableDiffusionModel,
             batch: dict,
             args: TrainArgs,
-            train_progress: TrainProgress
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         generator = torch.Generator(device=args.train_device)
         generator.manual_seed(train_progress.global_step)
@@ -123,7 +125,7 @@ class BaseStableDiffusionSetup(
 
         latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
-        if is_align_prop_step:
+        if is_align_prop_step and not deterministic:
             dummy = torch.zeros((1,), device=self.train_device)
             dummy.requires_grad_(True)
 
@@ -224,13 +226,17 @@ class BaseStableDiffusionSetup(
                 'predicted': predicted_image,
             }
         else:
-            timestep = torch.randint(
-                low=0,
-                high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
-                size=(scaled_latent_image.shape[0],),
-                generator=generator,
-                device=scaled_latent_image.device,
-            ).long()
+            if not deterministic:
+                timestep = torch.randint(
+                    low=0,
+                    high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
+                    size=(scaled_latent_image.shape[0],),
+                    generator=generator,
+                    device=scaled_latent_image.device,
+                ).long()
+            else:
+                # -1 is for zero-based indexing
+                timestep = int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1
 
             scaled_noisy_latent_image = model.noise_scheduler.add_noise(
                 original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep

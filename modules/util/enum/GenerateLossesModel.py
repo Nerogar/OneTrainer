@@ -4,6 +4,7 @@ from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.TrainProgress import TrainProgress
 from modules.util import create
 from modules.util.torch_util import torch_gc
 from torch.nn import Parameter
@@ -62,6 +63,7 @@ class GenerateLossesModel:
         self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
         self.model.eval()
+        self.model.train_progress = TrainProgress()
         torch_gc()
 
         self.data_loader = create.create_data_loader(
@@ -88,8 +90,19 @@ class GenerateLossesModel:
         # Don't really need a backward pass here, so we can make the calculation MUCH faster.
         with forward_context, torch.inference_mode():
             for epoch_step, batch in enumerate(step_tqdm):
-                    model_output_data = self.model_setup.predict(self.model, batch, self.args, self.model.train_progress)
-                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
+                    model_output_data = self.model_setup.predict(
+                        self.model,
+                        batch,
+                        self.args,
+                        self.model.train_progress,
+                        deterministic=True,
+                    )
+                    loss = self.model_setup.calculate_loss(
+                        self.model,
+                        batch,
+                        model_output_data,
+                        self.args,
+                    )
                     filename_loss_list.append((batch['image_path'][0], float(loss)))
 
         # Sort such that highest loss comes first

@@ -74,7 +74,9 @@ class BaseKandinskySetup(
             model: KandinskyModel,
             batch: dict,
             args: TrainArgs,
-            train_progress: TrainProgress
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         movq_scaling_factor = 1.0
 
@@ -92,13 +94,17 @@ class BaseKandinskySetup(
 
         latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
-        timestep = torch.randint(
-            low=0,
-            high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
-            size=(scaled_latent_image.shape[0],),
-            generator=generator,
-            device=scaled_latent_image.device,
-        ).long()
+        if not deterministic:
+            timestep = torch.randint(
+                low=0,
+                high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
+                size=(scaled_latent_image.shape[0],),
+                generator=generator,
+                device=scaled_latent_image.device,
+            ).long()
+        else:
+            # -1 is for zero-based indexing
+            timestep = int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1
 
         scaled_noisy_latent_image = model.noise_scheduler.add_noise(
             original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep

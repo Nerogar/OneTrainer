@@ -61,6 +61,9 @@ class BaseModelSetup(metaclass=ABCMeta):
             batch: dict,
             args: TrainArgs,
             train_progress: TrainProgress,
+            /,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         pass
 
@@ -71,6 +74,7 @@ class BaseModelSetup(metaclass=ABCMeta):
             batch: dict,
             data: dict,
             args: TrainArgs,
+            deterministic: bool = False,
     ) -> Tensor:
         pass
 
