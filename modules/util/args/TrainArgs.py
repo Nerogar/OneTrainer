@@ -60,7 +60,7 @@ class TrainArgs(BaseArgs):
     temp_device: str
     train_dtype: DataType
     only_cache: bool
-    resolution: int
+    resolution: str
     attention_mechanism: AttentionMechanism
     align_prop: bool
     align_prop_probability: float
@@ -289,7 +289,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
-        parser.add_argument("--resolution", type=int, required=True, dest="resolution", help="Resolution to train at")
+        parser.add_argument("--resolution", type=str, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
         parser.add_argument("--align-prop", required=False, action='store_true', dest="align_prop", help="Enable AlignProp loss calculations")
         parser.add_argument("--align-prop-probability", type=float, required=False, default=0.1, dest="align_prop_probability", help="If AlignProp is active, defines the number of steps that use the AlignProp loss")
@@ -479,7 +479,7 @@ class TrainArgs(BaseArgs):
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
         data.append(("only_cache", False, bool, False))
-        data.append(("resolution", 512, int, False))
+        data.append(("resolution", "512", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
         data.append(("align_prop", False, bool, False))
         data.append(("align_prop_probability", 0.1, float, False))

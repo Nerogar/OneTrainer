@@ -107,7 +107,8 @@ reduces the quality, while providing a significant speed boost.
 
 ### Resolution
 
-Your training images will be resized to that resolution when training. You don't need to do any manual resizing.
+Your training images will be resized to that resolution when training. You don't need to do any manual resizing. You can
+specify multiple resolutions as a comma separated list. All resolutions will be trained at the same time.
 
 ### Masked training
 

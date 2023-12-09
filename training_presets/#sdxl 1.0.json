@@ -3,7 +3,7 @@
     "model_type": "STABLE_DIFFUSION_XL_10_BASE",
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
-    "resolution": 1024,
+    "resolution": "1024",
     "train_text_encoder": false,
     "train_text_encoder_2": false,
     "train_text_encoder_epochs": 30,
