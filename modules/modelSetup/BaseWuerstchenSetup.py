@@ -80,7 +80,7 @@ class BaseWuerstchenSetup(
             args: TrainArgs,
             train_progress: TrainProgress,
             *,
-            deterministic: bool = True,
+            deterministic: bool = False,
     ) -> dict:
         latent_mean = 42.0
         latent_std = 1.0
