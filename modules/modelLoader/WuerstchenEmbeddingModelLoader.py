@@ -41,9 +41,8 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
         tensor = embedding_state["prior"]
 
         embedding = WuerstchenModelEmbedding(
-            name="*",
             prior_text_encoder_vector=tensor,
-            token_count=tensor.shape[0]
+            prefix='embedding',
         )
 
         model.embeddings = [embedding]
@@ -61,9 +60,8 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
         tensor = embedding_state["prior"]
 
         embedding = WuerstchenModelEmbedding(
-            name="*",
             prior_text_encoder_vector=tensor,
-            token_count=tensor.shape[0]
+            prefix='embedding',
         )
 
         model.embeddings = [embedding]
@@ -149,4 +147,4 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load LoRA: " + str(model_names.embedding))
+        raise Exception("could not load embedding: " + str(model_names.embedding))

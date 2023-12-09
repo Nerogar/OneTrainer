@@ -8,22 +8,35 @@ from safetensors.torch import save_file
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.mixin.ModelSaverClipEmbeddingMixin import ModelSaverClipEmbeddingMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionXLEmbeddingModelSaver(BaseModelSaver):
+class StableDiffusionXLEmbeddingModelSaver(
+    BaseModelSaver,
+    ModelSaverClipEmbeddingMixin,
+):
 
-    @staticmethod
     def __save_ckpt(
+            self,
             model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        text_encoder_1_vector_cpu = model.embeddings[0].text_encoder_1_vector.to("cpu", dtype)
-        text_encoder_2_vector_cpu = model.embeddings[0].text_encoder_2_vector.to("cpu", dtype)
+        text_encoder_1_vector_cpu = self._get_embedding_vector(
+            model.tokenizer_1,
+            model.text_encoder_1,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
+
+        text_encoder_2_vector_cpu = self._get_embedding_vector(
+            model.tokenizer_2,
+            model.text_encoder_2,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
 
         torch.save(
             {
@@ -33,16 +46,25 @@ class StableDiffusionXLEmbeddingModelSaver(BaseModelSaver):
             destination
         )
 
-    @staticmethod
     def __save_safetensors(
+            self,
             model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        text_encoder_1_vector_cpu = model.embeddings[0].text_encoder_1_vector.to("cpu", dtype)
-        text_encoder_2_vector_cpu = model.embeddings[0].text_encoder_2_vector.to("cpu", dtype)
+        text_encoder_1_vector_cpu = self._get_embedding_vector(
+            model.tokenizer_1,
+            model.text_encoder_1,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
+
+        text_encoder_2_vector_cpu = self._get_embedding_vector(
+            model.tokenizer_2,
+            model.text_encoder_2,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
 
         save_file(
             {
@@ -52,15 +74,15 @@ class StableDiffusionXLEmbeddingModelSaver(BaseModelSaver):
             destination
         )
 
-    @staticmethod
     def __save_internal(
+            self,
             model: StableDiffusionXLModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
 
         # embedding
-        StableDiffusionXLEmbeddingModelSaver.__save_safetensors(
+        self.__save_safetensors(
             model,
             os.path.join(destination, "embedding", "embedding.safetensors"),
             torch.float32

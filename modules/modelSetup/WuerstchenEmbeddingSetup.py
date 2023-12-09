@@ -1,22 +1,20 @@
 from typing import Iterable
 
 import torch
-from torch import Tensor
 from torch.nn import Parameter
 
-from modules.model.StableDiffusionModel import StableDiffusionModelEmbedding
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
+from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class WuerstchenEmbeddingSetup(BaseWuerstchenSetup):
-    all_prior_text_encoder_original_token_embeds: Tensor
-    prior_text_encoder_trainable_token_embeds_mask: list[bool]
-    prior_text_encoder_untrainable_token_embeds_mask: list[bool]
-
+class WuerstchenEmbeddingSetup(
+    BaseWuerstchenSetup,
+    ModelSetupClipEmbeddingMixin,
+):
     def __init__(
             self,
             train_device: torch.device,
@@ -66,55 +64,25 @@ class WuerstchenEmbeddingSetup(BaseWuerstchenSetup):
         model.decoder_vqgan.requires_grad_(False)
         model.effnet_encoder.requires_grad_(False)
 
-        token_count = args.token_count if len(model.embeddings) == 0 else model.embeddings[0].token_count
-
-        tokens = [f"<embedding_{i}>" for i in range(token_count)]
-        model.prior_tokenizer.add_tokens(tokens)
-        model.prior_text_encoder.resize_token_embeddings(len(model.prior_tokenizer))
-
         model.prior_text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
 
-        with torch.no_grad():
-            prior_text_encoder_token_ids = model.prior_tokenizer.encode(
-                tokens,
-                add_special_tokens=False,
+        if len(model.embeddings) == 0:
+            vector = self._create_new_embedding(
+                model.prior_tokenizer,
+                model.prior_text_encoder,
+                args.initial_embedding_text,
+                args.token_count,
             )
 
-            all_prior_text_encoder_token_embeds = model.prior_text_encoder.get_input_embeddings().weight.data
-            self.all_prior_text_encoder_original_token_embeds = all_prior_text_encoder_token_embeds.clone()
-            self.prior_text_encoder_trainable_token_embeds_mask = \
-                [(i in prior_text_encoder_token_ids) for i in
-                 range(len(self.all_prior_text_encoder_original_token_embeds))]
-            self.prior_text_encoder_untrainable_token_embeds_mask = [
-                (i not in prior_text_encoder_token_ids) for i in
-                range(len(self.all_prior_text_encoder_original_token_embeds))
-            ]
+            model.embeddings = [WuerstchenModelEmbedding(vector, 'embedding')]
 
-            if len(model.embeddings) > 0:
-                # an embedding was loaded
-                for i, token_id in enumerate(prior_text_encoder_token_ids):
-                    all_prior_text_encoder_token_embeds[token_id] = model.embeddings[0].prior_text_encoder_vector[i]
-            else:
-                # create a new embedding
-                prior_text_encoder_initial_token_ids = model.prior_tokenizer.encode(
-                    args.initial_embedding_text,
-                    add_special_tokens=False,
-                    max_length=token_count,
-                )
-                prior_text_encoder_pad_token_id = model.prior_tokenizer.encode(
-                    '*',
-                    add_special_tokens=False,
-                    max_length=token_count,
-                )[0]
-                prior_text_encoder_initial_token_ids += [prior_text_encoder_pad_token_id] * (
-                        token_count - len(prior_text_encoder_initial_token_ids))
-                for token_id, initial_token_id in zip(prior_text_encoder_token_ids, prior_text_encoder_initial_token_ids):
-                    all_prior_text_encoder_token_embeds[token_id] = all_prior_text_encoder_token_embeds[initial_token_id]
-
-                model.embeddings = [
-                    StableDiffusionModelEmbedding(
-                        "*", all_prior_text_encoder_token_embeds[self.prior_text_encoder_trainable_token_embeds_mask],
-                        token_count)]
+        original_token_embeds, untrainable_token_ids = self._add_embeddings_to_clip(
+            model.prior_tokenizer,
+            model.prior_text_encoder,
+            [(model.embeddings[0].prior_text_encoder_vector, model.embeddings[0].text_tokens)],
+        )
+        model.all_prior_text_encoder_original_token_embeds = original_token_embeds
+        model.prior_text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
@@ -155,15 +123,8 @@ class WuerstchenEmbeddingSetup(BaseWuerstchenSetup):
             args: TrainArgs,
             train_progress: TrainProgress
     ):
-        # reset untrainable embeddings
-        with torch.no_grad():
-            model.prior_text_encoder.get_input_embeddings().weight[
-                self.prior_text_encoder_untrainable_token_embeds_mask
-            ] = self.all_prior_text_encoder_original_token_embeds[self.prior_text_encoder_untrainable_token_embeds_mask]
-
-        # save back to model
-        model.embeddings = [WuerstchenModelEmbedding(
-            "*",
-            model.prior_text_encoder.get_input_embeddings().weight[self.prior_text_encoder_trainable_token_embeds_mask],
-            model.embeddings[0].token_count
-        )]
+        self._embeddigns_after_optimizer_step(
+            model.prior_text_encoder.get_input_embeddings(),
+            model.all_prior_text_encoder_original_token_embeds,
+            model.prior_text_encoder_untrainable_token_embeds_mask,
+        )

@@ -45,10 +45,9 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpe
         name = embedding_state['name']
 
         embedding = StableDiffusionXLModelEmbedding(
-            name=name,
             text_encoder_1_vector=text_encoder_1_vector,
             text_encoder_2_vector=text_encoder_2_vector,
-            token_count=text_encoder_1_vector.shape[0],
+            prefix='embedding',
         )
 
         model.embeddings = [embedding]
@@ -67,10 +66,9 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpe
         text_encoder_2_vector = embedding_state['clip_g']
 
         embedding = StableDiffusionXLModelEmbedding(
-            name="*",
             text_encoder_1_vector=text_encoder_1_vector,
             text_encoder_2_vector=text_encoder_2_vector,
-            token_count=text_encoder_1_vector.shape[0],
+            prefix='embedding',
         )
 
         model.embeddings = [embedding]
@@ -156,4 +154,4 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpe
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load LoRA: " + str(model_names.embedding))
+        raise Exception("could not load embedding: " + str(model_names.embedding))

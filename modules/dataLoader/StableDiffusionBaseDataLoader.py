@@ -70,9 +70,11 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             if not os.path.exists(image_cache_dir):
                 return True
 
-        if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
-            if not os.path.exists(text_cache_dir):
-                return True
+            if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+                if not os.path.exists(text_cache_dir):
+                    return True
+        else:
+            return True
 
         return args.debug_mode
 

@@ -8,27 +8,35 @@ from safetensors.torch import save_file
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.mixin.ModelSaverClipEmbeddingMixin import ModelSaverClipEmbeddingMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
+class StableDiffusionEmbeddingModelSaver(
+    BaseModelSaver,
+    ModelSaverClipEmbeddingMixin,
+):
 
-    @staticmethod
     def __save_ckpt(
+            self,
             model: StableDiffusionModel,
             destination: str,
             dtype: torch.dtype,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        vector_cpu = model.embeddings[0].vector.to("cpu", dtype)
+        vector_cpu = self._get_embedding_vector(
+            model.tokenizer,
+            model.text_encoder,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
 
         torch.save(
             {
                 "string_to_token": {"*": 265},
                 "string_to_param": {"*": vector_cpu},
-                "name": model.embeddings[0].name,
+                "name": '*',
                 "step": 0,
                 "sd_checkpoint": "",
                 "sd_checkpoint_name": "",
@@ -36,30 +44,34 @@ class StableDiffusionEmbeddingModelSaver(BaseModelSaver):
             destination
         )
 
-    @staticmethod
     def __save_safetensors(
+            self,
             model: StableDiffusionModel,
             destination: str,
             dtype: torch.dtype,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        vector_cpu = model.embeddings[0].vector.to("cpu", dtype)
+        vector_cpu = self._get_embedding_vector(
+            model.tokenizer,
+            model.text_encoder,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
 
         save_file(
             {"emp_params": vector_cpu},
             destination
         )
 
-    @staticmethod
     def __save_internal(
+            self,
             model: StableDiffusionModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
 
         # embedding
-        StableDiffusionEmbeddingModelSaver.__save_safetensors(
+        self.__save_safetensors(
             model,
             os.path.join(destination, "embedding", "embedding.safetensors"),
             torch.float32

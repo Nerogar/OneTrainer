@@ -8,21 +8,28 @@ from safetensors.torch import save_file
 from modules.model.BaseModel import BaseModel
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.mixin.ModelSaverClipEmbeddingMixin import ModelSaverClipEmbeddingMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class WuerstchenEmbeddingModelSaver(BaseModelSaver):
-
-    @staticmethod
+class WuerstchenEmbeddingModelSaver(
+    BaseModelSaver,
+    ModelSaverClipEmbeddingMixin,
+):
     def __save_ckpt(
+            self,
             model: WuerstchenModel,
             destination: str,
             dtype: torch.dtype,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        prior_text_encoder_vector_cpu = model.embeddings[0].prior_text_encoder_vector.to("cpu", dtype)
+        prior_text_encoder_vector_cpu = self._get_embedding_vector(
+            model.prior_tokenizer,
+            model.prior_text_encoder,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
 
         torch.save(
             {
@@ -31,15 +38,19 @@ class WuerstchenEmbeddingModelSaver(BaseModelSaver):
             destination
         )
 
-    @staticmethod
     def __save_safetensors(
+            self,
             model: WuerstchenModel,
             destination: str,
             dtype: torch.dtype,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        prior_text_encoder_vector_cpu = model.embeddings[0].prior_text_encoder_vector.to("cpu", dtype)
+        prior_text_encoder_vector_cpu = self._get_embedding_vector(
+            model.prior_tokenizer,
+            model.prior_text_encoder,
+            model.embeddings[0].text_tokens,
+        ).to("cpu", dtype)
 
         save_file(
             {
@@ -48,15 +59,15 @@ class WuerstchenEmbeddingModelSaver(BaseModelSaver):
             destination
         )
 
-    @staticmethod
     def __save_internal(
+            self,
             model: WuerstchenModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
 
         # embedding
-        WuerstchenEmbeddingModelSaver.__save_safetensors(
+        self.__save_safetensors(
             model,
             os.path.join(destination, "embedding", "embedding.safetensors"),
             torch.float32

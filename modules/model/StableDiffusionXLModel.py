@@ -13,15 +13,15 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 class StableDiffusionXLModelEmbedding:
     def __init__(
             self,
-            name: str,
             text_encoder_1_vector: Tensor,
             text_encoder_2_vector: Tensor,
-            token_count: int
+            prefix: str,
     ):
-        self.name = name
+        token_count = text_encoder_1_vector.shape[0]
+
         self.text_encoder_1_vector = text_encoder_1_vector
         self.text_encoder_2_vector = text_encoder_2_vector
-        self.token_count = token_count
+        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionXLModel(BaseModel):
@@ -35,11 +35,18 @@ class StableDiffusionXLModel(BaseModel):
     vae: AutoencoderKL
     unet: UNet2DConditionModel
 
-    # persistent training data
+    # persistent embedding training data
+    all_text_encoder_1_original_token_embeds: Tensor
+    all_text_encoder_2_original_token_embeds: Tensor
+    text_encoder_1_untrainable_token_embeds_mask: list[bool]
+    text_encoder_2_untrainable_token_embeds_mask: list[bool]
     embeddings: list[StableDiffusionXLModelEmbedding] | None
+
+    # persistent lora training data
     text_encoder_1_lora: LoRAModuleWrapper | None
     text_encoder_2_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
+
     sd_config: dict | None
 
     def __init__(
