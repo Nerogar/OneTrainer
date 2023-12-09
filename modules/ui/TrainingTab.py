@@ -168,7 +168,7 @@ class TrainingTab:
 
         # resolution
         components.label(frame, 6, 0, "Resolution",
-                         tooltip="The resolution used for training")
+                         tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma.")
         components.entry(frame, 6, 1, self.ui_state, "resolution")
 
     def __create_align_prop_frame(self, master, row):
