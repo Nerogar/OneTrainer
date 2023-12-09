@@ -1,18 +1,19 @@
+import json
+import os
+from contextlib import nullcontext
+
 import torch
+from tqdm import tqdm
+
 from modules.dataLoader import StableDiffusionFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.util.args.TrainArgs import TrainArgs
-from modules.util.TrainProgress import TrainProgress
 from modules.util import create
-from modules.util.torch_util import torch_gc
-from torch.nn import Parameter
-from tqdm import tqdm
+from modules.util.TrainProgress import TrainProgress
+from modules.util.args.TrainArgs import TrainArgs
 from modules.util.dtype_util import allow_mixed_precision
-from contextlib import nullcontext
-import os
-import json
+from modules.util.torch_util import torch_gc
 
 
 class GenerateLossesModel:
@@ -25,7 +26,6 @@ class GenerateLossesModel:
     model_setup: BaseModelSetup
     data_loader: StableDiffusionFineTuneDataLoader
     model: BaseModel
-    parameters: list[Parameter]
 
     def __init__(self, args: TrainArgs):
         # Create a copy of args because we will mutate
@@ -60,7 +60,6 @@ class GenerateLossesModel:
             weight_dtypes=self.args.weight_dtypes(),
         )
 
-        self.model_setup.setup_train_device(self.model, self.args)
         self.model_setup.setup_model(self.model, self.args)
         self.model.eval()
         self.model.train_progress = TrainProgress()
@@ -76,10 +75,16 @@ class GenerateLossesModel:
             self.model.train_progress,
         )
 
-        self.parameters = list(self.model_setup.create_parameters(self.model, self.args))
+        if self.data_loader.needs_setup_cache_device(self.model.train_progress, self.args):
+            self.model.to(self.temp_device)
+            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device, self.args)
+            self.model.eval()
+            torch_gc()
 
         self.data_loader.get_data_set().start_next_epoch()
         step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
+
+        self.model_setup.setup_train_device(self.model, self.args)
 
         if allow_mixed_precision(self.args):
             forward_context = torch.autocast(self.train_device.type, dtype=self.args.train_dtype.torch_dtype())
@@ -110,4 +115,4 @@ class GenerateLossesModel:
         filename_to_loss: dict[str, float] = {x[0]: x[1] for x in filename_loss_list}
         save_filename = f"{os.path.splitext(self.args.output_model_destination)[0]}.json"
         with open(save_filename, "w") as f:
-            json.dump(filename_to_loss, f)
+            json.dump(filename_to_loss, f, indent=4)
