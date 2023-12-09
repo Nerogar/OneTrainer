@@ -106,8 +106,9 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
                 if args.masked_training and args.normalize_masked_area_loss:
                     clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
-                    mse_losses = mse_losses / clamped_mask.mean(dim=(1, 2, 3))
-                    mae_losses = mae_losses / clamped_mask.mean(dim=(1, 2, 3))
+                    mask_mean = clamped_mask.mean(dim=(1, 2, 3))
+                    mse_losses = mse_losses / mask_mean
+                    mae_losses = mae_losses / mask_mean
 
             # Add MSE and MAE losses scaled by strength
             losses = (
