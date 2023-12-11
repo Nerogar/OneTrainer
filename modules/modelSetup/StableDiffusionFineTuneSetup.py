@@ -8,7 +8,6 @@ from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
@@ -45,28 +44,12 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
-        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
-
+        
         if args.train_text_encoder:
-            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.text_encoder.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate, param_groups)
 
         if args.train_unet:
-            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.unet.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate, param_groups)
 
         return param_groups
 

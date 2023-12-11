@@ -9,7 +9,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
@@ -31,19 +30,17 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter]:
         params = list()
-        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
-        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
         if args.train_text_encoder:
-            params += list(model.text_encoder_1_lora.parameters())
-
+            self.create_param_groups(args, model.text_encoder_1.parameters(), args.text_encoder_learning_rate, param_groups)
+            
         if args.train_text_encoder_2:
-            params += list(model.text_encoder_2_lora.parameters())
+            self.create_param_groups(args, model.text_encoder_2.parameters(), args.text_encoder_2_learning_rate, param_groups)
 
         if args.train_unet:
-            params += list(model.unet_lora.parameters())
+            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate, param_groups)
 
-        return params
+        return param_groups
 
     def create_parameters_for_optimizer(
             self,
