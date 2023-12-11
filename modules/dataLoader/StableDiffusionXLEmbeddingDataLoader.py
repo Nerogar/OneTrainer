@@ -26,8 +26,7 @@ class StableDiffusionXLEmbeddingDataLoader(StablDiffusionXLBaseDataLoader):
     def _load_input_modules(self, args: TrainArgs, model: StableDiffusionXLModel) -> list:
         modules = super(StableDiffusionXLEmbeddingDataLoader, self)._load_input_modules(args, model)
 
-        tokens = [f"<embedding_{i}>" for i in range(model.embeddings[0].token_count)]
-        all_token_string = ''.join(tokens)
+        all_token_string = ''.join(model.embeddings[0].text_tokens)
 
         replace_text = ReplaceText(
             text_in_name='prompt', text_out_name='prompt', old_text='<embedding>', new_text=all_token_string

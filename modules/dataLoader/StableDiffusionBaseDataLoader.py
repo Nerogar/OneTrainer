@@ -56,6 +56,28 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             model.text_encoder_to(train_device)
 
+    def needs_setup_cache_device(
+            self,
+            train_progress: TrainProgress,
+            args: TrainArgs,
+    ):
+        cache_epoch = train_progress.epoch % args.latent_caching_epochs
+
+        image_cache_dir = os.path.join(args.cache_dir, "image", "epoch-" + str(cache_epoch))
+        text_cache_dir = os.path.join(args.cache_dir, "text", "epoch-" + str(cache_epoch))
+
+        if args.latent_caching:
+            if not os.path.exists(image_cache_dir):
+                return True
+
+            if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+                if not os.path.exists(text_cache_dir):
+                    return True
+        else:
+            return True
+
+        return args.debug_mode
+
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
 
@@ -111,8 +133,9 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         if args.model_type.has_depth_input():
             inputs.append('depth')
 
+        lowest_resolution = min(int(res.strip()) for res in args.resolution.split(','))
         circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='settings.enable_random_circular_mask_shrink')
-        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=args.resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='settings.enable_random_mask_rotate_crop')
+        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=lowest_resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='settings.enable_random_mask_rotate_crop')
 
         modules = []
 
@@ -128,7 +151,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
         aspect_bucketing = AspectBucketing(
-            target_resolution=args.resolution,
+            target_resolution=[int(res.strip()) for res in args.resolution.split(',')],
             quantization=8,
             resolution_in_name='original_resolution',
             scale_resolution_out_name='scale_resolution',
@@ -137,7 +160,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         )
 
         single_aspect_calculation = SingleAspectCalculation(
-            target_resolution=args.resolution,
+            target_resolution=[int(res.strip()) for res in args.resolution.split(',')],
             resolution_in_name='original_resolution',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',

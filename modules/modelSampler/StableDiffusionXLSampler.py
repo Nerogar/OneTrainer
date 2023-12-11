@@ -539,8 +539,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
         negative_prompt = sample_params.negative_prompt
 
         if len(self.model.embeddings) > 0:
-            tokens = [f"<embedding_{i}>" for i in range(self.model.embeddings[0].token_count)]
-            embedding_string = ''.join(tokens)
+            embedding_string = ''.join(self.model.embeddings[0].text_tokens)
             prompt = prompt.replace("<embedding>", embedding_string)
             negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
 

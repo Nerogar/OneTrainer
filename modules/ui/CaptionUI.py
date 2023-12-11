@@ -27,10 +27,10 @@ class CaptionUI(ctk.CTkToplevel):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
         self.dir = initial_dir
-        self.image_size = 900
+        self.image_size = 850
 
         self.title("OneTrainer")
-        self.geometry("1280x1024")
+        self.geometry("1280x980")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()

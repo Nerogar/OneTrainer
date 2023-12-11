@@ -14,10 +14,15 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
 class StableDiffusionModelEmbedding:
-    def __init__(self, name: str, vector: Tensor, token_count: int):
-        self.name = name
-        self.vector = vector
-        self.token_count = token_count
+    def __init__(
+            self,
+            text_encoder_vector: Tensor,
+            prefix: str,
+    ):
+        token_count = text_encoder_vector.shape[0]
+
+        self.text_encoder_vector = text_encoder_vector
+        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionModel(BaseModel):
@@ -31,10 +36,15 @@ class StableDiffusionModel(BaseModel):
     image_depth_processor: DPTImageProcessor
     depth_estimator: DPTForDepthEstimation
 
-    # persistent training data
+    # persistent embedding training data
+    all_text_encoder_original_token_embeds: Tensor
+    text_encoder_untrainable_token_embeds_mask: list[bool]
     embeddings: list[StableDiffusionModelEmbedding] | None
+
+    # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
+
     sd_config: dict | None
 
     def __init__(

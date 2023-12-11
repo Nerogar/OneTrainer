@@ -85,7 +85,9 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
             model: StableDiffusionModel,
             batch: dict,
             args: TrainArgs,
-            train_progress: TrainProgress
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         latent_image = batch['latent_image']
         image = batch['image']

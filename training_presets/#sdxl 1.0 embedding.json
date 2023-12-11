@@ -7,7 +7,7 @@
     "model_type": "STABLE_DIFFUSION_XL_10_BASE",
     "output_model_destination": "models/embedding.safetensors",
     "output_model_format": "SAFETENSORS",
-    "resolution": 1024,
+    "resolution": "1024",
     "sample_after": 1,
     "train_text_encoder_epochs": 30,
     "train_unet_epochs": 100000,

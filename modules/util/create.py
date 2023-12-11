@@ -7,7 +7,6 @@ from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscr
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
-from modules.dataLoader.KandinskyFineTuneDataLoader import KandinskyFineTuneDataLoader
 from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
@@ -17,8 +16,6 @@ from modules.dataLoader.WuerstchenEmbeddingDataLoader import WuerstchenEmbedding
 from modules.dataLoader.WuerstchenFineTuneDataLoader import WuerstchenFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.KandinskyLoRAModelLoader import KandinskyLoRAModelLoader
-from modules.modelLoader.KandinskyModelLoader import KandinskyModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
@@ -29,14 +26,11 @@ from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddi
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelLoader.WuerstchenModelLoader import WuerstchenModelLoader
 from modules.modelSampler import BaseModelSampler
-from modules.modelSampler.KandinskySampler import KandinskySampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
 from modules.modelSampler.WuerstchenSampler import WuerstchenSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
-from modules.modelSaver.KandinskyDiffusionModelSaver import KandinskyModelSaver
-from modules.modelSaver.KandinskyLoRAModelSaver import KandinskyLoRAModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
@@ -47,8 +41,6 @@ from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbedding
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSaver.WuerstchenModelSaver import WuerstchenModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.modelSetup.KandinskyFineTuneSetup import KandinskyFineTuneSetup
-from modules.modelSetup.KandinskyLoRASetup import KandinskyLoRASetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
@@ -81,8 +73,6 @@ def create_model_loader(
                 return StableDiffusionModelLoader()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLModelLoader()
-            if model_type.is_kandinsky():
-                return KandinskyModelLoader()
             if model_type.is_wuerstchen():
                 return WuerstchenModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
@@ -93,8 +83,6 @@ def create_model_loader(
                 return StableDiffusionLoRAModelLoader()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLLoRAModelLoader()
-            if model_type.is_kandinsky():
-                return KandinskyLoRAModelLoader()
             if model_type.is_wuerstchen():
                 return WuerstchenLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
@@ -116,8 +104,6 @@ def create_model_saver(
                 return StableDiffusionModelSaver()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLModelSaver()
-            if model_type.is_kandinsky():
-                return KandinskyModelSaver()
             if model_type.is_wuerstchen():
                 return WuerstchenModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
@@ -128,8 +114,6 @@ def create_model_saver(
                 return StableDiffusionLoRAModelSaver()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLLoRAModelSaver()
-            if model_type.is_kandinsky():
-                return KandinskyLoRAModelSaver()
             if model_type.is_wuerstchen():
                 return WuerstchenLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
@@ -154,8 +138,6 @@ def create_model_setup(
                 return StableDiffusionFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLFineTuneSetup(train_device, temp_device, debug_mode)
-            if model_type.is_kandinsky():
-                return KandinskyFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
@@ -166,8 +148,6 @@ def create_model_setup(
                 return StableDiffusionLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLLoRASetup(train_device, temp_device, debug_mode)
-            if model_type.is_kandinsky():
-                return KandinskyLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_wuerstchen():
                 return WuerstchenLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
@@ -192,8 +172,6 @@ def create_model_sampler(
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
-            if model_type.is_kandinsky():
-                return KandinskySampler(train_device, temp_device, model, model_type)
             if model_type.is_wuerstchen():
                 return WuerstchenSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
@@ -204,8 +182,6 @@ def create_model_sampler(
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
-            if model_type.is_kandinsky():
-                return KandinskySampler(train_device, temp_device, model, model_type)
             if model_type.is_wuerstchen():
                 return WuerstchenSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.EMBEDDING:
@@ -232,8 +208,6 @@ def create_data_loader(
                 return StableDiffusionFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
-            if model_type.is_kandinsky():
-                return KandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
@@ -244,8 +218,6 @@ def create_data_loader(
                 return StableDiffusionFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
-            if model_type.is_kandinsky():
-                return KandinskyFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.EMBEDDING:

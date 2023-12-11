@@ -53,12 +53,10 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
         embedding_state = torch.load(embedding_name)
 
         string_to_param_dict = embedding_state['string_to_param']
-        name = embedding_state['name']
 
         embedding = StableDiffusionModelEmbedding(
-            name=name,
-            vector=string_to_param_dict['*'],
-            token_count=string_to_param_dict['*'].shape[0]
+            text_encoder_vector=string_to_param_dict['*'],
+            prefix='embedding',
         )
 
         model.embeddings = [embedding]
@@ -76,9 +74,8 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
         tensor = embedding_state["emp_params"]
 
         embedding = StableDiffusionModelEmbedding(
-            name="*",
-            vector=tensor,
-            token_count=tensor.shape[0]
+            text_encoder_vector=tensor,
+            prefix='embedding',
         )
 
         model.embeddings = [embedding]
@@ -164,4 +161,4 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load LoRA: " + str(model_names.embedding))
+        raise Exception("could not load embedding: " + str(model_names.embedding))

@@ -39,7 +39,7 @@ class BaseArgs:
         for (name, _) in self.types.items():
             try:
                 if self.types[name] == str:
-                    setattr(self, name, data[name])
+                    setattr(self, name, str(data[name]))
                 elif issubclass(self.types[name], Enum):
                     if isinstance(data[name], str):
                         if self.nullables[name]:

@@ -38,10 +38,16 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
 
 
 class WuerstchenModelEmbedding:
-    def __init__(self, name: str, prior_text_encoder_vector: Tensor, token_count: int):
-        self.name = name
+    def __init__(
+            self,
+            prior_text_encoder_vector: Tensor,
+            prefix: str,
+    ):
+        token_count = prior_text_encoder_vector.shape[0]
+
         self.prior_text_encoder_vector = prior_text_encoder_vector
-        self.token_count = token_count
+        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+
 
 class WuerstchenModel(BaseModel):
     # base model data
@@ -57,8 +63,12 @@ class WuerstchenModel(BaseModel):
     prior_noise_scheduler: DDPMWuerstchenScheduler
     prior_prior: WuerstchenPrior
 
-    # persistent training data
+    # persistent embedding training data
+    all_prior_text_encoder_original_token_embeds: Tensor
+    prior_text_encoder_untrainable_token_embeds_mask: list[bool]
     embeddings: list[WuerstchenModelEmbedding] | None
+
+    # persistent lora training data
     prior_text_encoder_lora: LoRAModuleWrapper | None
     prior_prior_lora: LoRAModuleWrapper | None
 
