@@ -32,15 +32,15 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
         params = list()
 
         if args.train_text_encoder:
-            self.create_param_groups(args, model.text_encoder_1.parameters(), args.text_encoder_learning_rate, param_groups)
-            
+            params += list(model.text_encoder_1_lora.parameters())
+
         if args.train_text_encoder_2:
-            self.create_param_groups(args, model.text_encoder_2.parameters(), args.text_encoder_2_learning_rate, param_groups)
+            params += list(model.text_encoder_2_lora.parameters())
 
         if args.train_unet:
-            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate, param_groups)
+            params += list(model.unet_lora.parameters())
 
-        return param_groups
+        return params
 
     def create_parameters_for_optimizer(
             self,
@@ -50,34 +50,13 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
         param_groups = list()
 
         if args.train_text_encoder:
-            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.text_encoder_1_lora.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
-
+            self.create_param_groups(args, model.text_encoder_1_lora.parameters(), args.text_encoder_learning_rate, param_groups)
+            
         if args.train_text_encoder_2:
-            lr = args.text_encoder_2_learning_rate if args.text_encoder_2_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.text_encoder_2_lora.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            self.create_param_groups(args, model.text_encoder_2_lora.parameters(), args.text_encoder_2_learning_rate, param_groups)
 
         if args.train_unet:
-            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
-
-            param_groups.append({
-                'params': model.unet_lora.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            self.create_param_groups(args, model.unet_lora.parameters(), args.unet_learning_rate, param_groups)
 
         return param_groups
 

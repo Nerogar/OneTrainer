@@ -8,7 +8,6 @@ from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
@@ -45,26 +44,12 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
-        gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
-        if args.train_prior:
-            lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
-            lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+        if args.train_text_encoder:
+            self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate, param_groups)
 
-            param_groups.append({
-                'params': model.prior_prior.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
-
-        if args.train_prior:
-            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            param_groups.append({
-                'params': model.prior_text_encoder.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+        if args.prior:
+            self.create_param_groups(args, model.prior.parameters(), args.prior_learning_rate, param_groups)
 
         return param_groups
 

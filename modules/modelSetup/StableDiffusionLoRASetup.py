@@ -47,10 +47,10 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
         param_groups = list()
         
         if args.train_text_encoder:
-            self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate, param_groups)
+            self.create_param_groups(args, model.text_encoder_lora.parameters(), args.text_encoder_learning_rate, param_groups)
 
         if args.train_unet:
-            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate, param_groups)
+            self.create_param_groups(args, model.unet_lora.parameters(), args.unet_learning_rate, param_groups)
 
         return param_groups
 
