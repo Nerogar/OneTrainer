@@ -60,7 +60,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     losses = self.align_prop_loss_fn(data['predicted'])
 
             losses = losses * args.align_prop_weight
-        else:            
+        else:
             # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
             #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
             if args.masked_training and not args.model_type.has_conditioning_image_input():
@@ -95,7 +95,6 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                         data['target'],
                         reduction='none'
                     ).mean([1, 2, 3])
-                    
 
                 #MAE/L1 Loss
                 if mae_strength != 0:
@@ -107,8 +106,10 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
                 if args.masked_training and args.normalize_masked_area_loss:
                     clamped_mask = torch.clamp(batch['latent_mask'], args.unmasked_weight, 1)
-                    losses = losses / clamped_mask.mean(dim=(1, 2, 3))
-            
+                    mask_mean = clamped_mask.mean(dim=(1, 2, 3))
+                    mse_losses = mse_losses / mask_mean
+                    mae_losses = mae_losses / mask_mean
+
             # Add MSE and MAE losses scaled by strength
             losses = (
                 mse_strength * mse_losses +          
