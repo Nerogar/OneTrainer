@@ -17,7 +17,7 @@ tensorboard==2.14.1
 pytorch-lightning==2.0.3
 
 # stable diffusion
-git+https://github.com/huggingface/diffusers.git@4e54dfe#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@4e54dfe#egg=diffusers
 transformers==4.31.0
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
@@ -28,7 +28,7 @@ pooch==1.7.0
 open-clip-torch==2.22.0
 
 # data loader
-git+https://github.com/Nerogar/mgds.git@f5e06c4#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@f5e06c4#egg=mgds
 
 # xformers
 xformers==0.0.22.post7+cu118
