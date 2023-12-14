@@ -11,5 +11,3 @@ debug*.py
 train.bat
 *.pyc
 *.bak
-
-update - resources only.bat
