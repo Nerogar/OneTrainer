@@ -46,10 +46,14 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
         param_groups = list()
         
         if args.train_text_encoder:
-            self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate, param_groups)
+            param_groups.append(
+                self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate)
+            )
 
         if args.train_unet:
-            self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate, param_groups)
+            param_groups.append(
+                self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate)
+            )
 
         return param_groups
 

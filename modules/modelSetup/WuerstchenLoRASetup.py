@@ -47,10 +47,16 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         param_groups = list()
         
         if args.train_text_encoder:
-            self.create_param_groups(args, model.prior_text_encoder_lora.parameters(), args.text_encoder_learning_rate, param_groups)
+            param_groups.append(
+                self.create_param_groups(
+                    args, model.prior_text_encoder_lora.parameters(), args.text_encoder_learning_rate
+                )
+            )
 
-        if args.prior:
-            self.create_param_groups(args, model.prior_prior_lora.parameters(), args.prior_learning_rate, param_groups)
+        if args.train_prior:
+            param_groups.append(
+                self.create_param_groups(args, model.prior_prior_lora.parameters(), args.prior_learning_rate)
+            )
 
         return param_groups
 

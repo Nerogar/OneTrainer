@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Iterable
+from typing import Iterable, Iterator
 
 import torch
 from torch import Tensor
@@ -86,7 +86,12 @@ class BaseModelSetup(metaclass=ABCMeta):
     ):
         pass
 
-    def create_param_groups(self, args, params, lr_arg, param_groups):
+    def create_param_groups(
+            self,
+            args: TrainArgs,
+            params: Iterator[Parameter] | list[Parameter],
+            lr_arg: float,
+    ) -> dict:
         batch_size = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else args.batch_size
         gradient_accumulation_steps = 1 if args.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else args.gradient_accumulation_steps
 
@@ -95,11 +100,8 @@ class BaseModelSetup(metaclass=ABCMeta):
         lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
 
         # Create a parameter group for the text encoder
-        param_group = {
-            'params': params,
+        return {
+            'params': list(params),
             'lr': lr,
             'initial_lr': lr,
         }
-
-        # Append to param_groups
-        param_groups.append(param_group)

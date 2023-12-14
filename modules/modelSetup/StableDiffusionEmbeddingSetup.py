@@ -45,11 +45,11 @@ class StableDiffusionEmbeddingSetup(
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         return [
-            {
-                'params': model.text_encoder.get_input_embeddings().parameters(),
-                'lr': args.learning_rate,
-                'initial_lr': args.learning_rate,
-            }
+            self.create_param_groups(
+                args,
+                model.text_encoder.get_input_embeddings().parameters(),
+                args.learning_rate,
+            )
         ]
 
     def setup_model(
