@@ -8,6 +8,8 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -63,6 +65,7 @@ class TrainingTab:
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_unet_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
 
     def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -72,12 +75,14 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
         self.__create_text_encoder_2_frame(column_0, 2)
+        self.__create_loss_frame(column_2, 2)
 
     def __setup_wuerstchen_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_base2_frame(column_1, 0)
         self.__create_prior_frame(column_2, 0)
         self.__create_text_encoder_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
 
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -124,6 +129,11 @@ class TrainingTab:
         components.label(frame, 7, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
         components.entry(frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
+        
+        # Learning Rate Scaler
+        components.label(frame, 8, 0, "Learning Rate Scaler",
+                         tooltip="Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)")
+        components.options(frame, 8, 1, [str(x) for x in list(LearningRateScaler)], self.ui_state, "learning_rate_scaler")
 
     def __create_base2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -378,6 +388,25 @@ class TrainingTab:
         components.label(frame, 3, 0, "Normalize Masked Area Loss",
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
+
+    def __create_loss_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+
+        # MSE Strength
+        components.label(frame, 0, 0, "MSE Strength",
+                         tooltip="Mean Squared Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+        components.entry(frame, 0, 1, self.ui_state, "mse_strength")
+
+        # MAE Strength
+        components.label(frame, 1, 0, "MAE Strength",
+                         tooltip="Mean Absolute Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+        components.entry(frame, 1, 1, self.ui_state, "mae_strength")
+
+        # Loss Scaler
+        components.label(frame, 2, 0, "Loss Scaler",
+                         tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
+        components.options(frame, 2, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.ui_state)

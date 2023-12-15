@@ -45,22 +45,18 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-
+        
         if args.train_text_encoder:
-            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-            param_groups.append({
-                'params': model.prior_text_encoder_lora.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            param_groups.append(
+                self.create_param_groups(
+                    args, model.prior_text_encoder_lora.parameters(), args.text_encoder_learning_rate
+                )
+            )
 
         if args.train_prior:
-            lr = args.prior_learning_rate if args.prior_learning_rate is not None else args.learning_rate
-            param_groups.append({
-                'params': model.prior_prior_lora.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            param_groups.append(
+                self.create_param_groups(args, model.prior_prior_lora.parameters(), args.prior_learning_rate)
+            )
 
         return param_groups
 

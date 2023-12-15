@@ -44,23 +44,16 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-
+        
         if args.train_text_encoder:
-            lr = args.text_encoder_learning_rate if args.text_encoder_learning_rate is not None else args.learning_rate
-
-            param_groups.append({
-                'params': model.text_encoder.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            param_groups.append(
+                self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate)
+            )
 
         if args.train_unet:
-            lr = args.unet_learning_rate if args.unet_learning_rate is not None else args.learning_rate
-            param_groups.append({
-                'params': model.unet.parameters(),
-                'lr': lr,
-                'initial_lr': lr,
-            })
+            param_groups.append(
+                self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate)
+            )
 
         return param_groups
 

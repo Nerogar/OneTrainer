@@ -36,11 +36,11 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         return [
-            {
-                'params': model.vae.decoder.parameters(),
-                'lr': args.learning_rate,
-                'initial_lr': args.learning_rate,
-            }
+            self.create_param_groups(
+                args,
+                model.vae.decoder.parameters(),
+                args.learning_rate,
+            )
         ]
 
     def setup_model(
