@@ -34,24 +34,34 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 Installing OneTrainer requires Python 3.10. You can download Python here https://www.python.org/downloads/windows/.
 Then follow these steps:
 
-Automatic installation (Windows)
+Automatic installation
 
 - Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
-- Run `install.bat`
+- Run:
+    - Windows: `install.bat`
+    - Unix based systems: `install.sh`
 
-Manual installation (Windows and other systems)
+Manual installation
 
 - Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
 - Navigate into the cloned directory `cd OneTrainer`
 - Set up a virtual environment `python -m venv venv`
-- Activate the new venv `venv\scripts\activate`
+- Activate the new venv:
+    - Windows: `venv\scripts\activate`
+    - Unix based systems: `source venv/bin/activate`
 - Install the requirements `pip install -r requirements.txt`
+
+In some linux distribution, you might need to install libGL, for instance on ubuntu you will need to run:
+```
+sudo apt-get update
+sudo apt-get install libgl1
+```
 
 ## Updating
 
 Automatic update
 
-- Run `update.bat`
+- Run `update.bat` or `update.sh`
 
 Manual update
 
