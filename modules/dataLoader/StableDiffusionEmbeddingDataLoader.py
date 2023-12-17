@@ -1,4 +1,5 @@
-from mgds.GenericDataLoaderModules import *
+import torch
+from mgds.pipelineModules.ReplaceText import ReplaceText
 
 from modules.dataLoader.StableDiffusionBaseDataLoader import StablDiffusionBaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel

@@ -1,9 +1,24 @@
 import json
+import os
 
-from mgds.DebugDataLoaderModules import DecodeVAE, SaveImage
-from mgds.DiffusersDataLoaderModules import *
-from mgds.GenericDataLoaderModules import *
-from mgds.MGDS import MGDS, TrainDataLoader, OutputPipelineModule
+import torch
+from mgds.MGDS import TrainDataLoader, MGDS
+from mgds.OutputPipelineModule import OutputPipelineModule
+from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
+from mgds.pipelineModules.AspectBucketing import AspectBucketing
+from mgds.pipelineModules.CalcAspect import CalcAspect
+from mgds.pipelineModules.CollectPaths import CollectPaths
+from mgds.pipelineModules.DecodeVAE import DecodeVAE
+from mgds.pipelineModules.DiskCache import DiskCache
+from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.LoadImage import LoadImage
+from mgds.pipelineModules.ModifyPath import ModifyPath
+from mgds.pipelineModules.RamCache import RamCache
+from mgds.pipelineModules.RandomFlip import RandomFlip
+from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
+from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
+from mgds.pipelineModules.SaveImage import SaveImage
+from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -165,8 +180,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         aggregate_names = ['crop_resolution', 'image_path']
 
-        disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names,
-                               cached_epochs=args.latent_caching_epochs)
+        disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name='concept')
         ram_cache = RamCache(names=split_names + aggregate_names)
 
         modules = []
@@ -187,7 +201,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names,
-                                           batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+                                           batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]

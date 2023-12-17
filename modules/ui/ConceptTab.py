@@ -28,7 +28,7 @@ class ConceptTab(ConfigList):
         return ConceptParams.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return ConceptWindow(self.master, self.current_config[i], ui_state)
+        return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
 
 
 class ConceptWidget(ctk.CTkFrame):
@@ -39,6 +39,8 @@ class ConceptWidget(ctk.CTkFrame):
 
         self.concept = concept
         self.ui_state = UIState(self, concept)
+        self.image_ui_state = UIState(self, concept.image)
+        self.text_ui_state = UIState(self, concept.text)
         self.i = i
 
         self.grid_rowconfigure(1, weight=1)
@@ -78,7 +80,10 @@ class ConceptWidget(ctk.CTkFrame):
         )
         clone_button.place(x=25, y=0)
 
-        image_label.bind("<Button-1>", lambda event: open_command(self.i, self.ui_state))
+        image_label.bind(
+            "<Button-1>",
+            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
+        )
 
     def configure_element(self):
         self.name_label.configure(text=self.concept.name)

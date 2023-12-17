@@ -424,12 +424,13 @@ class GenericTrainer(BaseTrainer):
             self.model.eval()
             torch_gc()
 
-            cached_epochs = [False] * self.args.latent_caching_epochs
-            for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
-                if not cached_epochs[epoch % self.args.latent_caching_epochs]:
-                    self.data_loader.get_data_set().start_next_epoch()
-                    cached_epochs[epoch % self.args.latent_caching_epochs] = True
-            return
+            # TODO: add back the only_cache functionality
+            # cached_epochs = [False] * self.args.latent_caching_epochs
+            # for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
+            #     if not cached_epochs[epoch % self.args.latent_caching_epochs]:
+            #         self.data_loader.get_data_set().start_next_epoch()
+            #         cached_epochs[epoch % self.args.latent_caching_epochs] = True
+            # return
 
         lr_scheduler = create.create_lr_scheduler(
             optimizer=self.model.optimizer,

@@ -9,7 +9,9 @@ class BaseParams:
     def to_dict(self):
         data = {}
         for (key, value) in vars(self).items():
-            if isinstance(value, str):
+            if isinstance(value, dict):
+                continue
+            elif isinstance(value, str):
                 data[key] = value
             elif isinstance(value, Enum):
                 data[key] = str(value)
@@ -27,7 +29,9 @@ class BaseParams:
     def from_dict(self, data):
         for (key, value) in vars(self).items():
             try:
-                if isinstance(value, str):
+                if isinstance(value, BaseParams):
+                    continue
+                elif isinstance(value, str):
                     setattr(self, key, data[key])
                 elif isinstance(value, Enum):
                     enum_type = type(getattr(self, key))

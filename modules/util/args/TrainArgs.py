@@ -44,7 +44,6 @@ class TrainArgs(BaseArgs):
     random_rotate_and_crop: bool
     aspect_ratio_bucketing: bool
     latent_caching: bool
-    latent_caching_epochs: int
     clear_cache_before_training: bool
 
     # training settings
@@ -276,7 +275,6 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--random-rotate-and-crop", required=False, action='store_true', dest="random_rotate_and_crop", help="Randomly rotate and crop samples")
         parser.add_argument("--aspect-ratio-bucketing", required=False, action='store_true', dest="aspect_ratio_bucketing", help="Enable aspect ratio bucketing")
         parser.add_argument("--latent-caching", required=False, action='store_true', dest="latent_caching", help="Enable latent caching")
-        parser.add_argument("--latent-caching-epochs", type=int, required=False, default=1, dest="latent_caching_epochs", help="The amount of epochs to cache, to increase sample diversity")
         parser.add_argument("--clear-cache-before-training", required=False, action='store_true', dest="clear_cache_before_training", help="Clears the latent cache before starting to train")
 
         # training settings
@@ -471,7 +469,6 @@ class TrainArgs(BaseArgs):
         data.append(("random_rotate_and_crop", False, bool, False))
         data.append(("aspect_ratio_bucketing", True, bool, False))
         data.append(("latent_caching", True, bool, False))
-        data.append(("latent_caching_epochs", 1, int, False))
         data.append(("clear_cache_before_training", True, bool, False))
 
         # training settings
