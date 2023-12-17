@@ -75,12 +75,6 @@ class GenerateLossesModel:
             self.model.train_progress,
         )
 
-        if self.data_loader.needs_setup_cache_device(self.model.train_progress, self.args):
-            self.model.to(self.temp_device)
-            self.data_loader.setup_cache_device(self.model, self.train_device, self.temp_device, self.args)
-            self.model.eval()
-            torch_gc()
-
         self.data_loader.get_data_set().start_next_epoch()
         step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
 

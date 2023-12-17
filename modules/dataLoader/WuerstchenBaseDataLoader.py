@@ -87,28 +87,6 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             model.prior_text_encoder_to(train_device)
 
-    def needs_setup_cache_device(
-            self,
-            train_progress: TrainProgress,
-            args: TrainArgs,
-    ):
-        cache_epoch = train_progress.epoch % args.latent_caching_epochs
-
-        image_cache_dir = os.path.join(args.cache_dir, "image", "epoch-" + str(cache_epoch))
-        text_cache_dir = os.path.join(args.cache_dir, "text", "epoch-" + str(cache_epoch))
-
-        if args.latent_caching:
-            if not os.path.exists(image_cache_dir):
-                return True
-
-            if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-                if not os.path.exists(text_cache_dir):
-                    return True
-        else:
-            return True
-
-        return args.debug_mode
-
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
 

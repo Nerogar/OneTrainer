@@ -80,7 +80,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
 
-    def setup_cache_device(
+    def _setup_cache_device(
             self,
             model: StableDiffusionXLModel,
             train_device: torch.device,
@@ -93,28 +93,6 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
             model.text_encoder_2_to(train_device)
-
-    def needs_setup_cache_device(
-            self,
-            train_progress: TrainProgress,
-            args: TrainArgs,
-    ):
-        cache_epoch = train_progress.epoch % args.latent_caching_epochs
-
-        image_cache_dir = os.path.join(args.cache_dir, "image", "epoch-" + str(cache_epoch))
-        text_cache_dir = os.path.join(args.cache_dir, "text", "epoch-" + str(cache_epoch))
-
-        if args.latent_caching:
-            if not os.path.exists(image_cache_dir):
-                return True
-
-            if (not args.train_text_encoder or not args.train_text_encoder_2) and args.training_method != TrainingMethod.EMBEDDING:
-                if not os.path.exists(text_cache_dir):
-                    return True
-        else:
-            return True
-
-        return args.debug_mode
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -141,9 +119,9 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
-        load_concept_prompts = LoadMultipleTexts(path_in_name='concept.prompt_path', texts_out_name='concept_prompts')
+        load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
         filename_prompt = GetFilename(path_in_name='image_path', filename_out_name='filename_prompt', include_extension=False)
-        select_prompt_input = SelectInput(setting_name='concept.prompt_source', out_name='prompts', setting_to_in_name_map={
+        select_prompt_input = SelectInput(setting_name='concept.text.prompt_source', out_name='prompts', setting_to_in_name_map={
             'sample': 'sample_prompts',
             'concept': 'concept_prompts',
             'filename': 'filename_prompt',
@@ -223,13 +201,13 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if args.masked_training or args.model_type.has_mask_input():
             inputs.append('mask')
 
-        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
-        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.enable_random_rotate', max_angle_in_name='concept.random_rotate_max_angle')
-        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.enable_random_brightness', max_strength_in_name='concept.random_brightness_max_strength')
-        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.enable_random_contrast', max_strength_in_name='concept.random_contrast_max_strength')
-        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.enable_random_saturation', max_strength_in_name='concept.random_saturation_max_strength')
-        random_hue = RandomHue(names=['image'], enabled_in_name='concept.enable_random_hue', max_strength_in_name='concept.random_hue_max_strength')
-        shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.enable_tag_shuffling', delimiter_in_name='concept.tag_delimiter', keep_tags_count_in_name='concept.keep_tags_count', text_out_name='prompt')
+        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip')
+        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', max_angle_in_name='concept.image.random_rotate_max_angle')
+        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.image.enable_random_brightness', max_strength_in_name='concept.image.random_brightness_max_strength')
+        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.image.enable_random_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
+        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.image.enable_random_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
+        random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', max_strength_in_name='concept.image.random_hue_max_strength')
+        shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.text.enable_tag_shuffling', delimiter_in_name='concept.text.tag_delimiter', keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt')
 
         modules = [
             random_flip,
@@ -285,7 +263,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         return modules
 
-    def _cache_modules(self, args: TrainArgs):
+    def _cache_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
         image_split_names = ['latent_image_distribution', 'original_resolution', 'crop_offset']
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -307,11 +285,18 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             text_split_names.append('text_encoder_2_hidden_state')
             text_split_names.append('text_encoder_2_pooled_state')
 
+        output_names = image_split_names + image_aggregate_names + text_split_names + [
+            'prompt', 'tokens_1', 'tokens_2'
+        ]
+
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, cached_epochs=args.latent_caching_epochs)
-        image_ram_cache = RamCache(names=image_split_names + image_aggregate_names)
+        def before_cache_fun():
+            self._setup_cache_device(model, self.train_device, self.temp_device, args)
+
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, sort_names=output_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, sort_names=output_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
 
         modules = []
 
@@ -321,7 +306,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             modules.append(image_ram_cache)
 
         if (not args.train_text_encoder or not args.train_text_encoder_2) and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
-            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], cached_epochs=args.latent_caching_epochs)
+            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], sort_names=output_names, variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], before_cache_fun=before_cache_fun)
             modules.append(text_disk_cache)
 
         return modules
@@ -352,7 +337,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
             replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions'
         )
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]
@@ -420,12 +405,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         augmentation_modules = self._augmentation_modules(args)
         inpainting_modules = self._inpainting_modules(args)
         preparation_modules = self._preparation_modules(args, model)
-        cache_modules = self._cache_modules(args)
+        cache_modules = self._cache_modules(args, model)
         output_modules = self._output_modules(args, model)
 
         debug_modules = self._debug_modules(args, model)
-
-        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,

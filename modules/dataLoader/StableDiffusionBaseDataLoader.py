@@ -48,6 +48,7 @@ from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.torch_util import torch_gc
 
 
 class StablDiffusionBaseDataLoader(BaseDataLoader):
@@ -81,41 +82,21 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
 
-    def setup_cache_device(
+    def _setup_cache_device(
             self,
             model: StableDiffusionModel,
             train_device: torch.device,
             temp_device: torch.device,
             args: TrainArgs,
     ):
+        model.to(self.temp_device)
+
         model.vae_to(train_device)
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             model.text_encoder_to(train_device)
 
-    def needs_setup_cache_device(
-            self,
-            train_progress: TrainProgress,
-            args: TrainArgs,
-    ):
-        return True
-
-        # TODO: add this function
-        # cache_epoch = train_progress.epoch % args.latent_caching_epochs
-        #
-        # image_cache_dir = os.path.join(args.cache_dir, "image", "epoch-" + str(cache_epoch))
-        # text_cache_dir = os.path.join(args.cache_dir, "text", "epoch-" + str(cache_epoch))
-        #
-        # if args.latent_caching:
-        #     if not os.path.exists(image_cache_dir):
-        #         return True
-        #
-        #     if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-        #         if not os.path.exists(text_cache_dir):
-        #             return True
-        # else:
-        #     return True
-        #
-        # return args.debug_mode
+        model.eval()
+        torch_gc()
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -298,7 +279,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         return modules
 
 
-    def _cache_modules(self, args: TrainArgs):
+    def _cache_modules(self, args: TrainArgs, model: StableDiffusionModel):
         image_split_names = ['latent_image_distribution']
 
         if args.masked_training or args.model_type.has_mask_input():
@@ -321,10 +302,13 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, sort_names=output_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'])
-        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, sort_names=output_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'])
+        def before_cache_fun():
+            self._setup_cache_device(model, self.train_device, self.temp_device, args)
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], sort_names=output_names, variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'])
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, sort_names=output_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, sort_names=output_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], sort_names=output_names, variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], before_cache_fun=before_cache_fun)
 
         modules = []
 
@@ -432,12 +416,10 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         augmentation_modules = self._augmentation_modules(args)
         inpainting_modules = self._inpainting_modules(args)
         preparation_modules = self._preparation_modules(args, model)
-        cache_modules = self._cache_modules(args)
+        cache_modules = self._cache_modules(args, model)
         output_modules = self._output_modules(args, model)
 
         debug_modules = self._debug_modules(args, model)
-
-        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,
