@@ -306,8 +306,8 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--align-prop-cfg-scale", type=float, required=False, default=7.0, dest="align_prop_cfg_scale", help="CFG Scale for inference steps of AlignProp calculations")
         parser.add_argument("--mse-strength", type=float, required=False, default=1.0, dest="mse_strength", help="Mean squared Error strength for custom loss settings")
         parser.add_argument("--mae-strength", type=float, required=False, default=0.0, dest="mae_strength", help="Mean Absolute Error strength for custom loss settings")
-        parser.add_argument("--scale-loss-type", type=LossScaler, required=False, default=LossScaler.NONE, dest="loss_scaler", help="Type of Loss Scaler", choices=list(LossScaler))
-        parser.add_argument("--scale-lr-type", type=LearningRateScaler, required=False, default=LearningRateScaler.NONE, dest="learning_rate_scaler", help="Type of Learning Rate Scaler", choices=list(LearningRateScaler))
+        parser.add_argument("--loss-scaler", type=LossScaler, required=False, default=LossScaler.NONE, dest="loss_scaler", help="Type of Loss Scaler", choices=list(LossScaler))
+        parser.add_argument("--learning-rate-scaler", type=LearningRateScaler, required=False, default=LearningRateScaler.NONE, dest="learning_rate_scaler", help="Type of Learning Rate Scaler", choices=list(LearningRateScaler))
 
         # unet
         parser.add_argument("--train-unet", required=False, action='store_true', dest="train_unet", help="Whether the unet should be trained")
