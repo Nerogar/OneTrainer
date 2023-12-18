@@ -16,6 +16,7 @@ from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.ModifyPath import ModifyPath
+from mgds.pipelineModules.NormalizeImageChannels import NormalizeImageChannels
 from mgds.pipelineModules.RamCache import RamCache
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
@@ -32,17 +33,19 @@ from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
+from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
+from mgds.pipelineModules.VariationSorting import VariationSorting
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
-from modules.dataLoader.wuerstchen.NormalizeImageChannels import NormalizeImageChannels
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.torch_util import torch_gc
 
 
 class WuerstchenBaseDataLoader(BaseDataLoader):
@@ -76,16 +79,21 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
 
-    def setup_cache_device(
+    def _setup_cache_device(
             self,
             model: WuerstchenModel,
             train_device: torch.device,
             temp_device: torch.device,
             args: TrainArgs,
     ):
+        model.to(self.temp_device)
+
         model.effnet_encoder_to(train_device)
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             model.prior_text_encoder_to(train_device)
+
+        model.eval()
+        torch_gc()
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -113,9 +121,9 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
-        load_concept_prompts = LoadMultipleTexts(path_in_name='concept.prompt_path', texts_out_name='concept_prompts')
+        load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
         filename_prompt = GetFilename(path_in_name='image_path', filename_out_name='filename_prompt', include_extension=False)
-        select_prompt_input = SelectInput(setting_name='concept.prompt_source', out_name='prompts', setting_to_in_name_map={
+        select_prompt_input = SelectInput(setting_name='concept.text.prompt_source', out_name='prompts', setting_to_in_name_map={
             'sample': 'sample_prompts',
             'concept': 'concept_prompts',
             'filename': 'filename_prompt',
@@ -199,12 +207,13 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         if args.masked_training or args.model_type.has_mask_input():
             inputs.append('mask')
 
-        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
-        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.enable_random_rotate', max_angle_in_name='concept.random_rotate_max_angle')
-        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.enable_random_brightness', max_strength_in_name='concept.random_brightness_max_strength')
-        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.enable_random_contrast', max_strength_in_name='concept.random_contrast_max_strength')
-        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.enable_random_saturation', max_strength_in_name='concept.random_saturation_max_strength')
-        random_hue = RandomHue(names=['image'], enabled_in_name='concept.enable_random_hue', max_strength_in_name='concept.random_hue_max_strength')
+        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip')
+        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', max_angle_in_name='concept.image.random_rotate_max_angle')
+        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.image.enable_random_brightness', max_strength_in_name='concept.image.random_brightness_max_strength')
+        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.image.enable_random_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
+        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.image.enable_random_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
+        random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', max_strength_in_name='concept.image.random_hue_max_strength')
+        shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.text.enable_tag_shuffling', delimiter_in_name='concept.text.tag_delimiter', keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt')
 
         modules = [
             random_flip,
@@ -213,6 +222,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
             random_contrast,
             random_saturation,
             random_hue,
+            shuffle_tags,
         ]
 
         return modules
@@ -240,7 +250,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         return modules
 
 
-    def _cache_modules(self, args: TrainArgs):
+    def _cache_modules(self, args: TrainArgs, model: WuerstchenModel):
         image_split_names = [
             'latent_image',
             'original_resolution', 'crop_offset',
@@ -251,17 +261,22 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
-        text_split_names = []
+        text_split_names = ['tokens', 'text_encoder_hidden_state']
 
-        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            text_split_names.append('tokens')
-            text_split_names.append('text_encoder_hidden_state')
+        sort_names = text_split_names + [
+            'prompt'
+        ]
 
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, cached_epochs=args.latent_caching_epochs)
-        image_ram_cache = RamCache(names=image_split_names + image_aggregate_names)
+        def before_cache_fun():
+            self._setup_cache_device(model, self.train_device, self.temp_device, args)
+
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], before_cache_fun=before_cache_fun)
 
         modules = []
 
@@ -271,8 +286,12 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
             modules.append(image_ram_cache)
 
         if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
-            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], cached_epochs=args.latent_caching_epochs)
             modules.append(text_disk_cache)
+            sort_names = [x for x in sort_names if x not in text_split_names]
+
+        if len(sort_names) > 0:
+            variation_sorting = VariationSorting(names=sort_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'])
+            modules.append(variation_sorting)
 
         return modules
 
@@ -294,7 +313,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
             latent_mask_name='latent_mask', latent_conditioning_image_name=None,
             replace_probability=args.unmasked_probability, vae=None, possible_resolutions_in_name='possible_resolutions'
         )
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size, sort_resolutions_for_each_epoch=True)
+        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = []
@@ -349,12 +368,10 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         crop_modules = self._crop_modules(args)
         augmentation_modules = self._augmentation_modules(args)
         preparation_modules = self._preparation_modules(args, model)
-        cache_modules = self._cache_modules(args)
+        cache_modules = self._cache_modules(args, model)
         output_modules = self._output_modules(args, model)
 
         debug_modules = self._debug_modules(args, model)
-
-        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,

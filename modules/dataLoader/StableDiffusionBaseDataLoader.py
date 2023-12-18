@@ -41,6 +41,7 @@ from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
+from mgds.pipelineModules.VariationSorting import VariationSorting
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -295,7 +296,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         text_split_names = ['tokens', 'text_encoder_hidden_state']
 
-        output_names = image_split_names + image_aggregate_names + text_split_names + [
+        sort_names = text_split_names + [
             'prompt'
         ]
 
@@ -305,10 +306,10 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         def before_cache_fun():
             self._setup_cache_device(model, self.train_device, self.temp_device, args)
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, sort_names=output_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
-        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, sort_names=output_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], sort_names=output_names, variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], before_cache_fun=before_cache_fun)
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], before_cache_fun=before_cache_fun)
 
         modules = []
 
@@ -319,6 +320,11 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(text_disk_cache)
+            sort_names = [x for x in sort_names if x not in text_split_names]
+
+        if len(sort_names) > 0:
+            variation_sorting = VariationSorting(names=sort_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'])
+            modules.append(variation_sorting)
 
         return modules
 

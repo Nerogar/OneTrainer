@@ -19,12 +19,14 @@ from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
+from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
+from modules.util.torch_util import torch_gc
 
 
 class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
@@ -58,14 +60,19 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
 
-    def setup_cache_device(
+    def _setup_cache_device(
             self,
             model: StableDiffusionModel,
             train_device: torch.device,
             temp_device: torch.device,
             args: TrainArgs,
     ):
+        model.to(self.temp_device)
+
         model.vae_to(train_device)
+
+        model.eval()
+        torch_gc()
 
     def __enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -101,7 +108,9 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __mask_augmentation_modules(self, args: TrainArgs) -> list:
         inputs = ['image']
 
-        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='latent_mask', additional_names=inputs, min_size=args.resolution,
+        lowest_resolution = min(int(res.strip()) for res in args.resolution.split(','))
+
+        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='latent_mask', additional_names=inputs, min_size=lowest_resolution,
                                                        min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20,
                                                        enabled_in_name='settings.enable_random_circular_mask_shrink')
 
@@ -116,8 +125,16 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __aspect_bucketing_in(self, args: TrainArgs):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
         aspect_bucketing = AspectBucketing(
-            target_resolution=args.resolution,
+            target_resolution=[int(res.strip()) for res in args.resolution.split(',')],
             quantization=8,
+            resolution_in_name='original_resolution',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            possible_resolutions_out_name='possible_resolutions'
+        )
+
+        single_aspect_calculation = SingleAspectCalculation(
+            target_resolution=[int(res.strip()) for res in args.resolution.split(',')],
             resolution_in_name='original_resolution',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
@@ -126,9 +143,11 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         modules = []
 
+        modules.append(calc_aspect)
         if args.aspect_ratio_bucketing:
-            modules.append(calc_aspect)
             modules.append(aspect_bucketing)
+        else:
+            modules.append(single_aspect_calculation)
 
         return modules
 
@@ -172,7 +191,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         return modules
 
 
-    def __cache_modules(self, args: TrainArgs):
+    def __cache_modules(self, args: TrainArgs, model: StableDiffusionModel):
         split_names = ['image', 'latent_image_distribution']
 
         if args.masked_training:
@@ -180,8 +199,11 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         aggregate_names = ['crop_resolution', 'image_path']
 
-        disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name='concept')
-        ram_cache = RamCache(names=split_names + aggregate_names)
+        def before_cache_fun():
+            self._setup_cache_device(model, self.train_device, self.temp_device, args)
+
+        disk_cache = DiskCache(cache_dir=args.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
+        ram_cache = RamCache(cache_names=split_names + aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], before_cache_fun=before_cache_fun)
 
         modules = []
 
@@ -228,7 +250,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         crop_modules = self.__crop_modules(args)
         augmentation_modules = self.__augmentation_modules(args)
         preparation_modules = self.__preparation_modules(args, model)
-        cache_modules = self.__cache_modules(args)
+        cache_modules = self.__cache_modules(args, model)
         output_modules = self.__output_modules(args)
 
         debug_dir = os.path.join(args.debug_dir, "dataloader")
@@ -240,8 +262,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
                       in_range_max=1),
             # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         ]
-
-        self.setup_cache_device(model, self.train_device, self.temp_device, args)
 
         return self._create_mgds(
             args,

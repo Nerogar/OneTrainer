@@ -2,11 +2,15 @@ from contextlib import nullcontext
 
 import torch
 from mgds.MGDS import PipelineModule
+from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 
 from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder
 
 
-class EncodeWuerstchenEffnet(PipelineModule):
+class EncodeWuerstchenEffnet(
+    PipelineModule,
+    RandomAccessPipelineModule,
+):
     def __init__(
             self,
             in_name: str,
@@ -21,7 +25,7 @@ class EncodeWuerstchenEffnet(PipelineModule):
         self.override_allow_mixed_precision = override_allow_mixed_precision
 
     def length(self) -> int:
-        return self.get_previous_length(self.in_name)
+        return self._get_previous_length(self.in_name)
 
     def get_inputs(self) -> list[str]:
         return [self.in_name]
@@ -29,8 +33,8 @@ class EncodeWuerstchenEffnet(PipelineModule):
     def get_outputs(self) -> list[str]:
         return [self.out_name]
 
-    def get_item(self, index: int, requested_name: str = None) -> dict:
-        image = self.get_previous_item(self.in_name, index)
+    def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
+        image = self._get_previous_item(variation, self.in_name, index)
 
         image = image.to(device=image.device, dtype=self.pipeline.dtype)
 
