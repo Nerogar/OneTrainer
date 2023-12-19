@@ -111,6 +111,22 @@ def file_entry(
             if command:
                 command(file_path)
 
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            if self._textvariable_callback_name:
+                self._textvariable.trace_remove("write", self._textvariable_callback_name)
+                self._textvariable_callback_name = ""
+
+            orig_destroy()
+
+        return destroy
+
+    destroy = create_destroy(entry_component)
+    entry_component.destroy = lambda: destroy(entry_component)
+
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
@@ -134,6 +150,22 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
             if command:
                 command(dir_path)
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            if self._textvariable_callback_name:
+                self._textvariable.trace_remove("write", self._textvariable_callback_name)
+                self._textvariable_callback_name = ""
+
+            orig_destroy()
+
+        return destroy
+
+    destroy = create_destroy(entry_component)
+    entry_component.destroy = lambda: destroy(entry_component)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
