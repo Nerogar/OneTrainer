@@ -54,7 +54,7 @@ class ConceptWidget(ctk.CTkFrame):
         image_label.grid(row=0, column=0)
 
         # name
-        self.name_label = components.label(self, 1, 0, self.concept.name, pad=5)
+        self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5)
 
         # close button
         close_button = ctk.CTkButton(
@@ -76,7 +76,7 @@ class ConceptWidget(ctk.CTkFrame):
             text="+",
             corner_radius=2,
             fg_color="#00C000",
-            command=lambda: clone_command(self.i, self.randomize_seed),
+            command=lambda: clone_command(self.i, self.__randomize_seed),
         )
         clone_button.place(x=25, y=0)
 
@@ -95,12 +95,20 @@ class ConceptWidget(ctk.CTkFrame):
             lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
         )
 
-    def randomize_seed(self, concept: ConceptParams):
+    def __randomize_seed(self, concept: ConceptParams):
         concept.seed = ConceptParams.default_values().seed
         return concept
 
+    def __get_display_name(self):
+        if self.concept.name:
+            return self.concept.name
+        elif self.concept.path:
+            return os.path.basename(self.concept.path)
+        else:
+            return ""
+
     def configure_element(self):
-        self.name_label.configure(text=self.concept.name)
+        self.name_label.configure(text=self.__get_display_name())
 
         self.image.configure(light_image=self.__get_preview_image())
 
