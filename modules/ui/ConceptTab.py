@@ -80,6 +80,16 @@ class ConceptWidget(ctk.CTkFrame):
         )
         clone_button.place(x=25, y=0)
 
+        # enabled switch
+        enabled_switch = ctk.CTkSwitch(
+            master=self,
+            width=40,
+            variable=self.ui_state.vars["enabled"],
+            text="",
+            command=save_command,
+        )
+        enabled_switch.place(x=110, y=0)
+
         image_label.bind(
             "<Button-1>",
             lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))

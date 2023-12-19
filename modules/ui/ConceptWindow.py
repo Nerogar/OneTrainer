@@ -29,7 +29,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
 
         self.title("Concept")
-        self.geometry("800x450")
+        self.geometry("800x480")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
@@ -56,15 +56,20 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Name of the concept")
         components.entry(master, 0, 1, self.ui_state, "name")
 
+        # enabled
+        components.label(master, 1, 0, "Enabled",
+                         tooltip="Enable or disable this concept")
+        components.switch(master, 1, 1, self.ui_state, "enabled")
+
         # path
-        components.label(master, 1, 0, "Path",
+        components.label(master, 2, 0, "Path",
                          tooltip="Path where the training data is located")
-        components.dir_entry(master, 1, 1, self.ui_state, "path")
+        components.dir_entry(master, 2, 1, self.ui_state, "path")
 
         # prompt source
-        components.label(master, 2, 0, "Prompt Source",
+        components.label(master, 3, 0, "Prompt Source",
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
-        prompt_path_entry = components.file_entry(master, 2, 2, self.text_ui_state, "prompt_path")
+        prompt_path_entry = components.file_entry(master, 3, 2, self.text_ui_state, "prompt_path")
 
         def set_prompt_path_entry_enabled(option: str):
             if option == 'concept':
@@ -74,7 +79,7 @@ class ConceptWindow(ctk.CTkToplevel):
                 for child in prompt_path_entry.children.values():
                     child.configure(state="disabled")
 
-        components.options_kv(master, 2, 1, [
+        components.options_kv(master, 3, 1, [
             ("From text file per sample", 'sample'),
             ("From single text file", 'concept'),
             ("From image file name", 'filename'),
@@ -82,24 +87,24 @@ class ConceptWindow(ctk.CTkToplevel):
         set_prompt_path_entry_enabled(concept.text.prompt_source)
 
         # include subdirectories
-        components.label(master, 3, 0, "Include Subdirectories",
+        components.label(master, 4, 0, "Include Subdirectories",
                          tooltip="Includes images from subdirectories into the dataset")
-        components.switch(master, 3, 1, self.ui_state, "include_subdirectories")
+        components.switch(master, 4, 1, self.ui_state, "include_subdirectories")
 
         # image variations
-        components.label(master, 4, 0, "Image Variations",
+        components.label(master, 5, 0, "Image Variations",
                          tooltip="The number of different image versions to cache if latent caching is enabled.")
-        components.entry(master, 4, 1, self.ui_state, "image_variations")
+        components.entry(master, 5, 1, self.ui_state, "image_variations")
 
         # text variations
-        components.label(master, 5, 0, "Text Variations",
+        components.label(master, 6, 0, "Text Variations",
                          tooltip="The number of different text versions to cache if latent caching is enabled.")
-        components.entry(master, 5, 1, self.ui_state, "text_variations")
+        components.entry(master, 6, 1, self.ui_state, "text_variations")
 
         # repeats
-        components.label(master, 6, 0, "Repeats",
+        components.label(master, 7, 0, "Repeats",
                          tooltip="The number of repeats for this concept during one epoch.")
-        components.entry(master, 6, 1, self.ui_state, "repeats")
+        components.entry(master, 7, 1, self.ui_state, "repeats")
 
     def __image_augmentation_tab(self, master):
         master.grid_columnconfigure(0, weight=0)

@@ -67,6 +67,7 @@ class ConceptParams(BaseParams):
     name: str
     path: str
     seed: int
+    enabled: bool
     include_subdirectories: bool
     image_variations: int
     text_variations: int
@@ -129,6 +130,7 @@ class ConceptParams(BaseParams):
         args["name"] = ""
         args["path"] = ""
         args["seed"] = random.randint(-(1 << 30), 1 << 30)
+        args["enabled"] = True
         args["image_variations"] = 1
         args["text_variations"] = 1
         args["repeats"] = 1.0
