@@ -76,7 +76,7 @@ class ConceptWidget(ctk.CTkFrame):
             text="+",
             corner_radius=2,
             fg_color="#00C000",
-            command=lambda: clone_command(self.i),
+            command=lambda: clone_command(self.i, self.randomize_seed),
         )
         clone_button.place(x=25, y=0)
 
@@ -84,6 +84,10 @@ class ConceptWidget(ctk.CTkFrame):
             "<Button-1>",
             lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
         )
+
+    def randomize_seed(self, concept: ConceptParams):
+        concept.seed = ConceptParams.default_values().seed
+        return concept
 
     def configure_element(self):
         self.name_label.configure(text=self.concept.name)
