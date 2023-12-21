@@ -163,6 +163,10 @@ class TrainUI(ctk.CTk):
                          tooltip="Starts the Tensorboard Web UI during training")
         components.switch(master, 6, 1, self.ui_state, "tensorboard")
 
+        components.label(master, 6, 0, "Expose Tensorboard",
+                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
+        components.switch(master, 6, 1, self.ui_state, "tensorboard_expose")
+
     def create_model_tab(self, master):
         return ModelTab(master, self.train_args, self.ui_state)
 

@@ -74,7 +74,8 @@ class GenericTrainer(BaseTrainer):
                     tensorboard_log_dir,
                     "--port",
                     "6006",
-                    "--samples_per_plugin=images=100"
+                    "--samples_per_plugin=images=100",
+                    "--bind_all" if self.args.tensorboard_expose else ""
                 ]
             )
         self.one_step_trained = False
