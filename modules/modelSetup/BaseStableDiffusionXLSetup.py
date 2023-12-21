@@ -243,12 +243,13 @@ class BaseStableDiffusionXLSetup(
                 if self.debug_mode:
                     with torch.no_grad():
                         # predicted image
-                        predicted_image = self._project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1)
+                        predicted_image = self._project_latent_to_image_sdxl(scaled_noisy_latent_image)
                         self._save_image(
                             predicted_image,
                             args.debug_dir + "/training_batches",
                             "2-predicted_image_" + str(step),
-                            train_progress.global_step
+                            train_progress.global_step,
+                            True
                         )
 
             predicted_latent_image = scaled_noisy_latent_image / vae_scaling_factor
@@ -345,26 +346,29 @@ class BaseStableDiffusionXLSetup(
             with torch.no_grad():
                 # noise
                 self._save_image(
-                    self._project_latent_to_image(latent_noise).clamp(-1, 1),
+                    self._project_latent_to_image_sdxl(latent_noise),
                     args.debug_dir + "/training_batches",
                     "1-noise",
-                    train_progress.global_step
+                    train_progress.global_step,
+                    True
                 )
 
                 # predicted noise
                 self._save_image(
-                    self._project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
+                    self._project_latent_to_image_sdxl(predicted_latent_noise),
                     args.debug_dir + "/training_batches",
                     "2-predicted_noise",
-                    train_progress.global_step
+                    train_progress.global_step,
+                    True
                 )
 
                 # noisy image
                 self._save_image(
-                    self._project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
+                    self._project_latent_to_image_sdxl(scaled_noisy_latent_image),
                     args.debug_dir + "/training_batches",
                     "3-noisy_image",
-                    train_progress.global_step
+                    train_progress.global_step,
+                    True
                 )
 
                 # predicted image
@@ -379,18 +383,20 @@ class BaseStableDiffusionXLSetup(
                     (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
                     / sqrt_alpha_prod
                 self._save_image(
-                    self._project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
+                    self._project_latent_to_image_sdxl(scaled_predicted_latent_image),
                     args.debug_dir + "/training_batches",
                     "4-predicted_image",
-                    model.train_progress.global_step
+                    model.train_progress.global_step,
+                    True
                 )
 
                 # image
                 self._save_image(
-                    self._project_latent_to_image(scaled_latent_image).clamp(-1, 1),
+                    self._project_latent_to_image_sdxl(scaled_latent_image),
                     args.debug_dir + "/training_batches",
                     "5-image",
-                    model.train_progress.global_step
+                    model.train_progress.global_step,
+                    True
                 )
 
         return model_output_data
