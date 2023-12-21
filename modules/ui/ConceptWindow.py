@@ -29,7 +29,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
 
         self.title("Concept")
-        self.geometry("800x480")
+        self.geometry("800x530")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
@@ -112,46 +112,63 @@ class ConceptWindow(ctk.CTkToplevel):
         master.grid_columnconfigure(2, weight=0)
         master.grid_columnconfigure(3, weight=1)
 
+        # header
+        components.label(master, 0, 1, "Random",
+                         tooltip="Enable this augmentation with random values")
+        components.label(master, 0, 2, "Fixed",
+                         tooltip="Enable this augmentation with fixed values")
+
         # crop jitter
-        components.label(master, 0, 0, "Crop Jitter",
+        components.label(master, 1, 0, "Crop Jitter",
                          tooltip="Enables random cropping of samples")
-        components.switch(master, 0, 1, self.image_ui_state, "enable_crop_jitter")
+        components.switch(master, 1, 1, self.image_ui_state, "enable_crop_jitter")
 
         # random flip
-        components.label(master, 1, 0, "Random Flip",
+        components.label(master, 2, 0, "Random Flip",
                          tooltip="Randomly flip the sample during training")
-        components.switch(master, 1, 1, self.image_ui_state, "enable_random_flip")
+        components.switch(master, 2, 1, self.image_ui_state, "enable_random_flip")
+        components.switch(master, 2, 2, self.image_ui_state, "enable_fixed_flip")
 
         # random rotation
-        components.label(master, 2, 0, "Random Rotation",
+        components.label(master, 3, 0, "Random Rotation",
                          tooltip="Randomly rotates the sample during training")
-        components.switch(master, 2, 1, self.image_ui_state, "enable_random_rotate")
-        components.entry(master, 2, 2, self.image_ui_state, "random_rotate_max_angle")
+        components.switch(master, 3, 1, self.image_ui_state, "enable_random_rotate")
+        components.switch(master, 3, 2, self.image_ui_state, "enable_fixed_rotate")
+        components.entry(master, 3, 3, self.image_ui_state, "random_rotate_max_angle")
 
         # random brightness
-        components.label(master, 3, 0, "Random Brightness",
+        components.label(master, 4, 0, "Random Brightness",
                          tooltip="Randomly adjusts the brightness of the sample during training")
-        components.switch(master, 3, 1, self.image_ui_state, "enable_random_brightness")
-        components.entry(master, 3, 2, self.image_ui_state, "random_brightness_max_strength")
+        components.switch(master, 4, 1, self.image_ui_state, "enable_random_brightness")
+        components.switch(master, 4, 2, self.image_ui_state, "enable_fixed_brightness")
+        components.entry(master, 4, 3, self.image_ui_state, "random_brightness_max_strength")
 
         # random contrast
-        components.label(master, 4, 0, "Random Contrast",
+        components.label(master, 5, 0, "Random Contrast",
                          tooltip="Randomly adjusts the contrast of the sample during training")
-        components.switch(master, 4, 1, self.image_ui_state, "enable_random_contrast")
-        components.entry(master, 4, 2, self.image_ui_state, "random_contrast_max_strength")
+        components.switch(master, 5, 1, self.image_ui_state, "enable_random_contrast")
+        components.switch(master, 5, 2, self.image_ui_state, "enable_fixed_contrast")
+        components.entry(master, 5, 3, self.image_ui_state, "random_contrast_max_strength")
 
         # random saturation
-        components.label(master, 5, 0, "Random Saturation",
+        components.label(master, 6, 0, "Random Saturation",
                          tooltip="Randomly adjusts the saturation of the sample during training")
-        components.switch(master, 5, 1, self.image_ui_state, "enable_random_saturation")
-        components.entry(master, 5, 2, self.image_ui_state, "random_saturation_max_strength")
+        components.switch(master, 6, 1, self.image_ui_state, "enable_random_saturation")
+        components.switch(master, 6, 2, self.image_ui_state, "enable_fixed_saturation")
+        components.entry(master, 6, 3, self.image_ui_state, "random_saturation_max_strength")
 
         # random hue
-        components.label(master, 6, 0, "Random Hue",
+        components.label(master, 7, 0, "Random Hue",
                          tooltip="Randomly adjusts the hue of the sample during training")
-        components.switch(master, 6, 1, self.image_ui_state, "enable_random_hue")
-        components.entry(master, 6, 2, self.image_ui_state, "random_hue_max_strength")
+        components.switch(master, 7, 1, self.image_ui_state, "enable_random_hue")
+        components.switch(master, 7, 2, self.image_ui_state, "enable_fixed_hue")
+        components.entry(master, 7, 3, self.image_ui_state, "random_hue_max_strength")
 
+        # resolution override
+        components.label(master, 8, 0, "Resolution Override",
+                         tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma.")
+        components.switch(master, 8, 2, self.image_ui_state, "enable_resolution_override")
+        components.entry(master, 8, 3, self.image_ui_state, "resolution_override")
 
         # image
         self.image = ctk.CTkImage(
@@ -159,10 +176,10 @@ class ConceptWindow(ctk.CTkToplevel):
             size=(300, 300)
         )
         image_label = ctk.CTkLabel(master=master, text="", image=self.image, height=150, width=150)
-        image_label.grid(row=0, column=3, rowspan=6)
+        image_label.grid(row=0, column=4, rowspan=6)
 
         # refresh preview
-        components.button(master, 6, 3, "Update Preview", command=self.__update_image_preview)
+        components.button(master, 6, 4, "Update Preview", command=self.__update_image_preview)
 
     def __text_augmentation_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -205,37 +222,55 @@ class ConceptWindow(ctk.CTkToplevel):
         image_tensor = functional.to_tensor(image)
         rand = random.Random()
 
-        if self.concept.image.enable_random_flip:
-            if rand.random() < 0.5:
+        if self.concept.image.enable_random_flip or self.concept.image.enable_fixed_flip:
+            if self.concept.image.enable_random_flip:
+                if rand.random() < 0.5:
+                    image_tensor = functional.hflip(image_tensor)
+            else:
                 image_tensor = functional.hflip(image_tensor)
 
-        if self.concept.image.enable_random_rotate:
+        if self.concept.image.enable_random_rotate or self.concept.image.enable_fixed_rotate:
             max_angle = self.concept.image.random_rotate_max_angle
-            angle = rand.uniform(-max_angle, max_angle)
+            if self.concept.image.enable_random_rotate:
+                angle = rand.uniform(-max_angle, max_angle)
+            else:
+                angle = max_angle
             image_tensor = functional.rotate(image_tensor, angle, interpolation=InterpolationMode.BILINEAR)
 
-        if self.concept.image.enable_random_brightness:
+        if self.concept.image.enable_random_brightness or self.concept.image.enable_fixed_brightness:
             max_strength = self.concept.image.random_brightness_max_strength
-            strength = rand.uniform(1 - max_strength, 1 + max_strength)
-            strength = max(0.0, strength)
+            if self.concept.image.enable_random_brightness:
+                strength = rand.uniform(1 - max_strength, 1 + max_strength)
+                strength = max(0.0, strength)
+            else:
+                strength = 1.0 + max_strength
             image_tensor = functional.adjust_brightness(image_tensor, strength)
 
-        if self.concept.image.enable_random_contrast:
+        if self.concept.image.enable_random_contrast or self.concept.image.enable_fixed_contrast:
             max_strength = self.concept.image.random_contrast_max_strength
-            strength = rand.uniform(1 - max_strength, 1 + max_strength)
-            strength = max(0.0, strength)
+            if self.concept.image.enable_random_contrast:
+                strength = rand.uniform(1 - max_strength, 1 + max_strength)
+                strength = max(0.0, strength)
+            else:
+                strength = 1.0 + max_strength
             image_tensor = functional.adjust_contrast(image_tensor, strength)
 
-        if self.concept.image.enable_random_saturation:
+        if self.concept.image.enable_random_saturation or self.concept.image.enable_fixed_saturation:
             max_strength = self.concept.image.random_saturation_max_strength
-            strength = rand.uniform(1 - max_strength, 1 + max_strength)
-            strength = max(0.0, strength)
-            image_tensor = functional.adjust_contrast(image_tensor, strength)
+            if self.concept.image.enable_random_saturation:
+                strength = rand.uniform(1 - max_strength, 1 + max_strength)
+                strength = max(0.0, strength)
+            else:
+                strength = 1.0 + max_strength
+            image_tensor = functional.adjust_saturation(image_tensor, strength)
 
-        if self.concept.image.enable_random_hue:
+        if self.concept.image.enable_random_hue or self.concept.image.enable_fixed_hue:
             max_strength = self.concept.image.random_hue_max_strength
-            strength = rand.uniform(-max_strength * 0.5, max_strength * 0.5)
-            strength = max(-0.5, min(0.5, strength))
+            if self.concept.image.enable_random_hue:
+                strength = rand.uniform(-max_strength * 0.5, max_strength * 0.5)
+                strength = max(-0.5, min(0.5, strength))
+            else:
+                strength = max_strength * 0.5
             image_tensor = functional.adjust_hue(image_tensor, strength)
 
         image = functional.to_pil_image(image_tensor)

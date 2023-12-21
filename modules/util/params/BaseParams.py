@@ -48,6 +48,7 @@ class BaseParams:
                 if key in data:
                     print(f"Could not set {key} as {str(data[key])}")
                 else:
-                    print(f"Could not set {key}, not found.")
+                    #print(f"Could not set {key}, not found.")
+                    pass
 
         return self

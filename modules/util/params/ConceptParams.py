@@ -5,17 +5,32 @@ from modules.util.params.BaseParams import BaseParams
 
 class ConceptImageParams(BaseParams):
     enable_crop_jitter: bool
+
     enable_random_flip: bool
+    enable_fixed_flip: bool
+
     enable_random_rotate: bool
+    enable_fixed_rotate: bool
     random_rotate_max_angle: float
+
     enable_random_brightness: bool
+    enable_fixed_brightness: bool
     random_brightness_max_strength: float
+
     enable_random_contrast: bool
+    enable_fixed_contrast: bool
     random_contrast_max_strength: float
+
     enable_random_saturation: bool
+    enable_fixed_saturation: bool
     random_saturation_max_strength: float
+
     enable_random_hue: bool
+    enable_fixed_hue: bool
     random_hue_max_strength: float
+
+    enable_resolution_override: bool
+    resolution_override: str
 
     def __init__(self, args: dict):
         super(ConceptImageParams, self).__init__(args)
@@ -25,17 +40,32 @@ class ConceptImageParams(BaseParams):
         args = {}
 
         args["enable_crop_jitter"] = True
+
         args["enable_random_flip"] = True
+        args["enable_fixed_flip"] = False
+
         args["enable_random_rotate"] = False
+        args["enable_fixed_rotate"] = False
         args["random_rotate_max_angle"] = 0.0
+
         args["enable_random_brightness"] = False
+        args["enable_fixed_brightness"] = False
         args["random_brightness_max_strength"] = 0.0
+
         args["enable_random_contrast"] = False
+        args["enable_fixed_contrast"] = False
         args["random_contrast_max_strength"] = 0.0
+
         args["enable_random_saturation"] = False
+        args["enable_fixed_saturation"] = False
         args["random_saturation_max_strength"] = 0.0
+
         args["enable_random_hue"] = False
+        args["enable_fixed_hue"] = False
         args["random_hue_max_strength"] = 0.0
+
+        args["enable_resolution_override"] = False
+        args["resolution_override"] = "512"
 
         return ConceptImageParams(args)
 
@@ -116,12 +146,15 @@ class ConceptParams(BaseParams):
             translated_data.text.keep_tags_count = data['keep_tags_count'] if 'keep_tags_count' in data else translated_data.text.keep_tags_count
             # @formatter:on
 
-            return translated_data
+            self.__dict__ = translated_data.__dict__
+            return self
         else:
             concept_params = super(ConceptParams, self).from_dict(data)
-            concept_params.image = ConceptImageParams(data['image'])
-            concept_params.text = ConceptTextParams(data['text'])
-            return concept_params
+            concept_params.image.from_dict(data['image'])
+            concept_params.text.from_dict(data['text'])
+
+            self.__dict__ = concept_params.__dict__
+            return self
 
     @staticmethod
     def default_values():

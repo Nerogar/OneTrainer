@@ -14,8 +14,13 @@ from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.ModifyPath import ModifyPath
 from mgds.pipelineModules.RamCache import RamCache
+from mgds.pipelineModules.RandomBrightness import RandomBrightness
+from mgds.pipelineModules.RandomContrast import RandomContrast
 from mgds.pipelineModules.RandomFlip import RandomFlip
+from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
+from mgds.pipelineModules.RandomRotate import RandomRotate
+from mgds.pipelineModules.RandomSaturation import RandomSaturation
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
@@ -176,9 +181,22 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         if args.masked_training:
             inputs.append('latent_mask')
 
-        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.enable_random_flip')
+        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', fixed_enabled_in_name='concept.image.enable_fixed_flip')
+        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', fixed_enabled_in_name='concept.image.enable_fixed_rotate', max_angle_in_name='concept.image.random_rotate_max_angle')
+        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.image.enable_random_brightness', fixed_enabled_in_name='concept.image.enable_fixed_brightness', max_strength_in_name='concept.image.random_brightness_max_strength')
+        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
+        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
+        random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
 
-        modules = [random_flip]
+
+        modules = [
+            random_flip,
+            random_rotate,
+            random_brightness,
+            random_contrast,
+            random_saturation,
+            random_hue,
+        ]
 
         return modules
 
