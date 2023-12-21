@@ -217,7 +217,8 @@ class TrainUI(ctk.CTk):
         # sample after
         top_frame = ctk.CTkFrame(master=master, corner_radius=0)
         top_frame.grid(row=0, column=0, sticky="nsew")
-
+        sub_frame = ctk.CTkFrame(master=top_frame, corner_radius=0, fg_color="transparent")
+        sub_frame.grid(row=1, column=0, sticky="nsew", columnspan=6)
         components.label(top_frame, 0, 0, "Sample After",
                          tooltip="The interval used when automatically sampling from the model during training")
         components.time_entry(top_frame, 0, 1, self.ui_state, "sample_after", "sample_after_unit")
@@ -233,13 +234,13 @@ class TrainUI(ctk.CTk):
 
         components.button(top_frame, 0, 5, "manual sample", self.open_sample_ui)
 
-        components.label(top_frame, 0, 6, "Non-EMA Sampling",
+        components.label(sub_frame, 0, 0, "Non-EMA Sampling",
                          tooltip="Whether to include non-ema sampling when using ema.")        
-        components.switch(top_frame, 0, 7, self.ui_state, "non_ema_sampling")
+        components.switch(sub_frame, 0, 1, self.ui_state, "non_ema_sampling")
 
-        components.label(top_frame, 0, 8, "Samples to Tensorboard",
+        components.label(sub_frame, 0, 2, "Samples to Tensorboard",
                          tooltip="Whether to include sample images in the Tensorboard output.")        
-        components.switch(top_frame, 0, 9, self.ui_state, "samples_to_tensorboard")
+        components.switch(sub_frame, 0, 3, self.ui_state, "samples_to_tensorboard")
 
         # table
         frame = ctk.CTkFrame(master=master, corner_radius=0)
