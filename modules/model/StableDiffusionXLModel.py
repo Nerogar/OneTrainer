@@ -1,7 +1,7 @@
 import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline, StableDiffusionXLPipeline, DDIMScheduler
 from torch import Tensor
-from transformers import CLIPTextModel, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
@@ -31,7 +31,7 @@ class StableDiffusionXLModel(BaseModel):
     tokenizer_2: CLIPTokenizer
     noise_scheduler: DDIMScheduler
     text_encoder_1: CLIPTextModel
-    text_encoder_2: CLIPTextModel
+    text_encoder_2: CLIPTextModelWithProjection
     vae: AutoencoderKL
     unet: UNet2DConditionModel
 
