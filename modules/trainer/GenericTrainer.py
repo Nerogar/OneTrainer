@@ -223,7 +223,7 @@ class GenericTrainer(BaseTrainer):
                     )
 
                     def on_sample_default(image: Image):
-                        if args.samples_to_tensorboard:
+                        if self.args.samples_to_tensorboard:
                             self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
                                                     train_progress.global_step)
                         self.callbacks.on_sample_default(image)
@@ -289,7 +289,7 @@ class GenericTrainer(BaseTrainer):
             self.model.ema.copy_temp_to(self.parameters)
 
         # ema-less sampling, if an ema model exists
-        if self.model.ema and not is_custom_sample and args.non_ema_sampling:
+        if self.model.ema and not is_custom_sample and self.args.non_ema_sampling:
             self.__sample_loop(
                 train_progress=train_progress,
                 train_device=train_device,
