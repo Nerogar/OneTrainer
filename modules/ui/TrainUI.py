@@ -233,6 +233,14 @@ class TrainUI(ctk.CTk):
 
         components.button(top_frame, 0, 5, "manual sample", self.open_sample_ui)
 
+        components.label(top_frame, 0, 6, "Non-EMA Sampling",
+                         tooltip="Whether to include non-ema sampling when using ema.")        
+        components.switch(top_frame, 0, 7, self.ui_state, "non_ema_sampling")
+
+        components.label(top_frame, 0, 8, "Samples to Tensorboard",
+                         tooltip="Whether to include sample images in the Tensorboard output.")        
+        components.switch(top_frame, 0, 9, self.ui_state, "samples_to_tensorboard")
+
         # table
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
