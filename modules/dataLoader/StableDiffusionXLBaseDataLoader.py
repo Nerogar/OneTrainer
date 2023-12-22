@@ -177,8 +177,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         )
 
         single_aspect_calculation = SingleAspectCalculation(
-            target_resolution=[int(res.strip()) for res in args.resolution.split(',')],
             resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
             possible_resolutions_out_name='possible_resolutions'
