@@ -427,8 +427,8 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--sample-after", type=float, required=True, dest="sample_after", help="The interval to sample")
         parser.add_argument("--sample-after-unit", type=TimeUnit, required=True, dest="sample_after_unit", help="The unit applied to the sample-after option")
         parser.add_argument("--sample-image-format", type=ImageFormat, required=False, default=ImageFormat.JPG, dest="sample_image_format", help="The file format used when saving samples", choices=list(ImageFormat))
-        parser.add_argument("--samples-to-tensorboard", type=bool, required=False, default=True, dest="samples_to_tensorboard", help="Whether to include sample images in the Tensorboard output.")
-        parser.add_argument("--non-ema-sampling", type=bool, required=false, default=True, dest="non_ema_sampling", help="Whether to include non-ema sampling when using ema.")
+        parser.add_argument("--samples-to-tensorboard", required=False, action='store_true', dest="samples_to_tensorboard", help="Whether to include sample images in the Tensorboard output.")
+        parser.add_argument("--non-ema-sampling", required=False, action='store_true', dest="non_ema_sampling", help="Whether to include non-ema sampling when using ema.")
 
         # backup settings
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
