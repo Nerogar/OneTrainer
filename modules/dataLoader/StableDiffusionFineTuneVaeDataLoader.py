@@ -24,6 +24,7 @@ from mgds.pipelineModules.RandomSaturation import RandomSaturation
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
+from mgds.pipelineModules.ShuffleBatch import ShuffleBatch
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -244,14 +245,16 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             output_names.append('latent_mask')
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names,
-                                           batch_size=args.batch_size)
+        shuffle_batch = ShuffleBatch(names=output_names, batch_size=args.batch_size)
+        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]
 
         if args.aspect_ratio_bucketing:
             modules.append(batch_sorting)
+        else:
+            modules.append(shuffle_batch)
 
         modules.append(output)
 

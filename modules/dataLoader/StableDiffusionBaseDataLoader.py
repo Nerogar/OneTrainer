@@ -38,6 +38,7 @@ from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
+from mgds.pipelineModules.ShuffleBatch import ShuffleBatch
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
@@ -355,6 +356,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions'
         )
         batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size)
+        shuffle_batch = ShuffleBatch(names=output_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]
@@ -367,6 +369,8 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         if args.aspect_ratio_bucketing:
             modules.append(batch_sorting)
+        else:
+            modules.append(shuffle_batch)
 
         modules.append(output)
 
