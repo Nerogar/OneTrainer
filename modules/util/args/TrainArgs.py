@@ -194,6 +194,8 @@ class TrainArgs(BaseArgs):
     sample_after: float
     sample_after_unit: TimeUnit
     sample_image_format: ImageFormat
+    samples_to_tensorboard: bool
+    non_ema_sampling: bool
 
     # backup settings
     backup_after: float
@@ -427,6 +429,8 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--sample-after", type=float, required=True, dest="sample_after", help="The interval to sample")
         parser.add_argument("--sample-after-unit", type=TimeUnit, required=True, dest="sample_after_unit", help="The unit applied to the sample-after option")
         parser.add_argument("--sample-image-format", type=ImageFormat, required=False, default=ImageFormat.JPG, dest="sample_image_format", help="The file format used when saving samples", choices=list(ImageFormat))
+        parser.add_argument("--samples-to-tensorboard", required=False, action='store_true', dest="samples_to_tensorboard", help="Whether to include sample images in the Tensorboard output.")
+        parser.add_argument("--non-ema-sampling", required=False, action='store_true', dest="non_ema_sampling", help="Whether to include non-ema sampling when using ema.")
 
         # backup settings
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
@@ -623,6 +627,8 @@ class TrainArgs(BaseArgs):
         data.append(("sample_after", 10, int, False))
         data.append(("sample_after_unit", TimeUnit.MINUTE, TimeUnit, False))
         data.append(("sample_image_format", ImageFormat.JPG, ImageFormat, False))
+        data.append(("samples_to_tensorboard", True, bool, False))
+        data.append(("non_ema_sampling", True, bool, False))
 
         # backup settings
         data.append(("backup_after", 30, int, False))
