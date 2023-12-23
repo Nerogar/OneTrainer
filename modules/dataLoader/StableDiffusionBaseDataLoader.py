@@ -49,6 +49,7 @@ from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.params.ConceptParams import ConceptParams
 from modules.util.torch_util import torch_gc
 
 
@@ -68,6 +69,8 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         with open(args.concept_file_name, 'r') as f:
             concepts = json.load(f)
+            for i in range(len(concepts)):
+                concepts[i] = ConceptParams.default_values().from_dict(concepts[i]).to_dict()
 
         self.__ds = self.create_dataset(
             args=args,
