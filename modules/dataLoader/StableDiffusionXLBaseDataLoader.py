@@ -37,7 +37,6 @@ from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
-from mgds.pipelineModules.ShuffleBatch import ShuffleBatch
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
@@ -289,7 +288,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         text_split_names = []
 
         sort_names = [
-            'prompt', 'tokens_1', 'tokens_2'
+            'prompt', 'tokens_1', 'tokens_2', 'concept'
         ]
 
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
@@ -315,8 +314,6 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
         image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
-
         modules = []
 
         if args.latent_caching:
@@ -325,6 +322,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             modules.append(image_ram_cache)
 
         if (not args.train_text_encoder or not args.train_text_encoder_2) and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
+            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
             modules.append(text_disk_cache)
             sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -354,14 +352,16 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
 
+        sort_names = output_names + ['concept']
+        output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
             replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions'
         )
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size)
-        shuffle_batch = ShuffleBatch(names=output_names, batch_size=args.batch_size)
+        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]
@@ -372,10 +372,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if args.model_type.has_mask_input():
             modules.append(mask_remove)
 
-        if args.aspect_ratio_bucketing:
-            modules.append(batch_sorting)
-        else:
-            modules.append(shuffle_batch)
+        modules.append(batch_sorting)
 
         modules.append(output)
 

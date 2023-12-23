@@ -33,7 +33,6 @@ from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
-from mgds.pipelineModules.ShuffleBatch import ShuffleBatch
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
@@ -269,7 +268,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         text_split_names = ['tokens', 'text_encoder_hidden_state']
 
         sort_names = text_split_names + [
-            'prompt'
+            'prompt', 'concept'
         ]
 
         image_cache_dir = os.path.join(args.cache_dir, "image")
@@ -314,12 +313,14 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_hidden_state')
 
+        sort_names = output_names + ['concept']
+        output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name=None,
             replace_probability=args.unmasked_probability, vae=None, possible_resolutions_in_name='possible_resolutions'
         )
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=output_names, batch_size=args.batch_size)
-        shuffle_batch = ShuffleBatch(names=output_names, batch_size=args.batch_size)
+        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
 
         modules = []
@@ -327,10 +328,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         if args.model_type.has_mask_input():
             modules.append(mask_remove)
 
-        if args.aspect_ratio_bucketing:
-            modules.append(batch_sorting)
-        else:
-            modules.append(shuffle_batch)
+        modules.append(batch_sorting)
 
         modules.append(output)
 

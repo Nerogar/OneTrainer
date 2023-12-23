@@ -197,6 +197,7 @@ class BaseWuerstchenSetup(
         predicted = data['predicted']
         target = data['target']
         timestep = data['timestep']
+        loss_weight = batch['loss_weight']
         mse_strength = args.mse_strength
         mae_strength = args.mae_strength
         batch_size = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] else args.batch_size
@@ -232,6 +233,6 @@ class BaseWuerstchenSetup(
         k = 1.0
         gamma = 1.0
         alpha_cumprod = self.__alpha_cumprod(target, timestep)
-        loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
+        timestep_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
 
-        return (losses * loss_weight).mean()
+        return (losses * timestep_loss_weight * loss_weight.to(device=losses.device)).mean()

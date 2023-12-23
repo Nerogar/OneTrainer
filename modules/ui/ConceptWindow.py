@@ -106,6 +106,11 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="The number of repeats for this concept during one epoch.")
         components.entry(master, 7, 1, self.ui_state, "repeats")
 
+        # loss weight
+        components.label(master, 8, 0, "Loss Weight",
+                         tooltip="The loss multiplyer for this concept.")
+        components.entry(master, 8, 1, self.ui_state, "loss_weight")
+
     def __image_augmentation_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=0)

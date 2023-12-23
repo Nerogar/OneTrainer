@@ -28,7 +28,7 @@ pooch==1.7.0
 open-clip-torch==2.22.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@c7c793e#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@bccc0f4#egg=mgds
 
 # xformers
 xformers==0.0.22.post7+cu118

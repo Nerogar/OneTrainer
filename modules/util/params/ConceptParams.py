@@ -102,6 +102,7 @@ class ConceptParams(BaseParams):
     image_variations: int
     text_variations: int
     repeats: float
+    loss_weight: float
 
     image: ConceptImageParams
     text: ConceptTextParams
@@ -164,10 +165,11 @@ class ConceptParams(BaseParams):
         args["path"] = ""
         args["seed"] = random.randint(-(1 << 30), 1 << 30)
         args["enabled"] = True
+        args["include_subdirectories"] = False
         args["image_variations"] = 1
         args["text_variations"] = 1
         args["repeats"] = 1.0
-        args["include_subdirectories"] = False
+        args["loss_weight"] = 1.0
 
         concept_params = ConceptParams(args)
         concept_params.image = ConceptImageParams.default_values()
