@@ -28,6 +28,7 @@ class TrainArgs(BaseArgs):
     workspace_dir: str
     cache_dir: str
     tensorboard: bool
+    tensorboard_expose: bool
     continue_last_backup: bool
 
     # model settings
@@ -260,6 +261,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--workspace-dir", type=str, required=True, dest="workspace_dir", help="directory to use as a workspace")
         parser.add_argument("--cache-dir", type=str, required=True, dest="cache_dir", help="The directory used for caching")
         parser.add_argument("--tensorboard", required=False, action='store_true', dest="tensorboard", help="Start a tensorboard interface during training. The web server will run on port 6006")
+        parser.add_argument("--tensorboard-expose", required=False, action='store_true', dest="tensorboard_expose", help="Expose tensorboard on all interfaces (useful if accessing from network / other machines)")
         parser.add_argument("--continue-last-backup", required=False, action='store_true', dest="continue_last_backup", help="Continues training from the last backup in <workspace>/run/backup")
 
         # model settings
@@ -455,6 +457,7 @@ class TrainArgs(BaseArgs):
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
         data.append(("tensorboard", True, bool, False))
+        data.append(("tensorboard_expose", False, bool, False))
         data.append(("continue_last_backup", False, bool, False))
 
         # model settings

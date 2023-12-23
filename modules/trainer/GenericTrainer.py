@@ -67,16 +67,20 @@ class GenericTrainer(BaseTrainer):
         if args.tensorboard:
             tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
 
-            self.tensorboard_subprocess = subprocess.Popen(
-                [
-                    tensorboard_executable,
-                    "--logdir",
-                    tensorboard_log_dir,
-                    "--port",
-                    "6006",
-                    "--samples_per_plugin=images=100"
-                ]
-            )
+            tensorboard_args = [
+                tensorboard_executable,
+                "--logdir",
+                tensorboard_log_dir,
+                "--port",
+                "6006",
+                "--samples_per_plugin=images=100",
+            ]
+
+            if self.args.tensorboard_expose:
+                tensorboard_args.append("--bind_all")
+
+            self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+
         self.one_step_trained = False
 
     def start(self):
