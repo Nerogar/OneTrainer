@@ -1,4 +1,5 @@
-from mgds.GenericDataLoaderModules import *
+import torch
+from mgds.pipelineModules.ReplaceText import ReplaceText
 
 from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
 from modules.model.WuerstchenModel import WuerstchenModel

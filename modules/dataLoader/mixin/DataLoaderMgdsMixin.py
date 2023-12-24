@@ -20,6 +20,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
         settings = {
             "enable_random_circular_mask_shrink": args.circular_mask_generation,
             "enable_random_mask_rotate_crop": args.random_rotate_and_crop,
+            "target_resolution": args.resolution,
         }
 
         ds = MGDS(

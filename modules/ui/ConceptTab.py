@@ -28,7 +28,7 @@ class ConceptTab(ConfigList):
         return ConceptParams.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return ConceptWindow(self.master, self.current_config[i], ui_state)
+        return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
 
 
 class ConceptWidget(ctk.CTkFrame):
@@ -39,6 +39,8 @@ class ConceptWidget(ctk.CTkFrame):
 
         self.concept = concept
         self.ui_state = UIState(self, concept)
+        self.image_ui_state = UIState(self, concept.image)
+        self.text_ui_state = UIState(self, concept.text)
         self.i = i
 
         self.grid_rowconfigure(1, weight=1)
@@ -52,7 +54,7 @@ class ConceptWidget(ctk.CTkFrame):
         image_label.grid(row=0, column=0)
 
         # name
-        self.name_label = components.label(self, 1, 0, self.concept.name, pad=5)
+        self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5)
 
         # close button
         close_button = ctk.CTkButton(
@@ -74,14 +76,39 @@ class ConceptWidget(ctk.CTkFrame):
             text="+",
             corner_radius=2,
             fg_color="#00C000",
-            command=lambda: clone_command(self.i),
+            command=lambda: clone_command(self.i, self.__randomize_seed),
         )
         clone_button.place(x=25, y=0)
 
-        image_label.bind("<Button-1>", lambda event: open_command(self.i, self.ui_state))
+        # enabled switch
+        enabled_switch = ctk.CTkSwitch(
+            master=self,
+            width=40,
+            variable=self.ui_state.vars["enabled"],
+            text="",
+            command=save_command,
+        )
+        enabled_switch.place(x=110, y=0)
+
+        image_label.bind(
+            "<Button-1>",
+            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
+        )
+
+    def __randomize_seed(self, concept: ConceptParams):
+        concept.seed = ConceptParams.default_values().seed
+        return concept
+
+    def __get_display_name(self):
+        if self.concept.name:
+            return self.concept.name
+        elif self.concept.path:
+            return os.path.basename(self.concept.path)
+        else:
+            return ""
 
     def configure_element(self):
-        self.name_label.configure(text=self.concept.name)
+        self.name_label.configure(text=self.__get_display_name())
 
         self.image.configure(light_image=self.__get_preview_image())
 

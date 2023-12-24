@@ -32,6 +32,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             args: TrainArgs,
             train_device: torch.device,
     ) -> Tensor:
+        loss_weight = batch['loss_weight']
         mse_strength = args.mse_strength
         mae_strength = args.mae_strength
         batch_size = 1 if args.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] else args.batch_size
@@ -119,4 +120,5 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             # Scale Losses by Batch and/or GA (if enabled)
             losses = losses * batch_size * gradient_accumulation_steps
 
+        losses *= loss_weight.to(device=losses.device)
         return losses.mean()

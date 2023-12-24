@@ -142,9 +142,12 @@ class ConfigList(metaclass=ABCMeta):
 
         self.__save_current_config()
 
-    def __clone_element(self, clone_i):
+    def __clone_element(self, clone_i, modify_element_fun = None):
         i = len(self.current_config)
         new_element = copy.deepcopy(self.current_config[clone_i])
+
+        if modify_element_fun is not None:
+            new_element = modify_element_fun(new_element)
 
         self.current_config.append(new_element)
         widget = self.create_widget(

@@ -33,19 +33,11 @@ class BaseDataLoader(
         pass
 
     @abstractmethod
-    def setup_cache_device(
+    def _setup_cache_device(
             self,
             model: BaseModel,
             train_device: torch.device,
             temp_device: torch.device,
-            args: TrainArgs,
-    ):
-        pass
-
-    @abstractmethod
-    def needs_setup_cache_device(
-            self,
-            train_progress: TrainProgress,
             args: TrainArgs,
     ):
         pass
