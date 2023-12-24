@@ -66,8 +66,8 @@ images are resized to roughly match the same total pixel count.
 
 Latent caching (as described in the caching section) will speed up the training by saving intermediate data. If this
 setting is enabled, some data will be calculated based on your training images and saved to disc. If you enable data
-augmentation, you should increase the "Latent Caching Epochs", otherwise only a single augmentation version will be
-cached.
+augmentation, you should increase the "Image Variations" setting of that concept, otherwise only a single augmentation
+version will be cached.
 
 ### Adding concepts.
 
