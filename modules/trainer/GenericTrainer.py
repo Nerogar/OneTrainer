@@ -468,9 +468,11 @@ class GenericTrainer(BaseTrainer):
 
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
                 if sample_commands:
-                    self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, train_device, sample_commands)
-                    )
+                    def create_sample_commands_fun(sample_commands):
+                        def sample_commands_fun():
+                            self.__sample_during_training(train_progress, train_device, sample_commands)
+                        return sample_commands_fun
+                    self.__enqueue_sample_during_training(create_sample_commands_fun(sample_commands))
 
                 if self.__needs_gc(train_progress):
                     torch_gc()
