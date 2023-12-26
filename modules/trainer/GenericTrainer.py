@@ -491,15 +491,9 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("training")
 
-                if allow_mixed_precision(self.args):
-                    forward_context = torch.autocast(train_device.type, dtype=self.args.train_dtype.torch_dtype())
-                else:
-                    forward_context = nullcontext()
+                model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
-                with forward_context:
-                    model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
-
-                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
+                loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
 
                 loss = loss / self.args.gradient_accumulation_steps
                 if scaler:

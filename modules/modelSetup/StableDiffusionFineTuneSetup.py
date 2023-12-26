@@ -103,9 +103,17 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
         model.unet_to(self.train_device)
         model.depth_estimator_to(self.temp_device)
 
-        model.text_encoder.train()
-        model.vae.train()
-        model.unet.train()
+        if args.train_text_encoder:
+            model.text_encoder.train()
+        else:
+            model.text_encoder.eval()
+
+        model.vae.eval()
+
+        if args.train_unet:
+            model.unet.train()
+        else:
+            model.unet.eval()
 
     def after_optimizer_step(
             self,

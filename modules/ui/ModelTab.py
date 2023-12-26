@@ -45,6 +45,8 @@ class ModelTab:
             self.__setup_stable_diffusion_xl_ui()
         elif self.train_args.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui()
+        elif self.train_args.model_type.is_pixart_alpha():
+            self.__setup_pixart_alpha_ui()
 
     def __setup_stable_diffusion_ui(self):
         row = 0
@@ -95,6 +97,23 @@ class ModelTab:
             allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=self.train_args.training_method != TrainingMethod.FINE_TUNE,
         )
+
+    def __setup_pixart_alpha_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            has_text_encoder=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_args.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
+            allow_checkpoint=True,
+        )
+
 
     def __create_base_dtype_components(self, row: int) -> int:
         # weight dtype

@@ -10,14 +10,13 @@ from transformers import CLIPTokenizer, CLIPTextModel
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
-from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderSDConfigMixin):
+class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
     def __init__(self):
         super(WuerstchenModelLoader, self).__init__()
 

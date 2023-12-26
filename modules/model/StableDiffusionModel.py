@@ -22,7 +22,7 @@ class StableDiffusionModelEmbedding:
         token_count = text_encoder_vector.shape[0]
 
         self.text_encoder_vector = text_encoder_vector
-        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionModel(BaseModel):

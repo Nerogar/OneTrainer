@@ -21,7 +21,7 @@ class StableDiffusionXLModelEmbedding:
 
         self.text_encoder_1_vector = text_encoder_1_vector
         self.text_encoder_2_vector = text_encoder_2_vector
-        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionXLModel(BaseModel):

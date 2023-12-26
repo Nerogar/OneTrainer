@@ -46,7 +46,7 @@ class WuerstchenModelEmbedding:
         token_count = prior_text_encoder_vector.shape[0]
 
         self.prior_text_encoder_vector = prior_text_encoder_vector
-        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
 
 
 class WuerstchenModel(BaseModel):
