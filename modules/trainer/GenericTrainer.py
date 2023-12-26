@@ -319,12 +319,13 @@ class GenericTrainer(BaseTrainer):
         shutil.copy2(self.args.concept_file_name, concepts_path)
         shutil.copy2(self.args.sample_definition_file_name, samples_path)
 
-    def backup(self):
+    def backup(self, train_progress: TrainProgress):
         torch_gc()
 
         self.callbacks.on_update_status("creating backup")
 
-        backup_path = os.path.join(self.args.workspace_dir, "backup", get_string_timestamp())
+        backup_name = f"{get_string_timestamp()}-step-{train_progress.filename_string()}"
+        backup_path = os.path.join(self.args.workspace_dir, "backup", backup_name)
 
         try:
             print("Creating Backup " + backup_path)
@@ -483,7 +484,7 @@ class GenericTrainer(BaseTrainer):
                     self.__execute_sample_during_training()
 
                 if self.__needs_backup(train_progress) or self.commands.get_and_reset_backup_command():
-                    self.backup()
+                    self.backup(train_progress)
 
                 if self.__needs_save(train_progress):
                     self.save(train_progress)
@@ -563,7 +564,7 @@ class GenericTrainer(BaseTrainer):
     def end(self):
         if self.one_step_trained:
             if self.args.backup_before_save:
-                self.backup()
+                self.backup(self.model.train_progress)
 
             self.callbacks.on_update_status("saving the final model")
 

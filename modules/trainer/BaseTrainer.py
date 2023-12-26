@@ -38,7 +38,7 @@ class BaseTrainer(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def backup(self):
+    def backup(self, train_progress: TrainProgress):
         pass
 
     def create_model_loader(self) -> BaseModelLoader:
