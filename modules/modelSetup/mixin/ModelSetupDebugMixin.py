@@ -31,6 +31,21 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
 
         image.save(path)
 
+    def _save_text(self, text: str, directory: str, name: str, step: int):
+        path = os.path.join(directory, "step-" + str(step) + "-" + name + ".txt")
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        with open(path, "w") as f:
+            f.write(text)
+
+    def _decode_tokens(self, tokens:Tensor, tokenizer):
+        return tokenizer.decode(
+            token_ids=tokens[0],
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True,
+        )
+
     # Decodes 4-channel latent to 3-channel RGB - technique appropriated from 
     # https://huggingface.co/blog/TimothyAlexisVass/explaining-the-sdxl-latent-space
     # Uses linear approximation based on first three channels of latent image (luminance, cyan/red, lime/purple)

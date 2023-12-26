@@ -103,11 +103,11 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         if args.debug_mode:
             with torch.no_grad():
                 # image
-                self.save_image(image, args.debug_dir + "/training_batches", "1-image", train_progress.global_step)
+                self._save_image(image, args.debug_dir + "/training_batches", "1-image", train_progress.global_step)
 
                 # predicted image
                 predicted_image_clamped = predicted_image.clamp(-1, 1)
-                self.save_image(
+                self._save_image(
                     predicted_image_clamped, args.debug_dir + "/training_batches", "2-predicted_image",
                     train_progress.global_step
                 )

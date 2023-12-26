@@ -3,7 +3,6 @@ from abc import ABCMeta
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
-from diffusers.pipelines.wuerstchen.modeling_wuerstchen_common import AttnBlock
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
@@ -12,14 +11,13 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_transformer_blocks, \
-    enable_checkpointing_for_clip_encoder_layers
-from modules.util import loss_util
+from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.enum.AttentionMechanism import AttentionMechanism
-from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.TrainingMethod import TrainingMethod
+
 
 class BaseWuerstchenSetup(
     BaseModelSetup,
@@ -135,25 +133,32 @@ class BaseWuerstchenSetup(
 
         if args.debug_mode:
             with torch.no_grad():
+                self._save_text(
+                    self._decode_tokens(batch['tokens'], model.prior_tokenizer),
+                    args.debug_dir + "/training_batches",
+                    "7-prompt",
+                    train_progress.global_step,
+                )
+
                 # noise
-                self.save_image(
-                    self.project_latent_to_image(latent_noise).clamp(-1, 1),
+                self._save_image(
+                    self._project_latent_to_image(latent_noise).clamp(-1, 1),
                     args.debug_dir + "/training_batches",
                     "1-noise",
                     train_progress.global_step
                 )
 
                 # predicted noise
-                self.save_image(
-                    self.project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
+                self._save_image(
+                    self._project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
                     args.debug_dir + "/training_batches",
                     "2-predicted_noise",
                     train_progress.global_step
                 )
 
                 # noisy image
-                self.save_image(
-                    self.project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
+                self._save_image(
+                    self._project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
                     args.debug_dir + "/training_batches",
                     "3-noisy_image",
                     train_progress.global_step
@@ -170,16 +175,16 @@ class BaseWuerstchenSetup(
                 scaled_predicted_latent_image = \
                     (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
                     / sqrt_alpha_prod
-                self.save_image(
-                    self.project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
+                self._save_image(
+                    self._project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
                     args.debug_dir + "/training_batches",
                     "4-predicted_image",
                     model.train_progress.global_step
                 )
 
                 # image
-                self.save_image(
-                    self.project_latent_to_image(scaled_latent_image).clamp(-1, 1),
+                self._save_image(
+                    self._project_latent_to_image(scaled_latent_image).clamp(-1, 1),
                     args.debug_dir + "/training_batches",
                     "5-image",
                     model.train_progress.global_step

@@ -24,6 +24,7 @@ from mgds.pipelineModules.RandomSaturation import RandomSaturation
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
+from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.VariationSorting import VariationSorting
 
@@ -268,6 +269,28 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return modules
 
+    def __debug_modules(self, args: TrainArgs, model: StableDiffusionModel):
+        debug_dir = os.path.join(args.debug_dir, "dataloader")
+
+        def before_save_fun():
+            model.vae_to(self.train_device)
+
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae)
+        upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
+
+        save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)
+        save_mask = SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun)
+
+        modules = []
+
+        modules.append(decode_image)
+        modules.append(save_image)
+
+        if args.masked_training or args.model_type.has_mask_input():
+            modules.append(upscale_mask)
+            modules.append(save_mask)
+
+        return modules
 
     def create_dataset(
             self,
@@ -286,15 +309,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         cache_modules = self.__cache_modules(args, model)
         output_modules = self.__output_modules(args)
 
-        debug_dir = os.path.join(args.debug_dir, "dataloader")
-        debug_modules = [
-            DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae),
-            SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1,
-                      in_range_max=1),
-            SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0,
-                      in_range_max=1),
-            # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
-        ]
+        debug_modules = self.__debug_modules(args, model)
 
         return self._create_mgds(
             args,
