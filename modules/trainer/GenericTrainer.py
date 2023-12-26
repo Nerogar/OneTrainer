@@ -427,18 +427,6 @@ class GenericTrainer(BaseTrainer):
                 self.data_loader.get_data_set().start_next_epoch()
             return
 
-        lr_scheduler = create.create_lr_scheduler(
-            optimizer=self.model.optimizer,
-            learning_rate_scheduler=self.args.learning_rate_scheduler,
-            warmup_steps=self.args.learning_rate_warmup_steps,
-            num_cycles=self.args.learning_rate_cycles,
-            num_epochs=self.args.epochs,
-            approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
-            batch_size=self.args.batch_size,
-            gradient_accumulation_steps=self.args.gradient_accumulation_steps,
-            global_step=train_progress.global_step
-        )
-
         weight_dtypes = self.args.trainable_weight_dtypes()
         if self.args.train_dtype.enable_loss_scaling(weight_dtypes):
             scaler = GradScaler()
@@ -449,6 +437,7 @@ class GenericTrainer(BaseTrainer):
         # This is used to schedule sampling only when the gradients don't take up any space
         has_gradient = False
 
+        lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
@@ -457,6 +446,19 @@ class GenericTrainer(BaseTrainer):
             self.data_loader.get_data_set().start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.args)
             torch_gc()
+
+            if lr_scheduler is None:
+                lr_scheduler = create.create_lr_scheduler(
+                    optimizer=self.model.optimizer,
+                    learning_rate_scheduler=self.args.learning_rate_scheduler,
+                    warmup_steps=self.args.learning_rate_warmup_steps,
+                    num_cycles=self.args.learning_rate_cycles,
+                    num_epochs=self.args.epochs,
+                    approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
+                    batch_size=self.args.batch_size,
+                    gradient_accumulation_steps=self.args.gradient_accumulation_steps,
+                    global_step=train_progress.global_step
+                )
 
             current_epoch_length = len(self.data_loader.get_data_loader()) + train_progress.epoch_step
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
