@@ -324,7 +324,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("creating backup")
 
-        backup_name = f"{get_string_timestamp()}-step-{train_progress.filename_string()}"
+        backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.args.workspace_dir, "backup", backup_name)
 
         try:
