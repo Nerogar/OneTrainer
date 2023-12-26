@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 #change the environment name for conda to use
 conda_env=ot
