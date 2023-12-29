@@ -159,6 +159,7 @@ class TrainUI(ctk.CTk):
                          tooltip="The directory where debug data is saved")
         components.dir_entry(master, 5, 1, self.ui_state, "debug_dir")
 
+        # tensorboard
         components.label(master, 6, 0, "Tensorboard",
                          tooltip="Starts the Tensorboard Web UI during training")
         components.switch(master, 6, 1, self.ui_state, "tensorboard")
@@ -166,6 +167,15 @@ class TrainUI(ctk.CTk):
         components.label(master, 7, 0, "Expose Tensorboard",
                          tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
         components.switch(master, 7, 1, self.ui_state, "tensorboard_expose")
+
+        # device
+        components.label(master, 8, 0, "Train Device",
+                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
+        components.entry(master, 8, 1, self.ui_state, "train_device")
+
+        components.label(master, 9, 0, "Temp Device",
+                         tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
+        components.entry(master, 9, 1, self.ui_state, "temp_device")
 
     def create_model_tab(self, master):
         return ModelTab(master, self.train_args, self.ui_state)
@@ -234,11 +244,11 @@ class TrainUI(ctk.CTk):
         components.button(top_frame, 0, 5, "manual sample", self.open_sample_ui)
 
         components.label(sub_frame, 0, 0, "Non-EMA Sampling",
-                         tooltip="Whether to include non-ema sampling when using ema.")        
+                         tooltip="Whether to include non-ema sampling when using ema.")
         components.switch(sub_frame, 0, 1, self.ui_state, "non_ema_sampling")
 
         components.label(sub_frame, 0, 2, "Samples to Tensorboard",
-                         tooltip="Whether to include sample images in the Tensorboard output.")        
+                         tooltip="Whether to include sample images in the Tensorboard output.")
         components.switch(sub_frame, 0, 3, self.ui_state, "samples_to_tensorboard")
 
         # table
