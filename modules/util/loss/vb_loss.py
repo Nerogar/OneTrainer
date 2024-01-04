@@ -169,6 +169,8 @@ def __vb_terms_bpd(
 
     # At the first timestep return the decoder NLL,
     # otherwise return KL(q(x_{t-1}|x_t,x_0) || p(x_{t-1}|x_t))
+    while t.dim() < decoder_nll.dim():
+        t = t.unsqueeze(-1)
     output = torch.where((t == 0), decoder_nll, kl)
     return output
 
@@ -180,7 +182,7 @@ def __extract_into_tensor(
 ) -> Tensor:
     res = tensor[timesteps]
     while len(res.shape) < len(broadcast_shape):
-        res = res.unsqueeze(0)
+        res = res.unsqueeze(-1)
     return res
 
 

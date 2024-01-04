@@ -97,7 +97,12 @@ class BasePixArtAlphaSetup(
             attention_mask = attention_mask.to(model.text_encoder.device)
 
         with model.text_encoder_autocast_context:
-            text_encoder_output = model.text_encoder(tokens, attention_mask=attention_mask)
+            text_encoder_output = model.text_encoder(
+                tokens,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
             text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]
             final_layer_norm = model.text_encoder.encoder.final_layer_norm
             prompt_embeds = final_layer_norm(

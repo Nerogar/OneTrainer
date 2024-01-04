@@ -254,7 +254,7 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_context=model.vae_autocast_context)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=120)
-        encode_prompt = EncodeT5Text(in_name='tokens', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1+args.text_encoder_layer_skip), autocast_context=model.text_encoder_autocast_context)
+        encode_prompt = EncodeT5Text(tokens_in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1+args.text_encoder_layer_skip), autocast_context=model.text_encoder_autocast_context)
 
         modules = [rescale_image, encode_image, tokenize_prompt]
 

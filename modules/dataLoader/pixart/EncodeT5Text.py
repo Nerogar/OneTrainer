@@ -12,7 +12,8 @@ class EncodeT5Text(
 ):
     def __init__(
             self,
-            in_name: str,
+            tokens_in_name: str,
+            tokens_attention_mask_in_name: str,
             hidden_state_out_name: str,
             pooled_out_name: str | None,
             text_encoder: T5EncoderModel,
@@ -21,7 +22,8 @@ class EncodeT5Text(
             autocast_context: torch.autocast | None = None,
     ):
         super(EncodeT5Text, self).__init__()
-        self.in_name = in_name
+        self.tokens_in_name = tokens_in_name
+        self.tokens_attention_mask_in_name = tokens_attention_mask_in_name
         self.hidden_state_out_name = hidden_state_out_name
         self.pooled_out_name = pooled_out_name
         self.text_encoder = text_encoder
@@ -32,10 +34,10 @@ class EncodeT5Text(
         self.autocast_enabled = isinstance(self.autocast_context, torch.autocast)
 
     def length(self) -> int:
-        return self._get_previous_length(self.in_name)
+        return self._get_previous_length(self.tokens_in_name)
 
     def get_inputs(self) -> list[str]:
-        return [self.in_name]
+        return [self.tokens_in_name, self.tokens_attention_mask_in_name]
 
     def get_outputs(self) -> list[str]:
         if self.pooled_out_name:
@@ -44,12 +46,19 @@ class EncodeT5Text(
             return [self.hidden_state_out_name]
 
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
-        tokens = self._get_previous_item(variation, self.in_name, index)
+        tokens = self._get_previous_item(variation, self.tokens_in_name, index)
+        tokens_attention_mask = self._get_previous_item(variation, self.tokens_attention_mask_in_name, index)
 
         tokens = tokens.unsqueeze(0)
+        tokens_attention_mask = tokens_attention_mask.unsqueeze(0)
 
         with self.autocast_context:
-            text_encoder_output = self.text_encoder(tokens, output_hidden_states=True, return_dict=True)
+            text_encoder_output = self.text_encoder(
+                tokens,
+                attention_mask=tokens_attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
 
         hidden_states = text_encoder_output.hidden_states[:-1]
         if self.pooled_out_name:
