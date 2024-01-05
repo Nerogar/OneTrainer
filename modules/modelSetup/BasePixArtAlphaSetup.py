@@ -349,6 +349,13 @@ class BasePixArtAlphaSetup(
 
             if self.debug_mode:
                 with torch.no_grad():
+                    self._save_text(
+                        self._decode_tokens(batch['tokens'], model.tokenizer),
+                        args.debug_dir + "/training_batches",
+                        "7-prompt",
+                        train_progress.global_step,
+                    )
+
                     if is_align_prop_step:
                         # noise
                         noise = model.vae.decode(latent_noise / vae_scaling_factor).sample
