@@ -573,6 +573,11 @@ def create_optimizer(
         case Optimizer.ADAFACTOR:
             from transformers.optimization import Adafactor
 
+            if args.optimizer_relative_step:
+                for parameter in parameters:
+                    if isinstance(parameter, dict) and 'lr' in parameter:
+                        parameter.pop('lr')
+
             optimizer = Adafactor(
                 params=parameters,
                 lr=None if args.optimizer_relative_step == True else args.learning_rate,
@@ -678,7 +683,7 @@ def create_lr_scheduler(
             from transformers.optimization import AdafactorSchedule
             return AdafactorSchedule(
                 optimizer,
-                initial_lr=optimizer.state_dict()['param_groups'][0]['lr'],
+                initial_lr=optimizer.state_dict()['param_groups'][0]['initial_lr'],
             )
         case _:
             lr_lambda = lr_lambda_constant()
