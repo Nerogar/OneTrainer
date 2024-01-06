@@ -24,7 +24,13 @@ class PixArtAlphaModelSaver(BaseModelSaver):
         pipeline = model.create_pipeline()
         original_device = pipeline.device
         pipeline.to("cpu")
+
+        # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
+        # the tokenizer tries to reload from the file system otherwise
+        tokenizer = pipeline.tokenizer
+        tokenizer.__deepcopy__ = lambda memo: tokenizer
         pipeline_copy = copy.deepcopy(pipeline)
+        delattr(tokenizer, '__deepcopy__')
         pipeline.to(original_device)
 
         pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
