@@ -5,7 +5,7 @@ import transformers
 from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
     DPMSolverMultistepScheduler, UniPCMultistepScheduler, SchedulerMixin
 from torch.nn import Parameter
-from torch.optim.lr_scheduler import LambdaLR, LRScheduler
+from torch.optim.lr_scheduler import LambdaLR, LRScheduler, CosineAnnealingLR
 
 from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
@@ -685,6 +685,8 @@ def create_lr_scheduler(
                 optimizer,
                 initial_lr=optimizer.state_dict()['param_groups'][0]['initial_lr'],
             )
+        case LearningRateScheduler.COSINE_ANNEALING:
+            return CosineAnnealingLR(optimizer, scheduler_steps)
         case _:
             lr_lambda = lr_lambda_constant()
 
