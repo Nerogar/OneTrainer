@@ -8,9 +8,9 @@ huggingface-hub==0.19.4
 scipy==1.11.3; sys_platform != 'win32'
 
 # pytorch
---extra-index-url https://download.pytorch.org/whl/cu118
-torch==2.1.0+cu118
-torchvision==0.16.0+cu118
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.1.2+cu121
+torchvision==0.16.2+cu121
 accelerate==0.21.0
 safetensors==0.3.1
 tensorboard==2.14.1
@@ -31,7 +31,7 @@ open-clip-torch==2.22.0
 -e git+https://github.com/Nerogar/mgds.git@2f8ead3#egg=mgds
 
 # xformers
-xformers==0.0.22.post7+cu118
+xformers==0.0.23.post1
 
 # optimizers
 --extra-index-url=https://jllllll.github.io/bitsandbytes-windows-webui --prefer-binary
