@@ -5,7 +5,6 @@ from typing import Callable
 
 import torch
 from PIL.Image import Image
-from diffusers import DPMSolverMultistepScheduler
 from tqdm import tqdm
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
@@ -93,7 +92,7 @@ class PixArtAlphaSampler(BaseModelSampler):
                     return_dict=True,
                     output_hidden_states=True,
                 )
-                text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1] # remove normalized output
+                text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]  # remove normalized output
                 final_layer_norm = text_encoder.encoder.final_layer_norm
                 prompt_embedding = final_layer_norm(
                     text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
@@ -147,8 +146,10 @@ class PixArtAlphaSampler(BaseModelSampler):
             width = latent_image.shape[3] * 8
             resolution = torch.tensor([height, width]).repeat(batch_size, 1)
             aspect_ratio = torch.tensor([float(height / width)]).repeat(batch_size, 1)
-            resolution = resolution.to(dtype=transformer.dtype, device=self.train_device)
-            aspect_ratio = aspect_ratio.to(dtype=transformer.dtype, device=self.train_device)
+            resolution = resolution \
+                .to(dtype=self.model.transformer_train_dtype.torch_dtype(), device=self.train_device)
+            aspect_ratio = aspect_ratio \
+                .to(dtype=self.model.transformer_train_dtype.torch_dtype(), device=self.train_device)
             added_cond_kwargs = {"resolution": resolution, "aspect_ratio": aspect_ratio}
 
             # denoising loop
@@ -159,13 +160,12 @@ class PixArtAlphaSampler(BaseModelSampler):
 
                 # predict the noise residual
                 with self.model.transformer_autocast_context:
-                    if torch.is_autocast_enabled():
-                        combined_prompt_attention_mask.to(dtype=torch.get_autocast_gpu_dtype())
-
                     noise_pred = transformer(
-                        latent_model_input.to(dtype=transformer.dtype),
-                        encoder_hidden_states=combined_prompt_embedding.to(dtype=transformer.dtype),
-                        encoder_attention_mask=combined_prompt_attention_mask.to(dtype=transformer.dtype),
+                        latent_model_input.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
+                        encoder_hidden_states=combined_prompt_embedding.to(
+                            dtype=self.model.transformer_train_dtype.torch_dtype()),
+                        encoder_attention_mask=combined_prompt_attention_mask.to(
+                            dtype=self.model.transformer_train_dtype.torch_dtype()),
                         timestep=timestep.unsqueeze(0),
                         added_cond_kwargs=added_cond_kwargs,
                     ).sample

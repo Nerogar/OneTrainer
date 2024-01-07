@@ -17,7 +17,7 @@ def get_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
-):
+) -> torch.autocast | nullcontext:
     weight_dtypes = list(weight_dtypes)
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
     weight_dtypes = list(set(weight_dtypes))
@@ -30,3 +30,10 @@ def get_autocast_context(
         return torch.autocast(device_type=device.type, enabled=False)
     else:
         return torch.autocast(device_type=device.type, dtype=train_dtype.torch_dtype())
+
+def get_autocast_dtype(
+        train_dtypes: list[DataType | None],
+) -> DataType:
+    for dtype in reversed(train_dtypes):
+        if dtype is not None and dtype != DataType.NONE:
+            return dtype

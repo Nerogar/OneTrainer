@@ -2,7 +2,6 @@ from abc import ABCMeta
 from random import Random
 
 import torch
-from diffusers.models import attention
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
 from diffusers.utils import is_xformers_available
 from torch import Tensor
@@ -14,7 +13,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import get_autocast_context
+from modules.util.dtype_util import get_autocast_context, get_autocast_dtype
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -35,34 +34,34 @@ class BasePixArtAlphaSetup(
             model: PixArtAlphaModel,
             args: TrainArgs,
     ):
-        # if args.attention_mechanism == AttentionMechanism.DEFAULT:
-        #     for name, child_module in model.transformer.named_modules():
-        #         if isinstance(child_module, Attention):
-        #             child_module.set_processor(AttnProcessor())
-        # elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-        #     try:
-        #         for name, child_module in model.transformer.named_modules():
-        #             if isinstance(child_module, Attention):
-        #                 child_module.set_processor(XFormersAttnProcessor())
-        #         model.vae.enable_xformers_memory_efficient_attention()
-        #     except Exception as e:
-        #         print(
-        #             "Could not enable memory efficient attention. Make sure xformers is installed"
-        #             f" correctly and a GPU is available: {e}"
-        #         )
-        # elif args.attention_mechanism == AttentionMechanism.SDP:
-        #     for name, child_module in model.transformer.named_modules():
-        #         if isinstance(child_module, Attention):
-        #             child_module.set_processor(AttnProcessor2_0())
-        #
-        #     if is_xformers_available():
-        #         try:
-        #             model.vae.enable_xformers_memory_efficient_attention()
-        #         except Exception as e:
-        #             print(
-        #                 "Could not enable memory efficient attention. Make sure xformers is installed"
-        #                 f" correctly and a GPU is available: {e}"
-        #             )
+        if args.attention_mechanism == AttentionMechanism.DEFAULT:
+            for name, child_module in model.transformer.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor())
+        elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
+            try:
+                for name, child_module in model.transformer.named_modules():
+                    if isinstance(child_module, Attention):
+                        child_module.set_processor(XFormersAttnProcessor())
+                model.vae.enable_xformers_memory_efficient_attention()
+            except Exception as e:
+                print(
+                    "Could not enable memory efficient attention. Make sure xformers is installed"
+                    f" correctly and a GPU is available: {e}"
+                )
+        elif args.attention_mechanism == AttentionMechanism.SDP:
+            for name, child_module in model.transformer.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor2_0())
+
+            if is_xformers_available():
+                try:
+                    model.vae.enable_xformers_memory_efficient_attention()
+                except Exception as e:
+                    print(
+                        "Could not enable memory efficient attention. Make sure xformers is installed"
+                        f" correctly and a GPU is available: {e}"
+                    )
 
 
         if args.gradient_checkpointing:
@@ -74,6 +73,10 @@ class BasePixArtAlphaSetup(
         model.text_encoder_autocast_context = self.__create_text_encoder_autocast_context(args)
         model.transformer_autocast_context = self.__create_transformer_autocast_context(args)
         model.vae_autocast_context = self.__create_vae_autocast_context(args)
+
+        model.text_encoder_train_dtype = get_autocast_dtype([args.train_dtype, args.text_encoder_train_dtype])
+        model.transformer_train_dtype = get_autocast_dtype([args.train_dtype, args.prior_train_dtype])
+        model.vae_train_dtype = get_autocast_dtype([args.train_dtype])
 
     def __encode_text(
             self,
@@ -322,17 +325,17 @@ class BasePixArtAlphaSetup(
                 width = latent_input.shape[3] * 8
                 resolution = torch.tensor([height, width]).repeat(batch_size, 1)
                 aspect_ratio = torch.tensor([float(height / width)]).repeat(batch_size, 1)
-                resolution = resolution.to(dtype=model.transformer.dtype, device=self.train_device)
-                aspect_ratio = aspect_ratio.to(dtype=model.transformer.dtype, device=self.train_device)
+                resolution = resolution.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                aspect_ratio = aspect_ratio.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
                 added_cond_kwargs = {"resolution": resolution, "aspect_ratio": aspect_ratio}
 
                 text_encoder_attention_mask = text_encoder_attention_mask.view(batch_size, -1)
 
                 with model.transformer_autocast_context:
                     predicted_latent_noise, predicted_latent_var_values = model.transformer(
-                        latent_input.to(dtype=model.transformer.dtype),
-                        encoder_hidden_states=text_encoder_output.to(dtype=model.transformer.dtype),
-                        encoder_attention_mask=text_encoder_attention_mask,
+                        latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_hidden_states=text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_attention_mask=text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
                         timestep=timestep,
                         added_cond_kwargs=added_cond_kwargs,
                     ).sample.chunk(2, dim=1)

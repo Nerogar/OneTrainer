@@ -47,7 +47,6 @@ from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import get_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.params.ConceptParams import ConceptParams
 from modules.util.torch_util import torch_gc
@@ -85,22 +84,6 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
 
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
-
-    def _setup_cache_device(
-            self,
-            model: PixArtAlphaModel,
-            train_device: torch.device,
-            temp_device: torch.device,
-            args: TrainArgs,
-    ):
-        model.to(self.temp_device)
-
-        model.vae_to(train_device)
-        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            model.text_encoder_to(train_device)
-
-        model.eval()
-        torch_gc()
 
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -291,13 +274,22 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
 
-        def before_cache_fun():
-            self._setup_cache_device(model, self.train_device, self.temp_device, args)
+        def before_cache_image_fun():
+            model.to(self.temp_device)
+            model.vae_to(self.train_device)
+            model.eval()
+            torch_gc()
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
-        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+        def before_cache_text_fun():
+            model.to(self.temp_device)
+            model.text_encoder_to(self.train_device)
+            model.eval()
+            torch_gc()
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
         modules = []
 
