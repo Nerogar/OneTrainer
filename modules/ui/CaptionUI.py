@@ -82,6 +82,7 @@ Mouse wheel: increase or decrease brush size"""
         self.image = None
         self.image_label = None
         self.enable_mask_editing_var = ctk.BooleanVar()
+        self.enable_mask_editing_alpha_var = None
         self.prompt_var = None
         self.prompt_component = None
         self.content_column(self.bottom_frame)
@@ -135,15 +136,23 @@ Mouse wheel: increase or decrease brush size"""
         right_frame = ctk.CTkFrame(master, fg_color="transparent")
         right_frame.grid(row=0, column=1, sticky="nsew")
 
-        right_frame.grid_columnconfigure(0, weight=1)
-        right_frame.grid_rowconfigure(0, weight=1)
+        right_frame.grid_columnconfigure(2, weight=1)
+        right_frame.grid_rowconfigure(1, weight=1)
 
         # checkbox to enable mask editing
         self.enable_mask_editing_var = ctk.BooleanVar()
         self.enable_mask_editing_var.set(False)
         enable_mask_editing_checkbox = ctk.CTkCheckBox(
             right_frame, text="Enable Mask Editing", variable=self.enable_mask_editing_var, width=50)
-        enable_mask_editing_checkbox.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
+        enable_mask_editing_checkbox.grid(row=0, column=0, padx=25, pady=5, sticky="w")
+
+        self.enable_mask_editing_alpha_var = ctk.CTkEntry(master=right_frame, width=35, placeholder_text="1.0")
+        self.enable_mask_editing_alpha_var.insert(0, "1.0")
+        self.enable_mask_editing_alpha_var.grid(row=0, column=1, sticky="e", padx=5, pady=5)
+
+        enable_mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="Brush Alpha", width=75)
+        enable_mask_editing_alpha_label.grid(row=0, column=2, padx=0, pady=5, sticky="w")
+
 
         # image
         self.image = ctk.CTkImage(
@@ -153,7 +162,7 @@ Mouse wheel: increase or decrease brush size"""
         self.image_label = ctk.CTkLabel(
             master=right_frame, text="", image=self.image, height=self.image_size, width=self.image_size
         )
-        self.image_label.grid(row=1, column=0, sticky="nsew")
+        self.image_label.grid(row=1, column=0, columnspan=3, sticky="nsew")
 
         self.image_label.bind("<Motion>", self.draw_mask)
         self.image_label.bind("<Button-1>", self.draw_mask)
@@ -163,7 +172,7 @@ Mouse wheel: increase or decrease brush size"""
         # prompt
         self.prompt_var = ctk.StringVar()
         self.prompt_component = ctk.CTkEntry(right_frame, textvariable=self.prompt_var)
-        self.prompt_component.grid(row=2, column=0, pady=5, sticky="new")
+        self.prompt_component.grid(row=2, column=0, columnspan=3, pady=5, sticky="new")
         self.prompt_component.bind("<Down>", self.next_image)
         self.prompt_component.bind("<Up>", self.previous_image)
         self.prompt_component.bind("<Return>", self.save)
@@ -275,9 +284,10 @@ Mouse wheel: increase or decrease brush size"""
             if self.display_only_mask:
                 self.image.configure(light_image=resized_pil_mask, size=resized_pil_mask.size)
             else:
+                norm_min = 0.2
                 np_image = np.array(self.pil_image).astype(np.float32) / 255.0
                 np_mask = np.array(resized_pil_mask).astype(np.float32) / 255.0
-                np_mask = np.clip(np_mask, 0.4, 1.0)
+                np_mask = (np_mask - np_mask.min())/(1.0 - np_mask.min()) * (1.0 - norm_min) + norm_min # normalize mask display between normalize_min and 1.0
                 np_masked_image = (np_image * np_mask * 255.0).astype(np.uint8)
                 masked_image = Image.fromarray(np_masked_image, mode='RGB')
 
@@ -318,7 +328,9 @@ Mouse wheel: increase or decrease brush size"""
         color = None
 
         if event.state & 0x0100 or event.num == 1:  # left mouse button
-            color = (255, 255, 255)
+            alpha = float(self.enable_mask_editing_alpha_var.get())
+            rgb_value = int(max(0, min(alpha, 1)) * 255)
+            color = (rgb_value, rgb_value, rgb_value)
         elif event.state & 0x0400 or event.num == 3:  # right mouse button
             color = (0, 0, 0)
 
