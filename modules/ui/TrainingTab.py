@@ -83,7 +83,8 @@ class TrainingTab:
         self.__create_base_frame(column_0, 0)
         self.__create_base2_frame(column_1, 0)
         self.__create_prior_frame(column_2, 0)
-        self.__create_text_encoder_frame(column_2, 1)
+        self.__create_text_encoder_frame(column_1, 1)
+        self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
     def __setup_pixart_alpha_ui(self, column_0, column_1, column_2):
@@ -188,10 +189,18 @@ class TrainingTab:
             ("tfloat32", DataType.TFLOAT_32),
         ], self.ui_state, "train_dtype")
 
+        # train dtype
+        components.label(frame, 6, 0, "Fallback Train Data Type",
+                         tooltip="The mixed precision data type used for training stages that don't support float16 data types. This can increase training speed, but reduces precision")
+        components.options_kv(frame, 6, 1, [
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+        ], self.ui_state, "fallback_train_dtype")
+
         # resolution
-        components.label(frame, 6, 0, "Resolution",
+        components.label(frame, 7, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma.")
-        components.entry(frame, 6, 1, self.ui_state, "resolution")
+        components.entry(frame, 7, 1, self.ui_state, "resolution")
 
     def __create_align_prop_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -256,17 +265,6 @@ class TrainingTab:
                          tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
 
-        # text encoder train data type
-        components.label(frame, 4, 0, "Text Encoder Train Data Type",
-                         tooltip="The mixed precision data type used for training the text encoder. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("", None),
-            ("float32", DataType.FLOAT_32),
-            ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("tfloat32", DataType.TFLOAT_32),
-        ], self.ui_state, "text_encoder_train_dtype")
-
     def __create_text_encoder_1_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -290,17 +288,6 @@ class TrainingTab:
         components.label(frame, 3, 0, "Clip Skip 1",
                          tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
-
-        # text encoder train data type
-        components.label(frame, 4, 0, "Text Encoder 1 Train Data Type",
-                         tooltip="The mixed precision data type used for training the text encoder 1. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("", None),
-            ("float32", DataType.FLOAT_32),
-            ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("tfloat32", DataType.TFLOAT_32),
-        ], self.ui_state, "text_encoder_train_dtype")
 
 
     def __create_text_encoder_2_frame(self, master, row):
@@ -326,17 +313,6 @@ class TrainingTab:
         components.label(frame, 3, 0, "Clip Skip 2",
                          tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_2_layer_skip")
-
-        # text encoder train data type
-        components.label(frame, 4, 0, "Text Encoder 2 Train Data Type",
-                         tooltip="The mixed precision data type used for training the text encoder 2. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("", None),
-            ("float32", DataType.FLOAT_32),
-            ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("tfloat32", DataType.TFLOAT_32),
-        ], self.ui_state, "text_encoder_2_train_dtype")
 
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -377,17 +353,6 @@ class TrainingTab:
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(frame, 6, 1, self.ui_state, "max_noising_strength")
 
-        # unet train data type
-        components.label(frame, 7, 0, "Unet Train Data Type",
-                         tooltip="The mixed precision data type used for training the unet. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 7, 1, [
-            ("", None),
-            ("float32", DataType.FLOAT_32),
-            ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("tfloat32", DataType.TFLOAT_32),
-        ], self.ui_state, "unet_train_dtype")
-
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -421,17 +386,6 @@ class TrainingTab:
         components.label(frame, 6, 0, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(frame, 6, 1, self.ui_state, "max_noising_strength")
-
-        # prior train data type
-        components.label(frame, 7, 0, "Prior Train Data Type",
-                         tooltip="The mixed precision data type used for training the prior. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 7, 1, [
-            ("", None),
-            ("float32", DataType.FLOAT_32),
-            ("float16", DataType.FLOAT_16),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("tfloat32", DataType.TFLOAT_32),
-        ], self.ui_state, "prior_train_dtype")
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

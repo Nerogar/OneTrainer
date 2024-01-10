@@ -85,25 +85,6 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
 
-    def _setup_cache_device(
-            self,
-            model: StableDiffusionXLModel,
-            train_device: torch.device,
-            temp_device: torch.device,
-            args: TrainArgs,
-    ):
-        model.to(self.temp_device)
-
-        model.vae_to(train_device)
-        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            model.text_encoder_1_to(train_device)
-
-        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
-            model.text_encoder_2_to(train_device)
-
-        model.eval()
-        torch_gc()
-
     def _enumerate_input_modules(self, args: TrainArgs) -> list:
         supported_extensions = path_util.supported_image_extensions()
 
@@ -248,13 +229,13 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
     def _preparation_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_context=model.vae_autocast_context)
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, override_allow_mixed_precision=False)
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_context=model.vae_autocast_context)
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
-        encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, add_layer_norm=False, text_encoder=model.text_encoder_1, hidden_state_output_index=-(2+args.text_encoder_layer_skip))
-        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_2, hidden_state_output_index=-(2+args.text_encoder_2_layer_skip))
+        encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, add_layer_norm=False, text_encoder=model.text_encoder_1, hidden_state_output_index=-(2+args.text_encoder_layer_skip), autocast_context=model.autocast_context)
+        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_2, hidden_state_output_index=-(2+args.text_encoder_2_layer_skip), autocast_context=model.autocast_context)
 
         modules = [
             rescale_image, encode_image,
@@ -311,11 +292,26 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
 
-        def before_cache_fun():
-            self._setup_cache_device(model, self.train_device, self.temp_device, args)
+        def before_cache_image_fun():
+            model.to(self.temp_device)
+            model.vae_to(self.train_device)
+            model.eval()
+            torch_gc()
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
-        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+        def before_cache_text_fun():
+            model.to(self.temp_device)
+
+            if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
+                model.text_encoder_1_to(self.train_device)
+
+            if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
+                model.text_encoder_2_to(self.train_device)
+
+            model.eval()
+            torch_gc()
+
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
         modules = []
 
@@ -325,7 +321,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             modules.append(image_ram_cache)
 
         if (not args.train_text_encoder or not args.train_text_encoder_2) and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
-            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
             modules.append(text_disk_cache)
             sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -358,11 +354,18 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
 
+        def before_cache_image_fun():
+            model.to(self.temp_device)
+            model.vae_to(self.train_device)
+            model.eval()
+            torch_gc()
+
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
-            replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions'
+            replace_probability=args.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions',
+            autocast_context=model.autocast_context, before_cache_fun=before_cache_image_fun,
         )
         batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=args.batch_size)
         output = OutputPipelineModule(names=output_names)
@@ -387,8 +390,8 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         def before_save_fun():
             model.vae_to(self.train_device)
 
-        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, override_allow_mixed_precision=False)
-        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, override_allow_mixed_precision=False)
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_context=model.vae_autocast_context)
+        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_context=model.vae_autocast_context)
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
         decode_prompt = DecodeTokens(in_name='tokens_1', out_name='decoded_prompt', tokenizer=model.tokenizer_1)
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)

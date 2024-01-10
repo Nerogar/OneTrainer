@@ -86,7 +86,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             ).mean([1, 2, 3]) * args.mae_strength
 
         # VB loss
-        if args.vb_loss_strength != 0 and 'predicted_var_values' in data:
+        if args.vb_loss_strength != 0 and 'predicted_var_values' in data and self.coefficients is not None:
             losses += masked_losses(
                 losses=vb_losses(
                     coefficients=self.coefficients,
@@ -151,7 +151,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             data: dict,
             args: TrainArgs,
             train_device: torch.device,
-            betas: Tensor,
+            betas: Tensor | None,
     ) -> Tensor:
         loss_weight = batch['loss_weight']
         batch_size_scale = \
@@ -161,7 +161,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             1 if args.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
                 else args.gradient_accumulation_steps
 
-        if self.coefficients is None:
+        if self.coefficients is None and betas is not None:
             self.coefficients = DiffusionScheduleCoefficients.from_betas(betas)
 
         if data['loss_type'] == 'align_prop':
@@ -178,4 +178,4 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses = losses * batch_size_scale * gradient_accumulation_steps_scale
 
         losses *= loss_weight.to(device=losses.device)
-        return losses.mean()
+        return losses

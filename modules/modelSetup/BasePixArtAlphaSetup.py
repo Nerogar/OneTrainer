@@ -13,7 +13,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import get_autocast_context, get_autocast_dtype
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -69,14 +69,25 @@ class BasePixArtAlphaSetup(
             model.transformer.enable_gradient_checkpointing()
             # enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
 
-        model.autocast_context = self.__create_autocast_context(args)
-        model.text_encoder_autocast_context = self.__create_text_encoder_autocast_context(args)
-        model.transformer_autocast_context = self.__create_transformer_autocast_context(args)
-        model.vae_autocast_context = self.__create_vae_autocast_context(args)
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
+            args.prior_weight_dtype,
+            args.text_encoder_weight_dtype,
+            args.vae_weight_dtype,
+            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+            args.embedding_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+        ])
 
-        model.text_encoder_train_dtype = get_autocast_dtype([args.train_dtype, args.text_encoder_train_dtype])
-        model.transformer_train_dtype = get_autocast_dtype([args.train_dtype, args.prior_train_dtype])
-        model.vae_train_dtype = get_autocast_dtype([args.train_dtype])
+        model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(
+            self.train_device,
+            args.train_dtype,
+            args.fallback_train_dtype,
+            [
+                args.text_encoder_weight_dtype,
+                args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+                args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
+            ],
+        )
+
 
     def __encode_text(
             self,
@@ -113,46 +124,6 @@ class BasePixArtAlphaSetup(
             )
 
         return prompt_embeds, attention_mask
-
-    def __create_autocast_context(
-            self,
-            args: TrainArgs,
-    ):
-        return get_autocast_context(self.train_device, args.train_dtype, [
-            args.prior_weight_dtype,
-            args.text_encoder_weight_dtype,
-            args.vae_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-        ])
-
-    def __create_text_encoder_autocast_context(
-            self,
-            args: TrainArgs,
-    ):
-        return get_autocast_context(self.train_device, args.text_encoder_train_dtype, [
-            args.text_encoder_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
-        ])
-
-    def __create_transformer_autocast_context(
-            self,
-            args: TrainArgs,
-    ):
-        return get_autocast_context(self.train_device, None, [
-            args.prior_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-        ])
-
-    def __create_vae_autocast_context(
-            self,
-            args: TrainArgs,
-    ):
-        return get_autocast_context(self.train_device, None, [
-            args.vae_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-        ])
 
     def predict(
             self,
@@ -331,14 +302,13 @@ class BasePixArtAlphaSetup(
 
                 text_encoder_attention_mask = text_encoder_attention_mask.view(batch_size, -1)
 
-                with model.transformer_autocast_context:
-                    predicted_latent_noise, predicted_latent_var_values = model.transformer(
-                        latent_input.to(dtype=args.train_dtype.torch_dtype()),
-                        encoder_hidden_states=text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
-                        encoder_attention_mask=text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
-                        timestep=timestep,
-                        added_cond_kwargs=added_cond_kwargs,
-                    ).sample.chunk(2, dim=1)
+                predicted_latent_noise, predicted_latent_var_values = model.transformer(
+                    latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                    encoder_hidden_states=text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                    encoder_attention_mask=text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
+                    timestep=timestep,
+                    added_cond_kwargs=added_cond_kwargs,
+                ).sample.chunk(2, dim=1)
 
                 model_output_data = {
                     'loss_type': 'target',
@@ -469,4 +439,4 @@ class BasePixArtAlphaSetup(
             args=args,
             train_device=self.train_device,
             betas=model.noise_scheduler.betas.to(device=self.train_device),
-        )
+        ).mean()

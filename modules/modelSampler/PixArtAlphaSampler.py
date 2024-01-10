@@ -147,9 +147,9 @@ class PixArtAlphaSampler(BaseModelSampler):
             resolution = torch.tensor([height, width]).repeat(batch_size, 1)
             aspect_ratio = torch.tensor([float(height / width)]).repeat(batch_size, 1)
             resolution = resolution \
-                .to(dtype=self.model.transformer_train_dtype.torch_dtype(), device=self.train_device)
+                .to(dtype=self.model.train_dtype.torch_dtype(), device=self.train_device)
             aspect_ratio = aspect_ratio \
-                .to(dtype=self.model.transformer_train_dtype.torch_dtype(), device=self.train_device)
+                .to(dtype=self.model.train_dtype.torch_dtype(), device=self.train_device)
             added_cond_kwargs = {"resolution": resolution, "aspect_ratio": aspect_ratio}
 
             # denoising loop
@@ -159,19 +159,18 @@ class PixArtAlphaSampler(BaseModelSampler):
                 latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
                 # predict the noise residual
-                with self.model.transformer_autocast_context:
-                    noise_pred = transformer(
-                        latent_model_input.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        encoder_hidden_states=combined_prompt_embedding.to(
-                            dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        encoder_attention_mask=combined_prompt_attention_mask.to(
-                            dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        timestep=timestep.unsqueeze(0),
-                        added_cond_kwargs=added_cond_kwargs,
-                    ).sample
+                noise_pred = transformer(
+                    latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
+                    encoder_hidden_states=combined_prompt_embedding.to(
+                        dtype=self.model.train_dtype.torch_dtype()),
+                    encoder_attention_mask=combined_prompt_attention_mask.to(
+                        dtype=self.model.train_dtype.torch_dtype()),
+                    timestep=timestep.unsqueeze(0),
+                    added_cond_kwargs=added_cond_kwargs,
+                ).sample
 
-                    # extract mean
-                    noise_pred = noise_pred.chunk(2, dim=1)[0]
+                # extract mean
+                noise_pred = noise_pred.chunk(2, dim=1)[0]
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -200,8 +199,7 @@ class PixArtAlphaSampler(BaseModelSampler):
             self.model.vae_to(self.train_device)
 
             latent_image = latent_image.to(dtype=vae.dtype)
-            with self.model.vae_autocast_context:
-                image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
+            image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)

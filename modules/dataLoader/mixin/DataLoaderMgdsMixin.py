@@ -5,7 +5,6 @@ from mgds.MGDS import MGDS
 
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import allow_mixed_precision
 
 
 class DataLoaderMgdsMixin(metaclass=ABCMeta):
@@ -25,8 +24,6 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
 
         ds = MGDS(
             torch.device(args.train_device),
-            args.train_dtype.torch_dtype(),
-            allow_mixed_precision(args),
             concepts,
             settings,
             definition,

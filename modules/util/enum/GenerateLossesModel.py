@@ -12,7 +12,6 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import allow_mixed_precision
 from modules.util.torch_util import torch_gc
 
 
@@ -80,14 +79,9 @@ class GenerateLossesModel:
 
         self.model_setup.setup_train_device(self.model, self.args)
 
-        if allow_mixed_precision(self.args):
-            forward_context = torch.autocast(self.train_device.type, dtype=self.args.train_dtype.torch_dtype())
-        else:
-            forward_context = nullcontext()
-
         filename_loss_list: list[tuple[str, float]] = []
         # Don't really need a backward pass here, so we can make the calculation MUCH faster.
-        with forward_context, torch.inference_mode():
+        with torch.inference_mode():
             for epoch_step, batch in enumerate(step_tqdm):
                     model_output_data = self.model_setup.predict(
                         self.model,

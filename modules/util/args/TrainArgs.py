@@ -61,6 +61,7 @@ class TrainArgs(BaseArgs):
     train_device: str
     temp_device: str
     train_dtype: DataType
+    fallback_train_dtype: DataType
     only_cache: bool
     resolution: str
     attention_mechanism: AttentionMechanism
@@ -88,14 +89,12 @@ class TrainArgs(BaseArgs):
     force_epsilon_prediction: bool
     max_noising_strength: float
     unet_weight_dtype: DataType
-    unet_train_dtype: DataType
 
     # prior
     train_prior: bool
     train_prior_epochs: int
     prior_learning_rate: float
     prior_weight_dtype: DataType
-    prior_train_dtype: DataType
 
     # text encoder
     train_text_encoder: bool
@@ -103,7 +102,6 @@ class TrainArgs(BaseArgs):
     text_encoder_learning_rate: float
     text_encoder_layer_skip: int
     text_encoder_weight_dtype: DataType
-    text_encoder_train_dtype: DataType
 
     # text encoder 2
     train_text_encoder_2: bool
@@ -111,7 +109,6 @@ class TrainArgs(BaseArgs):
     text_encoder_2_learning_rate: float
     text_encoder_2_layer_skip: int
     text_encoder_2_weight_dtype: DataType
-    text_encoder_2_train_dtype: DataType
 
     # vae
     vae_weight_dtype: DataType
@@ -301,6 +298,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--train-device", type=str, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
         parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The mixed precision data type to use during training", choices=list(DataType))
+        parser.add_argument("--fallback-train-dtype", type=DataType, required=False, default=DataType.BFLOAT_16, dest="fallback_train_dtype", help="The mixed precision data type to use during training for stages that don't support float16 data types.", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=str, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
@@ -328,14 +326,12 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
         parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
         parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
-        parser.add_argument("--unet-train-dtype", type=DataType, required=False, default=None, dest="unet_train_dtype", help="The unet mixed precision data type to use during training", choices=list(DataType))
 
         # prior
         parser.add_argument("--train-prior", required=False, action='store_true', dest="train_prior", help="Whether the unet should be trained")
         parser.add_argument("--train-prior-epochs", type=int, required=False, default=2 ** 30, dest="train_prior_epochs", help="Number of epochs to train the unet for")
         parser.add_argument("--prior-learning-rate", type=float, required=False, default=None, dest="prior_learning_rate", help="Learning rate for the unet")
         parser.add_argument("--prior-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="prior_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
-        parser.add_argument("--prior-train-dtype", type=DataType, required=False, default=None, dest="prior_train_dtype", help="The prior mixed precision data type to use during training", choices=list(DataType))
 
         # text encoder
         parser.add_argument("--train-text-encoder", required=False, action='store_true', dest="train_text_encoder", help="Whether the text encoder should be trained")
@@ -343,7 +339,6 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--text-encoder-learning-rate", type=float, required=False, default=None, dest="text_encoder_learning_rate", help="Learning rate for the text encoder")
         parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
         parser.add_argument("--text-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_weight_dtype", help="The data type to use for text encoder weights during training", choices=list(DataType))
-        parser.add_argument("--text-encoder-train-dtype", type=DataType, required=False, default=None, dest="text_encoder_train_dtype", help="The text encoder mixed precision data type to use during training", choices=list(DataType))
 
         # text encoder 2
         parser.add_argument("--train-text-encoder-2", required=False, action='store_true', dest="train_text_encoder_2", help="Whether the text encoder 2 should be trained")
@@ -351,7 +346,6 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--text-encoder-2-learning-rate", type=float, required=False, default=None, dest="text_encoder_2_learning_rate", help="Learning rate for the text encoder 2")
         parser.add_argument("--text-encoder-2-layer-skip", type=int, required=False, default=0, dest="text_encoder_2_layer_skip", help="Skip last layers of the text encoder 2")
         parser.add_argument("--text-encoder-2-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_2_weight_dtype", help="The data type to use for text encoder 2 weights during training", choices=list(DataType))
-        parser.add_argument("--text-encoder-2-train-dtype", type=DataType, required=False, default=None, dest="text_encoder_2_train_dtype", help="The text encoder 2 mixed precision data type to use during training", choices=list(DataType))
 
         # vae
         parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
@@ -502,6 +496,7 @@ class TrainArgs(BaseArgs):
         data.append(("train_device", "cuda", str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
+        data.append(("fallback_train_dtype", DataType.BFLOAT_16, DataType, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
@@ -529,14 +524,12 @@ class TrainArgs(BaseArgs):
         data.append(("force_epsilon_prediction", False, bool, False))
         data.append(("max_noising_strength", 1.0, float, False))
         data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
-        data.append(("unet_train_dtype", None, DataType, True))
 
         # prior
         data.append(("train_prior", True, bool, False))
         data.append(("train_prior_epochs", 10000, int, False))
         data.append(("prior_learning_rate", None, float, True))
         data.append(("prior_weight_dtype", DataType.NONE, DataType, False))
-        data.append(("prior_train_dtype", None, DataType, True))
 
         # text encoder
         data.append(("train_text_encoder", True, bool, False))
@@ -544,7 +537,6 @@ class TrainArgs(BaseArgs):
         data.append(("text_encoder_learning_rate", None, float, True))
         data.append(("text_encoder_layer_skip", 0, int, False))
         data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
-        data.append(("text_encoder_train_dtype", None, DataType, True))
 
         # text encoder 2
         data.append(("train_text_encoder_2", True, bool, False))
@@ -552,7 +544,6 @@ class TrainArgs(BaseArgs):
         data.append(("text_encoder_2_learning_rate", None, float, True))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_2_weight_dtype", DataType.NONE, DataType, False))
-        data.append(("text_encoder_2_train_dtype", None, DataType, True))
 
         # vae
         data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))

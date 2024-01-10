@@ -39,12 +39,9 @@ class PixArtAlphaModel(BaseModel):
     # autocast context
     autocast_context: torch.autocast | nullcontext
     text_encoder_autocast_context: torch.autocast | nullcontext
-    transformer_autocast_context: torch.autocast | nullcontext
-    vae_autocast_context: torch.autocast | nullcontext
 
+    train_dtype: DataType
     text_encoder_train_dtype: DataType
-    transformer_train_dtype: DataType
-    vae_train_dtype: DataType
 
     # persistent embedding training data
     all_text_encoder_original_token_embeds: Tensor
@@ -87,12 +84,9 @@ class PixArtAlphaModel(BaseModel):
 
         self.autocast_context = nullcontext()
         self.text_encoder_autocast_context = nullcontext()
-        self.transformer_autocast_context = nullcontext()
-        self.vae_autocast_context = nullcontext()
 
+        self.train_dtype = DataType.FLOAT_32
         self.text_encoder_train_dtype = DataType.FLOAT_32
-        self.transformer_train_dtype = DataType.FLOAT_32
-        self.vae_train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
         self.text_encoder_lora = text_encoder_lora

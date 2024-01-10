@@ -16,7 +16,7 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import \
     create_checkpointed_unet_forward
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import get_autocast_context
+from modules.util.dtype_util import get_autocast_dtype, create_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -66,6 +66,14 @@ class BaseStableDiffusionSetup(
             enable_checkpointing_for_transformer_blocks(model.unet)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
 
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
+            args.prior_weight_dtype,
+            args.text_encoder_weight_dtype,
+            args.prior_weight_dtype,
+            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+            args.embedding_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+        ])
+
     def __encode_text(
             self,
             model: StableDiffusionModel,
@@ -84,38 +92,15 @@ class BaseStableDiffusionSetup(
             )
             tokens = tokenizer_output.input_ids.to(model.text_encoder.device)
 
-        with self.__get_text_encoder_autocast_context(args):
-            # TODO: use attention mask if this is true:
-            # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-            text_encoder_output = model.text_encoder(tokens, return_dict=True, output_hidden_states=True)
-            final_layer_norm = model.text_encoder.text_model.final_layer_norm
-            prompt_embeds = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
+        # TODO: use attention mask if this is true:
+        # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
+        text_encoder_output = model.text_encoder(tokens, return_dict=True, output_hidden_states=True)
+        final_layer_norm = model.text_encoder.text_model.final_layer_norm
+        prompt_embeds = final_layer_norm(
+            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+        )
 
         return prompt_embeds
-
-    def __get_autocast_context(
-            self,
-            args: TrainArgs,
-    ):
-        return get_autocast_context(self.train_device, args.train_dtype, [
-            args.prior_weight_dtype,
-            args.text_encoder_weight_dtype,
-            args.prior_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-        ])
-
-    def __get_text_encoder_autocast_context(
-            self,
-            args: TrainArgs,
-    ):
-        return get_autocast_context(self.train_device, args.text_encoder_train_dtype, [
-            args.text_encoder_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
-        ])
 
     def predict(
             self,
@@ -126,7 +111,7 @@ class BaseStableDiffusionSetup(
             *,
             deterministic: bool = False,
     ) -> dict:
-        with self.__get_autocast_context(args):
+        with model.autocast_context:
             generator = torch.Generator(device=args.train_device)
             generator.manual_seed(train_progress.global_step)
             rand = Random(train_progress.global_step)
@@ -421,9 +406,10 @@ class BaseStableDiffusionSetup(
             data: dict,
             args: TrainArgs,
     ) -> Tensor:
-        return self._diffusion_loss(
+        return self._diffusion_losses(
             batch=batch,
             data=data,
             args=args,
             train_device=self.train_device,
-        )
+            betas=model.noise_scheduler.betas.to(device=self.train_device),
+        ).mean()
