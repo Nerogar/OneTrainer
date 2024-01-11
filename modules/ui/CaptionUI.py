@@ -82,7 +82,7 @@ Mouse wheel: increase or decrease brush size"""
         self.image = None
         self.image_label = None
         self.enable_mask_editing_var = ctk.BooleanVar()
-        self.enable_mask_editing_alpha_var = None
+        self.enable_mask_editing_alpha = None
         self.prompt_var = None
         self.prompt_component = None
         self.content_column(self.bottom_frame)
@@ -146,9 +146,14 @@ Mouse wheel: increase or decrease brush size"""
             right_frame, text="Enable Mask Editing", variable=self.enable_mask_editing_var, width=50)
         enable_mask_editing_checkbox.grid(row=0, column=0, padx=25, pady=5, sticky="w")
 
-        self.enable_mask_editing_alpha_var = ctk.CTkEntry(master=right_frame, width=35, placeholder_text="1.0")
-        self.enable_mask_editing_alpha_var.insert(0, "1.0")
-        self.enable_mask_editing_alpha_var.grid(row=0, column=1, sticky="e", padx=5, pady=5)
+        # mask alpha textbox
+        self.enable_mask_editing_alpha = ctk.CTkEntry(master=right_frame, width=40, placeholder_text="1.0")
+        self.enable_mask_editing_alpha.insert(0, "1.0")
+        self.enable_mask_editing_alpha.grid(row=0, column=1, sticky="e", padx=5, pady=5)
+        self.enable_mask_editing_alpha.bind("<Down>", self.next_image)
+        self.enable_mask_editing_alpha.bind("<Up>", self.previous_image)
+        self.enable_mask_editing_alpha.bind("<Return>", self.save)
+        self.enable_mask_editing_alpha.bind("<Control-m>", self.toggle_mask)
 
         enable_mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="Brush Alpha", width=75)
         enable_mask_editing_alpha_label.grid(row=0, column=2, padx=0, pady=5, sticky="w")
@@ -284,10 +289,19 @@ Mouse wheel: increase or decrease brush size"""
             if self.display_only_mask:
                 self.image.configure(light_image=resized_pil_mask, size=resized_pil_mask.size)
             else:
-                norm_min = 0.2
                 np_image = np.array(self.pil_image).astype(np.float32) / 255.0
                 np_mask = np.array(resized_pil_mask).astype(np.float32) / 255.0
-                np_mask = (np_mask - np_mask.min())/(1.0 - np_mask.min()) * (1.0 - norm_min) + norm_min # normalize mask display between normalize_min and 1.0
+
+                # normalize mask between 0.3 - 1.0 so we can see image underneath and gauge strength of the alpha
+                norm_min = 0.3
+                np_mask_min = np_mask.min()
+                if np_mask_min == 0:
+                    # optimize for common case
+                    np_mask = np_mask * (1.0 - norm_min) + norm_min
+                elif np_mask_min < 1:
+                    # note: min of 1 means we get divide by 0
+                    np_mask = (np_mask - np_mask_min)/(1.0 - np_mask_min) * (1.0 - norm_min) + norm_min
+
                 np_masked_image = (np_image * np_mask * 255.0).astype(np.uint8)
                 masked_image = Image.fromarray(np_masked_image, mode='RGB')
 
@@ -328,9 +342,13 @@ Mouse wheel: increase or decrease brush size"""
         color = None
 
         if event.state & 0x0100 or event.num == 1:  # left mouse button
-            alpha = float(self.enable_mask_editing_alpha_var.get())
-            rgb_value = int(max(0, min(alpha, 1)) * 255)
+            try:
+                alpha = float(self.enable_mask_editing_alpha.get())
+            except:
+                alpha = 1.0
+            rgb_value = int(max(0, min(alpha, 1)) * 255) # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
+
         elif event.state & 0x0400 or event.num == 3:  # right mouse button
             color = (0, 0, 0)
 
