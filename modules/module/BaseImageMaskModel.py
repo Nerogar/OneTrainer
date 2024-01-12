@@ -236,6 +236,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
+            include_subdirectories (`bool`): whether to include subdirectories when processing samples
         """
 
         filenames = self.__get_sample_filenames(sample_dir, include_subdirectories)

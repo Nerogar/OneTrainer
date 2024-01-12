@@ -140,6 +140,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
                 - fill: creates new caption for all samples without a caption
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
+            include_subdirectories (`bool`): whether to include subfolders when processing samples
         """
 
         filenames = self.__get_sample_filenames(sample_dir, include_subdirectories)
