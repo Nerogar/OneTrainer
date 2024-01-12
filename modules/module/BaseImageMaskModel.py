@@ -114,12 +114,21 @@ class MaskSample:
 
 class BaseImageMaskModel(metaclass=ABCMeta):
     @staticmethod
-    def __get_sample_filenames(sample_dir: str) -> [str]:
+    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> [str]:
+        def __is_supported_image_extension(filename: str) -> bool:
+            ext = os.path.splitext(filename)[1]
+            return ext in path_util.supported_image_extensions() and '-masklabel.png' not in filename
+
         filenames = []
-        for filename in os.listdir(sample_dir):
-            ext = os.path.splitext(filename)[1].lower()
-            if ext in path_util.supported_image_extensions() and '-masklabel.png' not in filename:
-                filenames.append(os.path.join(sample_dir, filename))
+        if include_subdirectories:
+            for root, _, files in os.walk(sample_dir):
+                for filename in files:
+                    if __is_supported_image_extension(filename):
+                        filenames.append(os.path.join(root, filename))
+        else:
+            for filename in os.listdir(sample_dir):
+                if __is_supported_image_extension(filename):
+                    filenames.append(os.path.join(sample_dir, filename))
 
         return filenames
 
@@ -207,6 +216,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             alpha: float = 1.0,
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
+            include_subdirectories: bool = False,
     ):
         """
         Masks all samples in a folder
@@ -228,7 +238,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             error_callback (`Callable[[str], None]`): called for every exception
         """
 
-        filenames = self.__get_sample_filenames(sample_dir)
+        filenames = self.__get_sample_filenames(sample_dir, include_subdirectories)
         self.mask_images(
             filenames=filenames,
             prompts=prompts,

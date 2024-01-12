@@ -17,6 +17,7 @@ class GenerateMasksArgs(BaseArgs):
     device: str
     dtype: DataType
     alpha: float
+    include_subdirectories: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(GenerateMasksArgs, self).__init__(data)
@@ -37,6 +38,7 @@ class GenerateMasksArgs(BaseArgs):
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
         parser.add_argument("--alpha", type=float, required=False, default=1.0, dest="alpha", help="The factor to weight the mask by. Default is 1.")
+        parser.add_argument("--include-subfolders", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subfolders when processing samples")
 
         # @formatter:on
 
@@ -58,5 +60,6 @@ class GenerateMasksArgs(BaseArgs):
         data.append(("device", "cuda", str, False))
         data.append(("dtype", DataType.FLOAT_16, DataType, False))
         data.append(("alpha", 1.0, float, False))
+        data.append(("include_subdirectories", False, bool, False))
 
         return GenerateMasksArgs(data)

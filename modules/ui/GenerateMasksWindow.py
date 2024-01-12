@@ -12,7 +12,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate masks")
-        self.geometry("320x380")
+        self.geometry("350x420")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
@@ -73,13 +73,17 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.alpha_entry.insert(0, 1)
         self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
 
+        self.include_subdirectories_var = ctk.BooleanVar(self, False)
+        self.include_subdirectories_checkbox = ctk.CTkCheckBox(self.frame, text="Include subfolders", variable=self.include_subdirectories_var)
+        self.include_subdirectories_checkbox.grid(row=8, column=0, sticky="w", padx=5, pady=5)
+
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=8, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=9, column=1, sticky="w", padx=5, pady=5)
 
         self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
-        self.create_masks_button.grid(row=9, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
 
@@ -119,5 +123,6 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             smooth_pixels=int(self.smooth_entry.get()),
             expand_pixels=int(self.expand_entry.get()),
             progress_callback=self.set_progress,
+            include_subdirectories=self.include_subdirectories_var.get(),
         )
         self.parent.load_image()
