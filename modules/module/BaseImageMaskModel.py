@@ -117,7 +117,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
     def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> [str]:
         def __is_supported_image_extension(filename: str) -> bool:
             ext = os.path.splitext(filename)[1]
-            return ext in path_util.supported_image_extensions() and '-masklabel.png' not in filename
+            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
 
         filenames = []
         if include_subdirectories:
