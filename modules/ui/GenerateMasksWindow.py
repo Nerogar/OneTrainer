@@ -12,7 +12,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate masks")
-        self.geometry("350x420")
+        self.geometry("360x430")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()

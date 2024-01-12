@@ -12,7 +12,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate captions")
-        self.geometry("350x270")
+        self.geometry("360x270")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
