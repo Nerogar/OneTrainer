@@ -49,9 +49,11 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
         self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
+        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
+        self.include_subdirectories_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
         self.include_subdirectories_var = ctk.BooleanVar(self, False)
-        self.include_subdirectories_checkbox = ctk.CTkCheckBox(self.frame, text="Include subfolders", variable=self.include_subdirectories_var)
-        self.include_subdirectories_checkbox.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
+        self.include_subdirectories_switch.grid(row=4, column=1, sticky="w", padx=5, pady=5)
 
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
         self.progress_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)

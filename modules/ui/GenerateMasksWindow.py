@@ -73,9 +73,11 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.alpha_entry.insert(0, 1)
         self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
 
+        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
+        self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
         self.include_subdirectories_var = ctk.BooleanVar(self, False)
-        self.include_subdirectories_checkbox = ctk.CTkCheckBox(self.frame, text="Include subfolders", variable=self.include_subdirectories_var)
-        self.include_subdirectories_checkbox.grid(row=8, column=0, sticky="w", padx=5, pady=5)
+        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
+        self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
         self.progress_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
