@@ -51,12 +51,21 @@ class CaptionSample:
 
 class BaseImageCaptionModel(metaclass=ABCMeta):
     @staticmethod
-    def __get_sample_filenames(sample_dir: str) -> [str]:
-        filenames = []
-        for filename in os.listdir(sample_dir):
+    def __get_sample_filenames(sample_dir: str, include_subfolders: bool = False) -> [str]:
+        def __is_supported_image_extension(filename: str) -> bool:
             ext = os.path.splitext(filename)[1]
-            if path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename:
-                filenames.append(os.path.join(sample_dir, filename))
+            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
+
+        filenames = []
+        if include_subfolders:
+            for root, _, files in os.walk(sample_dir):
+                for filename in files:
+                    if __is_supported_image_extension(filename):
+                        filenames.append(os.path.join(root, filename))
+        else:
+            for filename in os.listdir(sample_dir):
+                if __is_supported_image_extension(filename):
+                    filenames.append(os.path.join(sample_dir, filename))
 
         return filenames
 
@@ -118,6 +127,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             mode: str = 'fill',
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
+            include_subfolders: bool = False,
     ):
         """
         Captions all samples in a folder
@@ -132,7 +142,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             error_callback (`Callable[[str], None]`): called for every exception
         """
 
-        filenames = self.__get_sample_filenames(sample_dir)
+        filenames = self.__get_sample_filenames(sample_dir, include_subfolders)
         self.caption_images(
             filenames=filenames,
             initial_caption=initial_caption,

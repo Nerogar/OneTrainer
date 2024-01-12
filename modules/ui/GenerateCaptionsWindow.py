@@ -12,7 +12,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate captions")
-        self.geometry("320x230")
+        self.geometry("350x270")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
@@ -49,13 +49,17 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
         self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
+        self.include_subfolders_var = ctk.BooleanVar(self, False)
+        self.include_subfolders_checkbox = ctk.CTkCheckBox(self.frame, text="Include subfolders", variable=self.include_subfolders_var)
+        self.include_subfolders_checkbox.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=5, column=1, sticky="w", padx=5, pady=5)
 
         self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self.create_captions)
-        self.create_captions_button.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_captions_button.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
 
@@ -88,5 +92,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             initial_caption=self.caption_entry.get(),
             mode=mode,
             progress_callback=self.set_progress,
+            include_subfolders=self.include_subfolders_var.get(),
         )
         self.parent.load_image()

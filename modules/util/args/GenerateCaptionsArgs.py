@@ -13,6 +13,7 @@ class GenerateCaptionsArgs(BaseArgs):
     mode: str
     device: str
     dtype: DataType
+    include_subfolders: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(GenerateCaptionsArgs, self).__init__(data)
@@ -29,6 +30,7 @@ class GenerateCaptionsArgs(BaseArgs):
         parser.add_argument("--mode", type=str, default='fill', required=False, dest="mode", help="Either replace, fill, add or subtract")
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
+        parser.add_argument("--include-subfolders", action="store_true", required=False, default=False, dest="include_subfolders", help="Whether to include subfolders when processing samples")
 
         # @formatter:on
 
@@ -46,5 +48,6 @@ class GenerateCaptionsArgs(BaseArgs):
         data.append(("mode", "fill", str, False))
         data.append(("device", "cuda", str, False))
         data.append(("dtype", DataType.FLOAT_16, DataType, False))
+        data.append(("include_subfolders", False, bool, False))
 
         return GenerateCaptionsArgs(data)
