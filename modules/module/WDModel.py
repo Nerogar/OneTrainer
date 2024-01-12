@@ -16,7 +16,11 @@ class WDModel(BaseImageCaptionModel):
         model_path = huggingface_hub.hf_hub_download(
             "SmilingWolf/wd-v1-4-vit-tagger-v2", "model.onnx"
         )
-        self.model = onnxruntime.InferenceSession(model_path)
+        if device.type == 'cpu':
+            provider = "CPUExecutionProvider"
+        else:
+            provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in onnxruntime.get_available_providers() else "CPUExecutionProvider"
+        self.model = onnxruntime.InferenceSession(model_path, providers=[provider])
 
         label_path = huggingface_hub.hf_hub_download(
             "SmilingWolf/wd-v1-4-vit-tagger-v2", "selected_tags.csv"
