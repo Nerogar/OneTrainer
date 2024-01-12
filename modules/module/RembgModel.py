@@ -42,7 +42,11 @@ class RembgModel(BaseImageMaskModel):
             progressbar=True,
         )
 
-        return onnxruntime.InferenceSession(os.path.join(path, filename))
+        if self.device.type == 'cpu':
+            provider = "CPUExecutionProvider"
+        else:
+            provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in onnxruntime.get_available_providers() else "CPUExecutionProvider"
+        return onnxruntime.InferenceSession(os.path.join(path, filename), providers=[provider])
 
     def __create_average_kernel(self, kernel_radius: Optional[int]):
         if kernel_radius is None:
