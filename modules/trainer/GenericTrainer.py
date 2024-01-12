@@ -534,6 +534,7 @@ class GenericTrainer(BaseTrainer):
                         'loss': accumulated_loss,
                         'smooth loss': ema_loss,
                     })
+                    self.tensorboard.add_scalar("smooth loss", ema_loss, train_progress.global_step)
                     accumulated_loss = 0.0
 
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
