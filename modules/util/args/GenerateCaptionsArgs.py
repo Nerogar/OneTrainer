@@ -30,7 +30,7 @@ class GenerateCaptionsArgs(BaseArgs):
         parser.add_argument("--mode", type=str, default='fill', required=False, dest="mode", help="Either replace, fill, add or subtract")
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
-        parser.add_argument("--include-subfolders", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subfolders when processing samples")
+        parser.add_argument("--include-subdirectories", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subdirectories when processing samples")
 
         # @formatter:on
 

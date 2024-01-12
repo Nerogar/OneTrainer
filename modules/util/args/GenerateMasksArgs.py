@@ -38,7 +38,7 @@ class GenerateMasksArgs(BaseArgs):
         parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
         parser.add_argument("--alpha", type=float, required=False, default=1.0, dest="alpha", help="The factor to weight the mask by. Default is 1.")
-        parser.add_argument("--include-subfolders", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subfolders when processing samples")
+        parser.add_argument("--include-subdirectories", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subdirectories when processing samples")
 
         # @formatter:on
 

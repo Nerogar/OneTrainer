@@ -27,7 +27,7 @@ def main():
         initial_caption=args.initial_caption,
         mode=args.mode,
         error_callback=lambda filename: print("Error while processing image " + filename),
-        include_subfolders=args.include_subfolders
+        include_subdirectories=args.include_subdirectories
     )
 
 
