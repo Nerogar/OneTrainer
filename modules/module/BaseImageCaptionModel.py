@@ -51,13 +51,13 @@ class CaptionSample:
 
 class BaseImageCaptionModel(metaclass=ABCMeta):
     @staticmethod
-    def __get_sample_filenames(sample_dir: str, include_subfolders: bool = False) -> [str]:
+    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> [str]:
         def __is_supported_image_extension(filename: str) -> bool:
             ext = os.path.splitext(filename)[1]
             return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
 
         filenames = []
-        if include_subfolders:
+        if include_subdirectories:
             for root, _, files in os.walk(sample_dir):
                 for filename in files:
                     if __is_supported_image_extension(filename):
@@ -127,7 +127,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             mode: str = 'fill',
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
-            include_subfolders: bool = False,
+            include_subdirectories: bool = False,
     ):
         """
         Captions all samples in a folder
@@ -142,7 +142,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             error_callback (`Callable[[str], None]`): called for every exception
         """
 
-        filenames = self.__get_sample_filenames(sample_dir, include_subfolders)
+        filenames = self.__get_sample_filenames(sample_dir, include_subdirectories)
         self.caption_images(
             filenames=filenames,
             initial_caption=initial_caption,
