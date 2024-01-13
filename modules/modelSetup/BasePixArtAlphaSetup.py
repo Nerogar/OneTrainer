@@ -5,12 +5,14 @@ import torch
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
 from diffusers.utils import is_xformers_available
 from torch import Tensor
+from torch.utils.checkpoint import checkpoint
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
+from modules.modelSetup.stableDiffusion.checkpointing_util import create_checkpointed_forward
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
@@ -167,11 +169,15 @@ class BasePixArtAlphaSetup(
                 dummy = torch.zeros((1,), device=self.train_device)
                 dummy.requires_grad_(True)
 
-                negative_text_encoder_output, text_encoder_attention_mask = self.__encode_text(
+                negative_text_encoder_output, negative_text_encoder_attention_mask = self.__encode_text(
                     model,
                     args,
                     text="",
-                ).expand((scaled_latent_image.shape[0], -1, -1))
+                )
+                negative_text_encoder_output = negative_text_encoder_output\
+                    .expand((scaled_latent_image.shape[0], -1, -1))
+                negative_text_encoder_attention_mask = negative_text_encoder_attention_mask \
+                    .expand((scaled_latent_image.shape[0], -1, -1))
 
                 model.noise_scheduler.set_timesteps(args.align_prop_steps)
 
@@ -181,9 +187,18 @@ class BasePixArtAlphaSetup(
                 timestep_low = \
                     int(args.align_prop_steps * args.max_noising_strength * (1.0 - args.align_prop_truncate_steps))
 
+                batch_size = scaled_latent_image.shape[0]
+                height = scaled_latent_image.shape[2] * 8
+                width = scaled_latent_image.shape[3] * 8
+                resolution = torch.tensor([height, width]).repeat(batch_size, 1)
+                aspect_ratio = torch.tensor([float(height / width)]).repeat(batch_size, 1)
+                resolution = resolution.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                aspect_ratio = aspect_ratio.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                added_cond_kwargs = {"resolution": resolution, "aspect_ratio": aspect_ratio}
+
                 truncate_timestep_index = args.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-                checkpointed_unet = create_checkpointed_transformer_forward(model.transformer)
+                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device)
 
                 for step in range(args.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \
@@ -197,35 +212,25 @@ class BasePixArtAlphaSetup(
                     else:
                         latent_input = scaled_noisy_latent_image
 
-                    if args.model_type.has_depth_input():
-                        predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            text_encoder_output,
-                            batch['latent_depth'],
-                        ).sample
+                    predicted_latent_noise = checkpointed_transformer(
+                        latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_hidden_states=text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_attention_mask=text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
+                        timestep=timestep,
+                        added_cond_kwargs=added_cond_kwargs,
+                    ).sample
 
-                        negative_predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            negative_text_encoder_output,
-                            batch['latent_depth'],
-                        ).sample
-                    else:
-                        predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            text_encoder_output,
-                        ).sample
-
-                        negative_predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            negative_text_encoder_output,
-                        ).sample
+                    negative_predicted_latent_noise = checkpointed_transformer(
+                        latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_hidden_states=negative_text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_attention_mask=negative_text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
+                        timestep=timestep,
+                        added_cond_kwargs=added_cond_kwargs,
+                    ).sample
 
                     cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
                     cfg_predicted_latent_noise = negative_predicted_latent_noise + args.align_prop_cfg_scale * cfg_grad
+                    cfg_predicted_latent_noise = cfg_predicted_latent_noise.chunk(2, dim=1)[0]
 
                     scaled_noisy_latent_image = model.noise_scheduler \
                         .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
@@ -252,7 +257,7 @@ class BasePixArtAlphaSetup(
 
                 predicted_image = []
                 for x in predicted_latent_image.split(1):
-                    predicted_image.append(torch.utils.checkpoint.checkpoint(
+                    predicted_image.append(checkpoint(
                         model.vae.decode,
                         x,
                         use_reentrant=False

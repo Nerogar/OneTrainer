@@ -5,6 +5,7 @@ import torch
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
+from torch.utils.checkpoint import checkpoint
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
@@ -13,7 +14,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers, \
-    create_checkpointed_unet_forward
+    create_checkpointed_forward
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
@@ -222,7 +223,7 @@ class BaseStableDiffusionXLSetup(
                 negative_added_cond_kwargs = {"text_embeds": negative_pooled_text_encoder_2_output,
                                               "time_ids": add_time_ids}
 
-                checkpointed_unet = create_checkpointed_unet_forward(model.unet)
+                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device)
 
                 for step in range(args.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \

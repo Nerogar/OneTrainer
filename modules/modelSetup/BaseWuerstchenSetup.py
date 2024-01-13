@@ -1,7 +1,6 @@
 from abc import ABCMeta
 
 import torch
-import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
@@ -16,7 +15,6 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.dtype_util import create_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
-from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
