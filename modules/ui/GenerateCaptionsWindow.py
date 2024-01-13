@@ -4,7 +4,15 @@ import customtkinter as ctk
 
 
 class GenerateCaptionsWindow(ctk.CTkToplevel):
-    def __init__(self, parent, path, *args, **kwargs):
+    def __init__(self, parent, path, parent_include_subdirectories, *args, **kwargs):
+        """
+        Window for generating captions for a folder of images
+
+        Parameters:
+            parent (`Tk`): the parent window
+            path (`str`): the path to the folder
+            parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
+        """
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
@@ -51,7 +59,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
         self.include_subdirectories_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
-        self.include_subdirectories_var = ctk.BooleanVar(self, False)
+        self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
         self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
         self.include_subdirectories_switch.grid(row=4, column=1, sticky="w", padx=5, pady=5)
 

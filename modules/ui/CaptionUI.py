@@ -20,6 +20,7 @@ from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.ui import components
+from modules.util.ui.UIState import UIState
 
 
 class CaptionUI(ctk.CTkToplevel):
@@ -27,6 +28,10 @@ class CaptionUI(ctk.CTkToplevel):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
         self.dir = initial_dir
+        self.config_ui_data = {
+            "include_subdirectories": False
+        }
+        self.config_ui_state = UIState(self, self.config_ui_data)
         self.image_size = 850
 
         self.title("OneTrainer")
@@ -55,7 +60,8 @@ Mouse wheel: increase or decrease brush size"""
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.image_names = []
+        # relative path from self.dir to each image
+        self.image_rel_paths = []
         self.current_image_index = -1
 
         self.top_bar(self)
@@ -95,18 +101,20 @@ Mouse wheel: increase or decrease brush size"""
 
         components.button(top_frame, 0, 0, "Open", self.open_directory,
                           tooltip="open a new directory")
-        components.button(top_frame, 0, 1, "Generate Masks", self.open_mask_window,
+        components.switch(top_frame, 0, 1, self.config_ui_state, "include_subdirectories",
+                            text="include subdirectories when loading images")
+        components.button(top_frame, 0, 2, "Generate Masks", self.open_mask_window,
                           tooltip="open a dialog to automatically generate masks")
-        components.button(top_frame, 0, 2, "Generate Captions", self.open_caption_window,
+        components.button(top_frame, 0, 3, "Generate Captions", self.open_caption_window,
                           tooltip="open a dialog to automatically generate captions")
 
         if platform.system() == "Windows":
-            components.button(top_frame, 0, 3, "Open in Explorer", self.open_in_explorer,
+            components.button(top_frame, 0, 4, "Open in Explorer", self.open_in_explorer,
                               tooltip="open the current image in Explorer")
 
-        top_frame.grid_columnconfigure(4, weight=1)
+        top_frame.grid_columnconfigure(5, weight=1)
 
-        components.button(top_frame, 0, 5, "Help", self.print_help,
+        components.button(top_frame, 0, 6, "Help", self.print_help,
                           tooltip=self.help_text)
 
     def file_list_column(self, master):
@@ -117,7 +125,7 @@ Mouse wheel: increase or decrease brush size"""
         self.file_list = ctk.CTkScrollableFrame(master, width=300)
         self.file_list.grid(row=0, column=0, sticky="nsew")
 
-        for i, filename in enumerate(self.image_names):
+        for i, filename in enumerate(self.image_rel_paths):
             def __create_switch_image(index):
                 def __switch_image(event):
                     self.switch_image(index)
@@ -184,32 +192,45 @@ Mouse wheel: increase or decrease brush size"""
         self.prompt_component.bind("<Control-m>", self.toggle_mask)
         self.prompt_component.focus_set()
 
-    def load_directory(self):
-        self.scan_directory()
+    def load_directory(self, include_subdirectories: bool=False):
+        self.scan_directory(include_subdirectories)
         self.file_list_column(self.bottom_frame)
 
-        if len(self.image_names) > 0:
+        if len(self.image_rel_paths) > 0:
             self.switch_image(0)
         else:
             self.switch_image(-1)
 
         self.prompt_component.focus_set()
 
-    def scan_directory(self):
-        self.image_names = []
+    def scan_directory(self, include_subdirectories: bool=False):
+        def __is_supported_image_extension(filename):
+            name, ext = os.path.splitext(filename)
+            return path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel")
+        self.image_rel_paths = []
 
-        if self.dir and os.path.isdir(self.dir):
-            for i, filename in enumerate(os.listdir(self.dir)):
-                path = path_util.canonical_join(self.dir, filename)
-                name, ext = os.path.splitext(path)
-                if path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel"):
-                    self.image_names.append(filename)
+        if not self.dir or not os.path.isdir(self.dir):
+            return
+
+        if include_subdirectories:
+            for root, _, files in os.walk(self.dir):
+                for filename in files:
+                    if __is_supported_image_extension(filename):
+                        self.image_rel_paths.append(
+                            os.path.relpath(os.path.join(root, filename), self.dir)
+                        )
+        else:
+            for _, filename in enumerate(os.listdir(self.dir)):
+                if __is_supported_image_extension(filename):
+                    self.image_rel_paths.append(
+                        os.path.relpath(os.path.join(self.dir, filename), self.dir)
+                    )
 
     def load_image(self):
         image_name = "resources/icons/icon.png"
 
-        if len(self.image_names) > 0 and self.current_image_index < len(self.image_names):
-            image_name = self.image_names[self.current_image_index]
+        if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
+            image_name = self.image_rel_paths[self.current_image_index]
             image_name = os.path.join(self.dir, image_name)
 
         try:
@@ -218,8 +239,8 @@ Mouse wheel: increase or decrease brush size"""
             print(f'Could not open image {image_name}')
 
     def load_mask(self):
-        if len(self.image_names) > 0 and self.current_image_index < len(self.image_names):
-            image_name = self.image_names[self.current_image_index]
+        if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
+            image_name = self.image_rel_paths[self.current_image_index]
             mask_name = os.path.splitext(image_name)[0] + "-masklabel.png"
             mask_name = os.path.join(self.dir, mask_name)
 
@@ -231,8 +252,8 @@ Mouse wheel: increase or decrease brush size"""
             return None
 
     def load_prompt(self):
-        if len(self.image_names) > 0 and self.current_image_index < len(self.image_names):
-            image_name = self.image_names[self.current_image_index]
+        if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
+            image_name = self.image_rel_paths[self.current_image_index]
             prompt_name = os.path.splitext(image_name)[0] + ".txt"
             prompt_name = os.path.join(self.dir, prompt_name)
 
@@ -245,11 +266,11 @@ Mouse wheel: increase or decrease brush size"""
             return ""
 
     def previous_image(self, event):
-        if len(self.image_names) > 0 and (self.current_image_index - 1) >= 0:
+        if len(self.image_rel_paths) > 0 and (self.current_image_index - 1) >= 0:
             self.switch_image(self.current_image_index - 1)
 
     def next_image(self, event):
-        if len(self.image_names) > 0 and (self.current_image_index + 1) < len(self.image_names):
+        if len(self.image_rel_paths) > 0 and (self.current_image_index + 1) < len(self.image_rel_paths):
             self.switch_image(self.current_image_index + 1)
 
     def switch_image(self, index):
@@ -323,7 +344,7 @@ Mouse wheel: increase or decrease brush size"""
         if event.widget != self.image_label.children["!label"]:
             return
 
-        if len(self.image_names) == 0 or self.current_image_index >= len(self.image_names):
+        if len(self.image_rel_paths) == 0 or self.current_image_index >= len(self.image_rel_paths):
             return
 
         display_scaling = ScalingTracker.get_window_scaling(self)
@@ -369,8 +390,8 @@ Mouse wheel: increase or decrease brush size"""
             self.refresh_image()
 
     def save(self, event):
-        if len(self.image_names) > 0 and self.current_image_index < len(self.image_names):
-            image_name = self.image_names[self.current_image_index]
+        if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
+            image_name = self.image_rel_paths[self.current_image_index]
 
             prompt_name = os.path.splitext(image_name)[0] + ".txt"
             prompt_name = os.path.join(self.dir, prompt_name)
@@ -399,21 +420,21 @@ Mouse wheel: increase or decrease brush size"""
 
         if new_dir:
             self.dir = new_dir
-            self.load_directory()
+            self.load_directory(include_subdirectories=self.config_ui_state.vars["include_subdirectories"].get())
 
     def open_mask_window(self):
-        dialog = GenerateMasksWindow(self, self.dir)
+        dialog = GenerateMasksWindow(self, self.dir, self.config_ui_state.vars["include_subdirectories"].get())
         self.wait_window(dialog)
         self.switch_image(self.current_image_index)
 
     def open_caption_window(self):
-        dialog = GenerateCaptionsWindow(self, self.dir)
+        dialog = GenerateCaptionsWindow(self, self.dir, self.config_ui_state.vars["include_subdirectories"].get())
         self.wait_window(dialog)
         self.switch_image(self.current_image_index)
 
     def open_in_explorer(self):
         try:
-            image_name = self.image_names[self.current_image_index]
+            image_name = self.image_rel_paths[self.current_image_index]
             image_name = os.path.realpath(os.path.join(self.dir, image_name))
             subprocess.Popen(f"explorer /select,{image_name}")
         except:
