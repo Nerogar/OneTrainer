@@ -14,6 +14,7 @@ from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
 from modules.module.MaskByColor import MaskByColor
+from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
 from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
@@ -460,6 +461,10 @@ Mouse wheel: increase or decrease brush size"""
             if self.masking_model is None or not isinstance(self.masking_model, RembgModel):
                 print("loading Rembg model, this may take a while")
                 self.masking_model = RembgModel(torch.device("cuda"), torch.float32)
+        elif model == "Rembg-Human":
+            if self.masking_model is None or not isinstance(self.masking_model, RembgHumanModel):
+                print("loading Rembg-Human model, this may take a while")
+                self.masking_model = RembgHumanModel(torch.device("cuda"), torch.float32)
         elif model == "Hex Color":
             if self.masking_model is None or not isinstance(self.masking_model, MaskByColor):
                 self.masking_model = MaskByColor(torch.device("cuda"), torch.float32)

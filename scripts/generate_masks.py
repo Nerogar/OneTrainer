@@ -1,6 +1,8 @@
 import os
 import sys
 
+from modules.module.RembgHumanModel import RembgHumanModel
+
 sys.path.append(os.getcwd())
 
 import torch
@@ -19,6 +21,8 @@ def main():
         model = ClipSegModel(torch.device(args.device), args.dtype.torch_dtype())
     elif args.model == GenerateMasksModel.REMBG:
         model = RembgModel(torch.device(args.device), args.dtype.torch_dtype())
+    elif args.model == GenerateMasksModel.REMBG_HUMAN:
+        model = RembgHumanModel(torch.device(args.device), args.dtype.torch_dtype())
     elif args.model == GenerateMasksModel.COLOR:
         model = MaskByColor(torch.device(args.device), args.dtype.torch_dtype())
 
