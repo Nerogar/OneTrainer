@@ -110,10 +110,9 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
+            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
-
 
     def __create_base_dtype_components(self, row: int) -> int:
         # weight dtype

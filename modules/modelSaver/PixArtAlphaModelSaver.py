@@ -4,10 +4,12 @@ import os.path
 from pathlib import Path
 
 import torch
+from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.util.convert.convert_pixart_diffusers_to_ckpt import convert_pixart_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
@@ -39,6 +41,40 @@ class PixArtAlphaModelSaver(BaseModelSaver):
         pipeline_copy.save_pretrained(destination)
 
         del pipeline_copy
+
+    def __save_ckpt(
+            self,
+            model: PixArtAlphaModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+        state_dict = convert_pixart_diffusers_to_ckpt(
+            model.transformer.state_dict(),
+        )
+
+        state_dict = {'state_dict': state_dict}
+
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        self._convert_state_dict_to_contiguous(save_state_dict)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        torch.save(save_state_dict, destination)
+
+    def __save_safetensors(
+            self,
+            model: PixArtAlphaModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+        state_dict = convert_pixart_diffusers_to_ckpt(
+            model.transformer.state_dict(),
+        )
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        self._convert_state_dict_to_contiguous(save_state_dict)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+
+        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_internal(
             self,
@@ -84,8 +120,8 @@ class PixArtAlphaModelSaver(BaseModelSaver):
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
             case ModelFormat.CKPT:
-                raise NotImplementedError
+                self.__save_ckpt(model, output_model_destination, dtype)
             case ModelFormat.SAFETENSORS:
-                raise NotImplementedError
+                self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)

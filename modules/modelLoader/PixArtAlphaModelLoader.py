@@ -25,7 +25,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
     ) -> str | None:
         match model_type:
             case ModelType.PIXART_ALPHA:
-                return "resources/sd_model_spec/wuerstchen_2.0.json"  # TODO add model spec
+                return "resources/sd_model_spec/pixart_alpha_1.0.json"
             case _:
                 return None
 
