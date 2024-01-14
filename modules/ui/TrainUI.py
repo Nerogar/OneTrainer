@@ -423,7 +423,7 @@ class TrainUI(ctk.CTk):
         pass
 
     def open_dataset_tool(self):
-        window = CaptionUI(self, None)
+        window = CaptionUI(self, None, False)
         self.wait_window(window)
 
     def open_convert_model_tool(self):

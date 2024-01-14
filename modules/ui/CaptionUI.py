@@ -24,12 +24,19 @@ from modules.util.ui.UIState import UIState
 
 
 class CaptionUI(ctk.CTkToplevel):
-    def __init__(self, parent, initial_dir: str | None, *args, **kwargs):
+    def __init__(
+            self,
+            parent,
+            initial_dir: str | None,
+            initial_include_subdirectories: bool,
+            *args,
+            **kwargs,
+    ):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
         self.dir = initial_dir
         self.config_ui_data = {
-            "include_subdirectories": False
+            "include_subdirectories": initial_include_subdirectories
         }
         self.config_ui_state = UIState(self, self.config_ui_data)
         self.image_size = 850
