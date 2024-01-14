@@ -139,6 +139,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                 output_model_destination=self.convert_model_args.output_model_destination,
                 dtype=self.convert_model_args.output_dtype.torch_dtype(),
             )
+            print("Model converted")
         except:
             traceback.print_exc()
 
