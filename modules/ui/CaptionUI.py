@@ -101,16 +101,17 @@ Mouse wheel: increase or decrease brush size"""
 
         components.button(top_frame, 0, 0, "Open", self.open_directory,
                           tooltip="open a new directory")
-        components.switch(top_frame, 0, 1, self.config_ui_state, "include_subdirectories",
-                            text="include subdirectories when loading images")
-        components.button(top_frame, 0, 2, "Generate Masks", self.open_mask_window,
+        components.button(top_frame, 0, 1, "Generate Masks", self.open_mask_window,
                           tooltip="open a dialog to automatically generate masks")
-        components.button(top_frame, 0, 3, "Generate Captions", self.open_caption_window,
+        components.button(top_frame, 0, 2, "Generate Captions", self.open_caption_window,
                           tooltip="open a dialog to automatically generate captions")
 
         if platform.system() == "Windows":
-            components.button(top_frame, 0, 4, "Open in Explorer", self.open_in_explorer,
+            components.button(top_frame, 0, 3, "Open in Explorer", self.open_in_explorer,
                               tooltip="open the current image in Explorer")
+
+        components.switch(top_frame, 0, 4, self.config_ui_state, "include_subdirectories",
+                          text="include subdirectories")
 
         top_frame.grid_columnconfigure(5, weight=1)
 
@@ -420,15 +421,15 @@ Mouse wheel: increase or decrease brush size"""
 
         if new_dir:
             self.dir = new_dir
-            self.load_directory(include_subdirectories=self.config_ui_state.vars["include_subdirectories"].get())
+            self.load_directory(include_subdirectories=self.config_ui_data["include_subdirectories"])
 
     def open_mask_window(self):
-        dialog = GenerateMasksWindow(self, self.dir, self.config_ui_state.vars["include_subdirectories"].get())
+        dialog = GenerateMasksWindow(self, self.dir, self.config_ui_data["include_subdirectories"])
         self.wait_window(dialog)
         self.switch_image(self.current_image_index)
 
     def open_caption_window(self):
-        dialog = GenerateCaptionsWindow(self, self.dir, self.config_ui_state.vars["include_subdirectories"].get())
+        dialog = GenerateCaptionsWindow(self, self.dir, self.config_ui_data["include_subdirectories"])
         self.wait_window(dialog)
         self.switch_image(self.current_image_index)
 
