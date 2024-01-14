@@ -30,7 +30,8 @@ def main():
         smooth_pixels=args.smooth_pixels,
         expand_pixels=args.expand_pixels,
         alpha=args.alpha,
-        error_callback=lambda filename: print("Error while processing image " + filename)
+        error_callback=lambda filename: print("Error while processing image " + filename),
+        include_subdirectories=args.include_subdirectories
     )
 
 

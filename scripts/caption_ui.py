@@ -10,7 +10,7 @@ from modules.ui.CaptionUI import CaptionUI
 def main():
     args = CaptionUIArgs.parse_args()
 
-    ui = CaptionUI(None, args.dir)
+    ui = CaptionUI(None, args.dir, args.include_subdirectories)
     ui.mainloop()
 
 

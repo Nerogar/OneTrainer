@@ -130,10 +130,12 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 override_value = OPTIMIZER_KEY_MAP[selected_optimizer][key]
 
             if type != 'bool':
-                entry_widget = components.entry(master, row, col + 1, ui_state, key, override_value=override_value)
+                ui_state.vars[key].set(override_value if override_value is not None else "None")
+                entry_widget = components.entry(master, row, col + 1, ui_state, key)
                 entry_widget.bind("<FocusOut>", lambda event, opt=selected_optimizer, k=key: self.update_user_pref(opt, k, ui_state.vars[k].get()))
             else:
-                switch_widget = components.switch(master, row, col + 1, ui_state, key, override_value=override_value)
+                ui_state.vars[key].set(override_value)
+                switch_widget = components.switch(master, row, col + 1, ui_state, key)
                 switch_widget.configure(command=lambda opt=selected_optimizer, k=key: self.update_user_pref(opt, k, ui_state.vars[k].get()))
 
     def update_user_pref(self, optimizer, key, value):

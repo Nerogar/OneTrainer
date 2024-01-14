@@ -5,7 +5,6 @@ import subprocess
 import sys
 import traceback
 from contextlib import nullcontext
-from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -94,7 +93,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup = self.create_model_setup()
 
         self.callbacks.on_update_status("loading the model")
-        
+
         model_names = self.args.model_names()
 
         if self.args.continue_last_backup:
@@ -228,7 +227,7 @@ class GenericTrainer(BaseTrainer):
                     def on_sample_default(image: Image):
                         if self.args.samples_to_tensorboard:
                             self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                                    train_progress.global_step)
+                                                       train_progress.global_step)
                         self.callbacks.on_sample_default(image)
 
                     def on_sample_custom(image: Image):
@@ -473,7 +472,9 @@ class GenericTrainer(BaseTrainer):
                     def create_sample_commands_fun(sample_commands):
                         def sample_commands_fun():
                             self.__sample_during_training(train_progress, train_device, sample_commands)
+
                         return sample_commands_fun
+
                     self.__enqueue_sample_during_training(create_sample_commands_fun(sample_commands))
 
                 if self.__needs_gc(train_progress):
@@ -512,9 +513,9 @@ class GenericTrainer(BaseTrainer):
                         nn.utils.clip_grad_norm_(self.parameters, 1)
                         self.model.optimizer.step()
 
+                    lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
                     self.model.optimizer.zero_grad(set_to_none=True)
                     has_gradient = False
-                    lr_scheduler.step()
 
                     self.tensorboard.add_scalar(
                         "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
@@ -526,6 +527,7 @@ class GenericTrainer(BaseTrainer):
                         'loss': accumulated_loss,
                         'smooth loss': ema_loss,
                     })
+                    self.tensorboard.add_scalar("smooth loss", ema_loss, train_progress.global_step)
                     accumulated_loss = 0.0
 
                     self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
@@ -540,6 +542,7 @@ class GenericTrainer(BaseTrainer):
                             self.parameters,
                             update_step
                         )
+
                     self.one_step_trained = True
 
                 train_progress.next_step(self.args.batch_size)
