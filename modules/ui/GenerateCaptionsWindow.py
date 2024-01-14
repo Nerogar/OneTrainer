@@ -4,7 +4,15 @@ import customtkinter as ctk
 
 
 class GenerateCaptionsWindow(ctk.CTkToplevel):
-    def __init__(self, parent, path, *args, **kwargs):
+    def __init__(self, parent, path, parent_include_subdirectories, *args, **kwargs):
+        """
+        Window for generating captions for a folder of images
+
+        Parameters:
+            parent (`Tk`): the parent window
+            path (`str`): the path to the folder
+            parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
+        """
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
@@ -12,7 +20,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate captions")
-        self.geometry("320x230")
+        self.geometry("360x270")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
@@ -49,13 +57,19 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
         self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
+        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
+        self.include_subdirectories_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
+        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
+        self.include_subdirectories_switch.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=5, column=1, sticky="w", padx=5, pady=5)
 
         self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self.create_captions)
-        self.create_captions_button.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_captions_button.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
 
@@ -88,5 +102,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             initial_caption=self.caption_entry.get(),
             mode=mode,
             progress_callback=self.set_progress,
+            include_subdirectories=self.include_subdirectories_var.get(),
         )
         self.parent.load_image()

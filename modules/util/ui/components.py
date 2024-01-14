@@ -269,8 +269,8 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     return component
 
 
-def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None):
-    component = ctk.CTkSwitch(master, variable=ui_state.vars[var_name], text="", command=command)
+def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, text: str =""):
+    component = ctk.CTkSwitch(master, variable=ui_state.vars[var_name], text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
     return component
 
