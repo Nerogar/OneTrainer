@@ -109,6 +109,7 @@ class TrainArgs(BaseArgs):
     text_encoder_2_weight_dtype: DataType
 
     # vae
+    vae_model_name: str
     vae_weight_dtype: DataType
 
     # effnet encoder
@@ -245,6 +246,7 @@ class TrainArgs(BaseArgs):
             base_model=self.base_model_name,
             effnet_encoder_model=self.effnet_encoder_model_name,
             decoder_model=self.decoder_model_name,
+            vae_model=self.vae_model_name,
             lora=self.lora_model_name,
             embedding=self.embedding_model_names,
         )
@@ -344,10 +346,10 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--text-encoder-2-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="text_encoder_2_weight_dtype", help="The data type to use for text encoder 2 weights during training", choices=list(DataType))
 
         # vae
+        parser.add_argument("--vae-model-name", type=str, required=False, dest="vae_model_name", default="", help="The VAE model to start training from. Can be used to override the base model VAE.")
         parser.add_argument("--vae-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="vae_weight_dtype", help="The data type to use for vae weights during training", choices=list(DataType))
 
         # effnet encoder
-        parser.add_argument("--effnet-encoder-model-name", type=str, required=False, dest="effnet_encoder_model_name", default="", help="The effnet encoder model to start training from")
         parser.add_argument("--effnet-encoder-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="effnet_encoder_weight_dtype", help="The data type to use for effnet encoder weights during training", choices=list(DataType))
 
         # decoder
@@ -540,6 +542,7 @@ class TrainArgs(BaseArgs):
         data.append(("text_encoder_2_weight_dtype", DataType.NONE, DataType, False))
 
         # vae
+        data.append(("vae_model_name", "", str, False))
         data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # effnet encoder

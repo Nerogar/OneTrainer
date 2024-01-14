@@ -122,7 +122,7 @@ class ModelTab:
     ) -> int:
         # base model
         components.label(self.scroll_frame, row, 0, "Base Model",
-                         tooltip="Filename, directory or hugging face repository of the base model")
+                         tooltip="Filename, directory or Hugging Face repository of the base model")
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "base_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
@@ -194,6 +194,14 @@ class ModelTab:
             row += 1
 
         if has_vae:
+            # base model
+            components.label(self.scroll_frame, row, 0, "VAE",
+                             tooltip="Directory or Hugging Face repository of a VAE model. Can be used to override the base model VAE.")
+            components.file_entry(
+                self.scroll_frame, row, 1, self.ui_state, "vae_model_name",
+                path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            )
+
             # vae weight dtype
             components.label(self.scroll_frame, row, 3, "Override VAE Data Type",
                              tooltip="Overrides the vae weight data type")
@@ -211,7 +219,7 @@ class ModelTab:
     def __create_effnet_encoder_components(self, row: int):
         # effnet encoder model
         components.label(self.scroll_frame, row, 0, "Effnet Encoder Model",
-                         tooltip="Filename, directory or hugging face repository of the effnet encoder model")
+                         tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "effnet_encoder_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
@@ -234,7 +242,7 @@ class ModelTab:
     def __create_decoder_components(self, row: int) -> int:
         # decoder model
         components.label(self.scroll_frame, row, 0, "Decoder Model",
-                         tooltip="Filename, directory or hugging face repository of the decoder model")
+                         tooltip="Filename, directory or Hugging Face repository of the decoder model")
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "decoder_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x

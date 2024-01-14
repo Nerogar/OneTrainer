@@ -76,6 +76,7 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> StableDiffusionModel | None:
         with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
@@ -87,7 +88,7 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             )
 
         # base model
-        model = self.__load_diffusers(model_type, weight_dtypes, base_model_name)
+        model = self.__load_diffusers(model_type, weight_dtypes, base_model_name, vae_model_name)
 
         # optimizer
         try:
@@ -116,6 +117,7 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> StableDiffusionModel | None:
         tokenizer = CLIPTokenizer.from_pretrained(
             base_model_name,
@@ -137,11 +139,17 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
 
-        vae = AutoencoderKL.from_pretrained(
-            base_model_name,
-            subfolder="vae",
-            torch_dtype=weight_dtypes.vae.torch_dtype(),
-        )
+        if vae_model_name:
+            vae = AutoencoderKL.from_pretrained(
+                vae_model_name,
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
+        else:
+            vae = AutoencoderKL.from_pretrained(
+                base_model_name,
+                subfolder="vae",
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
 
         unet = UNet2DConditionModel.from_pretrained(
             base_model_name,
@@ -182,12 +190,13 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> StableDiffusionModel | None:
-        yaml_name = self._get_sd_config_name(model_type, base_model_name)
+        sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=base_model_name,
-            original_config_file=yaml_name,
+            original_config_file=sd_config_name,
             load_safety_checker=False,
         )
 
@@ -195,6 +204,12 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             noise_scheduler=NoiseScheduler.DDIM,
             original_noise_scheduler=pipeline.scheduler,
         )
+
+        if vae_model_name:
+            pipeline.vae = AutoencoderKL.from_pretrained(
+                vae_model_name,
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
 
         sd_config = self._load_sd_config(model_type, base_model_name)
 
@@ -218,12 +233,13 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> StableDiffusionModel | None:
-        yaml_name = self._get_sd_config_name(model_type, base_model_name)
+        sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=base_model_name,
-            original_config_file=yaml_name,
+            original_config_file=sd_config_name,
             load_safety_checker=False,
             from_safetensors=True,
         )
@@ -232,6 +248,12 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             noise_scheduler=NoiseScheduler.DDIM,
             original_noise_scheduler=pipeline.scheduler,
         )
+
+        if vae_model_name:
+            pipeline.vae = AutoencoderKL.from_pretrained(
+                vae_model_name,
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
 
         sd_config = self._load_sd_config(model_type)
 
@@ -259,28 +281,28 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
         stacktraces = []
 
         try:
-            model = self.__load_internal(model_type, weight_dtypes, model_names.base_model)
+            model = self.__load_internal(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_diffusers(model_type, weight_dtypes, model_names.base_model)
+            model = self.__load_diffusers(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_safetensors(model_type, weight_dtypes, model_names.base_model)
+            model = self.__load_safetensors(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             if model is not None:
                 return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_ckpt(model_type, weight_dtypes, model_names.base_model)
+            model = self.__load_ckpt(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             if model is not None:
                 return model
         except:
