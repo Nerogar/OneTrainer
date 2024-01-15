@@ -34,6 +34,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> PixArtAlphaModel | None:
         with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
@@ -48,7 +49,8 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
         model = self.__load_diffusers(
             model_type,
             weight_dtypes,
-            base_model_name
+            base_model_name,
+            vae_model_name,
         )
 
         # optimizer
@@ -76,6 +78,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> PixArtAlphaModel | None:
         tokenizer = T5Tokenizer.from_pretrained(
             base_model_name,
@@ -93,11 +96,17 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
 
-        vae = AutoencoderKL.from_pretrained(
-            base_model_name,
-            subfolder="vae",
-            torch_dtype=weight_dtypes.vae.torch_dtype(),
-        )
+        if vae_model_name:
+            vae = AutoencoderKL.from_pretrained(
+                vae_model_name,
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
+        else:
+            vae = AutoencoderKL.from_pretrained(
+                base_model_name,
+                subfolder="vae",
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
 
         transformer = Transformer2DModel.from_pretrained(
             base_model_name,
@@ -122,6 +131,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> PixArtAlphaModel | None:
         pass
 
@@ -130,6 +140,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
     ) -> PixArtAlphaModel | None:
         pass
 
@@ -148,6 +159,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 model_type,
                 weight_dtypes,
                 base_model_name,
+                model_names.vae_model,
             )
             if model is not None:
                 return model
@@ -159,6 +171,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 model_type,
                 weight_dtypes,
                 base_model_name,
+                model_names.vae_model,
             )
             if model is not None:
                 return model
@@ -170,6 +183,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 model_type,
                 weight_dtypes,
                 base_model_name,
+                model_names.vae_model,
             )
             if model is not None:
                 return model
@@ -181,6 +195,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 model_type,
                 weight_dtypes,
                 base_model_name,
+                model_names.vae_model,
             )
             if model is not None:
                 return model
