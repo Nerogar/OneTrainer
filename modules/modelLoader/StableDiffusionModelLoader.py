@@ -212,9 +212,16 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
         state_dict = torch.load(base_model_name)
         state_dict = self.__fix_nai_model(state_dict)
 
+        num_in_channels = 4
+        if model_type.has_mask_input():
+            num_in_channels += 1
+        if model_type.has_conditioning_image_input():
+            num_in_channels += 4
+
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=state_dict,
             original_config_file=sd_config_name,
+            num_in_channels=num_in_channels,
             load_safety_checker=False,
         )
 
@@ -255,9 +262,16 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
     ) -> StableDiffusionModel | None:
         sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
+        num_in_channels = 4
+        if model_type.has_mask_input():
+            num_in_channels += 1
+        if model_type.has_conditioning_image_input():
+            num_in_channels += 4
+
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=base_model_name,
             original_config_file=sd_config_name,
+            num_in_channels=num_in_channels,
             load_safety_checker=False,
             from_safetensors=True,
         )
