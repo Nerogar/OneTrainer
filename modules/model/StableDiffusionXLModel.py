@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline, StableDiffusionXLPipeline, DDIMScheduler
 from torch import Tensor
@@ -6,6 +8,7 @@ from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjecti
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -21,7 +24,7 @@ class StableDiffusionXLModelEmbedding:
 
         self.text_encoder_1_vector = text_encoder_1_vector
         self.text_encoder_2_vector = text_encoder_2_vector
-        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionXLModel(BaseModel):
@@ -34,6 +37,13 @@ class StableDiffusionXLModel(BaseModel):
     text_encoder_2: CLIPTextModelWithProjection
     vae: AutoencoderKL
     unet: UNet2DConditionModel
+
+    # autocast context
+    autocast_context: torch.autocast | nullcontext
+    vae_autocast_context: torch.autocast | nullcontext
+
+    train_dtype: DataType
+    vae_train_dtype: DataType
 
     # persistent embedding training data
     all_text_encoder_1_original_token_embeds: Tensor
@@ -56,7 +66,7 @@ class StableDiffusionXLModel(BaseModel):
             tokenizer_2: CLIPTokenizer | None = None,
             noise_scheduler: DDIMScheduler | None = None,
             text_encoder_1: CLIPTextModel | None = None,
-            text_encoder_2: CLIPTextModel | None = None,
+            text_encoder_2: CLIPTextModelWithProjection | None = None,
             vae: AutoencoderKL | None = None,
             unet: UNet2DConditionModel | None = None,
             optimizer_state_dict: dict | None = None,
@@ -84,6 +94,12 @@ class StableDiffusionXLModel(BaseModel):
         self.text_encoder_2 = text_encoder_2
         self.vae = vae
         self.unet = unet
+
+        self.autocast_context = nullcontext()
+        self.vae_autocast_context = nullcontext()
+
+        self.train_dtype = DataType.FLOAT_32
+        self.vae_train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
         self.text_encoder_1_lora = text_encoder_1_lora

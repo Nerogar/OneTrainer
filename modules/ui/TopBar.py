@@ -77,6 +77,7 @@ class TopBar:
                 ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
                 ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
                 ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
+                ("PixArt Alpha", ModelType.PIXART_ALPHA),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -107,6 +108,10 @@ class TopBar:
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_args.model_type.is_pixart_alpha():
+            values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
             ]
 
         # training method

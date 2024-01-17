@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import torch
 import torchvision
 from diffusers import DiffusionPipeline, DDPMWuerstchenScheduler, WuerstchenCombinedPipeline, ModelMixin, ConfigMixin
@@ -9,6 +11,7 @@ from transformers import CLIPTextModel, CLIPTokenizer
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -46,7 +49,7 @@ class WuerstchenModelEmbedding:
         token_count = prior_text_encoder_vector.shape[0]
 
         self.prior_text_encoder_vector = prior_text_encoder_vector
-        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
 
 
 class WuerstchenModel(BaseModel):
@@ -62,6 +65,11 @@ class WuerstchenModel(BaseModel):
     prior_text_encoder: CLIPTextModel
     prior_noise_scheduler: DDPMWuerstchenScheduler
     prior_prior: WuerstchenPrior
+
+    # autocast context
+    autocast_context: torch.autocast | nullcontext
+
+    train_dtype: DataType
 
     # persistent embedding training data
     all_prior_text_encoder_original_token_embeds: Tensor
@@ -111,6 +119,10 @@ class WuerstchenModel(BaseModel):
         self.prior_text_encoder = prior_text_encoder
         self.prior_noise_scheduler = prior_noise_scheduler
         self.prior_prior = prior_prior
+
+        self.autocast_context = nullcontext()
+
+        self.train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
         self.prior_text_encoder_lora = prior_text_encoder_lora

@@ -7,6 +7,7 @@ from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscr
 from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
+from modules.dataLoader.PixArtAlphaFineTuneDataLoader import PixArtAlphaFineTuneDataLoader
 from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
@@ -16,6 +17,7 @@ from modules.dataLoader.WuerstchenEmbeddingDataLoader import WuerstchenEmbedding
 from modules.dataLoader.WuerstchenFineTuneDataLoader import WuerstchenFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.modelLoader.PixArtAlphaModelLoader import PixArtAlphaModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
@@ -26,11 +28,13 @@ from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddi
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelLoader.WuerstchenModelLoader import WuerstchenModelLoader
 from modules.modelSampler import BaseModelSampler
+from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
 from modules.modelSampler.WuerstchenSampler import WuerstchenSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.PixArtAlphaModelSaver import PixArtAlphaModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
@@ -41,6 +45,7 @@ from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbedding
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSaver.WuerstchenModelSaver import WuerstchenModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
@@ -75,6 +80,8 @@ def create_model_loader(
                 return StableDiffusionXLModelLoader()
             if model_type.is_wuerstchen():
                 return WuerstchenModelLoader()
+            if model_type.is_pixart_alpha():
+                return PixArtAlphaModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelLoader()
@@ -106,6 +113,8 @@ def create_model_saver(
                 return StableDiffusionXLModelSaver()
             if model_type.is_wuerstchen():
                 return WuerstchenModelSaver()
+            if model_type.is_pixart_alpha():
+                return PixArtAlphaModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionModelSaver()
@@ -140,6 +149,8 @@ def create_model_setup(
                 return StableDiffusionXLFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_pixart_alpha():
+                return PixArtAlphaFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -174,6 +185,8 @@ def create_model_sampler(
                 return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
             if model_type.is_wuerstchen():
                 return WuerstchenSampler(train_device, temp_device, model, model_type)
+            if model_type.is_pixart_alpha():
+                return PixArtAlphaSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
@@ -210,6 +223,8 @@ def create_data_loader(
                 return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
+            if model_type.is_pixart_alpha():
+                return PixArtAlphaFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, args, model, train_progress)

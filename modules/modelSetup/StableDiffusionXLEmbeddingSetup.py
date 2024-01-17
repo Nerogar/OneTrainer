@@ -137,10 +137,10 @@ class StableDiffusionXLEmbeddingSetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
 
-        model.text_encoder_1.train()
-        model.text_encoder_2.train()
+        model.text_encoder_1.eval()
+        model.text_encoder_2.eval()
         model.vae.eval()
-        model.unet.train()
+        model.unet.eval()
 
     def after_optimizer_step(
             self,

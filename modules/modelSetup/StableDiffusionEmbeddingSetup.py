@@ -106,9 +106,9 @@ class StableDiffusionEmbeddingSetup(
         model.unet.to(self.train_device)
         model.depth_estimator_to(self.temp_device)
 
-        model.text_encoder.train()
+        model.text_encoder.eval()
         model.vae.eval()
-        model.unet.train()
+        model.unet.eval()
 
     def after_optimizer_step(
             self,

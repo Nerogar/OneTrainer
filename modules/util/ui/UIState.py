@@ -162,8 +162,7 @@ class UIState:
                 elif issubclass(var_type, Enum):
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
-                    var.trace_add("write",
-                                  self.__set_enum_var(obj, is_dict, name, var, type(obj_var), obj.nullables[name]))
+                    var.trace_add("write", self.__set_enum_var(obj, is_dict, name, var, var_type, obj.nullables[name]))
                     self.vars[name] = var
                 elif var_type == bool:
                     var = tk.BooleanVar(master=self.master)

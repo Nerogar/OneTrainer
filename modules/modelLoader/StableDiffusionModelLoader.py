@@ -185,6 +185,21 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             model_spec=model_spec,
         )
 
+    def __fix_nai_model(self, state_dict: dict) -> dict:
+        # fix for loading models with an empty state_dict key
+        while 'state_dict' in state_dict and len(state_dict['state_dict']) > 0:
+            state_dict = state_dict['state_dict']
+        if 'state_dict' in state_dict:
+            state_dict.pop('state_dict')
+
+        converted_state_dict = {}
+        for key, value in state_dict.items():
+            if key.startswith('cond_stage_model.transformer') and not key.startswith('cond_stage_model.transformer.text_model'):
+                key = key.replace('cond_stage_model.transformer', 'cond_stage_model.transformer.text_model')
+            converted_state_dict[key] = value
+
+        return converted_state_dict
+
     def __load_ckpt(
             self,
             model_type: ModelType,
@@ -194,9 +209,19 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
     ) -> StableDiffusionModel | None:
         sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
+        state_dict = torch.load(base_model_name)
+        state_dict = self.__fix_nai_model(state_dict)
+
+        num_in_channels = 4
+        if model_type.has_mask_input():
+            num_in_channels += 1
+        if model_type.has_conditioning_image_input():
+            num_in_channels += 4
+
         pipeline = download_from_original_stable_diffusion_ckpt(
-            checkpoint_path_or_dict=base_model_name,
+            checkpoint_path_or_dict=state_dict,
             original_config_file=sd_config_name,
+            num_in_channels=num_in_channels,
             load_safety_checker=False,
         )
 
@@ -237,9 +262,16 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
     ) -> StableDiffusionModel | None:
         sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
+        num_in_channels = 4
+        if model_type.has_mask_input():
+            num_in_channels += 1
+        if model_type.has_conditioning_image_input():
+            num_in_channels += 4
+
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=base_model_name,
             original_config_file=sd_config_name,
+            num_in_channels=num_in_channels,
             load_safety_checker=False,
             from_safetensors=True,
         )

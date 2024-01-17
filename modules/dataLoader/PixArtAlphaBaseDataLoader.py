@@ -11,7 +11,7 @@ from mgds.pipelineModules.CollectPaths import CollectPaths
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
-from mgds.pipelineModules.EncodeClipText import EncodeClipText
+from mgds.pipelineModules.EncodeT5Text import EncodeT5Text
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
@@ -43,7 +43,7 @@ from mgds.pipelineModules.Tokenize import Tokenize
 from mgds.pipelineModules.VariationSorting import VariationSorting
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
-from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
@@ -52,16 +52,16 @@ from modules.util.params.ConceptParams import ConceptParams
 from modules.util.torch_util import torch_gc
 
 
-class StablDiffusionXLBaseDataLoader(BaseDataLoader):
+class PixArtAlphaBaseDataLoader(BaseDataLoader):
     def __init__(
             self,
             train_device: torch.device,
             temp_device: torch.device,
             args: TrainArgs,
-            model: StableDiffusionXLModel,
+            model: PixArtAlphaModel,
             train_progress: TrainProgress,
     ):
-        super(StablDiffusionXLBaseDataLoader, self).__init__(
+        super(PixArtAlphaBaseDataLoader, self).__init__(
             train_device,
             temp_device,
         )
@@ -103,11 +103,12 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         return modules
 
-    def _load_input_modules(self, args: TrainArgs, model: StableDiffusionXLModel) -> list:
+    def _load_input_modules(self, args: TrainArgs, model: PixArtAlphaModel) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1)
 
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
+
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -150,7 +151,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
         aspect_bucketing = AspectBucketing(
-            quantization=64,
+            quantization=16,
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
@@ -188,6 +189,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(scale_crop_mask)
 
+
         return modules
 
     def _augmentation_modules(self, args: TrainArgs):
@@ -195,6 +197,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         if args.masked_training or args.model_type.has_mask_input():
             inputs.append('mask')
+
 
         random_flip = RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', fixed_enabled_in_name='concept.image.enable_fixed_flip')
         random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', fixed_enabled_in_name='concept.image.enable_fixed_rotate', max_angle_in_name='concept.image.random_rotate_max_angle')
@@ -226,22 +229,17 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         return modules
 
-    def _preparation_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
+
+    def _preparation_modules(self, args: TrainArgs, model: PixArtAlphaModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_context=model.vae_autocast_context)
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_context=model.autocast_context)
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_context=model.vae_autocast_context)
-        tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
-        tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
-        encode_prompt_1 = EncodeClipText(in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, add_layer_norm=False, text_encoder=model.text_encoder_1, hidden_state_output_index=-(2+args.text_encoder_layer_skip), autocast_context=model.autocast_context)
-        encode_prompt_2 = EncodeClipText(in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_2, hidden_state_output_index=-(2+args.text_encoder_2_layer_skip), autocast_context=model.autocast_context)
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_context=model.autocast_context)
+        tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=120)
+        encode_prompt = EncodeT5Text(tokens_in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1+args.text_encoder_layer_skip), autocast_context=model.text_encoder_autocast_context)
 
-        modules = [
-            rescale_image, encode_image,
-            tokenize_prompt_1,
-            tokenize_prompt_2,
-        ]
+        modules = [rescale_image, encode_image, tokenize_prompt]
 
         if args.masked_training or args.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -251,15 +249,13 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             modules.append(encode_conditioning_image)
 
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            modules.append(encode_prompt_1)
-
-        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
-            modules.append(encode_prompt_2)
+            modules.append(encode_prompt)
 
         return modules
 
-    def _cache_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
-        image_split_names = ['latent_image_distribution', 'original_resolution', 'crop_offset']
+
+    def _cache_modules(self, args: TrainArgs, model: PixArtAlphaModel):
+        image_split_names = ['latent_image_distribution']
 
         if args.masked_training or args.model_type.has_mask_input():
             image_split_names.append('latent_mask')
@@ -269,25 +265,11 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
-        text_split_names = []
+        text_split_names = ['tokens', 'tokens_mask', 'text_encoder_hidden_state']
 
-        sort_names = [
-            'prompt', 'tokens_1', 'tokens_2', 'concept'
+        sort_names = text_split_names + [
+            'prompt', 'concept'
         ]
-
-        if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            text_split_names.append('tokens_1')
-            text_split_names.append('text_encoder_1_hidden_state')
-            sort_names.append('tokens_1')
-            sort_names.append('text_encoder_1_hidden_state')
-
-        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
-            text_split_names.append('tokens_2')
-            text_split_names.append('text_encoder_2_hidden_state')
-            text_split_names.append('text_encoder_2_pooled_state')
-            sort_names.append('tokens_2')
-            sort_names.append('text_encoder_2_hidden_state')
-            sort_names.append('text_encoder_2_pooled_state')
 
         image_cache_dir = os.path.join(args.cache_dir, "image")
         text_cache_dir = os.path.join(args.cache_dir, "text")
@@ -300,18 +282,14 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         def before_cache_text_fun():
             model.to(self.temp_device)
-
-            if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-                model.text_encoder_1_to(self.train_device)
-
-            if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
-                model.text_encoder_2_to(self.train_device)
-
+            model.text_encoder_to(self.train_device)
             model.eval()
             torch_gc()
 
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
         image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
         modules = []
 
@@ -320,8 +298,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if (not args.train_text_encoder or not args.train_text_encoder_2) and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
-            text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
+        if not args.train_text_encoder and args.latent_caching and args.training_method != TrainingMethod.EMBEDDING:
             modules.append(text_disk_cache)
             sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -331,12 +308,9 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         return modules
 
-    def _output_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
-        output_names = [
-            'image_path', 'latent_image',
-            'tokens_1', 'tokens_2',
-            'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
-        ]
+
+    def _output_modules(self, args: TrainArgs, model: PixArtAlphaModel):
+        output_names = ['latent_image', 'tokens', 'tokens_mask', 'image_path', 'prompt']
 
         if args.masked_training or args.model_type.has_mask_input():
             output_names.append('latent_mask')
@@ -345,11 +319,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             output_names.append('latent_conditioning_image')
 
         if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING:
-            output_names.append('text_encoder_1_hidden_state')
-
-        if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING:
-            output_names.append('text_encoder_2_hidden_state')
-            output_names.append('text_encoder_2_pooled_state')
+            output_names.append('text_encoder_hidden_state')
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
@@ -384,19 +354,20 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         return modules
 
-    def _debug_modules(self, args: TrainArgs, model: StableDiffusionXLModel):
+
+    def _debug_modules(self, args: TrainArgs, model: PixArtAlphaModel):
         debug_dir = os.path.join(args.debug_dir, "dataloader")
 
         def before_save_fun():
             model.vae_to(self.train_device)
 
-        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_context=model.vae_autocast_context)
-        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_context=model.vae_autocast_context)
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_context=model.autocast_context)
+        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_context=model.autocast_context)
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
-        decode_prompt = DecodeTokens(in_name='tokens_1', out_name='decoded_prompt', tokenizer=model.tokenizer_1)
+        decode_prompt = DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer)
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)
         save_conditioning_image = SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)
-        # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun)
+        # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun),
         save_mask = SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun)
         save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir, before_save_fun=before_save_fun)
 
@@ -422,10 +393,11 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
 
         return modules
 
+
     def create_dataset(
             self,
             args: TrainArgs,
-            model: StableDiffusionXLModel,
+            model: PixArtAlphaModel,
             concepts: list[dict],
             train_progress: TrainProgress,
     ):
