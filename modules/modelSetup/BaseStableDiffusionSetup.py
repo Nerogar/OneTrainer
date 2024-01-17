@@ -239,8 +239,7 @@ class BaseStableDiffusionSetup(
                         device=scaled_latent_image.device,
                     ).long()
                 else:
-                    np_random_seed = torch.randint(0, 2**32, (1,), generator=generator).item()
-                    np.random.seed(np_random_seed)
+                    np.random.seed(train_progress.global_step)
                     weights = np.linspace(0, 1, max_timestep - min_timestep)
                     weights = 1 / (1 + np.exp(-args.noising_bias * (weights - 0.5))) # Sigmoid
                     weights /= np.sum(weights)
