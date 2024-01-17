@@ -4,7 +4,6 @@
     "output_model_destination": "models/model",
     "output_model_format": "DIFFUSERS",
     "resolution": "1024",
-    "text_encoder_train_dtype": "BFLOAT_16",
     "text_encoder_weight_dtype": "BFLOAT_16",
     "train_text_encoder": false,
     "train_text_encoder_epochs": 30,
