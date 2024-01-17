@@ -129,7 +129,7 @@ class TrainingTab:
         components.label(frame, 7, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
         components.entry(frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
-        
+
         # Learning Rate Scaler
         components.label(frame, 8, 0, "Learning Rate Scaler",
                          tooltip="Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)")
@@ -330,6 +330,11 @@ class TrainingTab:
         components.label(frame, 6, 0, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(frame, 6, 1, self.ui_state, "max_noising_strength")
+
+        # noising bias
+        components.label(frame, 7, 0, "Noising Bias",
+                         tooltip="This adjusts the distribution noise time steps.  Set to 0 for normal behavior, negative to bias towards minimum noise (high frequency detail), or positive to bias towards maximum noise (low frequency detail)")
+        components.entry(frame, 7, 1, self.ui_state, "noising_bias")
 
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

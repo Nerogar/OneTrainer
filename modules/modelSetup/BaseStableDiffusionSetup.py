@@ -2,6 +2,7 @@ from abc import ABCMeta
 from random import Random
 
 import torch
+import numpy as np
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
@@ -227,13 +228,24 @@ class BaseStableDiffusionSetup(
             }
         else:
             if not deterministic:
-                timestep = torch.randint(
-                    low=0,
-                    high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
-                    size=(scaled_latent_image.shape[0],),
-                    generator=generator,
-                    device=scaled_latent_image.device,
-                ).long()
+                min_timestep = 0
+                max_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
+                if args.noising_bias == 0:
+                    timestep = torch.randint(
+                        low=min_timestep,
+                        high=max_timestep,
+                        size=(scaled_latent_image.shape[0],),
+                        generator=generator,
+                        device=scaled_latent_image.device,
+                    ).long()
+                else:
+                    np_random_seed = torch.randint(0, 2**32, (1,), generator=generator).item()
+                    np.random.seed(np_random_seed)
+                    weights = np.linspace(0, 1, max_timestep - min_timestep)
+                    weights = 1 / (1 + np.exp(-args.noising_bias * (weights - 0.5))) # Sigmoid
+                    weights /= np.sum(weights)
+                    samples = np.random.choice(np.arange(min_timestep, max_timestep), size=(scaled_latent_image.shape[0],), p=weights)
+                    timestep = torch.tensor(samples, dtype=torch.long, device=scaled_latent_image.device)
             else:
                 # -1 is for zero-based indexing
                 timestep = torch.tensor(

@@ -86,6 +86,7 @@ class TrainArgs(BaseArgs):
     force_v_prediction: bool
     force_epsilon_prediction: bool
     max_noising_strength: float
+    noising_bias: float
     unet_weight_dtype: DataType
 
     # prior
@@ -323,6 +324,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
         parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
         parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
+        parser.add_argument("--noising-bias", type=float, required=False, default=0.0, dest="noising_bias", help="The bias towards min or max noise timesteps; 0=None, Negative=Focus Details, Positive=Focus Composition")
         parser.add_argument("--unet-weight-dtype", type=DataType, required=False, default=DataType.NONE, dest="unet_weight_dtype", help="The data type to use for unet weights during training", choices=list(DataType))
 
         # prior
@@ -519,6 +521,7 @@ class TrainArgs(BaseArgs):
         data.append(("force_v_prediction", False, bool, False))
         data.append(("force_epsilon_prediction", False, bool, False))
         data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("noising_bias", 0.0, float, False))
         data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
 
         # prior
