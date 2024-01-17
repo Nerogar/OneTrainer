@@ -67,7 +67,7 @@ class TrainingTab:
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_unet_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
-        self.__create_loss_frame(column_2, 2)
+        self.__create_loss_frame(column_2, 2, supports_vb_loss=False)
 
     def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -77,7 +77,7 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
         self.__create_text_encoder_2_frame(column_0, 2)
-        self.__create_loss_frame(column_2, 2)
+        self.__create_loss_frame(column_2, 2, supports_vb_loss=False)
 
     def __setup_wuerstchen_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -85,7 +85,7 @@ class TrainingTab:
         self.__create_prior_frame(column_2, 0)
         self.__create_text_encoder_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
-        self.__create_loss_frame(column_2, 2)
+        self.__create_loss_frame(column_2, 2, supports_vb_loss=False)
 
     def __setup_pixart_alpha_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -94,7 +94,7 @@ class TrainingTab:
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_prior_frame(column_1, 1)
         self.__create_masked_frame(column_2, 1)
-        self.__create_loss_frame(column_2, 2)
+        self.__create_loss_frame(column_2, 2, supports_vb_loss=True)
 
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -411,7 +411,7 @@ class TrainingTab:
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
 
-    def __create_loss_frame(self, master, row):
+    def __create_loss_frame(self, master, row, supports_vb_loss: bool):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
 
@@ -425,10 +425,11 @@ class TrainingTab:
                          tooltip="Mean Absolute Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
         components.entry(frame, 1, 1, self.ui_state, "mae_strength")
 
-        # VB Strength
-        components.label(frame, 2, 0, "VB Strength",
-                         tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
-        components.entry(frame, 2, 1, self.ui_state, "vb_loss_strength")
+        if supports_vb_loss:
+            # VB Strength
+            components.label(frame, 2, 0, "VB Strength",
+                             tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
+            components.entry(frame, 2, 1, self.ui_state, "vb_loss_strength")
 
         # Loss Scaler
         components.label(frame, 3, 0, "Loss Scaler",
