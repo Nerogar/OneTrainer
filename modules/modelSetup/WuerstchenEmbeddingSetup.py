@@ -114,8 +114,8 @@ class WuerstchenEmbeddingSetup(
         model.decoder_vqgan.eval()
         model.effnet_encoder.eval()
 
-        model.prior_text_encoder.train()
-        model.prior_prior.train()
+        model.prior_text_encoder.eval()
+        model.prior_prior.eval()
 
     def after_optimizer_step(
             self,

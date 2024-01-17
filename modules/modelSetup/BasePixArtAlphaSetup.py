@@ -2,27 +2,25 @@ from abc import ABCMeta
 from random import Random
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
+from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 from torch.utils.checkpoint import checkpoint
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import \
-    enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers, \
-    create_checkpointed_forward
+from modules.modelSetup.stableDiffusion.checkpointing_util import create_checkpointed_forward
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import create_autocast_context
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
-class BaseStableDiffusionSetup(
+class BasePixArtAlphaSetup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
@@ -31,18 +29,22 @@ class BaseStableDiffusionSetup(
 ):
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
-        super(BaseStableDiffusionSetup, self).__init__(train_device, temp_device, debug_mode)
+        super(BasePixArtAlphaSetup, self).__init__(train_device, temp_device, debug_mode)
 
     def setup_optimizations(
             self,
-            model: StableDiffusionModel,
+            model: PixArtAlphaModel,
             args: TrainArgs,
     ):
         if args.attention_mechanism == AttentionMechanism.DEFAULT:
-            model.unet.set_attn_processor(AttnProcessor())
+            for name, child_module in model.transformer.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor())
         elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                model.unet.set_attn_processor(XFormersAttnProcessor())
+                for name, child_module in model.transformer.named_modules():
+                    if isinstance(child_module, Attention):
+                        child_module.set_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
             except Exception as e:
                 print(
@@ -50,7 +52,9 @@ class BaseStableDiffusionSetup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif args.attention_mechanism == AttentionMechanism.SDP:
-            model.unet.set_attn_processor(AttnProcessor2_0())
+            for name, child_module in model.transformer.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor2_0())
 
             if is_xformers_available():
                 try:
@@ -61,26 +65,38 @@ class BaseStableDiffusionSetup(
                         f" correctly and a GPU is available: {e}"
                     )
 
+
         if args.gradient_checkpointing:
             model.vae.enable_gradient_checkpointing()
-            model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_transformer_blocks(model.unet)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
+            model.transformer.enable_gradient_checkpointing()
+            # enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
             args.prior_weight_dtype,
             args.text_encoder_weight_dtype,
-            args.prior_weight_dtype,
+            args.vae_weight_dtype,
             args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
             args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
+        model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(
+            self.train_device,
+            args.train_dtype,
+            args.fallback_train_dtype,
+            [
+                args.text_encoder_weight_dtype,
+                args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+                args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
+            ],
+        )
+
+
     def __encode_text(
             self,
-            model: StableDiffusionModel,
+            model: PixArtAlphaModel,
             args: TrainArgs,
-            text_encoder_layer_skip: int,
             tokens: Tensor = None,
+            attention_mask: Tensor = None,
             text: str = None,
     ):
         if tokens is None:
@@ -88,24 +104,32 @@ class BaseStableDiffusionSetup(
                 text,
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=120,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(model.text_encoder.device)
 
-        # TODO: use attention mask if this is true:
-        # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-        text_encoder_output = model.text_encoder(tokens, return_dict=True, output_hidden_states=True)
-        final_layer_norm = model.text_encoder.text_model.final_layer_norm
-        prompt_embeds = final_layer_norm(
-            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-        )
+            attention_mask = tokenizer_output.attention_mask
+            attention_mask = attention_mask.to(model.text_encoder.device)
 
-        return prompt_embeds
+        with model.text_encoder_autocast_context:
+            text_encoder_output = model.text_encoder(
+                tokens,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]
+            final_layer_norm = model.text_encoder.encoder.final_layer_norm
+            prompt_embeds = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
+            )
+
+        return prompt_embeds, attention_mask
 
     def predict(
             self,
-            model: StableDiffusionModel,
+            model: PixArtAlphaModel,
             batch: dict,
             args: TrainArgs,
             train_progress: TrainProgress,
@@ -122,14 +146,15 @@ class BaseStableDiffusionSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
-                text_encoder_output = self.__encode_text(
+                text_encoder_output, text_encoder_attention_mask = self.__encode_text(
                     model,
                     args,
-                    args.text_encoder_layer_skip,
                     tokens=batch['tokens'],
+                    attention_mask=batch['tokens_mask'],
                 )
             else:
                 text_encoder_output = batch['text_encoder_hidden_state']
+                text_encoder_attention_mask = batch['tokens_mask']
 
             latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
@@ -141,12 +166,18 @@ class BaseStableDiffusionSetup(
             latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
             if is_align_prop_step and not deterministic:
-                negative_text_encoder_output = self.__encode_text(
+                dummy = torch.zeros((1,), device=self.train_device)
+                dummy.requires_grad_(True)
+
+                negative_text_encoder_output, negative_text_encoder_attention_mask = self.__encode_text(
                     model,
                     args,
-                    args.text_encoder_layer_skip,
                     text="",
-                ).expand((scaled_latent_image.shape[0], -1, -1))
+                )
+                negative_text_encoder_output = negative_text_encoder_output\
+                    .expand((scaled_latent_image.shape[0], -1, -1))
+                negative_text_encoder_attention_mask = negative_text_encoder_attention_mask \
+                    .expand((scaled_latent_image.shape[0], -1, -1))
 
                 model.noise_scheduler.set_timesteps(args.align_prop_steps)
 
@@ -156,14 +187,23 @@ class BaseStableDiffusionSetup(
                 timestep_low = \
                     int(args.align_prop_steps * args.max_noising_strength * (1.0 - args.align_prop_truncate_steps))
 
+                batch_size = scaled_latent_image.shape[0]
+                height = scaled_latent_image.shape[2] * 8
+                width = scaled_latent_image.shape[3] * 8
+                resolution = torch.tensor([height, width]).repeat(batch_size, 1)
+                aspect_ratio = torch.tensor([float(height / width)]).repeat(batch_size, 1)
+                resolution = resolution.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                aspect_ratio = aspect_ratio.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                added_cond_kwargs = {"resolution": resolution, "aspect_ratio": aspect_ratio}
+
                 truncate_timestep_index = args.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device)
+                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device)
 
                 for step in range(args.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \
                         .expand((scaled_latent_image.shape[0],)) \
-                        .to(device=model.unet.device)
+                        .to(device=model.transformer.device)
 
                     if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
                         latent_input = torch.concat(
@@ -172,35 +212,25 @@ class BaseStableDiffusionSetup(
                     else:
                         latent_input = scaled_noisy_latent_image
 
-                    if args.model_type.has_depth_input():
-                        predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            text_encoder_output,
-                            batch['latent_depth'],
-                        ).sample
+                    predicted_latent_noise = checkpointed_transformer(
+                        latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_hidden_states=text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_attention_mask=text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
+                        timestep=timestep,
+                        added_cond_kwargs=added_cond_kwargs,
+                    ).sample
 
-                        negative_predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            negative_text_encoder_output,
-                            batch['latent_depth'],
-                        ).sample
-                    else:
-                        predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            text_encoder_output,
-                        ).sample
-
-                        negative_predicted_latent_noise = checkpointed_unet(
-                            latent_input,
-                            timestep,
-                            negative_text_encoder_output,
-                        ).sample
+                    negative_predicted_latent_noise = checkpointed_transformer(
+                        latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_hidden_states=negative_text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                        encoder_attention_mask=negative_text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
+                        timestep=timestep,
+                        added_cond_kwargs=added_cond_kwargs,
+                    ).sample
 
                     cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
                     cfg_predicted_latent_noise = negative_predicted_latent_noise + args.align_prop_cfg_scale * cfg_grad
+                    cfg_predicted_latent_noise = cfg_predicted_latent_noise.chunk(2, dim=1)[0]
 
                     scaled_noisy_latent_image = model.noise_scheduler \
                         .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
@@ -240,30 +270,20 @@ class BaseStableDiffusionSetup(
                 }
             else:
                 if not deterministic:
-                    min_timestep = 0
-                    max_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
-                    if args.noising_bias == 0:
-                        timestep = torch.randint(
-                            low=min_timestep,
-                            high=max_timestep,
-                            size=(scaled_latent_image.shape[0],),
-                            generator=generator,
-                            device=scaled_latent_image.device,
-                        ).long()
-                    else:
-                        np.random.seed(train_progress.global_step)
-                        weights = np.linspace(0, 1, max_timestep - min_timestep)
-                        weights = 1 / (1 + np.exp(-args.noising_bias * (weights - 0.5))) # Sigmoid
-                        weights /= np.sum(weights)
-                        samples = np.random.choice(np.arange(min_timestep, max_timestep), size=(scaled_latent_image.shape[0],), p=weights)
-                        timestep = torch.tensor(samples, dtype=torch.long, device=scaled_latent_image.device)
+                    timestep = torch.randint(
+                        low=0,
+                        high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
+                        size=(scaled_latent_image.shape[0],),
+                        generator=generator,
+                        device=scaled_latent_image.device,
+                    ).long()
                 else:
                     # -1 is for zero-based indexing
                     timestep = torch.tensor(
                         int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
                         dtype=torch.long,
                         device=scaled_latent_image.device,
-                    )
+                    ).unsqueeze(0)
 
                 scaled_noisy_latent_image = model.noise_scheduler.add_noise(
                     original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
@@ -276,30 +296,34 @@ class BaseStableDiffusionSetup(
                 else:
                     latent_input = scaled_noisy_latent_image
 
-                if args.model_type.has_depth_input():
-                    predicted_latent_noise = model.unet(
-                        latent_input, timestep, text_encoder_output, batch['latent_depth']
-                    ).sample
-                else:
-                    predicted_latent_noise = model.unet(
-                        latent_input, timestep, text_encoder_output
-                    ).sample
+                batch_size = latent_input.shape[0]
+                height = latent_input.shape[2] * 8
+                width = latent_input.shape[3] * 8
+                resolution = torch.tensor([height, width]).repeat(batch_size, 1)
+                aspect_ratio = torch.tensor([float(height / width)]).repeat(batch_size, 1)
+                resolution = resolution.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                aspect_ratio = aspect_ratio.to(dtype=args.train_dtype.torch_dtype(), device=self.train_device)
+                added_cond_kwargs = {"resolution": resolution, "aspect_ratio": aspect_ratio}
 
-                model_output_data = {}
+                text_encoder_attention_mask = text_encoder_attention_mask.view(batch_size, -1)
 
-                if model.noise_scheduler.config.prediction_type == 'epsilon':
-                    model_output_data = {
-                        'loss_type': 'target',
-                        'predicted': predicted_latent_noise,
-                        'target': latent_noise,
-                    }
-                elif model.noise_scheduler.config.prediction_type == 'v_prediction':
-                    target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
-                    model_output_data = {
-                        'loss_type': 'target',
-                        'predicted': predicted_latent_noise,
-                        'target': target_velocity,
-                    }
+                predicted_latent_noise, predicted_latent_var_values = model.transformer(
+                    latent_input.to(dtype=args.train_dtype.torch_dtype()),
+                    encoder_hidden_states=text_encoder_output.to(dtype=args.train_dtype.torch_dtype()),
+                    encoder_attention_mask=text_encoder_attention_mask.to(dtype=args.train_dtype.torch_dtype()),
+                    timestep=timestep,
+                    added_cond_kwargs=added_cond_kwargs,
+                ).sample.chunk(2, dim=1)
+
+                model_output_data = {
+                    'loss_type': 'target',
+                    'predicted': predicted_latent_noise,
+                    'target': latent_noise,
+                    'noisy_latent_image': scaled_noisy_latent_image,
+                    'predicted_var_values': predicted_latent_var_values,
+                    'timestep': timestep,
+                    'scaled_latent_image': scaled_latent_image,
+                }
 
             if self.debug_mode:
                 with torch.no_grad():
@@ -371,8 +395,8 @@ class BaseStableDiffusionSetup(
                         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
                         scaled_predicted_latent_image = \
-                            (
-                                    scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
+                            (scaled_noisy_latent_image - predicted_latent_noise
+                             * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
                         predicted_latent_image = scaled_predicted_latent_image / vae_scaling_factor
                         predicted_image = model.vae.decode(predicted_latent_image).sample
                         predicted_image = predicted_image.clamp(-1, 1)
@@ -405,11 +429,11 @@ class BaseStableDiffusionSetup(
                                 train_progress.global_step
                             )
 
-            return model_output_data
+        return model_output_data
 
     def calculate_loss(
             self,
-            model: StableDiffusionModel,
+            model: PixArtAlphaModel,
             batch: dict,
             data: dict,
             args: TrainArgs,

@@ -61,6 +61,7 @@ class TrainArgs(BaseArgs):
     train_device: str
     temp_device: str
     train_dtype: DataType
+    fallback_train_dtype: DataType
     only_cache: bool
     resolution: str
     attention_mechanism: AttentionMechanism
@@ -73,6 +74,7 @@ class TrainArgs(BaseArgs):
     align_prop_cfg_scale: float
     mse_strength: float
     mae_strength: float
+    vb_loss_strength: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
 
@@ -298,7 +300,8 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--ema-update-step-interval", type=int, required=False, default=5, dest="ema_update_step_interval", help="")
         parser.add_argument("--train-device", type=str, required=False, default="cuda", dest="train_device", help="The device to train on")
         parser.add_argument("--temp-device", type=str, required=False, default="cpu", dest="temp_device", help="The device to use for temporary data")
-        parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The data type to use for training weights", choices=list(DataType))
+        parser.add_argument("--train-dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="train_dtype", help="The mixed precision data type to use during training", choices=list(DataType))
+        parser.add_argument("--fallback-train-dtype", type=DataType, required=False, default=DataType.BFLOAT_16, dest="fallback_train_dtype", help="The mixed precision data type to use during training for stages that don't support float16 data types.", choices=list(DataType))
         parser.add_argument("--only-cache", required=False, action='store_true', dest="only_cache", help="Only do the caching process without any training")
         parser.add_argument("--resolution", type=str, required=True, dest="resolution", help="Resolution to train at")
         parser.add_argument("--attention-mechanism", type=AttentionMechanism, required=False, default=AttentionMechanism.XFORMERS, dest="attention_mechanism", help="The Attention mechanism to use", choices=list(AttentionMechanism))
@@ -311,6 +314,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--align-prop-cfg-scale", type=float, required=False, default=7.0, dest="align_prop_cfg_scale", help="CFG Scale for inference steps of AlignProp calculations")
         parser.add_argument("--mse-strength", type=float, required=False, default=1.0, dest="mse_strength", help="Mean squared Error strength for custom loss settings")
         parser.add_argument("--mae-strength", type=float, required=False, default=0.0, dest="mae_strength", help="Mean Absolute Error strength for custom loss settings")
+        parser.add_argument("--vb-loss-strength", type=float, required=False, default=1.0, dest="vb_loss_strength", help="Variational lower-bound strength for custom loss settings")
         parser.add_argument("--loss-scaler", type=LossScaler, required=False, default=LossScaler.NONE, dest="loss_scaler", help="Type of Loss Scaler", choices=list(LossScaler))
         parser.add_argument("--learning-rate-scaler", type=LearningRateScaler, required=False, default=LearningRateScaler.NONE, dest="learning_rate_scaler", help="Type of Learning Rate Scaler", choices=list(LearningRateScaler))
 
@@ -496,6 +500,7 @@ class TrainArgs(BaseArgs):
         data.append(("train_device", "cuda", str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
+        data.append(("fallback_train_dtype", DataType.BFLOAT_16, DataType, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
@@ -508,6 +513,7 @@ class TrainArgs(BaseArgs):
         data.append(("align_prop_cfg_scale", 7.0, float, False))
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
+        data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
 

@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
     StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline, DDIMScheduler
@@ -9,6 +11,7 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import \
     rescale_noise_scheduler_to_zero_terminal_snr
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -22,7 +25,7 @@ class StableDiffusionModelEmbedding:
         token_count = text_encoder_vector.shape[0]
 
         self.text_encoder_vector = text_encoder_vector
-        self.text_tokens = [f"< {prefix}_{i}>" for i in range(token_count)]
+        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionModel(BaseModel):
@@ -35,6 +38,11 @@ class StableDiffusionModel(BaseModel):
     unet: UNet2DConditionModel
     image_depth_processor: DPTImageProcessor
     depth_estimator: DPTForDepthEstimation
+
+    # autocast context
+    autocast_context: torch.autocast | nullcontext
+
+    train_dtype: DataType
 
     # persistent embedding training data
     all_text_encoder_original_token_embeds: Tensor
@@ -81,6 +89,10 @@ class StableDiffusionModel(BaseModel):
         self.unet = unet
         self.image_depth_processor = image_depth_processor
         self.depth_estimator = depth_estimator
+
+        self.autocast_context = nullcontext()
+
+        self.train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
         self.text_encoder_lora = text_encoder_lora

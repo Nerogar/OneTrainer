@@ -16,6 +16,8 @@ class ModelType(Enum):
 
     WUERSTCHEN_2 = 'WUERSTCHEN_2'
 
+    PIXART_ALPHA = 'PIXART_ALPHA'
+
     def __str__(self):
         return self.value
 
@@ -35,6 +37,9 @@ class ModelType(Enum):
 
     def is_wuerstchen(self):
         return self == ModelType.WUERSTCHEN_2
+
+    def is_pixart_alpha(self):
+        return self == ModelType.PIXART_ALPHA
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \

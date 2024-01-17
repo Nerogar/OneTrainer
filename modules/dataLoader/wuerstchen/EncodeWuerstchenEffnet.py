@@ -16,13 +16,15 @@ class EncodeWuerstchenEffnet(
             in_name: str,
             out_name: str,
             effnet_encoder: WuerstchenEfficientNetEncoder,
-            override_allow_mixed_precision: bool | None = None,
+            autocast_context: torch.autocast | None = None,
     ):
         super(EncodeWuerstchenEffnet, self).__init__()
         self.in_name = in_name
         self.out_name = out_name
         self.effnet_encoder = effnet_encoder
-        self.override_allow_mixed_precision = override_allow_mixed_precision
+
+        self.autocast_context = nullcontext() if autocast_context is None else autocast_context
+        self.autocast_enabled = isinstance(self.autocast_context, torch.autocast)
 
     def length(self) -> int:
         return self._get_previous_length(self.in_name)
@@ -36,17 +38,13 @@ class EncodeWuerstchenEffnet(
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
         image = self._get_previous_item(variation, self.in_name, index)
 
-        image = image.to(device=image.device, dtype=self.pipeline.dtype)
+        image = image.to(device=self.effnet_encoder.device)
 
-        allow_mixed_precision = self.pipeline.allow_mixed_precision if self.override_allow_mixed_precision is None \
-            else self.override_allow_mixed_precision
+        if not self.autocast_enabled:
+            image = image.to(self.effnet_encoder.dtype)
 
-        image = image if allow_mixed_precision else image.to(self.effnet_encoder.dtype)
-
-        with torch.no_grad():
-            with torch.autocast(self.pipeline.device.type, self.pipeline.dtype) if allow_mixed_precision \
-                    else nullcontext():
-                image_embeddings = self.effnet_encoder(image.unsqueeze(0)).squeeze()
+        with self.autocast_context:
+            image_embeddings = self.effnet_encoder(image.unsqueeze(0)).squeeze()
 
         return {
             self.out_name: image_embeddings
