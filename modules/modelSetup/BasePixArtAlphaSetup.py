@@ -76,7 +76,7 @@ class BasePixArtAlphaSetup(
             args.text_encoder_weight_dtype,
             args.vae_weight_dtype,
             args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+            args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
         model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(

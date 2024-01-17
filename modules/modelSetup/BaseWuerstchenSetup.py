@@ -56,7 +56,7 @@ class BaseWuerstchenSetup(
             args.text_encoder_weight_dtype,
             args.prior_weight_dtype,
             args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.LORA else None,
+            args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
     def __alpha_cumprod(
