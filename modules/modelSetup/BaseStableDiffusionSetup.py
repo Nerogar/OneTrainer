@@ -2,6 +2,7 @@ from abc import ABCMeta
 from random import Random
 
 import torch
+import numpy as np
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
