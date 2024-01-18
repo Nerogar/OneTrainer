@@ -292,7 +292,7 @@ class BaseStableDiffusionXLSetup(
                 }
             else:
                 if not deterministic:
-                    min_timestep = 0
+                    min_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.min_noising_strength)
                     max_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
                     if args.noising_bias == 0:
                         timestep = torch.randint(

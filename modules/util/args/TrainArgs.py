@@ -87,6 +87,7 @@ class TrainArgs(BaseArgs):
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
     force_epsilon_prediction: bool
+    min_noising_strength: float
     max_noising_strength: float
     noising_weight: float
     noising_bias: float
@@ -328,6 +329,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--rescale-noise-scheduler-to-zero-terminal-snr", required=False, action='store_true', dest="rescale_noise_scheduler_to_zero_terminal_snr", help="Rescales the noise sceduler to have a zero terminal signal to noise ratio, this also sets the model to v-prediction mode")
         parser.add_argument("--force-v-prediction", required=False, action='store_true', dest="force_v_prediction", help="Forces the training to use v-prediction")
         parser.add_argument("--force-epsilon-prediction", required=False, action='store_true', dest="force_epsilon_prediction", help="Forces the training to use epsilon-prediction")
+        parser.add_argument("--min-noising-strength", type=float, required=False, default=0.0, dest="min_noising_strength", help="The min noising strength for training. Can help improve composition")
         parser.add_argument("--max-noising-strength", type=float, required=False, default=1.0, dest="max_noising_strength", help="The max noising strength for training. Useful to prevent overfitting")
         parser.add_argument("--noising-weight", type=float, required=False, default=0.0, dest="noising_weight", help="The weight/slope towards min or max noise timesteps; 0=None, Negative=Focus Details, Positive=Focus Composition")
         parser.add_argument("--noising-bias", type=float, required=False, default=0.5, dest="noising_bias", help="The bias/inflection point of noise distribution; 0=Low, 0.5=Default Center, 1=High")
@@ -528,6 +530,7 @@ class TrainArgs(BaseArgs):
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
         data.append(("force_epsilon_prediction", False, bool, False))
+        data.append(("min_noising_strength", 0.0, float, False))
         data.append(("max_noising_strength", 1.0, float, False))
         data.append(("noising_weight", 0.0, float, False))
         data.append(("noising_bias", 0.5, float, False))
