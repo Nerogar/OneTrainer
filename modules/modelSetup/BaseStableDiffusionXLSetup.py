@@ -304,7 +304,7 @@ class BaseStableDiffusionXLSetup(
                     else:
                         np.random.seed(train_progress.global_step)
                         weights = np.linspace(0, 1, max_timestep - min_timestep)
-                        weights = 1 / (1 + np.exp(-args.noising_bias * (weights - 0.5))) # Sigmoid
+                        weights = 1 / (1 + np.exp(-args.noising_weight * (weights - args.noising_bias))) # Sigmoid
                         weights /= np.sum(weights)
                         samples = np.random.choice(np.arange(min_timestep, max_timestep), size=(scaled_latent_image.shape[0],), p=weights)
                         timestep = torch.tensor(samples, dtype=torch.long, device=scaled_latent_image.device)

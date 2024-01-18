@@ -353,10 +353,15 @@ class TrainingTab:
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(frame, 6, 1, self.ui_state, "max_noising_strength")
 
+        # noising weight
+        components.label(frame, 7, 0, "Noising Weight",
+                         tooltip="Controls the emphasis on certain noise levels during training. A value of 0 disables this feature, leading to a uniform distribution where all noise levels are equally likely. Positive values increase the likelihood of selecting higher noise levels at any particular training step (resulting in smoother, low-frequency details), while negative values favor lower noise levels (sharper, high-frequency details). Note that extreme values (like -10 or 10) create a strong emphasis, significantly changing the focus of training.")
+        components.entry(frame, 7, 1, self.ui_state, "noising_weight")
+
         # noising bias
-        components.label(frame, 7, 0, "Noising Bias",
-                         tooltip="This adjusts the distribution noise time steps.  Set to 0 for normal behavior, negative to bias towards minimum noise (high frequency detail), or positive to bias towards maximum noise (low frequency detail)")
-        components.entry(frame, 7, 1, self.ui_state, "noising_bias")
+        components.label(frame, 8, 0, "Noising Bias",
+                         tooltip="Adjusts the balance point in the noise level selection process. The setting ranges from 0 to 1. At 0.5, the selection is balanced, neither favoring lower nor higher noise levels. Lower values shift the distribution curve left towards training lower noise levels (fine details), while higher values shift the distribution towards high noise levels (low-frequency details or image composition).")
+        components.entry(frame, 8, 1, self.ui_state, "noising_bias")
 
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
