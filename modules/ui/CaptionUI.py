@@ -268,7 +268,7 @@ Mouse wheel: increase or decrease brush size"""
 
             try:
                 with open(prompt_name, "r") as f:
-                    return f.readlines()[0]
+                    return f.readlines()[0].strip()
             except:
                 return ""
         else:
