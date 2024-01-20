@@ -69,7 +69,8 @@ class BasePixArtAlphaSetup(
         if args.gradient_checkpointing:
             model.vae.enable_gradient_checkpointing()
             model.transformer.enable_gradient_checkpointing()
-            # enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
+            if args.train_text_encoder:
+                model.text_encoder.encoder.gradient_checkpointing = True
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
             args.prior_weight_dtype,
@@ -269,7 +270,7 @@ class BasePixArtAlphaSetup(
                     'predicted': predicted_image,
                 }
             else:
-                timestep = self._get_timestep(
+                timestep = self._get_timestep_discrete(
                     model.noise_scheduler,
                     deterministic,
                     generator,
@@ -277,7 +278,7 @@ class BasePixArtAlphaSetup(
                     args,
                 )
 
-                scaled_noisy_latent_image = self._add_noise(
+                scaled_noisy_latent_image = self._add_noise_discrete(
                     scaled_latent_image,
                     latent_noise,
                     timestep,
@@ -319,10 +320,6 @@ class BasePixArtAlphaSetup(
                     'timestep': timestep,
                     'scaled_latent_image': scaled_latent_image,
                 }
-
-                torch.save(model_output_data, f"debug/pixart/data{train_progress.global_step}.pt")
-                torch.save(batch, f"debug/pixart/batch{train_progress.global_step}.pt")
-
 
             if self.debug_mode:
                 with torch.no_grad():

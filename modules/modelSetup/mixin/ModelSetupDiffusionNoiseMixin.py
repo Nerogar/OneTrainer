@@ -1,4 +1,5 @@
 from abc import ABCMeta
+from typing import Callable
 
 import torch
 from diffusers import DDIMScheduler
@@ -47,7 +48,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
 
         return noise
 
-    def _get_timestep(
+    def _get_timestep_discrete(
             self,
             noise_scheduler: DDIMScheduler,
             deterministic: bool,
@@ -71,7 +72,28 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                 device=generator.device,
             ).unsqueeze(0)
 
-    def _add_noise(
+    def _get_timestep_continuous(
+            self,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            args: TrainArgs,
+    ) -> Tensor:
+        if not deterministic:
+            return (1 - torch.rand(
+                size=(batch_size,),
+                generator=generator,
+                device=generator.device,
+            )) * args.max_noising_strength
+        else:
+            return torch.full(
+                size=(batch_size,),
+                fill_value=0.5,
+                device=generator.device,
+            )
+
+
+    def _add_noise_discrete(
             self,
             scaled_latent_image: Tensor,
             latent_noise: Tensor,
@@ -95,3 +117,15 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                                     + latent_noise.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_one_minus_alphas_cumprod
 
         return scaled_noisy_latent_image.to(dtype=orig_dtype)
+
+    def _add_noise_continuous(
+            self,
+            scaled_latent_image: Tensor,
+            latent_noise: Tensor,
+            timestep: Tensor,
+            alpha_cumprod_fun: Callable[[Tensor, int], Tensor],
+    ) -> Tensor:
+        alpha_cumprod = alpha_cumprod_fun(timestep, scaled_latent_image.dim())
+
+        return alpha_cumprod.sqrt() * scaled_latent_image + (1 - alpha_cumprod).sqrt() * latent_noise
+

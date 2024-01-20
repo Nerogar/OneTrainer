@@ -239,7 +239,7 @@ class BaseStableDiffusionSetup(
                     'predicted': predicted_image,
                 }
             else:
-                timestep = self._get_timestep(
+                timestep = self._get_timestep_discrete(
                     model.noise_scheduler,
                     deterministic,
                     generator,
@@ -247,7 +247,7 @@ class BaseStableDiffusionSetup(
                     args,
                 )
 
-                scaled_noisy_latent_image = self._add_noise(
+                scaled_noisy_latent_image = self._add_noise_discrete(
                     scaled_latent_image,
                     latent_noise,
                     timestep,

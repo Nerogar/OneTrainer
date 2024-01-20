@@ -61,28 +61,18 @@ class BaseWuerstchenSetup(
 
     def __alpha_cumprod(
             self,
-            device,
-            shape,
-            timesteps,
+            timesteps: Tensor,
+            dim: int,
     ):
         # copied and modified from https://github.com/dome272/wuerstchen
-        s = torch.tensor([0.008]).to(device=device)
+        s = torch.tensor([0.008], device=timesteps.device, dtype=torch.float32)
         init_alpha_cumprod = torch.cos(s / (1 + s) * torch.pi * 0.5) ** 2
         alpha_cumprod = torch.cos((timesteps + s) / (1 + s) * torch.pi * 0.5) ** 2 / init_alpha_cumprod
         alpha_cumprod = alpha_cumprod.clamp(0.0001, 0.9999)
         alpha_cumprod = alpha_cumprod.view(timesteps.shape[0])
-        while alpha_cumprod.dim() < len(shape):
+        while alpha_cumprod.dim() < dim:
             alpha_cumprod = alpha_cumprod.unsqueeze(-1)
         return alpha_cumprod
-
-    def __add_noise(
-            self,
-            original_samples,
-            noise,
-            timesteps,
-    ):
-        alpha_cumprod = self.__alpha_cumprod(original_samples.device, original_samples.shape, timesteps)
-        return alpha_cumprod.sqrt() * original_samples + (1 - alpha_cumprod).sqrt() * noise
 
     def predict(
             self,
@@ -105,23 +95,18 @@ class BaseWuerstchenSetup(
 
             latent_noise = self._create_noise(scaled_latent_image, args, generator)
 
-            if not deterministic:
-                timestep = (
-                    1 - torch.rand(
-                        size=(scaled_latent_image.shape[0],),
-                        generator=generator,
-                        device=scaled_latent_image.device,
-                    )
-                ).mul(1.08).add(0.001).clamp(0.001, 1.0)
-            else:
-                timestep = torch.full(
-                    size=(scaled_latent_image.shape[0],),
-                    fill_value=0.5,
-                    device=scaled_latent_image.device,
-                )
+            timestep = self._get_timestep_continuous(
+                deterministic,
+                generator,
+                scaled_latent_image.shape[0],
+                args,
+            ).mul(1.08).add(0.001).clamp(0.001, 1.0)
 
-            scaled_noisy_latent_image = self.__add_noise(
-                original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
+            scaled_noisy_latent_image = self._add_noise_continuous(
+                scaled_latent_image,
+                latent_noise,
+                timestep,
+                self.__alpha_cumprod,
             )
 
             if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
@@ -180,7 +165,7 @@ class BaseWuerstchenSetup(
                     )
 
                     # predicted image
-                    alpha_cumprod = self.__alpha_cumprod(latent_noise, timestep)
+                    alpha_cumprod = self.__alpha_cumprod(timestep, latent_noise.dim())
                     sqrt_alpha_prod = alpha_cumprod ** 0.5
                     sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
@@ -224,7 +209,7 @@ class BaseWuerstchenSetup(
 
         k = 1.0
         gamma = 1.0
-        alpha_cumprod = self.__alpha_cumprod(self.train_device, losses.shape, data['timestep'])
+        alpha_cumprod = self.__alpha_cumprod(data['timestep'], losses.dim())
         p2_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
 
         return (losses * p2_loss_weight).mean()
