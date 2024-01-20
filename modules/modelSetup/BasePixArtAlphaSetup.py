@@ -269,24 +269,19 @@ class BasePixArtAlphaSetup(
                     'predicted': predicted_image,
                 }
             else:
-                if not deterministic:
-                    timestep = torch.randint(
-                        low=0,
-                        high=int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
-                        size=(scaled_latent_image.shape[0],),
-                        generator=generator,
-                        device=scaled_latent_image.device,
-                    ).long()
-                else:
-                    # -1 is for zero-based indexing
-                    timestep = torch.tensor(
-                        int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
-                        dtype=torch.long,
-                        device=scaled_latent_image.device,
-                    ).unsqueeze(0)
+                timestep = self._get_timestep(
+                    model.noise_scheduler,
+                    deterministic,
+                    generator,
+                    scaled_latent_image.shape[0],
+                    args,
+                )
 
-                scaled_noisy_latent_image = model.noise_scheduler.add_noise(
-                    original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
+                scaled_noisy_latent_image = self._add_noise(
+                    scaled_latent_image,
+                    latent_noise,
+                    timestep,
+                    model.noise_scheduler.betas,
                 )
 
                 if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
@@ -324,6 +319,10 @@ class BasePixArtAlphaSetup(
                     'timestep': timestep,
                     'scaled_latent_image': scaled_latent_image,
                 }
+
+                torch.save(model_output_data, f"debug/pixart/data{train_progress.global_step}.pt")
+                torch.save(batch, f"debug/pixart/batch{train_progress.global_step}.pt")
+
 
             if self.debug_mode:
                 with torch.no_grad():

@@ -1,8 +1,10 @@
 from abc import ABCMeta
 
 import torch
+from diffusers import DDIMScheduler
 from torch import Tensor, Generator
 
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.args.TrainArgs import TrainArgs
 
 
@@ -10,6 +12,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
 
     def __init__(self):
         super(ModelSetupDiffusionNoiseMixin, self).__init__()
+        self.__coefficients = None
 
     def _create_noise(
             self,
@@ -43,3 +46,52 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             noise = noise + (args.perturbation_noise_weight * perturbation_noise)
 
         return noise
+
+    def _get_timestep(
+            self,
+            noise_scheduler: DDIMScheduler,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            args: TrainArgs,
+    ) -> Tensor:
+        if not deterministic:
+            return torch.randint(
+                low=0,
+                high=int(noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
+                size=(batch_size,),
+                generator=generator,
+                device=generator.device,
+            ).long()
+        else:
+            # -1 is for zero-based indexing
+            return torch.tensor(
+                int(noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
+                dtype=torch.long,
+                device=generator.device,
+            ).unsqueeze(0)
+
+    def _add_noise(
+            self,
+            scaled_latent_image: Tensor,
+            latent_noise: Tensor,
+            timestep: Tensor,
+            betas: Tensor,
+    ) -> Tensor:
+        if self.__coefficients is None:
+            betas = betas.to(device=scaled_latent_image.device)
+            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
+
+        orig_dtype = scaled_latent_image.dtype
+
+        sqrt_alphas_cumprod = self.__coefficients.sqrt_alphas_cumprod[timestep]
+        sqrt_one_minus_alphas_cumprod = self.__coefficients.sqrt_one_minus_alphas_cumprod[timestep]
+
+        while sqrt_alphas_cumprod.dim() < scaled_latent_image.dim():
+            sqrt_alphas_cumprod = sqrt_alphas_cumprod.unsqueeze(-1)
+            sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod.unsqueeze(-1)
+
+        scaled_noisy_latent_image = scaled_latent_image.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_alphas_cumprod \
+                                    + latent_noise.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_one_minus_alphas_cumprod
+
+        return scaled_noisy_latent_image.to(dtype=orig_dtype)

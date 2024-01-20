@@ -17,8 +17,8 @@ from modules.util.loss.vb_loss import vb_losses
 class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     def __init__(self):
         super(ModelSetupDiffusionLossMixin, self).__init__()
-        self.align_prop_loss_fn = None
-        self.coefficients = None
+        self.__align_prop_loss_fn = None
+        self.__coefficients = None
 
     def __align_prop_losses(
             self,
@@ -27,27 +27,27 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             args: TrainArgs,
             train_device: torch.device,
     ):
-        if self.align_prop_loss_fn is None:
+        if self.__align_prop_loss_fn is None:
             dtype = data['predicted'].dtype
 
             match args.align_prop_loss:
                 case AlignPropLoss.HPS:
-                    self.align_prop_loss_fn = HPSv2ScoreModel(dtype)
+                    self.__align_prop_loss_fn = HPSv2ScoreModel(dtype)
                 case AlignPropLoss.AESTHETIC:
-                    self.align_prop_loss_fn = AestheticScoreModel()
+                    self.__align_prop_loss_fn = AestheticScoreModel()
 
-            self.align_prop_loss_fn.to(device=train_device, dtype=dtype)
-            self.align_prop_loss_fn.requires_grad_(False)
-            self.align_prop_loss_fn.eval()
+            self.__align_prop_loss_fn.to(device=train_device, dtype=dtype)
+            self.__align_prop_loss_fn.requires_grad_(False)
+            self.__align_prop_loss_fn.eval()
 
         losses = 0
 
         match args.align_prop_loss:
             case AlignPropLoss.HPS:
                 with torch.autocast(device_type=train_device.type, dtype=data['predicted'].dtype):
-                    losses = self.align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
+                    losses = self.__align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
             case AlignPropLoss.AESTHETIC:
-                losses = self.align_prop_loss_fn(data['predicted'])
+                losses = self.__align_prop_loss_fn(data['predicted'])
 
         return losses * args.align_prop_weight
 
@@ -86,10 +86,10 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             ).mean([1, 2, 3]) * args.mae_strength
 
         # VB loss
-        if args.vb_loss_strength != 0 and 'predicted_var_values' in data and self.coefficients is not None:
+        if args.vb_loss_strength != 0 and 'predicted_var_values' in data and self.__coefficients is not None:
             losses += masked_losses(
                 losses=vb_losses(
-                    coefficients=self.coefficients,
+                    coefficients=self.__coefficients,
                     x_0=data['scaled_latent_image'].to(dtype=torch.float32),
                     x_t=data['noisy_latent_image'].to(dtype=torch.float32),
                     t=data['timestep'],
@@ -130,7 +130,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         # VB loss
         if args.vb_loss_strength != 0 and 'predicted_var_values' in data:
             losses += vb_losses(
-                coefficients=self.coefficients,
+                coefficients=self.__coefficients,
                 x_0=data['scaled_latent_image'].to(dtype=torch.float32),
                 x_t=data['noisy_latent_image'].to(dtype=torch.float32),
                 t=data['timestep'],
@@ -161,8 +161,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             1 if args.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
                 else args.gradient_accumulation_steps
 
-        if self.coefficients is None and betas is not None:
-            self.coefficients = DiffusionScheduleCoefficients.from_betas(betas)
+        if self.__coefficients is None and betas is not None:
+            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
 
         if data['loss_type'] == 'align_prop':
             losses = self.__align_prop_losses(batch, data, args, train_device)
