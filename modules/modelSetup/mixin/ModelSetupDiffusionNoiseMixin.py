@@ -123,9 +123,17 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             scaled_latent_image: Tensor,
             latent_noise: Tensor,
             timestep: Tensor,
-            alpha_cumprod_fun: Callable[[Tensor, int], Tensor],
+            alphas_cumprod_fun: Callable[[Tensor, int], Tensor],
     ) -> Tensor:
-        alpha_cumprod = alpha_cumprod_fun(timestep, scaled_latent_image.dim())
+        orig_dtype = scaled_latent_image.dtype
 
-        return alpha_cumprod.sqrt() * scaled_latent_image + (1 - alpha_cumprod).sqrt() * latent_noise
+        alphas_cumprod = alphas_cumprod_fun(timestep, scaled_latent_image.dim())
+
+        sqrt_alphas_cumprod = alphas_cumprod.sqrt()
+        sqrt_one_minus_alphas_cumprod = (1 - alphas_cumprod).sqrt()
+
+        scaled_noisy_latent_image = scaled_latent_image.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_alphas_cumprod \
+                                    + latent_noise.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_one_minus_alphas_cumprod
+
+        return scaled_noisy_latent_image.to(dtype=orig_dtype)
 
