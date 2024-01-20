@@ -24,7 +24,6 @@ class EncodeWuerstchenEffnet(
         self.effnet_encoder = effnet_encoder
 
         self.autocast_context = nullcontext() if autocast_context is None else autocast_context
-        self.autocast_enabled = isinstance(self.autocast_context, torch.autocast)
 
     def length(self) -> int:
         return self._get_previous_length(self.in_name)
@@ -38,10 +37,7 @@ class EncodeWuerstchenEffnet(
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
         image = self._get_previous_item(variation, self.in_name, index)
 
-        image = image.to(device=self.effnet_encoder.device)
-
-        if not self.autocast_enabled:
-            image = image.to(self.effnet_encoder.dtype)
+        image = image.to(device=self.effnet_encoder.device, dtype=self.effnet_encoder.dtype)
 
         with self.autocast_context:
             image_embeddings = self.effnet_encoder(image.unsqueeze(0)).squeeze()
