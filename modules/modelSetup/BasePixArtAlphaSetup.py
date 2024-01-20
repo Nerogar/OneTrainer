@@ -73,6 +73,7 @@ class BasePixArtAlphaSetup(
                 model.text_encoder.encoder.gradient_checkpointing = True
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
+            args.weight_dtype,
             args.prior_weight_dtype,
             args.text_encoder_weight_dtype,
             args.vae_weight_dtype,

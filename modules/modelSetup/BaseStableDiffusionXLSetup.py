@@ -65,10 +65,11 @@ class BaseStableDiffusionXLSetup(
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
-            args.prior_weight_dtype,
+            args.weight_dtype,
+            args.unet_weight_dtype,
             args.text_encoder_weight_dtype,
             args.text_encoder_2_weight_dtype,
-            args.prior_weight_dtype,
+            args.vae_weight_dtype,
             args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
             args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
         ])

@@ -49,6 +49,7 @@ class BaseWuerstchenSetup(
             enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
+            args.weight_dtype,
             args.decoder_text_encoder_weight_dtype,
             args.decoder_weight_dtype,
             args.decoder_vqgan_weight_dtype,
