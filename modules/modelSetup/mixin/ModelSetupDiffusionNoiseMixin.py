@@ -56,10 +56,11 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             args: TrainArgs,
+            global_step: int,
     ) -> Tensor:
         if not deterministic:
-            min_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.min_noising_strength)
-            max_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
+            min_timestep = int(noise_scheduler.config['num_train_timesteps'] * args.min_noising_strength)
+            max_timestep = int(noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
             if args.noising_weight == 0:
                 return torch.randint(
                     low=min_timestep,
@@ -69,7 +70,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                     device=generator.device,
                 ).long()
             else:
-                np.random.seed(train_progress.global_step)
+                np.random.seed(global_step)
                 weights = np.linspace(0, 1, max_timestep - min_timestep)
                 weights = 1 / (1 + np.exp(-args.noising_weight * (weights - args.noising_bias))) # Sigmoid
                 weights /= np.sum(weights)
@@ -89,6 +90,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             args: TrainArgs,
+            global_step: int,
     ) -> Tensor:
         if not deterministic:
             if args.noising_weight == 0:
@@ -98,7 +100,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                     device=generator.device,
                 )) * (args.max_noising_strength - args.min_noising_strength) + args.max_noising_strength
             else:
-                np.random.seed(train_progress.global_step)
+                np.random.seed(global_step)
                 choices = np.linspace(np.finfo(float).eps, 1, 5000)  # Discretize range (0, 1]
                 weights = 1 / (1 + np.exp(-args.noising_weight * (choices - args.noising_bias)))  # Sigmoid
                 weights /= np.sum(weights)
