@@ -26,11 +26,11 @@ def app_title(master, row, column):
     label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
 
 
-def label(master, row, column, text, pad=PAD, tooltip=None):
+def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False):
     component = ctk.CTkLabel(master, text=text)
     component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
     if tooltip:
-        ToolTip(component, tooltip)
+        ToolTip(component, tooltip, wide=wide_tooltip)
     return component
 
 
