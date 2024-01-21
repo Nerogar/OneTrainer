@@ -360,12 +360,12 @@ class TrainingTab:
 
         # noising weight
         components.label(frame, 8, 0, "Noising Weight",
-                         tooltip="Controls the emphasis on certain noise levels during training. A value of 0 disables this feature, leading to a uniform distribution where all noise levels are equally likely. Positive values increase the likelihood of selecting higher noise levels at any particular training step (resulting in smoother, low-frequency details), while negative values favor lower noise levels (sharper, high-frequency details). Note that extreme values (like -10 or 10) create a strong emphasis, significantly changing the focus of training.")
+                         tooltip="Controls the emphasis on certain noise levels during training. A value of 0 disables this feature, leading to a uniform distribution where all noise levels are equally likely. Positive values increase the likelihood of selecting higher noise levels at any particular training step (resulting in smoother, low-frequency details), while negative values favor lower noise levels (sharper, high-frequency details). Note that extreme values (like -10 or 10) create a strong emphasis, significantly changing the focus of training. The distribution function is as follows for a noise strength from 0 to 1: chance(noise_strength) = 1 / (1 + exp(-noising_weight * (noise_strength - noising_bias)))")
         components.entry(frame, 8, 1, self.ui_state, "noising_weight")
 
         # noising bias
         components.label(frame, 9, 0, "Noising Bias",
-                         tooltip="Adjusts the balance point in the noise level selection process. The setting ranges from 0 to 1. At 0.5, the selection is balanced, neither favoring lower nor higher noise levels. Lower values shift the distribution curve left towards training lower noise levels (fine details), while higher values shift the distribution towards high noise levels (low-frequency details or image composition).")
+                         tooltip="Adjusts the balance point in the noise level selection process. The setting ranges from 0 to 1. At 0.5, the selection is balanced, neither favoring lower nor higher noise levels. Lower values shift the distribution curve left towards training lower noise levels (fine details), while higher values shift the distribution towards high noise levels (low-frequency details or image composition). The distribution function is as follows for a noise strength from 0 to 1: chance(noise_strength) = 1 / (1 + exp(-noising_weight * (noise_strength - noising_bias)))")
         components.entry(frame, 9, 1, self.ui_state, "noising_bias")
 
     def __create_prior_frame(self, master, row):

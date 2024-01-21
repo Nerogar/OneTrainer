@@ -70,11 +70,11 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                     device=generator.device,
                 ).long()
             else:
-                np.random.seed(global_step)
+                rng = np.random.default_rng(global_step)
                 weights = np.linspace(0, 1, max_timestep - min_timestep)
                 weights = 1 / (1 + np.exp(-args.noising_weight * (weights - args.noising_bias))) # Sigmoid
                 weights /= np.sum(weights)
-                samples = np.random.choice(np.arange(min_timestep, max_timestep), size=(batch_size,), p=weights)
+                samples = rng.choice(np.arange(min_timestep, max_timestep), size=(batch_size,), p=weights)
                 return torch.tensor(samples, dtype=torch.long, device=generator.device)
         else:
             # -1 is for zero-based indexing
@@ -100,11 +100,11 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                     device=generator.device,
                 )) * (args.max_noising_strength - args.min_noising_strength) + args.max_noising_strength
             else:
-                np.random.seed(global_step)
+                rng = np.random.default_rng(global_step)
                 choices = np.linspace(np.finfo(float).eps, 1, 5000)  # Discretize range (0, 1]
                 weights = 1 / (1 + np.exp(-args.noising_weight * (choices - args.noising_bias)))  # Sigmoid
                 weights /= np.sum(weights)
-                samples = np.random.choice(choices, size=(batch_size,), p=weights)
+                samples = rng.choice(choices, size=(batch_size,), p=weights)
                 samples = samples * (args.max_noising_strength - args.min_noising_strength) + args.min_noising_strength
                 return torch.tensor(samples, dtype=torch.float, device=generator.device)
         else:
