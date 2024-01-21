@@ -69,8 +69,8 @@ class BasePixArtAlphaSetup(
         if args.gradient_checkpointing:
             model.vae.enable_gradient_checkpointing()
             model.transformer.enable_gradient_checkpointing()
-            # if args.train_text_encoder:
-            #     model.text_encoder.encoder.gradient_checkpointing = True
+            if args.train_text_encoder:
+                model.text_encoder.encoder.gradient_checkpointing_enable()
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
             args.weight_dtype,
