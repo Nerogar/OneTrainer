@@ -14,7 +14,7 @@ class CaptionSample:
         self.caption_filename = os.path.splitext(filename)[0] + ".txt"
 
         self.image = None
-        self.caption = None
+        self.captions = None
 
         self.height = 0
         self.width = 0
@@ -28,23 +28,26 @@ class CaptionSample:
         return self.image
 
     def get_caption(self) -> str:
-        if self.caption is None and os.path.exists(self.caption_filename):
+        if self.captions is None and os.path.exists(self.caption_filename):
             try:
                 with open(self.caption_filename, "r") as f:
-                    self.caption = f.readlines()[0]
+                    self.captions = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
             except:
-                self.caption = ""
+                self.captions = []
 
-        return self.caption
+        return self.captions
 
     def set_caption(self, caption: str):
-        self.caption = caption
+        self.captions = [caption]
+
+    def add_caption(self, caption: str):
+        self.captions.append(caption)
 
     def save_caption(self):
-        if self.caption is not None:
+        if self.captions is not None:
             try:
                 with open(self.caption_filename, "w", encoding='utf-8') as f:
-                    f.write(self.caption)
+                    f.write('\n'.join(self.captions))
             except:
                 pass
 
@@ -70,6 +73,22 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         return filenames
 
     @abstractmethod
+    def generate_caption(
+            self,
+            caption_sample: CaptionSample,
+            initial_caption: str = "",
+    ) -> str:
+        """
+        Generates caption for a single CaptionSample
+
+        Args:
+            caption_sample (`CaptionSample`): the sample to caption
+            initial_caption (`str`): the initial caption
+
+        Returns: the generated caption
+        """
+        pass
+
     def caption_image(
             self,
             filename: str,
@@ -83,10 +102,25 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             filename (`str`): a sample filename
             initial_caption (`str`): an initial caption. the generated caption will start with this string
             mode (`str`): can be one of
-                - replace: creates new caption for all samples, even if a caption already exists
-                - fill: creates new caption for all samples without a caption
+                - replace: creates a new caption for all samples, even if a caption already exists
+                - fill: creates a new caption for all samples without a caption
+                - add: creates a new caption for all samples, appending if a caption already exists
         """
-        pass
+        caption_sample = CaptionSample(filename)
+
+        existing_caption = caption_sample.get_caption()
+        if mode == 'fill' and existing_caption is not None and existing_caption != "":
+            return
+
+        predicted_caption = self.generate_caption(caption_sample, initial_caption)
+
+        if mode == 'replace' or mode == 'fill':
+            caption_sample.set_caption(predicted_caption)
+
+        if mode == 'add':
+            caption_sample.add_caption(predicted_caption)
+
+        caption_sample.save_caption()
 
     def caption_images(
             self,
@@ -103,8 +137,9 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             filenames (`[str]`): a list of sample filenames
             initial_caption (`str`): an initial caption. the generated caption will start with this string
             mode (`str`): can be one of
-                - replace: creates new caption for all samples, even if a caption already exists
-                - fill: creates new caption for all samples without a caption
+                - replace: creates a new caption for all samples, even if a caption already exists
+                - fill: creates a new caption for all samples without a caption
+                - add: creates a new caption for all samples, appending if a caption already exists
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
@@ -136,8 +171,9 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             sample_dir (`str`): directory where samples are located
             initial_caption (`str`): an initial caption. the generated caption will start with this string
             mode (`str`): can be one of
-                - replace: creates new caption for all samples, even if a caption already exists
-                - fill: creates new caption for all samples without a caption
+                - replace: creates a new caption for all samples, even if a caption already exists
+                - fill: creates a new caption for all samples without a caption
+                - add: creates a new caption for all samples, appending if a caption already exists
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
             include_subdirectories (`bool`): whether to include subfolders when processing samples

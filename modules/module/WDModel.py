@@ -41,18 +41,11 @@ class WDModel(BaseImageCaptionModel):
 
                 self.tag_names.append(row["name"])
 
-    def caption_image(
+    def generate_caption(
             self,
-            filename: str,
+            caption_sample: CaptionSample,
             initial_caption: str = "",
-            mode: str = 'fill',
     ):
-        caption_sample = CaptionSample(filename)
-
-        existing_caption = caption_sample.get_caption()
-        if mode == 'fill' and existing_caption is not None and existing_caption != "":
-            return
-
         _, height, width, _ = self.model.get_inputs()[0].shape
 
         image = caption_sample.get_image()
@@ -77,7 +70,4 @@ class WDModel(BaseImageCaptionModel):
             in sorted_general_labels
         ])
 
-        if mode == 'replace' or mode == 'fill':
-            caption_sample.set_caption(predicted_caption)
-
-        caption_sample.save_caption()
+        return predicted_caption
