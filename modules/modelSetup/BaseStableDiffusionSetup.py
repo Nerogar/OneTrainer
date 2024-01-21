@@ -2,7 +2,6 @@ from abc import ABCMeta
 from random import Random
 
 import torch
-import numpy as np
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
@@ -69,9 +68,10 @@ class BaseStableDiffusionSetup(
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
-            args.prior_weight_dtype,
+            args.weight_dtype,
             args.text_encoder_weight_dtype,
-            args.prior_weight_dtype,
+            args.unet_weight_dtype,
+            args.vae_weight_dtype,
             args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
             args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
         ])
@@ -240,34 +240,19 @@ class BaseStableDiffusionSetup(
                     'predicted': predicted_image,
                 }
             else:
-                if not deterministic:
-                    min_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.min_noising_strength)
-                    max_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
-                    if args.noising_bias == 0:
-                        timestep = torch.randint(
-                            low=min_timestep,
-                            high=max_timestep,
-                            size=(scaled_latent_image.shape[0],),
-                            generator=generator,
-                            device=scaled_latent_image.device,
-                        ).long()
-                    else:
-                        np.random.seed(train_progress.global_step)
-                        weights = np.linspace(0, 1, max_timestep - min_timestep)
-                        weights = 1 / (1 + np.exp(-args.noising_weight * (weights - args.noising_bias))) # Sigmoid
-                        weights /= np.sum(weights)
-                        samples = np.random.choice(np.arange(min_timestep, max_timestep), size=(scaled_latent_image.shape[0],), p=weights)
-                        timestep = torch.tensor(samples, dtype=torch.long, device=scaled_latent_image.device)
-                else:
-                    # -1 is for zero-based indexing
-                    timestep = torch.tensor(
-                        int(model.noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
-                        dtype=torch.long,
-                        device=scaled_latent_image.device,
-                    )
+                timestep = self._get_timestep_discrete(
+                    model.noise_scheduler,
+                    deterministic,
+                    generator,
+                    scaled_latent_image.shape[0],
+                    args,
+                )
 
-                scaled_noisy_latent_image = model.noise_scheduler.add_noise(
-                    original_samples=scaled_latent_image, noise=latent_noise, timesteps=timestep
+                scaled_noisy_latent_image = self._add_noise_discrete(
+                    scaled_latent_image,
+                    latent_noise,
+                    timestep,
+                    model.noise_scheduler.betas,
                 )
 
                 if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():

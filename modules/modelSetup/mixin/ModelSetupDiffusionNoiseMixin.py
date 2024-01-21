@@ -1,8 +1,12 @@
 from abc import ABCMeta
+from typing import Callable
 
 import torch
+import numpy as np
+from diffusers import DDIMScheduler
 from torch import Tensor, Generator
 
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.args.TrainArgs import TrainArgs
 
 
@@ -10,6 +14,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
 
     def __init__(self):
         super(ModelSetupDiffusionNoiseMixin, self).__init__()
+        self.__coefficients = None
 
     def _create_noise(
             self,
@@ -43,3 +48,111 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             noise = noise + (args.perturbation_noise_weight * perturbation_noise)
 
         return noise
+
+    def _get_timestep_discrete(
+            self,
+            noise_scheduler: DDIMScheduler,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            args: TrainArgs,
+    ) -> Tensor:
+        if not deterministic:
+            min_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.min_noising_strength)
+            max_timestep = int(model.noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
+            if args.noising_weight == 0:
+                return torch.randint(
+                    low=min_timestep,
+                    high=max_timestep,
+                    size=(batch_size,),
+                    generator=generator,
+                    device=generator.device,
+                ).long()
+            else:
+                np.random.seed(train_progress.global_step)
+                weights = np.linspace(0, 1, max_timestep - min_timestep)
+                weights = 1 / (1 + np.exp(-args.noising_weight * (weights - args.noising_bias))) # Sigmoid
+                weights /= np.sum(weights)
+                samples = np.random.choice(np.arange(min_timestep, max_timestep), size=(batch_size,), p=weights)
+                return torch.tensor(samples, dtype=torch.long, device=generator.device)
+        else:
+            # -1 is for zero-based indexing
+            return torch.tensor(
+                int(noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
+                dtype=torch.long,
+                device=generator.device,
+            ).unsqueeze(0)
+
+    def _get_timestep_continuous(
+            self,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            args: TrainArgs,
+    ) -> Tensor:
+        if not deterministic:
+            if args.noising_weight == 0:
+                return (1 - torch.rand(
+                    size=(batch_size,),
+                    generator=generator,
+                    device=generator.device,
+                )) * (args.max_noising_strength - args.min_noising_strength) + args.max_noising_strength
+            else:
+                np.random.seed(train_progress.global_step)
+                choices = np.linspace(np.finfo(float).eps, 1, 5000)  # Discretize range (0, 1]
+                weights = 1 / (1 + np.exp(-args.noising_weight * (choices - args.noising_bias)))  # Sigmoid
+                weights /= np.sum(weights)
+                samples = np.random.choice(choices, size=(batch_size,), p=weights)
+                samples = samples * (args.max_noising_strength - args.min_noising_strength) + args.min_noising_strength
+                return torch.tensor(samples, dtype=torch.float, device=generator.device)
+        else:
+            return torch.full(
+                size=(batch_size,),
+                fill_value=0.5,
+                device=generator.device,
+            )
+
+
+    def _add_noise_discrete(
+            self,
+            scaled_latent_image: Tensor,
+            latent_noise: Tensor,
+            timestep: Tensor,
+            betas: Tensor,
+    ) -> Tensor:
+        if self.__coefficients is None:
+            betas = betas.to(device=scaled_latent_image.device)
+            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
+
+        orig_dtype = scaled_latent_image.dtype
+
+        sqrt_alphas_cumprod = self.__coefficients.sqrt_alphas_cumprod[timestep]
+        sqrt_one_minus_alphas_cumprod = self.__coefficients.sqrt_one_minus_alphas_cumprod[timestep]
+
+        while sqrt_alphas_cumprod.dim() < scaled_latent_image.dim():
+            sqrt_alphas_cumprod = sqrt_alphas_cumprod.unsqueeze(-1)
+            sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod.unsqueeze(-1)
+
+        scaled_noisy_latent_image = scaled_latent_image.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_alphas_cumprod \
+                                    + latent_noise.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_one_minus_alphas_cumprod
+
+        return scaled_noisy_latent_image.to(dtype=orig_dtype)
+
+    def _add_noise_continuous(
+            self,
+            scaled_latent_image: Tensor,
+            latent_noise: Tensor,
+            timestep: Tensor,
+            alphas_cumprod_fun: Callable[[Tensor, int], Tensor],
+    ) -> Tensor:
+        orig_dtype = scaled_latent_image.dtype
+
+        alphas_cumprod = alphas_cumprod_fun(timestep, scaled_latent_image.dim())
+
+        sqrt_alphas_cumprod = alphas_cumprod.sqrt()
+        sqrt_one_minus_alphas_cumprod = (1 - alphas_cumprod).sqrt()
+
+        scaled_noisy_latent_image = scaled_latent_image.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_alphas_cumprod \
+                                    + latent_noise.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_one_minus_alphas_cumprod
+
+        return scaled_noisy_latent_image.to(dtype=orig_dtype)
