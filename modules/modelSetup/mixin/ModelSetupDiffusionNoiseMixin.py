@@ -2,6 +2,7 @@ from abc import ABCMeta
 from typing import Callable
 
 import torch
+import numpy as np
 from diffusers import DDIMScheduler
 from torch import Tensor, Generator
 
@@ -55,15 +56,26 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             args: TrainArgs,
+            global_step: int,
     ) -> Tensor:
         if not deterministic:
-            return torch.randint(
-                low=0,
-                high=int(noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength),
-                size=(batch_size,),
-                generator=generator,
-                device=generator.device,
-            ).long()
+            min_timestep = int(noise_scheduler.config['num_train_timesteps'] * args.min_noising_strength)
+            max_timestep = int(noise_scheduler.config['num_train_timesteps'] * args.max_noising_strength)
+            if args.noising_weight == 0:
+                return torch.randint(
+                    low=min_timestep,
+                    high=max_timestep,
+                    size=(batch_size,),
+                    generator=generator,
+                    device=generator.device,
+                ).long()
+            else:
+                rng = np.random.default_rng(global_step)
+                weights = np.linspace(0, 1, max_timestep - min_timestep)
+                weights = 1 / (1 + np.exp(-args.noising_weight * (weights - args.noising_bias))) # Sigmoid
+                weights /= np.sum(weights)
+                samples = rng.choice(np.arange(min_timestep, max_timestep), size=(batch_size,), p=weights)
+                return torch.tensor(samples, dtype=torch.long, device=generator.device)
         else:
             # -1 is for zero-based indexing
             return torch.tensor(
@@ -78,13 +90,23 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             args: TrainArgs,
+            global_step: int,
     ) -> Tensor:
         if not deterministic:
-            return (1 - torch.rand(
-                size=(batch_size,),
-                generator=generator,
-                device=generator.device,
-            )) * args.max_noising_strength
+            if args.noising_weight == 0:
+                return (1 - torch.rand(
+                    size=(batch_size,),
+                    generator=generator,
+                    device=generator.device,
+                )) * (args.max_noising_strength - args.min_noising_strength) + args.max_noising_strength
+            else:
+                rng = np.random.default_rng(global_step)
+                choices = np.linspace(np.finfo(float).eps, 1, 5000)  # Discretize range (0, 1]
+                weights = 1 / (1 + np.exp(-args.noising_weight * (choices - args.noising_bias)))  # Sigmoid
+                weights /= np.sum(weights)
+                samples = rng.choice(choices, size=(batch_size,), p=weights)
+                samples = samples * (args.max_noising_strength - args.min_noising_strength) + args.min_noising_strength
+                return torch.tensor(samples, dtype=torch.float, device=generator.device)
         else:
             return torch.full(
                 size=(batch_size,),
@@ -136,4 +158,3 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                                     + latent_noise.to(dtype=sqrt_alphas_cumprod.dtype) * sqrt_one_minus_alphas_cumprod
 
         return scaled_noisy_latent_image.to(dtype=orig_dtype)
-

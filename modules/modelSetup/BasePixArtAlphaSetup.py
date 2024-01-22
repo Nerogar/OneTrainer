@@ -277,6 +277,7 @@ class BasePixArtAlphaSetup(
                     generator,
                     scaled_latent_image.shape[0],
                     args,
+                    train_progress.global_step,
                 )
 
                 scaled_noisy_latent_image = self._add_noise_discrete(

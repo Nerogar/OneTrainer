@@ -101,6 +101,7 @@ class BaseWuerstchenSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 args,
+                train_progress.global_step,
             ).mul(1.08).add(0.001).clamp(0.001, 1.0)
 
             scaled_noisy_latent_image = self._add_noise_continuous(
