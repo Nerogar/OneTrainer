@@ -68,7 +68,8 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
         train_prior = config.train_prior and (model.train_progress.epoch < config.train_prior_epochs)
         model.prior_prior.requires_grad_(train_prior)
 
-        model.decoder_text_encoder.requires_grad_(False)
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder.requires_grad_(False)
         model.decoder_decoder.requires_grad_(False)
         model.decoder_vqgan.requires_grad_(False)
         model.effnet_encoder.requires_grad_(False)
@@ -90,7 +91,8 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        model.decoder_text_encoder_to(self.temp_device)
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder_to(self.temp_device)
         model.decoder_decoder_to(self.temp_device)
         model.decoder_vqgan_to(self.temp_device)
         model.effnet_encoder_to(self.temp_device)
@@ -100,7 +102,8 @@ class WuerstchenFineTuneSetup(BaseWuerstchenSetup):
         model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.prior_prior_to(self.train_device)
 
-        model.decoder_text_encoder.eval()
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder.eval()
         model.decoder_decoder.eval()
         model.decoder_vqgan.eval()
         model.effnet_encoder.eval()

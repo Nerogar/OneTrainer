@@ -4,9 +4,10 @@ import torch
 import torchvision
 from diffusers import DiffusionPipeline, DDPMWuerstchenScheduler, WuerstchenCombinedPipeline, ModelMixin, ConfigMixin
 from diffusers.configuration_utils import register_to_config
+from diffusers.pipelines.stable_cascade import StableCascadeUnet, StableCascadeCombinedPipeline
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
 from torch import nn, Tensor
-from transformers import CLIPTextModel, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
@@ -58,13 +59,13 @@ class WuerstchenModel(BaseModel):
     decoder_tokenizer: CLIPTokenizer
     decoder_noise_scheduler: DDPMWuerstchenScheduler
     decoder_text_encoder: CLIPTextModel
-    decoder_decoder: WuerstchenDiffNeXt
+    decoder_decoder: WuerstchenDiffNeXt | StableCascadeUnet
     decoder_vqgan: PaellaVQModel
     effnet_encoder: WuerstchenEfficientNetEncoder
     prior_tokenizer: CLIPTokenizer
     prior_text_encoder: CLIPTextModel
     prior_noise_scheduler: DDPMWuerstchenScheduler
-    prior_prior: WuerstchenPrior
+    prior_prior: WuerstchenPrior | StableCascadeUnet
 
     # autocast context
     autocast_context: torch.autocast | nullcontext
@@ -86,11 +87,11 @@ class WuerstchenModel(BaseModel):
             decoder_tokenizer: CLIPTokenizer | None = None,
             decoder_noise_scheduler: DDPMWuerstchenScheduler | None = None,
             decoder_text_encoder: CLIPTextModel | None = None,
-            decoder_decoder: WuerstchenDiffNeXt | None = None,
+            decoder_decoder: WuerstchenDiffNeXt | StableCascadeUnet | None = None,
             decoder_vqgan: PaellaVQModel | None = None,
             effnet_encoder: WuerstchenEfficientNetEncoder | None = None,
             prior_tokenizer: CLIPTokenizer | None = None,
-            prior_text_encoder: CLIPTextModel | None = None,
+            prior_text_encoder: CLIPTextModel | CLIPTextModelWithProjection | None = None,
             prior_noise_scheduler: DDPMWuerstchenScheduler | None = None,
             prior_prior: WuerstchenPrior | None = None,
             optimizer_state_dict: dict | None = None,
@@ -98,7 +99,7 @@ class WuerstchenModel(BaseModel):
             train_progress: TrainProgress = None,
             embeddings: list[WuerstchenModelEmbedding] | None = None,
             prior_text_encoder_lora: LoRAModuleWrapper | None = None,
-            prior_prior_lora: LoRAModuleWrapper | None = None,
+            prior_prior_lora: LoRAModuleWrapper | StableCascadeUnet | None = None,
             model_spec: ModelSpec | None = None,
     ):
         super(WuerstchenModel, self).__init__(
@@ -153,7 +154,8 @@ class WuerstchenModel(BaseModel):
             self.prior_prior_lora.to(device)
 
     def to(self, device: torch.device):
-        self.decoder_text_encoder_to(device)
+        if self.model_type.is_wuerstchen_v2():
+            self.decoder_text_encoder_to(device)
         self.decoder_decoder_to(device)
         self.decoder_vqgan_to(device)
         self.effnet_encoder_to(device)
@@ -161,7 +163,8 @@ class WuerstchenModel(BaseModel):
         self.prior_prior_to(device)
 
     def eval(self):
-        self.decoder_text_encoder.eval()
+        if self.model_type.is_wuerstchen_v2():
+            self.decoder_text_encoder.eval()
         self.decoder_decoder.eval()
         self.decoder_vqgan.eval()
         self.effnet_encoder.eval()
@@ -169,14 +172,25 @@ class WuerstchenModel(BaseModel):
         self.prior_prior.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
-        return WuerstchenCombinedPipeline(
-            tokenizer=self.decoder_tokenizer,
-            text_encoder=self.decoder_text_encoder,
-            decoder=self.decoder_decoder,
-            scheduler=self.decoder_noise_scheduler,
-            vqgan=self.decoder_vqgan,
-            prior_tokenizer=self.prior_tokenizer,
-            prior_text_encoder=self.prior_text_encoder,
-            prior_prior=self.prior_prior,
-            prior_scheduler=self.prior_noise_scheduler,
-        )
+        if self.model_type.is_wuerstchen_v2():
+            return WuerstchenCombinedPipeline(
+                tokenizer=self.decoder_tokenizer,
+                text_encoder=self.decoder_text_encoder,
+                decoder=self.decoder_decoder,
+                scheduler=self.decoder_noise_scheduler,
+                vqgan=self.decoder_vqgan,
+                prior_tokenizer=self.prior_tokenizer,
+                prior_text_encoder=self.prior_text_encoder,
+                prior_prior=self.prior_prior,
+                prior_scheduler=self.prior_noise_scheduler,
+            )
+        elif self.model_type.is_wuerstchen_v3():
+            return StableCascadeCombinedPipeline(
+                tokenizer=self.decoder_tokenizer,
+                text_encoder=self.prior_text_encoder,
+                decoder=self.decoder_decoder,
+                scheduler=self.decoder_noise_scheduler,
+                vqgan=self.decoder_vqgan,
+                prior_prior=self.prior_prior,
+                prior_scheduler=self.prior_noise_scheduler,
+            )

@@ -15,6 +15,7 @@ class ModelType(Enum):
     STABLE_DIFFUSION_XL_10_BASE_INPAINTING = 'STABLE_DIFFUSION_XL_10_BASE_INPAINTING'
 
     WUERSTCHEN_2 = 'WUERSTCHEN_2'
+    WUERSTCHEN_3 = 'WUERSTCHEN_3'
 
     PIXART_ALPHA = 'PIXART_ALPHA'
 
@@ -36,7 +37,8 @@ class ModelType(Enum):
             or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
 
     def is_wuerstchen(self):
-        return self == ModelType.WUERSTCHEN_2
+        return self == ModelType.WUERSTCHEN_2 \
+            or self == ModelType.WUERSTCHEN_3
 
     def is_pixart_alpha(self):
         return self == ModelType.PIXART_ALPHA
@@ -65,3 +67,9 @@ class ModelType(Enum):
             or self == ModelType.STABLE_DIFFUSION_20_DEPTH \
             or self == ModelType.STABLE_DIFFUSION_21 \
             or self == ModelType.STABLE_DIFFUSION_21_BASE
+
+    def is_wuerstchen_v2(self):
+        return self == ModelType.WUERSTCHEN_2
+
+    def is_wuerstchen_v3(self):
+        return self == ModelType.WUERSTCHEN_3

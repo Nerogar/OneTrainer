@@ -4,8 +4,9 @@ import traceback
 
 import torch
 from diffusers import DDPMWuerstchenScheduler
+from diffusers.pipelines.stable_cascade import StableCascadeUnet
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
-from transformers import CLIPTokenizer, CLIPTextModel
+from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -84,28 +85,41 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             effnet_encoder_model_name: str,
             decoder_model_name: str,
     ) -> WuerstchenModel | None:
-        decoder_tokenizer = CLIPTokenizer.from_pretrained(
-            decoder_model_name,
-            subfolder="tokenizer",
-        )
+        if model_type.is_wuerstchen_v2():
+            decoder_tokenizer = CLIPTokenizer.from_pretrained(
+                decoder_model_name,
+                subfolder="tokenizer",
+            )
+        if model_type.is_wuerstchen_v3():
+            decoder_tokenizer = None
 
         decoder_noise_scheduler = DDPMWuerstchenScheduler.from_pretrained(
             decoder_model_name,
             subfolder="scheduler",
         )
 
-        decoder_text_encoder = CLIPTextModel.from_pretrained(
-            decoder_model_name,
-            subfolder="text_encoder",
-            torch_dtype=weight_dtypes.decoder_text_encoder.torch_dtype(),
-        )
-        decoder_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+        if model_type.is_wuerstchen_v2():
+            decoder_text_encoder = CLIPTextModel.from_pretrained(
+                decoder_model_name,
+                subfolder="text_encoder",
+                torch_dtype=weight_dtypes.decoder_text_encoder.torch_dtype(),
+            )
+            decoder_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+        if model_type.is_wuerstchen_v3():
+            decoder_text_encoder = None
 
-        decoder_decoder = WuerstchenDiffNeXt.from_pretrained(
-            decoder_model_name,
-            subfolder="decoder",
-            torch_dtype=weight_dtypes.decoder.torch_dtype(),
-        )
+        if model_type.is_wuerstchen_v2():
+            decoder_decoder = WuerstchenDiffNeXt.from_pretrained(
+                decoder_model_name,
+                subfolder="decoder",
+                torch_dtype=weight_dtypes.decoder.torch_dtype(),
+            )
+        elif model_type.is_wuerstchen_v3():
+            decoder_decoder = StableCascadeUnet.from_pretrained(
+                decoder_model_name,
+                subfolder="decoder",
+                torch_dtype=weight_dtypes.decoder.torch_dtype(),
+            )
 
         decoder_vqgan = PaellaVQModel.from_pretrained(
             decoder_model_name,
@@ -118,23 +132,38 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             torch_dtype=weight_dtypes.effnet_encoder.torch_dtype(),
         )
 
-        prior_prior = WuerstchenPrior.from_pretrained(
-            prior_model_name,
-            subfolder="prior",
-            torch_dtype=weight_dtypes.prior.torch_dtype(),
-        )
+        if model_type.is_wuerstchen_v2():
+            prior_prior = WuerstchenPrior.from_pretrained(
+                prior_model_name,
+                subfolder="prior",
+                torch_dtype=weight_dtypes.prior.torch_dtype(),
+            )
+        elif model_type.is_wuerstchen_v3():
+            prior_prior = StableCascadeUnet.from_pretrained(
+                prior_model_name,
+                subfolder="prior",
+                torch_dtype=weight_dtypes.prior.torch_dtype(),
+            )
 
         prior_tokenizer = CLIPTokenizer.from_pretrained(
             prior_model_name,
             subfolder="tokenizer",
         )
 
-        prior_text_encoder = CLIPTextModel.from_pretrained(
-            prior_model_name,
-            subfolder="text_encoder",
-            torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
-        )
-        prior_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        if model_type.is_wuerstchen_v2():
+            prior_text_encoder = CLIPTextModel.from_pretrained(
+                prior_model_name,
+                subfolder="text_encoder",
+                torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+            )
+            prior_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        elif model_type.is_wuerstchen_v3():
+            prior_text_encoder = CLIPTextModelWithProjection.from_pretrained(
+                prior_model_name,
+                subfolder="text_encoder",
+                torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+            )
+            prior_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
 
         prior_noise_scheduler = DDPMWuerstchenScheduler.from_pretrained(
             prior_model_name,

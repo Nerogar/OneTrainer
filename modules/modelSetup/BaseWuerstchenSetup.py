@@ -119,12 +119,29 @@ class BaseWuerstchenSetup(
                 text_encoder_output = final_layer_norm(
                     text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
                 )
+                if model.model_type.is_wuerstchen_v3():
+                    pooled_text_encoder_output = model.prior_text_encoder.text_projection(text_encoder_output)
             else:
                 text_encoder_output = batch['text_encoder_hidden_state']
+                pooled_text_encoder_output = batch['pooled_text_encoder_output']
 
             latent_input = scaled_noisy_latent_image
 
-            predicted_latent_noise = model.prior_prior(latent_input, timestep, text_encoder_output)
+            if model.model_type.is_wuerstchen_v2():
+                prior_kwargs = {
+                    'c': text_encoder_output,
+                }
+            elif model.model_type.is_wuerstchen_v3():
+                prior_kwargs = {
+                    'clip_text': text_encoder_output,
+                    'clip_text_pooled': pooled_text_encoder_output,
+                }
+
+            predicted_latent_noise = model.prior_prior(
+                latent_input,
+                timestep,
+                **prior_kwargs,
+            )
 
             model_output_data = {
                 'loss_type': 'target',
