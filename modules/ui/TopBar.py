@@ -112,6 +112,7 @@ class TopBar:
         elif self.train_args.model_type.is_pixart_alpha():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
             ]
 
         # training method

@@ -17,28 +17,35 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 
 class BaseModelSaver(metaclass=ABCMeta):
 
-    @staticmethod
-    def _convert_state_dict_dtype(state_dict: dict, dtype: torch.dtype) -> dict:
+    def _convert_state_dict_dtype(
+            self,
+            state_dict: dict,
+            dtype: torch.dtype,
+    ) -> dict:
         converted_state_dict = {}
 
         for (key, value) in state_dict.items():
             if isinstance(value, dict):
-                converted_state_dict[key] = BaseModelSaver._convert_state_dict_dtype(value, dtype)
+                converted_state_dict[key] = self._convert_state_dict_dtype(value, dtype)
             else:
                 converted_state_dict[key] = value.to(device='cpu', dtype=dtype)
 
         return converted_state_dict
 
-    @staticmethod
-    def _convert_state_dict_to_contiguous(state_dict: dict):
+    def _convert_state_dict_to_contiguous(
+            self,
+            state_dict: dict,
+    ):
         for (key, value) in state_dict.items():
             if isinstance(value, dict):
-                BaseModelSaver._convert_state_dict_to_contiguous(value)
+                self._convert_state_dict_to_contiguous(value)
             else:
                 state_dict[key] = value.contiguous()
 
-    @staticmethod
-    def __calculate_safetensors_hash(state_dict: dict[str, Tensor] | None = None) -> str | None:
+    def __calculate_safetensors_hash(
+            self,
+            state_dict: dict[str, Tensor] | None = None,
+    ) -> str | None:
         if state_dict is None:
             return None
 
@@ -51,8 +58,11 @@ class BaseModelSaver(metaclass=ABCMeta):
 
         return f"0x{sha256_hash.hexdigest()}"
 
-    @staticmethod
-    def _create_safetensors_header(model: BaseModel, state_dict: dict[str, Tensor] | None = None) -> dict[str, str]:
+    def _create_safetensors_header(
+            self,
+            model: BaseModel,
+            state_dict: dict[str, Tensor] | None = None,
+    ) -> dict[str, str]:
         if model.model_spec is not None:
             model_spec = copy.deepcopy(model.model_spec)
         else:
@@ -60,7 +70,7 @@ class BaseModelSaver(metaclass=ABCMeta):
 
         # update calculated fields
         model_spec.date = datetime.now().strftime("%Y-%m-%d")
-        model_spec.hash_sha256 = BaseModelSaver.__calculate_safetensors_hash(state_dict)
+        model_spec.hash_sha256 = self.__calculate_safetensors_hash(state_dict)
 
         # assemble the header
         model_spec_dict = model_spec.to_dict()

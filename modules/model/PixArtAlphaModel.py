@@ -65,7 +65,7 @@ class PixArtAlphaModel(BaseModel):
             train_progress: TrainProgress = None,
             embeddings: list[PixArtAlphaModelEmbedding] = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
-            unet_lora: LoRAModuleWrapper | None = None,
+            transformer_lora: LoRAModuleWrapper | None = None,
             model_spec: ModelSpec | None = None,
     ):
         super(PixArtAlphaModel, self).__init__(
@@ -90,7 +90,7 @@ class PixArtAlphaModel(BaseModel):
 
         self.embeddings = embeddings if embeddings is not None else []
         self.text_encoder_lora = text_encoder_lora
-        self.unet_lora = unet_lora
+        self.transformer_lora = transformer_lora
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -104,8 +104,8 @@ class PixArtAlphaModel(BaseModel):
     def transformer_to(self, device: torch.device):
         self.transformer.to(device=device)
 
-        if self.unet_lora is not None:
-            self.unet_lora.to(device)
+        if self.transformer_lora is not None:
+            self.transformer_lora.to(device)
 
     def to(self, device: torch.device):
         self.vae_to(device)

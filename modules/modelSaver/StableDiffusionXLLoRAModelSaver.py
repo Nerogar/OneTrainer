@@ -15,8 +15,10 @@ from modules.util.enum.ModelType import ModelType
 
 class StableDiffusionXLLoRAModelSaver(BaseModelSaver):
 
-    @staticmethod
-    def __get_state_dict(model: StableDiffusionXLModel) -> dict[str, Tensor]:
+    def __get_state_dict(
+            self,
+            model: StableDiffusionXLModel,
+    ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_1_lora is not None:
             state_dict |= model.text_encoder_1_lora.state_dict()
@@ -27,39 +29,39 @@ class StableDiffusionXLLoRAModelSaver(BaseModelSaver):
 
         return state_dict
 
-    @staticmethod
     def __save_ckpt(
+            self,
             model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = StableDiffusionXLLoRAModelSaver.__get_state_dict(model)
-        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
+        state_dict = self.__get_state_dict(model)
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
 
-    @staticmethod
     def __save_safetensors(
+            self,
             model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype,
     ):
-        state_dict = StableDiffusionXLLoRAModelSaver.__get_state_dict(model)
-        save_state_dict = BaseModelSaver._convert_state_dict_dtype(state_dict, dtype)
+        state_dict = self.__get_state_dict(model)
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination, BaseModelSaver._create_safetensors_header(model, save_state_dict))
+        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
-    @staticmethod
     def __save_internal(
+            self,
             model: StableDiffusionXLModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
 
         # lora
-        StableDiffusionXLLoRAModelSaver.__save_safetensors(
+        self.__save_safetensors(
             model,
             os.path.join(destination, "lora", "lora.safetensors"),
             torch.float32
@@ -87,7 +89,7 @@ class StableDiffusionXLLoRAModelSaver(BaseModelSaver):
 
         # model spec
         with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
-            json.dump(BaseModelSaver._create_safetensors_header(model), model_spec_file)
+            json.dump(self._create_safetensors_header(model), model_spec_file)
 
     def save(
             self,

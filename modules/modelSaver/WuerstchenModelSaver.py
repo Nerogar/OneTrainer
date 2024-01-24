@@ -14,8 +14,8 @@ from modules.util.enum.ModelType import ModelType
 
 class WuerstchenModelSaver(BaseModelSaver):
 
-    @staticmethod
     def __save_diffusers(
+            self,
             model: WuerstchenModel,
             destination: str,
             dtype: torch.dtype,
@@ -34,13 +34,13 @@ class WuerstchenModelSaver(BaseModelSaver):
 
         del pipeline_copy
 
-    @staticmethod
     def __save_internal(
+            self,
             model: WuerstchenModel,
             destination: str,
     ):
         # base model
-        WuerstchenModelSaver.__save_diffusers(model, destination, torch.float32)
+        self.__save_diffusers(model, destination, torch.float32)
 
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
@@ -64,7 +64,7 @@ class WuerstchenModelSaver(BaseModelSaver):
 
         # model spec
         with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
-            json.dump(BaseModelSaver._create_safetensors_header(model), model_spec_file)
+            json.dump(self._create_safetensors_header(model), model_spec_file)
 
     def save(
             self,

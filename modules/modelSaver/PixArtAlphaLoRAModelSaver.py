@@ -7,29 +7,29 @@ from safetensors.torch import save_file
 from torch import Tensor
 
 from modules.model.BaseModel import BaseModel
-from modules.model.WuerstchenModel import WuerstchenModel
+from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class WuerstchenLoRAModelSaver(BaseModelSaver):
+class PixArtAlphaLoRAModelSaver(BaseModelSaver):
 
     def __get_state_dict(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
-        if model.prior_text_encoder_lora is not None:
-            state_dict |= model.prior_text_encoder_lora.state_dict()
-        if model.prior_prior_lora is not None:
-            state_dict |= model.prior_prior_lora.state_dict()
+        if model.text_encoder_lora is not None:
+            state_dict |= model.text_encoder_lora.state_dict()
+        if model.transformer_lora is not None:
+            state_dict |= model.transformer_lora.state_dict()
 
         return state_dict
 
     def __save_ckpt(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             destination: str,
             dtype: torch.dtype,
     ):
@@ -41,7 +41,7 @@ class WuerstchenLoRAModelSaver(BaseModelSaver):
 
     def __save_safetensors(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             destination: str,
             dtype: torch.dtype,
     ):
@@ -53,7 +53,7 @@ class WuerstchenLoRAModelSaver(BaseModelSaver):
 
     def __save_internal(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)

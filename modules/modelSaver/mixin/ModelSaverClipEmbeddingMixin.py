@@ -2,7 +2,7 @@ from abc import ABCMeta
 
 import torch
 from torch import Tensor
-from transformers import CLIPTokenizer, CLIPTextModel
+from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 
 class ModelSaverClipEmbeddingMixin(metaclass=ABCMeta):
@@ -10,7 +10,7 @@ class ModelSaverClipEmbeddingMixin(metaclass=ABCMeta):
     def _get_embedding_vector(
             self,
             tokenizer: CLIPTokenizer,
-            text_encoder: CLIPTextModel,
+            text_encoder: CLIPTextModel | CLIPTextModelWithProjection,
             text_tokens: list[str],
     ) -> Tensor:
         with torch.no_grad():

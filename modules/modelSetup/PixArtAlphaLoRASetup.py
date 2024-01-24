@@ -5,19 +5,20 @@ from torch.nn import Parameter
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
+from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
+class PixArtAlphaLoRASetup(BasePixArtAlphaSetup):
     def __init__(
             self,
             train_device: torch.device,
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(PixArtAlphaFineTuneSetup, self).__init__(
+        super(PixArtAlphaLoRASetup, self).__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -31,10 +32,10 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
         params = list()
 
         if args.train_text_encoder:
-            params += list(model.text_encoder.parameters())
+            params += list(model.text_encoder_lora.parameters())
 
         if args.train_prior:
-            params += list(model.transformer.parameters())
+            params += list(model.transformer_lora.parameters())
 
         return params
 
@@ -47,12 +48,12 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
 
         if args.train_text_encoder:
             param_groups.append(
-                self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate)
+                self.create_param_groups(args, model.text_encoder_lora.parameters(), args.text_encoder_learning_rate)
             )
 
         if args.train_prior:
             param_groups.append(
-                self.create_param_groups(args, model.transformer.parameters(), args.prior_learning_rate)
+                self.create_param_groups(args, model.transformer_lora.parameters(), args.prior_learning_rate)
             )
 
         return param_groups
@@ -62,11 +63,23 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
             model: PixArtAlphaModel,
             args: TrainArgs,
     ):
+        if model.text_encoder_lora is None and args.train_text_encoder:
+            model.text_encoder_lora = LoRAModuleWrapper(
+                model.text_encoder, args.lora_rank, "lora_te", args.lora_alpha
+            )
+
+        if model.transformer_lora is None and args.train_prior:
+            model.transformer_lora = LoRAModuleWrapper(
+                model.transformer, args.lora_rank, "lora_transformer", args.lora_alpha, ["attn1", "attn2"]
+            )
+
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
-        model.text_encoder.requires_grad_(train_text_encoder)
+        if model.text_encoder_lora is not None:
+            model.text_encoder_lora.requires_grad_(train_text_encoder)
 
         train_prior = args.train_prior and (model.train_progress.epoch < args.train_prior_epochs)
-        model.transformer.requires_grad_(train_prior)
+        if model.transformer_lora is not None:
+            model.transformer_lora.requires_grad_(train_prior)
 
         model.vae.requires_grad_(False)
 
@@ -77,6 +90,13 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
         #     model.force_v_prediction()
         # elif args.force_epsilon_prediction:
         #     model.force_epsilon_prediction()
+
+        if model.text_encoder_lora is not None:
+            model.text_encoder_lora.hook_to_module()
+            model.text_encoder_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
+        if model.transformer_lora is not None:
+            model.transformer_lora.hook_to_module()
+            model.transformer_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args

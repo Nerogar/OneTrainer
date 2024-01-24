@@ -106,7 +106,7 @@ class PixArtAlphaModelSaver(BaseModelSaver):
 
         # model spec
         with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
-            json.dump(BaseModelSaver._create_safetensors_header(model), model_spec_file)
+            json.dump(self._create_safetensors_header(model), model_spec_file)
 
     def save(
             self,
