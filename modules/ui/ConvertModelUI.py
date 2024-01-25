@@ -24,7 +24,6 @@ class ConvertModelUI(ctk.CTkToplevel):
         self.geometry("550x350")
         self.resizable(False, False)
         self.wait_visibility()
-        self.grab_set()
         self.focus_set()
 
         self.convert_model_args = ConvertModelArgs.default_values()

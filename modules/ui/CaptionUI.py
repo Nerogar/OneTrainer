@@ -46,7 +46,6 @@ class CaptionUI(ctk.CTkToplevel):
         self.geometry("1280x980")
         self.resizable(False, False)
         self.wait_visibility()
-        self.grab_set()
         self.focus_set()
 
         self.help_text = """

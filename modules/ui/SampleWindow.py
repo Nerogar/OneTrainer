@@ -49,7 +49,6 @@ class SampleWindow(ctk.CTkToplevel):
         self.geometry("1200x800")
         self.resizable(True, True)
         self.wait_visibility()
-        self.grab_set()
         self.focus_set()
 
         self.grid_rowconfigure(0, weight=0)
