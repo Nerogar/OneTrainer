@@ -5,6 +5,7 @@ import traceback
 from tkinter import filedialog
 
 import customtkinter as ctk
+import cv2
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
@@ -54,6 +55,8 @@ Up arrow: previous image
 Down arrow: next image
 Return: save
 Ctrl+M: only show the mask
+Ctrl+D: draw mask editing mode
+Ctrl+F: fill mask editing mode
 
 When editing masks:
 Left click: add mask
@@ -94,8 +97,9 @@ Mouse wheel: increase or decrease brush size"""
         self.display_only_mask = False
         self.image = None
         self.image_label = None
+        self.mask_editing_mode = 'draw'
         self.enable_mask_editing_var = ctk.BooleanVar()
-        self.enable_mask_editing_alpha = None
+        self.mask_editing_alpha = None
         self.prompt_var = None
         self.prompt_component = None
         self.content_column(self.bottom_frame)
@@ -152,28 +156,29 @@ Mouse wheel: increase or decrease brush size"""
         right_frame = ctk.CTkFrame(master, fg_color="transparent")
         right_frame.grid(row=0, column=1, sticky="nsew")
 
-        right_frame.grid_columnconfigure(2, weight=1)
+        right_frame.grid_columnconfigure(4, weight=1)
         right_frame.grid_rowconfigure(1, weight=1)
+
+        components.button(right_frame, 0, 0, "Draw", self.draw_mask_editing_mode,
+                          tooltip="draw a mask using a brush")
+        components.button(right_frame, 0, 1, "Fill", self.fill_mask_editing_mode,
+                          tooltip="draw a mask using a fill tool")
 
         # checkbox to enable mask editing
         self.enable_mask_editing_var = ctk.BooleanVar()
         self.enable_mask_editing_var.set(False)
         enable_mask_editing_checkbox = ctk.CTkCheckBox(
             right_frame, text="Enable Mask Editing", variable=self.enable_mask_editing_var, width=50)
-        enable_mask_editing_checkbox.grid(row=0, column=0, padx=25, pady=5, sticky="w")
+        enable_mask_editing_checkbox.grid(row=0, column=2, padx=25, pady=5, sticky="w")
 
         # mask alpha textbox
-        self.enable_mask_editing_alpha = ctk.CTkEntry(master=right_frame, width=40, placeholder_text="1.0")
-        self.enable_mask_editing_alpha.insert(0, "1.0")
-        self.enable_mask_editing_alpha.grid(row=0, column=1, sticky="e", padx=5, pady=5)
-        self.enable_mask_editing_alpha.bind("<Down>", self.next_image)
-        self.enable_mask_editing_alpha.bind("<Up>", self.previous_image)
-        self.enable_mask_editing_alpha.bind("<Return>", self.save)
-        self.enable_mask_editing_alpha.bind("<Control-m>", self.toggle_mask)
+        self.mask_editing_alpha = ctk.CTkEntry(master=right_frame, width=40, placeholder_text="1.0")
+        self.mask_editing_alpha.insert(0, "1.0")
+        self.mask_editing_alpha.grid(row=0, column=3, sticky="e", padx=5, pady=5)
+        self.bind_key_events(self.mask_editing_alpha)
 
-        enable_mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="Brush Alpha", width=75)
-        enable_mask_editing_alpha_label.grid(row=0, column=2, padx=0, pady=5, sticky="w")
-
+        mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="Brush Alpha", width=75)
+        mask_editing_alpha_label.grid(row=0, column=4, padx=0, pady=5, sticky="w")
 
         # image
         self.image = ctk.CTkImage(
@@ -183,24 +188,29 @@ Mouse wheel: increase or decrease brush size"""
         self.image_label = ctk.CTkLabel(
             master=right_frame, text="", image=self.image, height=self.image_size, width=self.image_size
         )
-        self.image_label.grid(row=1, column=0, columnspan=3, sticky="nsew")
+        self.image_label.grid(row=1, column=0, columnspan=5, sticky="nsew")
 
-        self.image_label.bind("<Motion>", self.draw_mask)
-        self.image_label.bind("<Button-1>", self.draw_mask)
-        self.image_label.bind("<Button-3>", self.draw_mask)
+        self.image_label.bind("<Motion>", self.edit_mask)
+        self.image_label.bind("<Button-1>", self.edit_mask)
+        self.image_label.bind("<Button-3>", self.edit_mask)
         self.image_label.bind("<MouseWheel>", self.draw_mask_radius)
 
         # prompt
         self.prompt_var = ctk.StringVar()
         self.prompt_component = ctk.CTkEntry(right_frame, textvariable=self.prompt_var)
-        self.prompt_component.grid(row=2, column=0, columnspan=3, pady=5, sticky="new")
-        self.prompt_component.bind("<Down>", self.next_image)
-        self.prompt_component.bind("<Up>", self.previous_image)
-        self.prompt_component.bind("<Return>", self.save)
-        self.prompt_component.bind("<Control-m>", self.toggle_mask)
+        self.prompt_component.grid(row=2, column=0, columnspan=5, pady=5, sticky="new")
+        self.bind_key_events(self.prompt_component)
         self.prompt_component.focus_set()
 
-    def load_directory(self, include_subdirectories: bool=False):
+    def bind_key_events(self, component):
+        component.bind("<Down>", self.next_image)
+        component.bind("<Up>", self.previous_image)
+        component.bind("<Return>", self.save)
+        component.bind("<Control-m>", self.toggle_mask)
+        component.bind("<Control-d>", self.draw_mask_editing_mode)
+        component.bind("<Control-f>", self.fill_mask_editing_mode)
+
+    def load_directory(self, include_subdirectories: bool = False):
         self.scan_directory(include_subdirectories)
         self.file_list_column(self.bottom_frame)
 
@@ -211,10 +221,11 @@ Mouse wheel: increase or decrease brush size"""
 
         self.prompt_component.focus_set()
 
-    def scan_directory(self, include_subdirectories: bool=False):
+    def scan_directory(self, include_subdirectories: bool = False):
         def __is_supported_image_extension(filename):
             name, ext = os.path.splitext(filename)
             return path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel")
+
         self.image_rel_paths = []
 
         if not self.dir or not os.path.isdir(self.dir):
@@ -329,7 +340,7 @@ Mouse wheel: increase or decrease brush size"""
                     np_mask = np_mask * (1.0 - norm_min) + norm_min
                 elif np_mask_min < 1:
                     # note: min of 1 means we get divide by 0
-                    np_mask = (np_mask - np_mask_min)/(1.0 - np_mask_min) * (1.0 - norm_min) + norm_min
+                    np_mask = (np_mask - np_mask_min) / (1.0 - np_mask_min) * (1.0 - norm_min) + norm_min
 
                 np_masked_image = (np_image * np_mask * 255.0).astype(np.uint8)
                 masked_image = Image.fromarray(np_masked_image, mode='RGB')
@@ -345,7 +356,7 @@ Mouse wheel: increase or decrease brush size"""
         delta = 1.0 + (-np.sign(event.delta) * 0.05)
         self.mask_draw_radius *= delta
 
-    def draw_mask(self, event):
+    def edit_mask(self, event):
         if not self.enable_mask_editing_var.get():
             return
 
@@ -368,18 +379,31 @@ Mouse wheel: increase or decrease brush size"""
         self.mask_draw_x = event_x
         self.mask_draw_y = event_y
 
+        is_right = False
+        is_left = False
+        if event.state & 0x0100 or event.num == 1:  # left mouse button
+            is_left = True
+        elif event.state & 0x0400 or event.num == 3:  # right mouse button
+            is_right = True
+
+        if self.mask_editing_mode == 'draw':
+            self.draw_mask(start_x, start_y, end_x, end_y, is_left, is_right)
+        if self.mask_editing_mode == 'fill':
+            self.fill_mask(start_x, start_y, end_x, end_y, is_left, is_right)
+
+    def draw_mask(self, start_x, start_y, end_x, end_y, is_left, is_right):
         color = None
 
         adding_to_mask = True
-        if event.state & 0x0100 or event.num == 1:  # left mouse button
+        if is_left:
             try:
-                alpha = float(self.enable_mask_editing_alpha.get())
+                alpha = float(self.mask_editing_alpha.get())
             except:
                 alpha = 1.0
-            rgb_value = int(max(0.0, min(alpha, 1.0)) * 255) # max/min stuff to clamp to 0 - 255 range
+            rgb_value = int(max(0.0, min(alpha, 1.0)) * 255)  # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
 
-        elif event.state & 0x0400 or event.num == 3:  # right mouse button
+        elif is_right:
             color = (0, 0, 0)
             adding_to_mask = False
 
@@ -399,6 +423,35 @@ Mouse wheel: increase or decrease brush size"""
                           start_x + radius, start_y + radius), fill=color, outline=None)
             draw.ellipse((end_x - radius, end_y - radius, end_x + radius,
                           end_y + radius), fill=color, outline=None)
+
+            self.refresh_image()
+
+    def fill_mask(self, start_x, start_y, end_x, end_y, is_left, is_right):
+        color = None
+
+        adding_to_mask = True
+        if is_left:
+            try:
+                alpha = float(self.mask_editing_alpha.get())
+            except:
+                alpha = 1.0
+            rgb_value = int(max(0.0, min(alpha, 1.0)) * 255)  # max/min stuff to clamp to 0 - 255 range
+            color = (rgb_value, rgb_value, rgb_value)
+
+        elif is_right:
+            color = (0, 0, 0)
+            adding_to_mask = False
+
+        if color is not None:
+            if self.pil_mask is None:
+                if adding_to_mask:
+                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(0, 0, 0))
+                else:
+                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(255, 255, 255))
+
+            np_mask = np.array(self.pil_mask).astype(np.uint8)
+            cv2.floodFill(np_mask, None, (start_x, start_y), color)
+            self.pil_mask = Image.fromarray(np_mask, 'RGB')
 
             self.refresh_image()
 
@@ -424,7 +477,13 @@ Mouse wheel: increase or decrease brush size"""
         else:
             return ""
 
-    def toggle_mask(self, event):
+    def draw_mask_editing_mode(self, *args):
+        self.mask_editing_mode = 'draw'
+
+    def fill_mask_editing_mode(self, *args):
+        self.mask_editing_mode = 'fill'
+
+    def toggle_mask(self, *args):
         self.display_only_mask = not self.display_only_mask
         self.refresh_image()
 
