@@ -370,20 +370,25 @@ Mouse wheel: increase or decrease brush size"""
 
         color = None
 
+        adding_to_mask = True
         if event.state & 0x0100 or event.num == 1:  # left mouse button
             try:
                 alpha = float(self.enable_mask_editing_alpha.get())
             except:
                 alpha = 1.0
-            rgb_value = int(max(0, min(alpha, 1)) * 255) # max/min stuff to clamp to 0 - 255 range
+            rgb_value = int(max(0.0, min(alpha, 1.0)) * 255) # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
 
         elif event.state & 0x0400 or event.num == 3:  # right mouse button
             color = (0, 0, 0)
+            adding_to_mask = False
 
         if color is not None:
             if self.pil_mask is None:
-                self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(0, 0, 0))
+                if adding_to_mask:
+                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(0, 0, 0))
+                else:
+                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(255, 255, 255))
 
             radius = int(self.mask_draw_radius * max(self.pil_mask.width, self.pil_mask.height))
 
