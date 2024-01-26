@@ -480,6 +480,10 @@ Mouse wheel: increase or decrease brush size"""
     def draw_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'draw'
 
+        if args:
+            # disable default event
+            return "break"
+
     def fill_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'fill'
 
