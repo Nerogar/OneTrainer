@@ -3,15 +3,19 @@ from typing import Iterable
 import torch
 from torch.nn import Parameter
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
+from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 
 
-class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
+class StableDiffusionLoRASetup(
+    BaseStableDiffusionSetup,
+    ModelSetupClipEmbeddingMixin,
+):
     def __init__(
             self,
             train_device: torch.device,
@@ -34,6 +38,9 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
         if args.train_text_encoder:
             params += list(model.text_encoder_lora.parameters())
 
+        if args.train_embedding:
+            params += list(model.text_encoder.get_input_embeddings().parameters())
+
         if args.train_unet:
             params += list(model.unet_lora.parameters())
 
@@ -45,10 +52,19 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             args: TrainArgs,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        
+
         if args.train_text_encoder:
             param_groups.append(
                 self.create_param_groups(args, model.text_encoder_lora.parameters(), args.text_encoder_learning_rate)
+            )
+
+        if args.train_embedding:
+            param_groups.append(
+                self.create_param_groups(
+                    args,
+                    model.text_encoder.get_input_embeddings().parameters(),
+                    args.embedding_learning_rate,
+                )
             )
 
         if args.train_unet:
@@ -80,6 +96,11 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         model.text_encoder_lora.requires_grad_(train_text_encoder)
 
+        train_embedding = args.train_embedding and (model.train_progress.epoch < args.train_embedding_epochs)
+        if train_embedding:
+            model.text_encoder.get_input_embeddings().requires_grad_(True)
+            model.text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
         model.unet_lora.requires_grad_(train_unet)
 
@@ -88,6 +109,24 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
 
         model.text_encoder_lora.hook_to_module()
         model.unet_lora.hook_to_module()
+
+        if len(model.embeddings) == 0:
+            vector = self._create_new_embedding(
+                model.tokenizer,
+                model.text_encoder,
+                args.initial_embedding_text,
+                args.token_count,
+            )
+
+            model.embeddings = [StableDiffusionModelEmbedding(vector, 'embedding')]
+
+        original_token_embeds, untrainable_token_ids = self._add_embeddings_to_clip(
+            model.tokenizer,
+            model.text_encoder,
+            [(model.embeddings[0].text_encoder_vector, model.embeddings[0].text_tokens, True)],
+        )
+        model.all_text_encoder_original_token_embeds = original_token_embeds
+        model.text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
 
         if args.rescale_noise_scheduler_to_zero_terminal_snr:
             model.rescale_noise_scheduler_to_zero_terminal_snr()
@@ -111,7 +150,11 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             args: TrainArgs,
     ):
         vae_on_train_device = self.debug_mode or args.align_prop
-        text_encoder_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
+        text_encoder_on_train_device = \
+            args.train_text_encoder \
+            or args.train_embedding \
+            or args.align_prop \
+            or not args.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
@@ -139,5 +182,15 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
         train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
         model.text_encoder_lora.requires_grad_(train_text_encoder)
 
+        train_embedding = model.train_progress.epoch < args.train_embedding_epochs
+        if args.train_embedding and not train_embedding:
+            model.text_encoder.get_input_embeddings().requires_grad_(False)
+
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
         model.unet_lora.requires_grad_(train_unet)
+
+        self._embeddigns_after_optimizer_step(
+            model.text_encoder.get_input_embeddings(),
+            model.all_text_encoder_original_token_embeds,
+            model.text_encoder_untrainable_token_embeds_mask,
+        )

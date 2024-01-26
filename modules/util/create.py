@@ -8,7 +8,6 @@ from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from modules.dataLoader.PixArtAlphaFineTuneDataLoader import PixArtAlphaFineTuneDataLoader
-from modules.dataLoader.StableDiffusionEmbeddingDataLoader import StableDiffusionEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLEmbeddingDataLoader import StableDiffusionXLEmbeddingDataLoader
@@ -250,7 +249,7 @@ def create_data_loader(
                 return PixArtAlphaFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
-                return StableDiffusionEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
+                return StableDiffusionFineTuneDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLEmbeddingDataLoader(train_device, temp_device, args, model, train_progress)
             if model_type.is_wuerstchen():

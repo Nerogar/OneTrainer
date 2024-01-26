@@ -63,6 +63,7 @@ class TrainingTab:
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_frame(column_0, 1)
+        self.__create_embedding_frame(column_0, 2)
 
         self.__create_base2_frame(column_1, 0)
         self.__create_unet_frame(column_1, 1)
@@ -301,7 +302,6 @@ class TrainingTab:
                          tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
 
-
     def __create_text_encoder_2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -325,6 +325,25 @@ class TrainingTab:
         components.label(frame, 3, 0, "Clip Skip 2",
                          tooltip="The number of clip layers to skip. 0 = disabled")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_2_layer_skip")
+
+    def __create_embedding_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+
+        # train text encoder
+        components.label(frame, 0, 0, "Train Embeddings",
+                         tooltip="Enables training embeddings")
+        components.switch(frame, 0, 1, self.ui_state, "train_embedding")
+
+        # train text encoder epochs
+        components.label(frame, 1, 0, "Train Embeddings Epochs",
+                         tooltip="Number of epochs to train the embeddings")
+        components.entry(frame, 1, 1, self.ui_state, "train_embedding_epochs")
+
+        # text encoder learning rate
+        components.label(frame, 2, 0, "Embeddings Learning Rate",
+                         tooltip="The learning rate of embeddings. Overrides the base learning rate")
+        components.entry(frame, 2, 1, self.ui_state, "embedding_learning_rate")
 
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

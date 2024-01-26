@@ -38,12 +38,12 @@ class ModelSetupClipEmbeddingMixin(metaclass=ABCMeta):
             self,
             tokenizer: CLIPTokenizer,
             text_encoder: CLIPTextModel,
-            embeddings: list[(Tensor, list[str])],
+            embeddings: list[(Tensor, list[str], bool)],
     ) -> (Tensor, list[bool]):
         with torch.no_grad():
             untrainable_token_ids = [True] * text_encoder.get_input_embeddings().weight.data.shape[0]
 
-            for embedding_vectors, text_tokens in embeddings:
+            for embedding_vectors, text_tokens, trainable in embeddings:
                 tokenizer.add_tokens(text_tokens)
                 text_encoder.resize_token_embeddings(len(tokenizer))
 

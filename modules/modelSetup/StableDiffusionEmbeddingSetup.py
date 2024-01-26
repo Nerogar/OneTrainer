@@ -77,7 +77,7 @@ class StableDiffusionEmbeddingSetup(
         original_token_embeds, untrainable_token_ids = self._add_embeddings_to_clip(
             model.tokenizer,
             model.text_encoder,
-            [(model.embeddings[0].text_encoder_vector, model.embeddings[0].text_tokens)],
+            [(model.embeddings[0].text_encoder_vector, model.embeddings[0].text_tokens, True)],
         )
         model.all_text_encoder_original_token_embeds = original_token_embeds
         model.text_encoder_untrainable_token_embeds_mask = untrainable_token_ids

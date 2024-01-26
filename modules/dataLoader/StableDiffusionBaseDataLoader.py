@@ -30,6 +30,7 @@ from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
+from mgds.pipelineModules.ReplaceText import ReplaceText
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -122,6 +123,9 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
+        all_token_string = ''.join(model.embeddings[0].text_tokens)
+        replace_embedding_text = ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text='<embedding>', new_text=all_token_string)
+
         modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 
         if args.masked_training:
@@ -132,6 +136,8 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         if args.model_type.has_depth_input():
             modules.append(generate_depth)
+
+        modules.append(replace_embedding_text)
 
         return modules
 

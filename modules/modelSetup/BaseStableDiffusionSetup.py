@@ -76,6 +76,13 @@ class BaseStableDiffusionSetup(
             args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
+    def setup_model(
+            self,
+            model: StableDiffusionModel,
+            args: TrainArgs,
+    ):
+        pass
+
     def __encode_text(
             self,
             model: StableDiffusionModel,
@@ -122,7 +129,7 @@ class BaseStableDiffusionSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
+            if args.train_text_encoder or args.train_embedding or args.training_method == TrainingMethod.EMBEDDING:
                 text_encoder_output = self.__encode_text(
                     model,
                     args,

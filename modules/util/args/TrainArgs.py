@@ -138,6 +138,9 @@ class TrainArgs(BaseArgs):
     normalize_masked_area_loss: bool
 
     # embedding
+    train_embedding: bool
+    train_embedding_epochs: int
+    embedding_learning_rate: float
     embedding_model_names: list[str]
     token_count: int
     initial_embedding_text: str
@@ -379,6 +382,9 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--normalize-masked-area-loss", required=False, action='store_true', dest="normalize_masked_area_loss", help="If masked training is active, normalizes the loss based on the masked region for each sample")
 
         # embedding
+        parser.add_argument("--train-embedding", required=False, action='store_true', dest="train_embedding", help="Whether embeddings should be trained")
+        parser.add_argument("--train-embedding-epochs", type=int, required=False, default=2 ** 30, dest="train_embedding_epochs", help="Number of epochs to train embeddings for")
+        parser.add_argument("--embedding-learning-rate", type=float, required=False, default=None, dest="embedding_learning_rate", help="Learning rate for embeddings")
         parser.add_argument("--embedding-model-name", type=str, required=False, action="append", default=[], dest="embedding_model_names", help="The embedding to start training from")
         parser.add_argument("--token-count", type=int, required=False, default=1, dest="token_count", help="The number of tokens to train")
         parser.add_argument("--initial-embedding-text", type=str, required=False, default="*", dest="initial_embedding_text", help="The text to initialize new embeddings")
@@ -581,6 +587,9 @@ class TrainArgs(BaseArgs):
         data.append(("normalize_masked_area_loss", False, bool, False))
 
         # embedding
+        data.append(("train_embedding", False, bool,  False))
+        data.append(("train_embedding_epochs", 10000, int, False))
+        data.append(("embedding_learning_rate", None, float, True))
         data.append(("embedding_model_names", [], list[str], False))
         data.append(("token_count", 1, int, False))
         data.append(("initial_embedding_text", "*", str, False))

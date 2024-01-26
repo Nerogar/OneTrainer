@@ -407,7 +407,8 @@ class TrainUI(ctk.CTk):
 
         if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
             self.lora_tab(self.tabview.add("LoRA"))
-        if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
+        # if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
+        if "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
 
     def open_tensorboard(self):

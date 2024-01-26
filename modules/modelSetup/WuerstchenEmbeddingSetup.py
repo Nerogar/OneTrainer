@@ -79,7 +79,7 @@ class WuerstchenEmbeddingSetup(
         original_token_embeds, untrainable_token_ids = self._add_embeddings_to_clip(
             model.prior_tokenizer,
             model.prior_text_encoder,
-            [(model.embeddings[0].prior_text_encoder_vector, model.embeddings[0].text_tokens)],
+            [(model.embeddings[0].prior_text_encoder_vector, model.embeddings[0].text_tokens, True)],
         )
         model.all_prior_text_encoder_original_token_embeds = original_token_embeds
         model.prior_text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
