@@ -619,14 +619,6 @@ def create_optimizer(
                 relative_step=args.optimizer_relative_step if args.optimizer_relative_step is not None else True,
                 warmup_init=args.optimizer_warmup_init if args.optimizer_warmup_init is not None else False,
             )
-        case Optimizer.PRODIGY:
-            optimizer = transformers.Adafactor(
-                params=parameters,
-                lr=args.learning_rate,
-                weight_decay=args.weight_decay,
-                use_bias_correction=True,
-                safeguard_warmup=True,
-            )
 
     if state_dict is not None:
         for i, params in enumerate(parameters):
