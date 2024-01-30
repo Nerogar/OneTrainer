@@ -3,6 +3,7 @@ from typing import Tuple, Any, Callable
 
 import customtkinter as ctk
 from PIL import Image
+from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.ui.ToolTip import ToolTip
@@ -206,6 +207,20 @@ def button(master, row, column, text, command, tooltip=None):
 def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
     component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.vars[var_name], command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
+
     return component
 
 
@@ -224,6 +239,19 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
 
     if command:
         command(ui_state.vars[var_name].get())  # call command once to set the initial value
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
 
     return frame
 
@@ -265,6 +293,19 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
 
     var.trace_add("write", lambda _0, _1, _2: update_var())
     update_var()  # call update_var once to set the initial value
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
 
     return component
 
