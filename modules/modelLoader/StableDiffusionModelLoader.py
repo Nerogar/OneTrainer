@@ -138,6 +138,7 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
             subfolder="text_encoder",
             torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
+        text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
 
         if vae_model_name:
             vae = AutoencoderKL.from_pretrained(
@@ -240,13 +241,18 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
         model_spec = self._load_default_model_spec(model_type)
 
+        text_encoder = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
+        text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
+        unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
+
         return StableDiffusionModel(
             model_type=model_type,
             tokenizer=pipeline.tokenizer,
             noise_scheduler=noise_scheduler,
-            text_encoder=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype()),
-            vae=pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype()),
-            unet=pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype()),
+            text_encoder=text_encoder,
+            vae=vae,
+            unet=unet,
             image_depth_processor=None,  # TODO
             depth_estimator=None,  # TODO
             sd_config=sd_config,
@@ -291,13 +297,18 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
         model_spec = self._load_default_model_spec(model_type, base_model_name)
 
+        text_encoder = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
+        text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
+        unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
+
         return StableDiffusionModel(
             model_type=model_type,
             tokenizer=pipeline.tokenizer,
             noise_scheduler=noise_scheduler,
-            text_encoder=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype()),
-            vae=pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype()),
-            unet=pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype()),
+            text_encoder=text_encoder,
+            vae=vae,
+            unet=unet,
             image_depth_processor=None,  # TODO
             depth_estimator=None,  # TODO
             sd_config=sd_config,

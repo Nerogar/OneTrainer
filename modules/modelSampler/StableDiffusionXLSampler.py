@@ -196,7 +196,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
         ]).unsqueeze(dim=0)
 
         add_time_ids = add_time_ids.to(
-            dtype=unet.dtype,
             device=self.train_device,
         )
 
@@ -206,7 +205,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
             generator=generator,
             device=self.train_device,
-            dtype=unet.dtype
+            dtype=torch.float32,
         ) * noise_scheduler.init_noise_sigma
 
         added_cond_kwargs = {
@@ -448,7 +447,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
         ]).unsqueeze(dim=0)
 
         add_time_ids = add_time_ids.to(
-            dtype=unet.dtype,
             device=self.train_device,
         )
 
@@ -458,7 +456,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
             generator=generator,
             device=self.train_device,
-            dtype=unet.dtype
+            dtype=torch.float32,
         ) * noise_scheduler.init_noise_sigma
 
         added_cond_kwargs = {

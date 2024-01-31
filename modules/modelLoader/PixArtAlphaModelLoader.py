@@ -95,6 +95,7 @@ class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             subfolder="text_encoder",
             torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
+        text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
 
         if vae_model_name:
             vae = AutoencoderKL.from_pretrained(

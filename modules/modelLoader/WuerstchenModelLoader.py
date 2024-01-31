@@ -99,6 +99,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             subfolder="text_encoder",
             torch_dtype=weight_dtypes.decoder_text_encoder.torch_dtype(),
         )
+        decoder_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
 
         decoder_decoder = WuerstchenDiffNeXt.from_pretrained(
             decoder_model_name,
@@ -133,6 +134,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             subfolder="text_encoder",
             torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
+        prior_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
 
         prior_noise_scheduler = DDPMWuerstchenScheduler.from_pretrained(
             prior_model_name,

@@ -118,12 +118,14 @@ class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, M
             subfolder="text_encoder",
             torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
         )
+        text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
 
         text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
             base_model_name,
             subfolder="text_encoder_2",
             torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
         )
+        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
 
         if vae_model_name:
             vae = AutoencoderKL.from_pretrained(
@@ -190,15 +192,22 @@ class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, M
 
         model_spec = self._load_default_model_spec(model_type)
 
+        text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
+        text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
+        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(False))
+        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
+        unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
+
         return StableDiffusionXLModel(
             model_type=model_type,
             tokenizer_1=pipeline.tokenizer,
             tokenizer_2=pipeline.tokenizer_2,
             noise_scheduler=noise_scheduler,
-            text_encoder_1=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype()),
-            text_encoder_2=pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype()),
-            vae=pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype()),
-            unet=pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype()),
+            text_encoder_1=text_encoder_1,
+            text_encoder_2=text_encoder_2,
+            vae=vae,
+            unet=unet,
             sd_config=sd_config,
             model_spec=model_spec,
         )
@@ -234,15 +243,22 @@ class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, M
 
         model_spec = self._load_default_model_spec(model_type, base_model_name)
 
+        text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
+        text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
+        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(False))
+        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
+        unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
+
         return StableDiffusionXLModel(
             model_type=model_type,
             tokenizer_1=pipeline.tokenizer,
             tokenizer_2=pipeline.tokenizer_2,
             noise_scheduler=noise_scheduler,
-            text_encoder_1=pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype()),
-            text_encoder_2=pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype()),
-            vae=pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype()),
-            unet=pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype()),
+            text_encoder_1=text_encoder_1,
+            text_encoder_2=text_encoder_2,
+            vae=vae,
+            unet=unet,
             sd_config=sd_config,
             model_spec=model_spec,
         )
