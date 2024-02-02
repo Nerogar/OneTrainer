@@ -29,6 +29,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.dtype_util import enable_grad_scaling
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
@@ -425,8 +426,7 @@ class GenericTrainer(BaseTrainer):
                 self.data_loader.get_data_set().start_next_epoch()
             return
 
-        weight_dtypes = self.args.trainable_weight_dtypes()
-        if self.args.train_dtype.enable_loss_scaling(weight_dtypes):
+        if enable_grad_scaling(self.args.train_dtype, self.parameters):
             scaler = GradScaler()
         else:
             scaler = None
