@@ -10,7 +10,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleParams import SampleConfig
 
 
 class StableDiffusionVaeSampler(BaseModelSampler):
@@ -28,7 +28,7 @@ class StableDiffusionVaeSampler(BaseModelSampler):
 
     def sample(
             self,
-            sample_params: SampleParams,
+            sample_params: SampleConfig,
             destination: str,
             image_format: ImageFormat,
             text_encoder_layer_skip: int,

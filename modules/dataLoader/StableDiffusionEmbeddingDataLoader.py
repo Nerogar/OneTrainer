@@ -4,7 +4,7 @@ from mgds.pipelineModules.ReplaceText import ReplaceText
 from modules.dataLoader.StableDiffusionBaseDataLoader import StablDiffusionBaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class StableDiffusionEmbeddingDataLoader(StablDiffusionBaseDataLoader):
@@ -12,20 +12,20 @@ class StableDiffusionEmbeddingDataLoader(StablDiffusionBaseDataLoader):
             self,
             train_device: torch.device,
             temp_device: torch.device,
-            args: TrainArgs,
+            config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
     ):
         super(StableDiffusionEmbeddingDataLoader, self).__init__(
             train_device,
             temp_device,
-            args,
+            config,
             model,
             train_progress,
         )
 
-    def _load_input_modules(self, args: TrainArgs, model: StableDiffusionModel) -> list:
-        modules = super(StableDiffusionEmbeddingDataLoader, self)._load_input_modules(args, model)
+    def _load_input_modules(self, config: TrainConfig, model: StableDiffusionModel) -> list:
+        modules = super(StableDiffusionEmbeddingDataLoader, self)._load_input_modules(config, model)
 
         all_token_string = ''.join(model.embeddings[0].text_tokens)
 

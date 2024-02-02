@@ -9,7 +9,7 @@ from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class StableDiffusionEmbeddingSetup(
@@ -35,41 +35,41 @@ class StableDiffusionEmbeddingSetup(
     def create_parameters(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         return model.text_encoder.get_input_embeddings().parameters()
 
     def create_parameters_for_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         return [
             self.create_param_groups(
-                args,
+                config,
                 model.text_encoder.get_input_embeddings().parameters(),
-                args.learning_rate,
+                config.learning_rate,
             )
         ]
 
     def setup_model(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
         model.text_encoder.requires_grad_(False)
         model.text_encoder.get_input_embeddings().requires_grad_(True)
         model.vae.requires_grad_(False)
         model.unet.requires_grad_(False)
 
-        model.text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+        model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         if len(model.embeddings) == 0:
             vector = self._create_new_embedding(
                 model.tokenizer,
                 model.text_encoder,
-                args.initial_embedding_text,
-                args.token_count,
+                config.initial_embedding_text,
+                config.token_count,
             )
 
             model.embeddings = [StableDiffusionModelEmbedding(vector, 'embedding')]
@@ -83,23 +83,23 @@ class StableDiffusionEmbeddingSetup(
         model.text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or args.align_prop_loss
+        vae_on_train_device = self.debug_mode or config.align_prop_loss
 
         model.text_encoder.to(self.train_device)
         model.vae.to(self.train_device if vae_on_train_device else self.temp_device)
@@ -113,7 +113,7 @@ class StableDiffusionEmbeddingSetup(
     def after_optimizer_step(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
         self._embeddigns_after_optimizer_step(

@@ -2,17 +2,17 @@ import customtkinter as ctk
 
 from modules.ui.ConfigList import ConfigList
 from modules.ui.SampleParamsWindow import SampleParamsWindow
-from modules.util.args.TrainArgs import TrainArgs
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.SampleParams import SampleConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
 class SamplingTab(ConfigList):
 
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(SamplingTab, self).__init__(
-            master, train_args, ui_state, "sample_definition_file_name",
+            master, train_config, ui_state, "sample_definition_file_name",
             "training_samples", "samples.json", "add sample",
             is_full_width=True,
         )
@@ -21,7 +21,7 @@ class SamplingTab(ConfigList):
         return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return SampleParams.default_values()
+        return SampleConfig.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         return SampleParamsWindow(self.master, self.current_config[i], ui_state)

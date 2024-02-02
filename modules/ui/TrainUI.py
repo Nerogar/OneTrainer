@@ -17,7 +17,7 @@ from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.DataType import DataType
@@ -47,8 +47,8 @@ class TrainUI(ctk.CTk):
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
 
-        self.train_args = TrainArgs.default_values()
-        self.ui_state = UIState(self, self.train_args)
+        self.train_cofig = TrainConfig.default_values()
+        self.ui_state = UIState(self, self.train_cofig)
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -75,7 +75,7 @@ class TrainUI(ctk.CTk):
         self.top_bar_component.save_default()
 
     def top_bar(self, master):
-        return TopBar(master, self.train_args, self.ui_state, self.change_model_type, self.change_training_method)
+        return TopBar(master, self.train_cofig, self.ui_state, self.change_model_type, self.change_training_method)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -120,7 +120,7 @@ class TrainUI(ctk.CTk):
         self.create_backup_tab(self.tabview.add("backup"))
         self.create_tools_tab(self.tabview.add("tools"))
 
-        self.change_training_method(self.train_args.training_method)
+        self.change_training_method(self.train_cofig.training_method)
 
         return frame
 
@@ -178,7 +178,7 @@ class TrainUI(ctk.CTk):
         components.entry(master, 9, 1, self.ui_state, "temp_device")
 
     def create_model_tab(self, master):
-        return ModelTab(master, self.train_args, self.ui_state)
+        return ModelTab(master, self.train_cofig, self.ui_state)
 
     def create_data_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -213,10 +213,10 @@ class TrainUI(ctk.CTk):
         components.switch(master, 4, 1, self.ui_state, "clear_cache_before_training")
 
     def create_concepts_tab(self, master):
-        ConceptTab(master, self.train_args, self.ui_state)
+        ConceptTab(master, self.train_cofig, self.ui_state)
 
     def create_training_tab(self, master) -> TrainingTab:
-        return TrainingTab(master, self.train_args, self.ui_state)
+        return TrainingTab(master, self.train_cofig, self.ui_state)
 
     def create_sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
@@ -255,7 +255,7 @@ class TrainUI(ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
 
-        SamplingTab(frame, self.train_args, self.ui_state)
+        SamplingTab(frame, self.train_cofig, self.ui_state)
 
     def create_backup_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -433,7 +433,7 @@ class TrainUI(ctk.CTk):
     def open_sampling_tool(self):
         window = SampleWindow(
             self,
-            train_args=self.train_args,
+            train_config=self.train_cofig,
         )
         self.wait_window(window)
         torch_gc()
@@ -459,7 +459,7 @@ class TrainUI(ctk.CTk):
             on_update_status=self.on_update_status,
         )
 
-        trainer = GenericTrainer(self.train_args, self.training_callbacks, self.training_commands)
+        trainer = GenericTrainer(self.train_cofig, self.training_callbacks, self.training_commands)
 
         try:
             trainer.start()
@@ -498,7 +498,7 @@ class TrainUI(ctk.CTk):
             self.training_commands.stop()
 
     def export_training(self):
-        args = self.train_args.to_args()
+        args = self.train_cofig.to_args()
         command = "python scripts/train.py " + args
 
         file_path = filedialog.asksaveasfilename(filetypes=[

@@ -10,20 +10,20 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.TimeUnit import TimeUnit
 
 
 class BaseTrainer(metaclass=ABCMeta):
-    def __init__(self, args: TrainArgs, callbacks: TrainCallbacks, commands: TrainCommands):
-        self.args = args
+    def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
+        self.config = config
         self.callbacks = callbacks
         self.commands = commands
         self.previous_action = {}
-        self.train_device = torch.device(self.args.train_device)
-        self.temp_device = torch.device(self.args.temp_device)
+        self.train_device = torch.device(self.config.train_device)
+        self.temp_device = torch.device(self.config.temp_device)
 
     @abstractmethod
     def start(self):
@@ -42,15 +42,15 @@ class BaseTrainer(metaclass=ABCMeta):
         pass
 
     def create_model_loader(self) -> BaseModelLoader:
-        return create.create_model_loader(self.args.model_type, self.args.training_method)
+        return create.create_model_loader(self.config.model_type, self.config.training_method)
 
     def create_model_setup(self) -> BaseModelSetup:
         return create.create_model_setup(
-            self.args.model_type,
+            self.config.model_type,
             self.train_device,
             self.temp_device,
-            self.args.training_method,
-            self.args.debug_mode,
+            self.config.training_method,
+            self.config.debug_mode,
         )
 
     def create_data_loader(self, model: BaseModel, train_progress: TrainProgress):
@@ -58,22 +58,22 @@ class BaseTrainer(metaclass=ABCMeta):
             self.train_device,
             self.temp_device,
             model,
-            self.args.model_type,
-            self.args.training_method,
-            self.args,
+            self.config.model_type,
+            self.config.training_method,
+            self.config,
             train_progress,
         )
 
     def create_model_saver(self) -> BaseModelSaver:
-        return create.create_model_saver(self.args.model_type, self.args.training_method)
+        return create.create_model_saver(self.config.model_type, self.config.training_method)
 
     def create_model_sampler(self, model: BaseModel) -> BaseModelSampler:
         return create.create_model_sampler(
             self.train_device,
             self.temp_device,
             model,
-            self.args.model_type,
-            self.args.training_method
+            self.config.model_type,
+            self.config.training_method
         )
 
     def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress,

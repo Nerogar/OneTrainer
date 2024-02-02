@@ -13,7 +13,7 @@ from modules.util import create
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleParams import SampleConfig
 from modules.util.torch_util import torch_gc
 
 
@@ -525,7 +525,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
 
     def sample(
             self,
-            sample_params: SampleParams,
+            sample_params: SampleConfig,
             destination: str,
             image_format: ImageFormat,
             text_encoder_layer_skip: int,

@@ -3,7 +3,7 @@ import torch
 from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class WuerstchenFineTuneDataLoader(WuerstchenBaseDataLoader):
@@ -11,14 +11,14 @@ class WuerstchenFineTuneDataLoader(WuerstchenBaseDataLoader):
             self,
             train_device: torch.device,
             temp_device: torch.device,
-            args: TrainArgs,
+            config: TrainConfig,
             model: WuerstchenModel,
             train_progress: TrainProgress,
     ):
         super(WuerstchenFineTuneDataLoader, self).__init__(
             train_device,
             temp_device,
-            args,
+            config,
             model,
             train_progress,
         )

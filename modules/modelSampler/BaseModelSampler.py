@@ -5,7 +5,7 @@ import torch
 from PIL.Image import Image
 
 from modules.util.enum.ImageFormat import ImageFormat
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleParams import SampleConfig
 
 
 class BaseModelSampler(metaclass=ABCMeta):
@@ -23,7 +23,7 @@ class BaseModelSampler(metaclass=ABCMeta):
     @abstractmethod
     def sample(
             self,
-            sample_params: SampleParams,
+            sample_params: SampleConfig,
             destination: str,
             image_format: ImageFormat,
             text_encoder_layer_skip: int,

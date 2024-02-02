@@ -9,10 +9,10 @@ from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.ui.SampleFrame import SampleFrame
 from modules.util import create
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleParams import SampleConfig
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -22,18 +22,18 @@ class SampleWindow(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
-            train_args: TrainArgs | None = None,
+            train_config: TrainConfig | None = None,
             callbacks: TrainCallbacks | None = None,
             commands: TrainCommands | None = None,
             *args, **kwargs
     ):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
-        self.train_args = train_args
+        self.train_config = train_config
         self.callbacks = callbacks
         self.commands = commands
 
-        use_external_model = train_args is None
+        use_external_model = train_config is None
 
         if use_external_model:
             self.callbacks.set_on_sample_custom(self.__update_preview)
@@ -42,7 +42,7 @@ class SampleWindow(ctk.CTkToplevel):
             self.model = self.__load_model()
             self.model_sampler = self.__create_sampler(self.model)
 
-        self.sample = SampleParams.default_values()
+        self.sample = SampleConfig.default_values()
         self.ui_state = UIState(self, self.sample)
 
         self.title("Sample")
@@ -78,34 +78,34 @@ class SampleWindow(ctk.CTkToplevel):
 
     def __load_model(self) -> BaseModel:
         model_loader = create.create_model_loader(
-            model_type=self.train_args.model_type,
-            training_method=self.train_args.training_method,
+            model_type=self.train_config.model_type,
+            training_method=self.train_config.training_method,
         )
 
         model_setup = create.create_model_setup(
-            model_type=self.train_args.model_type,
-            train_device=torch.device(self.train_args.train_device),
-            temp_device=torch.device(self.train_args.temp_device),
-            training_method=self.train_args.training_method,
+            model_type=self.train_config.model_type,
+            train_device=torch.device(self.train_config.train_device),
+            temp_device=torch.device(self.train_config.temp_device),
+            training_method=self.train_config.training_method,
         )
 
         model = model_loader.load(
-            model_type=self.train_args.model_type,
-            model_names=self.train_args.model_names(),
-            weight_dtypes=self.train_args.weight_dtypes(),
+            model_type=self.train_config.model_type,
+            model_names=self.train_config.model_names(),
+            weight_dtypes=self.train_config.weight_dtypes(),
         )
 
-        model_setup.setup_model(model, self.train_args)
+        model_setup.setup_model(model, self.train_config)
 
         return model
 
     def __create_sampler(self, model: BaseModel) -> BaseModelSampler:
         return create.create_model_sampler(
-            train_device=torch.device(self.train_args.train_device),
-            temp_device=torch.device(self.train_args.temp_device),
+            train_device=torch.device(self.train_config.train_device),
+            temp_device=torch.device(self.train_config.temp_device),
             model=model,
-            model_type=self.train_args.model_type,
-            training_method=self.train_args.training_method,
+            model_type=self.train_config.model_type,
+            training_method=self.train_config.training_method,
         )
 
     def __update_preview(self, image: Image):
@@ -126,13 +126,13 @@ class SampleWindow(ctk.CTkToplevel):
             self.commands.sample_custom(copy.copy(self.sample))
         else:
             sample_dir = os.path.join(
-                self.train_args.workspace_dir,
+                self.train_config.workspace_dir,
                 "samples",
                 "custom",
             )
 
             progress = self.model.train_progress
-            image_format = self.train_args.sample_image_format
+            image_format = self.train_config.sample_image_format
             sample_path = os.path.join(
                 sample_dir,
                 f"{get_string_timestamp()}-training-sample-{progress.filename_string()}{image_format.extension()}"
@@ -141,9 +141,9 @@ class SampleWindow(ctk.CTkToplevel):
             self.model_sampler.sample(
                 sample_params=copy.copy(self.sample),
                 destination=sample_path,
-                image_format=self.train_args.sample_image_format,
-                text_encoder_layer_skip=self.train_args.text_encoder_layer_skip,
-                force_last_timestep=self.train_args.rescale_noise_scheduler_to_zero_terminal_snr,
+                image_format=self.train_config.sample_image_format,
+                text_encoder_layer_skip=self.train_config.text_encoder_layer_skip,
+                force_last_timestep=self.train_config.rescale_noise_scheduler_to_zero_terminal_snr,
                 on_sample=self.__update_preview,
                 on_update_progress=self.__update_progress,
             )

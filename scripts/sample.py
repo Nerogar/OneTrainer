@@ -5,7 +5,7 @@ sys.path.append(os.getcwd())
 
 import torch
 
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleParams import SampleConfig
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
@@ -41,7 +41,7 @@ def main():
 
     print("Sampling " + args.destination)
     model_sampler.sample(
-        sample_params=SampleParams.default_values().from_dict(
+        sample_params=SampleConfig.default_values().from_dict(
             {
                 "prompt": args.prompt,
                 "negative_prompt": args.negative_prompt,

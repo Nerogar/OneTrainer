@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
@@ -17,11 +17,11 @@ from modules.util.ui.UIState import UIState
 
 class TrainingTab:
 
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(TrainingTab, self).__init__()
 
         self.master = master
-        self.train_args = train_args
+        self.train_config = train_config
         self.ui_state = ui_state
 
         master.grid_rowconfigure(0, weight=1)
@@ -51,13 +51,13 @@ class TrainingTab:
         column_2 = ctk.CTkFrame(master=self.scroll_frame, corner_radius=0, fg_color="transparent")
         column_2.grid(row=0, column=2, sticky="nsew")
 
-        if self.train_args.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui(column_0, column_1, column_2)
-        elif self.train_args.model_type.is_stable_diffusion_xl():
+        elif self.train_config.model_type.is_stable_diffusion_xl():
             self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2)
-        elif self.train_args.model_type.is_wuerstchen():
+        elif self.train_config.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui(column_0, column_1, column_2)
-        elif self.train_args.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart_alpha():
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
@@ -469,4 +469,4 @@ class TrainingTab:
             else:
                 value_to_set = user_prefs.get(key, default_value)
 
-            self.ui_state.vars[key].set(value_to_set)
+            self.ui_state.get_var(key).set(value_to_set)

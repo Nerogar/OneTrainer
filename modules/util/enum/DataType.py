@@ -37,6 +37,3 @@ class DataType(Enum):
 
     def enable_tf(self):
         return self == DataType.TFLOAT_32
-
-    def enable_loss_scaling(self, weight_dtypes: list['DataType']):
-        return self == DataType.FLOAT_16 and all(dtype == DataType.FLOAT_32 for dtype in weight_dtypes)

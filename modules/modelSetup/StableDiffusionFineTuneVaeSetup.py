@@ -7,7 +7,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
@@ -26,27 +26,27 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
     def create_parameters(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         return model.vae.decoder.parameters()
 
     def create_parameters_for_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         return [
             self.create_param_groups(
-                args,
+                config,
                 model.vae.decoder.parameters(),
-                args.learning_rate,
+                config.learning_rate,
             )
         ]
 
     def setup_model(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
         model.text_encoder.requires_grad_(False)
         model.vae.requires_grad_(False)
@@ -54,21 +54,21 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         model.unet.requires_grad_(False)
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
         model.text_encoder.to(self.temp_device)
         model.vae.to(self.train_device)
@@ -84,7 +84,7 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
             self,
             model: StableDiffusionModel,
             batch: dict,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
@@ -100,15 +100,15 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
             'target': image,
         }
 
-        if args.debug_mode:
+        if config.debug_mode:
             with torch.no_grad():
                 # image
-                self._save_image(image, args.debug_dir + "/training_batches", "1-image", train_progress.global_step)
+                self._save_image(image, config.debug_dir + "/training_batches", "1-image", train_progress.global_step)
 
                 # predicted image
                 predicted_image_clamped = predicted_image.clamp(-1, 1)
                 self._save_image(
-                    predicted_image_clamped, args.debug_dir + "/training_batches", "2-predicted_image",
+                    predicted_image_clamped, config.debug_dir + "/training_batches", "2-predicted_image",
                     train_progress.global_step
                 )
 
@@ -117,7 +117,7 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
     def after_optimizer_step(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
         pass

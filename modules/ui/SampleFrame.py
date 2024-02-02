@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 from modules.util.enum.NoiseScheduler import NoiseScheduler
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleParams import SampleConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -10,7 +10,7 @@ class SampleFrame(ctk.CTkFrame):
     def __init__(
             self,
             parent,
-            sample: SampleParams,
+            sample: SampleConfig,
             ui_state: UIState,
             include_prompt: bool = True,
             include_settings: bool = True,

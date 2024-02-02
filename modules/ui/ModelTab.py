@@ -2,7 +2,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -12,11 +12,11 @@ from modules.util.ui.UIState import UIState
 
 class ModelTab:
 
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(ModelTab, self).__init__()
 
         self.master = master
-        self.train_args = train_args
+        self.train_config = train_config
         self.ui_state = ui_state
 
         master.grid_rowconfigure(0, weight=1)
@@ -39,13 +39,13 @@ class ModelTab:
         self.scroll_frame.grid_columnconfigure(3, weight=0)
         self.scroll_frame.grid_columnconfigure(4, weight=1)
 
-        if self.train_args.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui()
-        elif self.train_args.model_type.is_stable_diffusion_xl():
+        elif self.train_config.model_type.is_stable_diffusion_xl():
             self.__setup_stable_diffusion_xl_ui()
-        elif self.train_args.model_type.is_wuerstchen():
+        elif self.train_config.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui()
-        elif self.train_args.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart_alpha():
             self.__setup_pixart_alpha_ui()
 
     def __setup_stable_diffusion_ui(self):
@@ -60,7 +60,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
+            allow_diffusers=self.train_config.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
             allow_checkpoint=True,
         )
 
@@ -77,7 +77,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
 
@@ -93,9 +93,9 @@ class ModelTab:
         row = self.__create_decoder_components(row)
         row = self.__create_output_components(
             row,
-            allow_safetensors=self.train_args.training_method != TrainingMethod.FINE_TUNE,
-            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=self.train_args.training_method != TrainingMethod.FINE_TUNE,
+            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_checkpoint=self.train_config.training_method != TrainingMethod.FINE_TUNE,
         )
 
     def __setup_pixart_alpha_ui(self):
@@ -110,7 +110,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
 

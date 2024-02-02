@@ -8,7 +8,7 @@ from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class WuerstchenEmbeddingSetup(
@@ -30,7 +30,7 @@ class WuerstchenEmbeddingSetup(
     def create_parameters(
             self,
             model: WuerstchenModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         params = list()
 
@@ -41,20 +41,20 @@ class WuerstchenEmbeddingSetup(
     def create_parameters_for_optimizer(
             self,
             model: WuerstchenModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         return [
             self.create_param_groups(
-                args,
+                config,
                 model.prior_text_encoder.get_input_embeddings().parameters(),
-                args.learning_rate,
+                config.learning_rate,
             ),
         ]
 
     def setup_model(
             self,
             model: WuerstchenModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
         model.prior_text_encoder.requires_grad_(False)
         model.prior_text_encoder.get_input_embeddings().requires_grad_(True)
@@ -64,14 +64,14 @@ class WuerstchenEmbeddingSetup(
         model.decoder_vqgan.requires_grad_(False)
         model.effnet_encoder.requires_grad_(False)
 
-        model.prior_text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+        model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         if len(model.embeddings) == 0:
             vector = self._create_new_embedding(
                 model.prior_tokenizer,
                 model.prior_text_encoder,
-                args.initial_embedding_text,
-                args.token_count,
+                config.initial_embedding_text,
+                config.token_count,
             )
 
             model.embeddings = [WuerstchenModelEmbedding(vector, 'embedding')]
@@ -85,21 +85,21 @@ class WuerstchenEmbeddingSetup(
         model.prior_text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: WuerstchenModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
         model.decoder_text_encoder_to(self.temp_device)
         model.decoder_decoder_to(self.temp_device)
@@ -120,7 +120,7 @@ class WuerstchenEmbeddingSetup(
     def after_optimizer_step(
             self,
             model: WuerstchenModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
         self._embeddigns_after_optimizer_step(

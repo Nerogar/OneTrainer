@@ -5,7 +5,7 @@ from tkinter import TclError
 
 import customtkinter as ctk
 
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
 from modules.util.ui import components
@@ -19,7 +19,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         self.parent = parent
 
-        self.train_args = TrainArgs.default_values()
+        self.train_config = TrainConfig.default_values()
         self.ui_state = ui_state
         self.protocol("WM_DELETE_WINDOW", self.on_window_close)
 
@@ -48,9 +48,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.main_frame(self.frame)
 
     def on_window_close(self):
-        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        selected_optimizer = self.ui_state.get_var('optimizer').get()
         for key in OPTIMIZER_KEY_MAP[selected_optimizer]:
-            value = self.ui_state.vars[key].get()
+            value = self.ui_state.get_var(key).get()
             self.update_user_pref(selected_optimizer, key, value)
 
         self.destroy()
@@ -130,13 +130,13 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 override_value = OPTIMIZER_KEY_MAP[selected_optimizer][key]
 
             if type != 'bool':
-                ui_state.vars[key].set(override_value if override_value is not None else "None")
+                ui_state.get_var(key).set(override_value if override_value is not None else "None")
                 entry_widget = components.entry(master, row, col + 1, ui_state, key)
-                entry_widget.bind("<FocusOut>", lambda event, opt=selected_optimizer, k=key: self.update_user_pref(opt, k, ui_state.vars[k].get()))
+                entry_widget.bind("<FocusOut>", lambda event, opt=selected_optimizer, k=key: self.update_user_pref(opt, k, ui_state.get_var(k).get()))
             else:
-                ui_state.vars[key].set(override_value)
+                ui_state.get_var(key).set(override_value)
                 switch_widget = components.switch(master, row, col + 1, ui_state, key)
-                switch_widget.configure(command=lambda opt=selected_optimizer, k=key: self.update_user_pref(opt, k, ui_state.vars[k].get()))
+                switch_widget.configure(command=lambda opt=selected_optimizer, k=key: self.update_user_pref(opt, k, ui_state.get_var(k).get()))
 
     def update_user_pref(self, optimizer, key, value):
         self.pref_util.save_preference(optimizer, key, value)
@@ -159,12 +159,12 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         components.button(self.frame, 0, 4, "Load Defaults", self.load_defaults,
                           tooltip="Load default settings for the selected optimizer")
 
-        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        selected_optimizer = self.ui_state.get_var('optimizer').get()
 
         self.create_dynamic_ui(selected_optimizer, master, components, self.ui_state)
 
     def on_optimizer_change(self, *args):
-        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        selected_optimizer = self.ui_state.get_var('optimizer').get()
         user_prefs = self.pref_util.load_preferences(selected_optimizer)
 
         for key, default_value in OPTIMIZER_KEY_MAP[selected_optimizer].items():
@@ -173,7 +173,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             else:
                 value_to_set = user_prefs.get(key, default_value)
 
-            self.ui_state.vars[key].set(value_to_set)
+            self.ui_state.get_var(key).set(value_to_set)
 
         if not self.winfo_exists():  # check if this window isn't open
             return
@@ -183,7 +183,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
     def load_defaults(self):
         if not self.winfo_exists():  # check if this window isn't open
             return
-        selected_optimizer = self.ui_state.vars['optimizer'].get()
+        selected_optimizer = self.ui_state.get_var('optimizer').get()
         self.clear_dynamic_ui(self.frame)
         self.remove_user_pref(selected_optimizer)
         self.create_dynamic_ui(selected_optimizer, self.frame, components, self.ui_state)

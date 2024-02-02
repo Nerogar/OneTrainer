@@ -6,7 +6,7 @@ from PIL import Image
 from torchvision.transforms import functional, InterpolationMode
 
 from modules.util import path_util
-from modules.util.params.ConceptParams import ConceptParams
+from modules.util.config.ConceptParams import ConceptConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -15,7 +15,7 @@ class ConceptWindow(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
-            concept: ConceptParams,
+            concept: ConceptConfig,
             ui_state: UIState,
             image_ui_state: UIState,
             text_ui_state: UIState,
@@ -47,7 +47,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         components.button(self, 1, 0, "ok", self.__ok)
 
-    def __general_tab(self, master, concept: ConceptParams):
+    def __general_tab(self, master, concept: ConceptConfig):
         master.grid_columnconfigure(1, weight=1)
         master.grid_columnconfigure(2, weight=1)
 

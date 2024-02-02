@@ -2,11 +2,11 @@ import tkinter as tk
 from enum import Enum
 from typing import Any
 
-from modules.util.args.BaseArgs import BaseArgs
+from modules.util.config.BaseConfig import BaseConfig
 
 
 class UIState:
-    vars: dict[str, Any]
+    __vars: dict[str, Any]
 
     def __init__(self, master, obj):
         self.master = master
@@ -16,6 +16,17 @@ class UIState:
     def update(self, obj):
         self.obj = obj
         self.__set_vars(obj)
+
+    def get_var(self, name):
+        split_name = name.split('.')
+
+        if len(split_name) == 1:
+            return self.__vars[split_name[0]]
+        else:
+            state = self
+            for name_part in split_name:
+                state = state.get_var(name_part)
+            return state
 
     def __set_str_var(self, obj, is_dict, name, var, nullable):
         if is_dict:
@@ -146,49 +157,47 @@ class UIState:
         return update
 
     def __create_vars(self, obj):
-        self.vars = {}
+        self.__vars = {}
 
         is_dict = isinstance(obj, dict)
-        is_arg = isinstance(obj, BaseArgs)
+        is_config = isinstance(obj, BaseConfig)
 
-        if is_arg:
+        if is_config:
             for name, var_type in obj.types.items():
                 obj_var = getattr(obj, name)
-                if var_type == str:
+                if issubclass(var_type, BaseConfig):
+                    var = UIState(self.master, obj_var)
+                    self.__vars[name] = var
+                elif var_type == str:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else obj_var)
                     var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, obj.nullables[name]))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif issubclass(var_type, Enum):
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_enum_var(obj, is_dict, name, var, var_type, obj.nullables[name]))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif var_type == bool:
                     var = tk.BooleanVar(master=self.master)
                     var.set(obj_var or False)
                     var.trace_add("write", self.__set_bool_var(obj, is_dict, name, var))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif var_type == int:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_int_var(obj, is_dict, name, var, obj.nullables[name]))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif var_type == float:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, obj.nullables[name]))
-                    self.vars[name] = var
-                elif var_type == list[str]:
+                    self.__vars[name] = var
+                elif var_type == list[str]:  # TODO: think of a better solution for string lists
                     var = tk.StringVar(master=self.master)
                     var.set("" if len(obj_var) == 0 else obj_var[0])
                     var.trace_add("write", self.__set_str_list_var(obj, is_dict, name, var))
-                    self.vars[name] = var
-                else:
-                    var = tk.StringVar(master=self.master)
-                    var.set("" if obj_var is None else obj_var)
-                    var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, obj.nullables[name]))
-                    self.vars[name] = var
+                    self.__vars[name] = var
         else:
             iterable = obj.items() if is_dict else vars(obj).items()
 
@@ -197,79 +206,79 @@ class UIState:
                     var = tk.StringVar(master=self.master)
                     var.set(obj_var)
                     var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, False))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif isinstance(obj_var, Enum):
                     var = tk.StringVar(master=self.master)
                     var.set(str(obj_var))
                     var.trace_add("write", self.__set_enum_var(obj, is_dict, name, var, type(obj_var), False))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif isinstance(obj_var, bool):
                     var = tk.BooleanVar(master=self.master)
                     var.set(obj_var)
                     var.trace_add("write", self.__set_bool_var(obj, is_dict, name, var))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif isinstance(obj_var, int):
                     var = tk.StringVar(master=self.master)
                     var.set(str(obj_var))
                     var.trace_add("write", self.__set_int_var(obj, is_dict, name, var, False))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 elif isinstance(obj_var, float):
                     var = tk.StringVar(master=self.master)
                     var.set(str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, False))
-                    self.vars[name] = var
+                    self.__vars[name] = var
                 else:
                     var = tk.StringVar(master=self.master)
                     var.set(obj_var)
                     var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, False))
-                    self.vars[name] = var
+                    self.__vars[name] = var
 
     def __set_vars(self, obj):
         is_dict = isinstance(obj, dict)
-        is_arg = isinstance(obj, BaseArgs)
+        is_config = isinstance(obj, BaseConfig)
         iterable = obj.items() if is_dict else vars(obj).items()
 
-        if is_arg:
+        if is_config:
             for name, var_type in obj.types.items():
                 obj_var = getattr(obj, name)
-                if var_type == str:
-                    var = self.vars[name]
+                if issubclass(var_type, BaseConfig):
+                    var = self.__vars[name]
+                    var.__set_vars(obj_var)
+                elif var_type == str:
+                    var = self.__vars[name]
                     var.set("" if obj_var is None else obj_var)
                 elif issubclass(var_type, Enum):
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
                 elif var_type == bool:
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(obj_var or False)
                 elif var_type == int:
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
                 elif var_type == float:
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
                 elif var_type == list[str]:
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set("" if len(obj_var) == 0 else obj_var[0])
-                else:
-                    var = self.vars[name]
-                    var.set("" if obj_var is None else obj_var)
         else:
             for name, obj_var in iterable:
                 if isinstance(obj_var, str):
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(obj_var)
                 elif isinstance(obj_var, Enum):
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(str(obj_var))
                 elif isinstance(obj_var, bool):
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(obj_var)
                 elif isinstance(obj_var, int):
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(str(obj_var))
                 elif isinstance(obj_var, float):
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(str(obj_var))
                 else:
-                    var = self.vars[name]
+                    var = self.__vars[name]
                     var.set(obj_var)
