@@ -1,4 +1,4 @@
-from modules.util.config.SampleParams import SampleConfig
+from modules.util.config.SampleConfig import SampleConfig
 
 
 class TrainCommands:

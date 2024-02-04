@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 
 from modules.util.args.CreateTrainFilesArgs import CreateTrainFilesArgs
-from modules.util.config.ConceptParams import ConceptConfig
-from modules.util.config.SampleParams import SampleConfig
+from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.config.SampleConfig import SampleConfig
 
 def main():
     args = CreateTrainFilesArgs.parse_args()

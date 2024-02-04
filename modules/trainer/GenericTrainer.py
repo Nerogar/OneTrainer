@@ -34,7 +34,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.config.SampleParams import SampleConfig
+from modules.util.config.SampleConfig import SampleConfig
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 

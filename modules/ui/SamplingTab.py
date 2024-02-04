@@ -3,7 +3,7 @@ import customtkinter as ctk
 from modules.ui.ConfigList import ConfigList
 from modules.ui.SampleParamsWindow import SampleParamsWindow
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.config.SampleParams import SampleConfig
+from modules.util.config.SampleConfig import SampleConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 

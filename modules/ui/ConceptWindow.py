@@ -6,7 +6,7 @@ from PIL import Image
 from torchvision.transforms import functional, InterpolationMode
 
 from modules.util import path_util
-from modules.util.config.ConceptParams import ConceptConfig
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 

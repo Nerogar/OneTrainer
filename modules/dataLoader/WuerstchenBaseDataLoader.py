@@ -45,7 +45,7 @@ from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.config.ConceptParams import ConceptConfig
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.torch_util import torch_gc
 
 

@@ -5,7 +5,7 @@ import torch
 from PIL.Image import Image
 
 from modules.util.enum.ImageFormat import ImageFormat
-from modules.util.config.SampleParams import SampleConfig
+from modules.util.config.SampleConfig import SampleConfig
 
 
 class BaseModelSampler(metaclass=ABCMeta):

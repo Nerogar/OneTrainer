@@ -12,7 +12,7 @@ from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.SampleParams import SampleConfig
+from modules.util.config.SampleConfig import SampleConfig
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
