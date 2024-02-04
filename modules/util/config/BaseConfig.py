@@ -6,17 +6,38 @@ class BaseConfig:
     def __init__(self, data: list[(str, Any, type, bool)]):
         self.types = {}
         self.nullables = {}
+        self.default_values = {}
         for (name, value, var_type, nullable) in data:
             setattr(self, name, value)
             self.types[name] = var_type
             self.nullables[name] = nullable
+            self.default_values[name] = value
 
     def to_dict(self) -> dict:
         data = {}
         for (name, _) in self.types.items():
             value = getattr(self, name)
-            if isinstance(value, dict):
-                continue
+            if issubclass(self.types[name], BaseConfig):
+                data[name] = value.to_dict()
+            elif get_origin(self.types[name]) == list:
+                list_type = get_args(self.types[name])[0]
+                list_data = []
+                if issubclass(list_type, BaseConfig):
+                    for list_entry in value:
+                        list_data.append(list_entry.to_dict())
+                elif list_type == str:
+                    for list_entry in list_data:
+                        list_data.append(list_entry)
+                data[name] = list_data
+            elif get_origin(self.types[name]) == dict:
+                # assume the key is always a str
+                dict_data = {}
+                for dict_key, dict_value in value.items():
+                    if isinstance(dict_value, BaseConfig):
+                        dict_data[dict_key] = dict_value.to_dict()
+                    elif isinstance(dict_value, str):
+                        dict_data[dict_key] = dict_value
+                data[name] = dict_data
             elif self.types[name] == str:
                 data[name] = value
             elif issubclass(self.types[name], Enum):
@@ -31,8 +52,6 @@ class BaseConfig:
                 else:
                     data[name] = value
             elif self.types[name] == list[str]:
-                data[name] = value
-            else:
                 data[name] = value
 
         return data
@@ -52,6 +71,16 @@ class BaseConfig:
                     elif list_type == str:
                         for list_entry in list_data:
                             value.append(str(list_entry))
+                    setattr(self, name, value)
+                elif get_origin(self.types[name]) == dict:
+                    # assume the key is always a str
+                    dict_type = get_args(self.types[name])[1]
+                    value = {}
+                    for dict_key, dict_value in data[name].items():
+                        if issubclass(dict_type, BaseConfig):
+                            value[dict_key] = dict_type.default_values().from_dict(dict_value)
+                        elif dict_type == str:
+                            value[dict_key] = dict_value
                     setattr(self, name, value)
                 elif self.types[name] == str:
                     setattr(self, name, str(data[name]))
@@ -86,7 +115,7 @@ class BaseConfig:
                 if name in data:
                     print(f"Could not set {name} as {str(data[name])}")
                 else:
-                    #print(f"Could not set {name}, not found.")
+                    # print(f"Could not set {name}, not found.")
                     pass
 
         return self

@@ -18,6 +18,108 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.config.BaseConfig import BaseConfig
 
 
+class TrainOptimizerConfig(BaseConfig):
+    optimizer: Optimizer
+    weight_decay: float
+    momentum: float
+    dampening: float
+    nesterov: bool
+    eps: float
+    foreach: bool
+    fused: bool
+    min_8bit_size: int
+    percentile_clipping: int
+    block_wise: bool
+    is_paged: bool
+    lr_decay: int
+    initial_accumulator_value: int
+    alpha: float
+    centered: bool
+    max_unorm: float
+    beta2: float
+    bias_correction: bool
+    amsgrad: bool
+    adam_w_mode: bool
+    use_bias_correction: bool
+    safeguard_warmup: bool
+    beta3: float
+    decouple: bool
+    d0: float
+    d_coef: float
+    growth_rate: float
+    fsdp_in_use: bool
+    clip_threshold: float
+    decay_rate: float
+    beta1: float
+    scale_parameter: bool
+    relative_step: bool
+    warmup_init: bool
+    eps2: float
+    optim_bits: int
+    log_every: int
+    no_prox: bool
+    maximize: bool
+    capturable: bool
+    differentiable: bool
+    use_triton: bool
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super(TrainOptimizerConfig, self).__init__(data)
+
+    def save_default_values(self) -> bool:
+        return False
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("optimizer", Optimizer.ADAMW, Optimizer, False))
+        data.append(("adam_w_mode", False, bool, False))
+        data.append(("alpha", None, float, True))
+        data.append(("amsgrad", False, bool, False))
+        data.append(("beta1", None, float, True))
+        data.append(("beta2", None, float, True))
+        data.append(("beta3", None, float, True))
+        data.append(("bias_correction", False, bool, False))
+        data.append(("block_wise", False, bool, False))
+        data.append(("capturable", False, bool, False))
+        data.append(("centered", False, bool, False))
+        data.append(("clip_threshold", None, float, True))
+        data.append(("d0", None, float, True))
+        data.append(("d_coef", None, float, True))
+        data.append(("dampening", None, float, True))
+        data.append(("decay_rate", None, float, True))
+        data.append(("decouple", False, bool, False))
+        data.append(("differentiable", False, bool, False))
+        data.append(("eps", None, float, True))
+        data.append(("eps2", None, float, True))
+        data.append(("foreach", False, bool, True))  # Disabled, because it uses too much FalseAM
+        data.append(("fsdp_in_use", False, bool, False))
+        data.append(("fused", False, bool, False))
+        data.append(("growth_rate", None, float, True))
+        data.append(("initial_accumulator_value", None, int, True))
+        data.append(("is_paged", False, bool, False))
+        data.append(("log_every", None, int, True))
+        data.append(("lr_decay", None, float, True))
+        data.append(("max_unorm", None, float, True))
+        data.append(("maximize", False, bool, False))
+        data.append(("min_8bit_size", None, int, True))
+        data.append(("momentum", None, float, True))
+        data.append(("nesterov", False, bool, False))
+        data.append(("no_prox", False, bool, False))
+        data.append(("optim_bits", None, int, True))
+        data.append(("percentile_clipping", None, float, True))
+        data.append(("relative_step", False, bool, False))
+        data.append(("safeguard_warmup", False, bool, False))
+        data.append(("scale_parameter", False, bool, False))
+        data.append(("use_bias_correction", False, bool, False))
+        data.append(("use_triton", False, bool, False))
+        data.append(("warmup_init", False, bool, False))
+        data.append(("weight_decay", None, float, True))
+
+        return TrainOptimizerConfig(data)
+
+
 class TrainConfig(BaseConfig):
     training_method: TrainingMethod
     model_type: ModelType
@@ -147,50 +249,9 @@ class TrainConfig(BaseConfig):
     lora_alpha: float
     lora_weight_dtype: DataType
 
-    # optimizer settings
-    optimizer: Optimizer
-    optimizer_weight_decay: float
-    optimizer_momentum: float
-    optimizer_dampening: float
-    optimizer_nesterov: bool
-    optimizer_eps: float
-    optimizer_foreach: bool
-    optimizer_fused: bool
-    optimizer_min_8bit_size: int
-    optimizer_percentile_clipping: int
-    optimizer_block_wise: bool
-    optimizer_is_paged: bool
-    optimizer_lr_decay: int
-    optimizer_initial_accumulator_value: int
-    optimizer_alpha: float
-    optimizer_centered: bool
-    optimizer_max_unorm: float
-    optimizer_beta2: float
-    optimizer_bias_correction: bool
-    optimizer_amsgrad: bool
-    optimizer_adam_w_mode: bool
-    optimizer_use_bias_correction: bool
-    optimizer_safeguard_warmup: bool
-    optimizer_beta3: float
-    optimizer_decouple: bool
-    optimizer_d0: float
-    optimizer_d_coef: float
-    optimizer_growth_rate: float
-    optimizer_fsdp_in_use: bool
-    optimizer_clip_threshold: float
-    optimizer_decay_rate: float
-    optimizer_beta1: float
-    optimizer_scale_parameter: bool
-    optimizer_relative_step: bool
-    optimizer_warmup_init: bool
-    optimizer_eps2: float
-    optimizer_optim_bits: int
-    optimizer_log_every: int
-    optimizer_no_prox: bool
-    optimizer_maximize: bool
-    optimizer_capturable: bool
-    optimizer_differentiable: bool
-    optimizer_use_triton: bool
+    # optimizer
+    optimizer: TrainOptimizerConfig
+    optimizer_defaults: dict[str, TrainOptimizerConfig]
 
     # sample settings
     sample_definition_file_name: str
@@ -372,50 +433,9 @@ class TrainConfig(BaseConfig):
         data.append(("lora_alpha", 1.0, float, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
 
-        # optimizer settings
-        data.append(("optimizer", Optimizer.ADAMW, Optimizer, False))
-        data.append(("optimizer_adam_w_mode", None, bool, True))
-        data.append(("optimizer_alpha", None, float, True))
-        data.append(("optimizer_amsgrad", None, bool, True))
-        data.append(("optimizer_beta1", None, float, True))
-        data.append(("optimizer_beta2", None, float, True))
-        data.append(("optimizer_beta3", None, float, True))
-        data.append(("optimizer_bias_correction", None, bool, True))
-        data.append(("optimizer_block_wise", None, bool, True))
-        data.append(("optimizer_capturable", None, bool, True))
-        data.append(("optimizer_centered", None, bool, True))
-        data.append(("optimizer_clip_threshold", None, float, True))
-        data.append(("optimizer_d0", None, float, True))
-        data.append(("optimizer_d_coef", None, float, True))
-        data.append(("optimizer_dampening", None, float, True))
-        data.append(("optimizer_decay_rate", None, float, True))
-        data.append(("optimizer_decouple", None, bool, True))
-        data.append(("optimizer_differentiable", None, bool, True))
-        data.append(("optimizer_eps", None, float, True))
-        data.append(("optimizer_eps2", None, float, True))
-        data.append(("optimizer_foreach", None, bool, True))  # Disabled, because it uses too much VRAM
-        data.append(("optimizer_fsdp_in_use", None, bool, True))
-        data.append(("optimizer_fused", None, bool, True))
-        data.append(("optimizer_growth_rate", None, float, True))
-        data.append(("optimizer_initial_accumulator_value", None, int, True))
-        data.append(("optimizer_is_paged", None, bool, True))
-        data.append(("optimizer_log_every", None, int, True))
-        data.append(("optimizer_lr_decay", None, float, True))
-        data.append(("optimizer_max_unorm", None, float, True))
-        data.append(("optimizer_maximize", None, bool, True))
-        data.append(("optimizer_min_8bit_size", None, int, True))
-        data.append(("optimizer_momentum", None, float, True))
-        data.append(("optimizer_nesterov", None, bool, True))
-        data.append(("optimizer_no_prox", None, bool, True))
-        data.append(("optimizer_optim_bits", None, int, True))
-        data.append(("optimizer_percentile_clipping", None, float, True))
-        data.append(("optimizer_relative_step", None, bool, True))
-        data.append(("optimizer_safeguard_warmup", None, bool, True))
-        data.append(("optimizer_scale_parameter", None, bool, True))
-        data.append(("optimizer_use_bias_correction", None, bool, True))
-        data.append(("optimizer_use_triton", None, bool, True))
-        data.append(("optimizer_warmup_init", None, bool, True))
-        data.append(("optimizer_weight_decay", None, float, True))
+        #optimizer
+        data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))
+        data.append(("optimizer_defaults", {}, dict[str, TrainOptimizerConfig], False))
 
         # sample settings
         data.append(("sample_definition_file_name", "training_samples/samples.json", str, False))
