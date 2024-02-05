@@ -266,13 +266,14 @@ class GenericTrainer(BaseTrainer):
 
         is_custom_sample = False
         if not sample_params_list:
-            with open(self.config.sample_definition_file_name, 'r') as f:
-                sample_params_json_list = json.load(f)
-                sample_params_list = []
-                for sample_params_json in sample_params_json_list:
-                    sample_params = SampleConfig.default_values()
-                    sample_params.from_dict(sample_params_json)
-                    sample_params_list.append(sample_params)
+            if self.config.samples is not None:
+                sample_params_list = self.config.samples
+            else:
+                with open(self.config.sample_definition_file_name, 'r') as f:
+                    samples = json.load(f)
+                    for i in range(len(samples)):
+                        samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                    sample_params_list = samples
         else:
             is_custom_sample = True
 

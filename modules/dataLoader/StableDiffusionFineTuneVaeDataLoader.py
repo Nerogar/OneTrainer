@@ -51,15 +51,9 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             temp_device,
         )
 
-        with open(config.concept_file_name, 'r') as f:
-            concepts = json.load(f)
-            for i in range(len(concepts)):
-                concepts[i] = ConceptConfig.default_values().from_dict(concepts[i]).to_dict()
-
         self.__ds = self.create_dataset(
             config=config,
             model=model,
-            concepts=concepts,
             train_progress=train_progress,
         )
         self.__dl = TrainDataLoader(self.__ds, config.batch_size)
@@ -296,7 +290,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             self,
             config: TrainConfig,
             model: StableDiffusionModel,
-            concepts: list[dict],
             train_progress: TrainProgress,
     ):
         enumerate_input = self.__enumerate_input_modules(config)
@@ -313,7 +306,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return self._create_mgds(
             config,
-            concepts,
             [
                 enumerate_input,
                 load_input,

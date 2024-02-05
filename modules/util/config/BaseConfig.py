@@ -19,25 +19,22 @@ class BaseConfig:
             value = getattr(self, name)
             if issubclass(self.types[name], BaseConfig):
                 data[name] = value.to_dict()
-            elif get_origin(self.types[name]) == list:
-                list_type = get_args(self.types[name])[0]
-                list_data = []
-                if issubclass(list_type, BaseConfig):
+            elif self.types[name] == list or get_origin(self.types[name]) == list:
+                if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
+                    list_data = []
                     for list_entry in value:
                         list_data.append(list_entry.to_dict())
-                elif list_type == str:
-                    for list_entry in list_data:
-                        list_data.append(list_entry)
-                data[name] = list_data
-            elif get_origin(self.types[name]) == dict:
-                # assume the key is always a str
-                dict_data = {}
-                for dict_key, dict_value in value.items():
-                    if isinstance(dict_value, BaseConfig):
+                    data[name] = list_data
+                else:
+                    data[name] = value
+            elif self.types[name] == dict or get_origin(self.types[name]) == dict:
+                if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[1], BaseConfig):
+                    dict_data = {}
+                    for dict_key, dict_value in value.items():
                         dict_data[dict_key] = dict_value.to_dict()
-                    elif isinstance(dict_value, str):
-                        dict_data[dict_key] = dict_value
-                data[name] = dict_data
+                    data[name] = dict_data
+                else:
+                    data[name] = value
             elif self.types[name] == str:
                 data[name] = value
             elif issubclass(self.types[name], Enum):
@@ -61,27 +58,24 @@ class BaseConfig:
             try:
                 if issubclass(self.types[name], BaseConfig):
                     getattr(self, name).from_dict(data[name])
-                elif get_origin(self.types[name]) == list:
-                    list_type = get_args(self.types[name])[0]
-                    list_data = data[name]
-                    value = []
-                    if issubclass(list_type, BaseConfig):
-                        for list_entry in list_data:
+                elif self.types[name] == list or get_origin(self.types[name]) == list:
+                    if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
+                        list_type = get_args(self.types[name])[0]
+                        value = []
+                        for list_entry in data[name]:
                             value.append(list_type.default_values().from_dict(list_entry))
-                    elif list_type == str:
-                        for list_entry in list_data:
-                            value.append(str(list_entry))
-                    setattr(self, name, value)
-                elif get_origin(self.types[name]) == dict:
-                    # assume the key is always a str
-                    dict_type = get_args(self.types[name])[1]
-                    value = {}
-                    for dict_key, dict_value in data[name].items():
-                        if issubclass(dict_type, BaseConfig):
+                        setattr(self, name, value)
+                    else:
+                        setattr(self, name, data[name])
+                elif self.types[name] == dict or get_origin(self.types[name]) == dict:
+                    if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[1], BaseConfig):
+                        dict_type = get_args(self.types[name])[1]
+                        value = {}
+                        for dict_key, dict_value in data[name].items():
                             value[dict_key] = dict_type.default_values().from_dict(dict_value)
-                        elif dict_type == str:
-                            value[dict_key] = dict_value
-                    setattr(self, name, value)
+                        setattr(self, name, value)
+                    else:
+                        setattr(self, name, data[name])
                 elif self.types[name] == str:
                     setattr(self, name, str(data[name]))
                 elif issubclass(self.types[name], Enum):

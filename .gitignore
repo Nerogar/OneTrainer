@@ -9,5 +9,6 @@
 /external
 debug*.py
 train.bat
+config.json
 *.pyc
 *.bak

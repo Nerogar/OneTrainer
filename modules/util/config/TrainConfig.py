@@ -1,7 +1,10 @@
+import json
 from typing import Any
 
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
@@ -141,6 +144,7 @@ class TrainConfig(BaseConfig):
 
     # data settings
     concept_file_name: str
+    concepts: list[dict]
     circular_mask_generation: bool
     random_rotate_and_crop: bool
     aspect_ratio_bucketing: bool
@@ -255,6 +259,7 @@ class TrainConfig(BaseConfig):
 
     # sample settings
     sample_definition_file_name: str
+    samples: list[dict]
     sample_after: float
     sample_after_unit: TimeUnit
     sample_image_format: ImageFormat
@@ -298,6 +303,23 @@ class TrainConfig(BaseConfig):
             embedding=self.embedding_model_names,
         )
 
+    def to_pack_dict(self) -> dict:
+        config = TrainConfig.default_values().from_dict(self.to_dict())
+
+        with open(config.concept_file_name, 'r') as f:
+            concepts = json.load(f)
+            for i in range(len(concepts)):
+                concepts[i] = ConceptConfig.default_values().from_dict(concepts[i]).to_dict()
+            config.concepts = concepts
+
+        with open(config.sample_definition_file_name, 'r') as f:
+            samples = json.load(f)
+            for i in range(len(samples)):
+                samples[i] = SampleConfig.default_values().from_dict(samples[i]).to_dict()
+            config.samples = samples
+
+        return config.to_dict()
+
     @staticmethod
     def default_values() -> 'TrainConfig':
         data = []
@@ -325,6 +347,7 @@ class TrainConfig(BaseConfig):
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
+        data.append(("concepts", None, list[dict], True))
         data.append(("circular_mask_generation", False, bool, False))
         data.append(("random_rotate_and_crop", False, bool, False))
         data.append(("aspect_ratio_bucketing", True, bool, False))
@@ -439,6 +462,7 @@ class TrainConfig(BaseConfig):
 
         # sample settings
         data.append(("sample_definition_file_name", "training_samples/samples.json", str, False))
+        data.append(("samples", None, list[dict], True))
         data.append(("sample_after", 10, int, False))
         data.append(("sample_after_unit", TimeUnit.MINUTE, TimeUnit, False))
         data.append(("sample_image_format", ImageFormat.JPG, ImageFormat, False))
