@@ -186,14 +186,10 @@ class TopBar:
 
     def __load_current_config(self, filename):
         try:
-            load_dict = TrainConfig.default_values().to_dict()
-
             with open(filename, "r") as f:
-                load_dict |= json.load(f)
+                config_dict = TrainConfig.default_values().from_dict(json.load(f)).to_unpacked_config().to_dict()
 
-            load_dict = TrainConfig.default_values().from_dict(load_dict).to_unpacked_config().to_dict()
-
-            self.train_config.from_dict(load_dict)
+            self.train_config.from_dict(config_dict)
             self.ui_state.update(self.train_config)
         except Exception:
             print(traceback.format_exc())

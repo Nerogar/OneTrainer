@@ -3,6 +3,7 @@ from typing import Any
 
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
@@ -18,53 +19,53 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.config.BaseConfig import BaseConfig
 
 
 class TrainOptimizerConfig(BaseConfig):
     optimizer: Optimizer
-    weight_decay: float
-    momentum: float
-    dampening: float
-    nesterov: bool
-    eps: float
-    foreach: bool
-    fused: bool
-    min_8bit_size: int
-    percentile_clipping: int
-    block_wise: bool
-    is_paged: bool
-    lr_decay: int
-    initial_accumulator_value: int
-    alpha: float
-    centered: bool
-    max_unorm: float
-    beta2: float
-    bias_correction: bool
-    amsgrad: bool
     adam_w_mode: bool
-    use_bias_correction: bool
-    safeguard_warmup: bool
+    alpha: float
+    amsgrad: bool
+    beta1: float
+    beta2: float
     beta3: float
-    decouple: bool
+    bias_correction: bool
+    block_wise: bool
+    capturable: bool
+    centered: bool
+    clip_threshold: float
     d0: float
     d_coef: float
-    growth_rate: float
-    fsdp_in_use: bool
-    clip_threshold: float
+    dampening: float
     decay_rate: float
-    beta1: float
-    scale_parameter: bool
-    relative_step: bool
-    warmup_init: bool
-    eps2: float
-    optim_bits: int
-    log_every: int
-    no_prox: bool
-    maximize: bool
-    capturable: bool
+    decouple: bool
     differentiable: bool
+    eps: float
+    eps2: float
+    foreach: bool
+    fsdp_in_use: bool
+    fused: bool
+    growth_rate: float
+    initial_accumulator_value: int
+    is_paged: bool
+    log_every: int
+    lr_decay: float
+    max_unorm: float
+    maximize: bool
+    min_8bit_size: int
+    momentum: float
+    nesterov: bool
+    no_prox: bool
+    optim_bits: int
+    percentile_clipping: float
+    relative_step: bool
+    safeguard_warmup: bool
+    scale_parameter: bool
+    use_bias_correction: bool
     use_triton: bool
+    warmup_init: bool
+    weight_decay: float
+
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainOptimizerConfig, self).__init__(data)
 
@@ -96,7 +97,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("differentiable", False, bool, False))
         data.append(("eps", None, float, True))
         data.append(("eps2", None, float, True))
-        data.append(("foreach", False, bool, True))  # Disabled, because it uses too much FalseAM
+        data.append(("foreach", False, bool, True))  # Disabled, because it uses too much VRAM
         data.append(("fsdp_in_use", False, bool, False))
         data.append(("fused", False, bool, False))
         data.append(("growth_rate", None, float, True))
@@ -276,7 +277,28 @@ class TrainConfig(BaseConfig):
     save_after_unit: TimeUnit
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(TrainConfig, self).__init__(data)
+        super(TrainConfig, self).__init__(
+            data,
+            config_version=1,
+            config_migrations={
+                0: self.__migration_0,
+            }
+        )
+
+    def __migration_0(self, data: dict) -> dict:
+        migrated_data = {
+            'optimizer': {}
+        }
+        for key, value in data.items():
+            # move optimizer settings to sub object
+            if key == 'optimizer':
+                migrated_data['optimizer']['optimizer'] = value
+            elif key.startswith('optimizer'):
+                migrated_data['optimizer'][key.removeprefix('optimizer_')] = value
+            else:
+                migrated_data[key] = value
+
+        return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -462,7 +484,7 @@ class TrainConfig(BaseConfig):
         data.append(("lora_alpha", 1.0, float, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
 
-        #optimizer
+        # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))
         data.append(("optimizer_defaults", {}, dict[str, TrainOptimizerConfig], False))
 

@@ -18,11 +18,9 @@ from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
 from modules.util.TrainProgress import TrainProgress
-from modules.util.config.ConceptConfig import ConceptConfig
-from modules.util.config.SampleConfig import SampleConfig
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType

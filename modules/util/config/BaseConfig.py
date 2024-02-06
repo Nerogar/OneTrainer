@@ -1,9 +1,20 @@
 from enum import Enum
-from typing import Any, get_origin, get_args
+from typing import Any, get_origin, get_args, Callable
 
 
 class BaseConfig:
-    def __init__(self, data: list[(str, Any, type, bool)]):
+    config_version: int
+    config_migrations: dict[int, Callable[[dict], dict]]
+
+    def __init__(
+            self,
+            data: list[(str, Any, type, bool)],
+            config_version: int | None = None,
+            config_migrations: dict[int, Callable[[dict], dict]] | None = None
+    ):
+        self.config_version = config_version if config_version is not None else 0
+        self.config_migrations = config_migrations if config_migrations is not None else {}
+
         self.types = {}
         self.nullables = {}
         self.default_values = {}
@@ -14,7 +25,10 @@ class BaseConfig:
             self.default_values[name] = value
 
     def to_dict(self) -> dict:
-        data = {}
+        data = {
+            '__version': self.config_version,
+        }
+
         for (name, _) in self.types.items():
             value = getattr(self, name)
             if issubclass(self.types[name], BaseConfig):
@@ -53,7 +67,15 @@ class BaseConfig:
 
         return data
 
-    def from_dict(self, data) -> 'BaseConfig':
+    def from_dict(self, data: dict) -> 'BaseConfig':
+        version = 0
+        if '__version' in data:
+            version = data['__version']
+
+        while version in self.config_migrations:
+            data = self.config_migrations[version](data)
+            version += 1
+
         for (name, _) in self.types.items():
             try:
                 if issubclass(self.types[name], BaseConfig):

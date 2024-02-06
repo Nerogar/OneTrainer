@@ -2,8 +2,12 @@ from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 
 
-def change_optimizer(train_config: TrainConfig) -> TrainOptimizerConfig:
-    optimizer = train_config.optimizer.optimizer
+def change_optimizer(train_config: TrainConfig, optimizer: Optimizer) -> TrainOptimizerConfig:
+    old_optimizer = train_config.optimizer.optimizer
+
+    # if the optimizer didn't change, don't restore from defaults
+    if old_optimizer == optimizer:
+        return train_config.optimizer
 
     optimizer_config = TrainOptimizerConfig.default_values()
     optimizer_config.from_dict(OPTIMIZER_DEFAULT_PARAMETERS[optimizer])
