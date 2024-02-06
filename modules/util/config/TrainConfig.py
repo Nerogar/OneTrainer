@@ -320,6 +320,12 @@ class TrainConfig(BaseConfig):
 
         return config.to_dict()
 
+    def to_unpacked_config(self) -> 'TrainConfig':
+        config = TrainConfig.default_values().from_dict(self.to_dict())
+        config.concepts = None
+        config.samples = None
+        return config
+
     @staticmethod
     def default_values() -> 'TrainConfig':
         data = []
