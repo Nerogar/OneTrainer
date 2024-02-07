@@ -5,6 +5,7 @@ from modules.util.args.BaseArgs import BaseArgs
 
 
 class CreateTrainFilesArgs(BaseArgs):
+    config_output_destination: str
     concepts_output_destination: str
     samples_output_destination: str
 
@@ -17,6 +18,7 @@ class CreateTrainFilesArgs(BaseArgs):
 
         # @formatter:off
 
+        parser.add_argument("--config-output-destination", type=str, required=False, default=None, dest="config_output_destination", help="The destination filename to save a default config file")
         parser.add_argument("--concepts-output-destination", type=str, required=False, default=None, dest="concepts_output_destination", help="The destination filename to save a default concepts file")
         parser.add_argument("--samples-output-destination", type=str, required=False, default=None, dest="samples_output_destination", help="The destination filename to save a default samples file")
 
@@ -31,7 +33,8 @@ class CreateTrainFilesArgs(BaseArgs):
     def default_values():
         data = []
 
-        data.append(("concepts_output_destination", "", str, False))
-        data.append(("samples_output_destination", "", str, False))
+        data.append(("config_output_destination", None, str, True))
+        data.append(("concepts_output_destination", None, str, True))
+        data.append(("samples_output_destination", None, str, True))
 
         return CreateTrainFilesArgs(data)

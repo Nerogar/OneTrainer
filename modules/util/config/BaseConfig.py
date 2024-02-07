@@ -99,7 +99,10 @@ class BaseConfig:
                     else:
                         setattr(self, name, data[name])
                 elif self.types[name] == str:
-                    setattr(self, name, str(data[name]))
+                    if self.nullables[name]:
+                        setattr(self, name, None if data[name] is None else str(data[name]))
+                    else:
+                        setattr(self, name, str(data[name]))
                 elif issubclass(self.types[name], Enum):
                     if isinstance(data[name], str):
                         if self.nullables[name]:
