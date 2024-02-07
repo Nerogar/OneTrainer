@@ -265,7 +265,7 @@ def create_optimizer(
     optimizer = None
     optimizer_config = config.optimizer
 
-    match config.optimizer:
+    match config.optimizer.optimizer:
 
         # SGD Optimizer
         case Optimizer.SGD:
