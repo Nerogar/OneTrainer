@@ -13,3 +13,8 @@ class TimeUnit(Enum):
 
     def __str__(self):
         return self.value
+
+    def is_time_unit(self) -> bool:
+        return self == TimeUnit.SECOND \
+            or self == TimeUnit.MINUTE \
+            or self == TimeUnit.HOUR

@@ -50,12 +50,12 @@ class BaseWuerstchenSetup(
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtype,
-            config.decoder_text_encoder_weight_dtype,
-            config.decoder_weight_dtype,
-            config.decoder_vqgan_weight_dtype,
-            config.effnet_encoder_weight_dtype,
-            config.text_encoder_weight_dtype,
-            config.prior_weight_dtype,
+            config.decoder_text_encoder.weight_dtype,
+            config.decoder.weight_dtype,
+            config.decoder_vqgan.weight_dtype,
+            config.effnet_encoder.weight_dtype,
+            config.text_encoder.weight_dtype,
+            config.prior.weight_dtype,
             config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
             config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
@@ -111,7 +111,7 @@ class BaseWuerstchenSetup(
                 self.__alpha_cumprod,
             )
 
-            if config.train_text_encoder or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
                 text_encoder_output = model.prior_text_encoder(
                     batch['tokens'], output_hidden_states=True, return_dict=True
                 )

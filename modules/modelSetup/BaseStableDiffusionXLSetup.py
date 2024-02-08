@@ -66,10 +66,10 @@ class BaseStableDiffusionXLSetup(
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtype,
-            config.unet_weight_dtype,
-            config.text_encoder_weight_dtype,
-            config.text_encoder_2_weight_dtype,
-            config.vae_weight_dtype,
+            config.unet.weight_dtype,
+            config.text_encoder.weight_dtype,
+            config.text_encoder_2.weight_dtype,
+            config.vae.weight_dtype,
             config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
             config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
@@ -79,7 +79,7 @@ class BaseStableDiffusionXLSetup(
             config.train_dtype,
             config.fallback_train_dtype,
             [
-                config.vae_weight_dtype,
+                config.vae.weight_dtype,
             ]
         )
 
@@ -157,11 +157,11 @@ class BaseStableDiffusionXLSetup(
                 tokens_1=batch['tokens_1'],
                 tokens_2=batch['tokens_2'],
                 text_encoder_1_output=batch[
-                    'text_encoder_1_hidden_state'] if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_1_hidden_state'] if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING else None,
                 text_encoder_2_output=batch[
-                    'text_encoder_2_hidden_state'] if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_2_hidden_state'] if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING else None,
                 pooled_text_encoder_2_output=batch[
-                    'text_encoder_2_pooled_state'] if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_2_pooled_state'] if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING else None,
             )
 
             latent_image = batch['latent_image']

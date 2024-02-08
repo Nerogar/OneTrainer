@@ -157,7 +157,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "unet_weight_dtype")
+            ], self.ui_state, "unet.weight_dtype")
 
             row += 1
 
@@ -171,7 +171,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "prior_weight_dtype")
+            ], self.ui_state, "prior.weight_dtype")
 
             row += 1
 
@@ -185,7 +185,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "text_encoder_weight_dtype")
+            ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
 
@@ -199,7 +199,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "text_encoder_weight_dtype")
+            ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
 
@@ -213,7 +213,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "text_encoder_2_weight_dtype")
+            ], self.ui_state, "text_encoder_2.weight_dtype")
 
             row += 1
 
@@ -222,7 +222,7 @@ class ModelTab:
             components.label(self.scroll_frame, row, 0, "VAE",
                              tooltip="Directory or Hugging Face repository of a VAE model. Can be used to override the base model VAE.")
             components.file_entry(
-                self.scroll_frame, row, 1, self.ui_state, "vae_model_name",
+                self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
             )
 
@@ -235,7 +235,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "vae_weight_dtype")
+            ], self.ui_state, "vae.weight_dtype")
 
             row += 1
 
@@ -246,7 +246,7 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Effnet Encoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
         components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "effnet_encoder_model_name",
+            self.scroll_frame, row, 1, self.ui_state, "effnet_encoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -259,7 +259,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "effnet_encoder_weight_dtype")
+        ], self.ui_state, "effnet_encoder.weight_dtype")
 
         row += 1
 
@@ -270,7 +270,7 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
         components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "decoder_model_name",
+            self.scroll_frame, row, 1, self.ui_state, "decoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -283,7 +283,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_weight_dtype")
+        ], self.ui_state, "decoder.weight_dtype")
 
         row += 1
 
@@ -296,7 +296,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_text_encoder_weight_dtype")
+        ], self.ui_state, "decoder_text_encoder.weight_dtype")
 
         row += 1
 
@@ -309,7 +309,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_vqgan_weight_dtype")
+        ], self.ui_state, "decoder_vqgan.weight_dtype")
 
         row += 1
 

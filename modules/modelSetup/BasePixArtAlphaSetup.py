@@ -69,14 +69,14 @@ class BasePixArtAlphaSetup(
         if config.gradient_checkpointing:
             model.vae.enable_gradient_checkpointing()
             model.transformer.enable_gradient_checkpointing()
-            if config.train_text_encoder:
+            if config.text_encoder.train:
                 model.text_encoder.encoder.gradient_checkpointing_enable()
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtype,
-            config.prior_weight_dtype,
-            config.text_encoder_weight_dtype,
-            config.vae_weight_dtype,
+            config.prior.weight_dtype,
+            config.text_encoder.weight_dtype,
+            config.vae.weight_dtype,
             config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
             config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
@@ -86,7 +86,7 @@ class BasePixArtAlphaSetup(
             config.train_dtype,
             config.fallback_train_dtype,
             [
-                config.text_encoder_weight_dtype,
+                config.text_encoder.weight_dtype,
                 config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
                 config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
             ],
@@ -147,7 +147,7 @@ class BasePixArtAlphaSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            if config.train_text_encoder or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
                 text_encoder_output, text_encoder_attention_mask = self.__encode_text(
                     model,
                     config,

@@ -69,9 +69,9 @@ class BaseStableDiffusionSetup(
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtype,
-            config.text_encoder_weight_dtype,
-            config.unet_weight_dtype,
-            config.vae_weight_dtype,
+            config.text_encoder.weight_dtype,
+            config.unet.weight_dtype,
+            config.vae.weight_dtype,
             config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
             config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
@@ -122,7 +122,7 @@ class BaseStableDiffusionSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            if config.train_text_encoder or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
                 text_encoder_output = self.__encode_text(
                     model,
                     config,

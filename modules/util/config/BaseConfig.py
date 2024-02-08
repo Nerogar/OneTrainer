@@ -81,9 +81,15 @@ class BaseConfig:
                 elif self.types[name] == list or get_origin(self.types[name]) == list:
                     if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
                         list_type = get_args(self.types[name])[0]
+                        old_value = getattr(self, name) if hasattr(self, name) else []
                         value = []
-                        for list_entry in data[name]:
-                            value.append(list_type.default_values().from_dict(list_entry))
+                        for i in range(max(len(old_value), len(data[name]))):
+                            if i < len(old_value) and i < len(data[name]):
+                                value.append(old_value[i].from_dict(data[name][i]))
+                            elif i < len(old_value):
+                                value.append(old_value[i])
+                            else:
+                                value.append(list_type.default_values().from_dict(data[name][i]))
                         setattr(self, name, value)
                     else:
                         setattr(self, name, data[name])

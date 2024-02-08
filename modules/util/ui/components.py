@@ -170,18 +170,24 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
     return frame
 
 
-def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name):
+def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name, supports_time_units: bool = True):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
-    frame.grid_columnconfigure(0, weight=1)
+    frame.grid_columnconfigure(0, weight=0)
+    frame.grid_columnconfigure(1, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name))
+    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name), width=50)
     entry_component.grid(row=0, column=0, padx=PAD, pady=PAD, sticky="new")
+    entry_component.configure()
+
+    values = [str(x) for x in list(TimeUnit)]
+    if not supports_time_units:
+        values = [str(x) for x in list(TimeUnit) if not x.is_time_unit()]
 
     unit_component = ctk.CTkOptionMenu(
         frame,
-        values=[str(x) for x in list(TimeUnit)],
+        values=values,
         variable=ui_state.get_var(unit_var_name),
         width=100,
     )
@@ -310,7 +316,7 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     return component
 
 
-def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, text: str =""):
+def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, text: str = ""):
     component = ctk.CTkSwitch(master, variable=ui_state.get_var(var_name), text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
     return component

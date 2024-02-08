@@ -30,10 +30,10 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
     ) -> Iterable[Parameter]:
         params = list()
 
-        if config.train_text_encoder:
+        if config.text_encoder.train:
             params += list(model.text_encoder.parameters())
 
-        if config.train_prior:
+        if config.prior.train:
             params += list(model.transformer.parameters())
 
         return params
@@ -45,14 +45,14 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
 
-        if config.train_text_encoder:
+        if config.text_encoder.train:
             param_groups.append(
-                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder_learning_rate)
+                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder.learning_rate)
             )
 
-        if config.train_prior:
+        if config.prior.train:
             param_groups.append(
-                self.create_param_groups(config, model.transformer.parameters(), config.prior_learning_rate)
+                self.create_param_groups(config, model.transformer.parameters(), config.prior.learning_rate)
             )
 
         return param_groups
@@ -62,10 +62,12 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
             model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        train_text_encoder = config.train_text_encoder and (model.train_progress.epoch < config.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_prior = config.train_prior and (model.train_progress.epoch < config.train_prior_epochs)
+        train_prior = config.prior.train and \
+                             not self.stop_prior_training_elapsed(config, model.train_progress)
         model.transformer.requires_grad_(train_prior)
 
         model.vae.requires_grad_(False)
@@ -96,20 +98,20 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
             config: TrainConfig,
     ):
         vae_on_train_device = self.debug_mode or config.align_prop
-        text_encoder_on_train_device = config.train_text_encoder or config.align_prop or not config.latent_caching
+        text_encoder_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if config.train_text_encoder:
+        if config.text_encoder.train:
             model.text_encoder.train()
         else:
             model.text_encoder.eval()
 
         model.vae.eval()
 
-        if config.train_prior:
+        if config.prior.train:
             model.transformer.train()
         else:
             model.transformer.eval()
@@ -120,8 +122,10 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        train_text_encoder = config.train_text_encoder and (model.train_progress.epoch < config.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_prior = config.train_prior and (model.train_progress.epoch < config.train_prior_epochs)
+        train_prior = config.prior.train and \
+                             not self.stop_prior_training_elapsed(config, model.train_progress)
         model.transformer.requires_grad_(train_prior)
