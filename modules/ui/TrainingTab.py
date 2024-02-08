@@ -459,7 +459,6 @@ class TrainingTab:
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
-    def __restore_optimizer_config(self, optimizer: str):
-        optimizer = Optimizer[optimizer]
-        optimizer_config = change_optimizer(self.train_config, optimizer)
+    def __restore_optimizer_config(self, *args):
+        optimizer_config = change_optimizer(self.train_config)
         self.ui_state.get_var("optimizer").update(optimizer_config)

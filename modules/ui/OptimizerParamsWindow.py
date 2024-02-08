@@ -156,9 +156,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
     def update_user_pref(self, *args):
         update_optimizer_config(self.train_config)
 
-    def on_optimizer_change(self, optimizer: str):
-        optimizer = Optimizer[optimizer]
-        optimizer_config = change_optimizer(self.train_config, optimizer)
+    def on_optimizer_change(self, *args):
+        optimizer_config = change_optimizer(self.train_config)
         self.ui_state.get_var("optimizer").update(optimizer_config)
 
         self.clear_dynamic_ui(self.frame)

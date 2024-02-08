@@ -9,6 +9,7 @@ from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -187,10 +188,13 @@ class TopBar:
     def __load_current_config(self, filename):
         try:
             with open(filename, "r") as f:
-                config_dict = TrainConfig.default_values().from_dict(json.load(f)).to_unpacked_config().to_dict()
+                loaded_config = TrainConfig.default_values().from_dict(json.load(f)).to_unpacked_config()
 
-            self.train_config.from_dict(config_dict)
-            self.ui_state.update(self.train_config)
+            self.train_config.from_dict(loaded_config.to_dict())
+            self.ui_state.update(loaded_config)
+
+            optimizer_config = change_optimizer(self.train_config)
+            self.ui_state.get_var("optimizer").update(optimizer_config)
         except Exception:
             print(traceback.format_exc())
 
