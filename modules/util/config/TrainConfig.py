@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from typing import Any
 
 from modules.util.ModelNames import ModelNames
@@ -286,17 +287,21 @@ class TrainConfig(BaseConfig):
         )
 
     def __migration_0(self, data: dict) -> dict:
-        migrated_data = {
-            'optimizer': {}
-        }
+        optimizer_settings = {}
+        migrated_data = {}
         for key, value in data.items():
             # move optimizer settings to sub object
             if key == 'optimizer':
-                migrated_data['optimizer']['optimizer'] = value
+                optimizer_settings['optimizer'] = value
             elif key.startswith('optimizer'):
-                migrated_data['optimizer'][key.removeprefix('optimizer_')] = value
+                optimizer_settings[key.removeprefix('optimizer_')] = value
             else:
                 migrated_data[key] = value
+
+        migrated_data['optimizer'] = optimizer_settings
+        migrated_data['optimizer_defaults'] = {
+            optimizer_settings['optimizer']: deepcopy(optimizer_settings)
+        }
 
         return migrated_data
 
