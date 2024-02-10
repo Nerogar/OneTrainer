@@ -298,10 +298,11 @@ class TrainConfig(BaseConfig):
             else:
                 migrated_data[key] = value
 
-        migrated_data['optimizer'] = optimizer_settings
-        migrated_data['optimizer_defaults'] = {
-            optimizer_settings['optimizer']: deepcopy(optimizer_settings)
-        }
+        if 'optimizer' in optimizer_settings:
+            migrated_data['optimizer'] = optimizer_settings
+            migrated_data['optimizer_defaults'] = {
+                optimizer_settings['optimizer']: deepcopy(optimizer_settings)
+            }
 
         return migrated_data
 
