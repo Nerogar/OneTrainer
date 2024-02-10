@@ -187,8 +187,15 @@ class TopBar:
 
     def __load_current_config(self, filename):
         try:
+            is_built_in_preset = os.path.basename(filename).startswith("#")
+
             with open(filename, "r") as f:
-                loaded_config = TrainConfig.default_values().from_dict(json.load(f)).to_unpacked_config()
+                loaded_dict = json.load(f)
+                default_config = TrainConfig.default_values()
+                if is_built_in_preset:
+                    # always assume built-in configs are saved in the most recent version
+                    loaded_dict["__version"] = default_config.config_version
+                loaded_config = default_config.from_dict(loaded_dict).to_unpacked_config()
 
             self.train_config.from_dict(loaded_config.to_dict())
             self.ui_state.update(loaded_config)
