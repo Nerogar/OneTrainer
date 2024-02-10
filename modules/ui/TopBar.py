@@ -187,7 +187,8 @@ class TopBar:
 
     def __load_current_config(self, filename):
         try:
-            is_built_in_preset = os.path.basename(filename).startswith("#")
+            basename = os.path.basename(filename)
+            is_built_in_preset = basename.startswith("#") and basename != "#.json"
 
             with open(filename, "r") as f:
                 loaded_dict = json.load(f)
