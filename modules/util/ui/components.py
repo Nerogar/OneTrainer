@@ -45,19 +45,22 @@ def entry(
 ):
     var = ui_state.get_var(var_name)
     if command:
-        var.trace_add("write", lambda _0, _1, _2: command())
+        trace_id = ui_state.add_var_trace(var_name, command)
 
     component = ctk.CTkEntry(master, textvariable=var)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
 
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
     def create_destroy(component):
         orig_destroy = component.destroy
 
         def destroy(self):
+            # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
             if self._textvariable_callback_name:
                 self._textvariable.trace_remove("write", self._textvariable_callback_name)
                 self._textvariable_callback_name = ""
+
+            if command is not None:
+                ui_state.remove_var_trace(var_name, trace_id)
 
             orig_destroy()
 
@@ -310,9 +313,36 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     return component
 
 
-def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, text: str =""):
-    component = ctk.CTkSwitch(master, variable=ui_state.get_var(var_name), text=text, command=command)
+def switch(
+        master,
+        row,
+        column,
+        ui_state: UIState,
+        var_name: str,
+        command: Callable[[], None] = None,
+        text: str = "",
+):
+    var = ui_state.get_var(var_name)
+    if command:
+        trace_id = ui_state.add_var_trace(var_name, command)
+
+    component = ctk.CTkSwitch(master, variable=var, text=text)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            if command is not None:
+                ui_state.remove_var_trace(var_name, trace_id)
+
+            orig_destroy()
+
+        return destroy
+
+    destroy = create_destroy(component)
+    component.destroy = lambda: destroy(component)
+
     return component
 
 
