@@ -145,6 +145,20 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         return losses
 
+    def __min_snr_weight(
+            self,
+            timesteps: Tensor,
+            gamma: int,
+            device: torch.device
+    ):
+        all_snr = (self.__coefficients.sqrt_alphas_cumprod /
+                   self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
+        all_snr.to(device)
+        snr = torch.stack([all_snr[t] for t in timesteps])
+        gamma_over_snr = torch.div(torch.ones_like(snr)*gamma, snr)
+        snr_weight = torch.minimum(gamma_over_snr, torch.ones_like(gamma_over_snr)).float().to(device)
+        return snr_weight
+
     def _diffusion_losses(
             self,
             batch: dict,
@@ -178,4 +192,10 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses = losses * batch_size_scale * gradient_accumulation_steps_scale
 
         losses *= loss_weight.to(device=losses.device)
+
+        # Apply minimum SNR weighting.
+        if config.min_snr_gamma:
+            snr_weight = self.__min_snr_weight(data['timestep'], config.min_snr_gamma, losses.device)
+            losses *= snr_weight
+
         return losses
