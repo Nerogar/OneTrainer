@@ -118,6 +118,7 @@ class GenericTrainer(BaseTrainer):
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
         )
+        self.model.train_config = self.config
 
         self.callbacks.on_update_status("running model setup")
 

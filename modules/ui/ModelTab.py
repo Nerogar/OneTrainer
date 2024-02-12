@@ -3,6 +3,7 @@ from pathlib import Path
 import customtkinter as ctk
 
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -60,7 +61,10 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
+            allow_diffusers=self.train_config.training_method in [
+                TrainingMethod.FINE_TUNE,
+                TrainingMethod.FINE_TUNE_VAE,
+            ],
             allow_checkpoint=True,
         )
 
@@ -351,6 +355,18 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format")
+
+        # include config
+        components.label(self.scroll_frame, row, 3, "Include Config",
+                         tooltip="Include the training configuration in the final model. Only supported for safetensors files. "
+                                 "None: No config is included. "
+                                 "Settings: All training settings are included. "
+                                 "All: All settings, including the samples and concepts are included.")
+        components.options_kv(self.scroll_frame, row, 4, [
+            ("None", ConfigPart.NONE),
+            ("Settings", ConfigPart.SETTINGS),
+            ("All", ConfigPart.ALL),
+        ], self.ui_state, "include_train_config")
 
         row += 1
 

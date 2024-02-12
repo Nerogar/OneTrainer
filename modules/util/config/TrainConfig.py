@@ -9,6 +9,7 @@ from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
+from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.ImageFormat import ImageFormat
@@ -186,6 +187,7 @@ class TrainConfig(BaseConfig):
     tensorboard: bool
     tensorboard_expose: bool
     continue_last_backup: bool
+    include_train_config: ConfigPart
 
     # model settings
     base_model_name: str
@@ -456,6 +458,14 @@ class TrainConfig(BaseConfig):
             embedding=[embedding.model_name for embedding in self.embeddings],
         )
 
+    def to_settings_dict(self) -> dict:
+        config = TrainConfig.default_values().from_dict(self.to_dict())
+
+        config.concepts = None
+        config.samples = None
+
+        return config.to_dict()
+
     def to_pack_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
 
@@ -495,6 +505,7 @@ class TrainConfig(BaseConfig):
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("continue_last_backup", False, bool, False))
+        data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         # model settings
         data.append(("base_model_name", "runwayml/stable-diffusion-v1-5", str, False))
