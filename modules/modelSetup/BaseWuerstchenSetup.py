@@ -1,7 +1,8 @@
 from abc import ABCMeta
+from contextlib import nullcontext
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
+from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
@@ -10,10 +11,11 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers
+from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers, \
+    enable_checkpointing_for_stable_cascade_blocks
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -35,30 +37,48 @@ class BaseWuerstchenSetup(
             model.prior_prior.set_attn_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                model.prior_prior.set_attn_processor(XFormersAttnProcessor())
+                for name, child_module in model.prior_prior.named_modules():
+                    if isinstance(child_module, Attention):
+                        child_module.set_processor(XFormersAttnProcessor())
             except Exception as e:
                 print(
                     "Could not enable memory efficient attention. Make sure xformers is installed"
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            model.prior_prior.set_attn_processor(AttnProcessor2_0())
+            for name, child_module in model.prior_prior.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor2_0())
 
         if config.gradient_checkpointing:
-            model.prior_prior.enable_gradient_checkpointing()
-            enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder)
+            if model.model_type.is_wuerstchen_v2():
+                model.prior_prior.enable_gradient_checkpointing()
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
+            else:
+                enable_checkpointing_for_stable_cascade_blocks(model.prior_text_encoder, self.train_device)
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtype,
-            config.decoder_text_encoder_weight_dtype,
-            config.decoder_weight_dtype,
-            config.decoder_vqgan_weight_dtype,
-            config.effnet_encoder_weight_dtype,
-            config.text_encoder_weight_dtype,
-            config.prior_weight_dtype,
-            config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
-            config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
+            config.weight_dtypes().decoder_text_encoder,
+            config.weight_dtypes().decoder,
+            config.weight_dtypes().decoder_vqgan,
+            config.weight_dtypes().effnet_encoder,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().prior,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
+
+        if model.model_type.is_wuerstchen_v3():
+            model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
+                self.train_device,
+                config.train_dtype,
+                config.fallback_train_dtype,
+                [
+                    config.weight_dtypes().prior,
+                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                ],
+            )
 
     def __alpha_cumprod(
             self,
@@ -129,19 +149,20 @@ class BaseWuerstchenSetup(
 
             if model.model_type.is_wuerstchen_v2():
                 prior_kwargs = {
-                    'c': text_encoder_output,
+                    'c': text_encoder_output.to(dtype=model.prior_train_dtype.torch_dtype()),
                 }
             elif model.model_type.is_wuerstchen_v3():
                 prior_kwargs = {
-                    'clip_text': text_encoder_output,
-                    'clip_text_pooled': pooled_text_encoder_output,
+                    'clip_text': text_encoder_output.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'clip_text_pooled': pooled_text_encoder_output.to(dtype=model.prior_train_dtype.torch_dtype()),
                 }
 
-            predicted_latent_noise = model.prior_prior(
-                latent_input,
-                timestep,
-                **prior_kwargs,
-            )
+            with model.prior_autocast_context:
+                predicted_latent_noise = model.prior_prior(
+                    latent_input.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    timestep.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    **prior_kwargs,
+                )
 
             model_output_data = {
                 'loss_type': 'target',

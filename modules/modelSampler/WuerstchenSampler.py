@@ -96,9 +96,11 @@ class WuerstchenSampler(BaseModelSampler):
             if self.model_type.is_wuerstchen_v3():
                 pooled_negative_prompt_embedding = prior_text_encoder.text_projection(negative_prompt_embedding)
 
-        combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
+        combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
+            .to(dtype=self.model.prior_train_dtype.torch_dtype())
         if self.model_type.is_wuerstchen_v3():
-            pooled_combined_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding])
+            pooled_combined_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding]) \
+                .to(dtype=self.model.prior_train_dtype.torch_dtype())
 
         self.model.prior_text_encoder_to(self.temp_device)
         torch_gc()
@@ -115,7 +117,7 @@ class WuerstchenSampler(BaseModelSampler):
             size=(1, num_channels_latents, latent_height, latent_width),
             generator=generator,
             device=self.train_device,
-            dtype=torch.float32
+            dtype=self.model.prior_train_dtype.torch_dtype(),
         ) * prior_noise_scheduler.init_noise_sigma
 
         # denoising loop
@@ -125,12 +127,12 @@ class WuerstchenSampler(BaseModelSampler):
 
         self.model.prior_prior_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
-            timestep = torch.stack([timestep])
+            timestep = torch.stack([timestep]).to(dtype=self.model.prior_train_dtype.torch_dtype())
 
             latent_model_input = torch.cat([latent_image] * 2)
 
             # predict the noise residual
-            with self.model.autocast_context:
+            with self.model.autocast_context, self.model.prior_autocast_context:
                 if self.model_type.is_wuerstchen_v2():
                     prior_kwargs = {
                         'c': combined_prompt_embedding,

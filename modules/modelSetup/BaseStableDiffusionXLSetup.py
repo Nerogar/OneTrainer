@@ -60,9 +60,9 @@ class BaseStableDiffusionXLSetup(
 
         if config.gradient_checkpointing:
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_transformer_blocks(model.unet)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
+            enable_checkpointing_for_transformer_blocks(model.unet, self.train_device)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtype,

@@ -93,13 +93,13 @@ class WuerstchenModel(BaseModel):
             prior_tokenizer: CLIPTokenizer | None = None,
             prior_text_encoder: CLIPTextModel | CLIPTextModelWithProjection | None = None,
             prior_noise_scheduler: DDPMWuerstchenScheduler | None = None,
-            prior_prior: WuerstchenPrior | None = None,
+            prior_prior: WuerstchenPrior | StableCascadeUnet | None = None,
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
             embeddings: list[WuerstchenModelEmbedding] | None = None,
             prior_text_encoder_lora: LoRAModuleWrapper | None = None,
-            prior_prior_lora: LoRAModuleWrapper | StableCascadeUnet | None = None,
+            prior_prior_lora: LoRAModuleWrapper | None = None,
             model_spec: ModelSpec | None = None,
     ):
         super(WuerstchenModel, self).__init__(
@@ -122,8 +122,10 @@ class WuerstchenModel(BaseModel):
         self.prior_prior = prior_prior
 
         self.autocast_context = nullcontext()
+        self.prior_autocast_context = nullcontext()
 
         self.train_dtype = DataType.FLOAT_32
+        self.prior_train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
         self.prior_text_encoder_lora = prior_text_encoder_lora
