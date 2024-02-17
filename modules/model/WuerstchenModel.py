@@ -24,6 +24,7 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
             c_latent: int = 16,
             c_cond: int = 1280,
             effnet: str = "efficientnet_v2_s",
+            affine_batch_norm: bool = True,
     ):
         super().__init__()
 
@@ -34,7 +35,7 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
 
         self.mapper = nn.Sequential(
             nn.Conv2d(1280, c_latent, kernel_size=1, bias=False),
-            nn.BatchNorm2d(c_latent),  # then normalize them to have mean 0 and std 1
+            nn.BatchNorm2d(c_latent, affine=affine_batch_norm),  # then normalize them to have mean 0 and std 1
         )
 
     def forward(self, x):
@@ -186,7 +187,7 @@ class WuerstchenModel(BaseModel):
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )
-        elif self.model_type.is_wuerstchen_v3():
+        elif self.model_type.is_stable_cascade():
             return StableCascadeCombinedPipeline(
                 tokenizer=self.decoder_tokenizer,
                 text_encoder=self.prior_text_encoder,

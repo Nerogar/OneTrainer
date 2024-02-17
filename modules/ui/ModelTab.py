@@ -90,7 +90,7 @@ class ModelTab:
             has_text_encoder=True,
         )
         row = self.__create_effnet_encoder_components(row)
-        row = self.__create_decoder_components(row)
+        row = self.__create_decoder_components(row, self.train_config.model_type.is_wuerstchen_v2())
         row = self.__create_output_components(
             row,
             allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
@@ -265,7 +265,11 @@ class ModelTab:
 
         return row
 
-    def __create_decoder_components(self, row: int) -> int:
+    def __create_decoder_components(
+            self,
+            row: int,
+            has_text_encoder: bool,
+    ) -> int:
         # decoder model
         components.label(self.scroll_frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
@@ -287,18 +291,19 @@ class ModelTab:
 
         row += 1
 
-        # decoder text encoder weight dtype
-        components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
-                         tooltip="Overrides the decoder text encoder weight data type")
-        components.options_kv(self.scroll_frame, row, 4, [
-            ("", DataType.NONE),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-            ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_text_encoder_weight_dtype")
+        if has_text_encoder:
+            # decoder text encoder weight dtype
+            components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
+                             tooltip="Overrides the decoder text encoder weight data type")
+            components.options_kv(self.scroll_frame, row, 4, [
+                ("", DataType.NONE),
+                ("float32", DataType.FLOAT_32),
+                ("bfloat16", DataType.BFLOAT_16),
+                ("float16", DataType.FLOAT_16),
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "decoder_text_encoder_weight_dtype")
 
-        row += 1
+            row += 1
 
         # decoder vqgan weight dtype
         components.label(self.scroll_frame, row, 3, "Override Decoder VQGAN Data Type",

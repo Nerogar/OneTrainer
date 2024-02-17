@@ -76,29 +76,33 @@ class WuerstchenSampler(BaseModelSampler):
                 return_dict=True,
                 output_hidden_states=True,
             )
-            final_layer_norm = prior_text_encoder.text_model.final_layer_norm
-            prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-            if self.model_type.is_wuerstchen_v3():
-                pooled_prompt_embedding = prior_text_encoder.text_projection(prompt_embedding)
+            if self.model_type.is_wuerstchen_v2():
+                final_layer_norm = prior_text_encoder.text_model.final_layer_norm
+                prompt_embedding = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
+            elif self.model_type.is_stable_cascade():
+                prompt_embedding = text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                pooled_prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
 
-            text_encoder_output = prior_text_encoder(
+            negative_text_encoder_output = prior_text_encoder(
                 negative_tokens,
                 attention_mask=negative_tokens_attention_mask,
                 return_dict=True,
                 output_hidden_states=True,
             )
-            final_layer_norm = prior_text_encoder.text_model.final_layer_norm
-            negative_prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-            if self.model_type.is_wuerstchen_v3():
-                pooled_negative_prompt_embedding = prior_text_encoder.text_projection(negative_prompt_embedding)
+            if self.model_type.is_wuerstchen_v2():
+                final_layer_norm = prior_text_encoder.text_model.final_layer_norm
+                negative_prompt_embedding = final_layer_norm(
+                    negative_text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
+            if self.model_type.is_stable_cascade():
+                negative_prompt_embedding = negative_text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                pooled_negative_prompt_embedding = negative_text_encoder_output.text_embeds.unsqueeze(1)
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
             .to(dtype=self.model.prior_train_dtype.torch_dtype())
-        if self.model_type.is_wuerstchen_v3():
+        if self.model_type.is_stable_cascade():
             pooled_combined_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding]) \
                 .to(dtype=self.model.prior_train_dtype.torch_dtype())
 
@@ -125,6 +129,8 @@ class WuerstchenSampler(BaseModelSampler):
         if "generator" in set(inspect.signature(prior_noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
 
+        clip_img = torch.zeros(size=(2, 1, 768), dtype=combined_prompt_embedding.dtype, device=combined_prompt_embedding.device)
+
         self.model.prior_prior_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
             timestep = torch.stack([timestep]).to(dtype=self.model.prior_train_dtype.torch_dtype())
@@ -137,10 +143,11 @@ class WuerstchenSampler(BaseModelSampler):
                     prior_kwargs = {
                         'c': combined_prompt_embedding,
                     }
-                elif self.model_type.is_wuerstchen_v3():
+                elif self.model_type.is_stable_cascade():
                     prior_kwargs = {
                         'clip_text': combined_prompt_embedding,
                         'clip_text_pooled': pooled_combined_prompt_embedding,
+                        'clip_img': clip_img,
                     }
 
                 noise_pred = prior_prior(
@@ -197,7 +204,7 @@ class WuerstchenSampler(BaseModelSampler):
         # prepare prompt
         if self.model_type.is_wuerstchen_v2():
             self.model.decoder_text_encoder_to(self.train_device)
-        elif self.model_type.is_wuerstchen_v3():
+        elif self.model_type.is_stable_cascade():
             self.model.prior_text_encoder_to(self.train_device)
         tokenizer_output = decoder_tokenizer(
             prompt,
@@ -221,12 +228,12 @@ class WuerstchenSampler(BaseModelSampler):
                 text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
             )
 
-            if self.model_type.is_wuerstchen_v3():
-                prompt_embedding = decoder_text_encoder.text_projection(prompt_embedding)
+            if self.model_type.is_stable_cascade():
+                prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
 
         if self.model_type.is_wuerstchen_v2():
             self.model.decoder_text_encoder_to(self.temp_device)
-        elif self.model_type.is_wuerstchen_v3():
+        elif self.model_type.is_stable_cascade():
             self.model.prior_text_encoder_to(self.temp_device)
         torch_gc()
 
@@ -264,7 +271,7 @@ class WuerstchenSampler(BaseModelSampler):
                         'effnet': image_embedding,
                         'clip': prompt_embedding,
                     }
-                elif self.model_type.is_wuerstchen_v3():
+                elif self.model_type.is_stable_cascade():
                     decoder_kwargs = {
                         'clip_text_pooled': prompt_embedding,
                         'effnet': image_embedding,
@@ -322,7 +329,7 @@ class WuerstchenSampler(BaseModelSampler):
         if self.model_type.is_wuerstchen_v2():
             decoder_tokenizer = self.model.decoder_tokenizer
             decoder_text_encoder = self.model.decoder_text_encoder
-        elif self.model_type.is_wuerstchen_v3():
+        elif self.model_type.is_stable_cascade():
             decoder_tokenizer = self.model.prior_tokenizer
             decoder_text_encoder = self.model.prior_text_encoder
 

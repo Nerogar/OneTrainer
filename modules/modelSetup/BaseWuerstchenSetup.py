@@ -1,5 +1,4 @@
 from abc import ABCMeta
-from contextlib import nullcontext
 
 import torch
 from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
@@ -54,8 +53,8 @@ class BaseWuerstchenSetup(
             if model.model_type.is_wuerstchen_v2():
                 model.prior_prior.enable_gradient_checkpointing()
                 enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
-            else:
-                enable_checkpointing_for_stable_cascade_blocks(model.prior_text_encoder, self.train_device)
+            elif model.model_type.is_stable_cascade():
+                enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, self.train_device)
                 enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
@@ -69,7 +68,7 @@ class BaseWuerstchenSetup(
             config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
-        if model.model_type.is_wuerstchen_v3():
+        if model.model_type.is_stable_cascade():
             model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
                 self.train_device,
                 config.train_dtype,
@@ -79,6 +78,8 @@ class BaseWuerstchenSetup(
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
                 ],
             )
+        else:
+            model.prior_train_dtype = model.train_dtype
 
     def __alpha_cumprod(
             self,
@@ -105,11 +106,11 @@ class BaseWuerstchenSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            latent_mean = 42.0
-            latent_std = 1.0
-
             latent_image = batch['latent_image']
-            scaled_latent_image = latent_image.add(latent_std).div(latent_mean)
+            if model.model_type.is_wuerstchen_v2():
+                scaled_latent_image = latent_image.add(1.0).div(42.0)
+            elif model.model_type.is_stable_cascade():
+                scaled_latent_image = latent_image
 
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(train_progress.global_step)
@@ -122,7 +123,12 @@ class BaseWuerstchenSetup(
                 scaled_latent_image.shape[0],
                 config,
                 train_progress.global_step,
-            ).mul(1.08).add(0.001).clamp(0.001, 1.0)
+            )
+
+            if model.model_type.is_wuerstchen_v2():
+                timestep = timestep.mul(1.08).add(0.001).clamp(0.001, 1.0)
+            elif model.model_type.is_stable_cascade():
+                timestep = timestep.add(0.001).clamp(0.001, 1.0)
 
             scaled_noisy_latent_image = self._add_noise_continuous(
                 scaled_latent_image,
@@ -135,26 +141,36 @@ class BaseWuerstchenSetup(
                 text_encoder_output = model.prior_text_encoder(
                     batch['tokens'], output_hidden_states=True, return_dict=True
                 )
-                final_layer_norm = model.prior_text_encoder.text_model.final_layer_norm
-                text_encoder_output = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
-                )
-                if model.model_type.is_wuerstchen_v3():
-                    pooled_text_encoder_output = model.prior_text_encoder.text_projection(text_encoder_output)
+                if model.model_type.is_wuerstchen_v2():
+                    final_layer_norm = model.prior_text_encoder.text_model.final_layer_norm
+                    text_embedding = final_layer_norm(
+                        text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
+                    )
+                if model.model_type.is_stable_cascade():
+                    text_embedding = text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
+                    if model.model_type.is_stable_cascade():
+                        pooled_text_text_embedding = text_encoder_output.text_embeds.unsqueeze(1)
             else:
-                text_encoder_output = batch['text_encoder_hidden_state']
-                pooled_text_encoder_output = batch['pooled_text_encoder_output']
+                text_embedding = batch['text_encoder_hidden_state']
+                if model.model_type.is_stable_cascade():
+                    pooled_text_text_embedding = batch['pooled_text_encoder_output'].unsqueeze(1)
 
             latent_input = scaled_noisy_latent_image
 
             if model.model_type.is_wuerstchen_v2():
                 prior_kwargs = {
-                    'c': text_encoder_output.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'c': text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
                 }
-            elif model.model_type.is_wuerstchen_v3():
+            elif model.model_type.is_stable_cascade():
+                clip_img = torch.zeros(
+                    size=(text_embedding.shape[0], 1, 768),
+                    dtype=model.prior_train_dtype.torch_dtype(),
+                    device=self.train_device,
+                )
                 prior_kwargs = {
-                    'clip_text': text_encoder_output.to(dtype=model.prior_train_dtype.torch_dtype()),
-                    'clip_text_pooled': pooled_text_encoder_output.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'clip_text': text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'clip_text_pooled': pooled_text_text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'clip_img': clip_img,
                 }
 
             with model.prior_autocast_context:
