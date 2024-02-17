@@ -8,7 +8,32 @@
     "effnet_encoder_weight_dtype": "FLOAT_16",
     "model_type": "WUERSTCHEN_2",
     "optimizer": {
-        "optimizer": "ADAFACTOR"
+        "__version": 0,
+        "optimizer": "ADAFACTOR",
+        "beta1": null,
+        "clip_threshold": 1.0,
+        "decay_rate": -0.8,
+        "eps": 1e-30,
+        "eps2": 0.001,
+        "relative_step": false,
+        "scale_parameter": false,
+        "warmup_init": false,
+        "weight_decay": 0.0
+    },
+    "optimizer_defaults": {
+        "ADAFACTOR": {
+            "__version": 0,
+            "optimizer": "ADAFACTOR",
+            "beta1": null,
+            "clip_threshold": 1.0,
+            "decay_rate": -0.8,
+            "eps": 1e-30,
+            "eps2": 0.001,
+            "relative_step": false,
+            "scale_parameter": false,
+            "warmup_init": false,
+            "weight_decay": 0.0
+        }
     },
     "output_model_destination": "models/model",
     "output_model_format": "DIFFUSERS",
