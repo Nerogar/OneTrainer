@@ -38,7 +38,7 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
 
         embedding_state = torch.load(embedding_name)
 
-        tensor = embedding_state["prior"]
+        tensor = embedding_state["clip_g"]
 
         embedding = WuerstchenModelEmbedding(
             prior_text_encoder_vector=tensor,
@@ -57,7 +57,7 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
 
         embedding_state = load_file(embedding_name)
 
-        tensor = embedding_state["prior"]
+        tensor = embedding_state["clip_g"]
 
         embedding = WuerstchenModelEmbedding(
             prior_text_encoder_vector=tensor,

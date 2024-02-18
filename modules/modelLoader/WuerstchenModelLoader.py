@@ -251,8 +251,6 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             )
             if model is not None:
                 return model
-        except list as inner_stacktraces:
-            stacktraces += inner_stacktraces
         except:
             stacktraces.append(traceback.format_exc())
 

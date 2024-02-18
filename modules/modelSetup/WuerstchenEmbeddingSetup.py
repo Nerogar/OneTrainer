@@ -59,7 +59,8 @@ class WuerstchenEmbeddingSetup(
         model.prior_text_encoder.requires_grad_(False)
         model.prior_text_encoder.get_input_embeddings().requires_grad_(True)
         model.prior_prior.requires_grad_(False)
-        model.decoder_text_encoder.requires_grad_(False)
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder.requires_grad_(False)
         model.decoder_decoder.requires_grad_(False)
         model.decoder_vqgan.requires_grad_(False)
         model.effnet_encoder.requires_grad_(False)
@@ -101,7 +102,8 @@ class WuerstchenEmbeddingSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        model.decoder_text_encoder_to(self.temp_device)
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder_to(self.temp_device)
         model.decoder_decoder_to(self.temp_device)
         model.decoder_vqgan_to(self.temp_device)
         model.effnet_encoder_to(self.temp_device)
@@ -109,7 +111,8 @@ class WuerstchenEmbeddingSetup(
         model.prior_text_encoder_to(self.train_device)
         model.prior_prior_to(self.train_device)
 
-        model.decoder_text_encoder.eval()
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder.eval()
         model.decoder_decoder.eval()
         model.decoder_vqgan.eval()
         model.effnet_encoder.eval()

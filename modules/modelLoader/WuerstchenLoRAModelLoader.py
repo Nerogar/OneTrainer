@@ -39,7 +39,7 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         model.prior_prior_lora = self._load_lora_with_prefix(
             module=model.prior_prior,
             state_dict=state_dict,
-            prefix="lora_prior_prior",
+            prefix="lora_prior_unet",
             rank=rank,
             module_filter=["attention"],
         )

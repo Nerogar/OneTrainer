@@ -72,12 +72,13 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
 
         if model.prior_prior_lora is None and config.train_prior:
             model.prior_prior_lora = LoRAModuleWrapper(
-                model.prior_prior, config.lora_rank, "lora_prior_prior", config.lora_alpha, ["attention"]
+                model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, ["attention"]
             )
 
         model.prior_text_encoder.requires_grad_(False)
         model.prior_prior.requires_grad_(False)
-        model.decoder_text_encoder.requires_grad_(False)
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder.requires_grad_(False)
         model.decoder_decoder.requires_grad_(False)
         model.decoder_vqgan.requires_grad_(False)
         model.effnet_encoder.requires_grad_(False)
@@ -114,7 +115,8 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        model.decoder_text_encoder_to(self.temp_device)
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder_to(self.temp_device)
         model.decoder_decoder_to(self.temp_device)
         model.decoder_vqgan_to(self.temp_device)
         model.effnet_encoder_to(self.temp_device)
@@ -124,7 +126,8 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.prior_prior_to(self.train_device)
 
-        model.decoder_text_encoder.eval()
+        if model.model_type.is_wuerstchen_v2():
+            model.decoder_text_encoder.eval()
         model.decoder_decoder.eval()
         model.decoder_vqgan.eval()
         model.effnet_encoder.eval()
