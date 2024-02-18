@@ -28,9 +28,9 @@ class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, M
     ) -> str | None:
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
-                return "resources/diffusers_model_config/sd_xl_base.yaml"
+                return "resources/model_config/stable_diffusion_xl/sd_xl_base.yaml"
             case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING:  # TODO: find the actual yml file
-                return "resources/diffusers_model_config/sd_xl_base.yaml"
+                return "resources/model_config/stable_diffusion_xl/sd_xl_base.yaml"
             case _:
                 return None
 

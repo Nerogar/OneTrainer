@@ -115,6 +115,14 @@ class ModelTab:
         )
 
     def __create_base_dtype_components(self, row: int) -> int:
+        # base model
+        components.label(self.scroll_frame, row, 0, "Base Model",
+                         tooltip="Filename, directory or Hugging Face repository of the base model")
+        components.file_entry(
+            self.scroll_frame, row, 1, self.ui_state, "base_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
         # weight dtype
         components.label(self.scroll_frame, row, 3, "Weight Data Type",
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
@@ -139,14 +147,6 @@ class ModelTab:
             has_text_encoder_2: bool = False,
             has_vae: bool = False,
     ) -> int:
-        # base model
-        components.label(self.scroll_frame, row, 0, "Base Model",
-                         tooltip="Filename, directory or Hugging Face repository of the base model")
-        components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "base_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
         if has_unet:
             # unet weight dtype
             components.label(self.scroll_frame, row, 3, "Override UNet Data Type",
@@ -162,6 +162,14 @@ class ModelTab:
             row += 1
 
         if has_prior:
+            # prior model
+            components.label(self.scroll_frame, row, 0, "Prior Model",
+                             tooltip="Filename, directory or Hugging Face repository of the prior model")
+            components.file_entry(
+                self.scroll_frame, row, 1, self.ui_state, "prior_model_name",
+                path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            )
+
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")

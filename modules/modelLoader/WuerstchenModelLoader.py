@@ -7,6 +7,7 @@ from diffusers import DDPMWuerstchenScheduler
 from diffusers.pipelines.stable_cascade import StableCascadeUnet
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
 from safetensors.torch import load_file
+from safetensors import safe_open
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
@@ -15,6 +16,7 @@ from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModel
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
+from modules.util.convert.convert_stable_cascade_ckpt_to_diffusers import convert_stable_cascade_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
 
 
@@ -39,6 +41,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             prior_model_name: str,
+            prior_prior_model_name: str,
             effnet_encoder_model_name: str,
             decoder_model_name: str,
     ) -> WuerstchenModel | None:
@@ -52,7 +55,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             )
 
         # base model
-        model = self.__load_diffusers(
+        model = self.__load(
             model_type,
             weight_dtypes,
             prior_model_name,
@@ -80,11 +83,12 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
 
         return model
 
-    def __load_diffusers(
+    def __load(
             self,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             prior_model_name: str,
+            prior_prior_model_name: str,
             effnet_encoder_model_name: str,
             decoder_model_name: str,
     ) -> WuerstchenModel | None:
@@ -149,11 +153,23 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 torch_dtype=weight_dtypes.prior.torch_dtype(),
             )
         elif model_type.is_stable_cascade():
-            prior_prior = StableCascadeUnet.from_pretrained(
-                prior_model_name,
-                subfolder="prior",
-                torch_dtype=weight_dtypes.prior.torch_dtype(),
-            )
+            if prior_prior_model_name:
+                with safe_open(prior_prior_model_name, framework="pt") as f:
+                    if any(key.startswith("down_blocks.0.23") for key in f.keys()):
+                        config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_3.6b.json"
+                    else:
+                        config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_1.0b.json"
+                    with open(config_filename, "r") as config_file:
+                        prior_config = json.load(config_file)
+                prior_prior = StableCascadeUnet(**prior_config)
+                prior_prior.load_state_dict(convert_stable_cascade_ckpt_to_diffusers(load_file(prior_prior_model_name)))
+                prior_prior.to(dtype=weight_dtypes.prior.torch_dtype())
+            else:
+                prior_prior = StableCascadeUnet.from_pretrained(
+                    prior_model_name,
+                    subfolder="prior",
+                    torch_dtype=weight_dtypes.prior.torch_dtype(),
+                )
 
         prior_tokenizer = CLIPTokenizer.from_pretrained(
             prior_model_name,
@@ -197,26 +213,6 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_spec=model_spec,
         )
 
-    def __load_ckpt(
-            self,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            prior_model_name: str,
-            effnet_encoder_model_name: str,
-            decoder_model_name: str,
-    ) -> WuerstchenModel | None:
-        pass
-
-    def __load_safetensors(
-            self,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            prior_model_name: str,
-            effnet_encoder_model_name: str,
-            decoder_model_name: str,
-    ) -> WuerstchenModel | None:
-        pass
-
     def load(
             self,
             model_type: ModelType,
@@ -226,6 +222,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
         stacktraces = []
 
         prior_model_name = model_names.base_model
+        prior_prior_model_name = model_names.prior_model
         effnet_encoder_model_name = model_names.effnet_encoder_model
         decoder_model_name = model_names.decoder_model
 
@@ -234,6 +231,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 model_type,
                 weight_dtypes,
                 prior_model_name,
+                prior_prior_model_name,
                 effnet_encoder_model_name,
                 decoder_model_name,
             )
@@ -243,41 +241,18 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_diffusers(
+            model = self.__load(
                 model_type,
                 weight_dtypes,
                 prior_model_name,
+                prior_prior_model_name,
                 effnet_encoder_model_name,
                 decoder_model_name,
             )
             if model is not None:
                 return model
-        except:
-            stacktraces.append(traceback.format_exc())
-
-        try:
-            model = self.__load_safetensors(
-                model_type,
-                weight_dtypes,
-                prior_model_name,
-                effnet_encoder_model_name,
-                decoder_model_name,
-            )
-            if model is not None:
-                return model
-        except:
-            stacktraces.append(traceback.format_exc())
-
-        try:
-            model = self.__load_ckpt(
-                model_type,
-                weight_dtypes,
-                prior_model_name,
-                effnet_encoder_model_name,
-                decoder_model_name,
-            )
-            if model is not None:
-                return model
+        except list as inner_stacktraces:
+            stacktraces += inner_stacktraces
         except:
             stacktraces.append(traceback.format_exc())
 
