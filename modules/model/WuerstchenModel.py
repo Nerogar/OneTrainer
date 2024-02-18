@@ -189,7 +189,7 @@ class WuerstchenModel(BaseModel):
             )
         elif self.model_type.is_stable_cascade():
             return StableCascadeCombinedPipeline(
-                tokenizer=self.decoder_tokenizer,
+                tokenizer=self.prior_tokenizer,
                 text_encoder=self.prior_text_encoder,
                 decoder=self.decoder_decoder,
                 scheduler=self.decoder_noise_scheduler,
