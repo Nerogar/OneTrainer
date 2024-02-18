@@ -4,10 +4,12 @@ import os.path
 from pathlib import Path
 
 import torch
+from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.util.convert.convert_stable_cascade_diffusers_to_ckpt import convert_stable_cascade_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
@@ -66,6 +68,25 @@ class WuerstchenModelSaver(BaseModelSaver):
         with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
             json.dump(self._create_safetensors_header(model), model_spec_file)
 
+    def __save_safetensors(
+            self,
+            model: WuerstchenModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+        if model.model_type.is_stable_cascade():
+            state_dict = convert_stable_cascade_diffusers_to_ckpt(
+                model.prior_prior.state_dict(),
+            )
+            save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+            self._convert_state_dict_to_contiguous(save_state_dict)
+
+            os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+
+            save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
+        else:
+            raise NotImplementedError
+
     def save(
             self,
             model: BaseModel,
@@ -80,6 +101,6 @@ class WuerstchenModelSaver(BaseModelSaver):
             case ModelFormat.CKPT:
                 raise NotImplementedError
             case ModelFormat.SAFETENSORS:
-                raise NotImplementedError
+                self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)

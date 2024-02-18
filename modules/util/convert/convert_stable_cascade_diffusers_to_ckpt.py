@@ -70,21 +70,21 @@ def __map_unet_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
             # attention block
             out_states[util.combine(out_prefix, f"{i}.kv_mapper.1.weight")] = in_states[util.combine(in_prefix, f"{i}.kv_mapper.1.weight")]
             out_states[util.combine(out_prefix, f"{i}.kv_mapper.1.bias")] = in_states[util.combine(in_prefix, f"{i}.kv_mapper.1.bias")]
-            out_states[util.combine(out_prefix, f"{i}.attention.to_out.0.weight")] = in_states[util.combine(in_prefix, f"{i}.attention.attn.out_proj.weight")]
-            out_states[util.combine(out_prefix, f"{i}.attention.to_out.0.bias")] = in_states[util.combine(in_prefix, f"{i}.attention.attn.out_proj.bias")]
+            out_states[util.combine(out_prefix, f"{i}.attention.attn.out_proj.weight")] = in_states[util.combine(in_prefix, f"{i}.attention.to_out.0.weight")]
+            out_states[util.combine(out_prefix, f"{i}.attention.attn.out_proj.bias")] = in_states[util.combine(in_prefix, f"{i}.attention.to_out.0.bias")]
 
-            qkv_weight = in_states[util.combine(in_prefix, f"{i}.attention.attn.in_proj_weight")]
-            q_weight, k_weight, v_weight = qkv_weight.chunk(3, dim=0)
+            q_weight = in_states[util.combine(in_prefix, f"{i}.attention.to_q.weight")]
+            q_bias = in_states[util.combine(in_prefix, f"{i}.attention.to_q.bias")]
+            k_weight = in_states[util.combine(in_prefix, f"{i}.attention.to_k.weight")]
+            k_bias = in_states[util.combine(in_prefix, f"{i}.attention.to_k.bias")]
+            v_weight = in_states[util.combine(in_prefix, f"{i}.attention.to_v.weight")]
+            v_bias = in_states[util.combine(in_prefix, f"{i}.attention.to_v.bias")]
 
-            qkv_bias = in_states[util.combine(in_prefix, f"{i}.attention.attn.in_proj_bias")]
-            q_bias, k_bias, v_bias = qkv_bias.chunk(3, dim=0)
+            qkv_weight = torch.cat([q_weight, k_weight, v_weight], dim=0)
+            qkv_bias = torch.cat([q_bias, k_bias, v_bias], dim=0)
 
-            out_states[util.combine(out_prefix, f"{i}.attention.to_q.weight")] = q_weight
-            out_states[util.combine(out_prefix, f"{i}.attention.to_q.bias")] = q_bias
-            out_states[util.combine(out_prefix, f"{i}.attention.to_k.weight")] = k_weight
-            out_states[util.combine(out_prefix, f"{i}.attention.to_k.bias")] = k_bias
-            out_states[util.combine(out_prefix, f"{i}.attention.to_v.weight")] = v_weight
-            out_states[util.combine(out_prefix, f"{i}.attention.to_v.bias")] = v_bias
+            out_states[util.combine(out_prefix, f"{i}.attention.attn.in_proj_weight")] = qkv_weight
+            out_states[util.combine(out_prefix, f"{i}.attention.attn.in_proj_bias")] = qkv_bias
 
         i += 1
 
@@ -110,7 +110,7 @@ def __map_prior(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     return out_states
 
 
-def convert_stable_cascade_ckpt_to_diffusers(
+def convert_stable_cascade_diffusers_to_ckpt(
         prior_state_dict: dict,
 ) -> dict:
     state_dict = {}

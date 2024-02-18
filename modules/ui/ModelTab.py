@@ -60,7 +60,8 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
+            allow_diffusers=self.train_config.training_method in [TrainingMethod.FINE_TUNE,
+                                                                  TrainingMethod.FINE_TUNE_VAE],
             allow_checkpoint=True,
         )
 
@@ -93,7 +94,8 @@ class ModelTab:
         row = self.__create_decoder_components(row, self.train_config.model_type.is_wuerstchen_v2())
         row = self.__create_output_components(
             row,
-            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
+            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
+                              or self.train_config.model_type.is_stable_cascade(),
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=self.train_config.training_method != TrainingMethod.FINE_TUNE,
         )
