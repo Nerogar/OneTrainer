@@ -6,8 +6,8 @@ import torch
 from diffusers import DDPMWuerstchenScheduler
 from diffusers.pipelines.stable_cascade import StableCascadeUnet
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
-from safetensors.torch import load_file
 from safetensors import safe_open
+from safetensors.torch import load_file
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
@@ -59,6 +59,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
             model_type,
             weight_dtypes,
             prior_model_name,
+            "",  # pass an empty prior name, so it's always loaded from the backup
             effnet_encoder_model_name,
             decoder_model_name,
         )
