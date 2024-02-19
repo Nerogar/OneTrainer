@@ -148,14 +148,14 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     def __min_snr_weight(
             self,
             timesteps: Tensor,
-            gamma: int,
+            gamma: float,
             v_prediction: bool,
             device: torch.device
     ):
         all_snr = (self.__coefficients.sqrt_alphas_cumprod /
                    self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
         all_snr.to(device)
-        snr = torch.stack([all_snr[t] for t in timesteps])
+        snr = all_snr[timesteps]
         min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
         # Denominator of the snr_weight increased by 1 if v-prediction is being used.
         if v_prediction:
