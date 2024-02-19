@@ -427,6 +427,7 @@ class BasePixArtAlphaSetup(
                                 train_progress.global_step
                             )
 
+        model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(

@@ -156,7 +156,6 @@ class BaseStableDiffusionSetup(
                 timestep_high = int(config.align_prop_steps * config.max_noising_strength)
                 timestep_low = \
                     int(config.align_prop_steps * config.max_noising_strength * (1.0 - config.align_prop_truncate_steps))
-
                 truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
                 checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device)
@@ -277,6 +276,7 @@ class BaseStableDiffusionSetup(
                 if model.noise_scheduler.config.prediction_type == 'epsilon':
                     model_output_data = {
                         'loss_type': 'target',
+                        'timestep': timestep,
                         'predicted': predicted_latent_noise,
                         'target': latent_noise,
                     }
@@ -284,6 +284,7 @@ class BaseStableDiffusionSetup(
                     target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
                     model_output_data = {
                         'loss_type': 'target',
+                        'timestep': timestep,
                         'predicted': predicted_latent_noise,
                         'target': target_velocity,
                     }
@@ -392,6 +393,7 @@ class BaseStableDiffusionSetup(
                                 train_progress.global_step
                             )
 
+            model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
             return model_output_data
 
     def calculate_loss(

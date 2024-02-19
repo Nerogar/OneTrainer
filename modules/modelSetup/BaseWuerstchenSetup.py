@@ -129,6 +129,7 @@ class BaseWuerstchenSetup(
             model_output_data = {
                 'loss_type': 'target',
                 'predicted': predicted_latent_noise,
+                'prediction_type': model.prior_noise_scheduler.config.prediction_type,
                 'target': latent_noise,
                 'timestep': timestep,
             }
