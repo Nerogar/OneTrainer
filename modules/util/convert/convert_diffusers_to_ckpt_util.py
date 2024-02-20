@@ -14,13 +14,32 @@ def combine(left: str, right: str) -> str:
         return left + "." + right
 
 
-def map_wb(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
+def map_wb(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dict[str, Tensor]:
     out_states = {}
 
     out_states[combine(out_prefix, "weight")] = in_states[combine(in_prefix, "weight")]
     out_states[combine(out_prefix, "bias")] = in_states[combine(in_prefix, "bias")]
 
     return out_states
+
+
+def map_prefix(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dict[str, Tensor]:
+    out_states = {}
+
+    for key, tensor in in_states.items():
+        if key.startswith(in_prefix):
+            out_key = out_prefix + key.removeprefix(in_prefix)
+            out_states[out_key] = in_states[key]
+
+    return out_states
+
+
+def pop_prefix(in_states: dict[str, Tensor], in_prefix: str):
+    keys = list(in_states.keys())
+
+    for key in keys:
+        if key.startswith(in_prefix):
+            in_states.pop(key)
 
 
 def map_noise_scheduler(noise_scheduler: DDIMScheduler) -> dict:

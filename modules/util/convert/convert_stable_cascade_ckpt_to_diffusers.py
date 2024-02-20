@@ -3,46 +3,6 @@ import torch
 import modules.util.convert.convert_diffusers_to_ckpt_util as util
 
 
-def __map_transformer_attention_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
-    out_states = {}
-
-    attn_qkv_bias = torch.cat([
-        in_states[util.combine(in_prefix, "attn1.to_q.bias")],
-        in_states[util.combine(in_prefix, "attn1.to_k.bias")],
-        in_states[util.combine(in_prefix, "attn1.to_v.bias")],
-    ], 0)
-
-    attn_qkv_weight = torch.cat([
-        in_states[util.combine(in_prefix, "attn1.to_q.weight")],
-        in_states[util.combine(in_prefix, "attn1.to_k.weight")],
-        in_states[util.combine(in_prefix, "attn1.to_v.weight")],
-    ], 0)
-
-    cross_attn_kv_linear_bias = torch.cat([
-        in_states[util.combine(in_prefix, "attn2.to_k.bias")],
-        in_states[util.combine(in_prefix, "attn2.to_v.bias")],
-    ], 0)
-
-    cross_attn_kv_linear_weight = torch.cat([
-        in_states[util.combine(in_prefix, "attn2.to_k.weight")],
-        in_states[util.combine(in_prefix, "attn2.to_v.weight")],
-    ], 0)
-
-    out_states[util.combine(out_prefix, "attn.qkv.bias")] = attn_qkv_bias
-    out_states[util.combine(out_prefix, "attn.qkv.weight")] = attn_qkv_weight
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "attn.proj"), util.combine(in_prefix, "attn1.to_out.0"))
-
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "cross_attn.q_linear"), util.combine(in_prefix, "attn2.to_q"))
-    out_states[util.combine(out_prefix, "cross_attn.kv_linear.bias")] = cross_attn_kv_linear_bias
-    out_states[util.combine(out_prefix, "cross_attn.kv_linear.weight")] = cross_attn_kv_linear_weight
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "cross_attn.proj"), util.combine(in_prefix, "attn2.to_out.0"))
-
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "mlp.fc1"), util.combine(in_prefix, "ff.net.0.proj"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "mlp.fc2"), util.combine(in_prefix, "ff.net.2"))
-    out_states[util.combine(out_prefix, "scale_shift_table")] = in_states[util.combine(in_prefix, "scale_shift_table")]
-
-    return out_states
-
 def __map_unet_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 

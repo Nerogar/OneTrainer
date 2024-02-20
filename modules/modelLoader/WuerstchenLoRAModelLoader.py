@@ -14,6 +14,8 @@ from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModel
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
+from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import \
+    convert_stable_cascade_lora_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -62,6 +64,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         model.model_spec = self._load_default_model_spec(model.model_type, lora_name)
 
         state_dict = load_file(lora_name)
+        if model.model_type.is_stable_cascade():
+            state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(state_dict)
         self.__init_lora(model, state_dict)
 
     def __load_ckpt(
@@ -72,6 +76,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         model.model_spec = self._load_default_model_spec(model.model_type)
 
         state_dict = torch.load(lora_name)
+        if model.model_type.is_stable_cascade():
+            state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(state_dict)
         self.__init_lora(model, state_dict)
 
     def __load_internal(
