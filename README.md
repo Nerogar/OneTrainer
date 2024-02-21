@@ -6,7 +6,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
 ## Features
 
-- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, SDXL, Würstchen-v2, PixArt-Alpha and inpainting models
+- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha and inpainting
+  models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.
