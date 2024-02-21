@@ -88,6 +88,7 @@ class ModelTab:
         row = self.__create_base_components(
             row,
             has_prior=True,
+            allow_override_prior=self.train_config.model_type.is_stable_cascade(),
             has_text_encoder=True,
         )
         row = self.__create_effnet_encoder_components(row)
@@ -144,6 +145,7 @@ class ModelTab:
             row: int,
             has_unet: bool = False,
             has_prior: bool = False,
+            allow_override_prior: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
             has_text_encoder_2: bool = False,
@@ -164,13 +166,14 @@ class ModelTab:
             row += 1
 
         if has_prior:
-            # prior model
-            components.label(self.scroll_frame, row, 0, "Prior Model",
-                             tooltip="Filename, directory or Hugging Face repository of the prior model")
-            components.file_entry(
-                self.scroll_frame, row, 1, self.ui_state, "prior_model_name",
-                path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-            )
+            if allow_override_prior:
+                # prior model
+                components.label(self.scroll_frame, row, 0, "Prior Model",
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                components.file_entry(
+                    self.scroll_frame, row, 1, self.ui_state, "prior_model_name",
+                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                )
 
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
