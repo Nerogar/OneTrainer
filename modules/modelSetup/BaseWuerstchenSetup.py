@@ -185,7 +185,7 @@ class BaseWuerstchenSetup(
             model_output_data = {
                 'loss_type': 'target',
                 'predicted': predicted_latent_noise,
-                'prediction_type': model.prior_noise_scheduler.config.prediction_type,
+                'prediction_type': 'epsilon',  # the DDPMWuerstchenScheduler only supports eps prediction
                 'target': latent_noise,
                 'timestep': timestep,
             }
@@ -263,12 +263,16 @@ class BaseWuerstchenSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=None,
+            alphas_cumprod_fun=self.__alpha_cumprod,
         )
 
-        k = 1.0
-        gamma = 1.0
-        alpha_cumprod = self.__alpha_cumprod(data['timestep'], losses.dim())
-        p2_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
+        if config.min_snr_gamma:
+            # if min snr gamma is active, disable p2 scaling
+            return losses
+        else:
+            k = 1.0
+            gamma = 1.0
+            alpha_cumprod = self.__alpha_cumprod(data['timestep'], losses.dim())
+            p2_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
 
-        return (losses * p2_loss_weight).mean()
+            return (losses * p2_loss_weight).mean()
