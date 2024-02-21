@@ -33,7 +33,9 @@ class BaseWuerstchenSetup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            model.prior_prior.set_attn_processor(AttnProcessor())
+            for name, child_module in model.prior_prior.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
                 for name, child_module in model.prior_prior.named_modules():
