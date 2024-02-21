@@ -268,7 +268,7 @@ class BaseWuerstchenSetup(
 
         if config.min_snr_gamma:
             # if min snr gamma is active, disable p2 scaling
-            return losses
+            return losses.mean()
         else:
             k = 1.0
             gamma = 1.0
