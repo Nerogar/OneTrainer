@@ -53,6 +53,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         match model_type:
             case ModelType.WUERSTCHEN_2:
                 return "resources/sd_model_spec/wuerstchen_2.0-lora.json"
+            case ModelType.STABLE_CASCADE_1:
+                return "resources/sd_model_spec/stable_cascade_1.0-lora.json"
             case _:
                 return None
 
