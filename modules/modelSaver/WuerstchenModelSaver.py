@@ -75,15 +75,27 @@ class WuerstchenModelSaver(BaseModelSaver):
             dtype: torch.dtype,
     ):
         if model.model_type.is_stable_cascade():
-            state_dict = convert_stable_cascade_diffusers_to_ckpt(
+            os.makedirs(Path(destination).absolute(), exist_ok=True)
+
+            unet_state_dict = convert_stable_cascade_diffusers_to_ckpt(
                 model.prior_prior.state_dict(),
             )
-            save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-            self._convert_state_dict_to_contiguous(save_state_dict)
+            unet_save_state_dict = self._convert_state_dict_dtype(unet_state_dict, dtype)
+            self._convert_state_dict_to_contiguous(unet_save_state_dict)
+            save_file(
+                unet_save_state_dict,
+                os.path.join(destination, "stage_c.safetensors"),
+                self._create_safetensors_header(model, unet_save_state_dict)
+            )
 
-            os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-
-            save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
+            te_state_dict = model.prior_text_encoder.state_dict()
+            te_save_state_dict = self._convert_state_dict_dtype(te_state_dict, dtype)
+            self._convert_state_dict_to_contiguous(te_save_state_dict)
+            save_file(
+                te_save_state_dict,
+                os.path.join(destination, "text_encoder.safetensors"),
+                self._create_safetensors_header(model, te_save_state_dict)
+            )
         else:
             raise NotImplementedError
 

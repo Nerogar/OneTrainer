@@ -36,7 +36,7 @@
     },
     "output_dtype": "BFLOAT_16",
     "output_model_destination": "models/model",
-    "output_model_format": "DIFFUSERS",
+    "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "train_text_encoder_epochs": 30,
     "train_unet_epochs": 100000,
