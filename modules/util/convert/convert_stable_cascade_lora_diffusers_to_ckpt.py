@@ -10,7 +10,7 @@ def __map_unet_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
         out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_to_q", in_prefix + f"_{i}_attention_to_q")
         out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_to_k", in_prefix + f"_{i}_attention_to_k")
         out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_to_v", in_prefix + f"_{i}_attention_to_v")
-        out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_to_out_proj", in_prefix + f"_{i}_attention_to_out_0")
+        out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_out_proj", in_prefix + f"_{i}_attention_to_out_0")
         util.pop_prefix(in_states, in_prefix + f"_{i}_attention")
 
         i += 3
