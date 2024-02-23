@@ -65,12 +65,12 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
     ):
         if model.text_encoder_lora is None:
             model.text_encoder_lora = LoRAModuleWrapper(
-                model.text_encoder, config.lora_rank, "lora_te", config.lora_alpha, type=config.lora_type
+                model.text_encoder, config.lora_rank, "lora_te", config.lora_alpha
             )
 
         if model.unet_lora is None:
             model.unet_lora = LoRAModuleWrapper(
-                model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"], config.lora_type
+                model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"]
             )
 
         model.text_encoder.requires_grad_(False)
