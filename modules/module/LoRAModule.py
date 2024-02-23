@@ -183,17 +183,17 @@ class LoRAModuleWrapper:
         return lora_modules
 
     def requires_grad_(self, requires_grad: bool):
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.requires_grad_(requires_grad)
 
     def parameters(self) -> list[Parameter]:
         parameters = []
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             parameters += module.parameters()
         return parameters
 
     def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModuleWrapper':
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.to(device, dtype)
         return self
 
@@ -226,7 +226,7 @@ class LoRAModuleWrapper:
         """
         state_dict = {}
 
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             state_dict |= module.state_dict()
 
         return state_dict
@@ -235,28 +235,28 @@ class LoRAModuleWrapper:
         """
         Hooks the LoRA into the module without changing its weights
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.hook_to_module()
 
     def remove_hook_from_module(self):
         """
         Removes the LoRA hook from the module without changing its weights
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.remove_hook_from_module()
 
     def apply_to_module(self):
         """
         Applys the LoRA to the module, changing its weights
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.apply_to_module()
 
     def extract_from_module(self, base_module: nn.Module):
         """
         Creates a LoRA from the difference between the base_module and the orig_module
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.extract_from_module(base_module)
 
     def prune(self):
