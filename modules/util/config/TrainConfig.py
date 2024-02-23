@@ -182,6 +182,7 @@ class TrainConfig(BaseConfig):
     mae_strength: float
     vb_loss_strength: float
     min_snr_gamma: float
+    dropout_pct: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
 
@@ -420,6 +421,7 @@ class TrainConfig(BaseConfig):
         data.append(("mae_strength", 0.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("min_snr_gamma", 0, float, False))
+        data.append(("dropout_pct", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
 

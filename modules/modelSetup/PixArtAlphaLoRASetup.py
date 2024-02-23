@@ -65,12 +65,12 @@ class PixArtAlphaLoRASetup(BasePixArtAlphaSetup):
     ):
         if model.text_encoder_lora is None and config.train_text_encoder:
             model.text_encoder_lora = LoRAModuleWrapper(
-                model.text_encoder, config.lora_rank, "lora_te", config.lora_alpha
+                model.text_encoder, config.lora_rank, "lora_te", config.lora_alpha, config.dropout_pct
             )
 
         if model.transformer_lora is None and config.train_prior:
             model.transformer_lora = LoRAModuleWrapper(
-                model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, ["attn1", "attn2"]
+                model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, config.dropout_pct, ["attn1", "attn2"]
             )
 
         train_text_encoder = config.train_text_encoder and (model.train_progress.epoch < config.train_text_encoder_epochs)

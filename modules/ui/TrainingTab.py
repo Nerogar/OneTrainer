@@ -455,10 +455,15 @@ class TrainingTab:
                          tooltip="Minimum SNR gamma. Can help the model learn details more accurately. 0 disables, 20 maximum, ~5 is the usual setting")
         components.entry(frame, 3, 1, self.ui_state, "min_snr_gamma")
 
+        # Dropout Percentage
+        components.label(frame, 4, 0, "Dropout Percent",
+                         tooltip="Dropout percentage. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+        components.entry(frame, 4, 1, self.ui_state, "dropout_pct")
+
         # Loss Scaler
-        components.label(frame, 4, 0, "Loss Scaler",
+        components.label(frame, 5, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
-        components.options(frame, 4, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+        components.options(frame, 5, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)

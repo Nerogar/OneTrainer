@@ -3,7 +3,7 @@ from abc import ABCMeta
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Linear, Conv2d, Parameter
+from torch.nn import Dropout, Linear, Conv2d, Parameter
 
 
 class LoRAModule(metaclass=ABCMeta):
@@ -12,13 +12,18 @@ class LoRAModule(metaclass=ABCMeta):
     lora_down: nn.Module
     lora_up: nn.Module
     alpha: torch.Tensor
+    dropout: Dropout
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, dropout_pct: float = 0):
         super(LoRAModule, self).__init__()
+        if dropout_pct < 0 or dropout_pct > 1:
+            raise ValueError("Dropout must be between 0 and 1.")
+
         self.prefix = prefix.replace('.', '_')
         self.orig_module = orig_module
         self.rank = rank
         self.alpha = torch.tensor(alpha)
+        self.dropout = Dropout(dropout_pct)
         if orig_module is not None:
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
@@ -27,6 +32,10 @@ class LoRAModule(metaclass=ABCMeta):
         self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
 
     def forward(self, x, *args, **kwargs):
+        if self.orig_module.training:
+            ld = self.lora_up(self.dropout(self.lora_down(x)))
+            return self.orig_forward(x) + ld * (self.alpha / self.rank)
+
         return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
 
     def requires_grad_(self, requires_grad: bool):
@@ -50,6 +59,7 @@ class LoRAModule(metaclass=ABCMeta):
             "weight": state_dict.pop(self.prefix + ".lora_up.weight")
         }
         self.alpha = state_dict.pop(self.prefix + ".alpha")
+        self.dropout = Dropout(state_dict.pop(self.prefix + ".dropout_pct", 0))
 
         self.lora_down.load_state_dict(down_state_dict)
         self.lora_up.load_state_dict(up_state_dict)
@@ -59,6 +69,7 @@ class LoRAModule(metaclass=ABCMeta):
         state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
         state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
         state_dict[self.prefix + ".alpha"] = self.alpha
+        state_dict[self.prefix + ".dropout_pct"] = self.dropout.p
         return state_dict
 
     def hook_to_module(self):
@@ -81,8 +92,8 @@ class LoRAModule(metaclass=ABCMeta):
 
 
 class LinearLoRAModule(LoRAModule):
-    def __init__(self, prefix: str, orig_module: Linear, rank: int, alpha: float):
-        super(LinearLoRAModule, self).__init__(prefix, orig_module, rank, alpha)
+    def __init__(self, prefix: str, orig_module: Linear, rank: int, alpha: float, dropout_pct: float = 0):
+        super(LinearLoRAModule, self).__init__(prefix, orig_module, rank, alpha, dropout_pct)
 
         in_features = orig_module.in_features
         out_features = orig_module.out_features
@@ -95,8 +106,8 @@ class LinearLoRAModule(LoRAModule):
 
 
 class Conv2dLoRAModule(LoRAModule):
-    def __init__(self, prefix: str, orig_module: Conv2d, rank: int, alpha: float):
-        super(Conv2dLoRAModule, self).__init__(prefix, orig_module, rank, alpha)
+    def __init__(self, prefix: str, orig_module: Conv2d, rank: int, alpha: float, dropout_pct: float = 0):
+        super(Conv2dLoRAModule, self).__init__(prefix, orig_module, rank, alpha, dropout_pct)
         in_channels = orig_module.in_channels
         out_channels = orig_module.out_channels
 
@@ -109,7 +120,7 @@ class Conv2dLoRAModule(LoRAModule):
 
 class DummyLoRAModule(LoRAModule):
     def __init__(self, prefix: str):
-        super(DummyLoRAModule, self).__init__(prefix, None, 1, 1)
+        super(DummyLoRAModule, self).__init__(prefix, None, 1, 1, 0)
         self.lora_down = None
         self.lora_up = None
 
@@ -129,6 +140,7 @@ class DummyLoRAModule(LoRAModule):
             self.prefix + ".lora_down.weight": state_dict.pop(self.prefix + ".lora_down.weight"),
             self.prefix + ".lora_up.weight": state_dict.pop(self.prefix + ".lora_up.weight"),
             self.prefix + ".alpha": state_dict.pop(self.prefix + ".alpha"),
+            self.prefix + ".dropout_pct": state_dict.pop(self.prefix + ".dropout_pct"),
         }
 
     def state_dict(self) -> dict:
@@ -159,6 +171,7 @@ class LoRAModuleWrapper:
             rank: int,
             prefix: str,
             alpha: float = 1.0,
+            dropout_pct: float = 0.0,
             module_filter: list[str] = None,
     ):
         super(LoRAModuleWrapper, self).__init__()
@@ -167,18 +180,18 @@ class LoRAModuleWrapper:
         self.prefix = prefix
         self.module_filter = module_filter if module_filter is not None else []
 
-        self.modules = self.__create_modules(orig_module, alpha)
+        self.modules = self.__create_modules(orig_module, alpha, dropout_pct)
 
-    def __create_modules(self, orig_module: nn.Module | None, alpha: float) -> dict[str, LoRAModule]:
+    def __create_modules(self, orig_module: nn.Module | None, alpha: float, dropout_pct: float) -> dict[str, LoRAModule]:
         lora_modules = {}
 
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
                     if isinstance(child_module, Linear):
-                        lora_modules[name] = LinearLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
+                        lora_modules[name] = LinearLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha, dropout_pct)
                     elif isinstance(child_module, Conv2d):
-                        lora_modules[name] = Conv2dLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
+                        lora_modules[name] = Conv2dLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha, dropout_pct)
 
         return lora_modules
 
