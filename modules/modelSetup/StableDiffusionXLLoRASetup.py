@@ -75,17 +75,17 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
     ):
         if model.text_encoder_1_lora is None and config.train_text_encoder:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha
+                model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha, type=config.lora_type
             )
 
         if model.text_encoder_2_lora is None and config.train_text_encoder_2:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, config.lora_rank, "lora_te2", config.lora_alpha
+                model.text_encoder_2, config.lora_rank, "lora_te2", config.lora_alpha, type=config.lora_type
             )
 
         if model.unet_lora is None and config.train_unet:
             model.unet_lora = LoRAModuleWrapper(
-                model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"]
+                model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"], config.lora_type
             )
 
         model.text_encoder_1.requires_grad_(False)
