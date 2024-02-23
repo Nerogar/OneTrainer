@@ -1,4 +1,5 @@
 .idea
+/src
 /venv*
 /debug*
 /workspace*
