@@ -71,7 +71,7 @@ class LoRAModule(metaclass=ABCMeta):
         state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
         state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
         state_dict[self.prefix + ".alpha"] = self.alpha
-        state_dict[self.prefix + ".dropout"] = torch.tensor(self.dropout.d)
+        state_dict[self.prefix + ".dropout"] = torch.tensor(self.dropout.p)
         return state_dict
 
     def hook_to_module(self):
