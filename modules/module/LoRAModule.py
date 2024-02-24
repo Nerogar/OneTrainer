@@ -59,7 +59,9 @@ class LoRAModule(metaclass=ABCMeta):
             "weight": state_dict.pop(self.prefix + ".lora_up.weight")
         }
         self.alpha = state_dict.pop(self.prefix + ".alpha")
-        self.dropout = Dropout(state_dict.pop(self.prefix + ".dropout_pct", 0))
+        dropout_pct = state_dict.pop(self.prefix + ".dropout",
+                                     torch.tensor(0.0)).item()
+        self.dropout = Dropout(dropout_pct)
 
         self.lora_down.load_state_dict(down_state_dict)
         self.lora_up.load_state_dict(up_state_dict)
@@ -69,7 +71,7 @@ class LoRAModule(metaclass=ABCMeta):
         state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
         state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
         state_dict[self.prefix + ".alpha"] = self.alpha
-        state_dict[self.prefix + ".dropout_pct"] = self.dropout.p
+        state_dict[self.prefix + ".dropout"] = torch.tensor(self.dropout.d)
         return state_dict
 
     def hook_to_module(self):
