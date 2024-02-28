@@ -73,12 +73,11 @@ class BasePixArtAlphaSetup(
                 model.text_encoder.encoder.gradient_checkpointing_enable()
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtype,
-            config.prior.weight_dtype,
-            config.text_encoder.weight_dtype,
-            config.vae.weight_dtype,
-            config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
-            config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
+            config.weight_dtypes().prior,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
         model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(
@@ -86,9 +85,9 @@ class BasePixArtAlphaSetup(
             config.train_dtype,
             config.fallback_train_dtype,
             [
-                config.text_encoder.weight_dtype,
-                config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
-                config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
+                config.weight_dtypes().text_encoder,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
             ],
         )
 

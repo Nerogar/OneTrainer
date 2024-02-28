@@ -174,7 +174,7 @@ class ModelTab:
                 components.label(self.scroll_frame, row, 0, "Prior Model",
                                  tooltip="Filename, directory or Hugging Face repository of the prior model")
                 components.file_entry(
-                    self.scroll_frame, row, 1, self.ui_state, "prior_model_name",
+                    self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
                 )
 

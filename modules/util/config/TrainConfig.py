@@ -373,6 +373,8 @@ class TrainConfig(BaseConfig):
 
             elif key == "train_prior":
                 migrated_data["prior"]["train"] = value
+            elif key == "prior_model_name":
+                migrated_data["prior"]["model_name"] = value
             elif key == "train_prior_epochs":
                 migrated_data["prior"]["stop_training_after"] = value
                 migrated_data["prior"]["stop_training_after_unit"] = TimeUnit.EPOCH

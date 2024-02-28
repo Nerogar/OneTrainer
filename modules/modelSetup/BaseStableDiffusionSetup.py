@@ -68,12 +68,11 @@ class BaseStableDiffusionSetup(
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder, self.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtype,
-            config.text_encoder.weight_dtype,
-            config.unet.weight_dtype,
-            config.vae.weight_dtype,
-            config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
-            config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().unet,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
     def __encode_text(

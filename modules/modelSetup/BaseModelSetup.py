@@ -122,7 +122,7 @@ class BaseModelSetup(
             config: TrainConfig,
             train_progress: TrainProgress,
     ):
-        self.single_action_elapsed(
+        return self.single_action_elapsed(
             "stop_unet_training",
             config.text_encoder.stop_training_after,
             config.text_encoder.stop_training_after_unit,
@@ -134,7 +134,7 @@ class BaseModelSetup(
             config: TrainConfig,
             train_progress: TrainProgress,
     ):
-        self.single_action_elapsed(
+        return self.single_action_elapsed(
             "stop_prior_training",
             config.text_encoder.stop_training_after,
             config.text_encoder.stop_training_after_unit,
@@ -146,7 +146,7 @@ class BaseModelSetup(
             config: TrainConfig,
             train_progress: TrainProgress,
     ):
-        self.single_action_elapsed(
+        return self.single_action_elapsed(
             "stop_text_encoder_training",
             config.text_encoder.stop_training_after,
             config.text_encoder.stop_training_after_unit,
@@ -158,7 +158,7 @@ class BaseModelSetup(
             config: TrainConfig,
             train_progress: TrainProgress,
     ):
-        self.single_action_elapsed(
+        return self.single_action_elapsed(
             "stop_text_encoder_2_training",
             config.text_encoder.stop_training_after,
             config.text_encoder.stop_training_after_unit,
