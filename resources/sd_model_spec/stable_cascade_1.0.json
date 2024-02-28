@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "stable-cascade-v1-prior",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "Stable Cascade 1.0"
+}

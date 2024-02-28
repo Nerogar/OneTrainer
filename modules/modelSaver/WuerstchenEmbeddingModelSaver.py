@@ -33,7 +33,7 @@ class WuerstchenEmbeddingModelSaver(
 
         torch.save(
             {
-                "prior": prior_text_encoder_vector_cpu,
+                "clip_g": prior_text_encoder_vector_cpu,
             },
             destination
         )
@@ -54,7 +54,7 @@ class WuerstchenEmbeddingModelSaver(
 
         save_file(
             {
-                "prior": prior_text_encoder_vector_cpu,
+                "clip_g": prior_text_encoder_vector_cpu,
             },
             destination
         )

@@ -35,9 +35,12 @@ class BaseConfig:
                 data[name] = value.to_dict()
             elif self.types[name] == list or get_origin(self.types[name]) == list:
                 if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
-                    list_data = []
-                    for list_entry in value:
-                        list_data.append(list_entry.to_dict())
+                    if value is not None:
+                        list_data = []
+                        for list_entry in value:
+                            list_data.append(list_entry.to_dict())
+                    else:
+                        list_data = None
                     data[name] = list_data
                 else:
                     data[name] = value
@@ -81,15 +84,18 @@ class BaseConfig:
                 elif self.types[name] == list or get_origin(self.types[name]) == list:
                     if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
                         list_type = get_args(self.types[name])[0]
-                        old_value = getattr(self, name) if hasattr(self, name) else []
-                        value = []
-                        for i in range(max(len(old_value), len(data[name]))):
-                            if i < len(old_value) and i < len(data[name]):
-                                value.append(old_value[i].from_dict(data[name][i]))
-                            elif i < len(old_value):
-                                value.append(old_value[i])
-                            else:
-                                value.append(list_type.default_values().from_dict(data[name][i]))
+                        if data[name] is not None:
+                            old_value = getattr(self, name) if hasattr(self, name) else []
+                            value = []
+                            for i in range(max(len(old_value), len(data[name]))):
+                                if i < len(old_value) and i < len(data[name]):
+                                    value.append(old_value[i].from_dict(data[name][i]))
+                                elif i < len(old_value):
+                                    value.append(old_value[i])
+                                else:
+                                    value.append(list_type.default_values().from_dict(data[name][i]))
+                        else:
+                            value = None
                         setattr(self, name, value)
                     else:
                         setattr(self, name, data[name])

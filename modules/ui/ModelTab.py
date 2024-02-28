@@ -91,13 +91,15 @@ class ModelTab:
         row = self.__create_base_components(
             row,
             has_prior=True,
+            allow_override_prior=self.train_config.model_type.is_stable_cascade(),
             has_text_encoder=True,
         )
         row = self.__create_effnet_encoder_components(row)
-        row = self.__create_decoder_components(row)
+        row = self.__create_decoder_components(row, self.train_config.model_type.is_wuerstchen_v2())
         row = self.__create_output_components(
             row,
-            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
+            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
+                              or self.train_config.model_type.is_stable_cascade(),
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=self.train_config.training_method != TrainingMethod.FINE_TUNE,
         )
@@ -119,6 +121,14 @@ class ModelTab:
         )
 
     def __create_base_dtype_components(self, row: int) -> int:
+        # base model
+        components.label(self.scroll_frame, row, 0, "Base Model",
+                         tooltip="Filename, directory or Hugging Face repository of the base model")
+        components.file_entry(
+            self.scroll_frame, row, 1, self.ui_state, "base_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
         # weight dtype
         components.label(self.scroll_frame, row, 3, "Weight Data Type",
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
@@ -138,19 +148,12 @@ class ModelTab:
             row: int,
             has_unet: bool = False,
             has_prior: bool = False,
+            allow_override_prior: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
             has_text_encoder_2: bool = False,
             has_vae: bool = False,
     ) -> int:
-        # base model
-        components.label(self.scroll_frame, row, 0, "Base Model",
-                         tooltip="Filename, directory or Hugging Face repository of the base model")
-        components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "base_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
         if has_unet:
             # unet weight dtype
             components.label(self.scroll_frame, row, 3, "Override UNet Data Type",
@@ -166,6 +169,15 @@ class ModelTab:
             row += 1
 
         if has_prior:
+            if allow_override_prior:
+                # prior model
+                components.label(self.scroll_frame, row, 0, "Prior Model",
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                components.file_entry(
+                    self.scroll_frame, row, 1, self.ui_state, "prior_model_name",
+                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                )
+
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")
@@ -269,7 +281,11 @@ class ModelTab:
 
         return row
 
-    def __create_decoder_components(self, row: int) -> int:
+    def __create_decoder_components(
+            self,
+            row: int,
+            has_text_encoder: bool,
+    ) -> int:
         # decoder model
         components.label(self.scroll_frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
@@ -291,18 +307,19 @@ class ModelTab:
 
         row += 1
 
-        # decoder text encoder weight dtype
-        components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
-                         tooltip="Overrides the decoder text encoder weight data type")
-        components.options_kv(self.scroll_frame, row, 4, [
-            ("", DataType.NONE),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-            ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_text_encoder.weight_dtype")
+        if has_text_encoder:
+            # decoder text encoder weight dtype
+            components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
+                             tooltip="Overrides the decoder text encoder weight data type")
+            components.options_kv(self.scroll_frame, row, 4, [
+                ("", DataType.NONE),
+                ("float32", DataType.FLOAT_32),
+                ("bfloat16", DataType.BFLOAT_16),
+                ("float16", DataType.FLOAT_16),
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "decoder_text_encoder.weight_dtype")
 
-        row += 1
+            row += 1
 
         # decoder vqgan weight dtype
         components.label(self.scroll_frame, row, 3, "Override Decoder VQGAN Data Type",

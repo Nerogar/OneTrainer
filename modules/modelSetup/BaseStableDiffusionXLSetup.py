@@ -60,9 +60,9 @@ class BaseStableDiffusionXLSetup(
 
         if config.gradient_checkpointing:
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_transformer_blocks(model.unet)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
+            enable_checkpointing_for_transformer_blocks(model.unet, self.train_device)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtype,
@@ -349,6 +349,7 @@ class BaseStableDiffusionXLSetup(
                 if model.noise_scheduler.config.prediction_type == 'epsilon':
                     model_output_data = {
                         'loss_type': 'target',
+                        'timestep': timestep,
                         'predicted': predicted_latent_noise,
                         'target': latent_noise,
                     }
@@ -356,6 +357,7 @@ class BaseStableDiffusionXLSetup(
                     target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
                     model_output_data = {
                         'loss_type': 'target',
+                        'timestep': timestep,
                         'predicted': predicted_latent_noise,
                         'target': target_velocity,
                     }
@@ -443,6 +445,7 @@ class BaseStableDiffusionXLSetup(
                             True
                         )
 
+        model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(

@@ -18,7 +18,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             train_progress: TrainProgress,
     ):
         if config.concepts is not None:
-            concepts = config.concepts
+            concepts = [concept.to_dict() for concept in config.concepts]
         else:
             with open(config.concept_file_name, 'r') as f:
                 concepts = json.load(f)

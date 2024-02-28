@@ -4,10 +4,12 @@ import os.path
 from pathlib import Path
 
 import torch
+from safetensors.torch import save_file
 
 from modules.model.BaseModel import BaseModel
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.util.convert.convert_stable_cascade_diffusers_to_ckpt import convert_stable_cascade_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
@@ -66,6 +68,37 @@ class WuerstchenModelSaver(BaseModelSaver):
         with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
             json.dump(self._create_safetensors_header(model), model_spec_file)
 
+    def __save_safetensors(
+            self,
+            model: WuerstchenModel,
+            destination: str,
+            dtype: torch.dtype,
+    ):
+        if model.model_type.is_stable_cascade():
+            os.makedirs(Path(destination).absolute(), exist_ok=True)
+
+            unet_state_dict = convert_stable_cascade_diffusers_to_ckpt(
+                model.prior_prior.state_dict(),
+            )
+            unet_save_state_dict = self._convert_state_dict_dtype(unet_state_dict, dtype)
+            self._convert_state_dict_to_contiguous(unet_save_state_dict)
+            save_file(
+                unet_save_state_dict,
+                os.path.join(destination, "stage_c.safetensors"),
+                self._create_safetensors_header(model, unet_save_state_dict)
+            )
+
+            te_state_dict = model.prior_text_encoder.state_dict()
+            te_save_state_dict = self._convert_state_dict_dtype(te_state_dict, dtype)
+            self._convert_state_dict_to_contiguous(te_save_state_dict)
+            save_file(
+                te_save_state_dict,
+                os.path.join(destination, "text_encoder.safetensors"),
+                self._create_safetensors_header(model, te_save_state_dict)
+            )
+        else:
+            raise NotImplementedError
+
     def save(
             self,
             model: BaseModel,
@@ -80,6 +113,6 @@ class WuerstchenModelSaver(BaseModelSaver):
             case ModelFormat.CKPT:
                 raise NotImplementedError
             case ModelFormat.SAFETENSORS:
-                raise NotImplementedError
+                self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)

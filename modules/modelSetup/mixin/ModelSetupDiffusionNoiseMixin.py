@@ -98,7 +98,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
                     size=(batch_size,),
                     generator=generator,
                     device=generator.device,
-                )) * (config.max_noising_strength - config.min_noising_strength) + config.max_noising_strength
+                )) * (config.max_noising_strength - config.min_noising_strength) + config.min_noising_strength
             else:
                 rng = np.random.default_rng(global_step)
                 choices = np.linspace(np.finfo(float).eps, 1, 5000)  # Discretize range (0, 1]

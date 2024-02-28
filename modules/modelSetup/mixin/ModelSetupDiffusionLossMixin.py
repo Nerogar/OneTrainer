@@ -1,4 +1,5 @@
 from abc import ABCMeta
+from typing import Callable
 
 import torch
 import torch.nn.functional as F
@@ -15,10 +16,14 @@ from modules.util.loss.vb_loss import vb_losses
 
 
 class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
+    __coefficients: DiffusionScheduleCoefficients | None
+    __alphas_cumprod_fun: Callable[[Tensor, int], Tensor] | None
+
     def __init__(self):
         super(ModelSetupDiffusionLossMixin, self).__init__()
         self.__align_prop_loss_fn = None
         self.__coefficients = None
+        self.__alphas_cumprod_fun = None
 
     def __align_prop_losses(
             self,
@@ -145,13 +150,36 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         return losses
 
+    def __min_snr_weight(
+            self,
+            timesteps: Tensor,
+            gamma: float,
+            v_prediction: bool,
+            device: torch.device
+    ):
+        if self.__coefficients:
+            all_snr = (self.__coefficients.sqrt_alphas_cumprod /
+                       self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
+            all_snr.to(device)
+            snr = all_snr[timesteps]
+        else:
+            alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
+            snr = ((alphas_cumprod ** 0.5) / (1.0 - alphas_cumprod) ** 0.5) ** 2
+        min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
+        # Denominator of the snr_weight increased by 1 if v-prediction is being used.
+        if v_prediction:
+            snr += 1
+        snr_weight = torch.div(min_snr_gamma, snr).float().to(device)
+        return snr_weight
+
     def _diffusion_losses(
             self,
             batch: dict,
             data: dict,
             config: TrainConfig,
             train_device: torch.device,
-            betas: Tensor | None,
+            betas: Tensor | None = None,
+            alphas_cumprod_fun: Callable[[Tensor, int], Tensor] | None = None,
     ) -> Tensor:
         loss_weight = batch['loss_weight']
         batch_size_scale = \
@@ -163,6 +191,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         if self.__coefficients is None and betas is not None:
             self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
+
+        self.__alphas_cumprod_fun = alphas_cumprod_fun
 
         if data['loss_type'] == 'align_prop':
             losses = self.__align_prop_losses(batch, data, config, train_device)
@@ -178,4 +208,11 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses = losses * batch_size_scale * gradient_accumulation_steps_scale
 
         losses *= loss_weight.to(device=losses.device)
+
+        # Apply minimum SNR weighting.
+        if config.min_snr_gamma and 'timestep' in data and not data['loss_type'] == 'align_prop':
+            v_pred = data.get('prediction_type', '') == 'v_prediction'
+            snr_weight = self.__min_snr_weight(data['timestep'], config.min_snr_gamma, v_pred, losses.device)
+            losses *= snr_weight
+
         return losses
