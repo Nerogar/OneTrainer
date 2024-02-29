@@ -69,6 +69,7 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
+from modules.util.optimizer.adafactor_stochastic_rounding import step_adafactor
 
 
 def create_model_loader(
@@ -624,6 +625,9 @@ def create_optimizer(
                 relative_step=optimizer_config.relative_step if optimizer_config.relative_step is not None else True,
                 warmup_init=optimizer_config.warmup_init if optimizer_config.warmup_init is not None else False,
             )
+
+            # TODO: this is a hack
+            optimizer.step = step_adafactor.__get__(optimizer, Adafactor)
 
     if state_dict is not None:
         for i, params in enumerate(parameters):
