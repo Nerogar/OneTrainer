@@ -6,7 +6,5 @@
     "resolution": "1024",
     "text_encoder_weight_dtype": "BFLOAT_16",
     "train_text_encoder": false,
-    "train_text_encoder_epochs": 30,
-    "train_unet_epochs": 100000,
     "training_method": "FINE_TUNE"
 }

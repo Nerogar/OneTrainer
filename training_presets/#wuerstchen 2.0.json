@@ -38,7 +38,5 @@
     "output_model_destination": "models/model",
     "output_model_format": "DIFFUSERS",
     "resolution": "1024",
-    "train_text_encoder_epochs": 30,
-    "train_unet_epochs": 100000,
     "training_method": "FINE_TUNE"
 }

@@ -9,8 +9,6 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "sample_after": 1,
-    "train_text_encoder_epochs": 30,
-    "train_unet_epochs": 100000,
     "training_method": "EMBEDDING",
     "vae_weight_dtype": "FLOAT_32",
     "weight_dtype": "FLOAT_16"

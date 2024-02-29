@@ -5,9 +5,7 @@
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
-    "train_text_encoder_epochs": 30,
     "train_unet": true,
-    "train_unet_epochs": 100000,
     "training_method": "FINE_TUNE",
     "vae_weight_dtype": "FLOAT_32"
 }

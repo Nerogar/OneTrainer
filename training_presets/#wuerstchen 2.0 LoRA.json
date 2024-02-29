@@ -8,8 +8,6 @@
     "output_model_destination": "models/lora.safetensors",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
-    "train_text_encoder_epochs": 30,
-    "train_unet_epochs": 100000,
     "training_method": "LORA",
     "weight_dtype": "FLOAT_16"
 }

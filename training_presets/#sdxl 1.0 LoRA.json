@@ -9,8 +9,6 @@
     "resolution": "1024",
     "train_text_encoder": false,
     "train_text_encoder_2": false,
-    "train_text_encoder_epochs": 30,
-    "train_unet_epochs": 100000,
     "training_method": "LORA",
     "vae_weight_dtype": "FLOAT_32",
     "weight_dtype": "FLOAT_16"
