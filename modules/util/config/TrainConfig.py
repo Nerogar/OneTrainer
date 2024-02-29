@@ -574,7 +574,7 @@ class TrainConfig(BaseConfig):
         # unet
         unet = TrainModelPartConfig.default_values()
         unet.train = True
-        unet.stop_training_after = 10000
+        unet.stop_training_after = 0
         unet.learning_rate = None
         unet.weight_dtype = DataType.NONE
         data.append(("unet", unet, TrainModelPartConfig, False))
@@ -583,7 +583,7 @@ class TrainConfig(BaseConfig):
         prior = TrainModelPartConfig.default_values()
         prior.model_name = ""
         prior.train = True
-        prior.stop_training_after = 10000
+        prior.stop_training_after = 0
         prior.learning_rate = None
         prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
@@ -592,6 +592,7 @@ class TrainConfig(BaseConfig):
         text_encoder = TrainModelPartConfig.default_values()
         text_encoder.train = True
         text_encoder.stop_training_after = 30
+        text_encoder.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder.learning_rate = None
         text_encoder.weight_dtype = DataType.NONE
         data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
@@ -601,6 +602,7 @@ class TrainConfig(BaseConfig):
         text_encoder_2 = TrainModelPartConfig.default_values()
         text_encoder_2.train = True
         text_encoder_2.stop_training_after = 30
+        text_encoder_2.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_2.learning_rate = None
         text_encoder_2.weight_dtype = DataType.NONE
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
