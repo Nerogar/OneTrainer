@@ -270,8 +270,8 @@ class TrainingTab:
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
         # train text encoder epochs
-        components.label(frame, 1, 0, "Train Text Encoder Epochs",
-                         tooltip="Number of epochs to train the text encoder")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder")
         components.time_entry(frame, 1, 1, self.ui_state, "text_encoder.stop_training_after",
                               "text_encoder.stop_training_after_unit", supports_time_units=False)
 
@@ -296,8 +296,8 @@ class TrainingTab:
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
         # train text encoder epochs
-        components.label(frame, 1, 0, "Train Text Encoder 1 Epochs",
-                         tooltip="Number of epochs to train the text encoder 1")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder 1")
         components.time_entry(frame, 1, 1, self.ui_state, "text_encoder.stop_training_after",
                               "text_encoder.stop_training_after_unit", supports_time_units=False)
 
@@ -322,8 +322,8 @@ class TrainingTab:
         components.switch(frame, 0, 1, self.ui_state, "text_encoder_2.train")
 
         # train text encoder epochs
-        components.label(frame, 1, 0, "Train Text Encoder 2 Epochs",
-                         tooltip="Number of epochs to train the text encoder 1")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder 1")
         components.time_entry(frame, 1, 1, self.ui_state, "text_encoder_2.stop_training_after",
                               "text_encoder_2.stop_training_after_unit", supports_time_units=False)
 
@@ -348,8 +348,8 @@ class TrainingTab:
         components.switch(frame, 0, 1, self.ui_state, "unet.train")
 
         # train unet epochs
-        components.label(frame, 1, 0, "Train UNet Epochs",
-                         tooltip="Number of epochs to train the UNet")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the UNet")
         components.time_entry(frame, 1, 1, self.ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
                               supports_time_units=False)
 
@@ -375,7 +375,7 @@ class TrainingTab:
 
         # train prior epochs
         components.label(frame, 1, 0, "Stop Training After",
-                         tooltip="Number of epochs to train the Prior")
+                         tooltip="When to stop training the Prior")
         components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
                               supports_time_units=False)
 
