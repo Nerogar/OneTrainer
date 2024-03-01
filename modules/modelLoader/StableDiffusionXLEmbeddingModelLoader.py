@@ -131,7 +131,7 @@ class StableDiffusionXLEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpe
         else:
             model = StableDiffusionXLModel(model_type=model_type)
 
-        if model_names.embedding:
+        if any(model_names.embedding):
             try:
                 self.__load_internal(model, model_names.embedding)
                 return model

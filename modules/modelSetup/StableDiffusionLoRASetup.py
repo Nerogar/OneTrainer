@@ -83,7 +83,7 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             model.text_encoder_lora.requires_grad_(train_text_encoder)
 
         if model.unet_lora is not None:
-            train_unet = config.unet.stop_training_after and \
+            train_unet = config.unet.train and \
                                  not self.stop_unet_training_elapsed(config, model.train_progress)
             model.unet_lora.requires_grad_(train_unet)
 
