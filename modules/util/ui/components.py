@@ -182,7 +182,22 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name), width=50)
     entry_component.grid(row=0, column=0, padx=PAD, pady=PAD, sticky="new")
-    entry_component.configure()
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            if self._textvariable_callback_name:
+                self._textvariable.trace_remove("write", self._textvariable_callback_name)
+                self._textvariable_callback_name = ""
+
+            orig_destroy()
+
+        return destroy
+
+    destroy = create_destroy(entry_component)
+    entry_component.destroy = lambda: destroy(entry_component)
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
