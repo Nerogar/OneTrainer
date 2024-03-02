@@ -2,24 +2,24 @@ import math
 import torch
 from torch import Tensor
 
-mask_tensor = None
-
 def copy_stochastic_(target: Tensor, source: Tensor):
-    global mask_tensor
-    if mask_tensor is None:
-        mask_tensor = torch.tensor([-65536], dtype=torch.int32, device=target.device)  # -65536 = FFFF0000 as a signed int32
-
-    result_fp32 = source.to(dtype=torch.float32)
-    result_int32 = result_fp32.view(dtype=torch.int32)
-    result_int32.add_(torch.randint_like(
-        result_int32,
+    # create a random 16 bit integer
+    result = torch.randint_like(
+        source,
         dtype=torch.int32,
         low=0,
-        high=(1 << 16)
-    ))
-    result_int32_truncated = result_int32.bitwise_and(mask_tensor)
-    result_float32_truncated = result_int32_truncated.view(dtype=torch.float32)
-    target.copy_(result_float32_truncated.to(dtype=torch.bfloat16))
+        high=(1 << 16),
+    )
+
+    # add the random number to the lower 16 bit of the mantissa
+    result.add_(source.view(dtype=torch.int32))
+
+    # mask off the lower 16 bit of the mantissa
+    result.bitwise_and_(-65536)  # -65536 = FFFF0000 as a signed int32
+
+    # copy the higher 16 bit into the target tensor
+    target.copy_(result.view(dtype=torch.float32))
+
 
 @torch.no_grad()
 def step_adafactor(self, closure=None):
