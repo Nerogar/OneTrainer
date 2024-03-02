@@ -1,11 +1,19 @@
 {
     "base_model_name": "warp-ai/wuerstchen-prior",
-    "decoder_model_name": "warp-ai/wuerstchen",
-    "decoder_text_encoder_weight_dtype": "FLOAT_16",
-    "decoder_vqgan_weight_dtype": "FLOAT_16",
-    "decoder_weight_dtype": "FLOAT_16",
-    "effnet_encoder_model_name": "warp-ai/EfficientNetEncoder",
-    "effnet_encoder_weight_dtype": "FLOAT_16",
+    "decoder": {
+        "weight_dtype": "FLOAT_16",
+        "model_name": "warp-ai/wuerstchen"
+    },
+    "decoder_text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "decoder_vqgan": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "effnet_encoder": {
+        "model_name": "warp-ai/EfficientNetEncoder",
+        "weight_dtype": "FLOAT_16"
+    },
     "model_type": "WUERSTCHEN_2",
     "optimizer": {
         "__version": 0,

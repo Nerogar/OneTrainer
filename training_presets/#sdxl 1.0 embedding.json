@@ -10,6 +10,8 @@
     "resolution": "1024",
     "sample_after": 1,
     "training_method": "EMBEDDING",
-    "vae_weight_dtype": "FLOAT_32",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
     "weight_dtype": "FLOAT_16"
 }

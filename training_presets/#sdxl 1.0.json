@@ -4,9 +4,15 @@
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
-    "train_text_encoder": false,
-    "train_text_encoder_2": false,
+    "text_encoder": {
+        "train": false
+    },
+    "text_encoder_2": {
+        "train": false
+    },
     "training_method": "FINE_TUNE",
-    "vae_weight_dtype": "FLOAT_32",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
     "weight_dtype": "BFLOAT_16"
 }

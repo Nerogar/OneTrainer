@@ -8,6 +8,8 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "training_method": "LORA",
-    "vae_weight_dtype": "FLOAT_32",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
     "weight_dtype": "FLOAT_16"
 }
