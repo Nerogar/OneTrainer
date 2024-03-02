@@ -456,9 +456,9 @@ class TrainingTab:
         components.entry(frame, 3, 1, self.ui_state, "min_snr_gamma")
 
         # Dropout Percentage
-        components.label(frame, 4, 0, "Dropout Percent",
-                         tooltip="Dropout percentage. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(frame, 4, 1, self.ui_state, "dropout_pct")
+        components.label(frame, 4, 0, "Dropout Probability",
+                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+        components.entry(frame, 4, 1, self.ui_state, "dropout_probability")
 
         # Loss Scaler
         components.label(frame, 5, 0, "Loss Scaler",
