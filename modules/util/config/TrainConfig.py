@@ -63,6 +63,7 @@ class TrainOptimizerConfig(BaseConfig):
     relative_step: bool
     safeguard_warmup: bool
     scale_parameter: bool
+    stochastic_rounding: bool
     use_bias_correction: bool
     use_triton: bool
     warmup_init: bool
@@ -115,6 +116,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("relative_step", False, bool, False))
         data.append(("safeguard_warmup", False, bool, False))
         data.append(("scale_parameter", False, bool, False))
+        data.append(("stochastic_rounding", True, bool, False))
         data.append(("use_bias_correction", False, bool, False))
         data.append(("use_triton", False, bool, False))
         data.append(("warmup_init", False, bool, False))
