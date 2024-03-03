@@ -72,7 +72,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
 
         if model.prior_prior_lora is None and config.prior.train:
             model.prior_prior_lora = LoRAModuleWrapper(
-                model.prior_prior, config.lora_rank, "lora_prior_prior", config.lora_alpha, ["attention"]
+                model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, ["attention"]
             )
 
         if model.prior_text_encoder_lora:
