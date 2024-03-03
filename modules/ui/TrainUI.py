@@ -318,10 +318,15 @@ class TrainUI(ctk.CTk):
                          tooltip="The alpha parameter used when creating a new LoRA")
         components.entry(master, 2, 1, self.ui_state, "lora_alpha")
 
+        # Dropout Percentage
+        components.label(master, 3, 0, "Dropout Probability",
+                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+        components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+
         # lora weight dtype
-        components.label(master, 3, 0, "LoRA Weight Data Type",
+        components.label(master, 5, 0, "LoRA Weight Data Type",
                          tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 3, 1, [
+        components.options_kv(master, 5, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "lora_weight_dtype")
