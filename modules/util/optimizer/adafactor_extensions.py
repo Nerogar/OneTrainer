@@ -1,3 +1,9 @@
+#
+# Copied and modified from the original Adafactor implementation in transformers (https://github.com/huggingface/transformers)
+#
+# Implements stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192)
+#
+
 import math
 
 import torch

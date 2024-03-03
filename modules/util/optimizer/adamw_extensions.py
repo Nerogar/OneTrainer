@@ -1,3 +1,9 @@
+#
+# Copied and modified from the original AdamW implementation in PyTorchm (https://github.com/pytorch/pytorch/)
+#
+# Implements stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192)
+#
+
 import math
 from typing import List, Optional, Union
 
