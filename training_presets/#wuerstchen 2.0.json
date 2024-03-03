@@ -25,6 +25,7 @@
         "eps2": 0.001,
         "relative_step": false,
         "scale_parameter": false,
+        "stochastic_rounding": true,
         "warmup_init": false,
         "weight_decay": 0.0
     },
@@ -39,6 +40,7 @@
             "eps2": 0.001,
             "relative_step": false,
             "scale_parameter": false,
+            "stochastic_rounding": true,
             "warmup_init": false,
             "weight_decay": 0.0
         }
