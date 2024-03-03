@@ -9,6 +9,7 @@ from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTFor
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import \
     rescale_noise_scheduler_to_zero_terminal_snr
 from modules.util.enum.DataType import DataType
@@ -73,6 +74,7 @@ class StableDiffusionModel(BaseModel):
             unet_lora: LoRAModuleWrapper | None = None,
             sd_config: dict | None = None,
             model_spec: ModelSpec | None = None,
+            train_config: TrainConfig | None = None,
     ):
         super(StableDiffusionModel, self).__init__(
             model_type=model_type,
@@ -80,6 +82,7 @@ class StableDiffusionModel(BaseModel):
             ema_state_dict=ema_state_dict,
             train_progress=train_progress,
             model_spec=model_spec,
+            train_config=train_config,
         )
 
         self.tokenizer = tokenizer

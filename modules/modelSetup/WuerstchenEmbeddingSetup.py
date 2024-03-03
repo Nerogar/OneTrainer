@@ -71,8 +71,8 @@ class WuerstchenEmbeddingSetup(
             vector = self._create_new_embedding(
                 model.prior_tokenizer,
                 model.prior_text_encoder,
-                config.initial_embedding_text,
-                config.token_count,
+                config.embeddings[0].initial_embedding_text,
+                config.embeddings[0].token_count,
             )
 
             model.embeddings = [WuerstchenModelEmbedding(vector, 'embedding')]

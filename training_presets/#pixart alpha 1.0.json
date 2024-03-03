@@ -4,9 +4,9 @@
     "output_model_destination": "models/model",
     "output_model_format": "DIFFUSERS",
     "resolution": "1024",
-    "text_encoder_weight_dtype": "BFLOAT_16",
-    "train_text_encoder": false,
-    "train_text_encoder_epochs": 30,
-    "train_unet_epochs": 100000,
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "BFLOAT_16"
+    },
     "training_method": "FINE_TUNE"
 }

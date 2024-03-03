@@ -85,15 +85,15 @@ class StableDiffusionXLEmbeddingSetup(
             vector_1 = self._create_new_embedding(
                 model.tokenizer_1,
                 model.text_encoder_1,
-                config.initial_embedding_text,
-                config.token_count,
+                config.embeddings[0].initial_embedding_text,
+                config.embeddings[0].token_count,
             )
 
             vector_2 = self._create_new_embedding(
                 model.tokenizer_2,
                 model.text_encoder_2,
-                config.initial_embedding_text,
-                config.token_count,
+                config.embeddings[0].initial_embedding_text,
+                config.embeddings[0].token_count,
             )
 
             model.embeddings = [StableDiffusionXLModelEmbedding(vector_1, vector_2, 'embedding')]

@@ -9,6 +9,7 @@ from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
+from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.ImageFormat import ImageFormat
@@ -62,6 +63,7 @@ class TrainOptimizerConfig(BaseConfig):
     relative_step: bool
     safeguard_warmup: bool
     scale_parameter: bool
+    stochastic_rounding: bool
     use_bias_correction: bool
     use_triton: bool
     warmup_init: bool
@@ -69,9 +71,6 @@ class TrainOptimizerConfig(BaseConfig):
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainOptimizerConfig, self).__init__(data)
-
-    def save_default_values(self) -> bool:
-        return False
 
     @staticmethod
     def default_values():
@@ -117,12 +116,67 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("relative_step", False, bool, False))
         data.append(("safeguard_warmup", False, bool, False))
         data.append(("scale_parameter", False, bool, False))
+        data.append(("stochastic_rounding", True, bool, False))
         data.append(("use_bias_correction", False, bool, False))
         data.append(("use_triton", False, bool, False))
         data.append(("warmup_init", False, bool, False))
         data.append(("weight_decay", None, float, True))
 
         return TrainOptimizerConfig(data)
+
+
+class TrainModelPartConfig(BaseConfig):
+    model_name: str
+    train: bool
+    stop_training_after: int
+    stop_training_after_unit: TimeUnit
+    learning_rate: float
+    weight_dtype: DataType
+
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super(TrainModelPartConfig, self).__init__(data)
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("model_name", "", str, False))
+        data.append(("train", True, bool, False))
+        data.append(("stop_training_after", None, int, True))
+        data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("learning_rate", None, float, True))
+        data.append(("weight_dtype", DataType.NONE, DataType, False))
+
+        return TrainModelPartConfig(data)
+
+class TrainEmbeddingConfig(BaseConfig):
+    model_name: str
+    train: bool
+    stop_training_after: int
+    stop_training_after_unit: TimeUnit
+    token_count: int
+    initial_embedding_text: str
+    weight_dtype: DataType
+
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super(TrainEmbeddingConfig, self).__init__(data)
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("model_name", "", str, False))
+        data.append(("train", True, bool, False))
+        data.append(("stop_training_after", None, int, True))
+        data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("token_count", 1, int, False))
+        data.append(("initial_embedding_text", "*", str, False))
+        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
+
+        return TrainEmbeddingConfig(data)
+
 
 
 class TrainConfig(BaseConfig):
@@ -135,6 +189,7 @@ class TrainConfig(BaseConfig):
     tensorboard: bool
     tensorboard_expose: bool
     continue_last_backup: bool
+    include_train_config: ConfigPart
 
     # model settings
     base_model_name: str
@@ -186,10 +241,7 @@ class TrainConfig(BaseConfig):
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
 
-    # unet
-    train_unet: bool
-    train_unet_epochs: int
-    unet_learning_rate: float
+    # noise
     offset_noise_weight: float
     perturbation_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
@@ -199,46 +251,35 @@ class TrainConfig(BaseConfig):
     max_noising_strength: float
     noising_weight: float
     noising_bias: float
-    unet_weight_dtype: DataType
+
+    # unet
+    unet: TrainModelPartConfig
 
     # prior
-    prior_model_name: str
-    train_prior: bool
-    train_prior_epochs: int
-    prior_learning_rate: float
-    prior_weight_dtype: DataType
+    prior: TrainModelPartConfig
 
     # text encoder
-    train_text_encoder: bool
-    train_text_encoder_epochs: int
-    text_encoder_learning_rate: float
+    text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
-    text_encoder_weight_dtype: DataType
 
     # text encoder 2
-    train_text_encoder_2: bool
-    train_text_encoder_2_epochs: int
-    text_encoder_2_learning_rate: float
+    text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
-    text_encoder_2_weight_dtype: DataType
 
     # vae
-    vae_model_name: str
-    vae_weight_dtype: DataType
+    vae: TrainModelPartConfig
 
     # effnet encoder
-    effnet_encoder_model_name: str
-    effnet_encoder_weight_dtype: DataType
+    effnet_encoder: TrainModelPartConfig
 
     # decoder
-    decoder_model_name: str
-    decoder_weight_dtype: DataType
+    decoder: TrainModelPartConfig
 
     # decoder text encoder
-    decoder_text_encoder_weight_dtype: DataType
+    decoder_text_encoder: TrainModelPartConfig
 
     # decoder vqgan
-    decoder_vqgan_weight_dtype: DataType
+    decoder_vqgan: TrainModelPartConfig
 
     # masked training
     masked_training: bool
@@ -247,9 +288,7 @@ class TrainConfig(BaseConfig):
     normalize_masked_area_loss: bool
 
     # embedding
-    embedding_model_names: list[str]
-    token_count: int
-    initial_embedding_text: str
+    embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
 
     # lora
@@ -283,9 +322,10 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=1,
+            config_version=2,
             config_migrations={
                 0: self.__migration_0,
+                1: self.__migration_1,
             }
         )
 
@@ -309,17 +349,107 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_1(self, data: dict) -> dict:
+        migrated_data = {
+            "unet": {},
+            "prior": {},
+            "text_encoder": {},
+            "text_encoder_2": {},
+            "vae": {},
+            "effnet_encoder": {},
+            "decoder": {},
+            "decoder_text_encoder": {},
+            "decoder_vqgan": {},
+            "embeddings": [{}],
+        }
+
+        for key, value in data.items():
+            if key == "train_unet":
+                migrated_data["unet"]["train"] = value
+            elif key == "train_unet_epochs":
+                migrated_data["unet"]["stop_training_after"] = value
+                migrated_data["unet"]["stop_training_after_unit"] = TimeUnit.EPOCH
+            elif key == "unet_learning_rate":
+                migrated_data["unet"]["learning_rate"] = value
+            elif key == "unet_weight_dtype":
+                migrated_data["unet"]["weight_dtype"] = value
+
+            elif key == "train_prior":
+                migrated_data["prior"]["train"] = value
+            elif key == "prior_model_name":
+                migrated_data["prior"]["model_name"] = value
+            elif key == "train_prior_epochs":
+                migrated_data["prior"]["stop_training_after"] = value
+                migrated_data["prior"]["stop_training_after_unit"] = TimeUnit.EPOCH
+            elif key == "prior_learning_rate":
+                migrated_data["prior"]["learning_rate"] = value
+            elif key == "prior_weight_dtype":
+                migrated_data["prior"]["weight_dtype"] = value
+
+            elif key == "train_text_encoder":
+                migrated_data["text_encoder"]["train"] = value
+            elif key == "train_text_encoder_epochs":
+                migrated_data["text_encoder"]["stop_training_after"] = value
+                migrated_data["text_encoder"]["stop_training_after_unit"] = TimeUnit.EPOCH
+            elif key == "text_encoder_learning_rate":
+                migrated_data["text_encoder"]["learning_rate"] = value
+            elif key == "text_encoder_weight_dtype":
+                migrated_data["text_encoder"]["weight_dtype"] = value
+
+            elif key == "train_text_encoder_2":
+                migrated_data["text_encoder_2"]["train"] = value
+            elif key == "train_text_encoder_2_epochs":
+                migrated_data["text_encoder_2"]["stop_training_after"] = value
+                migrated_data["text_encoder_2"]["stop_training_after_unit"] = TimeUnit.EPOCH
+            elif key == "text_encoder_2_learning_rate":
+                migrated_data["text_encoder_2"]["learning_rate"] = value
+            elif key == "text_encoder_2_weight_dtype":
+                migrated_data["text_encoder_2"]["weight_dtype"] = value
+
+            elif key == "vae_model_name":
+                migrated_data["vae"]["model_name"] = value
+            elif key == "vae_weight_dtype":
+                migrated_data["vae"]["weight_dtype"] = value
+
+            elif key == "effnet_encoder_model_name":
+                migrated_data["effnet_encoder"]["model_name"] = value
+            elif key == "effnet_encoder_weight_dtype":
+                migrated_data["effnet_encoder"]["weight_dtype"] = value
+
+            elif key == "decoder_model_name":
+                migrated_data["decoder"]["model_name"] = value
+            elif key == "decoder_weight_dtype":
+                migrated_data["decoder"]["weight_dtype"] = value
+
+            elif key == "decoder_text_encoder_weight_dtype":
+                migrated_data["decoder_text_encoder"]["weight_dtype"] = value
+
+            elif key == "decoder_vqgan_weight_dtype":
+                migrated_data["decoder_vqgan"]["weight_dtype"] = value
+
+            elif key == "embedding_model_names" and len(value) > 0:
+                migrated_data["embeddings"][0]["model_name"] = value[0]
+            elif key == "token_count":
+                migrated_data["embeddings"][0]["token_count"] = value
+            elif key == "initial_embedding_text":
+                migrated_data["embeddings"][0]["initial_embedding_text"] = value
+
+            else:
+                migrated_data[key] = value
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
-            self.weight_dtype if self.unet_weight_dtype == DataType.NONE else self.unet_weight_dtype,
-            self.weight_dtype if self.prior_weight_dtype == DataType.NONE else self.prior_weight_dtype,
-            self.weight_dtype if self.text_encoder_weight_dtype == DataType.NONE else self.text_encoder_weight_dtype,
-            self.weight_dtype if self.text_encoder_2_weight_dtype == DataType.NONE else self.text_encoder_2_weight_dtype,
-            self.weight_dtype if self.vae_weight_dtype == DataType.NONE else self.vae_weight_dtype,
-            self.weight_dtype if self.effnet_encoder_weight_dtype == DataType.NONE else self.effnet_encoder_weight_dtype,
-            self.weight_dtype if self.decoder_weight_dtype == DataType.NONE else self.decoder_weight_dtype,
-            self.weight_dtype if self.decoder_text_encoder_weight_dtype == DataType.NONE else self.decoder_text_encoder_weight_dtype,
-            self.weight_dtype if self.decoder_vqgan_weight_dtype == DataType.NONE else self.decoder_vqgan_weight_dtype,
+            self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
+            self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
+            self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
+            self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
+            self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
+            self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
+            self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
+            self.weight_dtype if self.decoder_text_encoder.weight_dtype == DataType.NONE else self.decoder_text_encoder.weight_dtype,
+            self.weight_dtype if self.decoder_vqgan.weight_dtype == DataType.NONE else self.decoder_vqgan.weight_dtype,
             self.weight_dtype if self.lora_weight_dtype == DataType.NONE else self.lora_weight_dtype,
             self.weight_dtype if self.embedding_weight_dtype == DataType.NONE else self.embedding_weight_dtype,
         )
@@ -327,13 +457,21 @@ class TrainConfig(BaseConfig):
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
-            prior_model=self.prior_model_name,
-            effnet_encoder_model=self.effnet_encoder_model_name,
-            decoder_model=self.decoder_model_name,
-            vae_model=self.vae_model_name,
+            prior_model=self.prior.model_name,
+            effnet_encoder_model=self.effnet_encoder.model_name,
+            decoder_model=self.decoder.model_name,
+            vae_model=self.vae.model_name,
             lora=self.lora_model_name,
-            embedding=self.embedding_model_names,
+            embedding=[embedding.model_name for embedding in self.embeddings],
         )
+
+    def to_settings_dict(self) -> dict:
+        config = TrainConfig.default_values().from_dict(self.to_dict())
+
+        config.concepts = None
+        config.samples = None
+
+        return config.to_dict()
 
     def to_pack_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
@@ -374,6 +512,7 @@ class TrainConfig(BaseConfig):
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("continue_last_backup", False, bool, False))
+        data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         # model settings
         data.append(("base_model_name", "runwayml/stable-diffusion-v1-5", str, False))
@@ -425,10 +564,7 @@ class TrainConfig(BaseConfig):
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
 
-        # unet
-        data.append(("train_unet", True, bool, False))
-        data.append(("train_unet_epochs", 10000, int, False))
-        data.append(("unet_learning_rate", None, float, True))
+        # noise
         data.append(("offset_noise_weight", 0.0, float, False))
         data.append(("perturbation_noise_weight", 0.0, float, False))
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
@@ -438,46 +574,71 @@ class TrainConfig(BaseConfig):
         data.append(("max_noising_strength", 1.0, float, False))
         data.append(("noising_weight", 0.0, float, False))
         data.append(("noising_bias", 0.5, float, False))
-        data.append(("unet_weight_dtype", DataType.NONE, DataType, False))
+
+        # unet
+        unet = TrainModelPartConfig.default_values()
+        unet.train = True
+        unet.stop_training_after = 0
+        unet.learning_rate = None
+        unet.weight_dtype = DataType.NONE
+        data.append(("unet", unet, TrainModelPartConfig, False))
 
         # prior
-        data.append(("prior_model_name", "", str, False))
-        data.append(("train_prior", True, bool, False))
-        data.append(("train_prior_epochs", 10000, int, False))
-        data.append(("prior_learning_rate", None, float, True))
-        data.append(("prior_weight_dtype", DataType.NONE, DataType, False))
+        prior = TrainModelPartConfig.default_values()
+        prior.model_name = ""
+        prior.train = True
+        prior.stop_training_after = 0
+        prior.learning_rate = None
+        prior.weight_dtype = DataType.NONE
+        data.append(("prior", prior, TrainModelPartConfig, False))
 
         # text encoder
-        data.append(("train_text_encoder", True, bool, False))
-        data.append(("train_text_encoder_epochs", 30, int, False))
-        data.append(("text_encoder_learning_rate", None, float, True))
+        text_encoder = TrainModelPartConfig.default_values()
+        text_encoder.train = True
+        text_encoder.stop_training_after = 30
+        text_encoder.stop_training_after_unit = TimeUnit.EPOCH
+        text_encoder.learning_rate = None
+        text_encoder.weight_dtype = DataType.NONE
+        data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
-        data.append(("text_encoder_weight_dtype", DataType.NONE, DataType, False))
 
         # text encoder 2
-        data.append(("train_text_encoder_2", True, bool, False))
-        data.append(("train_text_encoder_2_epochs", 30, int, False))
-        data.append(("text_encoder_2_learning_rate", None, float, True))
+        text_encoder_2 = TrainModelPartConfig.default_values()
+        text_encoder_2.train = True
+        text_encoder_2.stop_training_after = 30
+        text_encoder_2.stop_training_after_unit = TimeUnit.EPOCH
+        text_encoder_2.learning_rate = None
+        text_encoder_2.weight_dtype = DataType.NONE
+        data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
-        data.append(("text_encoder_2_weight_dtype", DataType.NONE, DataType, False))
 
         # vae
-        data.append(("vae_model_name", "", str, False))
-        data.append(("vae_weight_dtype", DataType.FLOAT_32, DataType, False))
+        vae = TrainModelPartConfig.default_values()
+        vae.model_name = ""
+        vae.weight_dtype = DataType.FLOAT_32
+        data.append(("vae", vae, TrainModelPartConfig, False))
 
         # effnet encoder
-        data.append(("effnet_encoder_model_name", "", str, False))
-        data.append(("effnet_encoder_weight_dtype", DataType.NONE, DataType, False))
+        effnet_encoder = TrainModelPartConfig.default_values()
+        effnet_encoder.model_name = ""
+        effnet_encoder.weight_dtype = DataType.NONE
+        data.append(("effnet_encoder", effnet_encoder, TrainModelPartConfig, False))
 
         # decoder
-        data.append(("decoder_model_name", "", str, False))
-        data.append(("decoder_weight_dtype", DataType.NONE, DataType, False))
+        decoder = TrainModelPartConfig.default_values()
+        decoder.model_name = ""
+        decoder.weight_dtype = DataType.NONE
+        data.append(("decoder", decoder, TrainModelPartConfig, False))
 
         # decoder text encoder
-        data.append(("decoder_text_encoder_weight_dtype", DataType.NONE, DataType, False))
+        decoder_text_encoder = TrainModelPartConfig.default_values()
+        decoder_text_encoder.weight_dtype = DataType.NONE
+        data.append(("decoder_text_encoder", decoder_text_encoder, TrainModelPartConfig, False))
 
         # decoder vqgan
-        data.append(("decoder_vqgan_weight_dtype", DataType.NONE, DataType, False))
+        decoder_vqgan = TrainModelPartConfig.default_values()
+        decoder_vqgan.weight_dtype = DataType.NONE
+        data.append(("decoder_vqgan", decoder_vqgan, TrainModelPartConfig, False))
 
         # masked training
         data.append(("masked_training", False, bool, False))
@@ -486,9 +647,7 @@ class TrainConfig(BaseConfig):
         data.append(("normalize_masked_area_loss", False, bool, False))
 
         # embedding
-        data.append(("embedding_model_names", [], list[str], False))
-        data.append(("token_count", 1, int, False))
-        data.append(("initial_embedding_text", "*", str, False))
+        data.append(("embeddings", [TrainEmbeddingConfig.default_values()], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # lora

@@ -12,6 +12,7 @@ from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjecti
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
@@ -102,6 +103,7 @@ class WuerstchenModel(BaseModel):
             prior_text_encoder_lora: LoRAModuleWrapper | None = None,
             prior_prior_lora: LoRAModuleWrapper | None = None,
             model_spec: ModelSpec | None = None,
+            train_config: TrainConfig | None = None,
     ):
         super(WuerstchenModel, self).__init__(
             model_type=model_type,
@@ -109,6 +111,7 @@ class WuerstchenModel(BaseModel):
             ema_state_dict=ema_state_dict,
             train_progress=train_progress,
             model_spec=model_spec,
+            train_config=train_config,
         )
 
         self.decoder_tokenizer = decoder_tokenizer

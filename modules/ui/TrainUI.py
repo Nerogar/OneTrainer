@@ -339,19 +339,19 @@ class TrainUI(ctk.CTk):
         components.label(master, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "embedding_model_names",
+            master, 0, 1, self.ui_state, "embeddings.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
         components.label(master, 1, 0, "Token count",
                          tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "token_count")
+        components.entry(master, 1, 1, self.ui_state, "embeddings.token_count")
 
         # initial embedding text
         components.label(master, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "initial_embedding_text")
+        components.entry(master, 2, 1, self.ui_state, "embeddings.initial_embedding_text")
 
         # embedding weight dtype
         components.label(master, 3, 0, "Embedding Weight Data Type",

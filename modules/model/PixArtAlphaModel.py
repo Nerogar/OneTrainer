@@ -10,6 +10,7 @@ from transformers import T5Tokenizer, \
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
@@ -67,6 +68,7 @@ class PixArtAlphaModel(BaseModel):
             text_encoder_lora: LoRAModuleWrapper | None = None,
             transformer_lora: LoRAModuleWrapper | None = None,
             model_spec: ModelSpec | None = None,
+            train_config: TrainConfig | None = None,
     ):
         super(PixArtAlphaModel, self).__init__(
             model_type=model_type,
@@ -74,6 +76,7 @@ class PixArtAlphaModel(BaseModel):
             ema_state_dict=ema_state_dict,
             train_progress=train_progress,
             model_spec=model_spec,
+            train_config=train_config,
         )
 
         self.tokenizer = tokenizer

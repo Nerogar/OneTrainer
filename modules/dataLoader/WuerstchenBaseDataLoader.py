@@ -231,7 +231,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
 
-        if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
             modules.append(encode_prompt)
 
         return modules
@@ -283,7 +283,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if not config.train_text_encoder and config.latent_caching and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.latent_caching and config.training_method != TrainingMethod.EMBEDDING:
             modules.append(text_disk_cache)
             sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -304,7 +304,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         if config.masked_training or config.model_type.has_mask_input():
             output_names.append('latent_mask')
 
-        if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_hidden_state')
 
             if model.model_type.is_stable_cascade():

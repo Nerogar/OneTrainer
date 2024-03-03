@@ -1,7 +1,6 @@
 from typing import Iterable
 
 import torch
-import transformers
 from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
     DPMSolverMultistepScheduler, UniPCMultistepScheduler, SchedulerMixin
 from torch.nn import Parameter
@@ -69,6 +68,9 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
+from modules.util.optimizer.adafactor_extensions import step_adafactor
+from modules.util.optimizer.adam_extensions import step_adam
+from modules.util.optimizer.adamw_extensions import step_adamw
 
 
 def create_model_loader(
@@ -310,6 +312,11 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
+            if optimizer_config.stochastic_rounding and not optimizer_config.fused and not optimizer_config.foreach:
+                optimizer.step = step_adam.__get__(optimizer, torch.optim.Adam)
+            elif optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
+                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
+
         # ADAMW Optimizer
         case Optimizer.ADAMW:
             optimizer = torch.optim.AdamW(
@@ -326,6 +333,11 @@ def create_optimizer(
                 differentiable=optimizer_config.differentiable if optimizer_config.differentiable is not None else False,
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
+
+            if optimizer_config.stochastic_rounding and not optimizer_config.fused and not optimizer_config.foreach:
+                optimizer.step = step_adamw.__get__(optimizer, torch.optim.AdamW)
+            elif optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
+                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
 
         # ADAM_8BIT Optimizer
         case Optimizer.ADAM_8BIT:
@@ -624,6 +636,9 @@ def create_optimizer(
                 relative_step=optimizer_config.relative_step if optimizer_config.relative_step is not None else True,
                 warmup_init=optimizer_config.warmup_init if optimizer_config.warmup_init is not None else False,
             )
+
+            if optimizer_config.stochastic_rounding:
+                optimizer.step = step_adafactor.__get__(optimizer, Adafactor)
 
     if state_dict is not None:
         for i, params in enumerate(parameters):
