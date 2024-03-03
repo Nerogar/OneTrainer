@@ -120,7 +120,11 @@ def _single_tensor_adam(
             else:
                 denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
 
-            addcdiv_stochastic_(param, exp_avg, denom, value=-step_size)
+            if param.dtype == torch.bfloat16:
+                addcdiv_stochastic_(param, exp_avg, denom, value=-step_size)
+            else:
+                param.addcdiv_(exp_avg, denom, value=-step_size)
+
 
         # Lastly, switch back to complex view
         if amsgrad and torch.is_complex(params[i]):
