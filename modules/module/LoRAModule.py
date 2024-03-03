@@ -66,7 +66,6 @@ class LoRAModule(metaclass=ABCMeta):
         state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
         state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
         state_dict[self.prefix + ".alpha"] = self.alpha
-        state_dict[self.prefix + ".dropout"] = torch.tensor(self.dropout.p)
         return state_dict
 
     def hook_to_module(self):
@@ -117,7 +116,7 @@ class Conv2dLoRAModule(LoRAModule):
 
 class DummyLoRAModule(LoRAModule):
     def __init__(self, prefix: str):
-        super(DummyLoRAModule, self).__init__(prefix, None, 1, 1, 0)
+        super(DummyLoRAModule, self).__init__(prefix, None, 1, 1)
         self.lora_down = None
         self.lora_up = None
 
@@ -275,6 +274,7 @@ class LoRAModuleWrapper:
 
     def set_dropout(self, dropout_probability: float):
         """
+        Sets the dropout probability
         """
         if dropout_probability < 0 or dropout_probability > 1:
             raise ValueError("Dropout probability must be in [0, 1]")
