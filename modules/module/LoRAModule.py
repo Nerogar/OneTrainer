@@ -3,7 +3,7 @@ from abc import ABCMeta
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Linear, Conv2d, Parameter
+from torch.nn import Dropout, Linear, Conv2d, Parameter
 
 
 class LoRAModule(metaclass=ABCMeta):
@@ -12,13 +12,16 @@ class LoRAModule(metaclass=ABCMeta):
     lora_down: nn.Module
     lora_up: nn.Module
     alpha: torch.Tensor
+    dropout: Dropout
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super(LoRAModule, self).__init__()
+
         self.prefix = prefix.replace('.', '_')
         self.orig_module = orig_module
         self.rank = rank
         self.alpha = torch.tensor(alpha)
+        self.dropout = Dropout(0)
         if orig_module is not None:
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
@@ -27,6 +30,10 @@ class LoRAModule(metaclass=ABCMeta):
         self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
 
     def forward(self, x, *args, **kwargs):
+        if self.orig_module.training:
+            ld = self.lora_up(self.dropout(self.lora_down(x)))
+            return self.orig_forward(x) + ld * (self.alpha / self.rank)
+
         return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
 
     def requires_grad_(self, requires_grad: bool):
@@ -264,3 +271,12 @@ class LoRAModuleWrapper:
         Removes all dummy modules
         """
         self.modules = {k: v for (k, v) in self.modules.items() if not isinstance(v, DummyLoRAModule)}
+
+    def set_dropout(self, dropout_probability: float):
+        """
+        Sets the dropout probability
+        """
+        if dropout_probability < 0 or dropout_probability > 1:
+            raise ValueError("Dropout probability must be in [0, 1]")
+        for module in self.modules.values():
+            module.dropout.p = dropout_probability

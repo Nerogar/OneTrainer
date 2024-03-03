@@ -45,7 +45,7 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        
+
         if config.text_encoder.train:
             param_groups.append(
                 self.create_param_groups(config, model.text_encoder_lora.parameters(), config.text_encoder.learning_rate)
@@ -72,6 +72,9 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             model.unet_lora = LoRAModuleWrapper(
                 model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"]
             )
+
+        model.text_encoder_lora.set_dropout(config.dropout_probability)
+        model.unet_lora.set_dropout(config.dropout_probability)
 
         model.text_encoder.requires_grad_(False)
         model.unet.requires_grad_(False)

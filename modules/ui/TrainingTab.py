@@ -471,7 +471,6 @@ class TrainingTab:
         components.label(frame, 3, 0, "Min SNR Gamma",
                          tooltip="Minimum SNR gamma. Can help the model learn details more accurately. 0 disables, 20 maximum, ~5 is the usual setting")
         components.entry(frame, 3, 1, self.ui_state, "min_snr_gamma")
-
         # Loss Scaler
         components.label(frame, 4, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")

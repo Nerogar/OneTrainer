@@ -73,6 +73,11 @@ class PixArtAlphaLoRASetup(BasePixArtAlphaSetup):
                 model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, ["attn1", "attn2"]
             )
 
+        if model.text_encoder_lora:
+            model.text_encoder_lora.set_dropout(config.dropout_probability)
+        if model.transformer_lora:
+            model.transformer_lora.set_dropout(config.dropout_probability)
+
         model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
