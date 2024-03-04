@@ -3,6 +3,7 @@ from pathlib import Path
 import customtkinter as ctk
 
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -60,8 +61,10 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [TrainingMethod.FINE_TUNE,
-                                                                  TrainingMethod.FINE_TUNE_VAE],
+            allow_diffusers=self.train_config.training_method in [
+                TrainingMethod.FINE_TUNE,
+                TrainingMethod.FINE_TUNE_VAE,
+            ],
             allow_checkpoint=True,
         )
 
@@ -161,7 +164,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "unet_weight_dtype")
+            ], self.ui_state, "unet.weight_dtype")
 
             row += 1
 
@@ -171,7 +174,7 @@ class ModelTab:
                 components.label(self.scroll_frame, row, 0, "Prior Model",
                                  tooltip="Filename, directory or Hugging Face repository of the prior model")
                 components.file_entry(
-                    self.scroll_frame, row, 1, self.ui_state, "prior_model_name",
+                    self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
                 )
 
@@ -184,7 +187,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "prior_weight_dtype")
+            ], self.ui_state, "prior.weight_dtype")
 
             row += 1
 
@@ -198,7 +201,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "text_encoder_weight_dtype")
+            ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
 
@@ -212,7 +215,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "text_encoder_weight_dtype")
+            ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
 
@@ -226,7 +229,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "text_encoder_2_weight_dtype")
+            ], self.ui_state, "text_encoder_2.weight_dtype")
 
             row += 1
 
@@ -235,7 +238,7 @@ class ModelTab:
             components.label(self.scroll_frame, row, 0, "VAE",
                              tooltip="Directory or Hugging Face repository of a VAE model. Can be used to override the base model VAE.")
             components.file_entry(
-                self.scroll_frame, row, 1, self.ui_state, "vae_model_name",
+                self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
             )
 
@@ -248,7 +251,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "vae_weight_dtype")
+            ], self.ui_state, "vae.weight_dtype")
 
             row += 1
 
@@ -259,7 +262,7 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Effnet Encoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
         components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "effnet_encoder_model_name",
+            self.scroll_frame, row, 1, self.ui_state, "effnet_encoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -272,7 +275,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "effnet_encoder_weight_dtype")
+        ], self.ui_state, "effnet_encoder.weight_dtype")
 
         row += 1
 
@@ -287,7 +290,7 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
         components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "decoder_model_name",
+            self.scroll_frame, row, 1, self.ui_state, "decoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -300,7 +303,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_weight_dtype")
+        ], self.ui_state, "decoder.weight_dtype")
 
         row += 1
 
@@ -314,7 +317,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
-            ], self.ui_state, "decoder_text_encoder_weight_dtype")
+            ], self.ui_state, "decoder_text_encoder.weight_dtype")
 
             row += 1
 
@@ -327,7 +330,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
-        ], self.ui_state, "decoder_vqgan_weight_dtype")
+        ], self.ui_state, "decoder_vqgan.weight_dtype")
 
         row += 1
 
@@ -369,6 +372,18 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format")
+
+        # include config
+        components.label(self.scroll_frame, row, 3, "Include Config",
+                         tooltip="Include the training configuration in the final model. Only supported for safetensors files. "
+                                 "None: No config is included. "
+                                 "Settings: All training settings are included. "
+                                 "All: All settings, including the samples and concepts are included.")
+        components.options_kv(self.scroll_frame, row, 4, [
+            ("None", ConfigPart.NONE),
+            ("Settings", ConfigPart.SETTINGS),
+            ("All", ConfigPart.ALL),
+        ], self.ui_state, "include_train_config")
 
         row += 1
 

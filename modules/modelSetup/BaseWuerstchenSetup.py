@@ -139,7 +139,7 @@ class BaseWuerstchenSetup(
                 self.__alpha_cumprod,
             )
 
-            if config.train_text_encoder or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
                 text_encoder_output = model.prior_text_encoder(
                     batch['tokens'], output_hidden_states=True, return_dict=True
                 )

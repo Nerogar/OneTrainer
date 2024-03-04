@@ -1,0 +1,33 @@
+name: Feature Request
+description: Request a feature
+title: "[Feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this feature request!
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Describe your use-case.
+      description: Give as much detail as possible. Can the functionality be achieved using existing features?
+      placeholder: Tell us what you're missing!
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: What would you like to see as a solution?
+      description: Describe the proposed solution with a workflow. Be precise.
+      placeholder: Tell us what you'd like to see!
+    validations:
+      required: true
+  - type: textarea
+    id: alternative-solutions
+    attributes:
+      label: Have you considered alternatives? List them here.
+      description: Give a sketch of alternative solutions you've considered.
+      placeholder: How else can it be achieved?
+    validations:
+      required: false

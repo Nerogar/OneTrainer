@@ -9,19 +9,22 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
+from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.enum.TimeUnit import TimeUnit
 
 
-class BaseTrainer(metaclass=ABCMeta):
+class BaseTrainer(
+    TimedActionMixin,
+    metaclass=ABCMeta,
+):
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
+        super(BaseTrainer, self).__init__()
         self.config = config
         self.callbacks = callbacks
         self.commands = commands
-        self.previous_action = {}
         self.train_device = torch.device(self.config.train_device)
         self.temp_device = torch.device(self.config.temp_device)
 
@@ -76,57 +79,3 @@ class BaseTrainer(metaclass=ABCMeta):
             self.config.training_method
         )
 
-    def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress,
-                      start_at_zero: bool = True):
-        if name not in self.previous_action:
-            self.previous_action[name] = -1
-
-        match unit:
-            case TimeUnit.EPOCH:
-                if start_at_zero:
-                    return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0
-                else:
-                    # should actually be the last step of each epoch, but we don't know how many steps an epoch has
-                    return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
-                        and train_progress.epoch > 0
-            case TimeUnit.STEP:
-                if start_at_zero:
-                    return train_progress.global_step % int(interval) == 0
-                else:
-                    return (train_progress.global_step + 1) % int(interval) == 0
-            case TimeUnit.SECOND:
-                if not start_at_zero and self.previous_action[name] < 0:
-                    self.previous_action[name] = time.time()
-
-                seconds_since_previous_action = time.time() - self.previous_action[name]
-                if seconds_since_previous_action > interval:
-                    self.previous_action[name] = time.time()
-                    return True
-                else:
-                    return False
-            case TimeUnit.MINUTE:
-                if not start_at_zero and self.previous_action[name] < 0:
-                    self.previous_action[name] = time.time()
-
-                seconds_since_previous_action = time.time() - self.previous_action[name]
-                if seconds_since_previous_action > (interval * 60):
-                    self.previous_action[name] = time.time()
-                    return True
-                else:
-                    return False
-            case TimeUnit.HOUR:
-                if not start_at_zero and self.previous_action[name] < 0:
-                    self.previous_action[name] = time.time()
-
-                seconds_since_previous_action = time.time() - self.previous_action[name]
-                if seconds_since_previous_action > (interval * 60 * 60):
-                    self.previous_action[name] = time.time()
-                    return True
-                else:
-                    return False
-            case TimeUnit.NEVER:
-                return False
-            case TimeUnit.ALWAYS:
-                return True
-            case _:
-                return False

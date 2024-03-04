@@ -118,6 +118,7 @@ class GenericTrainer(BaseTrainer):
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
         )
+        self.model.train_config = self.config
 
         self.callbacks.on_update_status("running model setup")
 
@@ -396,23 +397,23 @@ class GenericTrainer(BaseTrainer):
         torch_gc()
 
     def __needs_sample(self, train_progress: TrainProgress):
-        return self.action_needed("sample", self.config.sample_after, self.config.sample_after_unit, train_progress)
+        return self.repeating_action_needed("sample", self.config.sample_after, self.config.sample_after_unit, train_progress)
 
     def __needs_backup(self, train_progress: TrainProgress):
-        return self.action_needed(
+        return self.repeating_action_needed(
             "backup", self.config.backup_after, self.config.backup_after_unit, train_progress, start_at_zero=False
         )
 
     def __needs_save(self, train_progress: TrainProgress):
-        return self.action_needed(
+        return self.repeating_action_needed(
             "save", self.config.save_after, self.config.save_after_unit, train_progress, start_at_zero=False
         )
 
     def __needs_gc(self, train_progress: TrainProgress):
-        return self.action_needed("gc", 5, TimeUnit.MINUTE, train_progress, start_at_zero=False)
+        return self.repeating_action_needed("gc", 5, TimeUnit.MINUTE, train_progress, start_at_zero=False)
 
     def __is_update_step(self, train_progress: TrainProgress) -> bool:
-        return self.action_needed(
+        return self.repeating_action_needed(
             "update_step", self.config.gradient_accumulation_steps, TimeUnit.STEP, train_progress, start_at_zero=False
         )
 

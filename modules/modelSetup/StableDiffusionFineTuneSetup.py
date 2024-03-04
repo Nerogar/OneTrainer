@@ -30,10 +30,10 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
     ) -> Iterable[Parameter]:
         params = list()
 
-        if config.train_text_encoder:
+        if config.text_encoder.train:
             params += list(model.text_encoder.parameters())
 
-        if config.train_unet:
+        if config.unet.train:
             params += list(model.unet.parameters())
 
         return params
@@ -45,14 +45,14 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
         
-        if config.train_text_encoder:
+        if config.text_encoder.train:
             param_groups.append(
-                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder_learning_rate)
+                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder.learning_rate)
             )
 
-        if config.train_unet:
+        if config.unet.train:
             param_groups.append(
-                self.create_param_groups(config, model.unet.parameters(), config.unet_learning_rate)
+                self.create_param_groups(config, model.unet.parameters(), config.unet.learning_rate)
             )
 
         return param_groups
@@ -62,10 +62,12 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        train_text_encoder = config.train_text_encoder and (model.train_progress.epoch < config.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_unet = config.train_unet and (model.train_progress.epoch < config.train_unet_epochs)
+        train_unet = config.unet.train and \
+                             not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
 
         model.vae.requires_grad_(False)
@@ -96,21 +98,21 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             config: TrainConfig,
     ):
         vae_on_train_device = self.debug_mode or config.align_prop
-        text_encoder_on_train_device = config.train_text_encoder or config.align_prop or not config.latent_caching
+        text_encoder_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
         model.depth_estimator_to(self.temp_device)
 
-        if config.train_text_encoder:
+        if config.text_encoder.train:
             model.text_encoder.train()
         else:
             model.text_encoder.eval()
 
         model.vae.eval()
 
-        if config.train_unet:
+        if config.unet.train:
             model.unet.train()
         else:
             model.unet.eval()
@@ -121,8 +123,10 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        train_text_encoder = config.train_text_encoder and (model.train_progress.epoch < config.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_unet = config.train_unet and (model.train_progress.epoch < config.train_unet_epochs)
+        train_unet = config.unet.train and \
+                             not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)

@@ -244,10 +244,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
             modules.append(encode_prompt_1)
 
-        if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING:
             modules.append(encode_prompt_2)
 
         return modules
@@ -269,13 +269,13 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
             'prompt', 'tokens_1', 'tokens_2', 'concept'
         ]
 
-        if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
             text_split_names.append('tokens_1')
             text_split_names.append('text_encoder_1_hidden_state')
             sort_names.append('tokens_1')
             sort_names.append('text_encoder_1_hidden_state')
 
-        if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING:
             text_split_names.append('tokens_2')
             text_split_names.append('text_encoder_2_hidden_state')
             text_split_names.append('text_encoder_2_pooled_state')
@@ -295,10 +295,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         def before_cache_text_fun():
             model.to(self.temp_device)
 
-            if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING:
+            if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
                 model.text_encoder_1_to(self.train_device)
 
-            if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING:
+            if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING:
                 model.text_encoder_2_to(self.train_device)
 
             model.eval()
@@ -314,7 +314,7 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if (not config.train_text_encoder or not config.train_text_encoder_2) and config.latent_caching and config.training_method != TrainingMethod.EMBEDDING:
+        if (not config.text_encoder.train or not config.text_encoder_2.train) and config.latent_caching and config.training_method != TrainingMethod.EMBEDDING:
             text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
             modules.append(text_disk_cache)
             sort_names = [x for x in sort_names if x not in text_split_names]
@@ -338,10 +338,10 @@ class StablDiffusionXLBaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_1_hidden_state')
 
-        if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING:
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
 

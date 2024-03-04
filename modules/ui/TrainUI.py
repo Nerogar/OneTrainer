@@ -318,10 +318,15 @@ class TrainUI(ctk.CTk):
                          tooltip="The alpha parameter used when creating a new LoRA")
         components.entry(master, 2, 1, self.ui_state, "lora_alpha")
 
+        # Dropout Percentage
+        components.label(master, 3, 0, "Dropout Probability",
+                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+        components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+
         # lora weight dtype
-        components.label(master, 3, 0, "LoRA Weight Data Type",
+        components.label(master, 5, 0, "LoRA Weight Data Type",
                          tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 3, 1, [
+        components.options_kv(master, 5, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "lora_weight_dtype")
@@ -339,19 +344,19 @@ class TrainUI(ctk.CTk):
         components.label(master, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "embedding_model_names",
+            master, 0, 1, self.ui_state, "embeddings.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
         components.label(master, 1, 0, "Token count",
                          tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "token_count")
+        components.entry(master, 1, 1, self.ui_state, "embeddings.token_count")
 
         # initial embedding text
         components.label(master, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "initial_embedding_text")
+        components.entry(master, 2, 1, self.ui_state, "embeddings.initial_embedding_text")
 
         # embedding weight dtype
         components.label(master, 3, 0, "Embedding Weight Data Type",

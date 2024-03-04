@@ -65,13 +65,12 @@ class BaseStableDiffusionXLSetup(
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtype,
-            config.unet_weight_dtype,
-            config.text_encoder_weight_dtype,
-            config.text_encoder_2_weight_dtype,
-            config.vae_weight_dtype,
-            config.lora_weight_dtype if config.training_method == TrainingMethod.LORA else None,
-            config.embedding_weight_dtype if config.training_method == TrainingMethod.EMBEDDING else None,
+            config.weight_dtypes().unet,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().text_encoder_2,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
@@ -79,7 +78,7 @@ class BaseStableDiffusionXLSetup(
             config.train_dtype,
             config.fallback_train_dtype,
             [
-                config.vae_weight_dtype,
+                config.weight_dtypes().vae,
             ]
         )
 
@@ -157,11 +156,11 @@ class BaseStableDiffusionXLSetup(
                 tokens_1=batch['tokens_1'],
                 tokens_2=batch['tokens_2'],
                 text_encoder_1_output=batch[
-                    'text_encoder_1_hidden_state'] if not config.train_text_encoder and config.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_1_hidden_state'] if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING else None,
                 text_encoder_2_output=batch[
-                    'text_encoder_2_hidden_state'] if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_2_hidden_state'] if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING else None,
                 pooled_text_encoder_2_output=batch[
-                    'text_encoder_2_pooled_state'] if not config.train_text_encoder_2 and config.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_2_pooled_state'] if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING else None,
             )
 
             latent_image = batch['latent_image']

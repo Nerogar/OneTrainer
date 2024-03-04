@@ -6,12 +6,16 @@ from torch import Tensor
 from torch.nn import Parameter
 
 from modules.model.BaseModel import BaseModel
+from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
-class BaseModelSetup(metaclass=ABCMeta):
+class BaseModelSetup(
+    TimedActionMixin,
+    metaclass=ABCMeta,
+):
     def __init__(
             self,
             train_device: torch.device,
@@ -92,12 +96,19 @@ class BaseModelSetup(metaclass=ABCMeta):
             params: Iterator[Parameter] | list[Parameter],
             lr_arg: float,
     ) -> dict:
-        batch_size = 1 if config.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.GRADIENT_ACCUMULATION] else config.batch_size
-        gradient_accumulation_steps = 1 if config.learning_rate_scaler in [LearningRateScaler.NONE, LearningRateScaler.BATCH] else config.gradient_accumulation_steps
+        batch_size_scale = 1 if config.learning_rate_scaler in [
+            LearningRateScaler.NONE,
+            LearningRateScaler.GRADIENT_ACCUMULATION,
+        ] else config.batch_size
+
+        gradient_accumulation_steps_scale = 1 if config.learning_rate_scaler in [
+            LearningRateScaler.NONE,
+            LearningRateScaler.BATCH,
+        ] else config.gradient_accumulation_steps
 
         # Determine the learning rate
         lr = lr_arg if lr_arg is not None else config.learning_rate
-        lr = lr * ((batch_size * gradient_accumulation_steps) ** 0.5)
+        lr = lr * ((batch_size_scale * gradient_accumulation_steps_scale) ** 0.5)
 
         # Create a parameter group for the text encoder
         return {
@@ -105,3 +116,51 @@ class BaseModelSetup(metaclass=ABCMeta):
             'lr': lr,
             'initial_lr': lr,
         }
+
+    def stop_unet_training_elapsed(
+            self,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_unet_training",
+            config.unet.stop_training_after,
+            config.unet.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_prior_training_elapsed(
+            self,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_prior_training",
+            config.prior.stop_training_after,
+            config.prior.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_text_encoder_training_elapsed(
+            self,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_text_encoder_training",
+            config.text_encoder.stop_training_after,
+            config.text_encoder.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_text_encoder_2_training_elapsed(
+            self,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_text_encoder_2_training",
+            config.text_encoder_2.stop_training_after,
+            config.text_encoder_2.stop_training_after_unit,
+            train_progress,
+        )

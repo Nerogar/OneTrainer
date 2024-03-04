@@ -1,6 +1,6 @@
 import tkinter as tk
 from enum import Enum
-from typing import Any, Callable
+from typing import Any, get_origin, get_args, Callable
 
 from modules.util.config.BaseConfig import BaseConfig
 
@@ -164,27 +164,7 @@ class UIState:
 
         return update
 
-    def __set_str_list_var(self, obj, is_dict, name, var):
-        if is_dict:
-            def update(_0, _1, _2):
-                string_var = var.get()
-                if string_var == "":
-                    obj[name] = []
-                else:
-                    obj[name] = [string_var]
-                self.__call_var_traces(name)
-        else:
-            def update(_0, _1, _2):
-                string_var = var.get()
-                if string_var == "":
-                    setattr(obj, name, [])
-                else:
-                    setattr(obj, name, [string_var])
-                self.__call_var_traces(name)
-
-        return update
-
-    def __create_vars(self, obj) -> dict[str, Any]:
+    def __create_vars(self, obj):
         new_vars = {}
 
         is_dict = isinstance(obj, dict)
@@ -196,6 +176,12 @@ class UIState:
                 if issubclass(var_type, BaseConfig):
                     var = UIState(self.master, obj_var)
                     new_vars[name] = var
+                elif var_type == list or get_origin(var_type) == list:
+                    if len(get_args(var_type)) > 0 and issubclass(get_args(var_type)[0], BaseConfig):
+                        # for lists, the first entry (if it exists) is used
+                        if obj_var is not None and len(obj_var) > 0:
+                            var = UIState(self.master, obj_var[0])
+                            new_vars[name] = var
                 elif var_type == str:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else obj_var)
@@ -220,11 +206,6 @@ class UIState:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, obj.nullables[name]))
-                    new_vars[name] = var
-                elif var_type == list[str]:  # TODO: think of a better solution for string lists
-                    var = tk.StringVar(master=self.master)
-                    var.set("" if len(obj_var) == 0 else obj_var[0])
-                    var.trace_add("write", self.__set_str_list_var(obj, is_dict, name, var))
                     new_vars[name] = var
         else:
             iterable = obj.items() if is_dict else vars(obj).items()
@@ -255,11 +236,6 @@ class UIState:
                     var.set(str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, False))
                     new_vars[name] = var
-                else:
-                    var = tk.StringVar(master=self.master)
-                    var.set(obj_var)
-                    var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, False))
-                    new_vars[name] = var
 
         return new_vars
 
@@ -274,6 +250,12 @@ class UIState:
                 if issubclass(var_type, BaseConfig):
                     var = self.__vars[name]
                     var.__set_vars(obj_var)
+                elif var_type == list or get_origin(var_type) == list:
+                    # for lists, the first entry (if it exists) is used
+                    if len(get_args(var_type)) > 0 and issubclass(get_args(var_type)[0], BaseConfig):
+                        if obj_var is not None and len(obj_var) > 0:
+                            var = self.__vars[name]
+                            var.__set_vars(obj_var[0])
                 elif var_type == str:
                     var = self.__vars[name]
                     var.set("" if obj_var is None else obj_var)
@@ -289,9 +271,6 @@ class UIState:
                 elif var_type == float:
                     var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
-                elif var_type == list[str]:
-                    var = self.__vars[name]
-                    var.set("" if len(obj_var) == 0 else obj_var[0])
         else:
             for name, obj_var in iterable:
                 if isinstance(obj_var, str):
@@ -309,6 +288,3 @@ class UIState:
                 elif isinstance(obj_var, float):
                     var = self.__vars[name]
                     var.set(str(obj_var))
-                else:
-                    var = self.__vars[name]
-                    var.set(obj_var)
