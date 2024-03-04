@@ -1,5 +1,4 @@
 import abc
-import enum
 import itertools
 import math
 import typing
@@ -8,21 +7,16 @@ import torch
 from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
+from modules.util.enum.LoraType import LoraType
+
 ModuleDict = dict[str, nn.Module]
 StateDict = dict[str, torch.Tensor]
 
-class LoRAType(enum.Enum):
-    LierLa = enum.auto()
-    LoCon = enum.auto()
-    LoHa = enum.auto()
-    LoKR = enum.auto()
-    IA3 = enum.auto()
-    DyLoRA = enum.auto()
+
 
 class BaseLoRAModule(abc.ABC):
-    type: LoRAType
+    type: typing.ClassVar[LoraType]
     orig_module: nn.Module
-<<<<<<< HEAD
     is_applied: bool
     prefix: str
     
@@ -41,11 +35,10 @@ class BaseLoRAModule(abc.ABC):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise RuntimeError("Do not call `super().forward`.")
     
-    def requires_grad_(self, requires_grad: bool) -> typing.Self:
+    def requires_grad_(self, requires_grad: bool) -> "BaseLoRAModule":
         for module in self.grad_modules().values():
             module.requires_grad_(requires_grad)
         
-=======
     lora_down: nn.Module
     lora_up: nn.Module
     alpha: torch.Tensor
@@ -81,7 +74,6 @@ class BaseLoRAModule(abc.ABC):
         self.lora_down.to(device, dtype)
         self.lora_up.to(device, dtype)
         self.alpha.to(device, dtype)
->>>>>>> origin/master
         return self
             
     def parameters(self) -> typing.Iterable[nn.Parameter]:
