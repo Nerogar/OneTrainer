@@ -124,11 +124,12 @@ class DiffusionLoraModule(nn.Module):
     def __create_modules(self, orig_module: nn.Module | None, module_filter: list[str] | None = None) -> None:
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
+                attrname = name.replace(".", "_")
                 if module_filter is None or any([x in name for x in self.module_filter]):
                     if isinstance(child_module, Linear):
-                        setattr(self, name, MODULE_MAP[self.options.type, Linear](child_module, self.options))
+                        setattr(self, attrname, MODULE_MAP[self.options.type, Linear](child_module, self.options))
                     elif isinstance(child_module, Conv2d):
-                        setattr(self, name, MODULE_MAP[self.options.type, Conv2d](child_module, self.options))
+                        setattr(self, attrname, MODULE_MAP[self.options.type, Conv2d](child_module, self.options))
 
     def apply_to_module(self):
         """
