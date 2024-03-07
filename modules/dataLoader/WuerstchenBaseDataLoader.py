@@ -95,10 +95,10 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
 
 
     def _load_input_modules(self, config: TrainConfig, model: WuerstchenModel) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1)
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, dtype=model.effnet_encoder_train_dtype.torch_dtype())
 
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, dtype=model.effnet_encoder_train_dtype.torch_dtype())
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -215,13 +215,13 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
     def _preparation_modules(self, config: TrainConfig, model: WuerstchenModel):
         downscale_image = ScaleImage(in_name='image', out_name='image', factor=0.75)
         normalize_image = NormalizeImageChannels(image_in_name='image', image_out_name='image', mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-        encode_image = EncodeWuerstchenEffnet(in_name='image', out_name='latent_image', effnet_encoder=model.effnet_encoder, autocast_context=model.autocast_context)
+        encode_image = EncodeWuerstchenEffnet(in_name='image', out_name='latent_image', effnet_encoder=model.effnet_encoder, autocast_contexts=[model.autocast_context, model.effnet_encoder_autocast_context], dtype=model.effnet_encoder_train_dtype.torch_dtype())
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.75 * 0.03125) # *0.75 / 32.0
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.prior_tokenizer, max_token_length=model.prior_tokenizer.model_max_length)
         if model.model_type.is_wuerstchen_v2():
-            encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1)
+            encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         elif model.model_type.is_stable_cascade():
-            encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name='pooled_text_encoder_output', add_layer_norm=False, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1)
+            encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name='pooled_text_encoder_output', add_layer_norm=False, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
         modules = [
             downscale_image, normalize_image, encode_image,
@@ -313,9 +313,17 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
 
+        def before_cache_image_fun():
+            model.to(self.temp_device)
+            model.effnet_encoder_to(self.train_device)
+            model.eval()
+            torch_gc()
+
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name=None,
-            replace_probability=config.unmasked_probability, vae=None, possible_resolutions_in_name='possible_resolutions'
+            replace_probability=config.unmasked_probability, vae=None, possible_resolutions_in_name='possible_resolutions',
+            autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
+            before_cache_fun=before_cache_image_fun
         )
         batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
         output = OutputPipelineModule(names=output_names)

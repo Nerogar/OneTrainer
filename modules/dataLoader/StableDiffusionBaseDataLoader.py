@@ -99,12 +99,12 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         return modules
 
     def _load_input_modules(self, config: TrainConfig, model: StableDiffusionModel) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1)
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, dtype=model.train_dtype.torch_dtype())
 
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1)
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, dtype=model.train_dtype.torch_dtype())
 
-        generate_depth = GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=model.image_depth_processor, depth_estimator=model.depth_estimator)
+        generate_depth = GenerateDepth(path_in_name='image_path', image_out_name='depth', image_depth_processor=model.image_depth_processor, depth_estimator=model.depth_estimator, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -240,12 +240,12 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
     def _preparation_modules(self, config: TrainConfig, model: StableDiffusionModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae)
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         downscale_depth = ScaleImage(in_name='depth', out_name='latent_depth', factor=0.125)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=model.tokenizer.model_max_length)
-        encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_context=model.autocast_context)
+        encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
         modules = [rescale_image, encode_image, tokenize_prompt]
 
@@ -352,7 +352,8 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
             replace_probability=config.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions',
-            autocast_context=model.autocast_context, before_cache_fun=before_cache_image_fun,
+            autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
+            before_cache_fun=before_cache_image_fun,
         )
         batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
         output = OutputPipelineModule(names=output_names)
@@ -378,8 +379,8 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         def before_save_fun():
             model.vae_to(self.train_device)
 
-        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae)
-        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae)
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
         decode_prompt = DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer)
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)

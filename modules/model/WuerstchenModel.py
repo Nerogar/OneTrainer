@@ -127,9 +127,11 @@ class WuerstchenModel(BaseModel):
 
         self.autocast_context = nullcontext()
         self.prior_autocast_context = nullcontext()
+        self.effnet_encoder_autocast_context = nullcontext()
 
         self.train_dtype = DataType.FLOAT_32
         self.prior_train_dtype = DataType.FLOAT_32
+        self.effnet_encoder_train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
         self.prior_text_encoder_lora = prior_text_encoder_lora

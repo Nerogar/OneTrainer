@@ -55,9 +55,24 @@ def disable_fp16_autocast_context(
     return torch.autocast(device_type=device.type, dtype=fallback_train_dtype.torch_dtype()), fallback_train_dtype
 
 
-def get_autocast_dtype(
-        train_dtypes: list[DataType | None],
-) -> DataType:
-    for dtype in reversed(train_dtypes):
-        if dtype is not None and dtype != DataType.NONE:
-            return dtype
+def disable_bf16_on_fp16_autocast_context(
+        device: torch.device,
+        train_dtype: DataType | None,
+        weight_dtypes: list[DataType | None],
+) -> (torch.autocast | nullcontext, DataType):
+    weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
+    weight_dtypes = list(set(weight_dtypes))
+
+    if all(weight_dtype != DataType.FLOAT_16 for weight_dtype in weight_dtypes):
+        # weights are not in fp16 -> nothing to disable
+        return nullcontext(), train_dtype
+
+    if train_dtype != DataType.BFLOAT_16:
+        # train dtype is not bf16 -> nothing to disable
+        return nullcontext(), train_dtype
+
+    if len(weight_dtypes) == 1:
+        # all weights use the same dtype -> disable autocast
+        return torch.autocast(device_type=device.type, enabled=False), weight_dtypes[0]
+
+    return torch.autocast(device_type=device.type, dtype=weight_dtypes[0]), weight_dtypes[0]

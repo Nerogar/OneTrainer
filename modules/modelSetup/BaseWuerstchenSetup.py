@@ -14,7 +14,8 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpo
     enable_checkpointing_for_stable_cascade_blocks
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context, \
+    disable_bf16_on_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -82,6 +83,14 @@ class BaseWuerstchenSetup(
             )
         else:
             model.prior_train_dtype = model.train_dtype
+
+        model.effnet_encoder_autocast_context, model.effnet_encoder_train_dtype = disable_bf16_on_fp16_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            [
+                config.weight_dtypes().effnet_encoder,
+            ],
+        )
 
     def __alpha_cumprod(
             self,
