@@ -26,6 +26,8 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
         match model_type:
             case ModelType.WUERSTCHEN_2:
                 return "resources/sd_model_spec/wuerstchen_2.0-embedding.json"
+            case ModelType.STABLE_CASCADE_1:
+                return "resources/sd_model_spec/stable_cascade_1.0-embedding.json"
             case _:
                 return None
 
@@ -38,7 +40,7 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
 
         embedding_state = torch.load(embedding_name)
 
-        tensor = embedding_state["prior"]
+        tensor = embedding_state["clip_g"]
 
         embedding = WuerstchenModelEmbedding(
             prior_text_encoder_vector=tensor,
@@ -57,7 +59,7 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
 
         embedding_state = load_file(embedding_name)
 
-        tensor = embedding_state["prior"]
+        tensor = embedding_state["clip_g"]
 
         embedding = WuerstchenModelEmbedding(
             prior_text_encoder_vector=tensor,
@@ -124,7 +126,7 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin)
         else:
             model = WuerstchenModel(model_type=model_type)
 
-        if model_names.embedding:
+        if any(model_names.embedding):
             try:
                 self.__load_internal(model, model_names.embedding)
                 return model

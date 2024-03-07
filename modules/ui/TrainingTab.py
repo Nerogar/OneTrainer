@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
@@ -10,18 +10,18 @@ from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.optimizer_util import UserPreferenceUtility, OPTIMIZER_KEY_MAP
+from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
 class TrainingTab:
 
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(TrainingTab, self).__init__()
 
         self.master = master
-        self.train_args = train_args
+        self.train_config = train_config
         self.ui_state = ui_state
 
         master.grid_rowconfigure(0, weight=1)
@@ -44,20 +44,23 @@ class TrainingTab:
 
         column_0 = ctk.CTkFrame(master=self.scroll_frame, corner_radius=0, fg_color="transparent")
         column_0.grid(row=0, column=0, sticky="nsew")
+        column_0.grid_columnconfigure(0, weight=1)
 
         column_1 = ctk.CTkFrame(master=self.scroll_frame, corner_radius=0, fg_color="transparent")
         column_1.grid(row=0, column=1, sticky="nsew")
+        column_1.grid_columnconfigure(0, weight=1)
 
         column_2 = ctk.CTkFrame(master=self.scroll_frame, corner_radius=0, fg_color="transparent")
         column_2.grid(row=0, column=2, sticky="nsew")
+        column_2.grid_columnconfigure(0, weight=1)
 
-        if self.train_args.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui(column_0, column_1, column_2)
-        elif self.train_args.model_type.is_stable_diffusion_xl():
+        elif self.train_config.model_type.is_stable_diffusion_xl():
             self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2)
-        elif self.train_args.model_type.is_wuerstchen():
+        elif self.train_config.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui(column_0, column_1, column_2)
-        elif self.train_args.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart_alpha():
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
@@ -112,12 +115,13 @@ class TrainingTab:
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # optimizer
         components.label(frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
-        components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer",
-                               command=self.__restore_optimizer_prefs, adv_command=self.__open_optimizer_params_window)
+        components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer.optimizer",
+                               command=self.__restore_optimizer_config, adv_command=self.__open_optimizer_params_window)
 
         # learning rate scheduler
         components.label(frame, 1, 0, "Learning Rate Scheduler",
@@ -164,6 +168,7 @@ class TrainingTab:
     def __create_base2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # attention mechanism
         components.label(frame, 0, 0, "Attention",
@@ -218,6 +223,7 @@ class TrainingTab:
     def __create_align_prop_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # align prop
         components.label(frame, 0, 0, "AlignProp",
@@ -257,21 +263,23 @@ class TrainingTab:
     def __create_text_encoder_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # train text encoder
         components.label(frame, 0, 0, "Train Text Encoder",
                          tooltip="Enables training the text encoder model")
-        components.switch(frame, 0, 1, self.ui_state, "train_text_encoder")
+        components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
         # train text encoder epochs
-        components.label(frame, 1, 0, "Train Text Encoder Epochs",
-                         tooltip="Number of epochs to train the text encoder")
-        components.entry(frame, 1, 1, self.ui_state, "train_text_encoder_epochs")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder")
+        components.time_entry(frame, 1, 1, self.ui_state, "text_encoder.stop_training_after",
+                              "text_encoder.stop_training_after_unit", supports_time_units=False)
 
         # text encoder learning rate
         components.label(frame, 2, 0, "Text Encoder Learning Rate",
                          tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "text_encoder_learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "text_encoder.learning_rate")
 
         # text encoder layer skip (clip skip)
         components.label(frame, 3, 0, "Clip Skip",
@@ -281,21 +289,23 @@ class TrainingTab:
     def __create_text_encoder_1_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # train text encoder
         components.label(frame, 0, 0, "Train Text Encoder 1",
                          tooltip="Enables training the text encoder 1 model")
-        components.switch(frame, 0, 1, self.ui_state, "train_text_encoder")
+        components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
         # train text encoder epochs
-        components.label(frame, 1, 0, "Train Text Encoder 1 Epochs",
-                         tooltip="Number of epochs to train the text encoder 1")
-        components.entry(frame, 1, 1, self.ui_state, "train_text_encoder_epochs")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder 1")
+        components.time_entry(frame, 1, 1, self.ui_state, "text_encoder.stop_training_after",
+                              "text_encoder.stop_training_after_unit", supports_time_units=False)
 
         # text encoder learning rate
         components.label(frame, 2, 0, "Text Encoder 1 Learning Rate",
                          tooltip="The learning rate of the text encoder 1. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "text_encoder_learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "text_encoder.learning_rate")
 
         # text encoder layer skip (clip skip)
         components.label(frame, 3, 0, "Clip Skip 1",
@@ -305,21 +315,23 @@ class TrainingTab:
     def __create_text_encoder_2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # train text encoder
         components.label(frame, 0, 0, "Train Text Encoder 2",
                          tooltip="Enables training the text encoder 2 model")
-        components.switch(frame, 0, 1, self.ui_state, "train_text_encoder_2")
+        components.switch(frame, 0, 1, self.ui_state, "text_encoder_2.train")
 
         # train text encoder epochs
-        components.label(frame, 1, 0, "Train Text Encoder 2 Epochs",
-                         tooltip="Number of epochs to train the text encoder 1")
-        components.entry(frame, 1, 1, self.ui_state, "train_text_encoder_2_epochs")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder 1")
+        components.time_entry(frame, 1, 1, self.ui_state, "text_encoder_2.stop_training_after",
+                              "text_encoder_2.stop_training_after_unit", supports_time_units=False)
 
         # text encoder learning rate
         components.label(frame, 2, 0, "Text Encoder 2 Learning Rate",
                          tooltip="The learning rate of the text encoder 2. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "text_encoder_2_learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "text_encoder_2.learning_rate")
 
         # text encoder layer skip (clip skip)
         components.label(frame, 3, 0, "Clip Skip 2",
@@ -348,21 +360,23 @@ class TrainingTab:
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # train unet
         components.label(frame, 0, 0, "Train UNet",
                          tooltip="Enables training the UNet model")
-        components.switch(frame, 0, 1, self.ui_state, "train_unet")
+        components.switch(frame, 0, 1, self.ui_state, "unet.train")
 
         # train unet epochs
-        components.label(frame, 1, 0, "Train UNet Epochs",
-                         tooltip="Number of epochs to train the UNet")
-        components.entry(frame, 1, 1, self.ui_state, "train_unet_epochs")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the UNet")
+        components.time_entry(frame, 1, 1, self.ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
+                              supports_time_units=False)
 
         # unet learning rate
         components.label(frame, 2, 0, "UNet Learning Rate",
                          tooltip="The learning rate of the UNet. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "unet_learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate")
 
         # rescale noise scheduler to zero terminal SNR
         components.label(frame, 3, 0, "Rescale Noise Scheduler",
@@ -372,25 +386,28 @@ class TrainingTab:
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # train prior
         components.label(frame, 0, 0, "Train Prior",
                          tooltip="Enables training the Prior model")
-        components.switch(frame, 0, 1, self.ui_state, "train_prior")
+        components.switch(frame, 0, 1, self.ui_state, "prior.train")
 
         # train prior epochs
-        components.label(frame, 1, 0, "Train Prior Epochs",
-                         tooltip="Number of epochs to train the Prior")
-        components.entry(frame, 1, 1, self.ui_state, "train_prior_epochs")
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the Prior")
+        components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
+                              supports_time_units=False)
 
         # prior learning rate
         components.label(frame, 2, 0, "Prior Learning Rate",
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "prior_learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
     def __create_noise_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # offset noise weight
         components.label(frame, 0, 0, "Offset Noise Weight",
@@ -424,10 +441,10 @@ class TrainingTab:
                          wide_tooltip=True)
         components.entry(frame, 5, 1, self.ui_state, "noising_bias")
 
-
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # Masked Training
         components.label(frame, 0, 0, "Masked Training",
@@ -452,6 +469,7 @@ class TrainingTab:
     def __create_loss_frame(self, master, row, supports_vb_loss: bool):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
 
         # MSE Strength
         components.label(frame, 0, 0, "MSE Strength",
@@ -469,23 +487,19 @@ class TrainingTab:
                              tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
             components.entry(frame, 2, 1, self.ui_state, "vb_loss_strength")
 
+        # Minimum SNR Gamma
+        components.label(frame, 3, 0, "Min SNR Gamma",
+                         tooltip="Minimum SNR gamma. Can help the model learn details more accurately. 0 disables, 20 maximum, ~5 is the usual setting")
+        components.entry(frame, 3, 1, self.ui_state, "min_snr_gamma")
         # Loss Scaler
-        components.label(frame, 3, 0, "Loss Scaler",
+        components.label(frame, 4, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
-        components.options(frame, 3, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+        components.options(frame, 4, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __open_optimizer_params_window(self):
-        window = OptimizerParamsWindow(self.master, self.ui_state)
+        window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
-    def __restore_optimizer_prefs(self, optimizer):
-        pref_util = UserPreferenceUtility()
-        user_prefs = pref_util.load_preferences(optimizer)
-
-        for key, default_value in OPTIMIZER_KEY_MAP[optimizer].items():
-            if user_prefs == "Use_Default":
-                value_to_set = default_value
-            else:
-                value_to_set = user_prefs.get(key, default_value)
-
-            self.ui_state.vars[key].set(value_to_set)
+    def __restore_optimizer_config(self, *args):
+        optimizer_config = change_optimizer(self.train_config)
+        self.ui_state.get_var("optimizer").update(optimizer_config)

@@ -8,7 +8,7 @@ from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class StableDiffusionFineTuneSetup(
@@ -30,11 +30,11 @@ class StableDiffusionFineTuneSetup(
     def create_parameters(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         params = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             params += list(model.text_encoder.parameters())
 
             if args.train_embedding:
@@ -43,7 +43,7 @@ class StableDiffusionFineTuneSetup(
         if args.train_embedding and not args.train_text_encoder:
             params += list(model.text_encoder.get_input_embeddings().parameters())
 
-        if args.train_unet:
+        if config.unet.train:
             params += list(model.unet.parameters())
 
         return params
@@ -51,18 +51,17 @@ class StableDiffusionFineTuneSetup(
     def create_parameters_for_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
         
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             text_encoder_parameters = list(model.text_encoder.parameters())
             if args.train_embedding:
                 for embedding_parameter in model.text_encoder.get_input_embeddings().parameters():
                     text_encoder_parameters.remove(embedding_parameter)
-
             param_groups.append(
-                self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate)
+                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder.learning_rate)
             )
 
         if args.train_embedding and not args.train_text_encoder:
@@ -74,9 +73,9 @@ class StableDiffusionFineTuneSetup(
                 )
             )
 
-        if args.train_unet:
+        if config.unet.train:
             param_groups.append(
-                self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate)
+                self.create_param_groups(config, model.unet.parameters(), config.unet.learning_rate)
             )
 
         return param_groups
@@ -84,16 +83,18 @@ class StableDiffusionFineTuneSetup(
     def __setup_requires_grad(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
         train_embedding = args.train_embedding and (model.train_progress.epoch < args.train_embedding_epochs)
         if train_embedding:
             model.text_encoder.get_input_embeddings().requires_grad_(True)
 
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        train_unet = config.unet.train and \
+                             not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
 
         model.vae.requires_grad_(False)
@@ -109,12 +110,12 @@ class StableDiffusionFineTuneSetup(
         if args.train_embedding:
             model.text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
 
-        if args.rescale_noise_scheduler_to_zero_terminal_snr:
+        if config.rescale_noise_scheduler_to_zero_terminal_snr:
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
-        elif args.force_v_prediction:
+        elif config.force_v_prediction:
             model.force_v_prediction()
-        elif args.force_epsilon_prediction:
+        elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
         if len(model.embeddings) == 0:
@@ -136,42 +137,42 @@ class StableDiffusionFineTuneSetup(
         model.text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or args.align_prop
+        vae_on_train_device = self.debug_mode or config.align_prop
         text_encoder_on_train_device = \
-            args.train_text_encoder \
-            or args.train_embedding \
-            or args.align_prop \
-            or not args.latent_caching
+            config.text_encoder.train \
+            or config.train_embedding \
+            or config.align_prop \
+            or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
         model.depth_estimator_to(self.temp_device)
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             model.text_encoder.train()
         else:
             model.text_encoder.eval()
 
         model.vae.eval()
 
-        if args.train_unet:
+        if config.unet.train:
             model.unet.train()
         else:
             model.unet.eval()
@@ -179,7 +180,7 @@ class StableDiffusionFineTuneSetup(
     def after_optimizer_step(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, args)

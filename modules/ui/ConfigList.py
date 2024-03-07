@@ -6,8 +6,8 @@ from abc import abstractmethod, ABCMeta
 import customtkinter as ctk
 
 from modules.util import path_util
-from modules.util.args.TrainArgs import TrainArgs
-from modules.util.params.BaseParams import BaseParams
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.BaseConfig import BaseConfig
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -17,7 +17,7 @@ class ConfigList(metaclass=ABCMeta):
     def __init__(
             self,
             master,
-            train_args: TrainArgs,
+            train_config: TrainConfig,
             ui_state: UIState,
             element_attr_name: str,
             config_dir: str,
@@ -26,7 +26,7 @@ class ConfigList(metaclass=ABCMeta):
             is_full_width: bool,
     ):
         self.master = master
-        self.train_args = train_args
+        self.train_config = train_config
         self.ui_state = ui_state
         self.element_attr_name = element_attr_name
 
@@ -50,7 +50,7 @@ class ConfigList(metaclass=ABCMeta):
 
         self.current_config = []
         self.widgets = []
-        self.__load_current_config(getattr(self.train_args, self.element_attr_name))
+        self.__load_current_config(getattr(self.train_config, self.element_attr_name))
 
         self.__create_configs_dropdown()
 
@@ -63,7 +63,7 @@ class ConfigList(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def create_new_element(self) -> BaseParams:
+    def create_new_element(self) -> BaseConfig:
         pass
 
     @abstractmethod
@@ -192,7 +192,7 @@ class ConfigList(metaclass=ABCMeta):
             if not os.path.exists(self.config_dir):
                 os.mkdir(self.config_dir)
 
-            with open(getattr(self.train_args, self.element_attr_name), "w") as f:
+            with open(getattr(self.train_config, self.element_attr_name), "w") as f:
                 json.dump(
                     [element.to_dict() for element in self.current_config],
                     f, indent=4

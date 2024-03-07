@@ -277,7 +277,7 @@ Mouse wheel: increase or decrease brush size"""
             prompt_name = os.path.join(self.dir, prompt_name)
 
             try:
-                with open(prompt_name, "r") as f:
+                with open(prompt_name, "r", encoding='utf-8') as f:
                     return f.readlines()[0].strip()
             except:
                 return ""
@@ -466,7 +466,7 @@ Mouse wheel: increase or decrease brush size"""
             mask_name = os.path.join(self.dir, mask_name)
 
             try:
-                with open(prompt_name, "w") as f:
+                with open(prompt_name, "w", encoding='utf-8') as f:
                     f.write(self.prompt_var.get())
             except:
                 return ""

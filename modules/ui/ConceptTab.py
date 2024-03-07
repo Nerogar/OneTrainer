@@ -6,17 +6,17 @@ from PIL import Image
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
-from modules.util.args.TrainArgs import TrainArgs
-from modules.util.params.ConceptParams import ConceptParams
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
 class ConceptTab(ConfigList):
 
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(ConceptTab, self).__init__(
-            master, train_args, ui_state, "concept_file_name",
+            master, train_config, ui_state, "concept_file_name",
             "training_concepts", "concepts.json", "add concept",
             is_full_width=False,
         )
@@ -25,7 +25,7 @@ class ConceptTab(ConfigList):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return ConceptParams.default_values()
+        return ConceptConfig.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
@@ -84,7 +84,7 @@ class ConceptWidget(ctk.CTkFrame):
         enabled_switch = ctk.CTkSwitch(
             master=self,
             width=40,
-            variable=self.ui_state.vars["enabled"],
+            variable=self.ui_state.get_var("enabled"),
             text="",
             command=save_command,
         )
@@ -95,8 +95,8 @@ class ConceptWidget(ctk.CTkFrame):
             lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
         )
 
-    def __randomize_seed(self, concept: ConceptParams):
-        concept.seed = ConceptParams.default_values().seed
+    def __randomize_seed(self, concept: ConceptConfig):
+        concept.seed = ConceptConfig.default_values().seed
         return concept
 
     def __get_display_name(self):

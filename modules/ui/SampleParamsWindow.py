@@ -1,13 +1,13 @@
 import customtkinter as ctk
 
 from modules.ui.SampleFrame import SampleFrame
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleConfig import SampleConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
 class SampleParamsWindow(ctk.CTkToplevel):
-    def __init__(self, parent, sample: SampleParams, ui_state: UIState, *args, **kwargs):
+    def __init__(self, parent, sample: SampleConfig, ui_state: UIState, *args, **kwargs):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
         self.sample = sample

@@ -16,7 +16,7 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers, \
     create_checkpointed_forward
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -33,11 +33,11 @@ class BaseStableDiffusionXLSetup(
     def setup_optimizations(
             self,
             model: StableDiffusionXLModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        if args.attention_mechanism == AttentionMechanism.DEFAULT:
+        if config.attention_mechanism == AttentionMechanism.DEFAULT:
             model.unet.set_attn_processor(AttnProcessor())
-        elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
+        elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
                 model.unet.set_attn_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
@@ -46,7 +46,7 @@ class BaseStableDiffusionXLSetup(
                     "Could not enable memory efficient attention. Make sure xformers is installed"
                     f" correctly and a GPU is available: {e}"
                 )
-        elif args.attention_mechanism == AttentionMechanism.SDP:
+        elif config.attention_mechanism == AttentionMechanism.SDP:
             model.unet.set_attn_processor(AttnProcessor2_0())
 
             if is_xformers_available():
@@ -58,28 +58,27 @@ class BaseStableDiffusionXLSetup(
                         f" correctly and a GPU is available: {e}"
                     )
 
-        if args.gradient_checkpointing:
+        if config.gradient_checkpointing:
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_transformer_blocks(model.unet)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2)
+            enable_checkpointing_for_transformer_blocks(model.unet, self.train_device)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
-            args.weight_dtype,
-            args.unet_weight_dtype,
-            args.text_encoder_weight_dtype,
-            args.text_encoder_2_weight_dtype,
-            args.vae_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
+            config.weight_dtypes().unet,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().text_encoder_2,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
 
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
             self.train_device,
-            args.train_dtype,
-            args.fallback_train_dtype,
+            config.train_dtype,
+            config.fallback_train_dtype,
             [
-                args.vae_weight_dtype,
+                config.weight_dtypes().vae,
             ]
         )
 
@@ -136,42 +135,42 @@ class BaseStableDiffusionXLSetup(
             self,
             model: StableDiffusionXLModel,
             batch: dict,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            generator = torch.Generator(device=args.train_device)
+            generator = torch.Generator(device=config.train_device)
             generator.manual_seed(train_progress.global_step)
             rand = Random(train_progress.global_step)
 
-            is_align_prop_step = args.align_prop and (rand.random() < args.align_prop_probability)
+            is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, pooled_text_encoder_2_output = self.__encode_text(
                 model,
-                args.text_encoder_layer_skip,
-                args.text_encoder_2_layer_skip,
+                config.text_encoder_layer_skip,
+                config.text_encoder_2_layer_skip,
                 tokens_1=batch['tokens_1'],
                 tokens_2=batch['tokens_2'],
                 text_encoder_1_output=batch[
-                    'text_encoder_1_hidden_state'] if not args.train_text_encoder and args.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_1_hidden_state'] if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING else None,
                 text_encoder_2_output=batch[
-                    'text_encoder_2_hidden_state'] if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_2_hidden_state'] if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING else None,
                 pooled_text_encoder_2_output=batch[
-                    'text_encoder_2_pooled_state'] if not args.train_text_encoder_2 and args.training_method != TrainingMethod.EMBEDDING else None,
+                    'text_encoder_2_pooled_state'] if not config.text_encoder_2.train and config.training_method != TrainingMethod.EMBEDDING else None,
             )
 
             latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
-            if args.model_type.has_conditioning_image_input():
+            if config.model_type.has_conditioning_image_input():
                 scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
-            latent_noise = self._create_noise(scaled_latent_image, args, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             if is_align_prop_step and not deterministic:
                 dummy = torch.zeros((1,), device=self.train_device)
@@ -179,8 +178,8 @@ class BaseStableDiffusionXLSetup(
 
                 negative_text_encoder_output, negative_pooled_text_encoder_2_output = self.__encode_text(
                     model,
-                    args.text_encoder_layer_skip,
-                    args.text_encoder_2_layer_skip,
+                    config.text_encoder_layer_skip,
+                    config.text_encoder_2_layer_skip,
                     text="",
                 )
                 negative_text_encoder_output = negative_text_encoder_output \
@@ -188,15 +187,15 @@ class BaseStableDiffusionXLSetup(
                 negative_pooled_text_encoder_2_output = negative_pooled_text_encoder_2_output \
                     .expand((scaled_latent_image.shape[0], -1))
 
-                model.noise_scheduler.set_timesteps(args.align_prop_steps)
+                model.noise_scheduler.set_timesteps(config.align_prop_steps)
 
                 scaled_noisy_latent_image = latent_noise
 
-                timestep_high = int(args.align_prop_steps * args.max_noising_strength)
+                timestep_high = int(config.align_prop_steps * config.max_noising_strength)
                 timestep_low = \
-                    int(args.align_prop_steps * args.max_noising_strength * (1.0 - args.align_prop_truncate_steps))
+                    int(config.align_prop_steps * config.max_noising_strength * (1.0 - config.align_prop_truncate_steps))
 
-                truncate_timestep_index = args.align_prop_steps - rand.randint(timestep_low, timestep_high)
+                truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
                 # original size of the image
                 original_height = scaled_noisy_latent_image.shape[2] * 8
@@ -226,12 +225,12 @@ class BaseStableDiffusionXLSetup(
 
                 checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device)
 
-                for step in range(args.align_prop_steps):
+                for step in range(config.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \
                         .expand((scaled_latent_image.shape[0],)) \
                         .to(device=model.unet.device)
 
-                    if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
+                    if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                         latent_input = torch.concat(
                             [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
                         )
@@ -253,7 +252,7 @@ class BaseStableDiffusionXLSetup(
                     ).sample
 
                     cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
-                    cfg_predicted_latent_noise = negative_predicted_latent_noise + args.align_prop_cfg_scale * cfg_grad
+                    cfg_predicted_latent_noise = negative_predicted_latent_noise + config.align_prop_cfg_scale * cfg_grad
 
                     scaled_noisy_latent_image = model.noise_scheduler \
                         .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
@@ -268,7 +267,7 @@ class BaseStableDiffusionXLSetup(
                             predicted_image = self._project_latent_to_image_sdxl(scaled_noisy_latent_image)
                             self._save_image(
                                 predicted_image,
-                                args.debug_dir + "/training_batches",
+                                config.debug_dir + "/training_batches",
                                 "2-predicted_image_" + str(step),
                                 train_progress.global_step,
                                 True
@@ -296,7 +295,7 @@ class BaseStableDiffusionXLSetup(
                     deterministic,
                     generator,
                     scaled_latent_image.shape[0],
-                    args,
+                    config,
                     train_progress.global_step,
                 )
 
@@ -329,7 +328,7 @@ class BaseStableDiffusionXLSetup(
                     device=scaled_noisy_latent_image.device,
                 )
 
-                if args.model_type.has_mask_input() and args.model_type.has_conditioning_image_input():
+                if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                     latent_input = torch.concat(
                         [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
                     )
@@ -349,6 +348,7 @@ class BaseStableDiffusionXLSetup(
                 if model.noise_scheduler.config.prediction_type == 'epsilon':
                     model_output_data = {
                         'loss_type': 'target',
+                        'timestep': timestep,
                         'predicted': predicted_latent_noise,
                         'target': latent_noise,
                     }
@@ -356,15 +356,16 @@ class BaseStableDiffusionXLSetup(
                     target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
                     model_output_data = {
                         'loss_type': 'target',
+                        'timestep': timestep,
                         'predicted': predicted_latent_noise,
                         'target': target_velocity,
                     }
 
-            if args.debug_mode:
+            if config.debug_mode:
                 with torch.no_grad():
                     self._save_text(
                         self._decode_tokens(batch['tokens_1'], model.tokenizer_1),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "7-prompt",
                         train_progress.global_step,
                     )
@@ -373,7 +374,7 @@ class BaseStableDiffusionXLSetup(
                         # noise
                         self._save_image(
                             self._project_latent_to_image_sdxl(latent_noise),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "1-noise",
                             train_progress.global_step,
                             True
@@ -382,7 +383,7 @@ class BaseStableDiffusionXLSetup(
                         # image
                         self._save_image(
                             self._project_latent_to_image_sdxl(scaled_latent_image),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "2-image",
                             model.train_progress.global_step,
                             True
@@ -391,7 +392,7 @@ class BaseStableDiffusionXLSetup(
                         # noise
                         self._save_image(
                             self._project_latent_to_image_sdxl(latent_noise),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "1-noise",
                             train_progress.global_step,
                             True
@@ -400,7 +401,7 @@ class BaseStableDiffusionXLSetup(
                         # predicted noise
                         self._save_image(
                             self._project_latent_to_image_sdxl(predicted_latent_noise),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "2-predicted_noise",
                             train_progress.global_step,
                             True
@@ -409,14 +410,14 @@ class BaseStableDiffusionXLSetup(
                         # noisy image
                         self._save_image(
                             self._project_latent_to_image_sdxl(scaled_noisy_latent_image),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "3-noisy_image",
                             train_progress.global_step,
                             True
                         )
 
                         # predicted image
-                        alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(args.train_device)
+                        alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(config.train_device)
                         sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
                         sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
@@ -428,7 +429,7 @@ class BaseStableDiffusionXLSetup(
                             / sqrt_alpha_prod
                         self._save_image(
                             self._project_latent_to_image_sdxl(scaled_predicted_latent_image),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "4-predicted_image",
                             model.train_progress.global_step,
                             True
@@ -437,12 +438,13 @@ class BaseStableDiffusionXLSetup(
                         # image
                         self._save_image(
                             self._project_latent_to_image_sdxl(scaled_latent_image),
-                            args.debug_dir + "/training_batches",
+                            config.debug_dir + "/training_batches",
                             "5-image",
                             model.train_progress.global_step,
                             True
                         )
 
+        model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(
@@ -450,12 +452,12 @@ class BaseStableDiffusionXLSetup(
             model: StableDiffusionXLModel,
             batch: dict,
             data: dict,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Tensor:
         return self._diffusion_losses(
             batch=batch,
             data=data,
-            args=args,
+            config=config,
             train_device=self.train_device,
             betas=model.noise_scheduler.betas.to(device=self.train_device),
         ).mean()

@@ -1,7 +1,7 @@
 from abc import ABCMeta
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
+from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
@@ -10,10 +10,12 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers
+from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers, \
+    enable_checkpointing_for_stable_cascade_blocks
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
-from modules.util.dtype_util import create_autocast_context
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context, \
+    disable_bf16_on_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -29,36 +31,66 @@ class BaseWuerstchenSetup(
     def setup_optimizations(
             self,
             model: WuerstchenModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        if args.attention_mechanism == AttentionMechanism.DEFAULT:
-            model.prior_prior.set_attn_processor(AttnProcessor())
-        elif args.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
+        if config.attention_mechanism == AttentionMechanism.DEFAULT:
+            for name, child_module in model.prior_prior.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor())
+        elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                model.prior_prior.set_attn_processor(XFormersAttnProcessor())
+                for name, child_module in model.prior_prior.named_modules():
+                    if isinstance(child_module, Attention):
+                        child_module.set_processor(XFormersAttnProcessor())
             except Exception as e:
                 print(
                     "Could not enable memory efficient attention. Make sure xformers is installed"
                     f" correctly and a GPU is available: {e}"
                 )
-        elif args.attention_mechanism == AttentionMechanism.SDP:
-            model.prior_prior.set_attn_processor(AttnProcessor2_0())
+        elif config.attention_mechanism == AttentionMechanism.SDP:
+            for name, child_module in model.prior_prior.named_modules():
+                if isinstance(child_module, Attention):
+                    child_module.set_processor(AttnProcessor2_0())
 
-        if args.gradient_checkpointing:
-            model.prior_prior.enable_gradient_checkpointing()
-            enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder)
+        if config.gradient_checkpointing:
+            if model.model_type.is_wuerstchen_v2():
+                model.prior_prior.enable_gradient_checkpointing()
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
+            elif model.model_type.is_stable_cascade():
+                enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, self.train_device)
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, args.train_dtype, [
-            args.weight_dtype,
-            args.decoder_text_encoder_weight_dtype,
-            args.decoder_weight_dtype,
-            args.decoder_vqgan_weight_dtype,
-            args.effnet_encoder_weight_dtype,
-            args.text_encoder_weight_dtype,
-            args.prior_weight_dtype,
-            args.lora_weight_dtype if args.training_method == TrainingMethod.LORA else None,
-            args.embedding_weight_dtype if args.training_method == TrainingMethod.EMBEDDING else None,
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
+            config.weight_dtypes().decoder_text_encoder,
+            config.weight_dtypes().decoder,
+            config.weight_dtypes().decoder_vqgan,
+            config.weight_dtypes().effnet_encoder,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().prior,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
         ])
+
+        if model.model_type.is_stable_cascade():
+            model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
+                self.train_device,
+                config.train_dtype,
+                config.fallback_train_dtype,
+                [
+                    config.weight_dtypes().prior,
+                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                ],
+            )
+        else:
+            model.prior_train_dtype = model.train_dtype
+
+        model.effnet_encoder_autocast_context, model.effnet_encoder_train_dtype = disable_bf16_on_fp16_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            [
+                config.weight_dtypes().effnet_encoder,
+            ],
+        )
 
     def __alpha_cumprod(
             self,
@@ -79,30 +111,35 @@ class BaseWuerstchenSetup(
             self,
             model: WuerstchenModel,
             batch: dict,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            latent_mean = 42.0
-            latent_std = 1.0
-
             latent_image = batch['latent_image']
-            scaled_latent_image = latent_image.add(latent_std).div(latent_mean)
+            if model.model_type.is_wuerstchen_v2():
+                scaled_latent_image = latent_image.add(1.0).div(42.0)
+            elif model.model_type.is_stable_cascade():
+                scaled_latent_image = latent_image
 
-            generator = torch.Generator(device=args.train_device)
+            generator = torch.Generator(device=config.train_device)
             generator.manual_seed(train_progress.global_step)
 
-            latent_noise = self._create_noise(scaled_latent_image, args, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             timestep = self._get_timestep_continuous(
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
-                args,
+                config,
                 train_progress.global_step,
-            ).mul(1.08).add(0.001).clamp(0.001, 1.0)
+            )
+
+            if model.model_type.is_wuerstchen_v2():
+                timestep = timestep.mul(1.08).add(0.001).clamp(0.001, 1.0)
+            elif model.model_type.is_stable_cascade():
+                timestep = timestep.add(0.001).clamp(0.001, 1.0)
 
             scaled_noisy_latent_image = self._add_noise_continuous(
                 scaled_latent_image,
@@ -111,33 +148,62 @@ class BaseWuerstchenSetup(
                 self.__alpha_cumprod,
             )
 
-            if args.train_text_encoder or args.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
                 text_encoder_output = model.prior_text_encoder(
                     batch['tokens'], output_hidden_states=True, return_dict=True
                 )
-                final_layer_norm = model.prior_text_encoder.text_model.final_layer_norm
-                text_encoder_output = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + args.text_encoder_layer_skip)]
-                )
+                if model.model_type.is_wuerstchen_v2():
+                    final_layer_norm = model.prior_text_encoder.text_model.final_layer_norm
+                    text_embedding = final_layer_norm(
+                        text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
+                    )
+                if model.model_type.is_stable_cascade():
+                    text_embedding = text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
+                    if model.model_type.is_stable_cascade():
+                        pooled_text_text_embedding = text_encoder_output.text_embeds.unsqueeze(1)
             else:
-                text_encoder_output = batch['text_encoder_hidden_state']
+                text_embedding = batch['text_encoder_hidden_state']
+                if model.model_type.is_stable_cascade():
+                    pooled_text_text_embedding = batch['pooled_text_encoder_output'].unsqueeze(1)
 
             latent_input = scaled_noisy_latent_image
 
-            predicted_latent_noise = model.prior_prior(latent_input, timestep, text_encoder_output)
+            if model.model_type.is_wuerstchen_v2():
+                prior_kwargs = {
+                    'c': text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                }
+            elif model.model_type.is_stable_cascade():
+                clip_img = torch.zeros(
+                    size=(text_embedding.shape[0], 1, 768),
+                    dtype=model.prior_train_dtype.torch_dtype(),
+                    device=self.train_device,
+                )
+                prior_kwargs = {
+                    'clip_text': text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'clip_text_pooled': pooled_text_text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    'clip_img': clip_img,
+                }
+
+            with model.prior_autocast_context:
+                predicted_latent_noise = model.prior_prior(
+                    latent_input.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    timestep.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    **prior_kwargs,
+                )
 
             model_output_data = {
                 'loss_type': 'target',
                 'predicted': predicted_latent_noise,
+                'prediction_type': 'epsilon',  # the DDPMWuerstchenScheduler only supports eps prediction
                 'target': latent_noise,
                 'timestep': timestep,
             }
 
-            if args.debug_mode:
+            if config.debug_mode:
                 with torch.no_grad():
                     self._save_text(
                         self._decode_tokens(batch['tokens'], model.prior_tokenizer),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "7-prompt",
                         train_progress.global_step,
                     )
@@ -145,7 +211,7 @@ class BaseWuerstchenSetup(
                     # noise
                     self._save_image(
                         self._project_latent_to_image(latent_noise).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "1-noise",
                         train_progress.global_step
                     )
@@ -153,7 +219,7 @@ class BaseWuerstchenSetup(
                     # predicted noise
                     self._save_image(
                         self._project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "2-predicted_noise",
                         train_progress.global_step
                     )
@@ -161,7 +227,7 @@ class BaseWuerstchenSetup(
                     # noisy image
                     self._save_image(
                         self._project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "3-noisy_image",
                         train_progress.global_step
                     )
@@ -179,7 +245,7 @@ class BaseWuerstchenSetup(
                         / sqrt_alpha_prod
                     self._save_image(
                         self._project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "4-predicted_image",
                         model.train_progress.global_step
                     )
@@ -187,7 +253,7 @@ class BaseWuerstchenSetup(
                     # image
                     self._save_image(
                         self._project_latent_to_image(scaled_latent_image).clamp(-1, 1),
-                        args.debug_dir + "/training_batches",
+                        config.debug_dir + "/training_batches",
                         "5-image",
                         model.train_progress.global_step
                     )
@@ -199,19 +265,23 @@ class BaseWuerstchenSetup(
             model: WuerstchenModel,
             batch: dict,
             data: dict,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Tensor:
         losses = self._diffusion_losses(
             batch=batch,
             data=data,
-            args=args,
+            config=config,
             train_device=self.train_device,
-            betas=None,
+            alphas_cumprod_fun=self.__alpha_cumprod,
         )
 
-        k = 1.0
-        gamma = 1.0
-        alpha_cumprod = self.__alpha_cumprod(data['timestep'], losses.dim())
-        p2_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
+        if config.min_snr_gamma:
+            # if min snr gamma is active, disable p2 scaling
+            return losses.mean()
+        else:
+            k = 1.0
+            gamma = 1.0
+            alpha_cumprod = self.__alpha_cumprod(data['timestep'], losses.dim())
+            p2_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
 
-        return (losses * p2_loss_weight).mean()
+            return (losses * p2_loss_weight).mean()

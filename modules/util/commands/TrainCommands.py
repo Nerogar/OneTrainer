@@ -1,4 +1,4 @@
-from modules.util.params.SampleParams import SampleParams
+from modules.util.config.SampleConfig import SampleConfig
 
 
 class TrainCommands:
@@ -14,10 +14,10 @@ class TrainCommands:
     def get_stop_command(self) -> bool:
         return self.__stop_command
 
-    def sample_custom(self, sample_params: SampleParams):
+    def sample_custom(self, sample_params: SampleConfig):
         self.__sample_custom_commands.append(sample_params)
 
-    def get_and_reset_sample_custom_commands(self) -> list[SampleParams]:
+    def get_and_reset_sample_custom_commands(self) -> list[SampleConfig]:
         sample_custom_commands = self.__sample_custom_commands
         self.__sample_custom_commands = []
         return sample_custom_commands

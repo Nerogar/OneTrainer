@@ -4,7 +4,7 @@ from mgds.pipelineModules.ReplaceText import ReplaceText
 from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class WuerstchenEmbeddingDataLoader(WuerstchenBaseDataLoader):
@@ -12,20 +12,20 @@ class WuerstchenEmbeddingDataLoader(WuerstchenBaseDataLoader):
             self,
             train_device: torch.device,
             temp_device: torch.device,
-            args: TrainArgs,
+            config: TrainConfig,
             model: WuerstchenModel,
             train_progress: TrainProgress,
     ):
         super(WuerstchenEmbeddingDataLoader, self).__init__(
             train_device,
             temp_device,
-            args,
+            config,
             model,
             train_progress,
         )
 
-    def _load_input_modules(self, args: TrainArgs, model: WuerstchenModel) -> list:
-        modules = super(WuerstchenEmbeddingDataLoader, self)._load_input_modules(args, model)
+    def _load_input_modules(self, config: TrainConfig, model: WuerstchenModel) -> list:
+        modules = super(WuerstchenEmbeddingDataLoader, self)._load_input_modules(config, model)
 
         all_token_string = ''.join(model.embeddings[0].text_tokens)
 

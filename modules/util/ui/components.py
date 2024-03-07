@@ -3,6 +3,7 @@ from typing import Tuple, Any, Callable
 
 import customtkinter as ctk
 from PIL import Image
+from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.ui.ToolTip import ToolTip
@@ -42,21 +43,24 @@ def entry(
         var_name: str,
         command: Callable[[], None] = None,
 ):
-    var = ui_state.vars[var_name]
+    var = ui_state.get_var(var_name)
     if command:
-        var.trace_add("write", lambda _0, _1, _2: command())
+        trace_id = ui_state.add_var_trace(var_name, command)
 
     component = ctk.CTkEntry(master, textvariable=var)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
 
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
     def create_destroy(component):
         orig_destroy = component.destroy
 
         def destroy(self):
+            # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
             if self._textvariable_callback_name:
                 self._textvariable.trace_remove("write", self._textvariable_callback_name)
                 self._textvariable_callback_name = ""
+
+            if command is not None:
+                ui_state.remove_var_trace(var_name, trace_id)
 
             orig_destroy()
 
@@ -79,7 +83,7 @@ def file_entry(
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.vars[var_name])
+    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name))
     entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
 
     def __open_dialog():
@@ -102,7 +106,7 @@ def file_entry(
             if path_modifier:
                 file_path = path_modifier(file_path)
 
-            ui_state.vars[var_name].set(file_path)
+            ui_state.get_var(var_name).set(file_path)
 
             if command:
                 command(file_path)
@@ -135,14 +139,14 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.vars[var_name])
+    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name))
     entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
 
     def __open_dialog():
         dir_path = filedialog.askdirectory()
 
         if dir_path:
-            ui_state.vars[var_name].set(dir_path)
+            ui_state.get_var(var_name).set(dir_path)
 
             if command:
                 command(dir_path)
@@ -169,19 +173,40 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
     return frame
 
 
-def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name):
+def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name, supports_time_units: bool = True):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
-    frame.grid_columnconfigure(0, weight=1)
+    frame.grid_columnconfigure(0, weight=0)
+    frame.grid_columnconfigure(1, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.vars[var_name])
+    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name), width=50)
     entry_component.grid(row=0, column=0, padx=PAD, pady=PAD, sticky="new")
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            if self._textvariable_callback_name:
+                self._textvariable.trace_remove("write", self._textvariable_callback_name)
+                self._textvariable_callback_name = ""
+
+            orig_destroy()
+
+        return destroy
+
+    destroy = create_destroy(entry_component)
+    entry_component.destroy = lambda: destroy(entry_component)
+
+    values = [str(x) for x in list(TimeUnit)]
+    if not supports_time_units:
+        values = [str(x) for x in list(TimeUnit) if not x.is_time_unit()]
 
     unit_component = ctk.CTkOptionMenu(
         frame,
-        values=[str(x) for x in list(TimeUnit)],
-        variable=ui_state.vars[unit_var_name],
+        values=values,
+        variable=ui_state.get_var(unit_var_name),
         width=100,
     )
     unit_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="new")
@@ -204,8 +229,22 @@ def button(master, row, column, text, command, tooltip=None):
 
 
 def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
-    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.vars[var_name], command=command)
+    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
+
     return component
 
 
@@ -216,21 +255,34 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
 
     frame.grid_columnconfigure(0, weight=1)
 
-    component = ctk.CTkOptionMenu(frame, values=values, variable=ui_state.vars[var_name], command=command)
+    component = ctk.CTkOptionMenu(frame, values=values, variable=ui_state.get_var(var_name), command=command)
     component.grid(row=0, column=0, padx=PAD, pady=(PAD, PAD), sticky="new")
 
     button_component = ctk.CTkButton(frame, text="…", width=20, command=adv_command)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
     if command:
-        command(ui_state.vars[var_name].get())  # call command once to set the initial value
+        command(ui_state.get_var(var_name).get())  # call command once to set the initial value
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
 
     return frame
 
 
 def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
                command: Callable[[Any], None] = None):
-    var = ui_state.vars[var_name]
+    var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
 
     # if the current value is not valid, select the first option
@@ -266,12 +318,52 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     var.trace_add("write", lambda _0, _1, _2: update_var())
     update_var()  # call update_var once to set the initial value
 
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
+
     return component
 
 
-def switch(master, row, column, ui_state: UIState, var_name: str, command: Callable[[], None] = None, text: str =""):
-    component = ctk.CTkSwitch(master, variable=ui_state.vars[var_name], text=text, command=command)
+def switch(
+        master,
+        row,
+        column,
+        ui_state: UIState,
+        var_name: str,
+        command: Callable[[], None] = None,
+        text: str = "",
+):
+    var = ui_state.get_var(var_name)
+    if command:
+        trace_id = ui_state.add_var_trace(var_name, command)
+
+    component = ctk.CTkSwitch(master, variable=var, text=text)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            if command is not None:
+                ui_state.remove_var_trace(var_name, trace_id)
+
+            orig_destroy()
+
+        return destroy
+
+    destroy = create_destroy(component)
+    component.destroy = lambda: destroy(component)
+
     return component
 
 

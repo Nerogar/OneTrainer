@@ -9,6 +9,8 @@ from torch import Tensor
 from modules.model.BaseModel import BaseModel
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.util.convert.convert_stable_cascade_lora_diffusers_to_ckpt import \
+    convert_stable_cascade_lora_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
@@ -35,6 +37,8 @@ class WuerstchenLoRAModelSaver(BaseModelSaver):
     ):
         state_dict = self.__get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        if model.model_type.is_stable_cascade():
+            save_state_dict = convert_stable_cascade_lora_diffusers_to_ckpt(save_state_dict)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         torch.save(save_state_dict, destination)
@@ -47,6 +51,8 @@ class WuerstchenLoRAModelSaver(BaseModelSaver):
     ):
         state_dict = self.__get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        if model.model_type.is_stable_cascade():
+            save_state_dict = convert_stable_cascade_lora_diffusers_to_ckpt(save_state_dict)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))

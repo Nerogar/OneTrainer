@@ -2,7 +2,8 @@ from pathlib import Path
 
 import customtkinter as ctk
 
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -12,11 +13,11 @@ from modules.util.ui.UIState import UIState
 
 class ModelTab:
 
-    def __init__(self, master, train_args: TrainArgs, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(ModelTab, self).__init__()
 
         self.master = master
-        self.train_args = train_args
+        self.train_config = train_config
         self.ui_state = ui_state
 
         master.grid_rowconfigure(0, weight=1)
@@ -39,13 +40,13 @@ class ModelTab:
         self.scroll_frame.grid_columnconfigure(3, weight=0)
         self.scroll_frame.grid_columnconfigure(4, weight=1)
 
-        if self.train_args.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui()
-        elif self.train_args.model_type.is_stable_diffusion_xl():
+        elif self.train_config.model_type.is_stable_diffusion_xl():
             self.__setup_stable_diffusion_xl_ui()
-        elif self.train_args.model_type.is_wuerstchen():
+        elif self.train_config.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui()
-        elif self.train_args.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart_alpha():
             self.__setup_pixart_alpha_ui()
 
     def __setup_stable_diffusion_ui(self):
@@ -60,7 +61,10 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
+            allow_diffusers=self.train_config.training_method in [
+                TrainingMethod.FINE_TUNE,
+                TrainingMethod.FINE_TUNE_VAE,
+            ],
             allow_checkpoint=True,
         )
 
@@ -77,7 +81,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
 
@@ -87,15 +91,17 @@ class ModelTab:
         row = self.__create_base_components(
             row,
             has_prior=True,
+            allow_override_prior=self.train_config.model_type.is_stable_cascade(),
             has_text_encoder=True,
         )
         row = self.__create_effnet_encoder_components(row)
-        row = self.__create_decoder_components(row)
+        row = self.__create_decoder_components(row, self.train_config.model_type.is_wuerstchen_v2())
         row = self.__create_output_components(
             row,
-            allow_safetensors=self.train_args.training_method != TrainingMethod.FINE_TUNE,
-            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=self.train_args.training_method != TrainingMethod.FINE_TUNE,
+            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
+                              or self.train_config.model_type.is_stable_cascade(),
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_checkpoint=self.train_config.training_method != TrainingMethod.FINE_TUNE,
         )
 
     def __setup_pixart_alpha_ui(self):
@@ -110,11 +116,19 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_args.training_method == TrainingMethod.FINE_TUNE,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
 
     def __create_base_dtype_components(self, row: int) -> int:
+        # base model
+        components.label(self.scroll_frame, row, 0, "Base Model",
+                         tooltip="Filename, directory or Hugging Face repository of the base model")
+        components.file_entry(
+            self.scroll_frame, row, 1, self.ui_state, "base_model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
         # weight dtype
         components.label(self.scroll_frame, row, 3, "Weight Data Type",
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
@@ -122,6 +136,7 @@ class ModelTab:
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
+            ("float8", DataType.FLOAT_8),
         ], self.ui_state, "weight_dtype")
 
         row += 1
@@ -133,19 +148,12 @@ class ModelTab:
             row: int,
             has_unet: bool = False,
             has_prior: bool = False,
+            allow_override_prior: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
             has_text_encoder_2: bool = False,
             has_vae: bool = False,
     ) -> int:
-        # base model
-        components.label(self.scroll_frame, row, 0, "Base Model",
-                         tooltip="Filename, directory or Hugging Face repository of the base model")
-        components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "base_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
         if has_unet:
             # unet weight dtype
             components.label(self.scroll_frame, row, 3, "Override UNet Data Type",
@@ -155,11 +163,21 @@ class ModelTab:
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
-            ], self.ui_state, "unet_weight_dtype")
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "unet.weight_dtype")
 
             row += 1
 
         if has_prior:
+            if allow_override_prior:
+                # prior model
+                components.label(self.scroll_frame, row, 0, "Prior Model",
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                components.file_entry(
+                    self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
+                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                )
+
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")
@@ -168,7 +186,8 @@ class ModelTab:
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
-            ], self.ui_state, "prior_weight_dtype")
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "prior.weight_dtype")
 
             row += 1
 
@@ -181,7 +200,8 @@ class ModelTab:
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
-            ], self.ui_state, "text_encoder_weight_dtype")
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
 
@@ -194,7 +214,8 @@ class ModelTab:
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
-            ], self.ui_state, "text_encoder_weight_dtype")
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
 
@@ -207,7 +228,8 @@ class ModelTab:
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
-            ], self.ui_state, "text_encoder_2_weight_dtype")
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "text_encoder_2.weight_dtype")
 
             row += 1
 
@@ -216,7 +238,7 @@ class ModelTab:
             components.label(self.scroll_frame, row, 0, "VAE",
                              tooltip="Directory or Hugging Face repository of a VAE model. Can be used to override the base model VAE.")
             components.file_entry(
-                self.scroll_frame, row, 1, self.ui_state, "vae_model_name",
+                self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
             )
 
@@ -228,7 +250,8 @@ class ModelTab:
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
-            ], self.ui_state, "vae_weight_dtype")
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "vae.weight_dtype")
 
             row += 1
 
@@ -239,7 +262,7 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Effnet Encoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
         components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "effnet_encoder_model_name",
+            self.scroll_frame, row, 1, self.ui_state, "effnet_encoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -251,18 +274,23 @@ class ModelTab:
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "effnet_encoder_weight_dtype")
+            ("float8", DataType.FLOAT_8),
+        ], self.ui_state, "effnet_encoder.weight_dtype")
 
         row += 1
 
         return row
 
-    def __create_decoder_components(self, row: int) -> int:
+    def __create_decoder_components(
+            self,
+            row: int,
+            has_text_encoder: bool,
+    ) -> int:
         # decoder model
         components.label(self.scroll_frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
         components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "decoder_model_name",
+            self.scroll_frame, row, 1, self.ui_state, "decoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
@@ -274,21 +302,24 @@ class ModelTab:
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "decoder_weight_dtype")
+            ("float8", DataType.FLOAT_8),
+        ], self.ui_state, "decoder.weight_dtype")
 
         row += 1
 
-        # decoder text encoder weight dtype
-        components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
-                         tooltip="Overrides the decoder text encoder weight data type")
-        components.options_kv(self.scroll_frame, row, 4, [
-            ("", DataType.NONE),
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-            ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "decoder_text_encoder_weight_dtype")
+        if has_text_encoder:
+            # decoder text encoder weight dtype
+            components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
+                             tooltip="Overrides the decoder text encoder weight data type")
+            components.options_kv(self.scroll_frame, row, 4, [
+                ("", DataType.NONE),
+                ("float32", DataType.FLOAT_32),
+                ("bfloat16", DataType.BFLOAT_16),
+                ("float16", DataType.FLOAT_16),
+                ("float8", DataType.FLOAT_8),
+            ], self.ui_state, "decoder_text_encoder.weight_dtype")
 
-        row += 1
+            row += 1
 
         # decoder vqgan weight dtype
         components.label(self.scroll_frame, row, 3, "Override Decoder VQGAN Data Type",
@@ -298,7 +329,8 @@ class ModelTab:
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
-        ], self.ui_state, "decoder_vqgan_weight_dtype")
+            ("float8", DataType.FLOAT_8),
+        ], self.ui_state, "decoder_vqgan.weight_dtype")
 
         row += 1
 
@@ -323,6 +355,7 @@ class ModelTab:
             ("float16", DataType.FLOAT_16),
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
+            ("float8", DataType.FLOAT_8),
         ], self.ui_state, "output_dtype")
 
         row += 1
@@ -339,6 +372,18 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format")
+
+        # include config
+        components.label(self.scroll_frame, row, 3, "Include Config",
+                         tooltip="Include the training configuration in the final model. Only supported for safetensors files. "
+                                 "None: No config is included. "
+                                 "Settings: All training settings are included. "
+                                 "All: All settings, including the samples and concepts are included.")
+        components.options_kv(self.scroll_frame, row, 4, [
+            ("None", ConfigPart.NONE),
+            ("Settings", ConfigPart.SETTINGS),
+            ("All", ConfigPart.ALL),
+        ], self.ui_state, "include_train_config")
 
         row += 1
 

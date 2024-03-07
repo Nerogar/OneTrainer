@@ -7,7 +7,7 @@ from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
@@ -26,14 +26,14 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
     def create_parameters(
             self,
             model: PixArtAlphaModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         params = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             params += list(model.text_encoder.parameters())
 
-        if args.train_prior:
+        if config.prior.train:
             params += list(model.transformer.parameters())
 
         return params
@@ -41,18 +41,18 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
     def create_parameters_for_optimizer(
             self,
             model: PixArtAlphaModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             param_groups.append(
-                self.create_param_groups(args, model.text_encoder.parameters(), args.text_encoder_learning_rate)
+                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder.learning_rate)
             )
 
-        if args.train_prior:
+        if config.prior.train:
             param_groups.append(
-                self.create_param_groups(args, model.transformer.parameters(), args.prior_learning_rate)
+                self.create_param_groups(config, model.transformer.parameters(), config.prior.learning_rate)
             )
 
         return param_groups
@@ -60,12 +60,14 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
     def setup_model(
             self,
             model: PixArtAlphaModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_prior = args.train_prior and (model.train_progress.epoch < args.train_prior_epochs)
+        train_prior = config.prior.train and \
+                             not self.stop_prior_training_elapsed(config, model.train_progress)
         model.transformer.requires_grad_(train_prior)
 
         model.vae.requires_grad_(False)
@@ -79,37 +81,37 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
         #     model.force_epsilon_prediction()
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: PixArtAlphaModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or args.align_prop
-        text_encoder_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
+        vae_on_train_device = self.debug_mode or config.align_prop
+        text_encoder_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             model.text_encoder.train()
         else:
             model.text_encoder.eval()
 
         model.vae.eval()
 
-        if args.train_prior:
+        if config.prior.train:
             model.transformer.train()
         else:
             model.transformer.eval()
@@ -117,11 +119,13 @@ class PixArtAlphaFineTuneSetup(BasePixArtAlphaSetup):
     def after_optimizer_step(
             self,
             model: PixArtAlphaModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        train_text_encoder = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_prior = args.train_prior and (model.train_progress.epoch < args.train_prior_epochs)
+        train_prior = config.prior.train and \
+                             not self.stop_prior_training_elapsed(config, model.train_progress)
         model.transformer.requires_grad_(train_prior)

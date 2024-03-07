@@ -14,6 +14,8 @@ from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModel
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
+from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import \
+    convert_stable_cascade_lora_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
@@ -39,7 +41,7 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         model.prior_prior_lora = self._load_lora_with_prefix(
             module=model.prior_prior,
             state_dict=state_dict,
-            prefix="lora_prior_prior",
+            prefix="lora_prior_unet",
             rank=rank,
             module_filter=["attention"],
         )
@@ -51,6 +53,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         match model_type:
             case ModelType.WUERSTCHEN_2:
                 return "resources/sd_model_spec/wuerstchen_2.0-lora.json"
+            case ModelType.STABLE_CASCADE_1:
+                return "resources/sd_model_spec/stable_cascade_1.0-lora.json"
             case _:
                 return None
 
@@ -62,6 +66,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         model.model_spec = self._load_default_model_spec(model.model_type, lora_name)
 
         state_dict = load_file(lora_name)
+        if model.model_type.is_stable_cascade():
+            state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(state_dict)
         self.__init_lora(model, state_dict)
 
     def __load_ckpt(
@@ -72,6 +78,8 @@ class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mode
         model.model_spec = self._load_default_model_spec(model.model_type)
 
         state_dict = torch.load(lora_name)
+        if model.model_type.is_stable_cascade():
+            state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(state_dict)
         self.__init_lora(model, state_dict)
 
     def __load_internal(

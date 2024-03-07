@@ -6,9 +6,10 @@ from typing import Callable
 import customtkinter as ctk
 
 from modules.util import path_util
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -17,13 +18,13 @@ class TopBar:
     def __init__(
             self,
             master,
-            train_args: TrainArgs,
+            train_config: TrainConfig,
             ui_state: UIState,
             change_model_type: Callable[[ModelType], None],
             change_training_method_callback: Callable[[TrainingMethod], None],
     ):
         self.master = master
-        self.train_args = train_args
+        self.train_config = train_config
         self.ui_state = ui_state
         self.change_model_type = change_model_type
         self.change_training_method_callback = change_training_method_callback
@@ -77,6 +78,7 @@ class TopBar:
                 ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
                 ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
                 ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
+                ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
             ],
             ui_state=self.ui_state,
@@ -90,26 +92,26 @@ class TopBar:
 
         values = []
 
-        if self.train_args.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
                 ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
             ]
-        elif self.train_args.model_type.is_stable_diffusion_xl():
+        elif self.train_config.model_type.is_stable_diffusion_xl():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_args.model_type.is_wuerstchen():
+        elif self.train_config.model_type.is_wuerstchen():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_args.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart_alpha():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
@@ -152,7 +154,7 @@ class TopBar:
         name = path_util.safe_filename(name)
         path = path_util.canonical_join("training_presets", f"{name}.json")
         with open(path, "w") as f:
-            json.dump(self.train_args.to_dict(), f, indent=4)
+            json.dump(self.train_config.to_dict(), f, indent=4)
 
         return path
 
@@ -165,7 +167,7 @@ class TopBar:
             self.configs.append((name, path))
 
         if self.config_ui_data["config_name"] != path_util.canonical_join(self.dir, f"{name}.json"):
-            self.config_ui_state.vars["config_name"].set(path_util.canonical_join(self.dir, f"{name}.json"))
+            self.config_ui_state.get_var("config_name").set(path_util.canonical_join(self.dir, f"{name}.json"))
 
         if is_new_config:
             self.__create_configs_dropdown()
@@ -186,16 +188,22 @@ class TopBar:
 
     def __load_current_config(self, filename):
         try:
-            load_dict = {}
-
-            if os.path.basename(filename).startswith("#"):
-                load_dict = TrainArgs.default_values().to_dict()
+            basename = os.path.basename(filename)
+            is_built_in_preset = basename.startswith("#") and basename != "#.json"
 
             with open(filename, "r") as f:
-                load_dict |= json.load(f)
+                loaded_dict = json.load(f)
+                default_config = TrainConfig.default_values()
+                if is_built_in_preset:
+                    # always assume built-in configs are saved in the most recent version
+                    loaded_dict["__version"] = default_config.config_version
+                loaded_config = default_config.from_dict(loaded_dict).to_unpacked_config()
 
-            self.train_args.from_dict(load_dict)
-            self.ui_state.update(self.train_args)
+            self.train_config.from_dict(loaded_config.to_dict())
+            self.ui_state.update(loaded_config)
+
+            optimizer_config = change_optimizer(self.train_config)
+            self.ui_state.get_var("optimizer").update(optimizer_config)
         except Exception:
             print(traceback.format_exc())
 

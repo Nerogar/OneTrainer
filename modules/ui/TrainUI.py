@@ -1,3 +1,4 @@
+import json
 import threading
 import traceback
 import webbrowser
@@ -17,9 +18,9 @@ from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
@@ -47,8 +48,8 @@ class TrainUI(ctk.CTk):
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
 
-        self.train_args = TrainArgs.default_values()
-        self.ui_state = UIState(self, self.train_args)
+        self.train_config = TrainConfig.default_values()
+        self.ui_state = UIState(self, self.train_config)
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -75,7 +76,7 @@ class TrainUI(ctk.CTk):
         self.top_bar_component.save_default()
 
     def top_bar(self, master):
-        return TopBar(master, self.train_args, self.ui_state, self.change_model_type, self.change_training_method)
+        return TopBar(master, self.train_config, self.ui_state, self.change_model_type, self.change_training_method)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -120,7 +121,7 @@ class TrainUI(ctk.CTk):
         self.create_backup_tab(self.tabview.add("backup"))
         self.create_tools_tab(self.tabview.add("tools"))
 
-        self.change_training_method(self.train_args.training_method)
+        self.change_training_method(self.train_config.training_method)
 
         return frame
 
@@ -178,7 +179,7 @@ class TrainUI(ctk.CTk):
         components.entry(master, 9, 1, self.ui_state, "temp_device")
 
     def create_model_tab(self, master):
-        return ModelTab(master, self.train_args, self.ui_state)
+        return ModelTab(master, self.train_config, self.ui_state)
 
     def create_data_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -213,10 +214,10 @@ class TrainUI(ctk.CTk):
         components.switch(master, 4, 1, self.ui_state, "clear_cache_before_training")
 
     def create_concepts_tab(self, master):
-        ConceptTab(master, self.train_args, self.ui_state)
+        ConceptTab(master, self.train_config, self.ui_state)
 
     def create_training_tab(self, master) -> TrainingTab:
-        return TrainingTab(master, self.train_args, self.ui_state)
+        return TrainingTab(master, self.train_config, self.ui_state)
 
     def create_sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
@@ -255,7 +256,7 @@ class TrainUI(ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
 
-        SamplingTab(frame, self.train_args, self.ui_state)
+        SamplingTab(frame, self.train_config, self.ui_state)
 
     def create_backup_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -317,10 +318,15 @@ class TrainUI(ctk.CTk):
                          tooltip="The alpha parameter used when creating a new LoRA")
         components.entry(master, 2, 1, self.ui_state, "lora_alpha")
 
+        # Dropout Percentage
+        components.label(master, 3, 0, "Dropout Probability",
+                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+        components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+
         # lora weight dtype
-        components.label(master, 3, 0, "LoRA Weight Data Type",
+        components.label(master, 5, 0, "LoRA Weight Data Type",
                          tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 3, 1, [
+        components.options_kv(master, 5, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "lora_weight_dtype")
@@ -338,19 +344,19 @@ class TrainUI(ctk.CTk):
         components.label(master, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "embedding_model_names",
+            master, 0, 1, self.ui_state, "embeddings.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
         components.label(master, 1, 0, "Token count",
                          tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "token_count")
+        components.entry(master, 1, 1, self.ui_state, "embeddings.token_count")
 
         # initial embedding text
         components.label(master, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "initial_embedding_text")
+        components.entry(master, 2, 1, self.ui_state, "embeddings.initial_embedding_text")
 
         # embedding weight dtype
         components.label(master, 3, 0, "Embedding Weight Data Type",
@@ -434,7 +440,7 @@ class TrainUI(ctk.CTk):
     def open_sampling_tool(self):
         window = SampleWindow(
             self,
-            train_args=self.train_args,
+            train_config=self.train_config,
         )
         self.wait_window(window)
         torch_gc()
@@ -460,7 +466,7 @@ class TrainUI(ctk.CTk):
             on_update_status=self.on_update_status,
         )
 
-        trainer = GenericTrainer(self.train_args, self.training_callbacks, self.training_commands)
+        trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
 
         try:
             trainer.start()
@@ -499,18 +505,14 @@ class TrainUI(ctk.CTk):
             self.training_commands.stop()
 
     def export_training(self):
-        args = self.train_args.to_args()
-        command = "python scripts/train.py " + args
-
         file_path = filedialog.asksaveasfilename(filetypes=[
             ("All Files", "*.*"),
-            ("Batch", "*.bat"),
-            ("Shell", "*.sh"),
-        ], initialdir=".", initialfile="train.bat")
+            ("json", "*.json"),
+        ], initialdir=".", initialfile="config.json")
 
         if file_path:
             with open(file_path, "w") as f:
-                f.write(command)
+                json.dump(self.train_config.to_pack_dict(), f, indent=4)
 
     def sample_now(self):
         train_commands = self.training_commands

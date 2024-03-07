@@ -1,5 +1,6 @@
 import copy
 import hashlib
+import json
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from datetime import datetime
@@ -10,6 +11,7 @@ from torch import Tensor
 
 from modules.model.BaseModel import BaseModel
 from modules.util import git_util
+from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
@@ -68,6 +70,13 @@ class BaseModelSaver(metaclass=ABCMeta):
         else:
             model_spec = ModelSpec()
 
+        if model.train_config is not None and model.train_config.include_train_config == ConfigPart.SETTINGS:
+            config = json.dumps(model.train_config.to_dict())
+        elif model.train_config is not None and model.train_config.include_train_config == ConfigPart.ALL:
+            config = json.dumps(model.train_config.to_pack_dict())
+        else:
+            config = None
+
         # update calculated fields
         model_spec.date = datetime.now().strftime("%Y-%m-%d")
         model_spec.hash_sha256 = self.__calculate_safetensors_hash(state_dict)
@@ -78,6 +87,9 @@ class BaseModelSaver(metaclass=ABCMeta):
             "ot_branch": git_util.get_git_branch(),
             "ot_revision": git_util.get_git_revision(),
         }
+        if config is not None:
+            one_trainer_header["ot_config"] = config
+
         kohya_header = {} # needed for the Automatic1111 webui to pick up model versions
         if model.model_type.is_stable_diffusion_xl():
             kohya_header["ss_base_model_version"] = "sdxl_"

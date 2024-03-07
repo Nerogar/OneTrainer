@@ -9,7 +9,7 @@ from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClip
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class StableDiffusionLoRASetup(
@@ -31,17 +31,17 @@ class StableDiffusionLoRASetup(
     def create_parameters(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         params = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             params += list(model.text_encoder_lora.parameters())
 
         if args.train_embedding:
             params += list(model.text_encoder.get_input_embeddings().parameters())
 
-        if args.train_unet:
+        if config.unet.train:
             params += list(model.unet_lora.parameters())
 
         return params
@@ -49,13 +49,13 @@ class StableDiffusionLoRASetup(
     def create_parameters_for_optimizer(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             param_groups.append(
-                self.create_param_groups(args, model.text_encoder_lora.parameters(), args.text_encoder_learning_rate)
+                self.create_param_groups(config, model.text_encoder_lora.parameters(), config.text_encoder.learning_rate)
             )
 
         if args.train_embedding:
@@ -67,9 +67,9 @@ class StableDiffusionLoRASetup(
                 )
             )
 
-        if args.train_unet:
+        if config.unet.train:
             param_groups.append(
-                self.create_param_groups(args, model.unet_lora.parameters(), args.unet_learning_rate)
+                self.create_param_groups(config, model.unet_lora.parameters(), config.unet.learning_rate)
             )
 
         return param_groups
@@ -77,24 +77,34 @@ class StableDiffusionLoRASetup(
     def setup_model(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
         if model.text_encoder_lora is None:
             model.text_encoder_lora = LoRAModuleWrapper(
-                model.text_encoder, args.lora_rank, "lora_te", args.lora_alpha
+                model.text_encoder, config.lora_rank, "lora_te", config.lora_alpha
             )
 
         if model.unet_lora is None:
             model.unet_lora = LoRAModuleWrapper(
-                model.unet, args.lora_rank, "lora_unet", args.lora_alpha, ["attentions"]
+                model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"]
             )
+
+        model.text_encoder_lora.set_dropout(config.dropout_probability)
+        model.unet_lora.set_dropout(config.dropout_probability)
 
         model.text_encoder.requires_grad_(False)
         model.unet.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
-        model.text_encoder_lora.requires_grad_(train_text_encoder)
+        if model.text_encoder_lora is not None:
+            train_text_encoder = config.text_encoder.train and \
+                                 not self.stop_text_encoder_training_elapsed(config, model.train_progress)
+            model.text_encoder_lora.requires_grad_(train_text_encoder)
+
+        if model.unet_lora is not None:
+            train_unet = config.unet.train and \
+                                 not self.stop_unet_training_elapsed(config, model.train_progress)
+            model.unet_lora.requires_grad_(train_unet)
 
         train_embedding = args.train_embedding and (model.train_progress.epoch < args.train_embedding_epochs)
         if train_embedding:
@@ -104,8 +114,8 @@ class StableDiffusionLoRASetup(
         train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
         model.unet_lora.requires_grad_(train_unet)
 
-        model.text_encoder_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
-        model.unet_lora.to(dtype=args.lora_weight_dtype.torch_dtype())
+        model.text_encoder_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+        model.unet_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
 
         model.text_encoder_lora.hook_to_module()
         model.unet_lora.hook_to_module()
@@ -128,47 +138,47 @@ class StableDiffusionLoRASetup(
         model.all_text_encoder_original_token_embeds = original_token_embeds
         model.text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
 
-        if args.rescale_noise_scheduler_to_zero_terminal_snr:
+        if config.rescale_noise_scheduler_to_zero_terminal_snr:
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or args.align_prop
+        vae_on_train_device = self.debug_mode or config.align_prop
         text_encoder_on_train_device = \
-            args.train_text_encoder \
-            or args.train_embedding \
-            or args.align_prop \
-            or not args.latent_caching
+            config.text_encoder.train \
+            or config.train_embedding \
+            or config.align_prop \
+            or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
         model.depth_estimator_to(self.temp_device)
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             model.text_encoder.train()
         else:
             model.text_encoder.eval()
 
         model.vae.eval()
 
-        if args.train_unet:
+        if config.unet.train:
             model.unet.train()
         else:
             model.unet.eval()
@@ -176,18 +186,22 @@ class StableDiffusionLoRASetup(
     def after_optimizer_step(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
-        train_text_encoder = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
-        model.text_encoder_lora.requires_grad_(train_text_encoder)
+        if model.text_encoder_lora is not None:
+            train_text_encoder = config.text_encoder.train and \
+                                 not self.stop_text_encoder_training_elapsed(config, model.train_progress)
+            model.text_encoder_lora.requires_grad_(train_text_encoder)
+
+        if model.unet_lora is not None:
+            train_unet = config.unet.train and \
+                                 not self.stop_unet_training_elapsed(config, model.train_progress)
+            model.unet_lora.requires_grad_(train_unet)
 
         train_embedding = model.train_progress.epoch < args.train_embedding_epochs
         if args.train_embedding and not train_embedding:
             model.text_encoder.get_input_embeddings().requires_grad_(False)
-
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
-        model.unet_lora.requires_grad_(train_unet)
 
         self._embeddigns_after_optimizer_step(
             model.text_encoder.get_input_embeddings(),

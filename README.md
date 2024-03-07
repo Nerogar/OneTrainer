@@ -6,7 +6,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
 ## Features
 
-- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, SDXL, Würstchen-v2, PixArt-Alpha and inpainting models
+- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha and inpainting
+  models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.
@@ -88,7 +89,7 @@ All functionality is split into different scrips located in the `scripts` direct
 - `create_train_files.py` A utility to create files needed when training only from the CLI
 - `generate_captions.py` A utility to automatically create captions for your dataset
 - `generate_masks.py` A utility to automatically create masks for your dataset
-- `train_from_config.py` A utility to start training from a config json file
+- `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
 
 To learn more about the different parameters, execute `<scipt-name> -h`. For example `python scripts\train.py -h`
 

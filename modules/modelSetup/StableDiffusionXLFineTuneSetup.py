@@ -7,7 +7,7 @@ from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
-from modules.util.args.TrainArgs import TrainArgs
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
@@ -26,17 +26,17 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
     def create_parameters(
             self,
             model: StableDiffusionXLModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter]:
         params = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             params += list(model.text_encoder_1.parameters())
 
-        if args.train_text_encoder_2:
+        if config.text_encoder_2.train:
             params += list(model.text_encoder_2.parameters())
 
-        if args.train_unet:
+        if config.unet.train:
             params += list(model.unet.parameters())
 
         return params
@@ -45,23 +45,23 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
     def create_parameters_for_optimizer(
             self,
             model: StableDiffusionXLModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             param_groups.append(
-                self.create_param_groups(args, model.text_encoder_1.parameters(), args.text_encoder_learning_rate)
+                self.create_param_groups(config, model.text_encoder_1.parameters(), config.text_encoder.learning_rate)
             )
 
-        if args.train_text_encoder_2:
+        if config.text_encoder_2.train:
             param_groups.append(
-                self.create_param_groups(args, model.text_encoder_2.parameters(), args.text_encoder_2_learning_rate)
+                self.create_param_groups(config, model.text_encoder_2.parameters(), config.text_encoder_2.learning_rate)
             )
 
-        if args.train_unet:
+        if config.unet.train:
             param_groups.append(
-                self.create_param_groups(args, model.unet.parameters(), args.unet_learning_rate)
+                self.create_param_groups(config, model.unet.parameters(), config.unet.learning_rate)
             )
 
         return param_groups
@@ -69,58 +69,61 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
     def setup_model(
             self,
             model: StableDiffusionXLModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        train_text_encoder_1 = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        train_text_encoder_1 = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder_1.requires_grad_(train_text_encoder_1)
 
-        train_text_encoder_2 = args.train_text_encoder_2 and (model.train_progress.epoch < args.train_text_encoder_2_epochs)
+        train_text_encoder_2 = config.text_encoder_2.train and \
+                             not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
         model.text_encoder_2.requires_grad_(train_text_encoder_2)
 
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        train_unet = config.unet.train and \
+                             not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
 
         model.vae.requires_grad_(False)
 
         model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, args), model.optimizer_state_dict, args
+            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
         del model.optimizer_state_dict
 
         model.ema = create.create_ema(
-            self.create_parameters(model, args), model.ema_state_dict, args
+            self.create_parameters(model, config), model.ema_state_dict, config
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, args)
+        self.setup_optimizations(model, config)
 
     def setup_train_device(
             self,
             model: StableDiffusionXLModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        vae_on_train_device = args.align_prop
-        text_encoder_1_on_train_device = args.train_text_encoder or args.align_prop or not args.latent_caching
-        text_encoder_2_on_train_device = args.train_text_encoder_2 or args.align_prop or not args.latent_caching
+        vae_on_train_device = config.align_prop
+        text_encoder_1_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
+        text_encoder_2_on_train_device = config.text_encoder_2.train or config.align_prop or not config.latent_caching
 
         model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
         model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.unet_to(self.train_device)
 
-        if args.train_text_encoder:
+        if config.text_encoder.train:
             model.text_encoder_1.train()
         else:
             model.text_encoder_1.eval()
 
-        if args.train_text_encoder_2:
+        if config.text_encoder_2.train:
             model.text_encoder_2.train()
         else:
             model.text_encoder_2.eval()
 
         model.vae.train()
 
-        if args.train_unet:
+        if config.unet.train:
             model.unet.train()
         else:
             model.unet.eval()
@@ -128,14 +131,17 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
     def after_optimizer_step(
             self,
             model: StableDiffusionXLModel,
-            args: TrainArgs,
+            config: TrainConfig,
             train_progress: TrainProgress
     ):
-        train_text_encoder_1 = args.train_text_encoder and (model.train_progress.epoch < args.train_text_encoder_epochs)
+        train_text_encoder_1 = config.text_encoder.train and \
+                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder_1.requires_grad_(train_text_encoder_1)
 
-        train_text_encoder_2 = args.train_text_encoder_2 and (model.train_progress.epoch < args.train_text_encoder_2_epochs)
+        train_text_encoder_2 = config.text_encoder_2.train and \
+                             not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
         model.text_encoder_2.requires_grad_(train_text_encoder_2)
 
-        train_unet = args.train_unet and (model.train_progress.epoch < args.train_unet_epochs)
+        train_unet = config.unet.train and \
+                             not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
