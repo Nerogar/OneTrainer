@@ -1,3 +1,4 @@
+import functools
 import json
 import os
 import shutil
@@ -32,6 +33,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.dtype_util import enable_grad_scaling
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.Optimizer import Optimizer as OptimizerEnum
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.config.SampleConfig import SampleConfig
@@ -140,6 +142,17 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue = []
 
         self.parameters = list(self.model_setup.create_parameters(self.model, self.config))
+
+    @functools.cached_property
+    def __adaptive_optimizer(self):
+        return self.config.optimizer.optimizer in [
+            OptimizerEnum.DADAPT_SGD,
+            OptimizerEnum.DADAPT_ADAM,
+            OptimizerEnum.DADAPT_ADAN,
+            OptimizerEnum.DADAPT_ADA_GRAD,
+            OptimizerEnum.DADAPT_LION,
+            OptimizerEnum.PRODIGY,
+        ]
 
     def __clear_cache(self):
         print(
@@ -518,8 +531,22 @@ class GenericTrainer(BaseTrainer):
                     self.model.optimizer.zero_grad(set_to_none=True)
                     has_gradient = False
 
+                    last_lr = lr_scheduler.get_last_lr()[0]
+                    scheduled_lr = last_lr
+                    if self.__adaptive_optimizer:
+                        last_lr *= self.model.optimizer.param_groups[0]["d"]
+                    unet_lr = self.config.unet.learning_rate if self.config.unet.learning_rate else self.config.learning_rate
+                    tenc_lr = self.config.text_encoder.learning_rate if self.config.text_encoder.learning_rate else self.config.learning_rate
+                    unet_lr *= last_lr
+                    tenc_lr *= last_lr
                     self.tensorboard.add_scalar(
-                        "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
+                        "lr/tenc", tenc_lr, train_progress.global_step
+                    )
+                    self.tensorboard.add_scalar(
+                        "lr/unet", unet_lr, train_progress.global_step
+                    )
+                    self.tensorboard.add_scalar(
+                        "lr/scheduler", scheduled_lr, train_progress.global_step
                     )
                     self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
                     ema_loss = ema_loss or accumulated_loss
