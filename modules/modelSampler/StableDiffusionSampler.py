@@ -135,7 +135,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
                 generator=generator,
                 device=self.train_device,
-                dtype=torch.float32
+                dtype=self.model.train_dtype.torch_dtype(),
             ) * noise_scheduler.init_noise_sigma
 
             # denoising loop
