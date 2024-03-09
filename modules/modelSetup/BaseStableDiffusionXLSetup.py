@@ -461,3 +461,31 @@ class BaseStableDiffusionXLSetup(
             train_device=self.train_device,
             betas=model.noise_scheduler.betas.to(device=self.train_device),
         ).mean()
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lrs = scheduler.get_last_lr()
+        te_lr = None
+        un_lr = None
+        if config.text_encoder.train:
+            te_lr = lrs[0]
+            if config.unet.train:
+                un_lr = lrs[1]
+        elif config.unet.train:
+            un_lr = lrs[0]
+
+        te_lr, un_lr = config.optimizer.optimizer.maybe_adjust_lrs([te_lr, un_lr], model.optimizer)
+
+        if te_lr is not None:
+            tensorboard.add_scalar(
+                "lr/te", te_lr, model.train_progress.global_step
+            )
+        if un_lr is not None:
+            tensorboard.add_scalar(
+                "lr/unet", un_lr, model.train_progress.global_step
+            )

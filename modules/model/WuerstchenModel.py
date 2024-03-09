@@ -179,6 +179,22 @@ class WuerstchenModel(BaseModel):
         self.prior_text_encoder.eval()
         self.prior_prior.eval()
 
+    def report_learning_rates(self):
+        lr = self.train_config.learning_rate
+        te_lr = self.train_config.text_encoder.learning_rate if self.train_config.text_encoder.learning_rate else lr
+        pr_lr = self.train_config.prior.learning_rate if self.train_config.prior.learning_rate else lr
+        if self.train_config.optimizer.optimizer.is_adaptive:
+            d = self.optimizer.param_groups[0]["d"]
+            te_lr *= d
+            pr_lr *= d
+        outs = OrderedDict()
+        if self.train_config.text_encoder.train:
+            outs['te'] = te_lr
+        if self.train_config.prior.train:
+            outs['prior'] = pr_lr
+            outs.move_to_end('prior')
+        return outs
+
     def create_pipeline(self) -> DiffusionPipeline:
         if self.model_type.is_wuerstchen_v2():
             return WuerstchenCombinedPipeline(

@@ -131,3 +131,14 @@ class WuerstchenEmbeddingSetup(
             model.all_prior_text_encoder_original_token_embeds,
             model.prior_text_encoder_untrainable_token_embeds_mask,
         )
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lr = scheduler.get_last_lr()[0]
+        lr = config.optimizer.optimizer.maybe_adjust_lrs([lr], model.optimizer)[0]
+        tensorboard.add_scalar("lr/embedding", lr, model.train_progress.global_step)
