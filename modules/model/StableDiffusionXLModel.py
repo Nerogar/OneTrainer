@@ -152,55 +152,6 @@ class StableDiffusionXLModel(BaseModel):
         self.text_encoder_2.eval()
         self.unet.eval()
 
-    def report_learning_rates(self, scheduler, tensorboard):
-        lrs = scheduler.get_last_lr()
-        te_lr = None
-        te2_lr = None
-        un_lr = None
-        if self.train_config.text_encoder.train:
-            te_lr = lrs[0]
-            if self.train_config.unet.train:
-                un_lr = lrs[1]
-        elif self.train_config.unet.train:
-            un_lr = lrs[0]
-
-        if self.train_config.optimizer.optimizer.is_adaptive:
-            d = self.optimizer.param_groups[0]["d"]
-            if te_lr:
-                te_lr *= d
-            if un_lr:
-                un_lr *= d
-
-        if self.train_config.text_encoder.train:
-            tensorboard.add_scalar(
-                "lr/te", te_lr, self.train_progress.global_step
-            )
-        if self.train_config.unet.train:
-            tensorboard.add_scalar(
-                "lr/unet", un_lr, self.train_progress.global_step
-            )
-
-    def report_learning_rates(self):
-        lr = self.train_config.learning_rate
-        te1_lr = self.train_config.text_encoder.learning_rate if self.train_config.text_encoder.learning_rate else lr
-        te2_lr = self.train_config.text_encoder_2.learning_rate if self.train_config.text_encoder_2.learning_rate else lr
-        un_lr = self.train_config.unet.learning_rate if train_config.unet.learning_rate else lr
-        if self.train_config.optimizer.optimizer.is_adaptive:
-            d = self.optimizer.param_groups[0]["d"]
-            te1_lr *= d
-            te2_lr *= d
-            un_lr *= d
-        outs = OrderedDict()
-        if self.train_config.text_encoder.train:
-            outs['te1'] = te1_lr
-        if self.train_config.text_encoder_2.train:
-            outs['te2'] = te2_lr
-            outs.move_to_end('te2')
-        if self.train_config.unet.train:
-            outs['unet'] = un_lr
-            outs.move_to_end('unet')
-        return outs
-
     def create_pipeline(self) -> DiffusionPipeline:
         return StableDiffusionXLPipeline(
             vae=self.vae,
