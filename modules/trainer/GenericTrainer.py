@@ -37,6 +37,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
+from modules.zluda import ZLUDA
 
 
 class GenericTrainer(BaseTrainer):
@@ -88,6 +89,8 @@ class GenericTrainer(BaseTrainer):
         if self.config.train_dtype.enable_tf():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
+
+        ZLUDA.setup(self.config)
 
         self.model_loader = self.create_model_loader()
         self.model_setup = self.create_model_setup()

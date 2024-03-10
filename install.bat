@@ -20,6 +20,10 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 echo installing dependencies
 %PYTHON% -m pip install -r requirements.txt
 
+:install_zluda
+echo installing ZLUDA
+%PYTHON% scripts/install_zluda.py
+
 :end_success
 echo.
 echo ************
