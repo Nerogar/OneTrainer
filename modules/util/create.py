@@ -18,8 +18,8 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.PixArtAlphaLoRAModelLoader import PixArtAlphaLoRAModelLoader
 from modules.modelLoader.PixArtAlphaModelLoader import PixArtAlphaModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
+from modules.modelLoader.StableDiffusionFineTuneModelLoader import StableDiffusionFineTuneModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
-from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.modelLoader.StableDiffusionXLEmbeddingModelLoader import StableDiffusionXLEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusionXLLoRAModelLoader
 from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
@@ -79,7 +79,7 @@ def create_model_loader(
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionModelLoader()
+                return StableDiffusionFineTuneModelLoader()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLModelLoader()
             if model_type.is_wuerstchen():
@@ -88,7 +88,7 @@ def create_model_loader(
                 return PixArtAlphaModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionModelLoader()
+                return StableDiffusionFineTuneModelLoader()
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelLoader()

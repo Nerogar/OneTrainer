@@ -38,7 +38,7 @@ class StableDiffusionLoRASetup(
         if config.text_encoder.train:
             params += list(model.text_encoder_lora.parameters())
 
-        if args.train_embedding:
+        if config.train_embedding:
             params += list(model.text_encoder.get_input_embeddings().parameters())
 
         if config.unet.train:

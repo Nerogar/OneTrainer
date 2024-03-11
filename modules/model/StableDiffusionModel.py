@@ -7,6 +7,7 @@ from torch import Tensor
 from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.BaseModel import BaseModel
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -20,13 +21,14 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 class StableDiffusionModelEmbedding:
     def __init__(
             self,
-            text_encoder_vector: Tensor,
-            prefix: str,
+            text_encoder_vector: Tensor | None,
+            placeholder: str,
     ):
         token_count = text_encoder_vector.shape[0]
 
         self.text_encoder_vector = text_encoder_vector
-        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
+        self.placeholder = placeholder
+        self.text_tokens = [f"<{placeholder}_{i}>" for i in range(token_count)]
 
 
 class StableDiffusionModel(BaseModel):
@@ -46,9 +48,9 @@ class StableDiffusionModel(BaseModel):
     train_dtype: DataType
 
     # persistent embedding training data
-    all_text_encoder_original_token_embeds: Tensor
-    text_encoder_untrainable_token_embeds_mask: list[bool]
     embeddings: list[StableDiffusionModelEmbedding] | None
+    additional_embedding_wrapper: AdditionalEmbeddingWrapper
+    additional_embedding_states: list[Tensor | None]
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -70,6 +72,8 @@ class StableDiffusionModel(BaseModel):
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
             embeddings: list[StableDiffusionModelEmbedding] = None,
+            additional_embedding_wrapper: AdditionalEmbeddingWrapper | None = None,
+            additional_embedding_states: list[Tensor | None] = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
             sd_config: dict | None = None,
@@ -98,6 +102,9 @@ class StableDiffusionModel(BaseModel):
         self.train_dtype = DataType.FLOAT_32
 
         self.embeddings = embeddings if embeddings is not None else []
+        self.additional_embedding_wrapper = additional_embedding_wrapper
+        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
+
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
         self.sd_config = sd_config

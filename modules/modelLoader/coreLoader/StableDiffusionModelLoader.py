@@ -1,119 +1,43 @@
-import json
-import os
 import traceback
 
 import torch
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, StableDiffusionPipeline
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
 from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.util import create
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
-class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderSDConfigMixin):
+class StableDiffusionModelLoader(
+    ModelLoaderSDConfigMixin
+):
     def __init__(self):
         super(StableDiffusionModelLoader, self).__init__()
 
-    def _default_sd_config_name(
-            self,
-            model_type: ModelType,
-    ) -> str | None:
-        match model_type:
-            case ModelType.STABLE_DIFFUSION_15:
-                return "resources/model_config/stable_diffusion/v1-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
-                return "resources/model_config/stable_diffusion/v1-inpainting-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_20:
-                return "resources/model_config/stable_diffusion/v2-inference-v.yaml"
-            case ModelType.STABLE_DIFFUSION_20_BASE:
-                return "resources/model_config/stable_diffusion/v2-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                return "resources/model_config/stable_diffusion/v2-inpainting-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_20_DEPTH:
-                return "resources/model_config/stable_diffusion/v2-midas-inference.yaml"
-            case ModelType.STABLE_DIFFUSION_21:
-                return "resources/model_config/stable_diffusion/v2-inference-v.yaml"
-            case ModelType.STABLE_DIFFUSION_21_BASE:
-                return "resources/model_config/stable_diffusion/v2-inference.yaml"
-            case _:
-                return None
-
-    def _default_model_spec_name(
-            self,
-            model_type: ModelType,
-    ) -> str | None:
-        match model_type:
-            case ModelType.STABLE_DIFFUSION_15:
-                return "resources/sd_model_spec/sd_1.5.json"
-            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
-                return "resources/sd_model_spec/sd_1.5_inpainting.json"
-            case ModelType.STABLE_DIFFUSION_20:
-                return "resources/sd_model_spec/sd_2.0.json"
-            case ModelType.STABLE_DIFFUSION_20_BASE:
-                return "resources/sd_model_spec/sd_2.0.json"
-            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                return "resources/sd_model_spec/sd_2.0_inpainting.json"
-            case ModelType.STABLE_DIFFUSION_20_DEPTH:
-                return "resources/sd_model_spec/sd_2.0_depth.json"
-            case ModelType.STABLE_DIFFUSION_21:
-                return "resources/sd_model_spec/sd_2.1.json"
-            case ModelType.STABLE_DIFFUSION_21_BASE:
-                return "resources/sd_model_spec/sd_2.1.json"
-            case _:
-                return None
-
     def __load_internal(
             self,
+            model: StableDiffusionModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
     ) -> StableDiffusionModel | None:
-        with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
-            meta = json.load(meta_file)
-            train_progress = TrainProgress(
-                epoch=meta['train_progress']['epoch'],
-                epoch_step=meta['train_progress']['epoch_step'],
-                epoch_sample=meta['train_progress']['epoch_sample'],
-                global_step=meta['train_progress']['global_step'],
-            )
-
         # base model
-        model = self.__load_diffusers(model_type, weight_dtypes, base_model_name, vae_model_name)
-
-        # optimizer
-        try:
-            model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
-        except FileNotFoundError:
-            pass
-
-        # ema
-        try:
-            model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
-        except FileNotFoundError:
-            pass
+        self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name)
 
         model.sd_config = self._load_sd_config(model_type)
-
-        # meta
-        model.train_progress = train_progress
-
-        # model spec
-        model.model_spec = self._load_default_model_spec(model_type)
 
         return model
 
     def __load_diffusers(
             self,
+            model: StableDiffusionModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
@@ -171,20 +95,15 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
         sd_config = self._load_sd_config(model_type)
 
-        model_spec = self._load_default_model_spec(model_type)
-
-        return StableDiffusionModel(
-            model_type=model_type,
-            tokenizer=tokenizer,
-            noise_scheduler=noise_scheduler,
-            text_encoder=text_encoder,
-            vae=vae,
-            unet=unet,
-            image_depth_processor=image_depth_processor,
-            depth_estimator=depth_estimator,
-            sd_config=sd_config,
-            model_spec=model_spec,
-        )
+        model.model_type = model_type
+        model.tokenizer = tokenizer
+        model.noise_scheduler = noise_scheduler
+        model.text_encoder = text_encoder
+        model.vae = vae
+        model.unet = unet
+        model.image_depth_processor = image_depth_processor
+        model.depth_estimator = depth_estimator
+        model.sd_config = sd_config
 
     def __fix_nai_model(self, state_dict: dict) -> dict:
         # fix for loading models with an empty state_dict key
@@ -195,7 +114,8 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
         converted_state_dict = {}
         for key, value in state_dict.items():
-            if key.startswith('cond_stage_model.transformer') and not key.startswith('cond_stage_model.transformer.text_model'):
+            if key.startswith('cond_stage_model.transformer') and not key.startswith(
+                    'cond_stage_model.transformer.text_model'):
                 key = key.replace('cond_stage_model.transformer', 'cond_stage_model.transformer.text_model')
             converted_state_dict[key] = value
 
@@ -203,11 +123,12 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
     def __load_ckpt(
             self,
+            model: StableDiffusionModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
-    ) -> StableDiffusionModel | None:
+    ):
         sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
         state_dict = torch.load(base_model_name)
@@ -239,33 +160,29 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
         sd_config = self._load_sd_config(model_type, base_model_name)
 
-        model_spec = self._load_default_model_spec(model_type)
-
         text_encoder = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
         text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
         vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
         unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
 
-        return StableDiffusionModel(
-            model_type=model_type,
-            tokenizer=pipeline.tokenizer,
-            noise_scheduler=noise_scheduler,
-            text_encoder=text_encoder,
-            vae=vae,
-            unet=unet,
-            image_depth_processor=None,  # TODO
-            depth_estimator=None,  # TODO
-            sd_config=sd_config,
-            model_spec=model_spec,
-        )
+        model.model_type = model_type
+        model.tokenizer = pipeline.tokenizer
+        model.noise_scheduler = noise_scheduler
+        model.text_encoder = text_encoder
+        model.vae = vae
+        model.unet = unet
+        model.image_depth_processor = None  # TODO
+        model.depth_estimator = None  # TODO
+        model.sd_config = sd_config
 
     def __load_safetensors(
             self,
+            model: StableDiffusionModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
-    ) -> StableDiffusionModel | None:
+    ):
         sd_config_name = self._get_sd_config_name(model_type, base_model_name)
 
         num_in_channels = 4
@@ -295,59 +212,51 @@ class StableDiffusionModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, Mod
 
         sd_config = self._load_sd_config(model_type)
 
-        model_spec = self._load_default_model_spec(model_type, base_model_name)
-
         text_encoder = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
         text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
         vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
         unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
 
-        return StableDiffusionModel(
-            model_type=model_type,
-            tokenizer=pipeline.tokenizer,
-            noise_scheduler=noise_scheduler,
-            text_encoder=text_encoder,
-            vae=vae,
-            unet=unet,
-            image_depth_processor=None,  # TODO
-            depth_estimator=None,  # TODO
-            sd_config=sd_config,
-            model_spec=model_spec,
-        )
+        model.model_type = model_type
+        model.tokenizer = pipeline.tokenizer
+        model.noise_scheduler = noise_scheduler
+        model.text_encoder = text_encoder
+        model.vae = vae
+        model.unet = unet
+        model.image_depth_processor = None  # TODO
+        model.depth_estimator = None  # TODO
+        model.sd_config = sd_config
 
     def load(
             self,
+            model: StableDiffusionModel,
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-    ) -> StableDiffusionModel | None:
+    ):
         stacktraces = []
 
         try:
-            model = self.__load_internal(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
-            if model is not None:
-                return model
+            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_diffusers(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
-            if model is not None:
-                return model
+            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_safetensors(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
-            if model is not None:
-                return model
+            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load_ckpt(model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
-            if model is not None:
-                return model
+            self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            return
         except:
             stacktraces.append(traceback.format_exc())
 

@@ -1,8 +1,10 @@
 import json
 from copy import deepcopy
+import random
 from typing import Any
+import uuid
 
-from modules.util.ModelNames import ModelNames
+from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -151,7 +153,9 @@ class TrainModelPartConfig(BaseConfig):
         return TrainModelPartConfig(data)
 
 class TrainEmbeddingConfig(BaseConfig):
+    uuid: str
     model_name: str
+    placeholder: str
     train: bool
     stop_training_after: int
     stop_training_after_unit: TimeUnit
@@ -167,7 +171,9 @@ class TrainEmbeddingConfig(BaseConfig):
         data = []
 
         # name, default value, data type, nullable
+        data.append(("uuid", str(uuid.uuid4()), str, False))
         data.append(("model_name", "", str, False))
+        data.append(("placeholder", "<embedding>", str, False))
         data.append(("train", True, bool, False))
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
@@ -288,6 +294,7 @@ class TrainConfig(BaseConfig):
     normalize_masked_area_loss: bool
 
     # embedding
+    embedding_learning_rate: float
     embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
 
@@ -462,8 +469,11 @@ class TrainConfig(BaseConfig):
             decoder_model=self.decoder.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
-            embedding=[embedding.model_name for embedding in self.embeddings],
+            embedding=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in self.embeddings],
         )
+
+    def train_any_embedding(self) -> bool:
+        return self.training_method == TrainingMethod.EMBEDDING or any(embedding.train for embedding in self.embeddings)
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
@@ -647,6 +657,7 @@ class TrainConfig(BaseConfig):
         data.append(("normalize_masked_area_loss", False, bool, False))
 
         # embedding
+        data.append(("embedding_learning_rate", None, float, True))
         data.append(("embeddings", [TrainEmbeddingConfig.default_values()], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 

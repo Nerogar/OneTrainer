@@ -8,7 +8,7 @@ from torch import Tensor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
+from modules.modelLoader.coreLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
 from modules.util.ModelNames import ModelNames

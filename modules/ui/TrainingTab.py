@@ -342,20 +342,10 @@ class TrainingTab:
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
 
-        # train text encoder
-        components.label(frame, 0, 0, "Train Embeddings",
-                         tooltip="Enables training embeddings")
-        components.switch(frame, 0, 1, self.ui_state, "train_embedding")
-
-        # train text encoder epochs
-        components.label(frame, 1, 0, "Train Embeddings Epochs",
-                         tooltip="Number of epochs to train the embeddings")
-        components.entry(frame, 1, 1, self.ui_state, "train_embedding_epochs")
-
-        # text encoder learning rate
-        components.label(frame, 2, 0, "Embeddings Learning Rate",
+        # embedding learning rate
+        components.label(frame, 0, 0, "Embeddings Learning Rate",
                          tooltip="The learning rate of embeddings. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "embedding_learning_rate")
+        components.entry(frame, 0, 1, self.ui_state, "embedding_learning_rate")
 
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

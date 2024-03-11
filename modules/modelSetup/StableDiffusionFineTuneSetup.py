@@ -6,6 +6,7 @@ from torch.nn import Parameter
 from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -37,11 +38,8 @@ class StableDiffusionFineTuneSetup(
         if config.text_encoder.train:
             params += list(model.text_encoder.parameters())
 
-            if args.train_embedding:
-                params += list(model.text_encoder.get_input_embeddings().parameters())
-
-        if args.train_embedding and not args.train_text_encoder:
-            params += list(model.text_encoder.get_input_embeddings().parameters())
+        if config.train_any_embedding():
+            params += list(model.additional_embedding_wrapper.parameters())
 
         if config.unet.train:
             params += list(model.unet.parameters())
@@ -56,20 +54,20 @@ class StableDiffusionFineTuneSetup(
         param_groups = list()
         
         if config.text_encoder.train:
-            text_encoder_parameters = list(model.text_encoder.parameters())
-            if args.train_embedding:
-                for embedding_parameter in model.text_encoder.get_input_embeddings().parameters():
-                    text_encoder_parameters.remove(embedding_parameter)
-            param_groups.append(
-                self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder.learning_rate)
-            )
-
-        if args.train_embedding and not args.train_text_encoder:
             param_groups.append(
                 self.create_param_groups(
-                    args,
-                    model.text_encoder.get_input_embeddings().parameters(),
-                    args.embedding_learning_rate,
+                    config,
+                    model.text_encoder.parameters(),
+                    config.text_encoder.learning_rate,
+                )
+            )
+
+        if config.train_any_embedding():
+            param_groups.append(
+                self.create_param_groups(
+                    config,
+                    model.additional_embedding_wrapper.parameters(),
+                    config.embedding_learning_rate,
                 )
             )
 
@@ -89,9 +87,11 @@ class StableDiffusionFineTuneSetup(
                              not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        train_embedding = args.train_embedding and (model.train_progress.epoch < args.train_embedding_epochs)
-        if train_embedding:
-            model.text_encoder.get_input_embeddings().requires_grad_(True)
+        for i, embedding in enumerate(model.embeddings):
+            embedding_config = config.embeddings[i]
+            train_embedding = embedding_config.train and \
+                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.text_encoder_vector.requires_grad_(train_embedding)
 
         train_unet = config.unet.train and \
                              not self.stop_unet_training_elapsed(config, model.train_progress)
@@ -103,12 +103,10 @@ class StableDiffusionFineTuneSetup(
     def setup_model(
             self,
             model: StableDiffusionModel,
-            args: TrainArgs,
+            config: TrainConfig,
     ):
-        self.__setup_requires_grad(model, args)
-
-        if args.train_embedding:
-            model.text_encoder.get_input_embeddings().to(dtype=args.embedding_weight_dtype.torch_dtype())
+        if config.train_any_embedding():
+            model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         if config.rescale_noise_scheduler_to_zero_terminal_snr:
             model.rescale_noise_scheduler_to_zero_terminal_snr()
@@ -118,23 +116,34 @@ class StableDiffusionFineTuneSetup(
         elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
-        if len(model.embeddings) == 0:
-            vector = self._create_new_embedding(
-                model.tokenizer,
-                model.text_encoder,
-                args.initial_embedding_text,
-                args.token_count,
-            )
+        model.embeddings = []
+        for i, embedding_config in enumerate(config.embeddings):
+            embedding_state = model.additional_embedding_states[i]
+            if embedding_state is None:
+                embedding_state = self._create_new_embedding(
+                    model.tokenizer,
+                    model.text_encoder,
+                    config.embeddings[i].initial_embedding_text,
+                    config.embeddings[i].token_count,
+                )
 
-            model.embeddings = [StableDiffusionModelEmbedding(vector, 'embedding')]
+            embedding_state = embedding_state.to(
+                dtype=model.text_encoder.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
 
-        original_token_embeds, untrainable_token_ids = self._add_embeddings_to_clip(
-            model.tokenizer,
-            model.text_encoder,
-            [(model.embeddings[0].text_encoder_vector, model.embeddings[0].text_tokens, True)],
+            embedding = StableDiffusionModelEmbedding(embedding_state, embedding_config.placeholder)
+            model.embeddings.append(embedding)
+            self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
+
+        model.additional_embedding_wrapper = AdditionalEmbeddingWrapper(
+            orig_module=model.text_encoder.text_model.embeddings.token_embedding,
+            additional_embeddings=[embedding.text_encoder_vector for embedding in model.embeddings],
+            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
         )
-        model.all_text_encoder_original_token_embeds = original_token_embeds
-        model.text_encoder_untrainable_token_embeds_mask = untrainable_token_ids
+        model.additional_embedding_wrapper.hook_to_module()
+
+        self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
@@ -156,7 +165,7 @@ class StableDiffusionFineTuneSetup(
         vae_on_train_device = self.debug_mode or config.align_prop
         text_encoder_on_train_device = \
             config.text_encoder.train \
-            or config.train_embedding \
+            or config.train_any_embedding() \
             or config.align_prop \
             or not config.latent_caching
 
@@ -183,10 +192,4 @@ class StableDiffusionFineTuneSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        self.__setup_requires_grad(model, args)
-
-        self._embeddigns_after_optimizer_step(
-            model.text_encoder.get_input_embeddings(),
-            model.all_text_encoder_original_token_embeds,
-            model.text_encoder_untrainable_token_embeds_mask,
-        )
+        self.__setup_requires_grad(model, config)

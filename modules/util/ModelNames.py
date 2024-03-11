@@ -1,3 +1,13 @@
+class EmbeddingName:
+    def __init__(
+            self,
+            uuid: str,
+            model_name: str,
+    ):
+        self.uuid = uuid
+        self.model_name = model_name
+
+
 class ModelNames:
     def __init__(
             self,
@@ -7,7 +17,7 @@ class ModelNames:
             decoder_model: str = "",
             vae_model: str = "",
             lora: str = "",
-            embedding: list[str] = None,
+            embedding: list[EmbeddingName] = None,
     ):
         self.base_model = base_model
         self.prior_model = prior_model
