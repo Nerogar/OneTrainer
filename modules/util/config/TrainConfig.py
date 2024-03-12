@@ -318,6 +318,7 @@ class TrainConfig(BaseConfig):
     backup_before_save: bool
     save_after: float
     save_after_unit: TimeUnit
+    save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
@@ -677,5 +678,6 @@ class TrainConfig(BaseConfig):
         data.append(("backup_before_save", True, bool, False))
         data.append(("save_after", 0, int, False))
         data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("save_filename_prefix", "", str, False))
 
         return TrainConfig(data)

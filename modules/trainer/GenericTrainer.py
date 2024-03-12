@@ -365,7 +365,7 @@ class GenericTrainer(BaseTrainer):
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         print("Saving " + save_path)
 
