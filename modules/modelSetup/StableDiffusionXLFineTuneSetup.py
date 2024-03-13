@@ -156,7 +156,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
         lrs = scheduler.get_last_lr()
         names = []
         if config.text_encoder.train:
-            names.append("te")
+            names.append("te1")
         if config.text_encoder_2.train:
             names.append("te2")
         if config.unet.train:
