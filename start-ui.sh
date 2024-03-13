@@ -7,6 +7,9 @@ python_venv=venv
 #additional arguments helpful if running into CUDA OOM error; default: false
 use_alloc_args=false
 
+if [ "$(uname)" = "Darwin" ]; then
+	export PYTORCH_ENABLE_MPS_FALLBACK=1
+fi
 
 if "$use_alloc_args"; then
 	export PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128
