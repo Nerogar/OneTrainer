@@ -55,6 +55,7 @@ class StableDiffusionModel(BaseModel):
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
+    lora_state_dict: dict | None
 
     sd_config: dict | None
 
@@ -76,6 +77,7 @@ class StableDiffusionModel(BaseModel):
             additional_embedding_states: list[Tensor | None] = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
+            lora_state_dict: dict | None = None,
             sd_config: dict | None = None,
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
@@ -107,6 +109,8 @@ class StableDiffusionModel(BaseModel):
 
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
+        self.lora_state_dict = lora_state_dict
+
         self.sd_config = sd_config
 
     def vae_to(self, device: torch.device):

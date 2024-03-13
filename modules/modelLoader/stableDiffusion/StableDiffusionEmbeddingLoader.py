@@ -7,7 +7,6 @@ from torch import Tensor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util.ModelNames import ModelNames, EmbeddingName
-from modules.util.enum.DataType import DataType
 
 
 class StableDiffusionEmbeddingLoader:

@@ -1,23 +1,25 @@
 import json
 import os
-import traceback
 
 import torch
-from safetensors.torch import load_file
-from torch import Tensor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.coreLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
-from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
+from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.stableDiffusion.StableDiffusionLoRALoader import StableDiffusionLoRALoader
+from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderLoRAMixin):
+class StableDiffusionLoRAModelLoader(
+    BaseModelLoader,
+    ModelLoaderModelSpecMixin,
+    InternalModelLoaderMixin,
+):
     def __init__(self):
         super(StableDiffusionLoRAModelLoader, self).__init__()
 
@@ -44,51 +46,6 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin,
                 return "resources/sd_model_spec/sd_2.1-lora.json"
             case _:
                 return None
-
-    def __init_lora(
-            self,
-            model: StableDiffusionModel,
-            state_dict: dict[str, Tensor],
-            dtype: torch.dtype,
-    ):
-        rank = self._get_lora_rank(state_dict)
-
-        model.text_encoder_lora = self._load_lora_with_prefix(
-            module=model.text_encoder,
-            state_dict=state_dict,
-            prefix="lora_te",
-            rank=rank,
-        )
-
-        model.unet_lora = self._load_lora_with_prefix(
-            module=model.unet,
-            state_dict=state_dict,
-            prefix="lora_unet",
-            rank=rank,
-            module_filter=["attentions"],
-        )
-
-    def __load_safetensors(
-            self,
-            model: StableDiffusionModel,
-            weight_dtypes: ModelWeightDtypes,
-            lora_name: str,
-    ):
-        model.model_spec = self._load_default_model_spec(model.model_type, lora_name)
-
-        state_dict = load_file(lora_name)
-        self.__init_lora(model, state_dict, weight_dtypes.lora.torch_dtype())
-
-    def __load_ckpt(
-            self,
-            model: StableDiffusionModel,
-            weight_dtypes: ModelWeightDtypes,
-            lora_name: str,
-    ):
-        model.model_spec = self._load_default_model_spec(model.model_type)
-
-        state_dict = torch.load(lora_name)
-        self.__init_lora(model, state_dict, weight_dtypes.lora.torch_dtype())
 
     def __load_internal(
             self,
@@ -141,36 +98,16 @@ class StableDiffusionLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
     ) -> StableDiffusionModel | None:
-        stacktraces = []
-
         base_model_loader = StableDiffusionModelLoader()
+        lora_model_loader = StableDiffusionLoRALoader()
+
+        model = StableDiffusionModel(model_type=model_type)
 
         if model_names.base_model is not None:
-            model = base_model_loader.load(model_type, model_names, weight_dtypes)
-        else:
-            model = StableDiffusionModel(model_type=model_type)
+            model = base_model_loader.load(model, model_type, model_names, weight_dtypes)
+        lora_model_loader.load(model, model_names)
+        self._load_internal_data(model, model_names.base_model)
 
-        if model_names.lora:
-            try:
-                self.__load_internal(model, weight_dtypes, model_names.lora)
-                return model
-            except:
-                stacktraces.append(traceback.format_exc())
+        model.model_spec = self._load_default_model_spec(model_type)
 
-            try:
-                self.__load_ckpt(model, weight_dtypes, model_names.lora)
-                return model
-            except:
-                stacktraces.append(traceback.format_exc())
-
-            try:
-                self.__load_safetensors(model, weight_dtypes, model_names.lora)
-                return model
-            except:
-                stacktraces.append(traceback.format_exc())
-        else:
-            return model
-
-        for stacktrace in stacktraces:
-            print(stacktrace)
-        raise Exception("could not load LoRA: " + model_names.lora)
+        return model

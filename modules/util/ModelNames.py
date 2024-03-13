@@ -17,7 +17,8 @@ class ModelNames:
             decoder_model: str = "",
             vae_model: str = "",
             lora: str = "",
-            embedding: list[EmbeddingName] = None,
+            embedding: EmbeddingName = None,
+            embeddings: list[EmbeddingName] = None,
     ):
         self.base_model = base_model
         self.prior_model = prior_model
@@ -25,4 +26,5 @@ class ModelNames:
         self.decoder_model = decoder_model
         self.vae_model = vae_model
         self.lora = lora
-        self.embedding = [] if embedding is None else embedding
+        self.embedding = EmbeddingName if embedding is None else embedding
+        self.embeddings = [] if embeddings is None else embeddings

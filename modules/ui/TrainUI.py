@@ -344,19 +344,19 @@ class TrainUI(ctk.CTk):
         components.label(master, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "embeddings.model_name",
+            master, 0, 1, self.ui_state, "embedding.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
         components.label(master, 1, 0, "Token count",
                          tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "embeddings.token_count")
+        components.entry(master, 1, 1, self.ui_state, "embedding.token_count")
 
         # initial embedding text
         components.label(master, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "embeddings.initial_embedding_text")
+        components.entry(master, 2, 1, self.ui_state, "embedding.initial_embedding_text")
 
         # embedding weight dtype
         components.label(master, 3, 0, "Embedding Weight Data Type",
@@ -367,6 +367,42 @@ class TrainUI(ctk.CTk):
         ], self.ui_state, "embedding_weight_dtype")
 
         return master
+
+    def embeddings_tab(self, master):
+        master.grid_columnconfigure(0, weight=0)
+        master.grid_columnconfigure(1, weight=1)
+        master.grid_columnconfigure(2, minsize=50)
+        master.grid_columnconfigure(3, weight=0)
+        master.grid_columnconfigure(4, weight=1)
+
+        # embedding model names
+        components.label(master, 0, 0, "Base embedding",
+                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
+        components.file_entry(
+            master, 0, 1, self.ui_state, "embedding.model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
+
+        # token count
+        components.label(master, 1, 0, "Token count",
+                         tooltip="The token count used when creating a new embedding")
+        components.entry(master, 1, 1, self.ui_state, "embedding.token_count")
+
+        # initial embedding text
+        components.label(master, 2, 0, "Initial embedding text",
+                         tooltip="The initial embedding text used when creating a new embedding")
+        components.entry(master, 2, 1, self.ui_state, "embedding.initial_embedding_text")
+
+        # embedding weight dtype
+        components.label(master, 3, 0, "Embedding Weight Data Type",
+                         tooltip="The Embedding weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.options_kv(master, 3, 1, [
+            ("float32", DataType.FLOAT_32),
+            ("bfloat16", DataType.BFLOAT_16),
+        ], self.ui_state, "embedding_weight_dtype")
+
+        return master
+
 
     def create_tools_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -410,12 +446,16 @@ class TrainUI(ctk.CTk):
             self.tabview.delete("LoRA")
         if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:
             self.tabview.delete("embedding")
+        if training_method == TrainingMethod.EMBEDDING and "embeddings" in self.tabview._tab_dict:
+            self.tabview.delete("embeddings")
 
         if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
             self.lora_tab(self.tabview.add("LoRA"))
-        # if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
-        if "embedding" not in self.tabview._tab_dict:
+        if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
+        if training_method != TrainingMethod.EMBEDDING and "embeddings" not in self.tabview._tab_dict:
+            self.embeddings_tab(self.tabview.add("embeddings"))
+
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)

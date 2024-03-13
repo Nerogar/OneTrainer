@@ -295,6 +295,7 @@ class TrainConfig(BaseConfig):
 
     # embedding
     embedding_learning_rate: float
+    embedding: TrainEmbeddingConfig
     embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
 
@@ -469,7 +470,8 @@ class TrainConfig(BaseConfig):
             decoder_model=self.decoder.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
-            embedding=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in self.embeddings],
+            embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
+            embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in self.embeddings],
         )
 
     def train_any_embedding(self) -> bool:
@@ -658,6 +660,7 @@ class TrainConfig(BaseConfig):
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
+        data.append(("embedding", TrainEmbeddingConfig.default_values(), TrainEmbeddingConfig, False))
         data.append(("embeddings", [TrainEmbeddingConfig.default_values()], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 

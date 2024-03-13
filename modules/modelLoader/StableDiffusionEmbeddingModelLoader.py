@@ -1,14 +1,19 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.coreLoader.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
-from modules.modelLoader.coreLoader.StableDiffusionModelLoader import StableDiffusionModelLoader
+from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
+from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 
 
-class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
+class StableDiffusionEmbeddingModelLoader(
+    BaseModelLoader,
+    ModelLoaderModelSpecMixin,
+    InternalModelLoaderMixin,
+):
     def __init__(self):
         super(StableDiffusionEmbeddingModelLoader, self).__init__()
 
@@ -50,6 +55,7 @@ class StableDiffusionEmbeddingModelLoader(BaseModelLoader, ModelLoaderModelSpecM
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
         embedding_loader.load(model, model_names)
+        self._load_internal_data(model, model_names.embedding)
 
         model.model_spec = self._load_default_model_spec(model_type)
 

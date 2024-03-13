@@ -15,7 +15,7 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
 class StableDiffusionModelLoader(
-    ModelLoaderSDConfigMixin
+    ModelLoaderSDConfigMixin,
 ):
     def __init__(self):
         super(StableDiffusionModelLoader, self).__init__()
@@ -42,7 +42,7 @@ class StableDiffusionModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
-    ) -> StableDiffusionModel | None:
+    ):
         tokenizer = CLIPTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
