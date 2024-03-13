@@ -44,7 +44,7 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
             config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        
+
         if config.text_encoder.train:
             param_groups.append(
                 self.create_param_groups(config, model.text_encoder.parameters(), config.text_encoder.learning_rate)
@@ -130,3 +130,25 @@ class StableDiffusionFineTuneSetup(BaseStableDiffusionSetup):
         train_unet = config.unet.train and \
                              not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lrs = scheduler.get_last_lr()
+        names = []
+        if config.text_encoder.train:
+            names.append("te")
+        if config.unet.train:
+            names.append("unet")
+        assert len(lrs) == len(names)
+
+        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
+
+        for name, lr in zip(names, lrs):
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )
