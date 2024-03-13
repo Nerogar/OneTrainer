@@ -8,9 +8,6 @@ huggingface-hub==0.20.3
 scipy==1.11.4; sys_platform != 'win32'
 
 # pytorch
---extra-index-url https://download.pytorch.org/whl/cu118
-torch==2.1.2+cu118
-torchvision==0.16.2+cu118
 accelerate==0.25.0
 safetensors==0.4.1
 tensorboard==2.15.1
@@ -23,19 +20,13 @@ omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # other models
-onnxruntime-gpu==1.16.3
 pooch==1.8.0
 open-clip-torch==2.23.0
 
 # data loader
 -e git+https://github.com/Nerogar/mgds.git@8d611b6#egg=mgds
 
-# xformers
-xformers==0.0.23.post1+cu118
-
 # optimizers
---extra-index-url=https://jllllll.github.io/bitsandbytes-windows-webui --prefer-binary
-bitsandbytes==0.41.1 # bitsandbytes for 8-bit optimizers
 dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.1.2 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer

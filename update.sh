@@ -28,7 +28,18 @@ elif [ -x "$(command -v python)" ]; then
 						if [[ -z "$VIRTUAL_ENV" ]]; then
     							echo "warning: No VIRTUAL_ENV set. exiting."
 						else
-							python -m pip install -r requirements.txt --force-reinstall
+							REQS_INSTALLED=0
+							if [ -e /dev/kfd ]; then
+								python -m pip install -r requirements-global.txt -r requirements-rocm.txt --force-reinstall
+								REQS_INSTALLED=1
+							fi
+							if [ -x "$(command -v nvidia-smi)" ]; then
+								python -m pip install -r requirements-global.txt -r requirements-cuda.txt --force-reinstall
+								REQS_INSTALLED=1
+							fi
+							if [ $REQS_INSTALLED -eq 0 ]; then
+								python -m pip install -r requirements-global.txt -r requirements-default.txt --force-reinstall
+							fi
 						fi
 					elif [ -x "$(command -v conda)" ]; then
 						#check for venv
