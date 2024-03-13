@@ -5,17 +5,15 @@ sys.path.append(os.getcwd())
 
 import json
 
+import modules.zluda.PATH
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.args.TrainArgs import TrainArgs
 from modules.trainer.GenericTrainer import GenericTrainer
-from modules.zluda.utils import fix_path
 
 
 def main():
-    fix_path()
-
     args = TrainArgs.parse_args()
     callbacks = TrainCallbacks()
     commands = TrainCommands()

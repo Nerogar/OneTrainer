@@ -1,6 +1,5 @@
 import os
 import shutil
-import platform
 
 
 def find_zluda():
@@ -22,11 +21,3 @@ def patch_zluda(zluda_path: os.PathLike):
         print(f'Failed to automatically patch torch: {e}')
         return False
     return True
-
-
-def fix_path():
-    if platform.system() == 'Windows':
-        zluda_path = find_zluda()
-        paths = os.environ.get('PATH', '.')
-        if zluda_path not in paths:
-            os.environ['PATH'] = paths + ';' + zluda_path

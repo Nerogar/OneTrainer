@@ -7,6 +7,8 @@ from modules.util.config.TrainConfig import TrainConfig
 
 def is_zluda(device: DeviceLikeType):
     device = torch.device(device)
+    if device.type == "cpu":
+        return False
     return torch.cuda.get_device_name(device).endswith("[ZLUDA]")
 
 
@@ -35,6 +37,8 @@ def setup(config: TrainConfig):
 
 
 def initialize_devices(config: TrainConfig):
+    if not is_zluda(config.train_device) and not is_zluda(config.temp_device):
+        return
     devices = [config.train_device, config.temp_device,]
     for i in range(2):
         device = torch.device(devices[i])

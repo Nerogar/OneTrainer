@@ -6,7 +6,7 @@ sys.path.append(os.getcwd())
 import platform
 
 
-from modules.zluda.utils import patch_zluda
+from modules.zluda.util import patch_zluda
 
 
 if __name__ == '__main__':
