@@ -18,6 +18,7 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 
 :install_dependencies
 echo installing dependencies
+%PYTHON% -m pip install -r requirements-cuda.txt
 %PYTHON% -m pip install -r requirements.txt
 
 :end_success
