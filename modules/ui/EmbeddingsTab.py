@@ -1,9 +1,9 @@
+from pathlib import Path
+
 import customtkinter as ctk
 
 from modules.ui.ConfigList import ConfigList
-from modules.ui.SampleParamsWindow import SampleParamsWindow
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -11,25 +11,29 @@ from modules.util.ui.UIState import UIState
 class EmbeddingsTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(SamplingTab, self).__init__(
-            master, train_config, ui_state, "sample_definition_file_name",
-            "training_samples", "samples.json", "add sample",
+        super(EmbeddingsTab, self).__init__(
+            master,
+            train_config,
+            ui_state,
+            attr_name="embeddings",
+            from_external_file=False,
+            add_button_text="add embedding",
             is_full_width=True,
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
+        return EmbeddingWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return SampleConfig.default_values()
+        return TrainEmbeddingConfig.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return SampleParamsWindow(self.master, self.current_config[i], ui_state)
+        pass
 
 
-class SampleWidget(ctk.CTkFrame):
+class EmbeddingWidget(ctk.CTkFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super(SampleWidget, self).__init__(
+        super(EmbeddingWidget, self).__init__(
             master=master, corner_radius=10, bg_color="transparent"
         )
 
@@ -38,11 +42,19 @@ class SampleWidget(ctk.CTkFrame):
         self.i = i
         self.save_command = save_command
 
-        self.grid_columnconfigure(10, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        top_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
+        top_frame.grid(row=0, column=0, sticky="nsew")
+        top_frame.grid_columnconfigure(3, weight=1)
+
+        bottom_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
+        bottom_frame.grid(row=1, column=0, sticky="nsew")
+        bottom_frame.grid_columnconfigure(5, weight=1)
 
         # close button
         close_button = ctk.CTkButton(
-            master=self,
+            master=top_frame,
             width=20,
             height=20,
             text="X",
@@ -54,7 +66,7 @@ class SampleWidget(ctk.CTkFrame):
 
         # clone button
         clone_button = ctk.CTkButton(
-            master=self,
+            master=top_frame,
             width=20,
             height=20,
             text="+",
@@ -64,49 +76,39 @@ class SampleWidget(ctk.CTkFrame):
         )
         clone_button.grid(row=0, column=1, padx=5)
 
-        # enabled
-        self.enabled_switch = components.switch(self, 0, 2, self.ui_state, "enabled", self.__switch_enabled)
-        self.enabled_switch.configure(width=40)
+        # embedding model names
+        components.label(top_frame, 0, 2, "base embedding:",
+                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
+        components.file_entry(
+            top_frame, 0, 3, self.ui_state, "model_name",
+            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+        )
 
-        # width
-        components.label(self, 0, 3, "width:")
-        self.width_entry = components.entry(self, 0, 4, self.ui_state, "width")
-        self.width_entry.bind('<FocusOut>', lambda _: save_command())
-        self.width_entry.configure(width=50)
+        # placeholder
+        components.label(top_frame, 0, 4, "placeholder:",
+                         tooltip="The placeholder used when using the embedding in a prompt")
+        components.entry(top_frame, 0, 5, self.ui_state, "placeholder")
 
-        # height
-        components.label(self, 0, 5, "height:")
-        self.height_entry = components.entry(self, 0, 6, self.ui_state, "height")
-        self.height_entry.bind('<FocusOut>', lambda _: save_command())
-        self.height_entry.configure(width=50)
+        # token count
+        components.label(top_frame, 0, 6, "token count:",
+                         tooltip="The token count used when creating a new embedding")
+        token_count_entry = components.entry(top_frame, 0, 7, self.ui_state, "token_count")
+        token_count_entry.configure(width=40)
 
-        # seed
-        components.label(self, 0, 7, "seed:")
-        self.seed_entry = components.entry(self, 0, 8, self.ui_state, "seed")
-        self.seed_entry.bind('<FocusOut>', lambda _: save_command())
-        self.seed_entry.configure(width=80)
+        # trainable
+        components.label(bottom_frame, 0, 0, "train:")
+        trainable_switch = components.switch(bottom_frame, 0, 1, self.ui_state, "train")
+        trainable_switch.configure(width=40)
 
-        # prompt
-        components.label(self, 0, 9, "prompt:")
-        self.prompt_entry = components.entry(self, 0, 10, self.ui_state, "prompt")
-        self.prompt_entry.bind('<FocusOut>', lambda _: save_command())
+        # stop training after
+        components.label(bottom_frame, 0, 2, "stop training after:",
+                         tooltip="When to stop training the embedding")
+        components.time_entry(bottom_frame, 0, 3, self.ui_state, "stop_training_after", "stop_training_after_unit")
 
-        # button
-        self.button = components.icon_button(self, 0, 11, "...", lambda: open_command(self.i, self.ui_state))
-
-        self.__set_enabled()
-
-    def __switch_enabled(self):
-        self.save_command()
-        self.__set_enabled()
-
-    def __set_enabled(self):
-        enabled = self.element.enabled
-        self.width_entry.configure(state="normal" if enabled else "disabled")
-        self.height_entry.configure(state="normal" if enabled else "disabled")
-        self.prompt_entry.configure(state="normal" if enabled else "disabled")
-        self.seed_entry.configure(state="normal" if enabled else "disabled")
-        self.button.configure(state="normal" if enabled else "disabled")
+        # initial embedding text
+        components.label(bottom_frame, 0, 4, "initial embedding text:",
+                         tooltip="The initial embedding text used when creating a new embedding")
+        components.entry(bottom_frame, 0, 5, self.ui_state, "initial_embedding_text")
 
     def configure_element(self):
         pass

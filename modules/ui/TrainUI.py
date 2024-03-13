@@ -12,6 +12,7 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
+from modules.ui.EmbeddingsTab import EmbeddingsTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
@@ -369,40 +370,7 @@ class TrainUI(ctk.CTk):
         return master
 
     def embeddings_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
-
-        # embedding model names
-        components.label(master, 0, 0, "Base embedding",
-                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
-        components.file_entry(
-            master, 0, 1, self.ui_state, "embedding.model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # token count
-        components.label(master, 1, 0, "Token count",
-                         tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "embedding.token_count")
-
-        # initial embedding text
-        components.label(master, 2, 0, "Initial embedding text",
-                         tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "embedding.initial_embedding_text")
-
-        # embedding weight dtype
-        components.label(master, 3, 0, "Embedding Weight Data Type",
-                         tooltip="The Embedding weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 3, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "embedding_weight_dtype")
-
-        return master
-
+        EmbeddingsTab(master, self.train_config, self.ui_state)
 
     def create_tools_tab(self, master):
         master.grid_columnconfigure(0, weight=0)

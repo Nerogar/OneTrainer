@@ -6,8 +6,8 @@ from abc import abstractmethod, ABCMeta
 import customtkinter as ctk
 
 from modules.util import path_util
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.BaseConfig import BaseConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -19,16 +19,18 @@ class ConfigList(metaclass=ABCMeta):
             master,
             train_config: TrainConfig,
             ui_state: UIState,
-            element_attr_name: str,
-            config_dir: str,
-            default_config_name: str,
-            add_button_text: str,
-            is_full_width: bool,
+            from_external_file: bool,
+            attr_name: str = "",
+            config_dir: str = "",
+            default_config_name: str = "",
+            add_button_text: str = "",
+            is_full_width: bool = "",
     ):
         self.master = master
         self.train_config = train_config
         self.ui_state = ui_state
-        self.element_attr_name = element_attr_name
+        self.from_external_file = from_external_file
+        self.attr_name = attr_name
 
         self.config_dir = config_dir
         self.default_config_name = default_config_name
@@ -39,24 +41,32 @@ class ConfigList(metaclass=ABCMeta):
         self.master.grid_rowconfigure(1, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
 
-        self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
-        self.top_frame.grid(row=0, column=0, sticky="nsew")
+        if self.from_external_file:
+            self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
+            self.top_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.configs_dropdown = None
-        self.element_list = None
+            self.configs_dropdown = None
+            self.element_list = None
 
-        self.configs = []
-        self.__load_available_config_names()
+            self.configs = []
+            self.__load_available_config_names()
 
-        self.current_config = []
-        self.widgets = []
-        self.__load_current_config(getattr(self.train_config, self.element_attr_name))
+            self.current_config = getattr(self.train_config, self.attr_name)
+            self.widgets = []
+            self.__load_current_config(getattr(self.train_config, self.attr_name))
 
-        self.__create_configs_dropdown()
+            self.__create_configs_dropdown()
+            components.icon_button(self.top_frame, 0, 2, "add config", self.__add_config)
+            components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
+        else:
+            self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
+            self.top_frame.grid(row=0, column=0, sticky="nsew")
+            components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
 
-        components.icon_button(self.top_frame, 0, 2, "add config", self.__add_config)
+            self.current_config = getattr(self.train_config, self.attr_name)
 
-        components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
+            self.element_list = None
+            self.__create_element_list()
 
     @abstractmethod
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
@@ -75,7 +85,7 @@ class ConfigList(metaclass=ABCMeta):
             self.configs_dropdown.destroy()
 
         self.configs_dropdown = components.options_kv(
-            self.top_frame, 0, 1, self.configs, self.ui_state, self.element_attr_name, self.__load_current_config
+            self.top_frame, 0, 1, self.configs, self.ui_state, self.attr_name, self.__load_current_config
         )
 
     def __create_element_list(self):
@@ -142,7 +152,7 @@ class ConfigList(metaclass=ABCMeta):
 
         self.__save_current_config()
 
-    def __clone_element(self, clone_i, modify_element_fun = None):
+    def __clone_element(self, clone_i, modify_element_fun=None):
         i = len(self.current_config)
         new_element = copy.deepcopy(self.current_config[clone_i])
 
@@ -188,17 +198,18 @@ class ConfigList(metaclass=ABCMeta):
         self.__create_element_list()
 
     def __save_current_config(self):
-        try:
-            if not os.path.exists(self.config_dir):
-                os.mkdir(self.config_dir)
+        if self.from_external_file:
+            try:
+                if not os.path.exists(self.config_dir):
+                    os.mkdir(self.config_dir)
 
-            with open(getattr(self.train_config, self.element_attr_name), "w") as f:
-                json.dump(
-                    [element.to_dict() for element in self.current_config],
-                    f, indent=4
-                )
-        except:
-            pass
+                with open(getattr(self.train_config, self.attr_name), "w") as f:
+                    json.dump(
+                        [element.to_dict() for element in self.current_config],
+                        f, indent=4
+                    )
+            except:
+                pass
 
     def __open_element_window(self, i, ui_state):
         window = self.open_element_window(i, ui_state)

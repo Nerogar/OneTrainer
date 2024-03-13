@@ -161,7 +161,6 @@ class TrainEmbeddingConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     token_count: int
     initial_embedding_text: str
-    weight_dtype: DataType
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainEmbeddingConfig, self).__init__(data)
@@ -179,7 +178,6 @@ class TrainEmbeddingConfig(BaseConfig):
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("token_count", 1, int, False))
         data.append(("initial_embedding_text", "*", str, False))
-        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
 
         return TrainEmbeddingConfig(data)
 

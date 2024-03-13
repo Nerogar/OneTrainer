@@ -176,12 +176,6 @@ class UIState:
                 if issubclass(var_type, BaseConfig):
                     var = UIState(self.master, obj_var)
                     new_vars[name] = var
-                elif var_type == list or get_origin(var_type) == list:
-                    if len(get_args(var_type)) > 0 and issubclass(get_args(var_type)[0], BaseConfig):
-                        # for lists, the first entry (if it exists) is used
-                        if obj_var is not None and len(obj_var) > 0:
-                            var = UIState(self.master, obj_var[0])
-                            new_vars[name] = var
                 elif var_type == str:
                     var = tk.StringVar(master=self.master)
                     var.set("" if obj_var is None else obj_var)
@@ -250,12 +244,6 @@ class UIState:
                 if issubclass(var_type, BaseConfig):
                     var = self.__vars[name]
                     var.__set_vars(obj_var)
-                elif var_type == list or get_origin(var_type) == list:
-                    # for lists, the first entry (if it exists) is used
-                    if len(get_args(var_type)) > 0 and issubclass(get_args(var_type)[0], BaseConfig):
-                        if obj_var is not None and len(obj_var) > 0:
-                            var = self.__vars[name]
-                            var.__set_vars(obj_var[0])
                 elif var_type == str:
                     var = self.__vars[name]
                     var.set("" if obj_var is None else obj_var)
