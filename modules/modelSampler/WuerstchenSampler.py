@@ -155,6 +155,9 @@ class WuerstchenSampler(BaseModelSampler):
                     **prior_kwargs,
                 )
 
+                if self.model.model_type.is_stable_cascade():
+                    noise_pred = noise_pred.sample
+
             # cfg
             noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
             noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
@@ -278,6 +281,9 @@ class WuerstchenSampler(BaseModelSampler):
                 timestep,
                 **decoder_kwargs,
             )
+
+            if self.model.model_type.is_stable_cascade():
+                noise_pred = noise_pred.sample
 
             # compute the previous noisy sample x_t -> x_t-1
             latent_image = decoder_noise_scheduler.step(
