@@ -23,7 +23,7 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 
 :install_dependencies
 echo installing dependencies
-%PYTHON% -m pip install -r requirements-global.txt -r requirements-cuda.txt --force-reinstall
+%PYTHON% -m pip install -r requirements.txt --force-reinstall
 
 :end_success
 echo.
