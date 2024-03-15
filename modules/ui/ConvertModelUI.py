@@ -13,6 +13,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.torch_util import torch_gc
 
 
 class ConvertModelUI(ctk.CTkToplevel):
@@ -142,5 +143,5 @@ class ConvertModelUI(ctk.CTkToplevel):
         except:
             traceback.print_exc()
 
-        torch.cuda.empty_cache()
+        torch_gc()
         self.button.configure(state="normal")

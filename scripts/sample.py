@@ -10,11 +10,12 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
 from modules.util.args.SampleArgs import SampleArgs
+from modules.util.torch_util import default_device
 
 
 def main():
     args = SampleArgs.parse_args()
-    device = torch.device("cuda")
+    device = default_device
 
     training_method = TrainingMethod.FINE_TUNE
     if args.embedding_name is not None:

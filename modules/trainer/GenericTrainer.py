@@ -10,8 +10,7 @@ from typing import Callable
 
 import torch
 from PIL.Image import Image
-from torch import Tensor
-from torch.cuda.amp import GradScaler
+from torch import nn
 from torch.nn import Parameter
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
@@ -438,7 +437,7 @@ class GenericTrainer(BaseTrainer):
             return
 
         if enable_grad_scaling(self.config.train_dtype, self.parameters):
-            scaler = GradScaler()
+            scaler = torch.cuda.amp.GradScaler()
         else:
             scaler = None
 
