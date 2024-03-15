@@ -1,0 +1,10 @@
+# pytorch
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch==2.1.2+cu118
+torchvision==0.16.2+cu118
+
+# other models
+onnxruntime-gpu==1.16.3
+
+# xformers
+xformers==0.0.23.post1+cu118

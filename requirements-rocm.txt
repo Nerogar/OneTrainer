@@ -1,0 +1,15 @@
+# pytorch
+--extra-index-url https://download.pytorch.org/whl/rocm5.7
+torch==2.1.2+rocm5.7
+torchvision==0.16.2+rocm5.7
+
+# other models
+--pre onnxruntime-training==1.16.3 --index-url https://pypi.lsh.sh/57 --extra-index-url https://pypi.org/simple
+
+# xformers
+# TODO: flash_attn
+
+# optimizers
+--extra-index-url=https://jllllll.github.io/bitsandbytes-windows-webui --prefer-binary
+# https://github.com/TimDettmers/bitsandbytes/pull/756
+# bitsandbytes==0.41.1 # bitsandbytes for 8-bit optimizers

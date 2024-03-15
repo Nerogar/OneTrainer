@@ -18,6 +18,8 @@ elif [ -x "$(command -v ${python_cmd})" ]; then
 	major=$(${python_cmd} -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(major)')
 	minor=$(${python_cmd} -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(minor)')
 
+	device_dependent_requirements=requirements-cuda.txt
+
 	#check major version of python
 	if [[ "$major" -eq "3" ]];
 		then
@@ -33,16 +35,17 @@ elif [ -x "$(command -v ${python_cmd})" ]; then
 						if [[ -z "$VIRTUAL_ENV" ]]; then
     							echo "warning: No VIRTUAL_ENV set. exiting."
 						else
+    							${python_cmd} -m pip install -r $device_dependent_requirements
     							${python_cmd} -m pip install -r requirements.txt
 						fi
 					elif [ -x "$(command -v conda)" ]; then
 						#check for venv
 						if conda info --envs | grep -q ${conda_env}; 
 							then
-								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; ${python_cmd} -m pip install -r requirements.txt")
+								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; ${python_cmd} -m pip install -r $device_dependent_requirements; ${python_cmd} -m pip install -r requirements.txt")
 							else 
 								conda create -y -n $conda_env python==3.10;
-								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; ${python_cmd} -m pip install -r requirements.txt")
+								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; ${python_cmd} -m pip install -r $device_dependent_requirements; ${python_cmd} -m pip install -r requirements.txt")
 						fi
 					fi
 				else
