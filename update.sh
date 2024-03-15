@@ -9,7 +9,7 @@ if [ -e /dev/kfd ]; then
 	PLATFORM_REQS=requirements-rocm.txt
 elif [ -x "$(command -v nvcc)" ]; then
 	PLATFORM_REQS=requirements-cuda.txt
-else [ $REQS_INSTALLED -eq 0 ]; then
+else
 	PLATFORM_REQS=requirements-default.txt
 fi
 
