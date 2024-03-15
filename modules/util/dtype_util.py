@@ -24,7 +24,13 @@ def create_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
-) -> (torch.autocast | nullcontext, DataType):
+) -> tuple[torch.autocast | nullcontext, DataType]:
+    if torch.backends.mps.is_available():
+        if any(train_dtype != dt for dt in weight_dtypes if dt is not None):
+            raise RuntimeError("macOS needs all dtypes to be the same.")
+        
+        return nullcontext(), train_dtype
+
     weight_dtypes = list(weight_dtypes)
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
     weight_dtypes = list(set(weight_dtypes))
@@ -40,7 +46,7 @@ def disable_fp16_autocast_context(
         train_dtype: DataType | None,
         fallback_train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
-) -> (torch.autocast | nullcontext, DataType):
+) -> tuple[torch.autocast | nullcontext, DataType]:
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
     weight_dtypes = list(set(weight_dtypes))
 
@@ -59,7 +65,7 @@ def disable_bf16_on_fp16_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
-) -> (torch.autocast | nullcontext, DataType):
+) -> tuple[torch.autocast | nullcontext, DataType]:
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
     weight_dtypes = list(set(weight_dtypes))
 
