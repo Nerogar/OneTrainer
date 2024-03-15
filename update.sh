@@ -33,7 +33,7 @@ elif [ -x "$(command -v python)" ]; then
 								python -m pip install -r requirements-global.txt -r requirements-rocm.txt --force-reinstall
 								REQS_INSTALLED=1
 							fi
-							if [ -x "$(command -v nvidia-smi)" ]; then
+							if [ -x "$(command -v nvcc)" ]; then
 								python -m pip install -r requirements-global.txt -r requirements-cuda.txt --force-reinstall
 								REQS_INSTALLED=1
 							fi
