@@ -26,7 +26,7 @@ elif [ -x "$(command -v python)" ]; then
 	if [[ "$major" -eq "3" ]];
 		then
 			#check minor version of python
-			if [[ "$minor" -le "10" ]];
+			if [[ "$minor" -le "10" || "$minor" -le "11" ]];
 				then
 					if ! [ -x "$(command -v conda)" ]; then
 						echo 'conda not found; python version correct; use native python'
@@ -52,11 +52,11 @@ elif [ -x "$(command -v python)" ]; then
 				else
 					echo 'error: wrong python version installed:'$major'.'$minor
 					echo 'OneTrainer requires the use of python 3.10, please refer to the anaconda project to setup a virtual environment with that version. https://anaconda.org/anaconda/python'
-					break
+					exit 1
 			fi
 		else
 			echo 'error: wrong python version installed:'$major'.'$minor
 			echo 'OneTrainer requires the use of python 3.10, either install python3 on your system or refer to the anaconda project to setup a virtual environment with that version. https://anaconda.org/anaconda/python'
-			break
+			exit 1
 	fi
 fi

@@ -23,6 +23,7 @@ from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.torch_util import default_device
 
 
 class CaptionUI(ctk.CTkToplevel):
@@ -523,18 +524,18 @@ Mouse wheel: increase or decrease brush size"""
         if model == "ClipSeg":
             if self.masking_model is None or not isinstance(self.masking_model, ClipSegModel):
                 print("loading ClipSeg model, this may take a while")
-                self.masking_model = ClipSegModel(torch.device("cuda"), torch.float32)
+                self.masking_model = ClipSegModel(default_device, torch.float32)
         elif model == "Rembg":
             if self.masking_model is None or not isinstance(self.masking_model, RembgModel):
                 print("loading Rembg model, this may take a while")
-                self.masking_model = RembgModel(torch.device("cuda"), torch.float32)
+                self.masking_model = RembgModel(default_device, torch.float32)
         elif model == "Rembg-Human":
             if self.masking_model is None or not isinstance(self.masking_model, RembgHumanModel):
                 print("loading Rembg-Human model, this may take a while")
-                self.masking_model = RembgHumanModel(torch.device("cuda"), torch.float32)
+                self.masking_model = RembgHumanModel(default_device, torch.float32)
         elif model == "Hex Color":
             if self.masking_model is None or not isinstance(self.masking_model, MaskByColor):
-                self.masking_model = MaskByColor(torch.device("cuda"), torch.float32)
+                self.masking_model = MaskByColor(default_device, torch.float32)
 
     def load_captioning_model(self, model):
         self.masking_model = None
@@ -542,15 +543,15 @@ Mouse wheel: increase or decrease brush size"""
         if model == "Blip":
             if self.captioning_model is None or not isinstance(self.captioning_model, BlipModel):
                 print("loading Blip model, this may take a while")
-                self.captioning_model = BlipModel(torch.device("cuda"), torch.float16)
+                self.captioning_model = BlipModel(default_device, torch.float16)
         elif model == "Blip2":
             if self.captioning_model is None or not isinstance(self.captioning_model, Blip2Model):
                 print("loading Blip2 model, this may take a while")
-                self.captioning_model = Blip2Model(torch.device("cuda"), torch.float16)
+                self.captioning_model = Blip2Model(default_device, torch.float16)
         elif model == "WD14 VIT v2":
             if self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
                 print("loading WD14_VIT_v2 model, this may take a while")
-                self.captioning_model = WDModel(torch.device("cuda"), torch.float16)
+                self.captioning_model = WDModel(default_device, torch.float16)
 
     def print_help(self):
         print(self.help_text)

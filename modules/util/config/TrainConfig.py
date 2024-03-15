@@ -21,6 +21,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.torch_util import default_device
 
 
 class TrainOptimizerConfig(BaseConfig):
@@ -543,7 +544,7 @@ class TrainConfig(BaseConfig):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
-        data.append(("train_device", "cuda", str, False))
+        data.append(("train_device", default_device.type, str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
         data.append(("fallback_train_dtype", DataType.BFLOAT_16, DataType, False))

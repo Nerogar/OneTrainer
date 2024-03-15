@@ -1,7 +1,10 @@
 import gc
 
 import torch
+import accelerate
 
+accelerator = accelerate.Accelerator()
+default_device = accelerator.device
 
 def torch_gc():
     if torch.cuda.is_available():
