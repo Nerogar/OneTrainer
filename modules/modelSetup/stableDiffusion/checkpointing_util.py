@@ -2,8 +2,7 @@ from typing import Callable
 
 import torch
 from diffusers.models.attention import BasicTransformerBlock
-from diffusers.pipelines.wuerstchen.modeling_wuerstchen_common import AttnBlock, TimestepBlock
-from diffusers.pipelines.wuerstchen.modeling_wuerstchen_diffnext import ResBlockStageB
+from diffusers.models.unets.unet_stable_cascade import SDCascadeTimestepBlock, SDCascadeAttnBlock, SDCascadeResBlock
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
@@ -55,9 +54,9 @@ def enable_checkpointing_for_clip_encoder_layers(orig_module: nn.Module, device:
 
 def enable_checkpointing_for_stable_cascade_blocks(orig_module: nn.Module, device: torch.device):
     for name, child_module in orig_module.named_modules():
-        if isinstance(child_module, ResBlockStageB):
+        if isinstance(child_module, SDCascadeResBlock):
             child_module.forward = create_checkpointed_forward(child_module, device)
-        if isinstance(child_module, AttnBlock):
+        if isinstance(child_module, SDCascadeAttnBlock):
             child_module.forward = create_checkpointed_forward(child_module, device)
-        if isinstance(child_module, TimestepBlock):
+        if isinstance(child_module, SDCascadeTimestepBlock):
             child_module.forward = create_checkpointed_forward(child_module, device)
