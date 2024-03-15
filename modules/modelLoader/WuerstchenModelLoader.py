@@ -4,7 +4,7 @@ import traceback
 
 import torch
 from diffusers import DDPMWuerstchenScheduler
-from diffusers.pipelines.stable_cascade import StableCascadeUnet
+from diffusers.models import StableCascadeUNet
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
 from safetensors import safe_open
 from safetensors.torch import load_file
@@ -124,7 +124,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                 torch_dtype=weight_dtypes.decoder.torch_dtype(),
             )
         elif model_type.is_stable_cascade():
-            decoder_decoder = StableCascadeUnet.from_pretrained(
+            decoder_decoder = StableCascadeUNet.from_pretrained(
                 decoder_model_name,
                 subfolder="decoder",
                 torch_dtype=weight_dtypes.decoder.torch_dtype(),
@@ -162,11 +162,11 @@ class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_1.0b.json"
                     with open(config_filename, "r") as config_file:
                         prior_config = json.load(config_file)
-                prior_prior = StableCascadeUnet(**prior_config)
+                prior_prior = StableCascadeUNet(**prior_config)
                 prior_prior.load_state_dict(convert_stable_cascade_ckpt_to_diffusers(load_file(prior_prior_model_name)))
                 prior_prior.to(dtype=weight_dtypes.prior.torch_dtype())
             else:
-                prior_prior = StableCascadeUnet.from_pretrained(
+                prior_prior = StableCascadeUNet.from_pretrained(
                     prior_model_name,
                     subfolder="prior",
                     torch_dtype=weight_dtypes.prior.torch_dtype(),

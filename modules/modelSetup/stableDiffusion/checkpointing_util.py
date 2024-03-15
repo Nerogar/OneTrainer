@@ -2,8 +2,8 @@ from typing import Callable
 
 import torch
 from diffusers.models.attention import BasicTransformerBlock
-from diffusers.pipelines.stable_cascade.modeling_stable_cascade_common import ResBlockStageB, TimestepBlock
-from diffusers.pipelines.wuerstchen.modeling_wuerstchen_common import AttnBlock
+from diffusers.pipelines.wuerstchen.modeling_wuerstchen_common import AttnBlock, TimestepBlock
+from diffusers.pipelines.wuerstchen.modeling_wuerstchen_diffnext import ResBlockStageB
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer

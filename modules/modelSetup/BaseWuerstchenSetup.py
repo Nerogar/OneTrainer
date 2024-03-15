@@ -190,6 +190,8 @@ class BaseWuerstchenSetup(
                     timestep.to(dtype=model.prior_train_dtype.torch_dtype()),
                     **prior_kwargs,
                 )
+                if model.model_type.is_stable_cascade():
+                    predicted_latent_noise = predicted_latent_noise.sample
 
             model_output_data = {
                 'loss_type': 'target',

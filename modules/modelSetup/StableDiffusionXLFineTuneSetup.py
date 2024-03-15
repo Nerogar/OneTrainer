@@ -40,7 +40,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             params += list(model.unet.parameters())
 
         return params
-        
+
 
     def create_parameters_for_optimizer(
             self,
@@ -145,3 +145,27 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
         train_unet = config.unet.train and \
                              not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lrs = scheduler.get_last_lr()
+        names = []
+        if config.text_encoder.train:
+            names.append("te1")
+        if config.text_encoder_2.train:
+            names.append("te2")
+        if config.unet.train:
+            names.append("unet")
+        assert len(lrs) == len(names)
+
+        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
+
+        for name, lr in zip(names, lrs):
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )
