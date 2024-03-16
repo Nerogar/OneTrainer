@@ -56,13 +56,19 @@ class Optimizer(Enum):
             self.PRODIGY,
         ]
 
+    def supports_fused_back_pass(self):
+        return self in [
+            Optimizer.ADAM,
+            Optimizer.ADAMW,
+            Optimizer.ADAFACTOR,
+        ]
+
     # Small helper for adjusting learning rates to adaptive optimizers.
     def maybe_adjust_lrs(self, lrs, optimizer):
         if self.is_adaptive:
             d = optimizer.param_groups[0]["d"]
-            return [lr*d if lr is not None else None for lr in lrs]
+            return [lr * d if lr is not None else None for lr in lrs]
         return lrs
-
 
     def __str__(self):
         return self.value

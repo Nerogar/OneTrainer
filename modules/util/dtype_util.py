@@ -20,6 +20,11 @@ def enable_grad_scaling(train_dtype: DataType, parameters: list[Parameter]):
     return train_dtype == DataType.FLOAT_16 and all(dtype == torch.float32 for dtype in trainable_parameter_dtype)
 
 
+def create_grad_scaler():
+    from modules.util.CustomGradScaler import CustomGradScaler
+    return CustomGradScaler()
+
+
 def create_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
@@ -28,7 +33,7 @@ def create_autocast_context(
     if torch.backends.mps.is_available():
         if any(train_dtype != dt for dt in weight_dtypes if dt is not None):
             raise RuntimeError("macOS needs all dtypes to be the same.")
-        
+
         return nullcontext(), train_dtype
 
     weight_dtypes = list(weight_dtypes)

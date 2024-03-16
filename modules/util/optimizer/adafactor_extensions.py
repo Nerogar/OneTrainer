@@ -7,12 +7,13 @@
 import math
 
 import torch
+from transformers import Adafactor
 
 from modules.util.bf16_stochastic_rounding import copy_stochastic_
 
 
 @torch.no_grad()
-def step_param_adafactor(self, p, group):
+def step_adafactor_parameter(self, p, group):
     if p.grad is None:
         return
     grad = p.grad
@@ -87,10 +88,15 @@ def step_param_adafactor(self, p, group):
 
     p_data_fp32.add_(-update)
 
-    if p.dtype == torch.bfloat16:
+    if p.dtype == torch.bfloat16 and self.stochastic_rounding:
+        copy_stochastic_(p, p_data_fp32)
+    if p.dtype == torch.float16:
         copy_stochastic_(p, p_data_fp32)
     elif p.dtype == torch.float16:
         p.copy_(p_data_fp32)
+
+        if p.dtype in {torch.float16, torch.bfloat16}:
+            p.copy_(p_data_fp32)
 
 
 @torch.no_grad()
@@ -108,6 +114,12 @@ def step_adafactor(self, closure=None):
 
     for group in self.param_groups:
         for p in group["params"]:
-            step_param_adafactor(self, p, group)
+            step_adafactor_parameter(self, p, group)
 
     return loss
+
+
+def patch_adafactor(optimizer: Adafactor, stochastic_rounding: bool):
+    optimizer.stochastic_rounding = stochastic_rounding
+    optimizer.step = step_adafactor.__get__(optimizer, Adafactor)
+    optimizer.step_parameter = step_adafactor_parameter.__get__(optimizer, Adafactor)

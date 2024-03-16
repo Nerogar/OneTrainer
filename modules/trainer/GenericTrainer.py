@@ -1,5 +1,4 @@
 import json
-import json
 import os
 import shutil
 import subprocess
@@ -10,7 +9,7 @@ from typing import Callable
 
 import torch
 from PIL.Image import Image
-from torch import nn
+from torch import Tensor, nn
 from torch.nn import Parameter
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
@@ -29,12 +28,11 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import enable_grad_scaling
+from modules.util.dtype_util import enable_grad_scaling, create_grad_scaler
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.optimizer.adafactor_extensions import step_param_adafactor
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 
@@ -416,14 +414,27 @@ class GenericTrainer(BaseTrainer):
             "update_step", self.config.gradient_accumulation_steps, TimeUnit.STEP, train_progress, start_at_zero=False
         )
 
-    def __apply_fused_back_pass(self):
-        for param_group in self.model.optimizer.param_groups:
-            for parameter in param_group["params"]:
-                def __grad_hook(tensor: Tensor, param_group=param_group):
-                    step_param_adafactor(self.model.optimizer, tensor, param_group)
-                    tensor.grad = None
+    def __apply_fused_back_pass(self, scaler):
+        if self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
+            if self.config.gradient_accumulation_steps > 1:
+                raise RuntimeError("fused_back_step can not be used if gradient_accumulation_steps > 1")
 
-                parameter.register_post_accumulate_grad_hook(__grad_hook)
+            for param_group in self.model.optimizer.param_groups:
+                for parameter in param_group["params"]:
+
+                    if scaler:
+                        def __grad_hook(tensor: Tensor, param_group=param_group):
+                            nn.utils.clip_grad_norm_(tensor, 1)
+                            scaler.unscale_parameter_(tensor, self.model.optimizer)
+                            scaler.maybe_opt_step_parameter(tensor, param_group, self.model.optimizer)
+                            tensor.grad = None
+                    else:
+                        def __grad_hook(tensor: Tensor, param_group=param_group):
+                            nn.utils.clip_grad_norm_(tensor, 1)
+                            self.model.optimizer.step_parameter(tensor, param_group)
+                            tensor.grad = None
+
+                    parameter.register_post_accumulate_grad_hook(__grad_hook)
 
     def train(self):
         train_device = torch.device(self.config.train_device)
@@ -437,11 +448,11 @@ class GenericTrainer(BaseTrainer):
             return
 
         if enable_grad_scaling(self.config.train_dtype, self.parameters):
-            scaler = torch.cuda.amp.GradScaler()
+            scaler = create_grad_scaler()
         else:
             scaler = None
 
-        self.__apply_fused_back_pass()
+        self.__apply_fused_back_pass(scaler)
 
         # False if the model gradients are all None, True otherwise
         # This is used to schedule sampling only when the gradients don't take up any space
@@ -507,22 +518,26 @@ class GenericTrainer(BaseTrainer):
                 loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
                 loss = loss / self.config.gradient_accumulation_steps
-                # if scaler:
-                #     scaler.scale(loss).backward()
-                # else:
-                loss.backward()
+                if scaler:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+
                 has_gradient = True
                 accumulated_loss += loss.item()
 
                 if self.__is_update_step(train_progress):
-                    # if scaler:
-                    #     scaler.unscale_(self.model.optimizer)
-                    #     nn.utils.clip_grad_norm_(self.parameters, 1)
-                    #     scaler.step(self.model.optimizer)
-                    #     scaler.update()
-                    # else:
-                    #     nn.utils.clip_grad_norm_(self.parameters, 1)
-                    #     self.model.optimizer.step()
+                    if scaler and self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
+                        scaler.step_after_unscale_parameter_(self.model.optimizer)
+                        scaler.update()
+                    elif scaler:
+                        scaler.unscale_(self.model.optimizer)
+                        nn.utils.clip_grad_norm_(self.parameters, 1)
+                        scaler.step(self.model.optimizer)
+                        scaler.update()
+                    else:
+                        nn.utils.clip_grad_norm_(self.parameters, 1)
+                        self.model.optimizer.step()
 
                     lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
                     self.model.optimizer.zero_grad(set_to_none=True)

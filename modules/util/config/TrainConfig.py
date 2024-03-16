@@ -48,6 +48,7 @@ class TrainOptimizerConfig(BaseConfig):
     foreach: bool
     fsdp_in_use: bool
     fused: bool
+    fused_back_pass: bool
     growth_rate: float
     initial_accumulator_value: int
     is_paged: bool
@@ -101,6 +102,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("foreach", False, bool, True))  # Disabled, because it uses too much VRAM
         data.append(("fsdp_in_use", False, bool, False))
         data.append(("fused", False, bool, False))
+        data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
         data.append(("initial_accumulator_value", None, int, True))
         data.append(("is_paged", False, bool, False))
