@@ -37,11 +37,11 @@ class CustomGradScaler(GradScaler):
             DummyOptimizer(parameter), inv_scale, found_inf, False
         )
 
-    def maybe_opt_step_parameter(self, parameter, param_group, optimizer):
+    def maybe_opt_step_parameter(self, parameter, param_group, i, optimizer):
         optimizer_state = self._per_optimizer_states[id(optimizer)]
 
         if not sum(v.item() for v in optimizer_state["found_inf_per_device"].values()):
-            optimizer.step_parameter(parameter, param_group)
+            optimizer.step_parameter(parameter, param_group, i)
 
     def step_after_unscale_parameter_(self, optimizer):
         optimizer_state = self._per_optimizer_states[id(optimizer)]

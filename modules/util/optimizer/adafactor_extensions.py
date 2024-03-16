@@ -13,7 +13,7 @@ from modules.util.bf16_stochastic_rounding import copy_stochastic_
 
 
 @torch.no_grad()
-def step_adafactor_parameter(self, p, group):
+def step_adafactor_parameter(self, p, group, i):
     if p.grad is None:
         return
     grad = p.grad
@@ -113,8 +113,8 @@ def step_adafactor(self, closure=None):
         loss = closure()
 
     for group in self.param_groups:
-        for p in group["params"]:
-            step_adafactor_parameter(self, p, group)
+        for i, p in enumerate(group["params"]):
+            step_adafactor_parameter(self, p, group, i)
 
     return loss
 

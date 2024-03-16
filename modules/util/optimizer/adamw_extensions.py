@@ -9,6 +9,7 @@ from typing import List, Optional, Union
 
 import torch
 from torch import Tensor
+from torch.optim import AdamW
 from torch.optim.optimizer import _use_grad_for_differentiable
 
 from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
@@ -194,3 +195,8 @@ def step_adamw(self, closure=None):
         )
 
     return loss
+
+def patch_adamw(optimizer: AdamW, stochastic_rounding: bool):
+    optimizer.stochastic_rounding = stochastic_rounding
+    optimizer.step = step_adamw.__get__(optimizer, AdamW)
+    # optimizer.step_parameter = step_adam_parameter.__get__(optimizer, AdamW)

@@ -420,18 +420,18 @@ class GenericTrainer(BaseTrainer):
                 raise RuntimeError("fused_back_step can not be used if gradient_accumulation_steps > 1")
 
             for param_group in self.model.optimizer.param_groups:
-                for parameter in param_group["params"]:
+                for i, parameter in enumerate(param_group["params"]):
 
                     if scaler:
-                        def __grad_hook(tensor: Tensor, param_group=param_group):
+                        def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
                             nn.utils.clip_grad_norm_(tensor, 1)
                             scaler.unscale_parameter_(tensor, self.model.optimizer)
-                            scaler.maybe_opt_step_parameter(tensor, param_group, self.model.optimizer)
+                            scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
                             tensor.grad = None
                     else:
-                        def __grad_hook(tensor: Tensor, param_group=param_group):
+                        def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
                             nn.utils.clip_grad_norm_(tensor, 1)
-                            self.model.optimizer.step_parameter(tensor, param_group)
+                            self.model.optimizer.step_parameter(tensor, param_group, i)
                             tensor.grad = None
 
                     parameter.register_post_accumulate_grad_hook(__grad_hook)

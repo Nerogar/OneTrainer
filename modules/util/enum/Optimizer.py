@@ -58,8 +58,6 @@ class Optimizer(Enum):
 
     def supports_fused_back_pass(self):
         return self in [
-            Optimizer.ADAM,
-            Optimizer.ADAMW,
             Optimizer.ADAFACTOR,
         ]
 
