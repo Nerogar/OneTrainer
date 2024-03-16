@@ -69,7 +69,7 @@ class BaseWuerstchenSetup(
             config.weight_dtypes().prior,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
-        ])
+        ], config.enable_autocast_cache)
 
         if model.model_type.is_stable_cascade():
             model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
@@ -80,6 +80,7 @@ class BaseWuerstchenSetup(
                     config.weight_dtypes().prior,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
                 ],
+                config.enable_autocast_cache,
             )
         else:
             model.prior_train_dtype = model.train_dtype
@@ -90,6 +91,7 @@ class BaseWuerstchenSetup(
             [
                 config.weight_dtypes().effnet_encoder,
             ],
+            config.enable_autocast_cache,
         )
 
     def __alpha_cumprod(

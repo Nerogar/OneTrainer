@@ -206,7 +206,7 @@ class TrainingTab:
             ("tfloat32", DataType.TFLOAT_32),
         ], self.ui_state, "train_dtype")
 
-        # train dtype
+        # fallback train dtype
         components.label(frame, 6, 0, "Fallback Train Data Type",
                          tooltip="The mixed precision data type used for training stages that don't support float16 data types. This can increase training speed, but reduces precision")
         components.options_kv(frame, 6, 1, [
@@ -214,10 +214,16 @@ class TrainingTab:
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "fallback_train_dtype")
 
+        # autocast cache
+        components.label(frame, 7, 0, "Autocast Cache",
+                         tooltip="Enables the autocast cache. Disabling this reduces memory usage, but increases training time")
+        components.switch(frame, 7, 1, self.ui_state, "enable_autocast_cache")
+
+
         # resolution
-        components.label(frame, 7, 0, "Resolution",
+        components.label(frame, 8, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma.")
-        components.entry(frame, 7, 1, self.ui_state, "resolution")
+        components.entry(frame, 8, 1, self.ui_state, "resolution")
 
     def __create_align_prop_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

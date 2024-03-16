@@ -226,6 +226,7 @@ class TrainConfig(BaseConfig):
     temp_device: str
     train_dtype: DataType
     fallback_train_dtype: DataType
+    enable_autocast_cache: bool
     only_cache: bool
     resolution: str
     attention_mechanism: AttentionMechanism
@@ -550,6 +551,7 @@ class TrainConfig(BaseConfig):
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
         data.append(("fallback_train_dtype", DataType.BFLOAT_16, DataType, False))
+        data.append(("enable_autocast_cache", True, bool, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))

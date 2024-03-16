@@ -29,6 +29,7 @@ def create_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
+        enable_autocast_cache: bool,
 ) -> tuple[torch.autocast | nullcontext, DataType]:
     if torch.backends.mps.is_available():
         if any(train_dtype != dt for dt in weight_dtypes if dt is not None):
@@ -43,7 +44,8 @@ def create_autocast_context(
     if len(weight_dtypes) == 1 and train_dtype == weight_dtypes[0]:
         return torch.autocast(device_type=device.type, enabled=False), train_dtype
     else:
-        return torch.autocast(device_type=device.type, dtype=train_dtype.torch_dtype()), train_dtype
+        return torch.autocast(device_type=device.type, dtype=train_dtype.torch_dtype(),
+                              cache_enabled=enable_autocast_cache), train_dtype
 
 
 def disable_fp16_autocast_context(
@@ -51,6 +53,7 @@ def disable_fp16_autocast_context(
         train_dtype: DataType | None,
         fallback_train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
+        enable_autocast_cache: bool,
 ) -> tuple[torch.autocast | nullcontext, DataType]:
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
     weight_dtypes = list(set(weight_dtypes))
@@ -63,13 +66,15 @@ def disable_fp16_autocast_context(
         # fallback_train_dtype is the same as all weights -> disable autocast
         return torch.autocast(device_type=device.type, enabled=False), weight_dtypes[0]
 
-    return torch.autocast(device_type=device.type, dtype=fallback_train_dtype.torch_dtype()), fallback_train_dtype
+    return torch.autocast(device_type=device.type, dtype=fallback_train_dtype.torch_dtype(),
+                          cache_enabled=enable_autocast_cache), fallback_train_dtype
 
 
 def disable_bf16_on_fp16_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
         weight_dtypes: list[DataType | None],
+        enable_autocast_cache: bool,
 ) -> tuple[torch.autocast | nullcontext, DataType]:
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
     weight_dtypes = list(set(weight_dtypes))
@@ -86,4 +91,5 @@ def disable_bf16_on_fp16_autocast_context(
         # all weights use the same dtype -> disable autocast
         return torch.autocast(device_type=device.type, enabled=False), weight_dtypes[0]
 
-    return torch.autocast(device_type=device.type, dtype=weight_dtypes[0]), weight_dtypes[0]
+    return torch.autocast(device_type=device.type, dtype=weight_dtypes[0],
+                          cache_enabled=enable_autocast_cache), weight_dtypes[0]
