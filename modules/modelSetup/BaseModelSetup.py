@@ -4,6 +4,8 @@ from typing import Iterable, Iterator
 import torch
 from torch import Tensor
 from torch.nn import Parameter
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.tensorboard import SummaryWriter
 
 from modules.model.BaseModel import BaseModel
 from modules.util.TimedActionMixin import TimedActionMixin
@@ -88,6 +90,17 @@ class BaseModelSetup(
             config: TrainConfig,
             train_progress: TrainProgress,
     ):
+        pass
+
+    @abstractmethod
+    def report_learning_rates(
+            self,
+            model: BaseModel,
+            config: TrainConfig,
+            scheduler: LRScheduler,
+            tensorboard: SummaryWriter
+    ):
+        """Reports current learning rates per the scheduler to tensorboard."""
         pass
 
     def create_param_groups(

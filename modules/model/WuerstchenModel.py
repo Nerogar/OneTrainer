@@ -4,7 +4,8 @@ import torch
 import torchvision
 from diffusers import DiffusionPipeline, DDPMWuerstchenScheduler, WuerstchenCombinedPipeline, ModelMixin, ConfigMixin
 from diffusers.configuration_utils import register_to_config
-from diffusers.pipelines.stable_cascade import StableCascadeUnet, StableCascadeCombinedPipeline
+from diffusers.models import StableCascadeUNet
+from diffusers.pipelines.stable_cascade import StableCascadeCombinedPipeline
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
 from torch import nn, Tensor
 from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection
@@ -61,13 +62,13 @@ class WuerstchenModel(BaseModel):
     decoder_tokenizer: CLIPTokenizer
     decoder_noise_scheduler: DDPMWuerstchenScheduler
     decoder_text_encoder: CLIPTextModel
-    decoder_decoder: WuerstchenDiffNeXt | StableCascadeUnet
+    decoder_decoder: WuerstchenDiffNeXt | StableCascadeUNet
     decoder_vqgan: PaellaVQModel
     effnet_encoder: WuerstchenEfficientNetEncoder
     prior_tokenizer: CLIPTokenizer
     prior_text_encoder: CLIPTextModel
     prior_noise_scheduler: DDPMWuerstchenScheduler
-    prior_prior: WuerstchenPrior | StableCascadeUnet
+    prior_prior: WuerstchenPrior | StableCascadeUNet
 
     # autocast context
     autocast_context: torch.autocast | nullcontext
@@ -89,13 +90,13 @@ class WuerstchenModel(BaseModel):
             decoder_tokenizer: CLIPTokenizer | None = None,
             decoder_noise_scheduler: DDPMWuerstchenScheduler | None = None,
             decoder_text_encoder: CLIPTextModel | None = None,
-            decoder_decoder: WuerstchenDiffNeXt | StableCascadeUnet | None = None,
+            decoder_decoder: WuerstchenDiffNeXt | StableCascadeUNet | None = None,
             decoder_vqgan: PaellaVQModel | None = None,
             effnet_encoder: WuerstchenEfficientNetEncoder | None = None,
             prior_tokenizer: CLIPTokenizer | None = None,
             prior_text_encoder: CLIPTextModel | CLIPTextModelWithProjection | None = None,
             prior_noise_scheduler: DDPMWuerstchenScheduler | None = None,
-            prior_prior: WuerstchenPrior | StableCascadeUnet | None = None,
+            prior_prior: WuerstchenPrior | StableCascadeUNet | None = None,
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
@@ -199,6 +200,8 @@ class WuerstchenModel(BaseModel):
                 decoder=self.decoder_decoder,
                 scheduler=self.decoder_noise_scheduler,
                 vqgan=self.decoder_vqgan,
+                prior_tokenizer=self.prior_tokenizer,
+                prior_text_encoder=self.prior_text_encoder,
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )

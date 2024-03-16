@@ -208,3 +208,25 @@ class StableDiffusionLoRASetup(
             model.all_text_encoder_original_token_embeds,
             model.text_encoder_untrainable_token_embeds_mask,
         )
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lrs = scheduler.get_last_lr()
+        names = []
+        if config.text_encoder.train:
+            names.append("te")
+        if config.unet.train:
+            names.append("unet")
+        assert len(lrs) == len(names)
+
+        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
+
+        for name, lr in zip(names, lrs):
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )

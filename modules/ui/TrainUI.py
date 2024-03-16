@@ -294,6 +294,12 @@ class TrainUI(ctk.CTk):
                          tooltip="The interval used when automatically saving the model during training")
         components.time_entry(master, 3, 1, self.ui_state, "save_after", "save_after_unit")
 
+        # save filename prefix
+        components.label(master, 3, 3, "Save Filename Prefix",
+                         tooltip="The prefix for filenames used when saving the model during training")
+        components.entry(master, 3, 4, self.ui_state, "save_filename_prefix")
+
+
     def lora_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)

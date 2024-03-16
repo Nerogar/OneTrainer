@@ -4,6 +4,7 @@ from typing import Any
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
+from modules.util.torch_util import default_device
 
 
 class GenerateCaptionsArgs(BaseArgs):
@@ -28,7 +29,7 @@ class GenerateCaptionsArgs(BaseArgs):
         parser.add_argument("--sample-dir", type=str, required=True, dest="sample_dir", help="Directory where samples are located")
         parser.add_argument("--initial-caption", type=str, default='', required=False, dest="initial_caption", help="An initial caption to start generating from")
         parser.add_argument("--mode", type=str, default='fill', required=False, dest="mode", help="Either replace, fill or add")
-        parser.add_argument("--device", type=str, required=False, default="cuda", dest="device", help="The device to use for calculations")
+        parser.add_argument("--device", type=str, required=False, default=default_device.type, dest="device", help="The device to use for calculations")
         parser.add_argument("--dtype", type=DataType, required=False, default=DataType.FLOAT_16, dest="dtype", help="The data type to use for weights during calculations", choices=list(DataType))
         parser.add_argument("--include-subdirectories", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subdirectories when processing samples")
 
@@ -46,7 +47,7 @@ class GenerateCaptionsArgs(BaseArgs):
         data.append(("sample_dir", "", str, False))
         data.append(("initial_caption", "", str, False))
         data.append(("mode", "fill", str, False))
-        data.append(("device", "cuda", str, False))
+        data.append(("device", default_device.type, str, False))
         data.append(("dtype", DataType.FLOAT_16, DataType, False))
         data.append(("include_subdirectories", False, bool, False))
 

@@ -207,7 +207,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         # Scale Losses by Batch and/or GA (if enabled)
         losses = losses * batch_size_scale * gradient_accumulation_steps_scale
 
-        losses *= loss_weight.to(device=losses.device)
+        losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         # Apply minimum SNR weighting.
         if config.min_snr_gamma and 'timestep' in data and not data['loss_type'] == 'align_prop':

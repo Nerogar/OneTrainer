@@ -52,7 +52,7 @@ class StableDiffusionFineTuneSetup(
             config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         param_groups = list()
-        
+
         if config.text_encoder.train:
             param_groups.append(
                 self.create_param_groups(
@@ -193,3 +193,25 @@ class StableDiffusionFineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lrs = scheduler.get_last_lr()
+        names = []
+        if config.text_encoder.train:
+            names.append("te")
+        if config.unet.train:
+            names.append("unet")
+        assert len(lrs) == len(names)
+
+        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
+
+        for name, lr in zip(names, lrs):
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )

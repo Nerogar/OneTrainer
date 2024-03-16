@@ -159,3 +159,16 @@ class StableDiffusionXLEmbeddingSetup(
             model.all_text_encoder_2_original_token_embeds,
             model.text_encoder_2_untrainable_token_embeds_mask,
         )
+
+    def report_learning_rates(
+            self,
+            model,
+            config,
+            scheduler,
+            tensorboard
+    ):
+        lr1 = scheduler.get_last_lr()[0]
+        lr2 = scheduler.get_last_lr()[1]
+        lr1, lr2 = config.optimizer.optimizer.maybe_adjust_lrs([lr1, lr2], model.optimizer)
+        tensorboard.add_scalar("lr/te1 embedding", lr1, model.train_progress.global_step)
+        tensorboard.add_scalar("lr/te2 embedding", lr2, model.train_progress.global_step)

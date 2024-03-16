@@ -5,6 +5,14 @@ conda_env=ot
 #change the environment name for python to use (only needed if Anaconda3 or miniconda is not installed)
 python_venv=venv
 
+if [ -e /dev/kfd ]; then
+	PLATFORM_REQS=requirements-rocm.txt
+elif [ -x "$(command -v nvcc)" ]; then
+	PLATFORM_REQS=requirements-cuda.txt
+else
+	PLATFORM_REQS=requirements-default.txt
+fi
+
 if ! [ -x "$(command -v python)" ]; then
 	echo 'error: python not installed or found!'
 	break
@@ -28,13 +36,13 @@ elif [ -x "$(command -v python)" ]; then
 						if [[ -z "$VIRTUAL_ENV" ]]; then
     							echo "warning: No VIRTUAL_ENV set. exiting."
 						else
-							python -m pip install -r requirements.txt --force-reinstall
+							pip install -r requirements-global.txt -r $PLATFORM_REQS
 						fi
 					elif [ -x "$(command -v conda)" ]; then
 						#check for venv
 						if conda info --envs | grep -q ${conda_env}; 
 							then
-								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; git pull; python -m pip install -r requirements.txt" --force-reinstall)
+								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; git pull; python -m pip install -r requirements-global.txt -r $PLATFORM_REQS" --force-reinstall)
 							else 
 								echo 'run install.sh first'
 						fi

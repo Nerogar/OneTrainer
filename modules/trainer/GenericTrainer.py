@@ -1,3 +1,4 @@
+import collections
 import json
 import os
 import shutil
@@ -10,7 +11,6 @@ from typing import Callable
 import torch
 from PIL.Image import Image
 from torch import nn
-from torch.cuda.amp import GradScaler
 from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.utils.tensorboard import SummaryWriter
@@ -32,6 +32,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.dtype_util import enable_grad_scaling
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.Optimizer import Optimizer as OptimizerEnum
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.config.SampleConfig import SampleConfig
@@ -365,7 +366,7 @@ class GenericTrainer(BaseTrainer):
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         print("Saving " + save_path)
 
@@ -429,7 +430,7 @@ class GenericTrainer(BaseTrainer):
             return
 
         if enable_grad_scaling(self.config.train_dtype, self.parameters):
-            scaler = GradScaler()
+            scaler = torch.cuda.amp.GradScaler()
         else:
             scaler = None
 
@@ -518,17 +519,18 @@ class GenericTrainer(BaseTrainer):
                     self.model.optimizer.zero_grad(set_to_none=True)
                     has_gradient = False
 
-                    self.tensorboard.add_scalar(
-                        "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
+                    self.model_setup.report_learning_rates(
+                        self.model, self.config, lr_scheduler, self.tensorboard
                     )
-                    self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
+
+                    self.tensorboard.add_scalar("loss/loss", accumulated_loss, train_progress.global_step)
                     ema_loss = ema_loss or accumulated_loss
                     ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
                     step_tqdm.set_postfix({
                         'loss': accumulated_loss,
                         'smooth loss': ema_loss,
                     })
-                    self.tensorboard.add_scalar("smooth loss", ema_loss, train_progress.global_step)
+                    self.tensorboard.add_scalar("loss/smooth loss", ema_loss, train_progress.global_step)
                     accumulated_loss = 0.0
 
                     self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
