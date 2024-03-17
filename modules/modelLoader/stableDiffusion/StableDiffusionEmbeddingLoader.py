@@ -77,13 +77,13 @@ class StableDiffusionEmbeddingLoader:
         stacktraces = []
 
         try:
-            self.__load_internal(model, model_names.base_model, model_names.embedding)
+            self.__load_internal(model, model_names.base_model, model_names.embeddings)
             return model
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_embeddings(model, model_names.embedding)
+            self.__load_embeddings(model, model_names.embeddings)
             return model
         except:
             stacktraces.append(traceback.format_exc())

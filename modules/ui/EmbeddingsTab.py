@@ -47,6 +47,7 @@ class EmbeddingWidget(ctk.CTkFrame):
         top_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
         top_frame.grid(row=0, column=0, sticky="nsew")
         top_frame.grid_columnconfigure(3, weight=1)
+        top_frame.grid_columnconfigure(5, weight=1)
 
         bottom_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
         bottom_frame.grid(row=1, column=0, sticky="nsew")

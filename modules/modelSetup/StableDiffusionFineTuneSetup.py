@@ -205,6 +205,8 @@ class StableDiffusionFineTuneSetup(
         names = []
         if config.text_encoder.train:
             names.append("te")
+        if config.train_any_embedding():
+            names.append("embeddings")
         if config.unet.train:
             names.append("unet")
         assert len(lrs) == len(names)

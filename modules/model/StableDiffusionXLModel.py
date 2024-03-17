@@ -1,3 +1,4 @@
+import uuid
 from contextlib import nullcontext
 
 import torch
@@ -19,13 +20,14 @@ class StableDiffusionXLModelEmbedding:
             self,
             text_encoder_1_vector: Tensor,
             text_encoder_2_vector: Tensor,
-            prefix: str,
+            placeholder: str,
     ):
         token_count = text_encoder_1_vector.shape[0]
 
         self.text_encoder_1_vector = text_encoder_1_vector
         self.text_encoder_2_vector = text_encoder_2_vector
-        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
+        self.placeholder = placeholder
+        self.text_tokens = [f"<{uuid.uuid4()}>" for _ in range(token_count)]
 
 
 class StableDiffusionXLModel(BaseModel):

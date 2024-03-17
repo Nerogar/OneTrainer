@@ -1,3 +1,4 @@
+import uuid
 from contextlib import nullcontext
 
 import torch
@@ -20,12 +21,13 @@ class PixArtAlphaModelEmbedding:
     def __init__(
             self,
             text_encoder_vector: Tensor,
-            prefix: str,
+            placeholder: str,
     ):
         token_count = text_encoder_vector.shape[0]
 
         self.text_encoder_vector = text_encoder_vector
-        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
+        self.placeholder = placeholder
+        self.text_tokens = [f"<{uuid.uuid4()}>" for _ in range(token_count)]
 
 
 class PixArtAlphaModel(BaseModel):

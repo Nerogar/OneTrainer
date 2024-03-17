@@ -390,10 +390,10 @@ class StableDiffusionSampler(BaseModelSampler):
         prompt = sample_params.prompt
         negative_prompt = sample_params.negative_prompt
 
-        if len(self.model.embeddings) > 0:
-            embedding_string = ''.join(self.model.embeddings[0].text_tokens)
-            prompt = prompt.replace("<embedding>", embedding_string)
-            negative_prompt = negative_prompt.replace("<embedding>", embedding_string)
+        for embedding in self.model.embeddings:
+            embedding_string = ''.join(embedding.text_tokens)
+            prompt = prompt.replace(embedding.placeholder, embedding_string)
+            negative_prompt = negative_prompt.replace(embedding.placeholder, embedding_string)
 
         if self.model_type.has_conditioning_image_input():
             image = self.__sample_inpainting(
