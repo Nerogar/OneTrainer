@@ -570,6 +570,8 @@ class GenericTrainer(BaseTrainer):
             if self.model.ema:
                 self.model.ema.copy_ema_to(self.parameters, store_temp=False)
 
+            print("Saving " + self.config.output_model_destination)
+
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,

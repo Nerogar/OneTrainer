@@ -1,9 +1,11 @@
+import tokenize
 from abc import ABCMeta
 
 import torch
 from torch import Tensor
 from torch.nn import Embedding
 from transformers import CLIPTokenizer, CLIPTextModel
+from transformers.tokenization_utils import Trie
 
 
 class ModelSetupClipEmbeddingMixin(metaclass=ABCMeta):
@@ -66,9 +68,20 @@ class ModelSetupClipEmbeddingMixin(metaclass=ABCMeta):
             tokenizer: CLIPTokenizer,
             embedding: list[str],
     ) -> (Tensor, list[bool]):
-            tokenizer.add_tokens(embedding)
+        tokenizer.add_tokens(embedding)
 
-    def _embeddigns_after_optimizer_step(
+    def _remove_added_embeddings_from_tokenizer(
+            self,
+            tokenizer: CLIPTokenizer,
+    ):
+        added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
+        for key, added_token in added_tokens:
+            tokenizer._added_tokens_decoder.pop(key)
+            tokenizer._added_tokens_encoder.pop(added_token.content)
+        tokenizer.tokens_trie = Trie()
+        tokenizer._update_trie()
+
+    def _embeddings_after_optimizer_step(
             self,
             embedding_layer: Embedding,
             original_token_embeds: Tensor,

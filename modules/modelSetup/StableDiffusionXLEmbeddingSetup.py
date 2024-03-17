@@ -148,13 +148,13 @@ class StableDiffusionXLEmbeddingSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        self._embeddigns_after_optimizer_step(
+        self._embeddings_after_optimizer_step(
             model.text_encoder_1.get_input_embeddings(),
             model.all_text_encoder_1_original_token_embeds,
             model.text_encoder_1_untrainable_token_embeds_mask,
         )
 
-        self._embeddigns_after_optimizer_step(
+        self._embeddings_after_optimizer_step(
             model.text_encoder_2.get_input_embeddings(),
             model.all_text_encoder_2_original_token_embeds,
             model.text_encoder_2_untrainable_token_embeds_mask,

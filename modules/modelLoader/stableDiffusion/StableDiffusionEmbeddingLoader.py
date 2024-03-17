@@ -44,8 +44,8 @@ class StableDiffusionEmbeddingLoader:
             for embedding_name in embedding_names:
                 safetensors_embedding_name = os.path.join(
                     base_model_name,
-                    "embedding",
-                    f"{embedding_name.model_name}.safetensors",
+                    "embeddings",
+                    f"{embedding_name.uuid}.safetensors",
                 )
 
                 if os.path.exists(safetensors_embedding_name):

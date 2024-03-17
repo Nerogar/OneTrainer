@@ -117,6 +117,7 @@ class StableDiffusionFineTuneSetup(
             model.force_epsilon_prediction()
 
         model.embeddings = []
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         for i, embedding_config in enumerate(config.embeddings):
             embedding_state = model.additional_embedding_states[i]
             if embedding_state is None:
@@ -132,7 +133,9 @@ class StableDiffusionFineTuneSetup(
                 device=self.train_device,
             ).detach()
 
-            embedding = StableDiffusionModelEmbedding(embedding_state, embedding_config.placeholder)
+            embedding = StableDiffusionModelEmbedding(
+                embedding_config.uuid, embedding_state, embedding_config.placeholder,
+            )
             model.embeddings.append(embedding)
             self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
 

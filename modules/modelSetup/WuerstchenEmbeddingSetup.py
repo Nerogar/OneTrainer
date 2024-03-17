@@ -126,7 +126,7 @@ class WuerstchenEmbeddingSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        self._embeddigns_after_optimizer_step(
+        self._embeddings_after_optimizer_step(
             model.prior_text_encoder.get_input_embeddings(),
             model.all_prior_text_encoder_original_token_embeds,
             model.prior_text_encoder_untrainable_token_embeds_mask,

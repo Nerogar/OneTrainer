@@ -36,8 +36,9 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
 from modules.modelSaver.PixArtAlphaModelSaver import PixArtAlphaModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
+from modules.modelSaver.StableDiffusionFineTuneModelSaver import StableDiffusionModelSaver, \
+    StableDiffusionFineTuneModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
-from modules.modelSaver.StableDiffusionModelSaver import StableDiffusionModelSaver
 from modules.modelSaver.StableDiffusionXLEmbeddingModelSaver import StableDiffusionXLEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
 from modules.modelSaver.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
@@ -114,7 +115,7 @@ def create_model_saver(
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionModelSaver()
+                return StableDiffusionFineTuneModelSaver()
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLModelSaver()
             if model_type.is_wuerstchen():

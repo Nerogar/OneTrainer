@@ -116,7 +116,7 @@ class StableDiffusionEmbeddingSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        self._embeddigns_after_optimizer_step(
+        self._embeddings_after_optimizer_step(
             model.text_encoder.get_input_embeddings(),
             model.all_text_encoder_original_token_embeds,
             model.text_encoder_untrainable_token_embeds_mask,

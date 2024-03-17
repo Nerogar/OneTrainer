@@ -1,5 +1,4 @@
 import copy
-import json
 import os.path
 from pathlib import Path
 
@@ -7,7 +6,6 @@ import torch
 import yaml
 from safetensors.torch import save_file
 
-from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.util.convert.convert_sd_diffusers_to_ckpt import convert_sd_diffusers_to_ckpt
@@ -21,7 +19,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
             self,
             model: StableDiffusionModel,
             destination: str,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
@@ -30,7 +28,7 @@ class StableDiffusionModelSaver(BaseModelSaver):
         pipeline_copy = copy.deepcopy(pipeline)
         pipeline.to(original_device)
 
-        pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
+        pipeline_copy.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
         pipeline_copy.save_pretrained(destination)
@@ -97,33 +95,9 @@ class StableDiffusionModelSaver(BaseModelSaver):
         # base model
         self.__save_diffusers(model, destination, torch.float32)
 
-        # optimizer
-        os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
-        torch.save(model.optimizer.state_dict(), os.path.join(destination, "optimizer", "optimizer.pt"))
-
-        # ema
-        if model.ema:
-            os.makedirs(os.path.join(destination, "ema"), exist_ok=True)
-            torch.save(model.ema.state_dict(), os.path.join(destination, "ema", "ema.pt"))
-
-        # meta
-        with open(os.path.join(destination, "meta.json"), "w") as meta_file:
-            json.dump({
-                'train_progress': {
-                    'epoch': model.train_progress.epoch,
-                    'epoch_step': model.train_progress.epoch_step,
-                    'epoch_sample': model.train_progress.epoch_sample,
-                    'global_step': model.train_progress.global_step,
-                },
-            }, meta_file)
-
-        # model spec
-        with open(os.path.join(destination, "model_spec.json"), "w") as model_spec_file:
-            json.dump(self._create_safetensors_header(model), model_spec_file)
-
     def save(
             self,
-            model: BaseModel,
+            model: StableDiffusionModel,
             model_type: ModelType,
             output_model_format: ModelFormat,
             output_model_destination: str,
