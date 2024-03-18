@@ -1,6 +1,7 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
+from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
@@ -12,6 +13,7 @@ from modules.util.enum.ModelType import ModelType
 class StableDiffusionFineTuneModelLoader(
     BaseModelLoader,
     ModelLoaderModelSpecMixin,
+    ModelLoaderSDConfigMixin,
     InternalModelLoaderMixin,
 ):
     def __init__(self):
@@ -76,10 +78,12 @@ class StableDiffusionFineTuneModelLoader(
 
         model = StableDiffusionModel(model_type=model_type)
 
+        self._load_internal_data(model, model_names.base_model)
+        model.model_spec = self._load_default_model_spec(model_type)
+        model.sd_config = self._load_sd_config(model_type)
+        model.sd_config_filename = self._get_sd_config_name(model_type)
+
         base_model_loader.load(model, model_type, model_names, weight_dtypes)
         embedding_loader.load(model, model_names)
-        self._load_internal_data(model, model_names.base_model)
-
-        model.model_spec = self._load_default_model_spec(model_type)
 
         return model

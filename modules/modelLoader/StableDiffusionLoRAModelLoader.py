@@ -1,23 +1,19 @@
-import json
-import os
-
-import torch
-
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.modelLoader.stableDiffusion.StableDiffusionLoRALoader import StableDiffusionLoRALoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
 class StableDiffusionLoRAModelLoader(
     BaseModelLoader,
     ModelLoaderModelSpecMixin,
+    ModelLoaderSDConfigMixin,
     InternalModelLoaderMixin,
 ):
     def __init__(self):
@@ -47,51 +43,6 @@ class StableDiffusionLoRAModelLoader(
             case _:
                 return None
 
-    def __load_internal(
-            self,
-            model: StableDiffusionModel,
-            weight_dtypes: ModelWeightDtypes,
-            lora_name: str,
-    ):
-        with open(os.path.join(lora_name, "meta.json"), "r") as meta_file:
-            meta = json.load(meta_file)
-            train_progress = TrainProgress(
-                epoch=meta['train_progress']['epoch'],
-                epoch_step=meta['train_progress']['epoch_step'],
-                epoch_sample=meta['train_progress']['epoch_sample'],
-                global_step=meta['train_progress']['global_step'],
-            )
-
-        # embedding model
-        pt_lora_name = os.path.join(lora_name, "lora", "lora.pt")
-        safetensors_lora_name = os.path.join(lora_name, "lora", "lora.safetensors")
-        if os.path.exists(pt_lora_name):
-            self.__load_ckpt(model, weight_dtypes, pt_lora_name)
-        elif os.path.exists(safetensors_lora_name):
-            self.__load_safetensors(model, weight_dtypes, safetensors_lora_name)
-        else:
-            raise Exception("no lora found")
-
-        # optimizer
-        try:
-            model.optimizer_state_dict = torch.load(os.path.join(lora_name, "optimizer", "optimizer.pt"))
-        except FileNotFoundError:
-            pass
-
-        # ema
-        try:
-            model.ema_state_dict = torch.load(os.path.join(lora_name, "ema", "ema.pt"))
-        except FileNotFoundError:
-            pass
-
-        # meta
-        model.train_progress = train_progress
-
-        # model spec
-        model.model_spec = self._load_default_model_spec(model.model_type)
-
-        return True
-
     def load(
             self,
             model_type: ModelType,
@@ -102,12 +53,13 @@ class StableDiffusionLoRAModelLoader(
         lora_model_loader = StableDiffusionLoRALoader()
 
         model = StableDiffusionModel(model_type=model_type)
+        self._load_internal_data(model, model_names.base_model)
+        model.model_spec = self._load_default_model_spec(model_type)
+        model.sd_config = self._load_sd_config(model_type)
+        model.sd_config_filename = self._get_sd_config_name(model_type)
 
         if model_names.base_model is not None:
             model = base_model_loader.load(model, model_type, model_names, weight_dtypes)
         lora_model_loader.load(model, model_names)
-        self._load_internal_data(model, model_names.base_model)
-
-        model.model_spec = self._load_default_model_spec(model_type)
 
         return model

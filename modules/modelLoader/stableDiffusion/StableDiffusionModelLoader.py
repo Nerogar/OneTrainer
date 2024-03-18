@@ -6,7 +6,6 @@ from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from
 from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
 from modules.util import create
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -14,9 +13,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
-class StableDiffusionModelLoader(
-    ModelLoaderSDConfigMixin,
-):
+class StableDiffusionModelLoader:
     def __init__(self):
         super(StableDiffusionModelLoader, self).__init__()
 
@@ -30,8 +27,6 @@ class StableDiffusionModelLoader(
     ) -> StableDiffusionModel | None:
         # base model
         self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name)
-
-        model.sd_config = self._load_sd_config(model_type)
 
         return model
 
@@ -93,8 +88,6 @@ class StableDiffusionModelLoader(
             torch_dtype=weight_dtypes.unet.torch_dtype(),  # TODO: use depth estimator dtype
         ) if model_type.has_depth_input() else None
 
-        sd_config = self._load_sd_config(model_type)
-
         model.model_type = model_type
         model.tokenizer = tokenizer
         model.noise_scheduler = noise_scheduler
@@ -103,7 +96,6 @@ class StableDiffusionModelLoader(
         model.unet = unet
         model.image_depth_processor = image_depth_processor
         model.depth_estimator = depth_estimator
-        model.sd_config = sd_config
 
     def __fix_nai_model(self, state_dict: dict) -> dict:
         # fix for loading models with an empty state_dict key
@@ -129,8 +121,6 @@ class StableDiffusionModelLoader(
             base_model_name: str,
             vae_model_name: str,
     ):
-        sd_config_name = self._get_sd_config_name(model_type, base_model_name)
-
         state_dict = torch.load(base_model_name)
         state_dict = self.__fix_nai_model(state_dict)
 
@@ -142,7 +132,7 @@ class StableDiffusionModelLoader(
 
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=state_dict,
-            original_config_file=sd_config_name,
+            original_config_file=model.sd_config_filename,
             num_in_channels=num_in_channels,
             load_safety_checker=False,
         )
@@ -158,8 +148,6 @@ class StableDiffusionModelLoader(
                 torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
 
-        sd_config = self._load_sd_config(model_type, base_model_name)
-
         text_encoder = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
         text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
         vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
@@ -173,7 +161,6 @@ class StableDiffusionModelLoader(
         model.unet = unet
         model.image_depth_processor = None  # TODO
         model.depth_estimator = None  # TODO
-        model.sd_config = sd_config
 
     def __load_safetensors(
             self,
@@ -183,8 +170,6 @@ class StableDiffusionModelLoader(
             base_model_name: str,
             vae_model_name: str,
     ):
-        sd_config_name = self._get_sd_config_name(model_type, base_model_name)
-
         num_in_channels = 4
         if model_type.has_mask_input():
             num_in_channels += 1
@@ -193,7 +178,7 @@ class StableDiffusionModelLoader(
 
         pipeline = download_from_original_stable_diffusion_ckpt(
             checkpoint_path_or_dict=base_model_name,
-            original_config_file=sd_config_name,
+            original_config_file=model.sd_config_filename,
             num_in_channels=num_in_channels,
             load_safety_checker=False,
             from_safetensors=True,
@@ -210,8 +195,6 @@ class StableDiffusionModelLoader(
                 torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
 
-        sd_config = self._load_sd_config(model_type)
-
         text_encoder = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
         text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
         vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
@@ -225,7 +208,6 @@ class StableDiffusionModelLoader(
         model.unet = unet
         model.image_depth_processor = None  # TODO
         model.depth_estimator = None  # TODO
-        model.sd_config = sd_config
 
     def load(
             self,

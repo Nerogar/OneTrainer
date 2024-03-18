@@ -61,6 +61,7 @@ class StableDiffusionModel(BaseModel):
     lora_state_dict: dict | None
 
     sd_config: dict | None
+    sd_config_filename: str | None
 
     def __init__(
             self,
@@ -82,6 +83,7 @@ class StableDiffusionModel(BaseModel):
             unet_lora: LoRAModuleWrapper | None = None,
             lora_state_dict: dict | None = None,
             sd_config: dict | None = None,
+            sd_config_filename: str | None = None,
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
@@ -115,6 +117,7 @@ class StableDiffusionModel(BaseModel):
         self.lora_state_dict = lora_state_dict
 
         self.sd_config = sd_config
+        self.sd_config_filename = sd_config_filename
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
