@@ -54,6 +54,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "relative_step": True,
         "warmup_init": False,
         "stochastic_rounding": True,
+        "fused_back_pass": False,
     },
     Optimizer.ADAGRAD: {
         "lr_decay": 0,

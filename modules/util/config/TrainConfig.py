@@ -50,6 +50,7 @@ class TrainOptimizerConfig(BaseConfig):
     foreach: bool
     fsdp_in_use: bool
     fused: bool
+    fused_back_pass: bool
     growth_rate: float
     initial_accumulator_value: int
     is_paged: bool
@@ -103,6 +104,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("foreach", False, bool, True))  # Disabled, because it uses too much VRAM
         data.append(("fsdp_in_use", False, bool, False))
         data.append(("fused", False, bool, False))
+        data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
         data.append(("initial_accumulator_value", None, int, True))
         data.append(("is_paged", False, bool, False))
@@ -228,6 +230,7 @@ class TrainConfig(BaseConfig):
     temp_device: str
     train_dtype: DataType
     fallback_train_dtype: DataType
+    enable_autocast_cache: bool
     only_cache: bool
     resolution: str
     attention_mechanism: AttentionMechanism
@@ -558,6 +561,7 @@ class TrainConfig(BaseConfig):
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
         data.append(("fallback_train_dtype", DataType.BFLOAT_16, DataType, False))
+        data.append(("enable_autocast_cache", True, bool, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
