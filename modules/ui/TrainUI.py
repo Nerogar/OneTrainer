@@ -64,6 +64,7 @@ class TrainUI(ctk.CTk):
 
         self.model_tab = None
         self.training_tab = None
+        self.embeddings_tab = None
 
         self.top_bar_component = self.top_bar(self)
         self.content_frame(self)
@@ -77,7 +78,14 @@ class TrainUI(ctk.CTk):
         self.top_bar_component.save_default()
 
     def top_bar(self, master):
-        return TopBar(master, self.train_config, self.ui_state, self.change_model_type, self.change_training_method)
+        return TopBar(
+            master,
+            self.train_config,
+            self.ui_state,
+            self.change_model_type,
+            self.change_training_method,
+            self.load_preset,
+        )
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -121,6 +129,7 @@ class TrainUI(ctk.CTk):
         self.create_sampling_tab(self.tabview.add("sampling"))
         self.create_backup_tab(self.tabview.add("backup"))
         self.create_tools_tab(self.tabview.add("tools"))
+        self.embeddings_tab = self.create_embeddings_tab(self.tabview.add("embeddings"))
 
         self.change_training_method(self.train_config.training_method)
 
@@ -299,7 +308,6 @@ class TrainUI(ctk.CTk):
                          tooltip="The prefix for filenames used when saving the model during training")
         components.entry(master, 3, 4, self.ui_state, "save_filename_prefix")
 
-
     def lora_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
@@ -375,8 +383,8 @@ class TrainUI(ctk.CTk):
 
         return master
 
-    def embeddings_tab(self, master):
-        EmbeddingsTab(master, self.train_config, self.ui_state)
+    def create_embeddings_tab(self, master):
+        return EmbeddingsTab(master, self.train_config, self.ui_state)
 
     def create_tools_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -420,16 +428,18 @@ class TrainUI(ctk.CTk):
             self.tabview.delete("LoRA")
         if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:
             self.tabview.delete("embedding")
-        if training_method == TrainingMethod.EMBEDDING and "embeddings" in self.tabview._tab_dict:
-            self.tabview.delete("embeddings")
 
         if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
             self.lora_tab(self.tabview.add("LoRA"))
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
-        if training_method != TrainingMethod.EMBEDDING and "embeddings" not in self.tabview._tab_dict:
-            self.embeddings_tab(self.tabview.add("embeddings"))
 
+    def load_preset(self):
+        if not self.tabview:
+            return
+
+        if self.embeddings_tab:
+            self.embeddings_tab.refresh_ui()
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)

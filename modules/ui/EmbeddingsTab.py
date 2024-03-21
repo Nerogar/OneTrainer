@@ -21,6 +21,9 @@ class EmbeddingsTab(ConfigList):
             is_full_width=True,
         )
 
+    def refresh_ui(self):
+        self._create_element_list()
+
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return EmbeddingWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 

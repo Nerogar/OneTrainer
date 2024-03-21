@@ -66,7 +66,7 @@ class ConfigList(metaclass=ABCMeta):
             self.current_config = getattr(self.train_config, self.attr_name)
 
             self.element_list = None
-            self.__create_element_list()
+            self._create_element_list()
 
     @abstractmethod
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
@@ -88,7 +88,10 @@ class ConfigList(metaclass=ABCMeta):
             self.top_frame, 0, 1, self.configs, self.ui_state, self.attr_name, self.__load_current_config
         )
 
-    def __create_element_list(self):
+    def _create_element_list(self):
+        if not self.from_external_file:
+            self.current_config = getattr(self.train_config, self.attr_name)
+
         self.widgets = []
         if self.element_list is not None:
             self.element_list.destroy()
@@ -195,7 +198,7 @@ class ConfigList(metaclass=ABCMeta):
         except:
             self.current_config = []
 
-        self.__create_element_list()
+        self._create_element_list()
 
     def __save_current_config(self):
         if self.from_external_file:

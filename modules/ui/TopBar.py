@@ -20,14 +20,16 @@ class TopBar:
             master,
             train_config: TrainConfig,
             ui_state: UIState,
-            change_model_type: Callable[[ModelType], None],
+            change_model_type_callback: Callable[[ModelType], None],
             change_training_method_callback: Callable[[TrainingMethod], None],
+            load_preset_callback: Callable[[], None],
     ):
         self.master = master
         self.train_config = train_config
         self.ui_state = ui_state
-        self.change_model_type = change_model_type
+        self.change_model_type_callback = change_model_type_callback
         self.change_training_method_callback = change_training_method_callback
+        self.load_preset_callback = load_preset_callback
 
         self.dir = "training_presets"
 
@@ -129,7 +131,7 @@ class TopBar:
         )
 
     def __change_model_type(self, model_type: ModelType):
-        self.change_model_type(model_type)
+        self.change_model_type_callback(model_type)
         self.__create_training_method()
 
     def __create_configs_dropdown(self):
@@ -204,6 +206,8 @@ class TopBar:
 
             optimizer_config = change_optimizer(self.train_config)
             self.ui_state.get_var("optimizer").update(optimizer_config)
+
+            self.load_preset_callback()
         except Exception:
             print(traceback.format_exc())
 
