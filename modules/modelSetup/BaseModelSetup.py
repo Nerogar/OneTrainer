@@ -73,7 +73,6 @@ class BaseModelSetup(
     ) -> dict:
         pass
 
-    @abstractmethod
     def calculate_loss(
             self,
             model: BaseModel,
@@ -81,7 +80,13 @@ class BaseModelSetup(
             data: dict,
             config: TrainConfig,
     ) -> Tensor:
-        pass
+        return self._diffusion_losses(
+            batch=batch,
+            data=data,
+            config=config,
+            train_device=self.train_device,
+            betas=model.noise_scheduler.betas.to(device=self.train_device),
+        ).mean()
 
     @abstractmethod
     def after_optimizer_step(

@@ -11,6 +11,7 @@ from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoeffici
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LossWeight import LossWeight
 from modules.util.loss.masked_loss import masked_losses
 from modules.util.loss.vb_loss import vb_losses
 
@@ -164,12 +165,12 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             snr = all_snr[timesteps]
         else:
             alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
-            snr = ((alphas_cumprod ** 0.5) / (1.0 - alphas_cumprod) ** 0.5) ** 2
+            snr = alphas_cumprod / (1.0 - alphas_cumprod)
         min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
         # Denominator of the snr_weight increased by 1 if v-prediction is being used.
         if v_prediction:
             snr += 1
-        snr_weight = torch.div(min_snr_gamma, snr).float().to(device)
+        snr_weight = (min_snr_gamma / snr).to(device)
         return snr_weight
     
     def __debiased_estimation_weight(
@@ -184,13 +185,25 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             snr = all_snr[timesteps]
         else:
             alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
-            snr = ((alphas_cumprod ** 0.5) / (1.0 - alphas_cumprod) ** 0.5) ** 2
-        
+            snr = alphas_cumprod / (1.0 - alphas_cumprod)
         weight = snr
-        torch.minimum(weight, torch.full_like(snr, 1000), out=weight)
-        torch.sqrt(weight, out=weight)
+        torch.clip(weight, min=1.0e-3, max=1.0e3, out=weight)
         torch.inverse(weight, out=weight)
+        torch.rsqrt(weight, out=weight)
         return weight
+    
+    def __p2_loss_weight(
+        self,
+        timesteps: Tensor,
+        gamma: float,
+        device: torch.device,
+    ) -> Tensor:
+        if self.__coefficients:
+            alphas_cumprod = self.__coefficients.alphas_cumprod.to(device)[timesteps]
+        else:
+            alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
+
+        return (1.0 + alphas_cumprod / (1 - alphas_cumprod)) ** -gamma
 
     def _diffusion_losses(
             self,
@@ -231,11 +244,14 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         # Apply minimum SNR weighting.
         if 'timestep' in data and not data['loss_type'] == 'align_prop':
-            if config.min_snr_gamma:
-                v_pred = data.get('prediction_type', '') == 'v_prediction'
-                snr_weight = self.__min_snr_weight(data['timestep'], config.min_snr_gamma, v_pred, losses.device)
-                losses *= snr_weight
-            if config.debiased_estimation_loss:
-                losses *= self.__debiased_estimation_weight(data['timestep'], losses.device)
+            match config.loss_weight:
+                case LossWeight.MIN_SNR_GAMMA:
+                    v_pred = data.get('prediction_type', '') == 'v_prediction'
+                    snr_weight = self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
+                    losses *= snr_weight
+                case LossWeight.DEBIASED_ESTIMATION:
+                    losses *= self.__debiased_estimation_weight(data['timestep'], losses.device)
+                case LossWeight.P2:
+                    losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, losses.device)
 
         return losses

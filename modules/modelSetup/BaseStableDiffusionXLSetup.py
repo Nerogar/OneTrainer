@@ -447,18 +447,3 @@ class BaseStableDiffusionXLSetup(
 
         model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
-
-    def calculate_loss(
-            self,
-            model: StableDiffusionXLModel,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
-    ) -> Tensor:
-        return self._diffusion_losses(
-            batch=batch,
-            data=data,
-            config=config,
-            train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
-        ).mean()

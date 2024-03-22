@@ -16,6 +16,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
@@ -240,8 +241,8 @@ class TrainConfig(BaseConfig):
     mse_strength: float
     mae_strength: float
     vb_loss_strength: float
-    min_snr_gamma: float
-    debiased_estimation_loss: bool
+    loss_weight_fn: LossWeight
+    loss_weight_strength: float
     dropout_probability: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
@@ -566,8 +567,8 @@ class TrainConfig(BaseConfig):
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
-        data.append(("min_snr_gamma", 0, float, False))
-        data.append(("debiased_estimation_loss", False, bool, False))
+        data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
+        data.append(("loss_weight_strength", 5.0, float, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))

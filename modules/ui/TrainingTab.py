@@ -9,6 +9,7 @@ from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
@@ -474,14 +475,15 @@ class TrainingTab:
             components.entry(frame, 2, 1, self.ui_state, "vb_loss_strength")
 
         # Minimum SNR Gamma
-        components.label(frame, 3, 0, "Min SNR Gamma",
-                         tooltip="Minimum SNR gamma. Can help the model learn details more accurately. 0 disables, 20 maximum, ~5 is the usual setting")
-        components.entry(frame, 3, 1, self.ui_state, "min_snr_gamma")
+        components.label(frame, 3, 0, "Loss Weight Function",
+                         tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
+        components.options(frame, 3, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
         
         # Debiased Estimation Loss
-        components.label(frame, 4, 0, "Debiased Estimation Loss",
-                         tooltip="Debiased Estimation loss. Can help the model learn details more accurately.")
-        components.switch(frame, 4, 1, self.ui_state, "debiased_estimation_loss")
+        components.label(frame, 4, 0, "Gamma",
+                         tooltip="Inverse strength of loss weighting. Currently only applies to P2 and min_snr_gamma, Range: 1-20.")
+        components.entry(frame, 4, 1, self.ui_state, "loss_weight_strength")
+
         # Loss Scaler
         components.label(frame, 5, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
