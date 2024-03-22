@@ -279,7 +279,7 @@ class BaseWuerstchenSetup(
             alphas_cumprod_fun=self.__alpha_cumprod,
         )
 
-        if config.min_snr_gamma:
+        if config.min_snr_gamma or config.debiased_estimation_loss:
             # if min snr gamma is active, disable p2 scaling
             return losses.mean()
         else:

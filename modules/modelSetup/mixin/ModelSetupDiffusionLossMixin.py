@@ -156,7 +156,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             gamma: float,
             v_prediction: bool,
             device: torch.device
-    ):
+    ) -> Tensor:
         if self.__coefficients:
             all_snr = (self.__coefficients.sqrt_alphas_cumprod /
                        self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
@@ -171,6 +171,26 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             snr += 1
         snr_weight = torch.div(min_snr_gamma, snr).float().to(device)
         return snr_weight
+    
+    def __debiased_estimation_weight(
+        self,
+        timesteps: Tensor,
+        device: torch.device
+    ) -> Tensor:
+        if self.__coefficients:
+            all_snr = (self.__coefficients.sqrt_alphas_cumprod /
+                       self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
+            all_snr.to(device)
+            snr = all_snr[timesteps]
+        else:
+            alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
+            snr = ((alphas_cumprod ** 0.5) / (1.0 - alphas_cumprod) ** 0.5) ** 2
+        
+        weight = snr
+        torch.minimum(weight, torch.full_like(snr, 1000), out=weight)
+        torch.sqrt(weight, out=weight)
+        torch.inverse(weight, out=weight)
+        return weight
 
     def _diffusion_losses(
             self,
@@ -210,9 +230,12 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         # Apply minimum SNR weighting.
-        if config.min_snr_gamma and 'timestep' in data and not data['loss_type'] == 'align_prop':
-            v_pred = data.get('prediction_type', '') == 'v_prediction'
-            snr_weight = self.__min_snr_weight(data['timestep'], config.min_snr_gamma, v_pred, losses.device)
-            losses *= snr_weight
+        if 'timestep' in data and not data['loss_type'] == 'align_prop':
+            if config.min_snr_gamma:
+                v_pred = data.get('prediction_type', '') == 'v_prediction'
+                snr_weight = self.__min_snr_weight(data['timestep'], config.min_snr_gamma, v_pred, losses.device)
+                losses *= snr_weight
+            if config.debiased_estimation_loss:
+                losses *= self.__debiased_estimation_weight(data['timestep'], losses.device)
 
         return losses
