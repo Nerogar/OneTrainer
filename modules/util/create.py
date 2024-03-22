@@ -315,7 +315,9 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
-            patch_adam(optimizer, optimizer_config.stochastic_rounding)
+            if optimizer_config.stochastic_rounding:
+                # TODO: only patch if fused/foreach is disabled
+                patch_adam(optimizer, optimizer_config.stochastic_rounding)
 
         # ADAMW Optimizer
         case Optimizer.ADAMW:
@@ -337,7 +339,9 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
-            patch_adamw(optimizer, optimizer_config.stochastic_rounding)
+            if optimizer_config.stochastic_rounding:
+                # TODO: only patch if fused/foreach is disabled
+                patch_adamw(optimizer, optimizer_config.stochastic_rounding)
 
         # ADAM_8BIT Optimizer
         case Optimizer.ADAM_8BIT:
