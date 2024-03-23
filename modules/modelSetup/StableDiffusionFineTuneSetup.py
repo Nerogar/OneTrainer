@@ -14,7 +14,6 @@ from modules.util.config.TrainConfig import TrainConfig
 
 class StableDiffusionFineTuneSetup(
     BaseStableDiffusionSetup,
-    ModelSetupClipEmbeddingMixin,
 ):
     def __init__(
             self,
@@ -94,7 +93,7 @@ class StableDiffusionFineTuneSetup(
             embedding.text_encoder_vector.requires_grad_(train_embedding)
 
         train_unet = config.unet.train and \
-                             not self.stop_unet_training_elapsed(config, model.train_progress)
+                     not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
 
         model.vae.requires_grad_(False)
@@ -116,36 +115,7 @@ class StableDiffusionFineTuneSetup(
         elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
-        model.embeddings = []
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
-        for i, embedding_config in enumerate(config.embeddings):
-            embedding_state = model.additional_embedding_states[i]
-            if embedding_state is None:
-                embedding_state = self._create_new_embedding(
-                    model.tokenizer,
-                    model.text_encoder,
-                    config.embeddings[i].initial_embedding_text,
-                    config.embeddings[i].token_count,
-                )
-
-            embedding_state = embedding_state.to(
-                dtype=model.text_encoder.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
-
-            embedding = StableDiffusionModelEmbedding(
-                embedding_config.uuid, embedding_state, embedding_config.placeholder,
-            )
-            model.embeddings.append(embedding)
-            self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
-
-        model.additional_embedding_wrapper = AdditionalEmbeddingWrapper(
-            orig_module=model.text_encoder.text_model.embeddings.token_embedding,
-            additional_embeddings=[embedding.text_encoder_vector for embedding in model.embeddings],
-            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        )
-        model.additional_embedding_wrapper.hook_to_module()
-
+        self.setup_embeddings(model, config)
         self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(

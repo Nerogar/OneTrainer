@@ -12,7 +12,7 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
@@ -20,7 +20,7 @@ from modules.util.convert.convert_stable_cascade_ckpt_to_diffusers import conver
 from modules.util.enum.ModelType import ModelType
 
 
-class WuerstchenModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
+class WuerstchenModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
     def __init__(self):
         super(WuerstchenModelLoader, self).__init__()
 

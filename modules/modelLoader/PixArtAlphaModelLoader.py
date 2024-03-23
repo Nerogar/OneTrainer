@@ -8,14 +8,14 @@ from transformers import T5Tokenizer, T5EncoderModel
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class PixArtAlphaModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin):
+class PixArtAlphaModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
     def __init__(self):
         super(PixArtAlphaModelLoader, self).__init__()
 

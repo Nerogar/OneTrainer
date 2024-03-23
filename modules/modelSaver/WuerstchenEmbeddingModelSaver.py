@@ -8,14 +8,14 @@ from safetensors.torch import save_file
 from modules.model.BaseModel import BaseModel
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
-from modules.modelSaver.mixin.ModelSaverClipEmbeddingMixin import ModelSaverClipEmbeddingMixin
+from modules.modelSaver.mixin.ClipEmbeddingModelSaverMixin import ClipEmbeddingModelSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
 class WuerstchenEmbeddingModelSaver(
     BaseModelSaver,
-    ModelSaverClipEmbeddingMixin,
+    ClipEmbeddingModelSaverMixin,
 ):
     def __save_ckpt(
             self,

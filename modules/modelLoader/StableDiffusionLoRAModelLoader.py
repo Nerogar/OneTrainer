@@ -1,8 +1,9 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
-from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
+from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
+from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionLoRALoader import StableDiffusionLoRALoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.ModelNames import ModelNames
@@ -12,8 +13,8 @@ from modules.util.enum.ModelType import ModelType
 
 class StableDiffusionLoRAModelLoader(
     BaseModelLoader,
-    ModelLoaderModelSpecMixin,
-    ModelLoaderSDConfigMixin,
+    ModelSpecModelLoaderMixin,
+    SDConfigModelLoaderMixin,
     InternalModelLoaderMixin,
 ):
     def __init__(self):
@@ -51,6 +52,7 @@ class StableDiffusionLoRAModelLoader(
     ) -> StableDiffusionModel | None:
         base_model_loader = StableDiffusionModelLoader()
         lora_model_loader = StableDiffusionLoRALoader()
+        embedding_loader = StableDiffusionEmbeddingLoader()
 
         model = StableDiffusionModel(model_type=model_type)
         self._load_internal_data(model, model_names.base_model)
@@ -59,7 +61,8 @@ class StableDiffusionLoRAModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type)
 
         if model_names.base_model is not None:
-            model = base_model_loader.load(model, model_type, model_names, weight_dtypes)
+            base_model_loader.load(model, model_type, model_names, weight_dtypes)
         lora_model_loader.load(model, model_names)
+        embedding_loader.load(model, model_names)
 
         return model

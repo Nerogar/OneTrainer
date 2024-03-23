@@ -7,14 +7,16 @@ from diffusers.utils import is_xformers_available
 from torch import Tensor
 from torch.utils.checkpoint import checkpoint
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers, \
     create_checkpointed_forward
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context
@@ -27,6 +29,7 @@ class BaseStableDiffusionSetup(
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupDiffusionNoiseMixin,
+    ModelSetupClipEmbeddingMixin,
     metaclass=ABCMeta,
 ):
 
@@ -74,6 +77,44 @@ class BaseStableDiffusionSetup(
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING or config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
+
+
+    def setup_embeddings(
+            self,
+            model: StableDiffusionModel,
+            config: TrainConfig,
+    ):
+        model.embeddings = []
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
+        for i, embedding_config in enumerate(config.embeddings):
+            embedding_state = model.additional_embedding_states[i]
+            if embedding_state is None:
+                embedding_state = self._create_new_embedding(
+                    model.tokenizer,
+                    model.text_encoder,
+                    config.embeddings[i].initial_embedding_text,
+                    config.embeddings[i].token_count,
+                )
+
+            embedding_state = embedding_state.to(
+                dtype=model.text_encoder.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
+
+            embedding = StableDiffusionModelEmbedding(
+                embedding_config.uuid, embedding_state, embedding_config.placeholder,
+            )
+            model.embeddings.append(embedding)
+            self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
+
+        model.additional_embedding_wrapper = AdditionalEmbeddingWrapper(
+            orig_module=model.text_encoder.text_model.embeddings.token_embedding,
+            additional_embeddings=[embedding.text_encoder_vector for embedding in model.embeddings],
+            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
+        )
+        model.additional_embedding_wrapper.hook_to_module()
+
+
 
     def __encode_text(
             self,

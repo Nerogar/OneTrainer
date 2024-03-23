@@ -6,38 +6,13 @@ from safetensors.torch import load_file
 from torch import Tensor
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
 from modules.util.ModelNames import ModelNames
 
 
 class StableDiffusionLoRALoader(
-    ModelLoaderLoRAMixin,
 ):
     def __init__(self):
         super(StableDiffusionLoRALoader, self).__init__()
-
-    def __init_lora(
-            self,
-            model: StableDiffusionModel,
-            state_dict: dict[str, Tensor],
-            dtype: torch.dtype,
-    ):
-        rank = self._get_lora_rank(state_dict)
-
-        model.text_encoder_lora = self._load_lora_with_prefix(
-            module=model.text_encoder,
-            state_dict=state_dict,
-            prefix="lora_te",
-            rank=rank,
-        )
-
-        model.unet_lora = self._load_lora_with_prefix(
-            module=model.unet,
-            state_dict=state_dict,
-            prefix="lora_unet",
-            rank=rank,
-            module_filter=["attentions"],
-        )
 
     def __load_safetensors(
             self,

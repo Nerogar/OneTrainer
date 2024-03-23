@@ -1,7 +1,7 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.ModelNames import ModelNames
@@ -11,7 +11,7 @@ from modules.util.enum.ModelType import ModelType
 
 class StableDiffusionEmbeddingModelLoader(
     BaseModelLoader,
-    ModelLoaderModelSpecMixin,
+    ModelSpecModelLoaderMixin,
     InternalModelLoaderMixin,
 ):
     def __init__(self):

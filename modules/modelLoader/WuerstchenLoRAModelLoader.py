@@ -9,8 +9,7 @@ from torch import Tensor
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.WuerstchenModelLoader import WuerstchenModelLoader
-from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
@@ -20,7 +19,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 
 
-class WuerstchenLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderLoRAMixin):
+class WuerstchenLoRAModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
     def __init__(self):
         super(WuerstchenLoRAModelLoader, self).__init__()
 

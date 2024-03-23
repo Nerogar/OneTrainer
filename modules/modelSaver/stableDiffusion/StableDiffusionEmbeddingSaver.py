@@ -5,13 +5,13 @@ import torch
 from safetensors.torch import save_file
 
 from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
-from modules.modelSaver.mixin.ModelSaverClipEmbeddingMixin import ModelSaverClipEmbeddingMixin
+from modules.modelSaver.mixin.ClipEmbeddingModelSaverMixin import ClipEmbeddingModelSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
 
 
 class StableDiffusionEmbeddingSaver(
-    ModelSaverClipEmbeddingMixin,
+    ClipEmbeddingModelSaverMixin,
 ):
 
     def __save_ckpt(

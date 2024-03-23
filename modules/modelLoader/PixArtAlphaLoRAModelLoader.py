@@ -9,15 +9,14 @@ from torch import Tensor
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.PixArtAlphaModelLoader import PixArtAlphaModelLoader
-from modules.modelLoader.mixin.ModelLoaderLoRAMixin import ModelLoaderLoRAMixin
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class PixArtAlphaLoRAModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderLoRAMixin):
+class PixArtAlphaLoRAModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
     def __init__(self):
         super(PixArtAlphaLoRAModelLoader, self).__init__()
 

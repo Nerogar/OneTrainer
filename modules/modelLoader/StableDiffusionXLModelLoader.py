@@ -8,8 +8,8 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.mixin.ModelLoaderModelSpecMixin import ModelLoaderModelSpecMixin
-from modules.modelLoader.mixin.ModelLoaderSDConfigMixin import ModelLoaderSDConfigMixin
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
+from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -18,7 +18,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
-class StableDiffusionXLModelLoader(BaseModelLoader, ModelLoaderModelSpecMixin, ModelLoaderSDConfigMixin):
+class StableDiffusionXLModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin, SDConfigModelLoaderMixin):
     def __init__(self):
         super(StableDiffusionXLModelLoader, self).__init__()
 
