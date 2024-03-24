@@ -187,7 +187,10 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     ) -> Tensor:
         snr = self.__snr(timesteps, device)
         weight = snr
-        torch.clip(weight, min=1.0e-3, max=1.0e3, out=weight)
+        # The line below is a departure from the original paper.
+        # This is to match the Kohya implementation, see: https://github.com/kohya-ss/sd-scripts/pull/889
+        # In addition, it helps avoid numerical instability.
+        torch.clip(weight, max=1.0e3, out=weight)
         if v_prediction:
             weight += 1.0
         torch.rsqrt(weight, out=weight)
