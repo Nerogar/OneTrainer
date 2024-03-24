@@ -329,10 +329,11 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=2,
+            config_version=3,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
+                2: self.__migration_2,
             }
         )
 
@@ -444,6 +445,19 @@ class TrainConfig(BaseConfig):
             else:
                 migrated_data[key] = value
 
+        return migrated_data
+    
+    def __migration_2(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        min_snr_gamma = migrated_data.pop("min_snr_gamma", 0.0)
+        model_type = migrated_data.get("model_type", ModelType.STABLE_DIFFUSION_15)
+        if min_snr_gamma:
+            migrated_data["loss_weight_fn"] = LossWeight.MIN_SNR_GAMMA
+            migrated_data["loss_weight_strength"] = min_snr_gamma
+        elif model_type == ModelType.WUERSTCHEN_2:
+            migrated_data["loss_weight_fn"] = LossWeight.P2
+            migrated_data["loss_weight_strength"] = 1
+        
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
