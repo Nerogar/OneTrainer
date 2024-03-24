@@ -45,6 +45,9 @@ class Optimizer(Enum):
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
 
+    # CAME
+    CAME = 'CAME'
+
     @property
     def is_adaptive(self):
         return self in [

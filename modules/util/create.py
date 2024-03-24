@@ -643,6 +643,21 @@ def create_optimizer(
 
             patch_adafactor(optimizer, optimizer_config.stochastic_rounding)
 
+        # CAME Optimizer
+        case Optimizer.CAME:
+            import came_pytorch
+
+            optimizer = came_pytorch.CAME(
+                params=parameters,
+                lr=config.learning_rate,
+                eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
+                     optimizer_config.eps2 if optimizer_config.eps2 is not None else 1e-16),
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
+                       optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+            )
+
     if state_dict is not None:
         for i, params in enumerate(parameters):
             state_dict['param_groups'][i]['lr'] = params['lr']
