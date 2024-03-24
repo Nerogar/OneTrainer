@@ -3,7 +3,7 @@ from typing import Iterable
 import torch
 from torch.nn import Parameter
 
-from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
+from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.module.LoRAModule import LoRAModuleWrapper
@@ -39,7 +39,7 @@ class StableDiffusionLoRASetup(
             params += list(model.text_encoder_lora.parameters())
 
         if config.train_any_embedding():
-            params += list(model.additional_embedding_wrapper.parameters())
+            params += list(model.embedding_wrapper.parameters())
 
         if config.unet.train:
             params += list(model.unet_lora.parameters())
@@ -66,7 +66,7 @@ class StableDiffusionLoRASetup(
             param_groups.append(
                 self.create_param_groups(
                     config,
-                    model.additional_embedding_wrapper.parameters(),
+                    model.embedding_wrapper.parameters(),
                     config.embedding_learning_rate,
                 )
             )
@@ -96,8 +96,8 @@ class StableDiffusionLoRASetup(
                                  not self.stop_text_encoder_training_elapsed(config, model.train_progress)
             model.text_encoder_lora.requires_grad_(train_text_encoder)
 
-        for i, embedding in enumerate(model.embeddings):
-            embedding_config = config.embeddings[i]
+        for i, embedding in enumerate(model.additional_embeddings):
+            embedding_config = config.additional_embeddings[i]
             train_embedding = embedding_config.train and \
                               not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
             embedding.text_encoder_vector.requires_grad_(train_embedding)
@@ -112,6 +112,9 @@ class StableDiffusionLoRASetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
+        if config.train_any_embedding():
+            model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+
         model.text_encoder_lora = LoRAModuleWrapper(
             model.text_encoder, config.lora_rank, "lora_te", config.lora_alpha
         )
@@ -137,7 +140,9 @@ class StableDiffusionLoRASetup(
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
 
-        self.setup_embeddings(model, config)
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
+        self._setup_additional_embeddings(model, config)
+        self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
@@ -150,7 +155,7 @@ class StableDiffusionLoRASetup(
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, config)
+        self._setup_optimizations(model, config)
 
     def setup_train_device(
             self,

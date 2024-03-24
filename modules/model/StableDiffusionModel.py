@@ -1,5 +1,5 @@
-from uuid import uuid4
 from contextlib import nullcontext
+from uuid import uuid4
 
 import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
@@ -51,9 +51,11 @@ class StableDiffusionModel(BaseModel):
     train_dtype: DataType
 
     # persistent embedding training data
-    embeddings: list[StableDiffusionModelEmbedding] | None
-    additional_embedding_wrapper: AdditionalEmbeddingWrapper
+    embedding: StableDiffusionModelEmbedding | None
+    embedding_state: Tensor | None
+    additional_embeddings: list[StableDiffusionModelEmbedding] | None
     additional_embedding_states: list[Tensor | None]
+    embedding_wrapper: AdditionalEmbeddingWrapper
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -76,9 +78,11 @@ class StableDiffusionModel(BaseModel):
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
-            embeddings: list[StableDiffusionModelEmbedding] = None,
-            additional_embedding_wrapper: AdditionalEmbeddingWrapper | None = None,
+            embedding: StableDiffusionModelEmbedding | None = None,
+            embedding_state: Tensor | None = None,
+            additional_embeddings: list[StableDiffusionModelEmbedding] | None = None,
             additional_embedding_states: list[Tensor | None] = None,
+            embedding_wrapper: AdditionalEmbeddingWrapper | None = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
             lora_state_dict: dict | None = None,
@@ -108,9 +112,11 @@ class StableDiffusionModel(BaseModel):
 
         self.train_dtype = DataType.FLOAT_32
 
-        self.embeddings = embeddings if embeddings is not None else []
-        self.additional_embedding_wrapper = additional_embedding_wrapper
+        self.embedding = embedding
+        self.embedding_state = embedding_state
+        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
         self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
+        self.embedding_wrapper = embedding_wrapper
 
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
@@ -195,3 +201,14 @@ class StableDiffusionModel(BaseModel):
 
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
+
+    def add_embeddings_to_prompt(self, prompt: str) -> str:
+        for embedding in self.additional_embeddings:
+            embedding_string = ''.join(embedding.text_tokens)
+            prompt = prompt.replace(embedding.placeholder, embedding_string)
+
+        if self.embedding is not None:
+            embedding_string = ''.join(self.embedding.text_tokens)
+            prompt = prompt.replace(self.embedding.placeholder, embedding_string)
+
+        return prompt

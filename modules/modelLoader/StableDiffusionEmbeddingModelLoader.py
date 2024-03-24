@@ -54,8 +54,9 @@ class StableDiffusionEmbeddingModelLoader(
 
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
-        embedding_loader.load(model, model_names)
-        self._load_internal_data(model, model_names.embedding)
+        embedding_loader.load_multiple(model, model_names)
+        embedding_loader.load_single(model, model_names)
+        self._load_internal_data(model, model_names.embedding.model_name)
 
         model.model_spec = self._load_default_model_spec(model_type)
 

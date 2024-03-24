@@ -1,8 +1,7 @@
 import json
-from copy import deepcopy
-import random
-from typing import Any
 import uuid
+from copy import deepcopy
+from typing import Any
 
 from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -155,6 +154,7 @@ class TrainModelPartConfig(BaseConfig):
 
         return TrainModelPartConfig(data)
 
+
 class TrainEmbeddingConfig(BaseConfig):
     uuid: str
     model_name: str
@@ -183,7 +183,6 @@ class TrainEmbeddingConfig(BaseConfig):
         data.append(("initial_embedding_text", "*", str, False))
 
         return TrainEmbeddingConfig(data)
-
 
 
 class TrainConfig(BaseConfig):
@@ -298,7 +297,7 @@ class TrainConfig(BaseConfig):
     # embedding
     embedding_learning_rate: float
     embedding: TrainEmbeddingConfig
-    embeddings: list[TrainEmbeddingConfig]
+    additional_embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
 
     # lora
@@ -333,10 +332,11 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=2,
+            config_version=3,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
+                2: self.__migration_2,
             }
         )
 
@@ -450,6 +450,18 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_2(self, data: dict) -> dict:
+        migrated_data = {}
+
+        for key, value in data.items():
+            if key == "embeddings":
+                if value is not None and len(value):
+                    migrated_data["embedding"] = value[0]
+            else:
+                migrated_data[key] = value
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
@@ -474,11 +486,13 @@ class TrainConfig(BaseConfig):
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
             embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
-            embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in self.embeddings],
+            additional_embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in
+                                   self.additional_embeddings],
         )
 
     def train_any_embedding(self) -> bool:
-        return self.training_method == TrainingMethod.EMBEDDING or any(embedding.train for embedding in self.embeddings)
+        return self.training_method == TrainingMethod.EMBEDDING \
+            or any(embedding.train for embedding in self.additional_embeddings)
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
@@ -665,7 +679,7 @@ class TrainConfig(BaseConfig):
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
         data.append(("embedding", TrainEmbeddingConfig.default_values(), TrainEmbeddingConfig, False))
-        data.append(("embeddings", [TrainEmbeddingConfig.default_values()], list[TrainEmbeddingConfig], False))
+        data.append(("additional_embeddings", [], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # lora

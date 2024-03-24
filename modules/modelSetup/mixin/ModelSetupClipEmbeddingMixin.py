@@ -1,9 +1,7 @@
-import tokenize
 from abc import ABCMeta
 
 import torch
 from torch import Tensor
-from torch.nn import Embedding
 from transformers import CLIPTokenizer, CLIPTextModel
 from transformers.tokenization_utils import Trie
 
@@ -80,14 +78,3 @@ class ModelSetupClipEmbeddingMixin(metaclass=ABCMeta):
             tokenizer._added_tokens_encoder.pop(added_token.content)
         tokenizer.tokens_trie = Trie()
         tokenizer._update_trie()
-
-    def _embeddings_after_optimizer_step(
-            self,
-            embedding_layer: Embedding,
-            original_token_embeds: Tensor,
-            untrainable_token_embeds_mask: list[bool],
-    ):
-        # reset untrainable embeddings
-        with torch.no_grad():
-            embedding_layer.weight[untrainable_token_embeds_mask] = \
-                original_token_embeds[untrainable_token_embeds_mask]

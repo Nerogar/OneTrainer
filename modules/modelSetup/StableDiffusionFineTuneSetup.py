@@ -38,7 +38,7 @@ class StableDiffusionFineTuneSetup(
             params += list(model.text_encoder.parameters())
 
         if config.train_any_embedding():
-            params += list(model.additional_embedding_wrapper.parameters())
+            params += list(model.embedding_wrapper.parameters())
 
         if config.unet.train:
             params += list(model.unet.parameters())
@@ -65,7 +65,7 @@ class StableDiffusionFineTuneSetup(
             param_groups.append(
                 self.create_param_groups(
                     config,
-                    model.additional_embedding_wrapper.parameters(),
+                    model.embedding_wrapper.parameters(),
                     config.embedding_learning_rate,
                 )
             )
@@ -86,8 +86,8 @@ class StableDiffusionFineTuneSetup(
                              not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder.requires_grad_(train_text_encoder)
 
-        for i, embedding in enumerate(model.embeddings):
-            embedding_config = config.embeddings[i]
+        for i, embedding in enumerate(model.additional_embeddings):
+            embedding_config = config.additional_embeddings[i]
             train_embedding = embedding_config.train and \
                               not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
             embedding.text_encoder_vector.requires_grad_(train_embedding)
@@ -115,7 +115,9 @@ class StableDiffusionFineTuneSetup(
         elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
-        self.setup_embeddings(model, config)
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
+        self._setup_additional_embeddings(model, config)
+        self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
@@ -128,7 +130,7 @@ class StableDiffusionFineTuneSetup(
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, config)
+        self._setup_optimizations(model, config)
 
     def setup_train_device(
             self,

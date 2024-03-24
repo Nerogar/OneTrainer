@@ -34,59 +34,69 @@ class StableDiffusionEmbeddingLoader:
 
     def __load_internal(
             self,
-            model: StableDiffusionModel,
-            base_model_name: str,
-            embedding_names: list[EmbeddingName],
-    ):
-        embedding_states = []
+            directory: str,
+            embedding_name: EmbeddingName,
+    ) -> Tensor | None:
+        if os.path.exists(os.path.join(directory, "meta.json")):
+            safetensors_embedding_name = os.path.join(
+                directory,
+                "embeddings",
+                f"{embedding_name.uuid}.safetensors",
+            )
 
-        if os.path.exists(os.path.join(base_model_name, "meta.json")):
-            for embedding_name in embedding_names:
-                safetensors_embedding_name = os.path.join(
-                    base_model_name,
-                    "embeddings",
-                    f"{embedding_name.uuid}.safetensors",
-                )
-
-                if os.path.exists(safetensors_embedding_name):
-                    embedding_states.append(self.__load_embedding(safetensors_embedding_name))
-                else:
-                    embedding_states.append(self.__load_embedding(embedding_name.model_name))
-
-            model.additional_embedding_states = embedding_states
+            if os.path.exists(safetensors_embedding_name):
+                return self.__load_embedding(safetensors_embedding_name)
+            else:
+                return self.__load_embedding(embedding_name.model_name)
         else:
             raise Exception("not an internal model")
 
-    def __load_embeddings(
+    def load_multiple(
             self,
             model: StableDiffusionModel,
-            embedding_names: list[EmbeddingName],
+            model_names: ModelNames,
     ):
-        embedding_states = []
+        model.additional_embedding_states = []
 
-        for embedding_name in embedding_names:
-            embedding_states.append(self.__load_embedding(embedding_name.model_name))
+        for embedding_name in model_names.additional_embeddings:
+            stacktraces = []
 
-        model.additional_embedding_states = embedding_states
+            try:
+                model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name))
+                continue
+            except:
+                try:
+                    model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
+                    continue
+                except:
+                    stacktraces.append(traceback.format_exc())
 
-    def load(
+                stacktraces.append(traceback.format_exc())
+
+                for stacktrace in stacktraces:
+                    print(stacktrace)
+                raise Exception("could not load embedding: " + str(model_names.embedding))
+
+    def load_single(
             self,
             model: StableDiffusionModel,
             model_names: ModelNames,
     ):
         stacktraces = []
 
+        embedding_name = model_names.embedding
+
         try:
-            self.__load_internal(model, model_names.base_model, model_names.embeddings)
-            return model
+            model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name)
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
-        try:
-            self.__load_embeddings(model, model_names.embeddings)
-            return model
-        except:
-            stacktraces.append(traceback.format_exc())
+            try:
+                model.embedding_state = self.__load_embedding(embedding_name.model_name)
+                return
+            except:
+                stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)

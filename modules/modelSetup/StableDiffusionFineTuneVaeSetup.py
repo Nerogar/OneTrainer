@@ -63,7 +63,7 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, config)
+        self._setup_optimizations(model, config)
 
     def setup_train_device(
             self,

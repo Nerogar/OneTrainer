@@ -387,13 +387,8 @@ class StableDiffusionSampler(BaseModelSampler):
             on_sample: Callable[[Image], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = sample_params.prompt
-        negative_prompt = sample_params.negative_prompt
-
-        for embedding in self.model.embeddings:
-            embedding_string = ''.join(embedding.text_tokens)
-            prompt = prompt.replace(embedding.placeholder, embedding_string)
-            negative_prompt = negative_prompt.replace(embedding.placeholder, embedding_string)
+        prompt = self.model.add_embeddings_to_prompt(sample_params.prompt)
+        negative_prompt = self.model.add_embeddings_to_prompt(sample_params.negative_prompt)
 
         if self.model_type.has_conditioning_image_input():
             image = self.__sample_inpainting(

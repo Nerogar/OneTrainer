@@ -115,9 +115,13 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
         replace_embedding_text = []
-        for embedding in model.embeddings:
+        for embedding in model.additional_embeddings:
             all_token_string = ''.join(embedding.text_tokens)
             replace_embedding_text.append(ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text=embedding.placeholder, new_text=all_token_string))
+
+        if model.embedding is not None:
+            all_token_string = ''.join(model.embedding.text_tokens)
+            replace_embedding_text.append(ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text=model.embedding.placeholder, new_text=all_token_string))
 
         modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 

@@ -84,6 +84,6 @@ class StableDiffusionFineTuneModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type)
 
         base_model_loader.load(model, model_type, model_names, weight_dtypes)
-        embedding_loader.load(model, model_names)
+        embedding_loader.load_multiple(model, model_names)
 
         return model

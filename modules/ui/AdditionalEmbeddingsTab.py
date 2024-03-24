@@ -8,14 +8,14 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
-class EmbeddingsTab(ConfigList):
+class AdditionalEmbeddingsTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(EmbeddingsTab, self).__init__(
+        super(AdditionalEmbeddingsTab, self).__init__(
             master,
             train_config,
             ui_state,
-            attr_name="embeddings",
+            attr_name="additional_embeddings",
             from_external_file=False,
             add_button_text="add embedding",
             is_full_width=True,

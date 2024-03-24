@@ -55,7 +55,7 @@ class StableDiffusionLoRAModelLoader(
         embedding_loader = StableDiffusionEmbeddingLoader()
 
         model = StableDiffusionModel(model_type=model_type)
-        self._load_internal_data(model, model_names.base_model)
+        self._load_internal_data(model, model_names.lora)
         model.model_spec = self._load_default_model_spec(model_type)
         model.sd_config = self._load_sd_config(model_type)
         model.sd_config_filename = self._get_sd_config_name(model_type)
@@ -63,6 +63,6 @@ class StableDiffusionLoRAModelLoader(
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
         lora_model_loader.load(model, model_names)
-        embedding_loader.load(model, model_names)
+        embedding_loader.load_multiple(model, model_names)
 
         return model
