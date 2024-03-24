@@ -262,8 +262,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight:
                 case LossWeight.MIN_SNR_GAMMA:
-                    snr_weight = self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
-                    losses *= snr_weight
+                    losses *= self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
                 case LossWeight.DEBIASED_ESTIMATION:
                     losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
                 case LossWeight.P2:
