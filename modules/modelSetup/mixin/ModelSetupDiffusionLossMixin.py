@@ -175,18 +175,21 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
         # Denominator of the snr_weight increased by 1 if v-prediction is being used.
         if v_prediction:
-            snr += 1
+            snr += 1.0
         snr_weight = (min_snr_gamma / snr).to(device)
         return snr_weight
     
     def __debiased_estimation_weight(
         self,
         timesteps: Tensor,
+        v_prediction: bool,
         device: torch.device
     ) -> Tensor:
         snr = self.__snr(timesteps, device)
         weight = snr
         torch.clip(weight, min=1.0e-3, max=1.0e3, out=weight)
+        if v_prediction:
+            weight += 1.0
         torch.rsqrt(weight, out=weight)
         return weight
     
@@ -194,9 +197,12 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         self,
         timesteps: Tensor,
         gamma: float,
+        v_prediction: bool,
         device: torch.device,
     ) -> Tensor:
         snr = self.__snr(timesteps, device)
+        if v_prediction:
+            snr += 1.0
         return (1.0 + snr) ** -gamma
 
     def _diffusion_losses(
@@ -244,8 +250,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     snr_weight = self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
                     losses *= snr_weight
                 case LossWeight.DEBIASED_ESTIMATION:
-                    losses *= self.__debiased_estimation_weight(data['timestep'], losses.device)
+                    losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
                 case LossWeight.P2:
-                    losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, losses.device)
+                    losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
 
         return losses
