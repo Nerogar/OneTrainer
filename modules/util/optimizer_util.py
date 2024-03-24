@@ -294,5 +294,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "eps": 1e-30,
         "eps2": 1e-16,
         "weight_decay": 1e-2,
+        "stochastic_rounding": False,
     },
 }

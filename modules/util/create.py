@@ -71,6 +71,7 @@ from modules.util.lr_scheduler_util import *
 from modules.util.optimizer.adafactor_extensions import step_adafactor, patch_adafactor
 from modules.util.optimizer.adam_extensions import step_adam, patch_adam
 from modules.util.optimizer.adamw_extensions import step_adamw, patch_adamw
+from modules.util.optimizer.came_extensions import patch_came
 
 
 def create_model_loader(
@@ -657,6 +658,8 @@ def create_optimizer(
                        optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
             )
+
+            patch_came(optimizer, optimizer_config.stochastic_rounding)
 
     if state_dict is not None:
         for i, params in enumerate(parameters):
