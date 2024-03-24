@@ -151,6 +151,21 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         return losses
     
+    def calculate_loss(
+            self,
+            model,
+            batch: dict,
+            data: dict,
+            config: TrainConfig,
+    ) -> Tensor:
+        return self._diffusion_losses(
+            batch=batch,
+            data=data,
+            config=config,
+            train_device=self.train_device,
+            betas=model.noise_scheduler.betas.to(device=self.train_device),
+        ).mean()
+    
     def __snr(self, timesteps: Tensor, device: torch.device):
         if self.__coefficients:
             all_snr = (self.__coefficients.sqrt_alphas_cumprod /
