@@ -474,14 +474,14 @@ class TrainingTab:
                              tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
             components.entry(frame, 2, 1, self.ui_state, "vb_loss_strength")
 
-        # Minimum SNR Gamma
+        # Loss Weight function
         components.label(frame, 3, 0, "Loss Weight Function",
                          tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
         components.options(frame, 3, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
         
-        # Debiased Estimation Loss
+        # Loss weight strength
         components.label(frame, 4, 0, "Gamma",
-                         tooltip="Inverse strength of loss weighting. Currently only applies to P2 and min_snr_gamma, Range: 1-20.")
+                         tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
         components.entry(frame, 4, 1, self.ui_state, "loss_weight_strength")
 
         # Loss Scaler
