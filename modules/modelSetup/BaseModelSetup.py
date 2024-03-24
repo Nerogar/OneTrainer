@@ -81,7 +81,7 @@ class BaseModelSetup(
             data: dict,
             config: TrainConfig,
     ) -> Tensor:
-        ...
+        pass
 
     @abstractmethod
     def after_optimizer_step(
