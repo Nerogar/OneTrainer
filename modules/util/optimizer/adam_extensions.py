@@ -34,6 +34,7 @@ def _single_tensor_adam(
         maximize: bool,
         capturable: bool,
         differentiable: bool,
+        stochastic_rounding: bool,
 ):
     assert grad_scale is None and found_inf is None
 
@@ -127,7 +128,7 @@ def _single_tensor_adam(
             else:
                 denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
 
-            if param.dtype == torch.bfloat16:
+            if param.dtype == torch.bfloat16 and stochastic_rounding:
                 addcdiv_stochastic_(param, exp_avg, denom, value=-step_size)
             else:
                 param.addcdiv_(exp_avg, denom, value=-step_size)
@@ -188,7 +189,8 @@ def step_adam(self, closure=None):
             eps=group['eps'],
             maximize=group['maximize'],
             capturable=group['capturable'],
-            differentiable=group['differentiable']
+            differentiable=group['differentiable'],
+            stochastic_rounding=self.stochastic_rounding,
         )
 
     return loss
