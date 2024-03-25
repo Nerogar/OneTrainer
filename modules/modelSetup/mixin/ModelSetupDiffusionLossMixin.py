@@ -248,7 +248,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         # Apply minimum SNR weighting.
         if 'timestep' in data and not data['loss_type'] == 'align_prop':
             v_pred = data.get('prediction_type', '') == 'v_prediction'
-            match config.loss_weight:
+            match config.loss_weight_fn:
                 case LossWeight.MIN_SNR_GAMMA:
                     losses *= self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
                 case LossWeight.DEBIASED_ESTIMATION:
