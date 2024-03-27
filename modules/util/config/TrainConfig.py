@@ -16,6 +16,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
@@ -240,7 +241,8 @@ class TrainConfig(BaseConfig):
     mse_strength: float
     mae_strength: float
     vb_loss_strength: float
-    min_snr_gamma: float
+    loss_weight_fn: LossWeight
+    loss_weight_strength: float
     dropout_probability: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
@@ -327,10 +329,11 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=2,
+            config_version=3,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
+                2: self.__migration_2,
             }
         )
 
@@ -442,6 +445,19 @@ class TrainConfig(BaseConfig):
             else:
                 migrated_data[key] = value
 
+        return migrated_data
+    
+    def __migration_2(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        min_snr_gamma = migrated_data.pop("min_snr_gamma", 0.0)
+        model_type = migrated_data.get("model_type", ModelType.STABLE_DIFFUSION_15)
+        if min_snr_gamma:
+            migrated_data["loss_weight_fn"] = LossWeight.MIN_SNR_GAMMA
+            migrated_data["loss_weight_strength"] = min_snr_gamma
+        elif model_type.is_wuerstchen():
+            migrated_data["loss_weight_fn"] = LossWeight.P2
+            migrated_data["loss_weight_strength"] = 1
+        
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
@@ -565,7 +581,8 @@ class TrainConfig(BaseConfig):
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
-        data.append(("min_snr_gamma", 0, float, False))
+        data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
+        data.append(("loss_weight_strength", 5.0, float, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))

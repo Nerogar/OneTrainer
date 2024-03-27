@@ -11,6 +11,7 @@ from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoeffici
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LossWeight import LossWeight
 from modules.util.loss.masked_loss import masked_losses
 from modules.util.loss.vb_loss import vb_losses
 
@@ -149,14 +150,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             losses /= mask_mean
 
         return losses
-
-    def __min_snr_weight(
-            self,
-            timesteps: Tensor,
-            gamma: float,
-            v_prediction: bool,
-            device: torch.device
-    ):
+    
+    def __snr(self, timesteps: Tensor, device: torch.device):
         if self.__coefficients:
             all_snr = (self.__coefficients.sqrt_alphas_cumprod /
                        self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
@@ -164,13 +159,54 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             snr = all_snr[timesteps]
         else:
             alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
-            snr = ((alphas_cumprod ** 0.5) / (1.0 - alphas_cumprod) ** 0.5) ** 2
+            snr = alphas_cumprod / (1.0 - alphas_cumprod)
+        
+        return snr
+        
+
+    def __min_snr_weight(
+            self,
+            timesteps: Tensor,
+            gamma: float,
+            v_prediction: bool,
+            device: torch.device
+    ) -> Tensor:
+        snr = self.__snr(timesteps, device)
         min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
         # Denominator of the snr_weight increased by 1 if v-prediction is being used.
         if v_prediction:
-            snr += 1
-        snr_weight = torch.div(min_snr_gamma, snr).float().to(device)
+            snr += 1.0
+        snr_weight = (min_snr_gamma / snr).to(device)
         return snr_weight
+    
+    def __debiased_estimation_weight(
+        self,
+        timesteps: Tensor,
+        v_prediction: bool,
+        device: torch.device
+    ) -> Tensor:
+        snr = self.__snr(timesteps, device)
+        weight = snr
+        # The line below is a departure from the original paper.
+        # This is to match the Kohya implementation, see: https://github.com/kohya-ss/sd-scripts/pull/889
+        # In addition, it helps avoid numerical instability.
+        torch.clip(weight, max=1.0e3, out=weight)
+        if v_prediction:
+            weight += 1.0
+        torch.rsqrt(weight, out=weight)
+        return weight
+    
+    def __p2_loss_weight(
+        self,
+        timesteps: Tensor,
+        gamma: float,
+        v_prediction: bool,
+        device: torch.device,
+    ) -> Tensor:
+        snr = self.__snr(timesteps, device)
+        if v_prediction:
+            snr += 1.0
+        return (1.0 + snr) ** -gamma
 
     def _diffusion_losses(
             self,
@@ -210,9 +246,14 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         # Apply minimum SNR weighting.
-        if config.min_snr_gamma and 'timestep' in data and not data['loss_type'] == 'align_prop':
+        if 'timestep' in data and not data['loss_type'] == 'align_prop':
             v_pred = data.get('prediction_type', '') == 'v_prediction'
-            snr_weight = self.__min_snr_weight(data['timestep'], config.min_snr_gamma, v_pred, losses.device)
-            losses *= snr_weight
+            match config.loss_weight_fn:
+                case LossWeight.MIN_SNR_GAMMA:
+                    losses *= self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
+                case LossWeight.DEBIASED_ESTIMATION:
+                    losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
+                case LossWeight.P2:
+                    losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
 
         return losses

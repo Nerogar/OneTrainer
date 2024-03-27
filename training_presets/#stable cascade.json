@@ -47,5 +47,7 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "training_method": "FINE_TUNE",
-    "weight_dtype": "BFLOAT_16"
+    "weight_dtype": "BFLOAT_16",
+    "loss_weight_fn": "P2",
+    "loss_weight_strength": 1.0
 }
