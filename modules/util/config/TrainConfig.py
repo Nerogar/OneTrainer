@@ -454,7 +454,7 @@ class TrainConfig(BaseConfig):
         if min_snr_gamma:
             migrated_data["loss_weight_fn"] = LossWeight.MIN_SNR_GAMMA
             migrated_data["loss_weight_strength"] = min_snr_gamma
-        elif model_type == ModelType.WUERSTCHEN_2:
+        elif model_type.is_wuerstchen():
             migrated_data["loss_weight_fn"] = LossWeight.P2
             migrated_data["loss_weight_strength"] = 1
         
