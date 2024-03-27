@@ -7,7 +7,7 @@ from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from modules.dataLoader.PixArtAlphaFineTuneDataLoader import PixArtAlphaFineTuneDataLoader
-from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
+from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLEmbeddingDataLoader import StableDiffusionXLEmbeddingDataLoader
 from modules.dataLoader.StableDiffusionXLFineTuneDataLoader import StableDiffusionXLFineTuneDataLoader
@@ -124,7 +124,7 @@ def create_model_saver(
                 return PixArtAlphaModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionModelSaver()
+                return StableDiffusionFineTuneModelSaver()
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelSaver()
@@ -231,7 +231,7 @@ def create_data_loader(
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():
@@ -243,7 +243,7 @@ def create_data_loader(
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress)
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
-                return StableDiffusionFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():
@@ -252,7 +252,7 @@ def create_data_loader(
                 return PixArtAlphaFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
-                return StableDiffusionFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLEmbeddingDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():

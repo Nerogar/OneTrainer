@@ -51,7 +51,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.torch_util import torch_gc
 
 
-class StablDiffusionBaseDataLoader(BaseDataLoader):
+class StableDiffusionBaseDataLoader(BaseDataLoader):
     def __init__(
             self,
             train_device: torch.device,
@@ -60,7 +60,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             model: StableDiffusionModel,
             train_progress: TrainProgress,
     ):
-        super(StablDiffusionBaseDataLoader, self).__init__(
+        super(StableDiffusionBaseDataLoader, self).__init__(
             train_device,
             temp_device,
         )

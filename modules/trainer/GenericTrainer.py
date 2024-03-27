@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 from tqdm import tqdm
 
-from modules.dataLoader.StableDiffusionFineTuneDataLoader import StableDiffusionFineTuneDataLoader
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -40,7 +40,7 @@ from modules.util.torch_util import torch_gc
 class GenericTrainer(BaseTrainer):
     model_loader: BaseModelLoader
     model_setup: BaseModelSetup
-    data_loader: StableDiffusionFineTuneDataLoader
+    data_loader: BaseDataLoader
     model_saver: BaseModelSaver
     model_sampler: BaseModelSampler
     model: BaseModel
