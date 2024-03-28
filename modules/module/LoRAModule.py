@@ -1,14 +1,44 @@
+import abc
+import itertools
 import math
-from abc import ABCMeta
+import typing
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
+from modules.util.enum.LoraType import LoraType
 
-class LoRAModule(metaclass=ABCMeta):
-    prefix: str
+ModuleDict = dict[str, nn.Module]
+StateDict = dict[str, torch.Tensor]
+
+
+
+class BaseLoRAModule(abc.ABC):
+    type: typing.ClassVar[LoraType]
     orig_module: nn.Module
+    is_applied: bool
+    prefix: str
+    
+    def __init__(self, prefix: str, orig_module: nn.Module) -> None:
+        super().__init__()
+        self.prefix = prefix
+        self.orig_module = orig_module
+        self.orig_forward = orig_module.forward
+        self.is_applied = False
+    
+    @abc.abstractmethod
+    def grad_modules(self) -> ModuleDict:
+        raise RuntimeError("Do not call `super().grad_modules`.")
+    
+    @abc.abstractmethod
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        raise RuntimeError("Do not call `super().forward`.")
+    
+    def requires_grad_(self, requires_grad: bool) -> "BaseLoRAModule":
+        for module in self.grad_modules().values():
+            module.requires_grad_(requires_grad)
+        
     lora_down: nn.Module
     lora_up: nn.Module
     alpha: torch.Tensor
@@ -45,29 +75,32 @@ class LoRAModule(metaclass=ABCMeta):
         self.lora_up.to(device, dtype)
         self.alpha.to(device, dtype)
         return self
-
-    def parameters(self) -> list[Parameter]:
-        return list(self.lora_down.parameters()) + list(self.lora_up.parameters())
-
-    def load_state_dict(self, state_dict: dict):
-        down_state_dict = {
-            "weight": state_dict.pop(self.prefix + ".lora_down.weight")
-        }
-        up_state_dict = {
-            "weight": state_dict.pop(self.prefix + ".lora_up.weight")
-        }
-        self.alpha = state_dict.pop(self.prefix + ".alpha")
-
-        self.lora_down.load_state_dict(down_state_dict)
-        self.lora_up.load_state_dict(up_state_dict)
-
-    def state_dict(self) -> dict:
-        state_dict = {}
-        state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
-        state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
-        state_dict[self.prefix + ".alpha"] = self.alpha
-        return state_dict
-
+            
+    def parameters(self) -> typing.Iterable[nn.Parameter]:
+        return itertools.chain(*(module.parameters() for module in self.grad_modules().values()))
+    
+    @abc.abstractmethod
+    def load_state_dict(self, state_dict: StateDict) -> typing.Self:
+        for key, module in self.grad_modules().items():
+            module_state_dict: StateDict = {}
+            for name, _ in module.named_parameters():
+                module_state_dict[name] = state_dict.pop(f"{self.prefix}.{key}.{name}")
+            
+            module.load_state_dict(module_state_dict)
+        
+        return self
+                
+    
+    @abc.abstractmethod
+    def state_dict(self) -> StateDict:
+        params = {}
+        
+        for key, module in self.grad_modules().items():
+            for param_key, param in module.state_dict().items():
+                params[f"{self.prefix}.{key}.{param_key}"] = param
+        
+        return params
+    
     def hook_to_module(self):
         if not self.is_applied:
             self.orig_module.forward = self.forward
@@ -77,14 +110,56 @@ class LoRAModule(metaclass=ABCMeta):
         if self.is_applied:
             self.orig_module.forward = self.orig_forward
             self.is_applied = False
-
+    
+    def to(self, device: torch.device | None  = None, dtype: torch.dtype | None = None) -> typing.Self:
+        for module in self.grad_modules().values():
+            module.to(device=device, dtype=dtype)
+        
+        return self
+            
     def apply_to_module(self):
         # TODO
         pass
 
     def extract_from_module(self, base_module: nn.Module):
         # TODO
-        pass
+        pass  
+        
+
+LORA_TYPE_MAP: dict[tuple[typing.Type[nn.Module], LoRAType], typing.Type[BaseLoRAModule]] = {}
+
+
+class LoRAModule(BaseLoRAModule, abc.ABC):
+    orig_module: nn.Module
+    lora_down: nn.Module
+    lora_up: nn.Module
+    alpha: float
+
+    def __init__(self, prefix: str, orig_module: nn.Module, rank: int, alpha: float):
+        super(LoRAModule, self).__init__(prefix, orig_module)
+        self.rank = rank
+        self.alpha = alpha
+
+    def forward(self, x, *args, **kwargs):
+        return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
+    
+    def grad_modules(self) -> dict[str, nn.Module]:
+        return {
+            "lora_down": self.lora_down,
+            "lora_up": self.lora_up,
+        }
+
+    def load_state_dict(self, state_dict: StateDict) -> typing.Self:
+        super().load_state_dict(state_dict)
+        self.alpha = state_dict.pop(f"{self.prefix}.alpha").item()
+        return self
+
+    def state_dict(self) -> StateDict:
+        state_dict = super(LoRAModule, self).state_dict()
+        state_dict[f"{self.prefix}.alpha"] = torch.tensor(self.alpha)
+        return state_dict
+        
+
 
 
 class LinearLoRAModule(LoRAModule):
@@ -162,17 +237,17 @@ class LoRAModuleWrapper:
 
     def __init__(
             self,
-            orig_module: nn.Module | None,
+            orig_module: nn.Module,
             rank: int,
             prefix: str,
             alpha: float = 1.0,
-            module_filter: list[str] = None,
+            module_filter: list[str] | None = None,
     ):
         super(LoRAModuleWrapper, self).__init__()
         self.orig_module = orig_module
         self.rank = rank
         self.prefix = prefix
-        self.module_filter = module_filter if module_filter is not None else []
+        self.module_filter = module_filter
 
         self.modules = self.__create_modules(orig_module, alpha)
 
@@ -181,7 +256,7 @@ class LoRAModuleWrapper:
 
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
-                if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
+                if self.module_filter is None or any([x in name for x in self.module_filter]):
                     if isinstance(child_module, Linear):
                         lora_modules[name] = LinearLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
                     elif isinstance(child_module, Conv2d):
@@ -190,17 +265,17 @@ class LoRAModuleWrapper:
         return lora_modules
 
     def requires_grad_(self, requires_grad: bool):
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.requires_grad_(requires_grad)
 
     def parameters(self) -> list[Parameter]:
         parameters = []
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             parameters += module.parameters()
         return parameters
 
-    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModuleWrapper':
-        for name, module in self.modules.items():
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None) -> 'LoRAModuleWrapper':
+        for module in self.modules.values():
             module.to(device, dtype)
         return self
 
@@ -233,7 +308,7 @@ class LoRAModuleWrapper:
         """
         state_dict = {}
 
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             state_dict |= module.state_dict()
 
         return state_dict
@@ -242,28 +317,28 @@ class LoRAModuleWrapper:
         """
         Hooks the LoRA into the module without changing its weights
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.hook_to_module()
 
     def remove_hook_from_module(self):
         """
         Removes the LoRA hook from the module without changing its weights
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.remove_hook_from_module()
 
     def apply_to_module(self):
         """
         Applys the LoRA to the module, changing its weights
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.apply_to_module()
 
     def extract_from_module(self, base_module: nn.Module):
         """
         Creates a LoRA from the difference between the base_module and the orig_module
         """
-        for name, module in self.modules.items():
+        for module in self.modules.values():
             module.extract_from_module(base_module)
 
     def prune(self):
