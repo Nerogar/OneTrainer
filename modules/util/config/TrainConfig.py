@@ -450,13 +450,13 @@ class TrainConfig(BaseConfig):
     def __migration_2(self, data: dict) -> dict:
         migrated_data = data.copy()
         min_snr_gamma = migrated_data.pop("min_snr_gamma", 0.0)
-        model_type = migrated_data.get("model_type", ModelType.STABLE_DIFFUSION_15)
+        model_type = ModelType(migrated_data.get("model_type", ModelType.STABLE_DIFFUSION_15))
         if min_snr_gamma:
             migrated_data["loss_weight_fn"] = LossWeight.MIN_SNR_GAMMA
             migrated_data["loss_weight_strength"] = min_snr_gamma
         elif model_type.is_wuerstchen():
             migrated_data["loss_weight_fn"] = LossWeight.P2
-            migrated_data["loss_weight_strength"] = 1
+            migrated_data["loss_weight_strength"] = 1.0
         
         return migrated_data
 
