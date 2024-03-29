@@ -16,6 +16,6 @@ class BaseModelSaver(metaclass=ABCMeta):
             model_type: ModelType,
             output_model_format: ModelFormat,
             output_model_destination: str,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ):
         pass

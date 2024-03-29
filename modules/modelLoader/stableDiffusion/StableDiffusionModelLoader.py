@@ -24,11 +24,8 @@ class StableDiffusionModelLoader:
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
-    ) -> StableDiffusionModel | None:
-        # base model
+    ):
         self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name)
-
-        return model
 
     def __load_diffusers(
             self,

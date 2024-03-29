@@ -9,8 +9,7 @@ from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 from modules.dataLoader.PixArtAlphaFineTuneDataLoader import PixArtAlphaFineTuneDataLoader
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
-from modules.dataLoader.StableDiffusionXLEmbeddingDataLoader import StableDiffusionXLEmbeddingDataLoader
-from modules.dataLoader.StableDiffusionXLFineTuneDataLoader import StableDiffusionXLFineTuneDataLoader
+from modules.dataLoader.StableDiffusionXLBaseDataLoader import StableDiffusionXLBaseDataLoader
 from modules.dataLoader.WuerstchenEmbeddingDataLoader import WuerstchenEmbeddingDataLoader
 from modules.dataLoader.WuerstchenFineTuneDataLoader import WuerstchenFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
@@ -21,8 +20,8 @@ from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffus
 from modules.modelLoader.StableDiffusionFineTuneModelLoader import StableDiffusionFineTuneModelLoader
 from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLoRAModelLoader
 from modules.modelLoader.StableDiffusionXLEmbeddingModelLoader import StableDiffusionXLEmbeddingModelLoader
+from modules.modelLoader.StableDiffusionXLFineTuneModelLoader import StableDiffusionXLFineTuneModelLoader
 from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusionXLLoRAModelLoader
-from modules.modelLoader.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
 from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddingModelLoader
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelLoader.WuerstchenModelLoader import WuerstchenModelLoader
@@ -36,12 +35,11 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
 from modules.modelSaver.PixArtAlphaModelSaver import PixArtAlphaModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
-from modules.modelSaver.StableDiffusionFineTuneModelSaver import StableDiffusionModelSaver, \
-    StableDiffusionFineTuneModelSaver
+from modules.modelSaver.StableDiffusionFineTuneModelSaver import StableDiffusionFineTuneModelSaver
 from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRAModelSaver
 from modules.modelSaver.StableDiffusionXLEmbeddingModelSaver import StableDiffusionXLEmbeddingModelSaver
+from modules.modelSaver.StableDiffusionXLFineTuneModelSaver import StableDiffusionXLFineTuneModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
-from modules.modelSaver.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
 from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbeddingModelSaver
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSaver.WuerstchenModelSaver import WuerstchenModelSaver
@@ -68,9 +66,9 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
-from modules.util.optimizer.adafactor_extensions import step_adafactor, patch_adafactor
-from modules.util.optimizer.adam_extensions import step_adam, patch_adam
-from modules.util.optimizer.adamw_extensions import step_adamw, patch_adamw
+from modules.util.optimizer.adafactor_extensions import patch_adafactor
+from modules.util.optimizer.adam_extensions import patch_adam
+from modules.util.optimizer.adamw_extensions import patch_adamw
 
 
 def create_model_loader(
@@ -82,7 +80,7 @@ def create_model_loader(
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLModelLoader()
+                return StableDiffusionXLFineTuneModelLoader()
             if model_type.is_wuerstchen():
                 return WuerstchenModelLoader()
             if model_type.is_pixart_alpha():
@@ -117,7 +115,7 @@ def create_model_saver(
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelSaver()
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLModelSaver()
+                return StableDiffusionXLFineTuneModelSaver()
             if model_type.is_wuerstchen():
                 return WuerstchenModelSaver()
             if model_type.is_pixart_alpha():
@@ -233,7 +231,7 @@ def create_data_loader(
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_pixart_alpha():
@@ -245,7 +243,7 @@ def create_data_loader(
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():
                 return WuerstchenFineTuneDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_pixart_alpha():
@@ -254,7 +252,7 @@ def create_data_loader(
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLEmbeddingDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():
                 return WuerstchenEmbeddingDataLoader(train_device, temp_device, config, model, train_progress)
 

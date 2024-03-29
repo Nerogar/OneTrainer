@@ -18,7 +18,7 @@ class DtypeModelSaverMixin:
     def _convert_state_dict_dtype(
             self,
             state_dict: dict,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ) -> dict:
         converted_state_dict = {}
 

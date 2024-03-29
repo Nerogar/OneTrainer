@@ -122,6 +122,7 @@ class StableDiffusionLoRASetup(
         model.unet_lora = LoRAModuleWrapper(
             model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"]
         )
+
         if model.lora_state_dict:
             model.text_encoder_lora.load_state_dict(model.lora_state_dict)
             model.unet_lora.load_state_dict(model.lora_state_dict)

@@ -75,7 +75,7 @@ class BaseStableDiffusionSetup(
             config.weight_dtypes().unet,
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING or config.train_any_embedding() else None,
+            config.weight_dtypes().embedding if config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
 
     def _setup_additional_embeddings(
@@ -104,13 +104,6 @@ class BaseStableDiffusionSetup(
             )
             model.additional_embeddings.append(embedding)
             self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
-
-        model.embedding_wrapper = AdditionalEmbeddingWrapper(
-            orig_module=model.text_encoder.text_model.embeddings.token_embedding,
-            additional_embeddings=[embedding.text_encoder_vector for embedding in model.additional_embeddings],
-            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        )
-        model.embedding_wrapper.hook_to_module()
 
     def _setup_embedding(
             self,
@@ -146,7 +139,7 @@ class BaseStableDiffusionSetup(
         model.embedding_wrapper = AdditionalEmbeddingWrapper(
             orig_module=model.text_encoder.text_model.embeddings.token_embedding,
             additional_embeddings=[embedding.text_encoder_vector for embedding in model.additional_embeddings]
-                                  + [] if model.embedding is None else [model.embedding.text_encoder_vector],
+                                  + ([] if model.embedding is None else [model.embedding.text_encoder_vector]),
             dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
         )
         model.embedding_wrapper.hook_to_module()
@@ -197,7 +190,7 @@ class BaseStableDiffusionSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            if config.text_encoder.train or config.train_any_embedding() or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.train_any_embedding():
                 text_encoder_output = self.__encode_text(
                     model,
                     config,

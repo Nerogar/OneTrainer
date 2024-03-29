@@ -42,7 +42,7 @@ class StableDiffusionModelSaver(
             model: StableDiffusionModel,
             model_type: ModelType,
             destination: str,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ):
         state_dict = convert_sd_diffusers_to_ckpt(
             model_type,
@@ -69,7 +69,7 @@ class StableDiffusionModelSaver(
             model: StableDiffusionModel,
             model_type: ModelType,
             destination: str,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ):
         state_dict = convert_sd_diffusers_to_ckpt(
             model_type,
@@ -94,8 +94,7 @@ class StableDiffusionModelSaver(
             model: StableDiffusionModel,
             destination: str,
     ):
-        # base model
-        self.__save_diffusers(model, destination, torch.float32)
+        self.__save_diffusers(model, destination, None)
 
     def save(
             self,
@@ -103,7 +102,7 @@ class StableDiffusionModelSaver(
             model_type: ModelType,
             output_model_format: ModelFormat,
             output_model_destination: str,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:

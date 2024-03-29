@@ -332,7 +332,7 @@ class GenericTrainer(BaseTrainer):
                 self.config.model_type,
                 ModelFormat.INTERNAL,
                 backup_path,
-                torch.float32
+                None,
             )
 
             self.__save_backup_config(backup_path)

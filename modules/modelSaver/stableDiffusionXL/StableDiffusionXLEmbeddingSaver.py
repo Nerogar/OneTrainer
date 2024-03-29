@@ -4,53 +4,54 @@ from pathlib import Path
 import torch
 from safetensors.torch import save_file
 
-from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
 
 
-class StableDiffusionEmbeddingSaver:
+class StableDiffusionXLEmbeddingSaver:
 
     def __save_ckpt(
             self,
-            embedding: StableDiffusionModelEmbedding,
+            embedding: StableDiffusionXLModelEmbedding,
             destination: str,
             dtype: torch.dtype | None,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        vector_cpu = embedding.text_encoder_vector.to(device="cpu", dtype=dtype)
+        text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype)
+        text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype)
 
         torch.save(
             {
-                "string_to_token": {"*": 265},
-                "string_to_param": {"*": vector_cpu},
-                "name": '*',
-                "step": 0,
-                "sd_checkpoint": "",
-                "sd_checkpoint_name": "",
+                "clip_l": text_encoder_1_vector_cpu,
+                "clip_g": text_encoder_2_vector_cpu,
             },
             destination
         )
 
     def __save_safetensors(
             self,
-            embedding: StableDiffusionModelEmbedding,
+            embedding: StableDiffusionXLModelEmbedding,
             destination: str,
             dtype: torch.dtype | None,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
-        vector_cpu = embedding.text_encoder_vector.to(device="cpu", dtype=dtype)
+        text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype)
+        text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype)
 
         save_file(
-            {"emp_params": vector_cpu},
+            {
+                "clip_l": text_encoder_1_vector_cpu,
+                "clip_g": text_encoder_2_vector_cpu,
+            },
             destination
         )
 
     def __save_internal(
             self,
-            embedding: StableDiffusionModelEmbedding,
+            embedding: StableDiffusionXLModelEmbedding,
             destination: str,
     ):
         safetensors_embedding_name = os.path.join(
@@ -62,7 +63,7 @@ class StableDiffusionEmbeddingSaver:
 
     def save_single(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,
@@ -89,7 +90,7 @@ class StableDiffusionEmbeddingSaver:
 
     def save_multiple(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,

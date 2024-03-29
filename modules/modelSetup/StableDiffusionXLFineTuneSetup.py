@@ -10,7 +10,9 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 
 
-class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
+class StableDiffusionXLFineTuneSetup(
+    BaseStableDiffusionXLSetup,
+):
     def __init__(
             self,
             train_device: torch.device,
@@ -36,6 +38,10 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
         if config.text_encoder_2.train:
             params += list(model.text_encoder_2.parameters())
 
+        if config.train_any_embedding():
+            params += list(model.embedding_wrapper_1.parameters())
+            params += list(model.embedding_wrapper_2.parameters())
+
         if config.unet.train:
             params += list(model.unet.parameters())
 
@@ -59,6 +65,22 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
                 self.create_param_groups(config, model.text_encoder_2.parameters(), config.text_encoder_2.learning_rate)
             )
 
+        if config.train_any_embedding():
+            param_groups.append(
+                self.create_param_groups(
+                    config,
+                    model.embedding_wrapper_1.parameters(),
+                    config.embedding_learning_rate,
+                )
+            )
+            param_groups.append(
+                self.create_param_groups(
+                    config,
+                    model.embedding_wrapper_2.parameters(),
+                    config.embedding_learning_rate,
+                )
+            )
+
         if config.unet.train:
             param_groups.append(
                 self.create_param_groups(config, model.unet.parameters(), config.unet.learning_rate)
@@ -66,24 +88,46 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
 
         return param_groups
 
-    def setup_model(
+    def __setup_requires_grad(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
         train_text_encoder_1 = config.text_encoder.train and \
-                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
+                               not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.text_encoder_1.requires_grad_(train_text_encoder_1)
 
         train_text_encoder_2 = config.text_encoder_2.train and \
-                             not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
+                               not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
         model.text_encoder_2.requires_grad_(train_text_encoder_2)
 
+        for i, embedding in enumerate(model.additional_embeddings):
+            embedding_config = config.additional_embeddings[i]
+            train_embedding = embedding_config.train and \
+                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.text_encoder_1_vector.requires_grad_(train_embedding)
+            embedding.text_encoder_2_vector.requires_grad_(train_embedding)
+
         train_unet = config.unet.train and \
-                             not self.stop_unet_training_elapsed(config, model.train_progress)
+                     not self.stop_unet_training_elapsed(config, model.train_progress)
         model.unet.requires_grad_(train_unet)
 
         model.vae.requires_grad_(False)
+
+    def setup_model(
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
+    ):
+        if config.train_any_embedding():
+            model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+            model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
+        self._setup_additional_embeddings(model, config)
+        self._setup_embedding_wrapper(model, config)
+        self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
@@ -95,7 +139,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, config)
+        self._setup_optimizations(model, config)
 
     def setup_train_device(
             self,
@@ -103,8 +147,17 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             config: TrainConfig,
     ):
         vae_on_train_device = config.align_prop
-        text_encoder_1_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
-        text_encoder_2_on_train_device = config.text_encoder_2.train or config.align_prop or not config.latent_caching
+        text_encoder_1_on_train_device = \
+            config.text_encoder.train \
+            or config.train_any_embedding() \
+            or config.align_prop \
+            or not config.latent_caching
+
+        text_encoder_2_on_train_device = \
+            config.text_encoder_2.train \
+            or config.train_any_embedding() \
+            or config.align_prop \
+            or not config.latent_caching
 
         model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
         model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
@@ -134,17 +187,7 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        train_text_encoder_1 = config.text_encoder.train and \
-                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-        model.text_encoder_1.requires_grad_(train_text_encoder_1)
-
-        train_text_encoder_2 = config.text_encoder_2.train and \
-                             not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
-        model.text_encoder_2.requires_grad_(train_text_encoder_2)
-
-        train_unet = config.unet.train and \
-                             not self.stop_unet_training_elapsed(config, model.train_progress)
-        model.unet.requires_grad_(train_unet)
+        self.__setup_requires_grad(model, config)
 
     def report_learning_rates(
             self,
@@ -159,6 +202,9 @@ class StableDiffusionXLFineTuneSetup(BaseStableDiffusionXLSetup):
             names.append("te1")
         if config.text_encoder_2.train:
             names.append("te2")
+        if config.train_any_embedding():
+            names.append("embeddings_te_1")
+            names.append("embeddings_te_2")
         if config.unet.train:
             names.append("unet")
         assert len(lrs) == len(names)

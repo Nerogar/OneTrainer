@@ -5,22 +5,24 @@ import torch
 from safetensors.torch import save_file
 from torch import Tensor
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 
 
-class StableDiffusionLoRASaver(
+class StableDiffusionXLLoRASaver(
     DtypeModelSaverMixin,
 ):
 
     def __get_state_dict(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
-        if model.text_encoder_lora is not None:
-            state_dict |= model.text_encoder_lora.state_dict()
+        if model.text_encoder_1_lora is not None:
+            state_dict |= model.text_encoder_1_lora.state_dict()
+        if model.text_encoder_2_lora is not None:
+            state_dict |= model.text_encoder_2_lora.state_dict()
         if model.unet_lora is not None:
             state_dict |= model.unet_lora.state_dict()
 
@@ -28,7 +30,7 @@ class StableDiffusionLoRASaver(
 
     def __save_ckpt(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype | None,
     ):
@@ -40,7 +42,7 @@ class StableDiffusionLoRASaver(
 
     def __save_safetensors(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             destination: str,
             dtype: torch.dtype | None,
     ):
@@ -52,7 +54,7 @@ class StableDiffusionLoRASaver(
 
     def __save_internal(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
@@ -61,7 +63,7 @@ class StableDiffusionLoRASaver(
 
     def save(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,

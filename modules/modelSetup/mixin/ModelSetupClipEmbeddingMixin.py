@@ -2,7 +2,7 @@ from abc import ABCMeta
 
 import torch
 from torch import Tensor
-from transformers import CLIPTokenizer, CLIPTextModel
+from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 from transformers.tokenization_utils import Trie
 
 
@@ -13,7 +13,7 @@ class ModelSetupClipEmbeddingMixin(metaclass=ABCMeta):
     def _create_new_embedding(
             self,
             tokenizer: CLIPTokenizer,
-            text_encoder: CLIPTextModel,
+            text_encoder: CLIPTextModel | CLIPTextModelWithProjection,
             initial_embedding_text: str,
             token_count: int,
     ) -> Tensor:

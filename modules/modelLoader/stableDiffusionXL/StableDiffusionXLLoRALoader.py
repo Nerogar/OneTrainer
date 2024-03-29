@@ -4,31 +4,32 @@ import traceback
 import torch
 from safetensors.torch import load_file
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.util.ModelNames import ModelNames
 
 
-class StableDiffusionLoRALoader:
+class StableDiffusionXLLoRALoader(
+):
     def __init__(self):
-        super(StableDiffusionLoRALoader, self).__init__()
+        super(StableDiffusionXLLoRALoader, self).__init__()
 
     def __load_safetensors(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             lora_name: str,
     ):
         model.lora_state_dict = load_file(lora_name)
 
     def __load_ckpt(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             lora_name: str,
     ):
         model.lora_state_dict = torch.load(lora_name)
 
     def __load_internal(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             lora_name: str,
     ):
         if os.path.exists(os.path.join(lora_name, "meta.json")):
@@ -40,9 +41,9 @@ class StableDiffusionLoRALoader:
 
     def load(
             self,
-            model: StableDiffusionModel,
+            model: StableDiffusionXLModel,
             model_names: ModelNames,
-    ) -> StableDiffusionModel | None:
+    ) -> StableDiffusionXLModel | None:
         stacktraces = []
 
         if model_names.lora == "":

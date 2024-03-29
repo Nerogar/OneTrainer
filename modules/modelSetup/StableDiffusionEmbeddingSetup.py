@@ -3,7 +3,7 @@ from typing import Iterable
 import torch
 from torch.nn import Parameter
 
-from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
+from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
@@ -47,7 +47,7 @@ class StableDiffusionEmbeddingSetup(
             )
         ]
 
-    def setup_model(
+    def __setup_requires_grad(
             self,
             model: StableDiffusionModel,
             config: TrainConfig,
@@ -56,14 +56,26 @@ class StableDiffusionEmbeddingSetup(
         model.vae.requires_grad_(False)
         model.unet.requires_grad_(False)
 
+        model.embedding.text_encoder_vector.requires_grad_(True)
+
+        for i, embedding in enumerate(model.additional_embeddings):
+            embedding_config = config.additional_embeddings[i]
+            train_embedding = embedding_config.train and \
+                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.text_encoder_vector.requires_grad_(train_embedding)
+
+    def setup_model(
+            self,
+            model: StableDiffusionModel,
+            config: TrainConfig,
+    ):
         model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
-        self._setup_embedding(model, config)
         self._setup_additional_embeddings(model, config)
+        self._setup_embedding(model, config)
         self._setup_embedding_wrapper(model, config)
-
-        model.embedding.text_encoder_vector.requires_grad_(True)
+        self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
@@ -99,7 +111,7 @@ class StableDiffusionEmbeddingSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        pass
+        self.__setup_requires_grad(model, config)
 
     def report_learning_rates(
             self,

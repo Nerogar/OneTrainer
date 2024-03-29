@@ -81,6 +81,7 @@ class TrainingTab:
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_1_frame(column_0, 1)
         self.__create_text_encoder_2_frame(column_0, 2)
+        self.__create_embedding_frame(column_0, 3)
 
         self.__create_base2_frame(column_1, 0)
         self.__create_unet_frame(column_1, 1)

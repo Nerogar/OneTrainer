@@ -3,10 +3,8 @@ from typing import Iterable
 import torch
 from torch.nn import Parameter
 
-from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
+from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
-from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
-from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig

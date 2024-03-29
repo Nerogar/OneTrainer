@@ -1,12 +1,10 @@
 from typing import Iterable
 
 import torch
-from torch import Tensor
 from torch.nn import Parameter
 
-from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
-from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -14,16 +12,7 @@ from modules.util.config.TrainConfig import TrainConfig
 
 class StableDiffusionXLEmbeddingSetup(
     BaseStableDiffusionXLSetup,
-    ModelSetupClipEmbeddingMixin,
 ):
-    all_text_encoder_1_original_token_embeds: Tensor
-    text_encoder_1_trainable_token_embeds_mask: list[bool]
-    text_encoder_1_untrainable_token_embeds_mask: list[bool]
-
-    all_text_encoder_2_original_token_embeds: Tensor
-    text_encoder_2_trainable_token_embeds_mask: list[bool]
-    text_encoder_2_untrainable_token_embeds_mask: list[bool]
-
     def __init__(
             self,
             train_device: torch.device,
@@ -43,8 +32,8 @@ class StableDiffusionXLEmbeddingSetup(
     ) -> Iterable[Parameter]:
         params = list()
 
-        params += list(model.text_encoder_1.get_input_embeddings().parameters())
-        params += list(model.text_encoder_2.get_input_embeddings().parameters())
+        params += list(model.embedding_wrapper_1.parameters())
+        params += list(model.embedding_wrapper_2.parameters())
 
         return params
 
@@ -56,63 +45,50 @@ class StableDiffusionXLEmbeddingSetup(
         return [
             self.create_param_groups(
                 config,
-                model.text_encoder_1.get_input_embeddings().parameters(),
+                model.embedding_wrapper_1.parameters(),
                 config.learning_rate,
             ),
             self.create_param_groups(
                 config,
-                model.text_encoder_2.get_input_embeddings().parameters(),
+                model.embedding_wrapper_2.parameters(),
                 config.learning_rate,
             )
         ]
 
-    def setup_model(
+    def __setup_requires_grad(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
         model.text_encoder_1.requires_grad_(False)
         model.text_encoder_2.requires_grad_(False)
-        model.text_encoder_1.get_input_embeddings().requires_grad_(True)
-        model.text_encoder_2.get_input_embeddings().requires_grad_(True)
         model.vae.requires_grad_(False)
         model.unet.requires_grad_(False)
 
+        model.embedding.text_encoder_1_vector.requires_grad_(True)
+        model.embedding.text_encoder_2_vector.requires_grad_(True)
+
+        for i, embedding in enumerate(model.additional_embeddings):
+            embedding_config = config.additional_embeddings[i]
+            train_embedding = embedding_config.train and \
+                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.text_encoder_1_vector.requires_grad_(train_embedding)
+            embedding.text_encoder_2_vector.requires_grad_(train_embedding)
+
+    def setup_model(
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
+    ):
         model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
         model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        if len(model.embeddings) == 0:
-            vector_1 = self._create_new_embedding(
-                model.tokenizer_1,
-                model.text_encoder_1,
-                config.embeddings[0].initial_embedding_text,
-                config.embeddings[0].token_count,
-            )
-
-            vector_2 = self._create_new_embedding(
-                model.tokenizer_2,
-                model.text_encoder_2,
-                config.embeddings[0].initial_embedding_text,
-                config.embeddings[0].token_count,
-            )
-
-            model.embeddings = [StableDiffusionXLModelEmbedding(vector_1, vector_2, 'embedding')]
-
-        original_token_embeds_1, untrainable_token_ids_1 = self._add_embeddings_to_clip(
-            model.tokenizer_1,
-            model.text_encoder_1,
-            [(model.embeddings[0].text_encoder_1_vector, model.embeddings[0].text_tokens, True)],
-        )
-        model.all_text_encoder_1_original_token_embeds = original_token_embeds_1
-        model.text_encoder_1_untrainable_token_embeds_mask = untrainable_token_ids_1
-
-        original_token_embeds_2, untrainable_token_ids_2 = self._add_embeddings_to_clip(
-            model.tokenizer_2,
-            model.text_encoder_2,
-            [(model.embeddings[0].text_encoder_2_vector, model.embeddings[0].text_tokens, True)],
-        )
-        model.all_text_encoder_2_original_token_embeds = original_token_embeds_2
-        model.text_encoder_2_untrainable_token_embeds_mask = untrainable_token_ids_2
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
+        self._setup_additional_embeddings(model, config)
+        self._setup_embedding(model, config)
+        self._setup_embedding_wrapper(model, config)
+        self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
@@ -124,7 +100,7 @@ class StableDiffusionXLEmbeddingSetup(
         )
         del model.ema_state_dict
 
-        self.setup_optimizations(model, config)
+        self._setup_optimizations(model, config)
 
     def setup_train_device(
             self,
@@ -148,17 +124,7 @@ class StableDiffusionXLEmbeddingSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        self._embeddings_after_optimizer_step(
-            model.text_encoder_1.get_input_embeddings(),
-            model.all_text_encoder_1_original_token_embeds,
-            model.text_encoder_1_untrainable_token_embeds_mask,
-        )
-
-        self._embeddings_after_optimizer_step(
-            model.text_encoder_2.get_input_embeddings(),
-            model.all_text_encoder_2_original_token_embeds,
-            model.text_encoder_2_untrainable_token_embeds_mask,
-        )
+        self.__setup_requires_grad(model, config)
 
     def report_learning_rates(
             self,
