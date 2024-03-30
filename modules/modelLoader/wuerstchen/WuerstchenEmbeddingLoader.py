@@ -5,38 +5,36 @@ import torch
 from safetensors.torch import load_file
 from torch import Tensor
 
-from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util.ModelNames import ModelNames, EmbeddingName
 
 
-class StableDiffusionXLEmbeddingLoader:
+class WuerstchenEmbeddingLoader:
     def __init__(self):
-        super(StableDiffusionXLEmbeddingLoader, self).__init__()
+        super(WuerstchenEmbeddingLoader, self).__init__()
 
     def __load_embedding(
             self,
             embedding_name: str,
-    ) -> tuple[Tensor, Tensor] | None:
+    ) -> Tensor | None:
         if embedding_name == "":
             return None
 
         try:
             embedding_state = torch.load(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l']
-            text_encoder_2_vector = embedding_state['clip_g']
+            prior_text_encoder_vector = embedding_state['clip_g']
 
-            return text_encoder_1_vector, text_encoder_2_vector
+            return prior_text_encoder_vector
         except:
             pass
 
         try:
             embedding_state = load_file(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l']
-            text_encoder_2_vector = embedding_state['clip_g']
+            prior_text_encoder_vector = embedding_state['clip_g']
 
-            return text_encoder_1_vector, text_encoder_2_vector
+            return prior_text_encoder_vector
         except:
             pass
 
@@ -46,7 +44,7 @@ class StableDiffusionXLEmbeddingLoader:
             self,
             directory: str,
             embedding_name: EmbeddingName,
-    ) -> tuple[Tensor, Tensor] | None:
+    ) -> Tensor | None:
         if os.path.exists(os.path.join(directory, "meta.json")):
             safetensors_embedding_name = os.path.join(
                 directory,
@@ -63,7 +61,7 @@ class StableDiffusionXLEmbeddingLoader:
 
     def load_multiple(
             self,
-            model: StableDiffusionXLModel,
+            model: WuerstchenModel,
             model_names: ModelNames,
     ):
         model.additional_embedding_states = []
@@ -89,7 +87,7 @@ class StableDiffusionXLEmbeddingLoader:
 
     def load_single(
             self,
-            model: StableDiffusionXLModel,
+            model: WuerstchenModel,
             model_names: ModelNames,
     ):
         stacktraces = []

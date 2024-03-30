@@ -178,7 +178,7 @@ class BaseModelSetup(
             train_progress,
         )
 
-    def stop_embedding_training_elapsed(
+    def stop_additional_embedding_training_elapsed(
             self,
             config: TrainEmbeddingConfig,
             train_progress: TrainProgress,
@@ -186,6 +186,18 @@ class BaseModelSetup(
     ):
         return self.single_action_elapsed(
             "stop_embedding_training_" + str(embedding_index),
+            config.stop_training_after,
+            config.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_embedding_training_elapsed(
+            self,
+            config: TrainEmbeddingConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_embedding_training",
             config.stop_training_after,
             config.stop_training_after_unit,
             train_progress,

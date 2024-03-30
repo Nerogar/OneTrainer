@@ -43,7 +43,6 @@ class StableDiffusionXLFineTuneModelLoader(
             case _:
                 return None
 
-
     def load(
             self,
             model_type: ModelType,

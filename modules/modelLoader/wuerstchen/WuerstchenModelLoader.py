@@ -1,8 +1,6 @@
 import json
-import os
 import traceback
 
-import torch
 from diffusers import DDPMWuerstchenScheduler
 from diffusers.models import StableCascadeUNet
 from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
@@ -11,51 +9,27 @@ from safetensors.torch import load_file
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
-from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.TrainProgress import TrainProgress
 from modules.util.convert.convert_stable_cascade_ckpt_to_diffusers import convert_stable_cascade_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
 
 
-class WuerstchenModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
+class WuerstchenModelLoader:
     def __init__(self):
         super(WuerstchenModelLoader, self).__init__()
 
-    def _default_model_spec_name(
-            self,
-            model_type: ModelType,
-    ) -> str | None:
-        match model_type:
-            case ModelType.WUERSTCHEN_2:
-                return "resources/sd_model_spec/wuerstchen_2.0.json"
-            case ModelType.STABLE_CASCADE_1:
-                return "resources/sd_model_spec/stable_cascade_1.0.json"
-            case _:
-                return None
-
     def __load_internal(
             self,
+            model: WuerstchenModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             prior_model_name: str,
-            prior_prior_model_name: str,
             effnet_encoder_model_name: str,
             decoder_model_name: str,
-    ) -> WuerstchenModel | None:
-        with open(os.path.join(prior_model_name, "meta.json"), "r") as meta_file:
-            meta = json.load(meta_file)
-            train_progress = TrainProgress(
-                epoch=meta['train_progress']['epoch'],
-                epoch_step=meta['train_progress']['epoch_step'],
-                epoch_sample=meta['train_progress']['epoch_sample'],
-                global_step=meta['train_progress']['global_step'],
-            )
-
-        # base model
-        model = self.__load(
+    ):
+        self.__load_diffusers(
+            model,
             model_type,
             weight_dtypes,
             prior_model_name,
@@ -64,28 +38,9 @@ class WuerstchenModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
             decoder_model_name,
         )
 
-        # optimizer
-        try:
-            model.optimizer_state_dict = torch.load(os.path.join(prior_model_name, "optimizer", "optimizer.pt"))
-        except FileNotFoundError:
-            pass
-
-        # ema
-        try:
-            model.ema_state_dict = torch.load(os.path.join(prior_model_name, "ema", "ema.pt"))
-        except FileNotFoundError:
-            pass
-
-        # meta
-        model.train_progress = train_progress
-
-        # model spec
-        model.model_spec = self._load_default_model_spec(model_type)
-
-        return model
-
-    def __load(
+    def __load_diffusers(
             self,
+            model: WuerstchenModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             prior_model_name: str,
@@ -197,29 +152,25 @@ class WuerstchenModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
             subfolder="scheduler",
         )
 
-        model_spec = self._load_default_model_spec(model_type)
-
-        return WuerstchenModel(
-            model_type=model_type,
-            decoder_tokenizer=decoder_tokenizer,
-            decoder_noise_scheduler=decoder_noise_scheduler,
-            decoder_text_encoder=decoder_text_encoder,
-            decoder_decoder=decoder_decoder,
-            decoder_vqgan=decoder_vqgan,
-            effnet_encoder=effnet_encoder,
-            prior_tokenizer=prior_tokenizer,
-            prior_text_encoder=prior_text_encoder,
-            prior_noise_scheduler=prior_noise_scheduler,
-            prior_prior=prior_prior,
-            model_spec=model_spec,
-        )
+        model.model_type = model_type
+        model.decoder_tokenizer = decoder_tokenizer
+        model.decoder_noise_scheduler = decoder_noise_scheduler
+        model.decoder_text_encoder = decoder_text_encoder
+        model.decoder_decoder = decoder_decoder
+        model.decoder_vqgan = decoder_vqgan
+        model.effnet_encoder = effnet_encoder
+        model.prior_tokenizer = prior_tokenizer
+        model.prior_text_encoder = prior_text_encoder
+        model.prior_noise_scheduler = prior_noise_scheduler
+        model.prior_prior = prior_prior
 
     def load(
             self,
+            model: WuerstchenModel,
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-    ) -> WuerstchenModel | None:
+    ):
         stacktraces = []
 
         prior_model_name = model_names.base_model
@@ -228,21 +179,21 @@ class WuerstchenModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
         decoder_model_name = model_names.decoder_model
 
         try:
-            model = self.__load_internal(
+            self.__load_internal(
+                model,
                 model_type,
                 weight_dtypes,
                 prior_model_name,
-                prior_prior_model_name,
                 effnet_encoder_model_name,
                 decoder_model_name,
             )
-            if model is not None:
-                return model
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
-            model = self.__load(
+            self.__load_diffusers(
+                model,
                 model_type,
                 weight_dtypes,
                 prior_model_name,
@@ -250,8 +201,7 @@ class WuerstchenModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
                 effnet_encoder_model_name,
                 decoder_model_name,
             )
-            if model is not None:
-                return model
+            return
         except:
             stacktraces.append(traceback.format_exc())
 

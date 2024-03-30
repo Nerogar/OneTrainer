@@ -1,21 +1,19 @@
-import json
-import os
-import traceback
-
-import torch
-from safetensors.torch import load_file
-
-from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
+from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.WuerstchenModelLoader import WuerstchenModelLoader
+from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
+from modules.modelLoader.wuerstchen.WuerstchenEmbeddingLoader import WuerstchenEmbeddingLoader
+from modules.modelLoader.wuerstchen.WuerstchenModelLoader import WuerstchenModelLoader
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.ModelType import ModelType
 
 
-class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin):
+class WuerstchenEmbeddingModelLoader(
+    BaseModelLoader,
+    ModelSpecModelLoaderMixin,
+    InternalModelLoaderMixin,
+):
     def __init__(self):
         super(WuerstchenEmbeddingModelLoader, self).__init__()
 
@@ -31,122 +29,23 @@ class WuerstchenEmbeddingModelLoader(BaseModelLoader, ModelSpecModelLoaderMixin)
             case _:
                 return None
 
-    def __load_ckpt(
-            self,
-            model: WuerstchenModel,
-            embedding_names: list[str],
-    ):
-        embedding_name = embedding_names[0]
-
-        embedding_state = torch.load(embedding_name)
-
-        tensor = embedding_state["clip_g"]
-
-        embedding = WuerstchenModelEmbedding(
-            prior_text_encoder_vector=tensor,
-            prefix='embedding',
-        )
-
-        model.embeddings = [embedding]
-        model.model_spec = self._load_default_model_spec(model.model_type)
-
-    def __load_safetensors(
-            self,
-            model: WuerstchenModel,
-            embedding_names: list[str],
-    ):
-        embedding_name = embedding_names[0]
-
-        embedding_state = load_file(embedding_name)
-
-        tensor = embedding_state["clip_g"]
-
-        embedding = WuerstchenModelEmbedding(
-            prior_text_encoder_vector=tensor,
-            prefix='embedding',
-        )
-
-        model.embeddings = [embedding]
-        model.model_spec = self._load_default_model_spec(model.model_type, embedding_name)
-
-    def __load_internal(
-            self,
-            model: WuerstchenModel,
-            embedding_names: list[str],
-    ):
-        embedding_name = embedding_names[0]
-
-        with open(os.path.join(embedding_name, "meta.json"), "r") as meta_file:
-            meta = json.load(meta_file)
-            train_progress = TrainProgress(
-                epoch=meta['train_progress']['epoch'],
-                epoch_step=meta['train_progress']['epoch_step'],
-                epoch_sample=meta['train_progress']['epoch_sample'],
-                global_step=meta['train_progress']['global_step'],
-            )
-
-        # embedding model
-        pt_embedding_name = os.path.join(embedding_name, "embedding", "embedding.pt")
-        safetensors_embedding_name = os.path.join(embedding_name, "embedding", "embedding.safetensors")
-        if os.path.exists(pt_embedding_name):
-            self.__load_ckpt(model, [pt_embedding_name])
-        elif os.path.exists(safetensors_embedding_name):
-            self.__load_safetensors(model, [safetensors_embedding_name])
-        else:
-            raise Exception("no embedding found")
-
-        # optimizer
-        try:
-            model.optimizer_state_dict = torch.load(os.path.join(embedding_name, "optimizer", "optimizer.pt"))
-        except FileNotFoundError:
-            pass
-
-        # ema
-        try:
-            model.ema_state_dict = torch.load(os.path.join(embedding_name, "ema", "ema.pt"))
-        except FileNotFoundError:
-            pass
-
-        # meta
-        model.train_progress = train_progress
-        model.model_spec = self._load_default_model_spec(model.model_type)
-
     def load(
             self,
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
     ) -> WuerstchenModel | None:
-        stacktraces = []
-
         base_model_loader = WuerstchenModelLoader()
+        embedding_loader = WuerstchenEmbeddingLoader()
+
+        model = WuerstchenModel(model_type=model_type)
 
         if model_names.base_model is not None:
-            model = base_model_loader.load(model_type, model_names, weight_dtypes)
-        else:
-            model = WuerstchenModel(model_type=model_type)
+            base_model_loader.load(model, model_type, model_names, weight_dtypes)
+        embedding_loader.load_multiple(model, model_names)
+        embedding_loader.load_single(model, model_names)
+        self._load_internal_data(model, model_names.embedding.model_name)
 
-        if any(model_names.embedding):
-            try:
-                self.__load_internal(model, model_names.embedding)
-                return model
-            except:
-                stacktraces.append(traceback.format_exc())
+        model.model_spec = self._load_default_model_spec(model_type)
 
-            try:
-                self.__load_safetensors(model, model_names.embedding)
-                return model
-            except:
-                stacktraces.append(traceback.format_exc())
-
-            try:
-                self.__load_ckpt(model, model_names.embedding)
-                return model
-            except:
-                stacktraces.append(traceback.format_exc())
-        else:
-            return model
-
-        for stacktrace in stacktraces:
-            print(stacktrace)
-        raise Exception("could not load embedding: " + str(model_names.embedding))
+        return model

@@ -5,7 +5,6 @@ from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
-from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -13,7 +12,6 @@ from modules.util.config.TrainConfig import TrainConfig
 
 class StableDiffusionEmbeddingSetup(
     BaseStableDiffusionSetup,
-    ModelSetupClipEmbeddingMixin,
 ):
     def __init__(
             self,
@@ -60,8 +58,9 @@ class StableDiffusionEmbeddingSetup(
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            train_embedding = \
+                embedding_config.train \
+                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
             embedding.text_encoder_vector.requires_grad_(train_embedding)
 
     def setup_model(

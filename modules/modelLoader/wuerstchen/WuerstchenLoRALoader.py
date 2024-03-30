@@ -4,31 +4,37 @@ import traceback
 import torch
 from safetensors.torch import load_file
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util.ModelNames import ModelNames
+from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import \
+    convert_stable_cascade_lora_ckpt_to_diffusers
 
 
-class StableDiffusionLoRALoader:
+class WuerstchenLoRALoader:
     def __init__(self):
-        super(StableDiffusionLoRALoader, self).__init__()
+        super(WuerstchenLoRALoader, self).__init__()
 
     def __load_safetensors(
             self,
-            model: StableDiffusionModel,
+            model: WuerstchenModel,
             lora_name: str,
     ):
         model.lora_state_dict = load_file(lora_name)
+        if model.model_type.is_stable_cascade():
+            model.lora_state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(model.lora_state_dict)
 
     def __load_ckpt(
             self,
-            model: StableDiffusionModel,
+            model: WuerstchenModel,
             lora_name: str,
     ):
         model.lora_state_dict = torch.load(lora_name)
+        if model.model_type.is_stable_cascade():
+            model.lora_state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(model.lora_state_dict)
 
     def __load_internal(
             self,
-            model: StableDiffusionModel,
+            model: WuerstchenModel,
             lora_name: str,
     ):
         if os.path.exists(os.path.join(lora_name, "meta.json")):
@@ -40,7 +46,7 @@ class StableDiffusionLoRALoader:
 
     def load(
             self,
-            model: StableDiffusionModel,
+            model: WuerstchenModel,
             model_names: ModelNames,
     ):
         stacktraces = []

@@ -25,7 +25,7 @@ class StableDiffusionXLFineTuneModelSaver(
         base_model_saver = StableDiffusionXLModelSaver()
         embedding_model_saver = StableDiffusionXLEmbeddingSaver()
 
-        base_model_saver.save(model, model_type, output_model_format, output_model_destination, dtype)
+        base_model_saver.save(model, output_model_format, output_model_destination, dtype)
         embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
 
         if output_model_format == ModelFormat.INTERNAL:

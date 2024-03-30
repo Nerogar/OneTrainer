@@ -10,7 +10,9 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 
 
-class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
+class StableDiffusionFineTuneVaeSetup(
+    BaseStableDiffusionSetup,
+):
     def __init__(
             self,
             train_device: torch.device,

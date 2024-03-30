@@ -138,7 +138,6 @@ def __map_text_encoder_2(in_states: dict, out_prefix: str, in_prefix: str) -> di
 
 
 def convert_sdxl_diffusers_to_ckpt(
-        model_type: ModelType,
         vae_state_dict: dict,
         unet_state_dict: dict,
         text_encoder_1_state_dict: dict,

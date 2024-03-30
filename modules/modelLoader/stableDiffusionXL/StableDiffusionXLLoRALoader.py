@@ -8,8 +8,7 @@ from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.util.ModelNames import ModelNames
 
 
-class StableDiffusionXLLoRALoader(
-):
+class StableDiffusionXLLoRALoader:
     def __init__(self):
         super(StableDiffusionXLLoRALoader, self).__init__()
 
@@ -43,26 +42,27 @@ class StableDiffusionXLLoRALoader(
             self,
             model: StableDiffusionXLModel,
             model_names: ModelNames,
-    ) -> StableDiffusionXLModel | None:
+    ):
         stacktraces = []
 
         if model_names.lora == "":
             return
+
         try:
             self.__load_internal(model, model_names.lora)
-            return model
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_ckpt(model, model_names.lora)
-            return model
+            return
         except:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_safetensors(model, model_names.lora)
-            return model
+            return
         except:
             stacktraces.append(traceback.format_exc())
 

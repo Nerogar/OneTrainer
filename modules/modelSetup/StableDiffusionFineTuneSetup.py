@@ -87,7 +87,7 @@ class StableDiffusionFineTuneSetup(
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
             train_embedding = embedding_config.train and \
-                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
             embedding.text_encoder_vector.requires_grad_(train_embedding)
 
         train_unet = config.unet.train and \
