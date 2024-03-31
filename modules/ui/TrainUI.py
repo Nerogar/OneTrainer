@@ -8,7 +8,6 @@ from typing import Callable
 
 import customtkinter as ctk
 
-import modules.zluda.PATH
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab

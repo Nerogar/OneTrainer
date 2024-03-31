@@ -4,7 +4,6 @@ script_imports()
 
 import json
 
-import modules.zluda.PATH
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
