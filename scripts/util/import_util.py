@@ -18,3 +18,7 @@ def script_imports():
             paths = os.environ.get('PATH', '.')
             if zluda_path not in paths:
                 os.environ['PATH'] = paths + ';' + zluda_path
+
+            from modules.zluda import ZLUDA
+
+            ZLUDA.initialize()

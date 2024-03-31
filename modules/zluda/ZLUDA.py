@@ -23,17 +23,11 @@ def test(device: DeviceLikeType):
         return False
 
 
-def setup(config: TrainConfig):
-    if is_zluda(config.train_device) or is_zluda(config.temp_device):
-        torch.backends.cudnn.enabled = False
-        torch.backends.cuda.enable_flash_sdp(False)
-        torch.backends.cuda.enable_math_sdp(True)
-        torch.backends.cuda.enable_mem_efficient_sdp(False)
-    else:
-        torch.backends.cudnn.enabled = True
-        torch.backends.cuda.enable_flash_sdp(True)
-        torch.backends.cuda.enable_math_sdp(True)
-        torch.backends.cuda.enable_mem_efficient_sdp(True)
+def initialize():
+    torch.backends.cudnn.enabled = False
+    torch.backends.cuda.enable_flash_sdp(False)
+    torch.backends.cuda.enable_math_sdp(True)
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
 
 
 def initialize_devices(config: TrainConfig):
