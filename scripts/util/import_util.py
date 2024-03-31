@@ -2,6 +2,7 @@ def script_imports():
     import logging
     import os
     import sys
+    import shutil
 
     # filter out the triton warning on startup
     logging \
@@ -14,11 +15,15 @@ def script_imports():
         from modules.zluda.util import find_zluda
 
         zluda_path = find_zluda()
+        use_zluda = shutil.which('zluda') is not None
+
         if os.path.exists(zluda_path):
+            use_zluda = True
             paths = os.environ.get('PATH', '.')
             if zluda_path not in paths:
                 os.environ['PATH'] = paths + ';' + zluda_path
 
+        if use_zluda:
             from modules.zluda import ZLUDA
 
             ZLUDA.initialize()
