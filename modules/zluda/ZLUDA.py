@@ -41,6 +41,7 @@ def initialize_devices(config: TrainConfig):
         return
     devices = [config.train_device, config.temp_device,]
     for i in range(2):
+        device = torch.device(devices[i])
         if not test(device):
             print(f'ZLUDA device failed to pass basic operation test: index={device.index}, device_name={torch.cuda.get_device_name(device)}')
             device = 'cpu'
