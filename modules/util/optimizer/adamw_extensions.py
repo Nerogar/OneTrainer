@@ -9,6 +9,7 @@ from typing import List, Optional, Union
 
 import torch
 from torch import Tensor
+from torch.optim import AdamW
 from torch.optim.optimizer import _use_grad_for_differentiable
 
 from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
@@ -33,6 +34,7 @@ def _single_tensor_adamw(
         maximize: bool,
         capturable: bool,
         differentiable: bool,
+        stochastic_rounding: bool,
 ):
 
     assert grad_scale is None and found_inf is None
@@ -127,7 +129,7 @@ def _single_tensor_adamw(
             else:
                 denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
 
-            if param.dtype == torch.bfloat16:
+            if param.dtype == torch.bfloat16 and stochastic_rounding:
                 addcdiv_stochastic_(param, exp_avg, denom, value=-step_size)
             else:
                 param.addcdiv_(exp_avg, denom, value=-step_size)
@@ -190,7 +192,13 @@ def step_adamw(self, closure=None):
             eps=group["eps"],
             maximize=group["maximize"],
             capturable=group["capturable"],
-            differentiable=group["differentiable"]
+            differentiable=group["differentiable"],
+            stochastic_rounding=self.stochastic_rounding,
         )
 
     return loss
+
+def patch_adamw(optimizer: AdamW, stochastic_rounding: bool):
+    optimizer.stochastic_rounding = stochastic_rounding
+    optimizer.step = step_adamw.__get__(optimizer, AdamW)
+    # optimizer.step_parameter = step_adam_parameter.__get__(optimizer, AdamW)

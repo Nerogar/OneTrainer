@@ -1,9 +1,8 @@
-import os
-import sys
+from util.import_util import script_imports
+
+script_imports()
 
 from modules.module.RembgHumanModel import RembgHumanModel
-
-sys.path.append(os.getcwd())
 
 import torch
 from modules.util.enum.GenerateMasksModel import GenerateMasksModel

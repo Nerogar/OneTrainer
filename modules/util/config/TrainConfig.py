@@ -16,11 +16,13 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
+from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.torch_util import default_device
 
 
 class TrainOptimizerConfig(BaseConfig):
@@ -47,6 +49,7 @@ class TrainOptimizerConfig(BaseConfig):
     foreach: bool
     fsdp_in_use: bool
     fused: bool
+    fused_back_pass: bool
     growth_rate: float
     initial_accumulator_value: int
     is_paged: bool
@@ -100,6 +103,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("foreach", False, bool, True))  # Disabled, because it uses too much VRAM
         data.append(("fsdp_in_use", False, bool, False))
         data.append(("fused", False, bool, False))
+        data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
         data.append(("initial_accumulator_value", None, int, True))
         data.append(("is_paged", False, bool, False))
@@ -223,6 +227,7 @@ class TrainConfig(BaseConfig):
     temp_device: str
     train_dtype: DataType
     fallback_train_dtype: DataType
+    enable_autocast_cache: bool
     only_cache: bool
     resolution: str
     attention_mechanism: AttentionMechanism
@@ -236,7 +241,8 @@ class TrainConfig(BaseConfig):
     mse_strength: float
     mae_strength: float
     vb_loss_strength: float
-    min_snr_gamma: float
+    loss_weight_fn: LossWeight
+    loss_weight_strength: float
     dropout_probability: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
@@ -318,14 +324,16 @@ class TrainConfig(BaseConfig):
     backup_before_save: bool
     save_after: float
     save_after_unit: TimeUnit
+    save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=2,
+            config_version=3,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
+                2: self.__migration_2,
             }
         )
 
@@ -438,6 +446,19 @@ class TrainConfig(BaseConfig):
                 migrated_data[key] = value
 
         return migrated_data
+    
+    def __migration_2(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        min_snr_gamma = migrated_data.pop("min_snr_gamma", 0.0)
+        model_type = ModelType(migrated_data.get("model_type", ModelType.STABLE_DIFFUSION_15))
+        if min_snr_gamma:
+            migrated_data["loss_weight_fn"] = LossWeight.MIN_SNR_GAMMA
+            migrated_data["loss_weight_strength"] = min_snr_gamma
+        elif model_type.is_wuerstchen():
+            migrated_data["loss_weight_fn"] = LossWeight.P2
+            migrated_data["loss_weight_strength"] = 1.0
+        
+        return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -542,10 +563,11 @@ class TrainConfig(BaseConfig):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
-        data.append(("train_device", "cuda", str, False))
+        data.append(("train_device", default_device.type, str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
         data.append(("fallback_train_dtype", DataType.BFLOAT_16, DataType, False))
+        data.append(("enable_autocast_cache", True, bool, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
@@ -559,7 +581,8 @@ class TrainConfig(BaseConfig):
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
-        data.append(("min_snr_gamma", 0, float, False))
+        data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
+        data.append(("loss_weight_strength", 5.0, float, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
@@ -677,5 +700,6 @@ class TrainConfig(BaseConfig):
         data.append(("backup_before_save", True, bool, False))
         data.append(("save_after", 0, int, False))
         data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("save_filename_prefix", "", str, False))
 
         return TrainConfig(data)

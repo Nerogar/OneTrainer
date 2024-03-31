@@ -45,5 +45,28 @@ class Optimizer(Enum):
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
 
+    @property
+    def is_adaptive(self):
+        return self in [
+            self.DADAPT_SGD,
+            self.DADAPT_ADAM,
+            self.DADAPT_ADAN,
+            self.DADAPT_ADA_GRAD,
+            self.DADAPT_LION,
+            self.PRODIGY,
+        ]
+
+    def supports_fused_back_pass(self):
+        return self in [
+            Optimizer.ADAFACTOR,
+        ]
+
+    # Small helper for adjusting learning rates to adaptive optimizers.
+    def maybe_adjust_lrs(self, lrs, optimizer):
+        if self.is_adaptive:
+            d = optimizer.param_groups[0]["d"]
+            return [lr * d if lr is not None else None for lr in lrs]
+        return lrs
+
     def __str__(self):
         return self.value

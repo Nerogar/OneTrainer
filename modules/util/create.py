@@ -68,9 +68,9 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
-from modules.util.optimizer.adafactor_extensions import step_adafactor
-from modules.util.optimizer.adam_extensions import step_adam
-from modules.util.optimizer.adamw_extensions import step_adamw
+from modules.util.optimizer.adafactor_extensions import step_adafactor, patch_adafactor
+from modules.util.optimizer.adam_extensions import step_adam, patch_adam
+from modules.util.optimizer.adamw_extensions import step_adamw, patch_adamw
 
 
 def create_model_loader(
@@ -297,6 +297,9 @@ def create_optimizer(
 
         # ADAM Optimizer
         case Optimizer.ADAM:
+            if optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
+                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
+
             optimizer = torch.optim.Adam(
                 params=parameters,
                 lr=config.learning_rate,
@@ -312,13 +315,15 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
-            if optimizer_config.stochastic_rounding and not optimizer_config.fused and not optimizer_config.foreach:
-                optimizer.step = step_adam.__get__(optimizer, torch.optim.Adam)
-            elif optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
-                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
+            if optimizer_config.stochastic_rounding:
+                # TODO: only patch if fused/foreach is disabled
+                patch_adam(optimizer, optimizer_config.stochastic_rounding)
 
         # ADAMW Optimizer
         case Optimizer.ADAMW:
+            if optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
+                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
+
             optimizer = torch.optim.AdamW(
                 params=parameters,
                 lr=config.learning_rate,
@@ -334,10 +339,9 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
-            if optimizer_config.stochastic_rounding and not optimizer_config.fused and not optimizer_config.foreach:
-                optimizer.step = step_adamw.__get__(optimizer, torch.optim.AdamW)
-            elif optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
-                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
+            if optimizer_config.stochastic_rounding:
+                # TODO: only patch if fused/foreach is disabled
+                patch_adamw(optimizer, optimizer_config.stochastic_rounding)
 
         # ADAM_8BIT Optimizer
         case Optimizer.ADAM_8BIT:
@@ -637,8 +641,7 @@ def create_optimizer(
                 warmup_init=optimizer_config.warmup_init if optimizer_config.warmup_init is not None else False,
             )
 
-            if optimizer_config.stochastic_rounding:
-                optimizer.step = step_adafactor.__get__(optimizer, Adafactor)
+            patch_adafactor(optimizer, optimizer_config.stochastic_rounding)
 
     if state_dict is not None:
         for i, params in enumerate(parameters):

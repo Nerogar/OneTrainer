@@ -1,7 +1,6 @@
-import os
-import sys
+from util.import_util import script_imports
 
-sys.path.append(os.getcwd())
+script_imports()
 
 from modules.ui.TrainUI import TrainUI
 

@@ -48,5 +48,7 @@
     "output_model_destination": "models/model",
     "output_model_format": "DIFFUSERS",
     "resolution": "1024",
-    "training_method": "FINE_TUNE"
+    "training_method": "FINE_TUNE",
+    "loss_weight_fn": "P2",
+    "loss_weight_strength": 1.0
 }

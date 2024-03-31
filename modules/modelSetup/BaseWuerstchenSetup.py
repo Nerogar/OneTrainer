@@ -69,7 +69,7 @@ class BaseWuerstchenSetup(
             config.weight_dtypes().prior,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
-        ])
+        ], config.enable_autocast_cache)
 
         if model.model_type.is_stable_cascade():
             model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
@@ -80,6 +80,7 @@ class BaseWuerstchenSetup(
                     config.weight_dtypes().prior,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
                 ],
+                config.enable_autocast_cache,
             )
         else:
             model.prior_train_dtype = model.train_dtype
@@ -90,6 +91,7 @@ class BaseWuerstchenSetup(
             [
                 config.weight_dtypes().effnet_encoder,
             ],
+            config.enable_autocast_cache,
         )
 
     def __alpha_cumprod(
@@ -190,6 +192,8 @@ class BaseWuerstchenSetup(
                     timestep.to(dtype=model.prior_train_dtype.torch_dtype()),
                     **prior_kwargs,
                 )
+                if model.model_type.is_stable_cascade():
+                    predicted_latent_noise = predicted_latent_noise.sample
 
             model_output_data = {
                 'loss_type': 'target',
@@ -267,21 +271,10 @@ class BaseWuerstchenSetup(
             data: dict,
             config: TrainConfig,
     ) -> Tensor:
-        losses = self._diffusion_losses(
+        return self._diffusion_losses(
             batch=batch,
             data=data,
             config=config,
             train_device=self.train_device,
             alphas_cumprod_fun=self.__alpha_cumprod,
-        )
-
-        if config.min_snr_gamma:
-            # if min snr gamma is active, disable p2 scaling
-            return losses.mean()
-        else:
-            k = 1.0
-            gamma = 1.0
-            alpha_cumprod = self.__alpha_cumprod(data['timestep'], losses.dim())
-            p2_loss_weight = (k + alpha_cumprod / (1 - alpha_cumprod)) ** -gamma
-
-            return (losses * p2_loss_weight).mean()
+        ).mean()

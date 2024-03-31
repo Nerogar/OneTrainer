@@ -73,7 +73,7 @@ class BaseStableDiffusionSetup(
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
-        ])
+        ], config.enable_autocast_cache)
 
     def __encode_text(
             self,
