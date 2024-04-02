@@ -28,6 +28,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.zluda import ZLUDA
 
 
 class TrainUI(ctk.CTk):
@@ -470,6 +471,8 @@ class TrainUI(ctk.CTk):
             on_update_train_progress=self.on_update_train_progress,
             on_update_status=self.on_update_status,
         )
+
+        ZLUDA.initialize_devices(self.train_config)
 
         trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
 
