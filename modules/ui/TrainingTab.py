@@ -106,6 +106,7 @@ class TrainingTab:
     def __setup_pixart_alpha_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_frame(column_0, 1)
+        self.__create_embedding_frame(column_0, 2)
 
         self.__create_base2_frame(column_1, 0)
         self.__create_prior_frame(column_1, 1)

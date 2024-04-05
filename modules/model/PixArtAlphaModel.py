@@ -1,5 +1,5 @@
-import uuid
 from contextlib import nullcontext
+from uuid import uuid4
 
 import torch
 from diffusers import AutoencoderKL, DiffusionPipeline, DDIMScheduler, Transformer2DModel, \
@@ -9,6 +9,7 @@ from transformers import T5Tokenizer, \
     T5EncoderModel
 
 from modules.model.BaseModel import BaseModel
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -20,14 +21,16 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 class PixArtAlphaModelEmbedding:
     def __init__(
             self,
+            uuid: str,
             text_encoder_vector: Tensor,
             placeholder: str,
     ):
         token_count = text_encoder_vector.shape[0]
 
+        self.uuid = uuid
         self.text_encoder_vector = text_encoder_vector
         self.placeholder = placeholder
-        self.text_tokens = [f"<{uuid.uuid4()}>" for _ in range(token_count)]
+        self.text_tokens = [f"<{uuid4()}>" for _ in range(token_count)]
 
 
 class PixArtAlphaModel(BaseModel):
@@ -47,9 +50,11 @@ class PixArtAlphaModel(BaseModel):
     text_encoder_train_dtype: DataType
 
     # persistent embedding training data
-    all_text_encoder_original_token_embeds: Tensor
-    text_encoder_untrainable_token_embeds_mask: list[bool]
-    embeddings: list[PixArtAlphaModelEmbedding] | None
+    embedding: PixArtAlphaModelEmbedding | None
+    embedding_state: Tensor | None
+    additional_embeddings: list[PixArtAlphaModelEmbedding] | None
+    additional_embedding_states: list[Tensor | None]
+    embedding_wrapper: AdditionalEmbeddingWrapper
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -66,9 +71,14 @@ class PixArtAlphaModel(BaseModel):
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
-            embeddings: list[PixArtAlphaModelEmbedding] = None,
+            embedding: PixArtAlphaModelEmbedding | None = None,
+            embedding_state: Tensor | None = None,
+            additional_embeddings: list[PixArtAlphaModelEmbedding] | None = None,
+            additional_embedding_states: list[Tensor | None] = None,
+            embedding_wrapper: AdditionalEmbeddingWrapper | None = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             transformer_lora: LoRAModuleWrapper | None = None,
+            lora_state_dict: dict | None = None,
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
@@ -93,9 +103,15 @@ class PixArtAlphaModel(BaseModel):
         self.train_dtype = DataType.FLOAT_32
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
-        self.embeddings = embeddings if embeddings is not None else []
+        self.embedding = embedding
+        self.embedding_state = embedding_state
+        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
+        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
+        self.embedding_wrapper = embedding_wrapper
+
         self.text_encoder_lora = text_encoder_lora
         self.transformer_lora = transformer_lora
+        self.lora_state_dict = lora_state_dict
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -130,3 +146,14 @@ class PixArtAlphaModel(BaseModel):
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
         )
+
+    def add_embeddings_to_prompt(self, prompt: str) -> str:
+        for embedding in self.additional_embeddings:
+            embedding_string = ''.join(embedding.text_tokens)
+            prompt = prompt.replace(embedding.placeholder, embedding_string)
+
+        if self.embedding is not None:
+            embedding_string = ''.join(self.embedding.text_tokens)
+            prompt = prompt.replace(self.embedding.placeholder, embedding_string)
+
+        return prompt

@@ -41,7 +41,7 @@ class StableDiffusionEmbeddingSetup(
             self.create_param_groups(
                 config,
                 model.embedding_wrapper.parameters(),
-                config.learning_rate,
+                config.embedding_learning_rate,
             )
         ]
 
@@ -95,9 +95,9 @@ class StableDiffusionEmbeddingSetup(
     ):
         vae_on_train_device = self.debug_mode or config.align_prop_loss
 
-        model.text_encoder.to(self.train_device)
-        model.vae.to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet.to(self.train_device)
+        model.text_encoder_to(self.train_device)
+        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
+        model.unet_to(self.train_device)
         model.depth_estimator_to(self.temp_device)
 
         model.text_encoder.eval()

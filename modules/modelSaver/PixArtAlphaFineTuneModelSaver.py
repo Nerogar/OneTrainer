@@ -4,12 +4,12 @@ from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
 from modules.modelSaver.pixartAlpha.PixArtAlphaEmbeddingSaver import PixArtAlphaEmbeddingSaver
-from modules.modelSaver.pixartAlpha.PixArtAlphaLoRASaver import PixArtAlphaLoRASaver
+from modules.modelSaver.pixartAlpha.PixArtAlphaModelSaver import PixArtAlphaModelSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 
-class PixArtAlphaLoRAModelSaver(
+class PixArtAlphaFineTuneModelSaver(
     BaseModelSaver,
     InternalModelSaverMixin,
 ):
@@ -22,10 +22,10 @@ class PixArtAlphaLoRAModelSaver(
             output_model_destination: str,
             dtype: torch.dtype,
     ):
-        lora_model_saver = PixArtAlphaLoRASaver()
+        base_model_saver = PixArtAlphaModelSaver()
         embedding_model_saver = PixArtAlphaEmbeddingSaver()
 
-        lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
+        base_model_saver.save(model, output_model_format, output_model_destination, dtype)
         embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
 
         if output_model_format == ModelFormat.INTERNAL:

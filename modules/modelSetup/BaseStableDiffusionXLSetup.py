@@ -9,7 +9,7 @@ from torch.utils.checkpoint import checkpoint
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
@@ -29,7 +29,7 @@ class BaseStableDiffusionXLSetup(
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupDiffusionNoiseMixin,
-    ModelSetupClipEmbeddingMixin,
+    ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
 

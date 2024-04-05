@@ -3,26 +3,34 @@ from abc import ABCMeta
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-
-from modules.util.enum.DataType import DataType
+from transformers import CLIPTokenizer, T5Tokenizer
 
 
 class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
+    tokenizer: CLIPTokenizer | T5Tokenizer
     prefix: str
     orig_module: nn.Embedding
     additional_embeddings: list[Tensor]
 
-    def __init__(self, orig_module: nn.Embedding, additional_embeddings: list[Tensor], dtype: DataType | None):
+    def __init__(
+            self,
+            tokenizer: CLIPTokenizer | T5Tokenizer,
+            orig_module: nn.Embedding,
+            additional_embeddings: list[Tensor],
+    ):
         super(AdditionalEmbeddingWrapper, self).__init__()
 
         self.orig_module = orig_module
         self.additional_embeddings = additional_embeddings
+        self.original_token_count = len(tokenizer) - sum(x.shape[0] for x in self.additional_embeddings)
 
         self.is_applied = False
         self.orig_forward = self.orig_module.forward
 
     def forward(self, x, *args, **kwargs):
-        weight = torch.cat([self.orig_module.weight] + self.additional_embeddings, dim=0)
+        # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create
+        orig_module_weight = self.orig_module.weight[0:self.original_token_count]
+        weight = torch.cat([orig_module_weight] + self.additional_embeddings, dim=0)
         return F.embedding(
             input=x,
             weight=weight,

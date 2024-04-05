@@ -3,15 +3,15 @@ from typing import Iterable
 import torch
 from torch.nn import Parameter
 
-from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
-from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
+from modules.model.PixArtAlphaModel import PixArtAlphaModel
+from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
 from modules.util import create
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 
 
-class WuerstchenEmbeddingSetup(
-    BaseWuerstchenSetup,
+class PixArtAlphaEmbeddingSetup(
+    BasePixArtAlphaSetup,
 ):
     def __init__(
             self,
@@ -19,7 +19,7 @@ class WuerstchenEmbeddingSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(WuerstchenEmbeddingSetup, self).__init__(
+        super(PixArtAlphaEmbeddingSetup, self).__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -27,54 +27,50 @@ class WuerstchenEmbeddingSetup(
 
     def create_parameters(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             config: TrainConfig,
     ) -> Iterable[Parameter]:
-        return model.prior_embedding_wrapper.parameters()
+        return model.embedding_wrapper.parameters()
 
     def create_parameters_for_optimizer(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             config: TrainConfig,
     ) -> Iterable[Parameter] | list[dict]:
         return [
             self.create_param_groups(
                 config,
-                model.prior_embedding_wrapper.parameters(),
+                model.embedding_wrapper.parameters(),
                 config.embedding_learning_rate,
-            ),
+            )
         ]
 
     def __setup_requires_grad(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        model.prior_text_encoder.requires_grad_(False)
-        model.prior_prior.requires_grad_(False)
-        if model.model_type.is_wuerstchen_v2():
-            model.decoder_text_encoder.requires_grad_(False)
-        model.decoder_decoder.requires_grad_(False)
-        model.decoder_vqgan.requires_grad_(False)
-        model.effnet_encoder.requires_grad_(False)
+        model.text_encoder.requires_grad_(False)
+        model.transformer.requires_grad_(False)
+        model.vae.requires_grad_(False)
 
-        model.embedding.prior_text_encoder_vector.requires_grad_(True)
+        model.embedding.text_encoder_vector.requires_grad_(True)
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
-            train_embedding = \
-                embedding_config.train \
-                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.prior_text_encoder_vector.requires_grad_(train_embedding)
+            train_embedding = embedding_config.train and \
+                              not self.stop_additional_embedding_training_elapsed(embedding_config,
+                                                                                  model.train_progress, i)
+            embedding.text_encoder_vector.requires_grad_(train_embedding)
 
     def setup_model(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+        model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_additional_embeddings(model, config)
         self._setup_embedding(model, config)
         self._setup_embedding_wrapper(model, config)
@@ -94,30 +90,22 @@ class WuerstchenEmbeddingSetup(
 
     def setup_train_device(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        if model.model_type.is_wuerstchen_v2():
-            model.decoder_text_encoder_to(self.temp_device)
-        model.decoder_decoder_to(self.temp_device)
-        model.decoder_vqgan_to(self.temp_device)
-        model.effnet_encoder_to(self.temp_device)
+        vae_on_train_device = self.debug_mode or config.align_prop
 
-        model.prior_text_encoder_to(self.train_device)
-        model.prior_prior_to(self.train_device)
+        model.text_encoder_to(self.train_device)
+        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
+        model.transformer_to(self.train_device)
 
-        if model.model_type.is_wuerstchen_v2():
-            model.decoder_text_encoder.eval()
-        model.decoder_decoder.eval()
-        model.decoder_vqgan.eval()
-        model.effnet_encoder.eval()
-
-        model.prior_text_encoder.eval()
-        model.prior_prior.eval()
+        model.text_encoder.eval()
+        model.vae.eval()
+        model.transformer.eval()
 
     def after_optimizer_step(
             self,
-            model: WuerstchenModel,
+            model: PixArtAlphaModel,
             config: TrainConfig,
             train_progress: TrainProgress
     ):

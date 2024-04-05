@@ -7,7 +7,7 @@ from torch import Tensor
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.modelSetup.mixin.ModelSetupClipEmbeddingMixin import ModelSetupClipEmbeddingMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
@@ -27,7 +27,7 @@ class BaseWuerstchenSetup(
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupDiffusionNoiseMixin,
-    ModelSetupClipEmbeddingMixin,
+    ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):
 

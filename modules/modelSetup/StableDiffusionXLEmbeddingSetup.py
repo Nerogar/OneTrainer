@@ -51,7 +51,7 @@ class StableDiffusionXLEmbeddingSetup(
             self.create_param_groups(
                 config,
                 model.embedding_wrapper_2.parameters(),
-                config.learning_rate,
+                config.embedding_learning_rate,
             )
         ]
 
