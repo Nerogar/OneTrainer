@@ -235,8 +235,8 @@ class ModelTab:
 
         if has_vae:
             # base model
-            components.label(self.scroll_frame, row, 0, "VAE",
-                             tooltip="Directory or Hugging Face repository of a VAE model. Can be used to override the base model VAE.")
+            components.label(self.scroll_frame, row, 0, "VAE (Read Tooltip)",
+                             tooltip="Directory or Hugging Face repository of a VAE model. Can be used to override the base model VAE. Must be in diffosers format, if not, you will get an error that the model cannot be loaded")
             components.file_entry(
                 self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
