@@ -125,7 +125,7 @@ class PixArtAlphaLoRASetup(
         if model.lora_state_dict:
             model.text_encoder_lora.load_state_dict(model.lora_state_dict)
             model.transformer_lora.load_state_dict(model.lora_state_dict)
-            del model.lora_state_dict
+            model.lora_state_dict = None
 
         model.text_encoder_lora.set_dropout(config.dropout_probability)
         model.transformer_lora.set_dropout(config.dropout_probability)
@@ -144,12 +144,12 @@ class PixArtAlphaLoRASetup(
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
-        del model.optimizer_state_dict
+        model.optimizer_state_dict = None
 
         model.ema = create.create_ema(
             self.create_parameters(model, config), model.ema_state_dict, config
         )
-        del model.ema_state_dict
+        model.ema_state_dict = None
 
         self.setup_optimizations(model, config)
 

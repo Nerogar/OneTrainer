@@ -23,6 +23,8 @@ class PixArtAlphaLoRASaver(
             state_dict |= model.text_encoder_lora.state_dict()
         if model.transformer_lora is not None:
             state_dict |= model.transformer_lora.state_dict()
+        if model.lora_state_dict is not None:
+            state_dict |= model.lora_state_dict
 
         return state_dict
 

@@ -25,6 +25,8 @@ class WuerstchenLoRASaver(
             state_dict |= model.prior_text_encoder_lora.state_dict()
         if model.prior_prior_lora is not None:
             state_dict |= model.prior_prior_lora.state_dict()
+        if model.lora_state_dict is not None:
+            state_dict |= model.lora_state_dict
 
         return state_dict
 

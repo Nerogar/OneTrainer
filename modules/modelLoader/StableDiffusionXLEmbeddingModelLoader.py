@@ -40,7 +40,7 @@ class StableDiffusionXLEmbeddingModelLoader(
 
         model = StableDiffusionXLModel(model_type=model_type)
 
-        if model_names.base_model is not None:
+        if model_names.base_model:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
         embedding_loader.load_multiple(model, model_names)
         embedding_loader.load_single(model, model_names)

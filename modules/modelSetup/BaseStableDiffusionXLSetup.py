@@ -176,16 +176,16 @@ class BaseStableDiffusionXLSetup(
             config: TrainConfig,
     ):
         model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
+            tokenizer=model.tokenizer_1,
             orig_module=model.text_encoder_1.text_model.embeddings.token_embedding,
             additional_embeddings=[embedding.text_encoder_1_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_1_vector]),
-            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
         )
         model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
+            tokenizer=model.tokenizer_2,
             orig_module=model.text_encoder_2.text_model.embeddings.token_embedding,
             additional_embeddings=[embedding.text_encoder_2_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_2_vector]),
-            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
         )
 
         model.embedding_wrapper_1.hook_to_module()

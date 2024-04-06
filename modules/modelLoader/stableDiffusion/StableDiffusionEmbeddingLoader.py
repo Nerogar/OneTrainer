@@ -36,13 +36,21 @@ class StableDiffusionEmbeddingLoader:
             self,
             directory: str,
             embedding_name: EmbeddingName,
+            load_single: bool,
     ) -> Tensor | None:
         if os.path.exists(os.path.join(directory, "meta.json")):
-            safetensors_embedding_name = os.path.join(
-                directory,
-                "embeddings",
-                f"{embedding_name.uuid}.safetensors",
-            )
+            if load_single:
+                safetensors_embedding_name = os.path.join(
+                    directory,
+                    "embedding",
+                    f"embedding.safetensors",
+                )
+            else:
+                safetensors_embedding_name = os.path.join(
+                    directory,
+                    "additional_embeddings",
+                    f"{embedding_name.uuid}.safetensors",
+                )
 
             if os.path.exists(safetensors_embedding_name):
                 return self.__load_embedding(safetensors_embedding_name)
@@ -62,7 +70,7 @@ class StableDiffusionEmbeddingLoader:
             stacktraces = []
 
             try:
-                model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name))
+                model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
             except:
                 try:
@@ -87,7 +95,7 @@ class StableDiffusionEmbeddingLoader:
         embedding_name = model_names.embedding
 
         try:
-            model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name)
+            model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
         except:
             stacktraces.append(traceback.format_exc())

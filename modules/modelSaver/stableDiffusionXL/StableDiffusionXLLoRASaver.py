@@ -25,6 +25,8 @@ class StableDiffusionXLLoRASaver(
             state_dict |= model.text_encoder_2_lora.state_dict()
         if model.unet_lora is not None:
             state_dict |= model.unet_lora.state_dict()
+        if model.lora_state_dict is not None:
+            state_dict |= model.lora_state_dict
 
         return state_dict
 

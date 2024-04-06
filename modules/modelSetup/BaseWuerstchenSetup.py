@@ -156,10 +156,10 @@ class BaseWuerstchenSetup(
             config: TrainConfig,
     ):
         model.prior_embedding_wrapper = AdditionalEmbeddingWrapper(
+            tokenizer=model.prior_tokenizer,
             orig_module=model.prior_text_encoder.text_model.embeddings.token_embedding,
             additional_embeddings=[embedding.prior_text_encoder_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.prior_text_encoder_vector]),
-            dtype=config.weight_dtypes().embedding if config.train_any_embedding() else None,
         )
         model.prior_embedding_wrapper.hook_to_module()
 
