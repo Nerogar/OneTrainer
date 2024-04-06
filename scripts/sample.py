@@ -1,9 +1,6 @@
-import os
-import sys
+from util.import_util import script_imports
 
-sys.path.append(os.getcwd())
-
-import torch
+script_imports()
 
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.ImageFormat import ImageFormat

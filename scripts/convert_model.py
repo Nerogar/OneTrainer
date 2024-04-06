@@ -1,13 +1,12 @@
-import os
-import sys
-from uuid import uuid4
+from util.import_util import script_imports
 
-sys.path.append(os.getcwd())
+script_imports()
 
 from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
+from uuid import uuid4
 
 
 def main():
