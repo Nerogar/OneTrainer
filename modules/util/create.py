@@ -546,8 +546,6 @@ def create_optimizer(
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
                 weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0
             )
-            optimizer.register_step_pre_hook(lambda x, *y, **z: x.train())
-            optimizer.register_step_post_hook(lambda x, *y, **z: x.eval())
 
         # Schedule-free SGD
         case Optimizer.SCHEDULE_FREE_SGD:
@@ -561,8 +559,6 @@ def create_optimizer(
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
                 weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0
             )
-            optimizer.register_step_pre_hook(lambda x, *y, **z: x.train())
-            optimizer.register_step_post_hook(lambda x, *y, **z: x.eval())
 
         # DADAPT_SGD Optimizer
         case Optimizer.DADAPT_SGD:

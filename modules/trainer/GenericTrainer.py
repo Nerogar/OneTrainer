@@ -515,6 +515,11 @@ class GenericTrainer(BaseTrainer):
                     self.save(train_progress)
 
                 self.callbacks.on_update_status("training")
+                # Special case for schedule-free optimizers, which need train()
+                # called before training. Can and should move this to a callback
+                # during a refactoring.
+                if self.config.optimizer.optimizer.is_schedule_free:
+                    self.model.optimizer.train()
 
                 model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
@@ -577,6 +582,11 @@ class GenericTrainer(BaseTrainer):
 
                 train_progress.next_step(self.config.batch_size)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
+                # Special case for schedule-free optimizers, which need eval()
+                # called after training. Can and should move this to a callback
+                # during a refactoring.
+                if self.config.optimizer.optimizer.is_schedule_free:
+                    self.model.optimizer.eval()
 
                 if self.commands.get_stop_command():
                     return
