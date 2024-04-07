@@ -64,6 +64,7 @@ class TrainOptimizerConfig(BaseConfig):
     no_prox: bool
     optim_bits: int
     percentile_clipping: float
+    r: float
     relative_step: bool
     safeguard_warmup: bool
     scale_parameter: bool
@@ -72,6 +73,7 @@ class TrainOptimizerConfig(BaseConfig):
     use_triton: bool
     warmup_init: bool
     weight_decay: float
+    weight_lr_power: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainOptimizerConfig, self).__init__(data)
@@ -118,6 +120,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("no_prox", False, bool, False))
         data.append(("optim_bits", None, int, True))
         data.append(("percentile_clipping", None, float, True))
+        data.append(("r", None, float, True))
         data.append(("relative_step", False, bool, False))
         data.append(("safeguard_warmup", False, bool, False))
         data.append(("scale_parameter", False, bool, False))
@@ -126,6 +129,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_triton", False, bool, False))
         data.append(("warmup_init", False, bool, False))
         data.append(("weight_decay", None, float, True))
+        data.append(("weight_lr_power", None, float, True))
 
         return TrainOptimizerConfig(data)
 

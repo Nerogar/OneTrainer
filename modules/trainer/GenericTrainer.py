@@ -472,6 +472,7 @@ class GenericTrainer(BaseTrainer):
 
             if lr_scheduler is None:
                 lr_scheduler = create.create_lr_scheduler(
+                    config=self.config,
                     optimizer=self.model.optimizer,
                     learning_rate_scheduler=self.config.learning_rate_scheduler,
                     warmup_steps=self.config.learning_rate_warmup_steps,

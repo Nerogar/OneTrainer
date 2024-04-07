@@ -32,6 +32,10 @@ class Optimizer(Enum):
     SGD = 'SGD'
     SGD_8BIT = 'SGD_8BIT'
 
+    # Schedule-free optimizers
+    SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
+    SCHEDULE_FREE_SGD = 'SCHEDULE_FREE_SGD'
+
     # DADAPT
     DADAPT_ADA_GRAD = 'DADAPT_ADA_GRAD'
     DADAPT_ADAM = 'DADAPT_ADAM'
@@ -57,6 +61,13 @@ class Optimizer(Enum):
             self.DADAPT_ADA_GRAD,
             self.DADAPT_LION,
             self.PRODIGY,
+        ]
+
+    @property
+    def is_schedule_free(self):
+        return self in [
+            self.SCHEDULE_FREE_ADAMW,
+            self.SCHEDULE_FREE_SGD,
         ]
 
     def supports_fused_back_pass(self):
