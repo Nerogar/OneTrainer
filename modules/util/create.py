@@ -278,7 +278,7 @@ def create_optimizer(
                 dampening=optimizer_config.dampening if optimizer_config.dampening is not None else 0,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
-                foreach=optimizer_config.foreach if optimizer_config.optimizer_foreach is not None else False,
+                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False,
                 maximize=optimizer_config.maximize if optimizer_config.maximize is not None else False,
                 differentiable=optimizer_config.differentiable if optimizer_config.differentiable is not None else False,
             )
