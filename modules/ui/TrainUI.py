@@ -144,7 +144,7 @@ class TrainUI(ctk.CTk):
 
         # continue from previous backup
         components.label(master, 2, 0, "Continue from last backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/run/backup")
+                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
         components.switch(master, 2, 1, self.ui_state, "continue_last_backup")
 
         # only cache
