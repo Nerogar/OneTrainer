@@ -62,6 +62,7 @@ class Optimizer(Enum):
     def supports_fused_back_pass(self):
         return self in [
             Optimizer.ADAFACTOR,
+            Optimizer.CAME,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

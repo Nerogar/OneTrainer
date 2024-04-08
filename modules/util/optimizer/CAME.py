@@ -77,7 +77,7 @@ class CAME(torch.optim.Optimizer):
         return torch.mul(r_factor, c_factor)
 
     @torch.no_grad()
-    def step_came_parameter(self, p, group, i):
+    def step_parameter(self, p, group, i):
         if p.grad is None:
             return
         grad = p.grad.data
@@ -191,6 +191,6 @@ class CAME(torch.optim.Optimizer):
 
         for group in self.param_groups:
             for i, p in enumerate(group["params"]):
-                self.step_came_parameter(p, group, i)
+                self.step_parameter(p, group, i)
 
         return loss

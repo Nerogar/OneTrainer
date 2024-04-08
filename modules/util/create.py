@@ -68,7 +68,7 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
-from modules.util.optimizer import CAME
+from modules.util.optimizer.CAME import CAME
 from modules.util.optimizer.adafactor_extensions import step_adafactor, patch_adafactor
 from modules.util.optimizer.adam_extensions import step_adam, patch_adam
 from modules.util.optimizer.adamw_extensions import step_adamw, patch_adamw
@@ -646,7 +646,7 @@ def create_optimizer(
 
         # CAME Optimizer
         case Optimizer.CAME:
-            optimizer = CAME.CAME(
+            optimizer = CAME(
                 params=parameters,
                 lr=config.learning_rate,
                 eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
