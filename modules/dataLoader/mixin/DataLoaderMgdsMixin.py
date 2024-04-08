@@ -33,14 +33,13 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
         }
 
         # Just defaults for now.
-        state = PipelineState()
         ds = MGDS(
             torch.device(config.train_device),
             concepts,
             settings,
             definition,
             batch_size=config.batch_size,
-            state=state,
+            state=PipelineConfig(config.dataloader_threads),
             initial_epoch=train_progress.epoch,
             initial_epoch_sample=train_progress.epoch_sample,
         )
