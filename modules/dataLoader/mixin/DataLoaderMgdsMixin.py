@@ -3,6 +3,7 @@ from abc import ABCMeta
 
 import torch
 from mgds.MGDS import MGDS
+from mgds.PipelineModule import PipelineState
 
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -31,12 +32,15 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             "target_resolution": config.resolution,
         }
 
+        # Just defaults for now.
+        state = PipelineState()
         ds = MGDS(
             torch.device(config.train_device),
             concepts,
             settings,
             definition,
             batch_size=config.batch_size,
+            state=state,
             initial_epoch=train_progress.epoch,
             initial_epoch_sample=train_progress.epoch_sample,
         )
