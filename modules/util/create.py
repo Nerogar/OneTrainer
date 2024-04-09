@@ -68,6 +68,7 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
+from modules.util.optimizer.CAME import CAME
 from modules.util.optimizer.adafactor_extensions import step_adafactor, patch_adafactor
 from modules.util.optimizer.adam_extensions import step_adam, patch_adam
 from modules.util.optimizer.adamw_extensions import step_adamw, patch_adamw
@@ -642,6 +643,20 @@ def create_optimizer(
             )
 
             patch_adafactor(optimizer, optimizer_config.stochastic_rounding)
+
+        # CAME Optimizer
+        case Optimizer.CAME:
+            optimizer = CAME(
+                params=parameters,
+                lr=config.learning_rate,
+                eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
+                     optimizer_config.eps2 if optimizer_config.eps2 is not None else 1e-16),
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
+                       optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                stochastic_rounding=optimizer_config.stochastic_rounding
+            )
 
     if state_dict is not None:
         for i, params in enumerate(parameters):

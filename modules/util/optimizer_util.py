@@ -287,4 +287,14 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "weight_decay": 0.0,
         "use_triton": False,
     },
+    Optimizer.CAME: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "beta3": 0.9999,
+        "eps": 1e-30,
+        "eps2": 1e-16,
+        "weight_decay": 1e-2,
+        "stochastic_rounding": False,
+        "fused_back_pass": False,
+    },
 }

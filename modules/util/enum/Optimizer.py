@@ -45,6 +45,9 @@ class Optimizer(Enum):
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
 
+    # CAME
+    CAME = 'CAME'
+
     @property
     def is_adaptive(self):
         return self in [
@@ -59,6 +62,7 @@ class Optimizer(Enum):
     def supports_fused_back_pass(self):
         return self in [
             Optimizer.ADAFACTOR,
+            Optimizer.CAME,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.
