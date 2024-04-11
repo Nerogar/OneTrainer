@@ -464,8 +464,13 @@ class GenericTrainer(BaseTrainer):
         for epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
-            self.data_loader.get_data_set().start_next_epoch()
-            self.model_setup.setup_train_device(self.model, self.config)
+            if self.config.latent_caching:
+                self.data_loader.get_data_set().start_next_epoch()
+                self.model_setup.setup_train_device(self.model, self.config)
+            else:
+                self.model_setup.setup_train_device(self.model, self.config)
+                self.data_loader.get_data_set().start_next_epoch()
+
             torch_gc()
 
             if lr_scheduler is None:
@@ -481,7 +486,7 @@ class GenericTrainer(BaseTrainer):
                     global_step=train_progress.global_step
                 )
 
-            current_epoch_length = len(self.data_loader.get_data_loader()) + train_progress.epoch_step
+            current_epoch_length = self.data_loader.get_data_set().approximate_length()
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
             for epoch_step, batch in enumerate(step_tqdm):
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():

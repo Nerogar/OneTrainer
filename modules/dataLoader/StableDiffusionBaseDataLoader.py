@@ -17,6 +17,7 @@ from mgds.pipelineModules.GenerateDepth import GenerateDepth
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
 from mgds.pipelineModules.GetFilename import GetFilename
+from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.ModifyPath import ModifyPath
@@ -281,7 +282,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         text_split_names = ['tokens', 'text_encoder_hidden_state']
 
-        sort_names = text_split_names + [
+        sort_names = text_split_names + image_aggregate_names + image_split_names + [
             'prompt', 'concept'
         ]
 
@@ -301,7 +302,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             torch_gc()
 
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
-        image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+        # image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
         text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
@@ -309,12 +310,16 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         if config.latent_caching:
             modules.append(image_disk_cache)
-        else:
-            modules.append(image_ram_cache)
+        # else:
+        #     modules.append(image_ram_cache)
 
-        if not config.text_encoder.train and config.latent_caching and config.training_method != TrainingMethod.EMBEDDING:
-            modules.append(text_disk_cache)
-            sort_names = [x for x in sort_names if x not in text_split_names]
+        if config.latent_caching:
+            sort_names = [x for x in sort_names if x not in image_aggregate_names]
+            sort_names = [x for x in sort_names if x not in image_split_names]
+
+            if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
+                modules.append(text_disk_cache)
+                sort_names = [x for x in sort_names if x not in text_split_names]
 
         if len(sort_names) > 0:
             variation_sorting = VariationSorting(names=sort_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
@@ -355,7 +360,12 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
             before_cache_fun=before_cache_image_fun,
         )
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+
+        if config.latent_caching:
+            batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+        else:
+            batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]
