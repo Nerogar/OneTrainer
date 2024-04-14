@@ -1,6 +1,6 @@
 {
     "[python]": {
-        "editor.formatOnSave": false,
-        "files.eol": "\r\n"
+        // "editor.formatOnSave": false,
+        // "files.eol": "\r\n"
     }
 }

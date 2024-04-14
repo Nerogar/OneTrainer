@@ -25,6 +25,8 @@ Check the "Enable Mask Editing" checkbox at the top. Now you can draw a mask ont
 masked region, right click removes parts from the mask. With the mouse wheel you can increase or decrease the brush
 size. Use Ctrl+M to only show the mask. To save the mask, click into the caption input field, then press enter.
 
+"Prefix" will be added at the start of the caption. "Postfix" will be added at the end of the caption.
+
 ### Automatic masking
 
 Click on the "Generate Masks" button to open the batch captioning tool. Here you can choose which model to use for
