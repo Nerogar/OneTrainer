@@ -20,7 +20,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             path = ""
 
         self.title("Batch generate captions")
-        self.geometry("360x270")
+        self.geometry("360x360")
         self.resizable(False, False)
         self.wait_visibility()
         self.grab_set()
@@ -51,6 +51,16 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.caption_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.caption_entry = ctk.CTkEntry(self.frame, width=200)
         self.caption_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+
+        self.prefix_label = ctk.CTkLabel(self.frame, text="Caption Prefix", width=100)
+        self.prefix_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.prefix_entry = ctk.CTkEntry(self.frame, width=200)
+        self.prefix_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+
+        self.postfix_label = ctk.CTkLabel(self.frame, text="Caption Postfix", width=100)
+        self.postfix_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.postfix_entry = ctk.CTkEntry(self.frame, width=200)
+        self.postfix_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
 
         self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
         self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
@@ -101,6 +111,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.parent.captioning_model.caption_folder(
             sample_dir=self.path_entry.get(),
             initial_caption=self.caption_entry.get(),
+            caption_prefix=self.prefix_entry.get(),
+            caption_postfix=self.postfix_entry.get(),
             mode=mode,
             progress_callback=self.set_progress,
             include_subdirectories=self.include_subdirectories_var.get(),
