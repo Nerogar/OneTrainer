@@ -1,3 +1,4 @@
+import faulthandler
 import json
 import threading
 import traceback
@@ -99,6 +100,10 @@ class TrainUI(ctk.CTk):
         # export button
         self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
                                                tooltip="Export the current configuration as a script to run without a UI")
+
+        # Stackdump button
+        components.button(frame, 0, 6,"Dump Stack", self.dump_stack)
+
 
         return frame
 
@@ -421,6 +426,10 @@ class TrainUI(ctk.CTk):
             self.lora_tab(self.tabview.add("LoRA"))
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
+
+    def dump_stack(self):
+        with open('stacks.txt', 'w') as f:
+            faulthandler.dump_traceback(f)
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)
