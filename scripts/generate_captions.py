@@ -1,12 +1,13 @@
-from modules.module.WDModel import WDModel
-from modules.module.BlipModel import BlipModel
-from modules.module.Blip2Model import Blip2Model
-from modules.util.args.GenerateCaptionsArgs import GenerateCaptionsArgs
-from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
-import torch
 from util.import_util import script_imports
 
 script_imports()
+
+import torch
+from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
+from modules.util.args.GenerateCaptionsArgs import GenerateCaptionsArgs
+from modules.module.Blip2Model import Blip2Model
+from modules.module.BlipModel import BlipModel
+from modules.module.WDModel import WDModel
 
 
 def main():
@@ -26,8 +27,7 @@ def main():
         caption_prefix=args.caption_prefix,
         caption_postfix=args.caption_postfix,
         mode=args.mode,
-        error_callback=lambda filename: print(
-            "Error while processing image " + filename),
+        error_callback=lambda filename: print("Error while processing image " + filename),
         include_subdirectories=args.include_subdirectories
     )
 
