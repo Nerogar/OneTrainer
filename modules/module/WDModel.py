@@ -45,6 +45,8 @@ class WDModel(BaseImageCaptionModel):
             self,
             caption_sample: CaptionSample,
             initial_caption: str = "",
+            caption_prefix: str = "",
+            caption_postfix: str = "",
     ):
         _, height, width, _ = self.model.get_inputs()[0].shape
 
@@ -70,4 +72,4 @@ class WDModel(BaseImageCaptionModel):
             in sorted_general_labels
         ])
 
-        return predicted_caption
+        return (caption_prefix + predicted_caption + caption_postfix).strip()

@@ -22,6 +22,8 @@ class BlipModel(BaseImageCaptionModel):
             self,
             caption_sample: CaptionSample,
             initial_caption: str = "",
+            caption_prefix: str = "",
+            caption_postfix: str = "",
     ):
         inputs = self.processor(caption_sample.get_image(), initial_caption, return_tensors="pt")
         inputs = inputs.to(self.device, self.dtype)
@@ -29,4 +31,4 @@ class BlipModel(BaseImageCaptionModel):
             outputs = self.model.generate(**inputs)
         predicted_caption = self.processor.decode(outputs[0], skip_special_tokens=True)
 
-        return predicted_caption
+        return (caption_prefix + predicted_caption + caption_postfix).strip()
