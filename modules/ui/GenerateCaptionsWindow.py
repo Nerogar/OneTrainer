@@ -63,23 +63,23 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.postfix_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
 
         self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
-        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.mode_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
         self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
-        self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        self.mode_dropdown.grid(row=5, column=1, sticky="w", padx=5, pady=5)
 
         self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
-        self.include_subdirectories_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.include_subdirectories_label.grid(row=6, column=0, sticky="w", padx=5, pady=5)
         self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
         self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
-        self.include_subdirectories_switch.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.include_subdirectories_switch.grid(row=6, column=1, sticky="w", padx=5, pady=5)
 
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=5, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=7, column=1, sticky="w", padx=5, pady=5)
 
         self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self.create_captions)
-        self.create_captions_button.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_captions_button.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
 
