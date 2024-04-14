@@ -75,7 +75,9 @@ Manual update
 ## Usage
 
 To start the UI, run `start-ui.bat`. [You can find a quick start guide here.](docs/QuickStartGuide.md), and a more
-detailed overview of different topics [here](docs/Overview.md).
+detailed overview of different topics [here](docs/Overview.md). 
+
+You can watch full (133 min) Windows + Cloud tutorial [here](https://youtu.be/0t5l6CP9eBg).
 
 If you need more control, OneTrainer supports two modes of operation. Command line only, and a UI.
 All commands need to be run inside the active venv created during installation.
