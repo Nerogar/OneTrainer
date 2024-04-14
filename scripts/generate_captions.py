@@ -24,8 +24,6 @@ def main():
     model.caption_folder(
         sample_dir=args.sample_dir,
         initial_caption=args.initial_caption,
-        caption_prefix=args.caption_prefix,
-        caption_postfix=args.caption_postfix,
         mode=args.mode,
         error_callback=lambda filename: print("Error while processing image " + filename),
         include_subdirectories=args.include_subdirectories
