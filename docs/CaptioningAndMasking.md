@@ -19,8 +19,6 @@ captioning. For the initial caption, you can choose a text that should be used t
 captions, press the "Create Captions" button. When you use this for the first time, it has to download the model.
 Depending on the model you chose, this can take a while.
 
-"Prefix" will be added at the start of the caption. "Postfix" will be added at the end of the caption.
-
 ### Manual masking
 
 Check the "Enable Mask Editing" checkbox at the top. Now you can draw a mask onto the image. Left click adds to the
