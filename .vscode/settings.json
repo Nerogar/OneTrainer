@@ -1,6 +1,0 @@
-{
-    "[python]": {
-        "editor.formatOnSave": false
-        // "files.eol": "\r\n"
-    }
-}
