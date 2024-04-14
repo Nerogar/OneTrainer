@@ -1,7 +1,0 @@
-{
-    "[python]": {
-        "diffEditor.ignoreTrimWhitespace": false,
-        "gitlens.codeLens.symbolScopes": ["!Module"],
-        "editor.formatOnSave": false
-    }
-}
