@@ -24,13 +24,13 @@ class ProfilingWindow(ctk.CTkToplevel):
 
         components.button(self, 0, 0, "Dump stack", self._dump_stack)
         self._profile_button = components.button(
-            self, 1, 0, "Start Profiling", self._start_profiler)
+            self, 1, 0, "Start Profiling", self._start_profiler,
+            tooltip="Turns on/off Scalene profiling. Only works when OneTrainer is launched with Scalene!")
 
         # Bottom bar
         self._bottom_bar = ctk.CTkFrame(master=self, corner_radius=0)
         self._bottom_bar.grid(row=2, column=0, sticky="sew")
         self._message_label = components.label(self._bottom_bar, 0, 0, "Inactive")
-        self._bottom_bar
 
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
         self.withdraw()
