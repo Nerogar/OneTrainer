@@ -1,4 +1,3 @@
-import faulthandler
 import json
 import threading
 import traceback
@@ -14,6 +13,7 @@ from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.ModelTab import ModelTab
+from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -100,9 +100,6 @@ class TrainUI(ctk.CTk):
         # export button
         self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
                                                tooltip="Export the current configuration as a script to run without a UI")
-
-        # Stackdump button
-        components.button(frame, 0, 6,"Dump Stack", self.dump_stack)
 
 
         return frame
@@ -401,6 +398,10 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the model sampling tool")
         components.button(master, 2, 1, "Open", self.open_sampling_tool)
 
+        components.label(master, 3, 0, "Profiling Tool",
+                         tooltip="Open the profiling tools.")
+        components.button(master, 3, 1, "Open", self.open_profiling_tool)
+
         return master
 
     def change_model_type(self, model_type: ModelType):
@@ -426,10 +427,6 @@ class TrainUI(ctk.CTk):
             self.lora_tab(self.tabview.add("LoRA"))
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
-
-    def dump_stack(self):
-        with open('stacks.txt', 'w') as f:
-            faulthandler.dump_traceback(f)
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)
@@ -458,6 +455,10 @@ class TrainUI(ctk.CTk):
         )
         self.wait_window(window)
         torch_gc()
+
+    def open_profiling_tool(self):
+        window = ProfilingWindow(self)
+        self.wait_window(window)
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
