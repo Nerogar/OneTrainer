@@ -1,6 +1,7 @@
-import cProfile
 import faulthandler
+
 import customtkinter as ctk
+from scalene import scalene_profiler
 
 from modules.util.ui import components
 
@@ -40,16 +41,14 @@ class ProfilingWindow(ctk.CTkToplevel):
         self._message_label.configure(text='Stack dumped to stacks.txt')
 
     def _end_cpu_profiler(self):
-        self._active_profile.create_stats()
-        self._active_profile.dump_stats('cpu_profile.txt')
+        scalene_profiler.stop()
 
-        self._message_label.configure(text='Profile dumped to cpu_profile.txt')
+        self._message_label.configure(text='Profile dumped to profile.html')
         self._profile_button.configure(text='Start CPU Profiling')
         self._profile_button.configure(command=self._start_cpu_profiler)
 
     def _start_cpu_profiler(self):
-        self._active_profile = cProfile.Profile()
-        self._active_profile.enable()
+        scalene_profiler.start()
 
         self._message_label.configure(text='Profiling active...')
         self._profile_button.configure(text='End CPU Profiling')

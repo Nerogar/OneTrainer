@@ -31,5 +31,8 @@ dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.1.2 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer
 
+# Profiling
+scalene
+
 # ui
 customtkinter==5.2.1
