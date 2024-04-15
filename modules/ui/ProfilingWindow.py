@@ -31,6 +31,9 @@ class ProfilingWindow(ctk.CTkToplevel):
         self._message_label = components.label(self._bottom_bar, 0, 0, "Inactive")
         self._bottom_bar
 
+        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        self.withdraw()
+
     def _dump_stack(self):
         with open('stacks.txt', 'w') as f:
             faulthandler.dump_traceback(f)

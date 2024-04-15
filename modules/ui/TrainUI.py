@@ -73,6 +73,9 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+        # Persistent profiling window.
+        self.profiling_window = ProfilingWindow(self)
+
     def close(self):
         self.top_bar_component.save_default()
 
@@ -457,8 +460,7 @@ class TrainUI(ctk.CTk):
         torch_gc()
 
     def open_profiling_tool(self):
-        window = ProfilingWindow(self)
-        self.wait_window(window)
+        self.profiling_window.deiconify()
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
