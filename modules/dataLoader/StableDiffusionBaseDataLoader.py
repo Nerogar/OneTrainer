@@ -302,7 +302,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             torch_gc()
 
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
-        # image_ram_cache = RamCache(cache_names=image_split_names + image_aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
         text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
@@ -310,8 +309,6 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         if config.latent_caching:
             modules.append(image_disk_cache)
-        # else:
-        #     modules.append(image_ram_cache)
 
         if config.latent_caching:
             sort_names = [x for x in sort_names if x not in image_aggregate_names]

@@ -141,7 +141,7 @@ class StableDiffusionXLLoRASetup(BaseStableDiffusionXLSetup):
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = config.align_prop
+        vae_on_train_device = config.align_prop or not config.latent_caching
         text_encoder_1_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
         text_encoder_2_on_train_device = config.text_encoder_2.train or config.align_prop or not config.latent_caching
 

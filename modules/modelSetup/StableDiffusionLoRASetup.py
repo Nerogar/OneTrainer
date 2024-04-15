@@ -117,7 +117,7 @@ class StableDiffusionLoRASetup(BaseStableDiffusionSetup):
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or config.align_prop
+        vae_on_train_device = self.debug_mode or config.align_prop or not config.latent_caching
         text_encoder_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
