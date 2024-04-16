@@ -12,6 +12,8 @@ goto :end
 :activate_venv
 echo activating venv %VENV_DIR%
 set PYTHON="%VENV_DIR%\Scripts\python.exe"
+if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
+echo Using Python %PYTHON%
 
 :launch
 %PYTHON% scripts\train_ui.py

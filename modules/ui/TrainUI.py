@@ -13,6 +13,7 @@ from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.ModelTab import ModelTab
+from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -73,6 +74,9 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+        # Persistent profiling window.
+        self.profiling_window = ProfilingWindow(self)
+
     def close(self):
         self.top_bar_component.save_default()
 
@@ -100,6 +104,7 @@ class TrainUI(ctk.CTk):
         # export button
         self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
                                                tooltip="Export the current configuration as a script to run without a UI")
+
 
         return frame
 
@@ -397,6 +402,10 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the model sampling tool")
         components.button(master, 2, 1, "Open", self.open_sampling_tool)
 
+        components.label(master, 3, 0, "Profiling Tool",
+                         tooltip="Open the profiling tools.")
+        components.button(master, 3, 1, "Open", self.open_profiling_tool)
+
         return master
 
     def change_model_type(self, model_type: ModelType):
@@ -450,6 +459,9 @@ class TrainUI(ctk.CTk):
         )
         self.wait_window(window)
         torch_gc()
+
+    def open_profiling_tool(self):
+        self.profiling_window.deiconify()
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
