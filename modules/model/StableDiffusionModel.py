@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from uuid import uuid4
 
 import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
@@ -7,6 +8,7 @@ from torch import Tensor
 from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.BaseModel import BaseModel
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -20,13 +22,16 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 class StableDiffusionModelEmbedding:
     def __init__(
             self,
-            text_encoder_vector: Tensor,
-            prefix: str,
+            uuid: str,
+            text_encoder_vector: Tensor | None,
+            placeholder: str,
     ):
         token_count = text_encoder_vector.shape[0]
 
+        self.uuid = uuid
         self.text_encoder_vector = text_encoder_vector
-        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
+        self.placeholder = placeholder
+        self.text_tokens = [f"<{uuid4()}>" for _ in range(token_count)]
 
 
 class StableDiffusionModel(BaseModel):
@@ -46,15 +51,19 @@ class StableDiffusionModel(BaseModel):
     train_dtype: DataType
 
     # persistent embedding training data
-    all_text_encoder_original_token_embeds: Tensor
-    text_encoder_untrainable_token_embeds_mask: list[bool]
-    embeddings: list[StableDiffusionModelEmbedding] | None
+    embedding: StableDiffusionModelEmbedding | None
+    embedding_state: Tensor | None
+    additional_embeddings: list[StableDiffusionModelEmbedding] | None
+    additional_embedding_states: list[Tensor | None]
+    embedding_wrapper: AdditionalEmbeddingWrapper
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
     unet_lora: LoRAModuleWrapper | None
+    lora_state_dict: dict | None
 
     sd_config: dict | None
+    sd_config_filename: str | None
 
     def __init__(
             self,
@@ -69,10 +78,16 @@ class StableDiffusionModel(BaseModel):
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
-            embeddings: list[StableDiffusionModelEmbedding] = None,
+            embedding: StableDiffusionModelEmbedding | None = None,
+            embedding_state: Tensor | None = None,
+            additional_embeddings: list[StableDiffusionModelEmbedding] | None = None,
+            additional_embedding_states: list[Tensor | None] = None,
+            embedding_wrapper: AdditionalEmbeddingWrapper | None = None,
             text_encoder_lora: LoRAModuleWrapper | None = None,
             unet_lora: LoRAModuleWrapper | None = None,
+            lora_state_dict: dict | None = None,
             sd_config: dict | None = None,
+            sd_config_filename: str | None = None,
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
@@ -97,10 +112,18 @@ class StableDiffusionModel(BaseModel):
 
         self.train_dtype = DataType.FLOAT_32
 
-        self.embeddings = embeddings if embeddings is not None else []
+        self.embedding = embedding
+        self.embedding_state = embedding_state
+        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
+        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
+        self.embedding_wrapper = embedding_wrapper
+
         self.text_encoder_lora = text_encoder_lora
         self.unet_lora = unet_lora
+        self.lora_state_dict = lora_state_dict
+
         self.sd_config = sd_config
+        self.sd_config_filename = sd_config_filename
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -178,3 +201,14 @@ class StableDiffusionModel(BaseModel):
 
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
+
+    def add_embeddings_to_prompt(self, prompt: str) -> str:
+        for embedding in self.additional_embeddings:
+            embedding_string = ''.join(embedding.text_tokens)
+            prompt = prompt.replace(embedding.placeholder, embedding_string)
+
+        if self.embedding is not None:
+            embedding_string = ''.join(self.embedding.text_tokens)
+            prompt = prompt.replace(self.embedding.placeholder, embedding_string)
+
+        return prompt

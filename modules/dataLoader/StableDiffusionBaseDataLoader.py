@@ -1,4 +1,3 @@
-import json
 import os
 
 import torch
@@ -30,6 +29,7 @@ from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
+from mgds.pipelineModules.ReplaceText import ReplaceText
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -48,12 +48,10 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.torch_util import torch_gc
 
 
-class StablDiffusionBaseDataLoader(BaseDataLoader):
+class StableDiffusionBaseDataLoader(BaseDataLoader):
     def __init__(
             self,
             train_device: torch.device,
@@ -62,7 +60,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
             model: StableDiffusionModel,
             train_progress: TrainProgress,
     ):
-        super(StablDiffusionBaseDataLoader, self).__init__(
+        super(StableDiffusionBaseDataLoader, self).__init__(
             train_device,
             temp_device,
         )
@@ -116,6 +114,15 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
+        replace_embedding_text = []
+        for embedding in model.additional_embeddings:
+            all_token_string = ''.join(embedding.text_tokens)
+            replace_embedding_text.append(ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text=embedding.placeholder, new_text=all_token_string))
+
+        if model.embedding is not None:
+            all_token_string = ''.join(model.embedding.text_tokens)
+            replace_embedding_text.append(ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text=model.embedding.placeholder, new_text=all_token_string))
+
         modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 
         if config.masked_training:
@@ -126,6 +133,8 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
 
         if config.model_type.has_depth_input():
             modules.append(generate_depth)
+
+        modules.append(replace_embedding_text)
 
         return modules
 
@@ -259,7 +268,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         if config.model_type.has_depth_input():
             modules.append(downscale_depth)
 
-        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and not config.train_any_embedding():
             modules.append(encode_prompt)
 
         return modules
@@ -312,7 +321,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         else:
             modules.append(image_ram_cache)
 
-        if not config.text_encoder.train and config.latent_caching and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and config.latent_caching and not config.train_any_embedding():
             modules.append(text_disk_cache)
             sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -335,7 +344,7 @@ class StablDiffusionBaseDataLoader(BaseDataLoader):
         if config.model_type.has_depth_input():
             output_names.append('latent_depth')
 
-        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and not config.train_any_embedding():
             output_names.append('text_encoder_hidden_state')
 
         sort_names = output_names + ['concept']

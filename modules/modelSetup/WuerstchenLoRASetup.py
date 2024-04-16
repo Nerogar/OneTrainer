@@ -11,7 +11,9 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 
 
-class WuerstchenLoRASetup(BaseWuerstchenSetup):
+class WuerstchenLoRASetup(
+    BaseWuerstchenSetup,
+):
     def __init__(
             self,
             train_device: torch.device,
@@ -34,6 +36,9 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         if config.text_encoder.train:
             params += list(model.prior_text_encoder_lora.parameters())
 
+        if config.train_any_embedding():
+            params += list(model.prior_embedding_wrapper.parameters())
+
         if config.prior.train:
             params += list(model.prior_prior_lora.parameters())
 
@@ -49,37 +54,37 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         if config.text_encoder.train:
             param_groups.append(
                 self.create_param_groups(
-                    config, model.prior_text_encoder_lora.parameters(), config.text_encoder.learning_rate
+                    config,
+                    model.prior_text_encoder_lora.parameters(),
+                    config.text_encoder.learning_rate,
+                )
+            )
+
+        if config.train_any_embedding():
+            param_groups.append(
+                self.create_param_groups(
+                    config,
+                    model.prior_embedding_wrapper.parameters(),
+                    config.embedding_learning_rate,
                 )
             )
 
         if config.prior.train:
             param_groups.append(
-                self.create_param_groups(config, model.prior_prior_lora.parameters(), config.prior.learning_rate)
+                self.create_param_groups(
+                    config,
+                    model.prior_prior_lora.parameters(),
+                    config.prior.learning_rate,
+                )
             )
 
         return param_groups
 
-    def setup_model(
+    def __setup_requires_grad(
             self,
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        if model.prior_text_encoder_lora is None and config.text_encoder.train:
-            model.prior_text_encoder_lora = LoRAModuleWrapper(
-                model.prior_text_encoder, config.lora_rank, "lora_prior_te", config.lora_alpha
-            )
-
-        if model.prior_prior_lora is None and config.prior.train:
-            model.prior_prior_lora = LoRAModuleWrapper(
-                model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, ["attention"]
-            )
-
-        if model.prior_text_encoder_lora:
-            model.prior_text_encoder_lora.set_dropout(config.dropout_probability)
-        if model.prior_prior_lora:
-            model.prior_prior_lora.set_dropout(config.dropout_probability)
-
         model.prior_text_encoder.requires_grad_(False)
         model.prior_prior.requires_grad_(False)
         if model.model_type.is_wuerstchen_v2():
@@ -93,27 +98,62 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
                                  not self.stop_text_encoder_training_elapsed(config, model.train_progress)
             model.prior_text_encoder_lora.requires_grad_(train_text_encoder)
 
-        if model.prior_prior_lora is not None:
-            train_prior = config.prior.train and \
-                          not self.stop_prior_training_elapsed(config, model.train_progress)
-            model.prior_prior_lora.requires_grad_(train_prior)
+        for i, embedding in enumerate(model.additional_embeddings):
+            embedding_config = config.additional_embeddings[i]
+            train_embedding = embedding_config.train and \
+                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.prior_text_encoder_vector.requires_grad_(train_embedding)
 
-        if model.prior_text_encoder_lora is not None:
-            model.prior_text_encoder_lora.hook_to_module()
-            model.prior_text_encoder_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         if model.prior_prior_lora is not None:
-            model.prior_prior_lora.hook_to_module()
-            model.prior_prior_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+            train_unet = config.unet.train and \
+                         not self.stop_unet_training_elapsed(config, model.train_progress)
+            model.prior_prior_lora.requires_grad_(train_unet)
+
+
+    def setup_model(
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
+    ):
+        if config.train_any_embedding():
+            model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+
+        model.prior_text_encoder_lora = LoRAModuleWrapper(
+            model.prior_text_encoder, config.lora_rank, "lora_prior_te", config.lora_alpha
+        )
+
+        model.prior_prior_lora = LoRAModuleWrapper(
+            model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, ["attention"]
+        )
+
+        if model.lora_state_dict:
+            model.prior_text_encoder_lora.load_state_dict(model.lora_state_dict)
+            model.prior_prior_lora.load_state_dict(model.lora_state_dict)
+            model.lora_state_dict = None
+
+        model.prior_text_encoder_lora.set_dropout(config.dropout_probability)
+        model.prior_prior_lora.set_dropout(config.dropout_probability)
+
+        model.prior_text_encoder_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+        model.prior_prior_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+
+        model.prior_text_encoder_lora.hook_to_module()
+        model.prior_prior_lora.hook_to_module()
+
+        self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
+        self._setup_additional_embeddings(model, config)
+        self._setup_embedding_wrapper(model, config)
+        self.__setup_requires_grad(model, config)
 
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
-        del model.optimizer_state_dict
+        model.optimizer_state_dict = None
 
         model.ema = create.create_ema(
             self.create_parameters(model, config), model.ema_state_dict, config
         )
-        del model.ema_state_dict
+        model.ema_state_dict = None
 
         self.setup_optimizations(model, config)
 
@@ -128,7 +168,11 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         model.decoder_vqgan_to(self.temp_device)
         model.effnet_encoder_to(self.temp_device)
 
-        text_encoder_on_train_device = config.text_encoder.train or config.align_prop or not config.latent_caching
+        text_encoder_on_train_device = \
+            config.text_encoder.train \
+            or config.train_any_embedding() \
+            or config.align_prop \
+            or not config.latent_caching
 
         model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.prior_prior_to(self.train_device)
@@ -155,15 +199,7 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
             config: TrainConfig,
             train_progress: TrainProgress
     ):
-        if model.prior_text_encoder_lora is not None:
-            train_text_encoder = config.text_encoder.train and \
-                                 not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.prior_text_encoder_lora.requires_grad_(train_text_encoder)
-
-        if model.prior_prior_lora is not None:
-            train_prior = config.prior.train and \
-                          not self.stop_prior_training_elapsed(config, model.train_progress)
-            model.prior_prior_lora.requires_grad_(train_prior)
+        self.__setup_requires_grad(model, config)
 
     def report_learning_rates(
             self,
@@ -176,6 +212,8 @@ class WuerstchenLoRASetup(BaseWuerstchenSetup):
         names = []
         if config.text_encoder.train:
             names.append("te")
+        if config.train_any_embedding():
+            names.append("embeddings")
         if config.prior.train:
             names.append("prior")
         assert len(lrs) == len(names)

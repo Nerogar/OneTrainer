@@ -1,8 +1,9 @@
 import json
+import uuid
 from copy import deepcopy
 from typing import Any
 
-from modules.util.ModelNames import ModelNames
+from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -154,14 +155,16 @@ class TrainModelPartConfig(BaseConfig):
 
         return TrainModelPartConfig(data)
 
+
 class TrainEmbeddingConfig(BaseConfig):
+    uuid: str
     model_name: str
+    placeholder: str
     train: bool
     stop_training_after: int
     stop_training_after_unit: TimeUnit
     token_count: int
     initial_embedding_text: str
-    weight_dtype: DataType
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainEmbeddingConfig, self).__init__(data)
@@ -171,16 +174,16 @@ class TrainEmbeddingConfig(BaseConfig):
         data = []
 
         # name, default value, data type, nullable
+        data.append(("uuid", str(uuid.uuid4()), str, False))
         data.append(("model_name", "", str, False))
+        data.append(("placeholder", "<embedding>", str, False))
         data.append(("train", True, bool, False))
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("token_count", 1, int, False))
         data.append(("initial_embedding_text", "*", str, False))
-        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
 
         return TrainEmbeddingConfig(data)
-
 
 
 class TrainConfig(BaseConfig):
@@ -294,7 +297,9 @@ class TrainConfig(BaseConfig):
     normalize_masked_area_loss: bool
 
     # embedding
-    embeddings: list[TrainEmbeddingConfig]
+    embedding_learning_rate: float
+    embedding: TrainEmbeddingConfig
+    additional_embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
 
     # lora
@@ -460,6 +465,18 @@ class TrainConfig(BaseConfig):
         
         return migrated_data
 
+    def __migration_2(self, data: dict) -> dict:
+        migrated_data = {}
+
+        for key, value in data.items():
+            if key == "embeddings":
+                if value is not None and len(value):
+                    migrated_data["embedding"] = value[0]
+            else:
+                migrated_data[key] = value
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
@@ -483,8 +500,14 @@ class TrainConfig(BaseConfig):
             decoder_model=self.decoder.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
-            embedding=[embedding.model_name for embedding in self.embeddings],
+            embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
+            additional_embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in
+                                   self.additional_embeddings],
         )
+
+    def train_any_embedding(self) -> bool:
+        return self.training_method == TrainingMethod.EMBEDDING \
+            or any(embedding.train for embedding in self.additional_embeddings)
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
@@ -670,7 +693,9 @@ class TrainConfig(BaseConfig):
         data.append(("normalize_masked_area_loss", False, bool, False))
 
         # embedding
-        data.append(("embeddings", [TrainEmbeddingConfig.default_values()], list[TrainEmbeddingConfig], False))
+        data.append(("embedding_learning_rate", None, float, True))
+        data.append(("embedding", TrainEmbeddingConfig.default_values(), TrainEmbeddingConfig, False))
+        data.append(("additional_embeddings", [], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # lora

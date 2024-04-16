@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from uuid import uuid4
 
 import torch
 import torchvision
@@ -11,6 +12,7 @@ from torch import nn, Tensor
 from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection
 
 from modules.model.BaseModel import BaseModel
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -47,13 +49,16 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
 class WuerstchenModelEmbedding:
     def __init__(
             self,
+            uuid: str,
             prior_text_encoder_vector: Tensor,
-            prefix: str,
+            placeholder: str,
     ):
         token_count = prior_text_encoder_vector.shape[0]
 
+        self.uuid = uuid
         self.prior_text_encoder_vector = prior_text_encoder_vector
-        self.text_tokens = [f"<{prefix}_{i}>" for i in range(token_count)]
+        self.placeholder = placeholder
+        self.text_tokens = [f"<{uuid4()}>" for _ in range(token_count)]
 
 
 class WuerstchenModel(BaseModel):
@@ -76,13 +81,16 @@ class WuerstchenModel(BaseModel):
     train_dtype: DataType
 
     # persistent embedding training data
-    all_prior_text_encoder_original_token_embeds: Tensor
-    prior_text_encoder_untrainable_token_embeds_mask: list[bool]
-    embeddings: list[WuerstchenModelEmbedding] | None
+    embedding: WuerstchenModelEmbedding | None
+    embedding_state: Tensor | None
+    additional_embeddings: list[WuerstchenModelEmbedding] | None
+    additional_embedding_states: list[Tensor | None]
+    prior_embedding_wrapper: AdditionalEmbeddingWrapper
 
     # persistent lora training data
     prior_text_encoder_lora: LoRAModuleWrapper | None
     prior_prior_lora: LoRAModuleWrapper | None
+    lora_state_dict: dict | None
 
     def __init__(
             self,
@@ -100,9 +108,14 @@ class WuerstchenModel(BaseModel):
             optimizer_state_dict: dict | None = None,
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
-            embeddings: list[WuerstchenModelEmbedding] | None = None,
+            embedding: WuerstchenModelEmbedding | None = None,
+            embedding_state: Tensor | None = None,
+            additional_embeddings: list[WuerstchenModelEmbedding] | None = None,
+            additional_embedding_states: list[Tensor | None] = None,
+            prior_embedding_wrapper: AdditionalEmbeddingWrapper = None,
             prior_text_encoder_lora: LoRAModuleWrapper | None = None,
             prior_prior_lora: LoRAModuleWrapper | None = None,
+            lora_state_dict: dict | None = None,
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
@@ -134,9 +147,15 @@ class WuerstchenModel(BaseModel):
         self.prior_train_dtype = DataType.FLOAT_32
         self.effnet_encoder_train_dtype = DataType.FLOAT_32
 
-        self.embeddings = embeddings if embeddings is not None else []
+        self.embedding = embedding
+        self.embedding_state = embedding_state
+        self.additional_embeddings = additional_embeddings
+        self.additional_embedding_states = additional_embedding_states
+        self.prior_embedding_wrapper = prior_embedding_wrapper
+
         self.prior_text_encoder_lora = prior_text_encoder_lora
         self.prior_prior_lora = prior_prior_lora
+        self.lora_state_dict = lora_state_dict
 
     def decoder_text_encoder_to(self, device: torch.device):
         self.decoder_text_encoder.to(device=device)
@@ -205,3 +224,14 @@ class WuerstchenModel(BaseModel):
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )
+
+    def add_embeddings_to_prompt(self, prompt: str) -> str:
+        for embedding in self.additional_embeddings:
+            embedding_string = ''.join(embedding.text_tokens)
+            prompt = prompt.replace(embedding.placeholder, embedding_string)
+
+        if self.embedding is not None:
+            embedding_string = ''.join(self.embedding.text_tokens)
+            prompt = prompt.replace(self.embedding.placeholder, embedding_string)
+
+        return prompt

@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from modules.model.BaseModel import BaseModel
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
@@ -175,5 +175,30 @@ class BaseModelSetup(
             "stop_text_encoder_2_training",
             config.text_encoder_2.stop_training_after,
             config.text_encoder_2.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_additional_embedding_training_elapsed(
+            self,
+            config: TrainEmbeddingConfig,
+            train_progress: TrainProgress,
+            embedding_index: int,
+    ):
+        return self.single_action_elapsed(
+            "stop_embedding_training_" + str(embedding_index),
+            config.stop_training_after,
+            config.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_embedding_training_elapsed(
+            self,
+            config: TrainEmbeddingConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_embedding_training",
+            config.stop_training_after,
+            config.stop_training_after_unit,
             train_progress,
         )

@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "pixart-alpha/embedding",
+    "modelspec.implementation": "https://github.com/PixArt-alpha/PixArt-alpha",
+    "modelspec.title": "PixArt Alpha 1.0 Embedding"
+}

@@ -12,6 +12,7 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
+from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
@@ -65,6 +66,7 @@ class TrainUI(ctk.CTk):
 
         self.model_tab = None
         self.training_tab = None
+        self.additional_embeddings_tab = None
 
         self.top_bar_component = self.top_bar(self)
         self.content_frame(self)
@@ -81,7 +83,14 @@ class TrainUI(ctk.CTk):
         self.top_bar_component.save_default()
 
     def top_bar(self, master):
-        return TopBar(master, self.train_config, self.ui_state, self.change_model_type, self.change_training_method)
+        return TopBar(
+            master,
+            self.train_config,
+            self.ui_state,
+            self.change_model_type,
+            self.change_training_method,
+            self.load_preset,
+        )
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -126,6 +135,7 @@ class TrainUI(ctk.CTk):
         self.create_sampling_tab(self.tabview.add("sampling"))
         self.create_backup_tab(self.tabview.add("backup"))
         self.create_tools_tab(self.tabview.add("tools"))
+        self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
 
         self.change_training_method(self.train_config.training_method)
 
@@ -304,7 +314,6 @@ class TrainUI(ctk.CTk):
                          tooltip="The prefix for filenames used when saving the model during training")
         components.entry(master, 3, 4, self.ui_state, "save_filename_prefix")
 
-
     def lora_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
@@ -352,23 +361,23 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=0)
         master.grid_columnconfigure(4, weight=1)
 
-        # embedding model names
+        # embedding model name
         components.label(master, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "embeddings.model_name",
+            master, 0, 1, self.ui_state, "embedding.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
         components.label(master, 1, 0, "Token count",
                          tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "embeddings.token_count")
+        components.entry(master, 1, 1, self.ui_state, "embedding.token_count")
 
         # initial embedding text
         components.label(master, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "embeddings.initial_embedding_text")
+        components.entry(master, 2, 1, self.ui_state, "embedding.initial_embedding_text")
 
         # embedding weight dtype
         components.label(master, 3, 0, "Embedding Weight Data Type",
@@ -378,7 +387,17 @@ class TrainUI(ctk.CTk):
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "embedding_weight_dtype")
 
+        # placeholder
+        components.label(master, 4, 0, "Placeholder",
+                         tooltip="The placeholder used when using the embedding in a prompt")
+        components.entry(master, 4, 1, self.ui_state, "embedding.placeholder")
+
+
+
         return master
+
+    def create_additional_embeddings_tab(self, master):
+        return AdditionalEmbeddingsTab(master, self.train_config, self.ui_state)
 
     def create_tools_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
@@ -431,6 +450,13 @@ class TrainUI(ctk.CTk):
             self.lora_tab(self.tabview.add("LoRA"))
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
+
+    def load_preset(self):
+        if not self.tabview:
+            return
+
+        if self.additional_embeddings_tab:
+            self.additional_embeddings_tab.refresh_ui()
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:6006/", new=0, autoraise=False)

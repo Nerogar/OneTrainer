@@ -10,7 +10,9 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 
 
-class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
+class StableDiffusionFineTuneVaeSetup(
+    BaseStableDiffusionSetup,
+):
     def __init__(
             self,
             train_device: torch.device,
@@ -56,14 +58,14 @@ class StableDiffusionFineTuneVaeSetup(BaseStableDiffusionSetup):
         model.optimizer = create.create_optimizer(
             self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
         )
-        del model.optimizer_state_dict
+        model.optimizer_state_dict = None
 
         model.ema = create.create_ema(
             self.create_parameters(model, config), model.ema_state_dict, config
         )
-        del model.ema_state_dict
+        model.ema_state_dict = None
 
-        self.setup_optimizations(model, config)
+        self._setup_optimizations(model, config)
 
     def setup_train_device(
             self,

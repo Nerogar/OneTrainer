@@ -1,9 +1,21 @@
 import os.path
 
 
-def safe_filename(text: str):
+def safe_filename(
+        text: str,
+        allow_spaces: bool = True,
+        max_length: int | None = 32,
+):
     legal_chars = [' ', '.', '_', '-', '#']
-    return ''.join(filter(lambda x: str.isalnum(x) or x in legal_chars, text))[0:32].strip()
+    if not allow_spaces:
+        text = text.replace(' ', '_')
+
+    text = ''.join(filter(lambda x: str.isalnum(x) or x in legal_chars, text)).strip()
+
+    if max_length is not None:
+        text = text[0: max_length]
+
+    return text.strip()
 
 
 def canonical_join(base_path: str, *paths: str):
