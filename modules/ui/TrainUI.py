@@ -186,13 +186,17 @@ class TrainUI(ctk.CTk):
         components.switch(master, 7, 1, self.ui_state, "tensorboard_expose")
 
         # device
-        components.label(master, 8, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
-        components.entry(master, 8, 1, self.ui_state, "train_device")
+        components.label(master, 8, 0, "Dataloader Threads",
+                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
+        components.entry(master, 8, 1, self.ui_state, "dataloader_threads")
 
-        components.label(master, 9, 0, "Temp Device",
+        components.label(master, 9, 0, "Train Device",
+                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
+        components.entry(master, 9, 1, self.ui_state, "train_device")
+
+        components.label(master, 10, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(master, 9, 1, self.ui_state, "temp_device")
+        components.entry(master, 10, 1, self.ui_state, "temp_device")
 
     def create_model_tab(self, master):
         return ModelTab(master, self.train_config, self.ui_state)
