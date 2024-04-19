@@ -452,7 +452,7 @@ class TrainConfig(BaseConfig):
                 migrated_data[key] = value
 
         return migrated_data
-    
+
     def __migration_2(self, data: dict) -> dict:
         migrated_data = data.copy()
         min_snr_gamma = migrated_data.pop("min_snr_gamma", 0.0)
@@ -463,7 +463,7 @@ class TrainConfig(BaseConfig):
         elif model_type.is_wuerstchen():
             migrated_data["loss_weight_fn"] = LossWeight.P2
             migrated_data["loss_weight_strength"] = 1.0
-        
+
         return migrated_data
 
     def __migration_2(self, data: dict) -> dict:
@@ -587,7 +587,7 @@ class TrainConfig(BaseConfig):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
-        data.append(("dataloader_threads", 8, int, False))
+        data.append(("dataloader_threads", 2, int, False))
         data.append(("train_device", default_device.type, str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
