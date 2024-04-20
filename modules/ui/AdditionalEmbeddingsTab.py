@@ -76,7 +76,7 @@ class EmbeddingWidget(ctk.CTkFrame):
             text="+",
             corner_radius=2,
             fg_color="#00C000",
-            command=lambda: clone_command(self.i),
+            command=lambda: clone_command(self.i, self.__randomize_uuid),
         )
         clone_button.grid(row=0, column=1, padx=5)
 
@@ -113,6 +113,10 @@ class EmbeddingWidget(ctk.CTkFrame):
         components.label(bottom_frame, 0, 4, "initial embedding text:",
                          tooltip="The initial embedding text used when creating a new embedding")
         components.entry(bottom_frame, 0, 5, self.ui_state, "initial_embedding_text")
+
+    def __randomize_uuid(self, embedding_config: TrainEmbeddingConfig):
+        embedding_config.uuid = TrainEmbeddingConfig.default_values().uuid
+        return embedding_config
 
     def configure_element(self):
         pass

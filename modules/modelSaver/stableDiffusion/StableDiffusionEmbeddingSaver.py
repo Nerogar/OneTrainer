@@ -68,13 +68,13 @@ class StableDiffusionEmbeddingSaver:
             safetensors_embedding_name = os.path.join(
                 destination,
                 "additional_embeddings",
-                f"{embedding.uuid}.safetensors",
+                f"embedding.safetensors",
             )
         else:
             safetensors_embedding_name = os.path.join(
                 destination,
                 "embedding",
-                f"embedding.safetensors",
+                f"{embedding.uuid}.safetensors",
             )
         self.__save_safetensors(
             embedding,
