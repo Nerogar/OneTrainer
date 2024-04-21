@@ -56,7 +56,7 @@ class PixArtAlphaEmbeddingLoader:
             else:
                 safetensors_embedding_name = os.path.join(
                     directory,
-                    "additional_embeddings",
+                    "embedding",
                     f"{embedding_name.uuid}.safetensors",
                 )
 
