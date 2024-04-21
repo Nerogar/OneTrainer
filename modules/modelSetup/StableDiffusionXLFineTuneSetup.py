@@ -187,6 +187,9 @@ class StableDiffusionXLFineTuneSetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
+        if config.preserve_embedding_norm:
+            model.embedding_wrapper_1.normalize_embeddings()
+            model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
 
     def report_learning_rates(

@@ -26,6 +26,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
         self.is_applied = False
         self.orig_forward = self.orig_module.forward
+        self.orig_median_norm = torch.norm(self.orig_module.weight, dim=1).median().item()
 
     def forward(self, x, *args, **kwargs):
         # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create
@@ -48,3 +49,11 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
         if self.is_applied:
             self.orig_module.forward = self.orig_forward
             self.is_applied = False
+
+    def normalize_embeddings(self):
+        with torch.no_grad():
+            for additional_embedding in self.additional_embeddings:
+                if additional_embedding.requires_grad:  # only normalize if the embedding is learned
+                    copy = torch.nn.functional.normalize(additional_embedding)
+                    copy.mul_(self.orig_median_norm)
+                    additional_embedding.copy_(copy)

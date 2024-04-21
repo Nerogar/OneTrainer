@@ -199,6 +199,8 @@ class WuerstchenLoRASetup(
             config: TrainConfig,
             train_progress: TrainProgress
     ):
+        if config.preserve_embedding_norm:
+            model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
 
     def report_learning_rates(

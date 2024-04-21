@@ -357,6 +357,11 @@ class TrainingTab:
                          tooltip="The learning rate of embeddings. Overrides the base learning rate")
         components.entry(frame, 0, 1, self.ui_state, "embedding_learning_rate")
 
+        # preserve embedding norm
+        components.label(frame, 1, 0, "Preserve Embedding Norm",
+                         tooltip="Rescales each trained embedding to the median embedding norm")
+        components.switch(frame, 1, 1, self.ui_state, "preserve_embedding_norm")
+
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")

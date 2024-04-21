@@ -299,6 +299,7 @@ class TrainConfig(BaseConfig):
 
     # embedding
     embedding_learning_rate: float
+    preserve_embedding_norm: bool
     embedding: TrainEmbeddingConfig
     additional_embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
@@ -696,6 +697,7 @@ class TrainConfig(BaseConfig):
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
+        data.append(("preserve_embedding_norm", False, bool, False))
         data.append(("embedding", TrainEmbeddingConfig.default_values(), TrainEmbeddingConfig, False))
         data.append(("additional_embeddings", [], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
