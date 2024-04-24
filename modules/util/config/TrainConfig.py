@@ -467,18 +467,6 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
-    def __migration_2(self, data: dict) -> dict:
-        migrated_data = {}
-
-        for key, value in data.items():
-            if key == "embeddings":
-                if value is not None and len(value):
-                    migrated_data["embedding"] = value[0]
-            else:
-                migrated_data[key] = value
-
-        return migrated_data
-
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
