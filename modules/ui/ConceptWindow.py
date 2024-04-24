@@ -7,6 +7,7 @@ from torchvision.transforms import functional, InterpolationMode
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -101,10 +102,11 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="The number of different text versions to cache if latent caching is enabled.")
         components.entry(master, 6, 1, self.ui_state, "text_variations")
 
-        # repeats
-        components.label(master, 7, 0, "Repeats",
-                         tooltip="The number of repeats for this concept during one epoch.")
-        components.entry(master, 7, 1, self.ui_state, "repeats")
+        # balancing
+        components.label(master, 7, 0, "Balancing",
+                         tooltip="The number of samples used during training. Use repeats to multiply the concept, or samples to specify an exact number of samples used in each epoch.")
+        components.entry(master, 7, 1, self.ui_state, "balancing")
+        components.options(master, 7, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
 
         # loss weight
         components.label(master, 8, 0, "Loss Weight",

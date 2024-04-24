@@ -2,6 +2,7 @@ import random
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
+from modules.util.enum.BalancingStrategy import BalancingStrategy
 
 
 class ConceptImageConfig(BaseConfig):
@@ -109,7 +110,23 @@ class ConceptConfig(BaseConfig):
     text: ConceptTextConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(ConceptConfig, self).__init__(data)
+        super(ConceptConfig, self).__init__(
+            data,
+            config_version=1,
+            config_migrations={
+                0: self.__migration_0,
+            }
+        )
+
+    def __migration_0(self, data: dict) -> dict:
+        migrated_data = {}
+        for key, value in data.items():
+            if key == 'repeats':
+                migrated_data['balancing'] = value
+            else:
+                migrated_data[key] = value
+
+        return migrated_data
 
     def to_dict(self):
         as_dict = super(ConceptConfig, self).to_dict()
@@ -131,7 +148,8 @@ class ConceptConfig(BaseConfig):
         data.append(("include_subdirectories", False, bool, False))
         data.append(("image_variations", 1, int, False))
         data.append(("text_variations", 1, int, False))
-        data.append(("repeats", 1.0, float, False))
+        data.append(("balancing", 1.0, float, False))
+        data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
 
         return ConceptConfig(data)
