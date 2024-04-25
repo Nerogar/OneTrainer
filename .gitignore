@@ -1,4 +1,6 @@
-.idea
+.idea/
+.vscode/
+/src
 /venv*
 /debug*
 /workspace*
