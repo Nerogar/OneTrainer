@@ -224,11 +224,15 @@ class TrainingTab:
                          tooltip="Enables the autocast cache. Disabling this reduces memory usage, but increases training time")
         components.switch(frame, 7, 1, self.ui_state, "enable_autocast_cache")
 
-
         # resolution
         components.label(frame, 8, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma.")
         components.entry(frame, 8, 1, self.ui_state, "resolution")
+
+        # force circular padding
+        components.label(frame, 9, 0, "Force Circular Padding",
+                         tooltip="Enables circular padding for all conv layers to better train seamless images")
+        components.switch(frame, 9, 1, self.ui_state, "force_circular_padding")
 
     def __create_align_prop_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

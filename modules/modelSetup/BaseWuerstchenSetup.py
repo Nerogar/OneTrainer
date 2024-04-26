@@ -16,6 +16,7 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpo
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context, \
     disable_bf16_on_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -62,6 +63,13 @@ class BaseWuerstchenSetup(
             elif model.model_type.is_stable_cascade():
                 enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, self.train_device)
                 enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
+
+        if config.force_circular_padding:
+            apply_circular_padding_to_conv2d(model.decoder_vqgan)
+            apply_circular_padding_to_conv2d(model.decoder_decoder)
+            apply_circular_padding_to_conv2d(model.prior_prior)
+            if model.prior_prior_lora is not None:
+                apply_circular_padding_to_conv2d(model.prior_prior_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().decoder_text_encoder,

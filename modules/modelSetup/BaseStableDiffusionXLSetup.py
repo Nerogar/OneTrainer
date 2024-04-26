@@ -19,6 +19,7 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import \
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -66,6 +67,12 @@ class BaseStableDiffusionXLSetup(
             enable_checkpointing_for_transformer_blocks(model.unet, self.train_device)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
+
+        if config.force_circular_padding:
+            apply_circular_padding_to_conv2d(model.vae)
+            apply_circular_padding_to_conv2d(model.unet)
+            if model.unet_lora is not None:
+                apply_circular_padding_to_conv2d(model.unet_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().unet,

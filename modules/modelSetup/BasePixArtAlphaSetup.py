@@ -18,6 +18,7 @@ from modules.modelSetup.stableDiffusion.checkpointing_util import create_checkpo
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -74,6 +75,12 @@ class BasePixArtAlphaSetup(
             enable_checkpointing_for_transformer_blocks(model.transformer, self.train_device)
             if config.text_encoder.train or config.train_any_embedding():
                 enable_checkpointing_for_t5_encoder_layers(model.text_encoder, self.train_device)
+
+        if config.force_circular_padding:
+            apply_circular_padding_to_conv2d(model.vae)
+            apply_circular_padding_to_conv2d(model.transformer)
+            if model.transformer_lora is not None:
+                apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().prior,
