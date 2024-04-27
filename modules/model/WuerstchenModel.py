@@ -149,8 +149,8 @@ class WuerstchenModel(BaseModel):
 
         self.embedding = embedding
         self.embedding_state = embedding_state
-        self.additional_embeddings = additional_embeddings
-        self.additional_embedding_states = additional_embedding_states
+        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
+        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
         self.prior_embedding_wrapper = prior_embedding_wrapper
 
         self.prior_text_encoder_lora = prior_text_encoder_lora

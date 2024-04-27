@@ -121,8 +121,8 @@ class StableDiffusionXLModel(BaseModel):
 
         self.embedding = embedding
         self.embedding_state = embedding_state
-        self.additional_embeddings = additional_embeddings
-        self.additional_embedding_states = additional_embedding_states
+        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
+        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
         self.embedding_wrapper_1 = embedding_wrapper_1
         self.embedding_wrapper_1 = embedding_wrapper_2
 
