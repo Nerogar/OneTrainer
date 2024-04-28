@@ -201,6 +201,7 @@ class GenericTrainer(BaseTrainer):
     ):
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
         for i, sample_params in enumerate(sample_params_list):
@@ -257,6 +258,7 @@ class GenericTrainer(BaseTrainer):
                 torch_gc()
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
             self.model.optimizer.train()
 
     def __sample_during_training(
@@ -333,6 +335,7 @@ class GenericTrainer(BaseTrainer):
 
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
         try:
@@ -364,6 +367,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_train_device(self.model, self.config)
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
             self.model.optimizer.train()
 
         torch_gc()
@@ -386,6 +390,7 @@ class GenericTrainer(BaseTrainer):
 
             # Special case for schedule-free optimizers.
             if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
                 self.model.optimizer.eval()
             self.model_saver.save(
                 model=self.model,
@@ -395,6 +400,7 @@ class GenericTrainer(BaseTrainer):
                 dtype=self.config.output_dtype.torch_dtype()
             )
             if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
                 self.model.optimizer.train()
         except:
             traceback.print_exc()
@@ -462,6 +468,7 @@ class GenericTrainer(BaseTrainer):
         # called before evaluation. Can and should move this to a callback
         # during a refactoring.
         if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
     def train(self):
@@ -498,6 +505,7 @@ class GenericTrainer(BaseTrainer):
             # called before training. Can and should move this to a callback
             # during a refactoring.
             if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
                 self.model.optimizer.train()
             torch_gc()
 
