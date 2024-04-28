@@ -199,6 +199,10 @@ class GenericTrainer(BaseTrainer):
             image_format: ImageFormat = ImageFormat.JPG,
             is_custom_sample: bool = False,
     ):
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            self.model.optimizer.eval()
+
         for i, sample_params in enumerate(sample_params_list):
             if sample_params.enabled:
                 try:
@@ -251,6 +255,9 @@ class GenericTrainer(BaseTrainer):
                     print("Error during sampling, proceeding without sampling")
 
                 torch_gc()
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            self.model.optimizer.train()
 
     def __sample_during_training(
             self,
@@ -324,6 +331,10 @@ class GenericTrainer(BaseTrainer):
         backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
 
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            self.model.optimizer.eval()
+
         try:
             print("Creating Backup " + backup_path)
 
@@ -351,6 +362,9 @@ class GenericTrainer(BaseTrainer):
                 self.__prune_backups(self.config.rolling_backup_count)
 
         self.model_setup.setup_train_device(self.model, self.config)
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            self.model.optimizer.train()
 
         torch_gc()
 
