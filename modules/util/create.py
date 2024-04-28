@@ -534,6 +534,9 @@ def create_optimizer(
 
         # Schedule-free AdamW
         case Optimizer.SCHEDULE_FREE_ADAMW:
+            if (config.model_type.is_wuerstchen_v2 or
+                config.model_type.is_stable_cascade):
+                raise NotImplementedError("Cannot use schedule-free optimizers with Wuerstchen models.")
             from schedulefree import AdamWScheduleFree
             optimizer = AdamWScheduleFree(
                 params=parameters,
@@ -549,6 +552,9 @@ def create_optimizer(
 
         # Schedule-free SGD
         case Optimizer.SCHEDULE_FREE_SGD:
+            if (config.model_type.is_wuerstchen_v2 or
+                config.model_type.is_stable_cascade):
+                raise NotImplementedError("Cannot use schedule-free optimizers with Wuerstchen models.")
             from schedulefree import SGDScheduleFree
             optimizer = SGDScheduleFree(
                 params=parameters,
