@@ -421,20 +421,22 @@ class GenericTrainer(BaseTrainer):
 
             for param_group in self.model.optimizer.param_groups:
                 for i, parameter in enumerate(param_group["params"]):
+                    # TODO: Find a better check instead of "parameter.requires_grad".
+                    #       This will break if the some parameters don't require grad during the first training step.
+                    if parameter.requires_grad:
+                        if scaler:
+                            def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
+                                nn.utils.clip_grad_norm_(tensor, 1)
+                                scaler.unscale_parameter_(tensor, self.model.optimizer)
+                                scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
+                                tensor.grad = None
+                        else:
+                            def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
+                                nn.utils.clip_grad_norm_(tensor, 1)
+                                self.model.optimizer.step_parameter(tensor, param_group, i)
+                                tensor.grad = None
 
-                    if scaler:
-                        def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                            nn.utils.clip_grad_norm_(tensor, 1)
-                            scaler.unscale_parameter_(tensor, self.model.optimizer)
-                            scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
-                            tensor.grad = None
-                    else:
-                        def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                            nn.utils.clip_grad_norm_(tensor, 1)
-                            self.model.optimizer.step_parameter(tensor, param_group, i)
-                            tensor.grad = None
-
-                    parameter.register_post_accumulate_grad_hook(__grad_hook)
+                        parameter.register_post_accumulate_grad_hook(__grad_hook)
 
     def train(self):
         train_device = torch.device(self.config.train_device)
