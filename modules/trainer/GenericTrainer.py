@@ -421,6 +421,8 @@ class GenericTrainer(BaseTrainer):
 
             for param_group in self.model.optimizer.param_groups:
                 for i, parameter in enumerate(param_group["params"]):
+                    # TODO: Find a better check instead of "parameter.requires_grad".
+                    #       This will break if the some parameters don't require grad during the first training step.
                     if parameter.requires_grad:
                         if scaler:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
