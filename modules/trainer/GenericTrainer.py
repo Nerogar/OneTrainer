@@ -370,6 +370,9 @@ class GenericTrainer(BaseTrainer):
             if self.model.ema:
                 self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
+            # Special case for schedule-free optimizers.
+            if self.config.optimizer.optimizer.is_schedule_free:
+                self.model.optimizer.eval()
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,
@@ -377,6 +380,8 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
+            if self.config.optimizer.optimizer.is_schedule_free:
+                self.model.optimizer.train()
         except:
             traceback.print_exc()
             print("Could not save model. Check your disk space!")
@@ -438,6 +443,13 @@ class GenericTrainer(BaseTrainer):
 
                         parameter.register_post_accumulate_grad_hook(__grad_hook)
 
+    def __before_eval(self):
+        # Special case for schedule-free optimizers, which need eval()
+        # called before evaluation. Can and should move this to a callback
+        # during a refactoring.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            self.model.optimizer.eval()
+
     def train(self):
         train_device = torch.device(self.config.train_device)
 
@@ -468,6 +480,11 @@ class GenericTrainer(BaseTrainer):
 
             self.data_loader.get_data_set().start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.config)
+            # Special case for schedule-free optimizers, which need train()
+            # called before training. Can and should move this to a callback
+            # during a refactoring.
+            if self.config.optimizer.optimizer.is_schedule_free:
+                self.model.optimizer.train()
             torch_gc()
 
             if lr_scheduler is None:
@@ -515,11 +532,6 @@ class GenericTrainer(BaseTrainer):
                     self.save(train_progress)
 
                 self.callbacks.on_update_status("training")
-                # Special case for schedule-free optimizers, which need train()
-                # called before training. Can and should move this to a callback
-                # during a refactoring.
-                if self.config.optimizer.optimizer.is_schedule_free:
-                    self.model.optimizer.train()
 
                 model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
@@ -582,11 +594,6 @@ class GenericTrainer(BaseTrainer):
 
                 train_progress.next_step(self.config.batch_size)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
-                # Special case for schedule-free optimizers, which need eval()
-                # called after training. Can and should move this to a callback
-                # during a refactoring.
-                if self.config.optimizer.optimizer.is_schedule_free:
-                    self.model.optimizer.eval()
 
                 if self.commands.get_stop_command():
                     return
