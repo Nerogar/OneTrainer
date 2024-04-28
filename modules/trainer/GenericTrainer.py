@@ -123,6 +123,20 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_model(self.model, self.config)
         self.model.to(self.temp_device)
         self.model.eval()
+        # Special case for schedule-free optimizers, which need train()
+        # called before training and eval() called before evaluation.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            _self = self
+            def __eval_hook(orig, *args, **kwargs):
+                x = orig(*args, **kwargs)
+                _self.model.optimizer.eval()
+                return x
+            def __train_hook(orig, *args, **kwargs):
+                x = orig(*args, **kwargs)
+                _self.model.optimizer.train()
+                return x
+            self.model.eval = __eval_hook(self.model.eval)
+            self.model.train = __train_hook(self.model.train)
         torch_gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
@@ -515,11 +529,6 @@ class GenericTrainer(BaseTrainer):
                     self.save(train_progress)
 
                 self.callbacks.on_update_status("training")
-                # Special case for schedule-free optimizers, which need train()
-                # called before training. Can and should move this to a callback
-                # during a refactoring.
-                if self.config.optimizer.optimizer.is_schedule_free:
-                    self.model.optimizer.train()
 
                 model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
@@ -582,11 +591,6 @@ class GenericTrainer(BaseTrainer):
 
                 train_progress.next_step(self.config.batch_size)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
-                # Special case for schedule-free optimizers, which need eval()
-                # called after training. Can and should move this to a callback
-                # during a refactoring.
-                if self.config.optimizer.optimizer.is_schedule_free:
-                    self.model.optimizer.eval()
 
                 if self.commands.get_stop_command():
                     return
