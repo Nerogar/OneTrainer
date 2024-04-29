@@ -199,11 +199,6 @@ class GenericTrainer(BaseTrainer):
             image_format: ImageFormat = ImageFormat.JPG,
             is_custom_sample: bool = False,
     ):
-        # Special case for schedule-free optimizers.
-        if self.config.optimizer.optimizer.is_schedule_free:
-            torch.clear_autocast_cache()
-            self.model.optimizer.eval()
-
         for i, sample_params in enumerate(sample_params_list):
             if sample_params.enabled:
                 try:
@@ -256,10 +251,6 @@ class GenericTrainer(BaseTrainer):
                     print("Error during sampling, proceeding without sampling")
 
                 torch_gc()
-        # Special case for schedule-free optimizers.
-        if self.config.optimizer.optimizer.is_schedule_free:
-            torch.clear_autocast_cache()
-            self.model.optimizer.train()
 
     def __sample_during_training(
             self,
@@ -267,6 +258,10 @@ class GenericTrainer(BaseTrainer):
             train_device: torch.device,
             sample_params_list: list[SampleConfig] = None,
     ):
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.eval()
         torch_gc()
 
         self.callbacks.on_update_status("sampling")
@@ -309,6 +304,10 @@ class GenericTrainer(BaseTrainer):
             )
 
         self.model_setup.setup_train_device(self.model, self.config)
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.train()
 
         torch_gc()
 
@@ -630,6 +629,10 @@ class GenericTrainer(BaseTrainer):
         if self.one_step_trained:
             if self.config.backup_before_save:
                 self.backup(self.model.train_progress)
+            # Special case for schedule-free optimizers.
+            if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
+                self.model.optimizer.eval()
 
             self.callbacks.on_update_status("saving the final model")
 
