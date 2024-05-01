@@ -349,12 +349,17 @@ class TrainUI(ctk.CTk):
         components.entry(master, 3, 1, self.ui_state, "dropout_probability")
 
         # lora weight dtype
-        components.label(master, 5, 0, "LoRA Weight Data Type",
+        components.label(master, 4, 0, "LoRA Weight Data Type",
                          tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 5, 1, [
+        components.options_kv(master, 4, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "lora_weight_dtype")
+
+        # For use with additional embeddings.
+        components.label(master, 5, 0, "Bundle Embeddings",
+                         tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
+        components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
         return master
 
