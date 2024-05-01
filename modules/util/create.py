@@ -547,7 +547,8 @@ def create_optimizer(
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 warmup_steps=config.learning_rate_warmup_steps,
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
-                weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0
+                weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0,
+                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False
             )
 
         # Schedule-free SGD
