@@ -27,12 +27,8 @@ class StableDiffusionLoRASaver(
             state_dict |= model.lora_state_dict
 
         if model.additional_embeddings:
-            embedding_dict = {}
             for embedding in model.additional_embeddings:
-                embedding_dict[embedding.placeholder] = {
-                    'string_to_param': {'*': embedding.text_encoder_vector.to(device="cpu")}
-                }
-            state_dict['bundle_emb'] = embedding_dict
+                state_dict[f"bundle_emb.{embedding.placeholder}.string_to_param.*"] = embedding.text_encoder_vector
 
         return state_dict
 
