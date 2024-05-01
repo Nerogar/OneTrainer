@@ -28,6 +28,11 @@ class StableDiffusionXLLoRASaver(
         if model.lora_state_dict is not None:
             state_dict |= model.lora_state_dict
 
+        if model.additional_embeddings and model.train_config.bundle_additional_embeddings:
+            for embedding in model.additional_embeddings:
+                state_dict[f"bundle_emb.{embedding.placeholder}.clip_l"] = embedding.text_encoder_1_vector
+                state_dict[f"bundle_emb.{embedding.placeholder}.clip_g"] = embedding.text_encoder_2_vector
+
         return state_dict
 
     def __save_ckpt(
