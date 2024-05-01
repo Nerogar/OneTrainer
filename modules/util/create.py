@@ -548,7 +548,7 @@ def create_optimizer(
                 warmup_steps=config.learning_rate_warmup_steps,
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
                 weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0,
-                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False
+                foreach=optimizer_config.foreach if optimizer_config.foreach else False
             )
 
         # Schedule-free SGD
@@ -564,7 +564,8 @@ def create_optimizer(
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 warmup_steps=config.learning_rate_warmup_steps,
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
-                weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0
+                weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0,
+                foreach=optimizer_config.foreach if optimizer_config.foreach else False
             )
 
         # DADAPT_SGD Optimizer
