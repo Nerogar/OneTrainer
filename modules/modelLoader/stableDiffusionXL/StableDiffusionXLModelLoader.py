@@ -4,6 +4,7 @@ from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, Stable
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -11,9 +12,23 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
-class StableDiffusionXLModelLoader:
+class StableDiffusionXLModelLoader(
+    SDConfigModelLoaderMixin,
+):
     def __init__(self):
         super(StableDiffusionXLModelLoader, self).__init__()
+
+    def _default_sd_config_name(
+            self,
+            model_type: ModelType,
+    ) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE:
+                return "resources/model_config/stable_diffusion_xl/sd_xl_base.yaml"
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING:  # TODO: find the actual yml file
+                return "resources/model_config/stable_diffusion_xl/sd_xl_base.yaml"
+            case _:
+                return None
 
     def __load_internal(
             self,
@@ -184,6 +199,9 @@ class StableDiffusionXLModelLoader:
             weight_dtypes: ModelWeightDtypes,
     ):
         stacktraces = []
+
+        model.sd_config = self._load_sd_config(model_type)
+        model.sd_config_filename = self._get_sd_config_name(model_type)
 
         try:
             self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)

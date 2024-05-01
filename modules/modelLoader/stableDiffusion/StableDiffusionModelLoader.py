@@ -6,6 +6,7 @@ from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from
 from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -13,9 +14,35 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
-class StableDiffusionModelLoader:
+class StableDiffusionModelLoader(
+    SDConfigModelLoaderMixin,
+):
     def __init__(self):
         super(StableDiffusionModelLoader, self).__init__()
+
+    def _default_sd_config_name(
+            self,
+            model_type: ModelType,
+    ) -> str | None:
+        match model_type:
+            case ModelType.STABLE_DIFFUSION_15:
+                return "resources/model_config/stable_diffusion/v1-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
+                return "resources/model_config/stable_diffusion/v1-inpainting-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_20:
+                return "resources/model_config/stable_diffusion/v2-inference-v.yaml"
+            case ModelType.STABLE_DIFFUSION_20_BASE:
+                return "resources/model_config/stable_diffusion/v2-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
+                return "resources/model_config/stable_diffusion/v2-inpainting-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_20_DEPTH:
+                return "resources/model_config/stable_diffusion/v2-midas-inference.yaml"
+            case ModelType.STABLE_DIFFUSION_21:
+                return "resources/model_config/stable_diffusion/v2-inference-v.yaml"
+            case ModelType.STABLE_DIFFUSION_21_BASE:
+                return "resources/model_config/stable_diffusion/v2-inference.yaml"
+            case _:
+                return None
 
     def __load_internal(
             self,
@@ -214,6 +241,9 @@ class StableDiffusionModelLoader:
             weight_dtypes: ModelWeightDtypes,
     ):
         stacktraces = []
+
+        model.sd_config = self._load_sd_config(model_type)
+        model.sd_config_filename = self._get_sd_config_name(model_type)
 
         try:
             self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)

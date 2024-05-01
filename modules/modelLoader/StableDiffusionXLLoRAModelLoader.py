@@ -2,7 +2,6 @@ from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
-from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.modelLoader.stableDiffusionXL.StableDiffusionXLEmbeddingLoader import StableDiffusionXLEmbeddingLoader
 from modules.modelLoader.stableDiffusionXL.StableDiffusionXLLoRALoader import StableDiffusionXLLoRALoader
 from modules.modelLoader.stableDiffusionXL.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
@@ -14,7 +13,6 @@ from modules.util.enum.ModelType import ModelType
 class StableDiffusionXLLoRAModelLoader(
     BaseModelLoader,
     ModelSpecModelLoaderMixin,
-    SDConfigModelLoaderMixin,
     InternalModelLoaderMixin,
 ):
     def __init__(self):
@@ -45,8 +43,6 @@ class StableDiffusionXLLoRAModelLoader(
         model = StableDiffusionXLModel(model_type=model_type)
         self._load_internal_data(model, model_names.lora)
         model.model_spec = self._load_default_model_spec(model_type)
-        model.sd_config = self._load_sd_config(model_type)
-        model.sd_config_filename = self._get_sd_config_name(model_type)
 
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
