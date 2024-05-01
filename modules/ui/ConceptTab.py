@@ -60,7 +60,7 @@ class ConceptWidget(ctk.CTkFrame):
         image_label.grid(row=0, column=0)
 
         # name
-        self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5)
+        self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5, wraplength=140)
 
         # close button
         close_button = ctk.CTkButton(
