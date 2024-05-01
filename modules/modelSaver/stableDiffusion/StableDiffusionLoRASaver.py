@@ -26,6 +26,13 @@ class StableDiffusionLoRASaver(
         if model.lora_state_dict is not None:
             state_dict |= model.lora_state_dict
 
+        if model.additional_embeddings:
+            embedding_dict = {}
+            for embedding in model.additional_embeddings:
+                embedding_dict[embedding.placeholder]['string_to_param']['*'] = \
+                    embedding.text_encoder_vector.to(device="cpu")
+            state_dict['bundle_emb'] = embedding_dict
+
         return state_dict
 
     def __save_ckpt(
