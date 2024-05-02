@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Iterable, Iterator
+from typing import Iterator
 
 import torch
 from torch import Tensor
@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.tensorboard import SummaryWriter
 
 from modules.model.BaseModel import BaseModel
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
@@ -35,15 +36,8 @@ class BaseModelSetup(
             self,
             model: BaseModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
+    ) -> NamedParameterGroupCollection:
         pass
-
-    def create_parameters_for_optimizer(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        return self.create_parameters(model, config)
 
     @abstractmethod
     def setup_model(
@@ -102,33 +96,6 @@ class BaseModelSetup(
     ):
         """Reports current learning rates per the scheduler to tensorboard."""
         pass
-
-    def create_param_groups(
-            self,
-            config: TrainConfig,
-            params: Iterator[Parameter] | list[Parameter],
-            lr_arg: float,
-    ) -> dict:
-        batch_size_scale = 1 if config.learning_rate_scaler in [
-            LearningRateScaler.NONE,
-            LearningRateScaler.GRADIENT_ACCUMULATION,
-        ] else config.batch_size
-
-        gradient_accumulation_steps_scale = 1 if config.learning_rate_scaler in [
-            LearningRateScaler.NONE,
-            LearningRateScaler.BATCH,
-        ] else config.gradient_accumulation_steps
-
-        # Determine the learning rate
-        lr = lr_arg if lr_arg is not None else config.learning_rate
-        lr = lr * ((batch_size_scale * gradient_accumulation_steps_scale) ** 0.5)
-
-        # Create a parameter group for the text encoder
-        return {
-            'params': list(params),
-            'lr': lr,
-            'initial_lr': lr,
-        }
 
     def stop_unet_training_elapsed(
             self,

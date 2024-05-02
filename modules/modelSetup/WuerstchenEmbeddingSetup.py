@@ -3,11 +3,12 @@ from typing import Iterable
 import torch
 from torch.nn import Parameter
 
-from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
+from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class WuerstchenEmbeddingSetup(
@@ -29,21 +30,17 @@ class WuerstchenEmbeddingSetup(
             self,
             model: WuerstchenModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        return model.prior_embedding_wrapper.parameters()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
-    def create_parameters_for_optimizer(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        return [
-            self.create_param_groups(
-                config,
-                model.prior_embedding_wrapper.parameters(),
-                config.embedding_learning_rate,
-            ),
-        ]
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name="prior_embeddings",
+            display_name="prior_embeddings",
+            parameters=model.prior_embedding_wrapper.parameters(),
+            learning_rate=config.embedding_learning_rate,
+        ))
+
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -80,15 +77,7 @@ class WuerstchenEmbeddingSetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self.setup_optimizations(model, config)
 

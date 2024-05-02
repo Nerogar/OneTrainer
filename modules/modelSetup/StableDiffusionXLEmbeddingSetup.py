@@ -5,9 +5,10 @@ from torch.nn import Parameter
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class StableDiffusionXLEmbeddingSetup(
@@ -29,31 +30,24 @@ class StableDiffusionXLEmbeddingSetup(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        params = list()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
-        params += list(model.embedding_wrapper_1.parameters())
-        params += list(model.embedding_wrapper_2.parameters())
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name="embeddings_1",
+            display_name="embeddings_1",
+            parameters=model.embedding_wrapper_1.parameters(),
+            learning_rate=config.embedding_learning_rate,
+        ))
 
-        return params
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name="embeddings_2",
+            display_name="embeddings_2",
+            parameters=model.embedding_wrapper_2.parameters(),
+            learning_rate=config.embedding_learning_rate,
+        ))
 
-    def create_parameters_for_optimizer(
-            self,
-            model: StableDiffusionXLModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        return [
-            self.create_param_groups(
-                config,
-                model.embedding_wrapper_1.parameters(),
-                config.learning_rate,
-            ),
-            self.create_param_groups(
-                config,
-                model.embedding_wrapper_2.parameters(),
-                config.embedding_learning_rate,
-            )
-        ]
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -91,15 +85,7 @@ class StableDiffusionXLEmbeddingSetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self._setup_optimizations(model, config)
 

@@ -6,9 +6,10 @@ from torch.nn import Parameter
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class WuerstchenLoRASetup(
@@ -30,55 +31,34 @@ class WuerstchenLoRASetup(
             self,
             model: WuerstchenModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        params = list()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train:
-            params += list(model.prior_text_encoder_lora.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="prior_text_encoder_lora",
+                display_name="prior_text_encoder_lora",
+                parameters=model.prior_text_encoder_lora.parameters(),
+                learning_rate=config.text_encoder.learning_rate,
+            ))
 
         if config.train_any_embedding():
-            params += list(model.prior_embedding_wrapper.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="prior_embeddings",
+                display_name="prior_embeddings",
+                parameters=model.prior_embedding_wrapper.parameters(),
+                learning_rate=config.embedding_learning_rate,
+            ))
 
         if config.prior.train:
-            params += list(model.prior_prior_lora.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="prior_prior_lora",
+                display_name="prior_prior_lora",
+                parameters=model.prior_prior_lora.parameters(),
+                learning_rate=config.prior.learning_rate,
+            ))
 
-        return params
-
-    def create_parameters_for_optimizer(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        param_groups = list()
-
-        if config.text_encoder.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.prior_text_encoder_lora.parameters(),
-                    config.text_encoder.learning_rate,
-                )
-            )
-
-        if config.train_any_embedding():
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.prior_embedding_wrapper.parameters(),
-                    config.embedding_learning_rate,
-                )
-            )
-
-        if config.prior.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.prior_prior_lora.parameters(),
-                    config.prior.learning_rate,
-                )
-            )
-
-        return param_groups
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -145,15 +125,7 @@ class WuerstchenLoRASetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self.setup_optimizations(model, config)
 

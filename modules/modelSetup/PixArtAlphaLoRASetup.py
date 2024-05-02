@@ -6,9 +6,10 @@ from torch.nn import Parameter
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class PixArtAlphaLoRASetup(
@@ -30,55 +31,34 @@ class PixArtAlphaLoRASetup(
             self,
             model: PixArtAlphaModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        params = list()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train:
-            params += list(model.text_encoder_lora.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="text_encoder_lora",
+                display_name="text_encoder_lora",
+                parameters=model.text_encoder_lora.parameters(),
+                learning_rate=config.text_encoder.learning_rate,
+            ))
 
         if config.train_any_embedding():
-            params += list(model.embedding_wrapper.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="embeddings",
+                display_name="embeddings",
+                parameters=model.embedding_wrapper.parameters(),
+                learning_rate=config.embedding_learning_rate,
+            ))
 
         if config.prior.train:
-            params += list(model.transformer_lora.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="transformer_lora",
+                display_name="transformer_lora",
+                parameters=model.transformer_lora.parameters(),
+                learning_rate=config.prior.learning_rate,
+            ))
 
-        return params
-
-    def create_parameters_for_optimizer(
-            self,
-            model: PixArtAlphaModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        param_groups = list()
-
-        if config.text_encoder.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.text_encoder_lora.parameters(),
-                    config.text_encoder.learning_rate,
-                )
-            )
-
-        if config.train_any_embedding():
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.embedding_wrapper.parameters(),
-                    config.embedding_learning_rate,
-                )
-            )
-
-        if config.prior.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.transformer_lora.parameters(),
-                    config.prior.learning_rate,
-                )
-            )
-
-        return param_groups
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -141,15 +121,7 @@ class PixArtAlphaLoRASetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self.setup_optimizations(model, config)
 

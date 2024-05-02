@@ -136,7 +136,7 @@ class GenericTrainer(BaseTrainer):
         self.previous_sample_time = -1
         self.sample_queue = []
 
-        self.parameters = list(self.model_setup.create_parameters(self.model, self.config))
+        self.parameters = self.model_setup.create_parameters(self.model, self.config).parameters()
 
     def __clear_cache(self):
         print(

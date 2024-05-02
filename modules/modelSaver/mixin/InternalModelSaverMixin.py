@@ -8,6 +8,7 @@ from modules.model.BaseModel import BaseModel
 
 
 class InternalModelSaverMixin(metaclass=ABCMeta):
+
     def _save_internal_data(
             self,
             model: BaseModel,
@@ -15,7 +16,12 @@ class InternalModelSaverMixin(metaclass=ABCMeta):
     ):
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
-        torch.save(model.optimizer.state_dict(), os.path.join(destination, "optimizer", "optimizer.pt"))
+        optimizer_state_dict = model.optimizer.state_dict()
+        optimizer_state_dict["param_group_mapping"] = model.param_group_mapping
+        optimizer_state_dict["param_group_optimizer_mapping"] = \
+            [str(model.train_config.optimizer.optimizer) for _ in model.param_group_mapping]
+
+        torch.save(optimizer_state_dict, os.path.join(destination, "optimizer", "optimizer.pt"))
 
         # ema
         if model.ema:

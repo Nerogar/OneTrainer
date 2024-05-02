@@ -5,9 +5,10 @@ from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class StableDiffusionFineTuneVaeSetup(
@@ -29,21 +30,17 @@ class StableDiffusionFineTuneVaeSetup(
             self,
             model: StableDiffusionModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        return model.vae.decoder.parameters()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
-    def create_parameters_for_optimizer(
-            self,
-            model: StableDiffusionModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        return [
-            self.create_param_groups(
-                config,
-                model.vae.decoder.parameters(),
-                config.learning_rate,
-            )
-        ]
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name="vae",
+            display_name="vae",
+            parameters=model.vae.decoder.parameters(),
+            learning_rate=config.learning_rate,
+        ))
+
+        return parameter_group_collection
 
     def setup_model(
             self,
@@ -55,15 +52,7 @@ class StableDiffusionFineTuneVaeSetup(
         model.vae.decoder.requires_grad_(True)
         model.unet.requires_grad_(False)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self._setup_optimizations(model, config)
 
