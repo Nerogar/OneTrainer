@@ -277,7 +277,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
     destroy = create_destroy(component._dropdown_menu)
     component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
 
-    return frame
+    return frame, {'component': component, 'button_component': button_component}
 
 
 def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,

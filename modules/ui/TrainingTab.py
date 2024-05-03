@@ -1,6 +1,7 @@
 import customtkinter as ctk
 
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
+from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -11,7 +12,7 @@ from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.optimizer_util import change_optimizer
+from modules.util.optimizer_util import change_optimizer, change_scheduler
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -130,8 +131,13 @@ class TrainingTab:
         # learning rate scheduler
         components.label(frame, 1, 0, "Learning Rate Scheduler",
                          tooltip="Learning rate scheduler that automatically changes the learning rate during training")
-        components.options(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
-                           "learning_rate_scheduler")
+        _, d = components.options_adv(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
+                                   "learning_rate_scheduler", command=self.__restore_scheduler_config,
+                                   adv_command=self.__open_scheduler_params_window)
+        self.lr_scheduler_comp = d['component']
+        self.lr_scheduler_adv_comp = d['button_component']
+        # Initial call requires the presence of self.lr_scheduler_adv_comp.
+        self.__restore_scheduler_config(self.ui_state.get_var("learning_rate_scheduler").get())
 
         # learning rate
         components.label(frame, 2, 0, "Learning Rate",
@@ -500,7 +506,7 @@ class TrainingTab:
         components.label(frame, 3, 0, "Loss Weight Function",
                          tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
         components.options(frame, 3, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
-        
+
         # Loss weight strength
         components.label(frame, 4, 0, "Gamma",
                          tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
@@ -515,6 +521,21 @@ class TrainingTab:
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
+    def __open_scheduler_params_window(self):
+        window = SchedulerParamsWindow(self.master, self.train_config, self.ui_state)
+        self.master.wait_window(window)
+
     def __restore_optimizer_config(self, *args):
         optimizer_config = change_optimizer(self.train_config)
         self.ui_state.get_var("optimizer").update(optimizer_config)
+
+    def __restore_scheduler_config(self, variable):
+        if not hasattr(self, 'lr_scheduler_adv_comp'):
+            return
+
+        if variable == "CUSTOM":
+            self.lr_scheduler_adv_comp.configure(state="normal")
+            scheduler_config = change_scheduler(self.train_config)
+            self.ui_state.get_var("scheduler").update(scheduler_config)
+        else:
+            self.lr_scheduler_adv_comp.configure(state="disabled")
