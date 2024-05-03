@@ -1,5 +1,4 @@
-from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig, TrainSchedulerConfig
-from modules.util.enum.LearningRateScheduler import LearningRateScheduler
+from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 
 
@@ -15,12 +14,6 @@ def change_optimizer(train_config: TrainConfig) -> TrainOptimizerConfig:
         optimizer_config.from_dict(saved_optimizer_config.to_dict())
 
     return optimizer_config
-
-
-def change_scheduler(train_config: TrainConfig) -> TrainSchedulerConfig:
-    if train_config.learning_rate_scheduler == LearningRateScheduler.CUSTOM:
-        return train_config.learning_rate_scheduler_config
-    return TrainSchedulerConfig.default_values()
 
 
 def load_optimizer_defaults(train_config: TrainConfig) -> TrainOptimizerConfig:
