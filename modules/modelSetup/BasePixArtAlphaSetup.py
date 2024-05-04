@@ -165,6 +165,10 @@ class BasePixArtAlphaSetup(
             orig_module=model.text_encoder.encoder.embed_tokens,
             additional_embeddings=[embedding.text_encoder_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_vector]),
+            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.uuid]),
         )
         model.embedding_wrapper.hook_to_module()
 

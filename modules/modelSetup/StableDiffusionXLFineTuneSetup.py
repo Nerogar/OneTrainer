@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
@@ -50,19 +47,25 @@ class StableDiffusionXLFineTuneSetup(
             ))
 
         if config.train_any_embedding():
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="embeddings_1",
-                display_name="embeddings_1",
-                parameters=model.embedding_wrapper_1.parameters(),
-                learning_rate=config.embedding_learning_rate,
-            ))
+            for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
+                                                    model.embedding_wrapper_1.additional_embedding_placeholders,
+                                                    model.embedding_wrapper_1.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"embeddings_1/{name}",
+                    display_name=f"embeddings_1/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="embeddings_2",
-                display_name="embeddings_2",
-                parameters=model.embedding_wrapper_2.parameters(),
-                learning_rate=config.embedding_learning_rate,
-            ))
+            for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
+                                                    model.embedding_wrapper_2.additional_embedding_placeholders,
+                                                    model.embedding_wrapper_2.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"embeddings_2/{name}",
+                    display_name=f"embeddings_2/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -169,30 +172,3 @@ class StableDiffusionXLFineTuneSetup(
             model.embedding_wrapper_1.normalize_embeddings()
             model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lrs = scheduler.get_last_lr()
-        names = []
-        if config.text_encoder.train:
-            names.append("te1")
-        if config.text_encoder_2.train:
-            names.append("te2")
-        if config.train_any_embedding():
-            names.append("embeddings_te_1")
-            names.append("embeddings_te_2")
-        if config.unet.train:
-            names.append("unet")
-        assert len(lrs) == len(names)
-
-        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
-
-        for name, lr in zip(names, lrs):
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )

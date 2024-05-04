@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
@@ -42,12 +39,15 @@ class WuerstchenFineTuneSetup(
             ))
 
         if config.train_any_embedding():
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="prior_embeddings",
-                display_name="prior_embeddings",
-                parameters=model.prior_embedding_wrapper.parameters(),
-                learning_rate=config.embedding_learning_rate,
-            ))
+            for parameter, placeholder, name in zip(model.prior_embedding_wrapper.additional_embeddings,
+                                                    model.prior_embedding_wrapper.additional_embedding_placeholders,
+                                                    model.prior_embedding_wrapper.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"prior_embeddings/{name}",
+                    display_name=f"prior_embeddings/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
         if config.prior.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -146,27 +146,3 @@ class WuerstchenFineTuneSetup(
         if config.preserve_embedding_norm:
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lrs = scheduler.get_last_lr()
-        names = []
-        if config.text_encoder.train:
-            names.append("te")
-        if config.train_any_embedding():
-            names.append("embeddings")
-        if config.prior.train:
-            names.append("prior")
-        assert len(lrs) == len(names)
-
-        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
-
-        for name, lr in zip(names, lrs):
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )

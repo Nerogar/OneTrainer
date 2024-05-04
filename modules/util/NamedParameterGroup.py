@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from torch.nn import Parameter
 from typing_extensions import Iterable
 
@@ -58,5 +60,10 @@ class NamedParameterGroupCollection:
 
         return parameters
 
+    @cached_property
     def unique_name_mapping(self) -> list[str]:
         return [group.unique_name for group in self.__groups]
+
+    @cached_property
+    def display_name_mapping(self) -> list[str]:
+        return [group.display_name for group in self.__groups]

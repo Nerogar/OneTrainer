@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
@@ -33,12 +30,15 @@ class WuerstchenEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        parameter_group_collection.add_group(NamedParameterGroup(
-            unique_name="prior_embeddings",
-            display_name="prior_embeddings",
-            parameters=model.prior_embedding_wrapper.parameters(),
-            learning_rate=config.embedding_learning_rate,
-        ))
+        for parameter, placeholder, name in zip(model.prior_embedding_wrapper.additional_embeddings,
+                                                model.prior_embedding_wrapper.additional_embedding_placeholders,
+                                                model.prior_embedding_wrapper.additional_embedding_names):
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name=f"prior_embeddings/{name}",
+                display_name=f"prior_embeddings/{placeholder}",
+                parameters=[parameter],
+                learning_rate=config.embedding_learning_rate,
+            ))
 
         return parameter_group_collection
 
@@ -113,14 +113,3 @@ class WuerstchenEmbeddingSetup(
         if config.preserve_embedding_norm:
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lr = scheduler.get_last_lr()[0]
-        lr = config.optimizer.optimizer.maybe_adjust_lrs([lr], model.optimizer)[0]
-        tensorboard.add_scalar("lr/embedding", lr, model.train_progress.global_step)

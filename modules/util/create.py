@@ -685,7 +685,7 @@ def create_optimizer(
             old_group_optimizer_mapping = state_dict['param_group_optimizer_mapping']
 
             new_param_groups = optimizer.state_dict()['param_groups']
-            new_group_mapping = parameter_group_collection.unique_name_mapping()
+            new_group_mapping = parameter_group_collection.unique_name_mapping
 
             state = {}
             param_groups = []

@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
@@ -113,14 +110,3 @@ class StableDiffusionFineTuneVaeSetup(
             train_progress: TrainProgress
     ):
         pass
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lr = scheduler.get_last_lr()[0]
-        lr = config.optimizer.optimizer.maybe_adjust_lrs([lr], model.optimizer)[0]
-        tensorboard.add_scalar("lr/vae", lr, model.train_progress.global_step)

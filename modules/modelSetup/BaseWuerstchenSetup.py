@@ -7,10 +7,10 @@ from torch import Tensor
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers, \
     enable_checkpointing_for_stable_cascade_blocks
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
@@ -168,6 +168,10 @@ class BaseWuerstchenSetup(
             orig_module=model.prior_text_encoder.text_model.embeddings.token_embedding,
             additional_embeddings=[embedding.prior_text_encoder_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.prior_text_encoder_vector]),
+            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.uuid]),
         )
         model.prior_embedding_wrapper.hook_to_module()
 

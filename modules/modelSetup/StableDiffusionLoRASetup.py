@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
@@ -43,12 +40,15 @@ class StableDiffusionLoRASetup(
             ))
 
         if config.train_any_embedding():
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="embeddings",
-                display_name="embeddings",
-                parameters=model.embedding_wrapper.parameters(),
-                learning_rate=config.embedding_learning_rate,
-            ))
+            for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
+                                                    model.embedding_wrapper.additional_embedding_placeholders,
+                                                    model.embedding_wrapper.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"embeddings/{name}",
+                    display_name=f"embeddings/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -166,27 +166,3 @@ class StableDiffusionLoRASetup(
         if config.preserve_embedding_norm:
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lrs = scheduler.get_last_lr()
-        names = []
-        if config.text_encoder.train:
-            names.append("te")
-        if config.train_any_embedding():
-            names.append("embeddings")
-        if config.unet.train:
-            names.append("unet")
-        assert len(lrs) == len(names)
-
-        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
-
-        for name, lr in zip(names, lrs):
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )

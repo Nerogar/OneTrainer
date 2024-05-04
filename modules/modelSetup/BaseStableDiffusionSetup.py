@@ -9,10 +9,10 @@ from torch.utils.checkpoint import checkpoint
 
 from modules.model.StableDiffusionModel import StableDiffusionModel, StableDiffusionModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_transformer_blocks, enable_checkpointing_for_clip_encoder_layers, \
     create_checkpointed_forward
@@ -148,6 +148,10 @@ class BaseStableDiffusionSetup(
             orig_module=model.text_encoder.text_model.embeddings.token_embedding,
             additional_embeddings=[embedding.text_encoder_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_vector]),
+            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.uuid]),
         )
         model.embedding_wrapper.hook_to_module()
 

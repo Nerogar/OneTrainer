@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
@@ -42,12 +39,15 @@ class StableDiffusionFineTuneSetup(
             ))
 
         if config.train_any_embedding():
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="embeddings",
-                display_name="embeddings",
-                parameters=model.embedding_wrapper.parameters(),
-                learning_rate=config.embedding_learning_rate,
-            ))
+            for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
+                                                    model.embedding_wrapper.additional_embedding_placeholders,
+                                                    model.embedding_wrapper.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"embeddings/{name}",
+                    display_name=f"embeddings/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -58,38 +58,6 @@ class StableDiffusionFineTuneSetup(
             ))
 
         return parameter_group_collection
-
-    def create_parameters_for_optimizer(
-            self,
-            model: StableDiffusionModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        param_groups = list()
-
-        if config.text_encoder.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.text_encoder.parameters(),
-                    config.text_encoder.learning_rate,
-                )
-            )
-
-        if config.train_any_embedding():
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.embedding_wrapper.parameters(),
-                    config.embedding_learning_rate,
-                )
-            )
-
-        if config.unet.train:
-            param_groups.append(
-                self.create_param_groups(config, model.unet.parameters(), config.unet.learning_rate)
-            )
-
-        return param_groups
 
     def __setup_requires_grad(
             self,
@@ -175,27 +143,3 @@ class StableDiffusionFineTuneSetup(
         if config.preserve_embedding_norm:
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lrs = scheduler.get_last_lr()
-        names = []
-        if config.text_encoder.train:
-            names.append("te")
-        if config.train_any_embedding():
-            names.append("embeddings")
-        if config.unet.train:
-            names.append("unet")
-        assert len(lrs) == len(names)
-
-        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
-
-        for name, lr in zip(names, lrs):
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )

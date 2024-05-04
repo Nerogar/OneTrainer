@@ -1,9 +1,7 @@
 from abc import ABCMeta, abstractmethod
-from typing import Iterator
 
 import torch
 from torch import Tensor
-from torch.nn import Parameter
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.tensorboard import SummaryWriter
 
@@ -12,7 +10,6 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
-from modules.util.enum.LearningRateScaler import LearningRateScaler
 
 
 class BaseModelSetup(
@@ -86,16 +83,30 @@ class BaseModelSetup(
     ):
         pass
 
-    @abstractmethod
-    def report_learning_rates(
+    def report_to_tensorboard(
             self,
             model: BaseModel,
             config: TrainConfig,
             scheduler: LRScheduler,
-            tensorboard: SummaryWriter
+            tensorboard: SummaryWriter,
     ):
-        """Reports current learning rates per the scheduler to tensorboard."""
-        pass
+        lrs = scheduler.get_last_lr()
+        parameters = model.parameters.display_name_mapping
+
+        reported_learning_rates = {}
+        for lr, parameter in zip(lrs, parameters):
+            # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
+            name = parameter.split('/')[0]
+
+            if name not in reported_learning_rates:
+                reported_learning_rates[name] = lr
+
+        reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
+
+        for name, lr in reported_learning_rates.items():
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )
 
     def stop_unet_training_elapsed(
             self,

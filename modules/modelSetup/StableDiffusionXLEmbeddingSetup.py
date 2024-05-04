@@ -1,7 +1,4 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
@@ -33,19 +30,25 @@ class StableDiffusionXLEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        parameter_group_collection.add_group(NamedParameterGroup(
-            unique_name="embeddings_1",
-            display_name="embeddings_1",
-            parameters=model.embedding_wrapper_1.parameters(),
-            learning_rate=config.embedding_learning_rate,
-        ))
+        for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
+                                                model.embedding_wrapper_1.additional_embedding_placeholders,
+                                                model.embedding_wrapper_1.additional_embedding_names):
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name=f"embeddings_1/{name}",
+                display_name=f"embeddings_1/{placeholder}",
+                parameters=[parameter],
+                learning_rate=config.embedding_learning_rate,
+            ))
 
-        parameter_group_collection.add_group(NamedParameterGroup(
-            unique_name="embeddings_2",
-            display_name="embeddings_2",
-            parameters=model.embedding_wrapper_2.parameters(),
-            learning_rate=config.embedding_learning_rate,
-        ))
+        for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
+                                                model.embedding_wrapper_2.additional_embedding_placeholders,
+                                                model.embedding_wrapper_2.additional_embedding_names):
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name=f"embeddings_2/{name}",
+                display_name=f"embeddings_2/{placeholder}",
+                parameters=[parameter],
+                learning_rate=config.embedding_learning_rate,
+            ))
 
         return parameter_group_collection
 
@@ -115,16 +118,3 @@ class StableDiffusionXLEmbeddingSetup(
             model.embedding_wrapper_1.normalize_embeddings()
             model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lr1 = scheduler.get_last_lr()[0]
-        lr2 = scheduler.get_last_lr()[1]
-        lr1, lr2 = config.optimizer.optimizer.maybe_adjust_lrs([lr1, lr2], model.optimizer)
-        tensorboard.add_scalar("lr/te1 embedding", lr1, model.train_progress.global_step)
-        tensorboard.add_scalar("lr/te2 embedding", lr2, model.train_progress.global_step)
