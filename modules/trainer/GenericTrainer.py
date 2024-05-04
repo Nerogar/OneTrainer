@@ -258,6 +258,10 @@ class GenericTrainer(BaseTrainer):
             train_device: torch.device,
             sample_params_list: list[SampleConfig] = None,
     ):
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.eval()
         torch_gc()
 
         self.callbacks.on_update_status("sampling")
@@ -300,6 +304,10 @@ class GenericTrainer(BaseTrainer):
             )
 
         self.model_setup.setup_train_device(self.model, self.config)
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.train()
 
         torch_gc()
 
@@ -323,6 +331,11 @@ class GenericTrainer(BaseTrainer):
 
         backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
+
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.eval()
 
         try:
             print("Creating Backup " + backup_path)
@@ -351,6 +364,10 @@ class GenericTrainer(BaseTrainer):
                 self.__prune_backups(self.config.rolling_backup_count)
 
         self.model_setup.setup_train_device(self.model, self.config)
+        # Special case for schedule-free optimizers.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.train()
 
         torch_gc()
 
@@ -370,6 +387,10 @@ class GenericTrainer(BaseTrainer):
             if self.model.ema:
                 self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
+            # Special case for schedule-free optimizers.
+            if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
+                self.model.optimizer.eval()
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,
@@ -377,6 +398,9 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
+            if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
+                self.model.optimizer.train()
         except:
             traceback.print_exc()
             print("Could not save model. Check your disk space!")
@@ -438,6 +462,14 @@ class GenericTrainer(BaseTrainer):
 
                         parameter.register_post_accumulate_grad_hook(__grad_hook)
 
+    def __before_eval(self):
+        # Special case for schedule-free optimizers, which need eval()
+        # called before evaluation. Can and should move this to a callback
+        # during a refactoring.
+        if self.config.optimizer.optimizer.is_schedule_free:
+            torch.clear_autocast_cache()
+            self.model.optimizer.eval()
+
     def train(self):
         train_device = torch.device(self.config.train_device)
 
@@ -468,10 +500,17 @@ class GenericTrainer(BaseTrainer):
 
             self.data_loader.get_data_set().start_next_epoch()
             self.model_setup.setup_train_device(self.model, self.config)
+            # Special case for schedule-free optimizers, which need train()
+            # called before training. Can and should move this to a callback
+            # during a refactoring.
+            if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
+                self.model.optimizer.train()
             torch_gc()
 
             if lr_scheduler is None:
                 lr_scheduler = create.create_lr_scheduler(
+                    config=self.config,
                     optimizer=self.model.optimizer,
                     learning_rate_scheduler=self.config.learning_rate_scheduler,
                     warmup_steps=self.config.learning_rate_warmup_steps,
@@ -590,6 +629,10 @@ class GenericTrainer(BaseTrainer):
         if self.one_step_trained:
             if self.config.backup_before_save:
                 self.backup(self.model.train_progress)
+            # Special case for schedule-free optimizers.
+            if self.config.optimizer.optimizer.is_schedule_free:
+                torch.clear_autocast_cache()
+                self.model.optimizer.eval()
 
             self.callbacks.on_update_status("saving the final model")
 

@@ -185,6 +185,22 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "percentile_clipping": 100,
         "block_wise": True,
     },
+    Optimizer.SCHEDULE_FREE_ADAMW: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-8,
+        "weight_decay": 1e-2,
+        "r": 0.0,
+        "weight_lr_power": 2.0,
+        "foreach": False,
+    },
+    Optimizer.SCHEDULE_FREE_SGD: {
+        "momentum": 0,
+        "weight_decay": 1e-2,
+        "r": 0.0,
+        "weight_lr_power": 2.0,
+        "foreach": False,
+    },
     Optimizer.PRODIGY: {
         "beta1": 0.9,
         "beta2": 0.999,
