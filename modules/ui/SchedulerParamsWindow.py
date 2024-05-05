@@ -23,7 +23,7 @@ class KvParams(ConfigList):
         self._create_element_list()
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return KvWidget(master, element, i+1, open_command, remove_command, clone_command, save_command)
+        return KvWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> tuple[str, str]:
         return ("", "")
@@ -39,6 +39,10 @@ class KvWidget(ctk.CTkFrame):
         self.ui_state = UIState(self, element)
         self.i = i
         self.save_command = save_command
+
+        self.grid_columnconfigure(0, weight=0)
+        self.grid_columnconfigure(1, weight=1, uniform=1)
+        self.grid_columnconfigure(2, weight=1, uniform=1)
 
         close_button = ctk.CTkButton(
             master=self,
@@ -58,10 +62,10 @@ class KvWidget(ctk.CTkFrame):
         # Value
         self.value = components.entry(self, 0, 2, self.ui_state, "value")
         self.value.bind("<FocusOut>", lambda _: save_command())
-        self.value.configure(width="50")
+        self.value.configure(width=50)
 
     def place_in_list(self):
-        self.grid(row=self.i, column=1, padx=5, pady=5, sticky="new")
+        self.grid(row=self.i, column=0, padx=5, pady=5, sticky="new")
 
 
 class SchedulerParamsWindow(ctk.CTkToplevel):
@@ -87,18 +91,20 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.frame.grid_columnconfigure(0, weight=0)
         self.frame.grid_columnconfigure(1, weight=1)
+        self.expand_frame = ctk.CTkFrame(self.frame, bg_color="transparent")
+        self.expand_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
 
     def main_frame(self, master):
-        if self.train_config.learning_rate_scheduler == LearningRateScheduler.CUSTOM:
+        if self.train_config.learning_rate_scheduler is LearningRateScheduler.CUSTOM:
             components.label(master, 0, 0, "Class Name",
                              tooltip="Python class module and name for the custom scheduler class.")
             components.entry(master, 0, 1, self.ui_state, "custom_scheduler")
 
         # Any additional parameters, in key-value form.
-        self.params = KvParams(master, self.train_config, self.ui_state)
+        self.params = KvParams(self.expand_frame, self.train_config, self.ui_state)
 
     def on_window_close(self):
         self.destroy()
