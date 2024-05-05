@@ -134,26 +134,6 @@ class TrainOptimizerConfig(BaseConfig):
         return TrainOptimizerConfig(data)
 
 
-class TrainSchedulerConfig(BaseConfig):
-    scheduler: LearningRateScheduler
-    custom_scheduler: str
-    scheduler_params: list[tuple[str, str]]
-
-    def __init__(self, data: list[(str, Any, type, bool)]):
-        super(TrainSchedulerConfig, self).__init__(data)
-
-    @staticmethod
-    def default_values():
-        data = []
-
-        # name, default value, data type, nullable
-        data.append(("scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
-        data.append(("custom_scheduler", None, str, True))
-        data.append(("scheduler_params", [], list[tuple[str, str]], True))
-
-        return TrainSchedulerConfig(data)
-
-
 class TrainModelPartConfig(BaseConfig):
     model_name: str
     train: bool
@@ -241,7 +221,9 @@ class TrainConfig(BaseConfig):
     clear_cache_before_training: bool
 
     # training settings
-    learning_rate_scheduler: TrainSchedulerConfig
+    learning_rate_scheduler: LearningRateScheduler
+    custom_scheduler: str | None
+    scheduler_params: list[tuple[str, str]]
     learning_rate: float
     learning_rate_warmup_steps: int
     learning_rate_cycles: float
@@ -592,7 +574,9 @@ class TrainConfig(BaseConfig):
         data.append(("clear_cache_before_training", True, bool, False))
 
         # training settings
-        data.append(("learning_rate_scheduler", TrainSchedulerConfig.default_values(), TrainSchedulerConfig, False))
+        data.append(("learning_rate_scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
+        data.append(("custom_scheduler", None, str, True))
+        data.append(("scheduler_params", [], list[tuple[str, str]], True))
         data.append(("learning_rate", 3e-6, float, False))
         data.append(("learning_rate_warmup_steps", 200, int, False))
         data.append(("learning_rate_cycles", 1, int, False))

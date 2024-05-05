@@ -12,13 +12,6 @@ from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
 
-def deep_getattr(obj, attr):
-    attrs = attr.split(".")
-    for attr in attrs:
-        obj = getattr(obj, attr)
-    return obj
-
-
 class ConfigList(metaclass=ABCMeta):
 
     def __init__(
@@ -70,7 +63,7 @@ class ConfigList(metaclass=ABCMeta):
             self.top_frame.grid(row=0, column=0, sticky="nsew")
             components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
 
-            self.current_config = deep_getattr(self.train_config, self.attr_name)
+            self.current_config = getattr(self.train_config, self.attr_name)
 
             self.element_list = None
             self._create_element_list()
@@ -97,7 +90,7 @@ class ConfigList(metaclass=ABCMeta):
 
     def _create_element_list(self):
         if not self.from_external_file:
-            self.current_config = deep_getattr(self.train_config, self.attr_name)
+            self.current_config = getattr(self.train_config, self.attr_name)
 
         self.widgets = []
         if self.element_list is not None:

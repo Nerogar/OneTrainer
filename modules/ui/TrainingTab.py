@@ -136,12 +136,12 @@ class TrainingTab:
         components.label(frame, 1, 0, "Learning Rate Scheduler",
                          tooltip="Learning rate scheduler that automatically changes the learning rate during training")
         _, d = components.options_adv(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
-                                      "learning_rate_scheduler.scheduler", command=self.__restore_scheduler_config,
+                                      "learning_rate_scheduler", command=self.__restore_scheduler_config,
                                       adv_command=self.__open_scheduler_params_window)
         self.lr_scheduler_comp = d['component']
         self.lr_scheduler_adv_comp = d['button_component']
         # Initial call requires the presence of self.lr_scheduler_adv_comp.
-        self.__restore_scheduler_config(self.ui_state.get_var("learning_rate_scheduler.scheduler").get())
+        self.__restore_scheduler_config(self.ui_state.get_var("learning_rate_scheduler").get())
 
         # learning rate
         components.label(frame, 2, 0, "Learning Rate",
