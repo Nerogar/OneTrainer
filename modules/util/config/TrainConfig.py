@@ -223,7 +223,9 @@ class TrainConfig(BaseConfig):
     # training settings
     learning_rate_scheduler: LearningRateScheduler
     custom_scheduler: str | None
-    scheduler_params: list[tuple[str, str]]
+    # Dict keys are literally called "key" and "value"; not a tuple because
+    # of restrictions with ConfigList.
+    scheduler_params: list[dict[str, str]]
     learning_rate: float
     learning_rate_warmup_steps: int
     learning_rate_cycles: float
@@ -576,7 +578,7 @@ class TrainConfig(BaseConfig):
         # training settings
         data.append(("learning_rate_scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
         data.append(("custom_scheduler", None, str, True))
-        data.append(("scheduler_params", [], list[tuple[str, str]], True))
+        data.append(("scheduler_params", [], list[dict[str, str]], True))
         data.append(("learning_rate", 3e-6, float, False))
         data.append(("learning_rate_warmup_steps", 200, int, False))
         data.append(("learning_rate_cycles", 1, int, False))

@@ -25,8 +25,8 @@ class KvParams(ConfigList):
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return KvWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
-    def create_new_element(self) -> tuple[str, str]:
-        return ("", "")
+    def create_new_element(self) -> dict[str, str]:
+        return {"key": "", "value": ""}
 
     def open_element_window(self, i, ui_state):
         pass
