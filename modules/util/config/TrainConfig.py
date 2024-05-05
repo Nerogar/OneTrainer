@@ -137,7 +137,7 @@ class TrainOptimizerConfig(BaseConfig):
 class TrainSchedulerConfig(BaseConfig):
     scheduler: LearningRateScheduler
     custom_scheduler: str
-    scheduler_params: dict[str, str]
+    scheduler_params: list[tuple[str, str]]
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainSchedulerConfig, self).__init__(data)
@@ -149,7 +149,7 @@ class TrainSchedulerConfig(BaseConfig):
         # name, default value, data type, nullable
         data.append(("scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
         data.append(("custom_scheduler", None, str, True))
-        data.append(("scheduler_params", {}, dict[str, str], True))
+        data.append(("scheduler_params", [], list[tuple[str, str]], True))
 
         return TrainSchedulerConfig(data)
 
