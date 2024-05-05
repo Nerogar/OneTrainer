@@ -42,6 +42,8 @@ def entry(
         ui_state: UIState,
         var_name: str,
         command: Callable[[], None] = None,
+        tooltip: str = "",
+        wide_tooltip: bool = False
 ):
     var = ui_state.get_var(var_name)
     if command:
@@ -68,6 +70,9 @@ def entry(
 
     destroy = create_destroy(component)
     component.destroy = lambda: destroy(component)
+
+    if tooltip:
+        ToolTip(component, tooltip, wide=wide_tooltip)
 
     return component
 
