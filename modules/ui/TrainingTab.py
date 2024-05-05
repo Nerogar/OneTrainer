@@ -129,11 +129,15 @@ class TrainingTab:
                                command=self.__restore_optimizer_config, adv_command=self.__open_optimizer_params_window)
 
         # learning rate scheduler
+        # Wackiness will ensue when reloading configs if we don't check and clear this first.
+        if hasattr(self, "lr_scheduler_comp"):
+            delattr(self, "lr_scheduler_comp")
+            delattr(self, "lr_scheduler_adv_comp")
         components.label(frame, 1, 0, "Learning Rate Scheduler",
                          tooltip="Learning rate scheduler that automatically changes the learning rate during training")
         _, d = components.options_adv(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
-                                   "learning_rate_scheduler.scheduler", command=self.__restore_scheduler_config,
-                                   adv_command=self.__open_scheduler_params_window)
+                                      "learning_rate_scheduler.scheduler", command=self.__restore_scheduler_config,
+                                      adv_command=self.__open_scheduler_params_window)
         self.lr_scheduler_comp = d['component']
         self.lr_scheduler_adv_comp = d['button_component']
         # Initial call requires the presence of self.lr_scheduler_adv_comp.
