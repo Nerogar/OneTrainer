@@ -1,10 +1,12 @@
+import ast
+import importlib
 from typing import Iterable
 
 import torch
 from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
     DPMSolverMultistepScheduler, UniPCMultistepScheduler, SchedulerMixin
 from torch.nn import Parameter
-from torch.optim.lr_scheduler import LambdaLR, LRScheduler
+from torch.optim.lr_scheduler import LambdaLR, LRScheduler, SequentialLR
 
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
@@ -794,6 +796,50 @@ def create_lr_scheduler(
                 optimizer,
                 initial_lr=optimizer.state_dict()['param_groups'][0]['initial_lr'],
             )
+        case LearningRateScheduler.CUSTOM:
+            # Special case. Unlike the others, we return from here.
+            if not config.custom_scheduler:
+                raise AssertionError("Must specify a class when using a custom LR scheduler.")
+            if "." not in config.custom_scheduler:
+                raise AssertionError("Custom class name must be in the format <module>.<class>")
+            klass = config.custom_scheduler.split(".")[-1]
+            module = config.custom_scheduler.removesuffix("." + klass)
+            module = importlib.import_module(module)
+            klass = getattr(module, klass)
+            # Compile arguments into single dict.
+            args = {}
+            for pd in config.scheduler_params:
+                key = pd["key"]
+                value = pd["value"]
+                # Special values
+                match value:
+                    case "%LR%":
+                        value = config.learning_rate
+                    case "%EPOCHS%":
+                        value = num_epochs
+                    case "%STEPS_PER_EPOCH%":
+                        value = steps_per_epoch
+                    case "%TOTAL_STEPS%":
+                        value = total_steps
+                    case "%SCHEDULER_STEPS%":
+                        value = scheduler_steps
+                    case _:
+                        value = ast.literal_eval(value)
+                args[key] = value
+            scheduler = klass(optimizer=optimizer,
+                              last_epoch=int(global_step / gradient_accumulation_steps) - 1,
+                              **args)
+            if warmup_steps > 0:
+                warmup_scheduler = LambdaLR(
+                    optimizer=optimizer,
+                    lr_lambda=lr_lambda_warmup(warmup_steps, lr_lambda_constant()),
+                    last_epoch=int(global_step / gradient_accumulation_steps) - 1)
+                scheduler = SequentialLR(
+                    optimizer,
+                    schedulers=[warmup_scheduler, scheduler],
+                    milestones=[warmup_steps],
+                    last_epoch=int(global_step / gradient_accumulation_steps) - 1)
+            return scheduler
         case _:
             lr_lambda = lr_lambda_constant()
 
