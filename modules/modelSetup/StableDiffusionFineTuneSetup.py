@@ -1,13 +1,11 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class StableDiffusionFineTuneSetup(
@@ -29,51 +27,37 @@ class StableDiffusionFineTuneSetup(
             self,
             model: StableDiffusionModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        params = list()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train:
-            params += list(model.text_encoder.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="text_encoder",
+                display_name="text_encoder",
+                parameters=model.text_encoder.parameters(),
+                learning_rate=config.text_encoder.learning_rate,
+            ))
 
         if config.train_any_embedding():
-            params += list(model.embedding_wrapper.parameters())
+            for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
+                                                    model.embedding_wrapper.additional_embedding_placeholders,
+                                                    model.embedding_wrapper.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"embeddings/{name}",
+                    display_name=f"embeddings/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
         if config.unet.train:
-            params += list(model.unet.parameters())
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="unet",
+                display_name="unet",
+                parameters=model.unet.parameters(),
+                learning_rate=config.unet.learning_rate,
+            ))
 
-        return params
-
-    def create_parameters_for_optimizer(
-            self,
-            model: StableDiffusionModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        param_groups = list()
-
-        if config.text_encoder.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.text_encoder.parameters(),
-                    config.text_encoder.learning_rate,
-                )
-            )
-
-        if config.train_any_embedding():
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.embedding_wrapper.parameters(),
-                    config.embedding_learning_rate,
-                )
-            )
-
-        if config.unet.train:
-            param_groups.append(
-                self.create_param_groups(config, model.unet.parameters(), config.unet.learning_rate)
-            )
-
-        return param_groups
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -96,7 +80,6 @@ class StableDiffusionFineTuneSetup(
 
         model.vae.requires_grad_(False)
 
-
     def setup_model(
             self,
             model: StableDiffusionModel,
@@ -118,15 +101,7 @@ class StableDiffusionFineTuneSetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self._setup_optimizations(model, config)
 
@@ -168,27 +143,3 @@ class StableDiffusionFineTuneSetup(
         if config.preserve_embedding_norm:
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lrs = scheduler.get_last_lr()
-        names = []
-        if config.text_encoder.train:
-            names.append("te")
-        if config.train_any_embedding():
-            names.append("embeddings")
-        if config.unet.train:
-            names.append("unet")
-        assert len(lrs) == len(names)
-
-        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
-
-        for name, lr in zip(names, lrs):
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )

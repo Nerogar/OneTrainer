@@ -1,13 +1,11 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class WuerstchenFineTuneSetup(
@@ -29,55 +27,37 @@ class WuerstchenFineTuneSetup(
             self,
             model: WuerstchenModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        params = list()
-
-        if config.prior.train:
-            params += list(model.prior_prior.parameters())
-
-        if config.train_any_embedding():
-            params += list(model.prior_embedding_wrapper.parameters())
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train:
-            params += list(model.prior_text_encoder.parameters())
-
-        return params
-
-    def create_parameters_for_optimizer(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        param_groups = list()
-
-        if config.text_encoder.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.prior_text_encoder.parameters(),
-                    config.text_encoder.learning_rate,
-                )
-            )
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="prior_text_encoder",
+                display_name="prior_text_encoder",
+                parameters=model.prior_text_encoder.parameters(),
+                learning_rate=config.text_encoder.learning_rate,
+            ))
 
         if config.train_any_embedding():
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.prior_embedding_wrapper.parameters(),
-                    config.embedding_learning_rate,
-                )
-            )
+            for parameter, placeholder, name in zip(model.prior_embedding_wrapper.additional_embeddings,
+                                                    model.prior_embedding_wrapper.additional_embedding_placeholders,
+                                                    model.prior_embedding_wrapper.additional_embedding_names):
+                parameter_group_collection.add_group(NamedParameterGroup(
+                    unique_name=f"prior_embeddings/{name}",
+                    display_name=f"prior_embeddings/{placeholder}",
+                    parameters=[parameter],
+                    learning_rate=config.embedding_learning_rate,
+                ))
 
         if config.prior.train:
-            param_groups.append(
-                self.create_param_groups(
-                    config,
-                    model.prior_prior.parameters(),
-                    config.prior.learning_rate,
-                )
-            )
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name="prior_prior",
+                display_name="prior_prior",
+                parameters=model.prior_prior.parameters(),
+                learning_rate=config.prior.learning_rate,
+            ))
 
-        return param_groups
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -117,15 +97,7 @@ class WuerstchenFineTuneSetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self.setup_optimizations(model, config)
 
@@ -174,27 +146,3 @@ class WuerstchenFineTuneSetup(
         if config.preserve_embedding_norm:
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lrs = scheduler.get_last_lr()
-        names = []
-        if config.text_encoder.train:
-            names.append("te")
-        if config.train_any_embedding():
-            names.append("embeddings")
-        if config.prior.train:
-            names.append("prior")
-        assert len(lrs) == len(names)
-
-        lrs = config.optimizer.optimizer.maybe_adjust_lrs(lrs, model.optimizer)
-
-        for name, lr in zip(names, lrs):
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )

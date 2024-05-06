@@ -136,7 +136,7 @@ class GenericTrainer(BaseTrainer):
         self.previous_sample_time = -1
         self.sample_queue = []
 
-        self.parameters = list(self.model_setup.create_parameters(self.model, self.config))
+        self.parameters = self.model.parameters.parameters()
 
     def __clear_cache(self):
         print(
@@ -584,7 +584,7 @@ class GenericTrainer(BaseTrainer):
                     self.model.optimizer.zero_grad(set_to_none=True)
                     has_gradient = False
 
-                    self.model_setup.report_learning_rates(
+                    self.model_setup.report_to_tensorboard(
                         self.model, self.config, lr_scheduler, self.tensorboard
                     )
 

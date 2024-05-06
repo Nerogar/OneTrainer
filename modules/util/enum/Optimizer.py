@@ -1,5 +1,7 @@
 from enum import Enum
 
+import torch
+
 
 class Optimizer(Enum):
     # Sorted by origin (BNB / torch first, then DADAPT), then by adapter name, then interleaved by variant.
@@ -77,10 +79,10 @@ class Optimizer(Enum):
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.
-    def maybe_adjust_lrs(self, lrs, optimizer):
+    def maybe_adjust_lrs(self, lrs: dict[str, float], optimizer: torch.optim.Optimizer):
         if self.is_adaptive:
             d = optimizer.param_groups[0]["d"]
-            return [lr * d if lr is not None else None for lr in lrs]
+            return {key: lr * d if lr is not None else None for key, lr in lrs.items()}
         return lrs
 
     def __str__(self):

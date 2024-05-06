@@ -1,13 +1,11 @@
-from typing import Iterable
-
 import torch
-from torch.nn import Parameter
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
-from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class StableDiffusionXLEmbeddingSetup(
@@ -29,31 +27,30 @@ class StableDiffusionXLEmbeddingSetup(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
-        params = list()
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
 
-        params += list(model.embedding_wrapper_1.parameters())
-        params += list(model.embedding_wrapper_2.parameters())
+        for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
+                                                model.embedding_wrapper_1.additional_embedding_placeholders,
+                                                model.embedding_wrapper_1.additional_embedding_names):
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name=f"embeddings_1/{name}",
+                display_name=f"embeddings_1/{placeholder}",
+                parameters=[parameter],
+                learning_rate=config.embedding_learning_rate,
+            ))
 
-        return params
+        for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
+                                                model.embedding_wrapper_2.additional_embedding_placeholders,
+                                                model.embedding_wrapper_2.additional_embedding_names):
+            parameter_group_collection.add_group(NamedParameterGroup(
+                unique_name=f"embeddings_2/{name}",
+                display_name=f"embeddings_2/{placeholder}",
+                parameters=[parameter],
+                learning_rate=config.embedding_learning_rate,
+            ))
 
-    def create_parameters_for_optimizer(
-            self,
-            model: StableDiffusionXLModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        return [
-            self.create_param_groups(
-                config,
-                model.embedding_wrapper_1.parameters(),
-                config.learning_rate,
-            ),
-            self.create_param_groups(
-                config,
-                model.embedding_wrapper_2.parameters(),
-                config.embedding_learning_rate,
-            )
-        ]
+        return parameter_group_collection
 
     def __setup_requires_grad(
             self,
@@ -91,15 +88,7 @@ class StableDiffusionXLEmbeddingSetup(
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
-        model.optimizer = create.create_optimizer(
-            self.create_parameters_for_optimizer(model, config), model.optimizer_state_dict, config
-        )
-        model.optimizer_state_dict = None
-
-        model.ema = create.create_ema(
-            self.create_parameters(model, config), model.ema_state_dict, config
-        )
-        model.ema_state_dict = None
+        init_model_parameters(model, self.create_parameters(model, config))
 
         self._setup_optimizations(model, config)
 
@@ -129,16 +118,3 @@ class StableDiffusionXLEmbeddingSetup(
             model.embedding_wrapper_1.normalize_embeddings()
             model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-    def report_learning_rates(
-            self,
-            model,
-            config,
-            scheduler,
-            tensorboard
-    ):
-        lr1 = scheduler.get_last_lr()[0]
-        lr2 = scheduler.get_last_lr()[1]
-        lr1, lr2 = config.optimizer.optimizer.maybe_adjust_lrs([lr1, lr2], model.optimizer)
-        tensorboard.add_scalar("lr/te1 embedding", lr1, model.train_progress.global_step)
-        tensorboard.add_scalar("lr/te2 embedding", lr2, model.train_progress.global_step)

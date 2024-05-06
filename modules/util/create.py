@@ -59,6 +59,7 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
@@ -271,12 +272,14 @@ def create_data_loader(
 
 
 def create_optimizer(
-        parameters: Iterable[Parameter] | list[dict],
+        parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
 ) -> torch.optim.Optimizer:
     optimizer = None
     optimizer_config = config.optimizer
+
+    parameters = parameter_group_collection.parameters_for_optimizer(config)
 
     match config.optimizer.optimizer:
 
@@ -705,11 +708,51 @@ def create_optimizer(
             )
 
     if state_dict is not None:
-        for i, params in enumerate(parameters):
-            state_dict['param_groups'][i]['lr'] = params['lr']
-            state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
+        if 'param_group_mapping' not in state_dict:
+            # Old method of loading the optimizer state. This only works if the param groups did not change.
+            for i, params in enumerate(parameters):
+                state_dict['param_groups'][i]['lr'] = params['lr']
+                state_dict['param_groups'][i]['initial_lr'] = params['initial_lr']
+        else:
+            # New method of loading the optimizer state. Each group is mapped by a unique name.
+            old_state = state_dict['state']
+            old_param_groups = state_dict['param_groups']
+            old_group_mapping = state_dict['param_group_mapping']
+            old_group_optimizer_mapping = state_dict['param_group_optimizer_mapping']
 
-        # TODO: this will break if the optimizer class changed during a restart
+            new_param_groups = optimizer.state_dict()['param_groups']
+            new_group_mapping = parameter_group_collection.unique_name_mapping
+
+            state = {}
+            param_groups = []
+            state_index = 0
+
+            for new_group_index, unique_group_name in enumerate(new_group_mapping):
+                if (unique_group_name in old_group_mapping and str(config.optimizer.optimizer) ==
+                        old_group_optimizer_mapping[old_group_mapping.index(unique_group_name)]):
+                    # the group state was saved in state_dict
+                    old_group_index = old_group_mapping.index(unique_group_name)
+                    new_group = new_param_groups[new_group_index]
+                    old_group = old_param_groups[old_group_index]
+                    for i, old_state_index in enumerate(old_group['params']):
+                        state[state_index] = old_state[old_state_index]
+                        old_group['params'][i] = state_index
+                        state_index += 1
+                    param_groups.append(old_group)
+
+                    old_group['lr'] = new_group['lr']
+                    old_group['initial_lr'] = new_group['initial_lr']
+                else:
+                    # the group state was not saved, initialize with an empty group state
+                    new_group = new_param_groups[new_group_index]
+                    for i, old_state_index in enumerate(new_group['params']):
+                        new_group['params'][i] = state_index
+                        state_index += 1
+                    param_groups.append(new_group)
+
+            state_dict['state'] = state
+            state_dict['param_groups'] = param_groups
+
         optimizer.load_state_dict(state_dict)
 
     return optimizer
