@@ -297,7 +297,7 @@ class TrainingTab:
 
         # text encoder layer skip (clip skip)
         components.label(frame, 3, 0, "Clip Skip",
-                         tooltip="The number of clip layers to skip. 0 = disabled")
+                         tooltip="The number of additional clip layers to skip. 0 = the model default")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
 
     def __create_text_encoder_1_frame(self, master, row):
@@ -322,8 +322,8 @@ class TrainingTab:
         components.entry(frame, 2, 1, self.ui_state, "text_encoder.learning_rate")
 
         # text encoder layer skip (clip skip)
-        components.label(frame, 3, 0, "Clip Skip 1",
-                         tooltip="The number of clip layers to skip. 0 = disabled")
+        components.label(frame, 3, 0, "Text Encoder 1 Clip Skip",
+                         tooltip="The number of additional clip layers to skip. 0 = the model default")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
 
     def __create_text_encoder_2_frame(self, master, row):
@@ -348,8 +348,8 @@ class TrainingTab:
         components.entry(frame, 2, 1, self.ui_state, "text_encoder_2.learning_rate")
 
         # text encoder layer skip (clip skip)
-        components.label(frame, 3, 0, "Clip Skip 2",
-                         tooltip="The number of clip layers to skip. 0 = disabled")
+        components.label(frame, 3, 0, "Text Encoder 2 Clip Skip",
+                         tooltip="The number of additional clip layers to skip. 0 = the model default")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_2_layer_skip")
 
     def __create_embedding_frame(self, master, row):
