@@ -33,7 +33,6 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.torch_util import torch_gc
 
 

@@ -13,6 +13,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.enum.EMAMode import EMAMode
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -29,11 +30,18 @@ class SampleWindow(ctk.CTkToplevel):
     ):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
-        self.train_config = train_config
+        if train_config is not None:
+            self.train_config = TrainConfig.default_values().from_dict(train_config.to_dict())
+
+            # remove some settings to speed up model loading for sampling
+            self.train_config.optimizer.optimizer = None
+            self.train_config.ema = EMAMode.OFF
+        else:
+            self.train_config = None
         self.callbacks = callbacks
         self.commands = commands
 
-        use_external_model = train_config is None
+        use_external_model = self.train_config is None
 
         if use_external_model:
             self.callbacks.set_on_sample_custom(self.__update_preview)

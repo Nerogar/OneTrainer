@@ -1,17 +1,15 @@
 from abc import ABCMeta, abstractmethod
-from typing import Iterable, Iterator
 
 import torch
 from torch import Tensor
-from torch.nn import Parameter
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.tensorboard import SummaryWriter
 
 from modules.model.BaseModel import BaseModel
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.LearningRateScaler import LearningRateScaler
+from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 
 
 class BaseModelSetup(
@@ -35,15 +33,8 @@ class BaseModelSetup(
             self,
             model: BaseModel,
             config: TrainConfig,
-    ) -> Iterable[Parameter]:
+    ) -> NamedParameterGroupCollection:
         pass
-
-    def create_parameters_for_optimizer(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
-    ) -> Iterable[Parameter] | list[dict]:
-        return self.create_parameters(model, config)
 
     @abstractmethod
     def setup_model(
@@ -92,43 +83,30 @@ class BaseModelSetup(
     ):
         pass
 
-    @abstractmethod
-    def report_learning_rates(
+    def report_to_tensorboard(
             self,
             model: BaseModel,
             config: TrainConfig,
             scheduler: LRScheduler,
-            tensorboard: SummaryWriter
+            tensorboard: SummaryWriter,
     ):
-        """Reports current learning rates per the scheduler to tensorboard."""
-        pass
+        lrs = scheduler.get_last_lr()
+        parameters = model.parameters.display_name_mapping
 
-    def create_param_groups(
-            self,
-            config: TrainConfig,
-            params: Iterator[Parameter] | list[Parameter],
-            lr_arg: float,
-    ) -> dict:
-        batch_size_scale = 1 if config.learning_rate_scaler in [
-            LearningRateScaler.NONE,
-            LearningRateScaler.GRADIENT_ACCUMULATION,
-        ] else config.batch_size
+        reported_learning_rates = {}
+        for lr, parameter in zip(lrs, parameters):
+            # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
+            name = parameter.split('/')[0]
 
-        gradient_accumulation_steps_scale = 1 if config.learning_rate_scaler in [
-            LearningRateScaler.NONE,
-            LearningRateScaler.BATCH,
-        ] else config.gradient_accumulation_steps
+            if name not in reported_learning_rates:
+                reported_learning_rates[name] = lr
 
-        # Determine the learning rate
-        lr = lr_arg if lr_arg is not None else config.learning_rate
-        lr = lr * ((batch_size_scale * gradient_accumulation_steps_scale) ** 0.5)
+        reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
 
-        # Create a parameter group for the text encoder
-        return {
-            'params': list(params),
-            'lr': lr,
-            'initial_lr': lr,
-        }
+        for name, lr in reported_learning_rates.items():
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )
 
     def stop_unet_training_elapsed(
             self,
@@ -175,5 +153,30 @@ class BaseModelSetup(
             "stop_text_encoder_2_training",
             config.text_encoder_2.stop_training_after,
             config.text_encoder_2.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_additional_embedding_training_elapsed(
+            self,
+            config: TrainEmbeddingConfig,
+            train_progress: TrainProgress,
+            embedding_index: int,
+    ):
+        return self.single_action_elapsed(
+            "stop_embedding_training_" + str(embedding_index),
+            config.stop_training_after,
+            config.stop_training_after_unit,
+            train_progress,
+        )
+
+    def stop_embedding_training_elapsed(
+            self,
+            config: TrainEmbeddingConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_embedding_training",
+            config.stop_training_after,
+            config.stop_training_after_unit,
             train_progress,
         )

@@ -16,8 +16,14 @@ class ConceptTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(ConceptTab, self).__init__(
-            master, train_config, ui_state, "concept_file_name",
-            "training_concepts", "concepts.json", "add concept",
+            master,
+            train_config,
+            ui_state,
+            from_external_file=True,
+            attr_name="concept_file_name",
+            config_dir="training_concepts",
+            default_config_name="concepts.json",
+            add_button_text="add concept",
             is_full_width=False,
         )
 
@@ -54,7 +60,7 @@ class ConceptWidget(ctk.CTkFrame):
         image_label.grid(row=0, column=0)
 
         # name
-        self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5)
+        self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5, wraplength=140)
 
         # close button
         close_button = ctk.CTkButton(

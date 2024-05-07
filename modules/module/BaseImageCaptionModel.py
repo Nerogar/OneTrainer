@@ -93,6 +93,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             self,
             filename: str,
             initial_caption: str = "",
+            caption_prefix: str = "",
+            caption_postfix: str = "",
             mode: str = 'fill',
     ):
         """
@@ -101,6 +103,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         Parameters:
             filename (`str`): a sample filename
             initial_caption (`str`): an initial caption. the generated caption will start with this string
+            caption_prefix (`str`): add this to the start of the generated caption (before initial caption)
+            caption_postfix (`str`): add this to the end of the generated caption
             mode (`str`): can be one of
                 - replace: creates a new caption for all samples, even if a caption already exists
                 - fill: creates a new caption for all samples without a caption
@@ -112,7 +116,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         if mode == 'fill' and existing_caption is not None and existing_caption != "":
             return
 
-        predicted_caption = self.generate_caption(caption_sample, initial_caption)
+        predicted_caption = self.generate_caption(caption_sample, initial_caption, caption_prefix, caption_postfix)
 
         if mode == 'replace' or mode == 'fill':
             caption_sample.set_caption(predicted_caption)
@@ -126,6 +130,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             self,
             filenames: [str],
             initial_caption: str = "",
+            caption_prefix: str = "",
+            caption_postfix: str = "",
             mode: str = 'fill',
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
@@ -136,6 +142,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         Parameters:
             filenames (`[str]`): a list of sample filenames
             initial_caption (`str`): an initial caption. the generated caption will start with this string
+            caption_prefix (`str`): add this to the start of the generated caption (before initial caption)
+            caption_postfix (`str`): add this to the end of the generated caption
             mode (`str`): can be one of
                 - replace: creates a new caption for all samples, even if a caption already exists
                 - fill: creates a new caption for all samples without a caption
@@ -148,7 +156,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             progress_callback(0, len(filenames))
         for i, filename in enumerate(tqdm(filenames)):
             try:
-                self.caption_image(filename, initial_caption, mode)
+                self.caption_image(filename, initial_caption, caption_prefix, caption_postfix, mode)
             except Exception as e:
                 if error_callback is not None:
                     error_callback(filename)
@@ -159,6 +167,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             self,
             sample_dir: str,
             initial_caption: str = "",
+            caption_prefix: str = "",
+            caption_postfix: str = "",
             mode: str = 'fill',
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
@@ -170,6 +180,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         Parameters:
             sample_dir (`str`): directory where samples are located
             initial_caption (`str`): an initial caption. the generated caption will start with this string
+            caption_prefix (`str`): add this to the start of the generated caption (before initial caption)
+            caption_postfix (`str`): add this to the end of the generated caption
             mode (`str`): can be one of
                 - replace: creates a new caption for all samples, even if a caption already exists
                 - fill: creates a new caption for all samples without a caption
@@ -183,6 +195,8 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         self.caption_images(
             filenames=filenames,
             initial_caption=initial_caption,
+            caption_prefix=caption_prefix,
+            caption_postfix=caption_postfix,
             mode=mode,
             progress_callback=progress_callback,
             error_callback=error_callback,

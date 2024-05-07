@@ -1,11 +1,12 @@
 import traceback
 from pathlib import Path
+from uuid import uuid4
 
 import customtkinter as ctk
 import torch
 
 from modules.util import create
-from modules.util.ModelNames import ModelNames
+from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -124,7 +125,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                     model_type=self.convert_model_args.model_type,
                     model_names=ModelNames(
                         lora=self.convert_model_args.input_name,
-                        embedding=[self.convert_model_args.input_name],
+                        embedding=EmbeddingName(str(uuid4()), self.convert_model_args.input_name),
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
                 )

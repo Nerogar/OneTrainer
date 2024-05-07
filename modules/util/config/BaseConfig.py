@@ -86,7 +86,7 @@ class BaseConfig:
                         list_type = get_args(self.types[name])[0]
                         if data[name] is not None:
                             old_value = \
-                                (getattr(self, name)) if hasattr(self, name) and getattr(self, name) is not None else []
+                                getattr(self, name) if hasattr(self, name) and getattr(self, name) is not None else []
                             value = []
                             for i in range(max(len(old_value), len(data[name]))):
                                 if i < len(old_value) and i < len(data[name]):

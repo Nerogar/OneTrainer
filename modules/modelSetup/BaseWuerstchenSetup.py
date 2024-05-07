@@ -5,15 +5,18 @@ from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProc
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 
-from modules.model.WuerstchenModel import WuerstchenModel
+from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers, \
     enable_checkpointing_for_stable_cascade_blocks
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context, \
     disable_bf16_on_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -25,6 +28,7 @@ class BaseWuerstchenSetup(
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupDiffusionNoiseMixin,
+    ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):
 
@@ -60,6 +64,13 @@ class BaseWuerstchenSetup(
                 enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, self.train_device)
                 enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, self.train_device)
 
+        if config.force_circular_padding:
+            apply_circular_padding_to_conv2d(model.decoder_vqgan)
+            apply_circular_padding_to_conv2d(model.decoder_decoder)
+            apply_circular_padding_to_conv2d(model.prior_prior)
+            if model.prior_prior_lora is not None:
+                apply_circular_padding_to_conv2d(model.prior_prior_lora)
+
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().decoder_text_encoder,
             config.weight_dtypes().decoder,
@@ -68,7 +79,7 @@ class BaseWuerstchenSetup(
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().prior,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
+            config.weight_dtypes().embedding if config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
 
         if model.model_type.is_stable_cascade():
@@ -93,6 +104,76 @@ class BaseWuerstchenSetup(
             ],
             config.enable_autocast_cache,
         )
+
+    def _setup_additional_embeddings(
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
+    ):
+        model.additional_embeddings = []
+        for i, embedding_config in enumerate(config.additional_embeddings):
+            embedding_state = model.additional_embedding_states[i]
+            if embedding_state is None:
+                embedding_state = self._create_new_embedding(
+                    model.prior_tokenizer,
+                    model.prior_text_encoder,
+                    config.additional_embeddings[i].initial_embedding_text,
+                    config.additional_embeddings[i].token_count,
+                )
+
+            embedding_state = embedding_state.to(
+                dtype=model.prior_text_encoder.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
+
+            embedding = WuerstchenModelEmbedding(
+                embedding_config.uuid, embedding_state, embedding_config.placeholder,
+            )
+            model.additional_embeddings.append(embedding)
+            self._add_embedding_to_tokenizer(model.prior_tokenizer, embedding.text_tokens)
+
+    def _setup_embedding(
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
+    ):
+        model.embedding = None
+
+        embedding_state = model.embedding_state
+        if embedding_state is None:
+            embedding_state = self._create_new_embedding(
+                model.prior_tokenizer,
+                model.prior_text_encoder,
+                config.embedding.initial_embedding_text,
+                config.embedding.token_count,
+            )
+
+        embedding_state = embedding_state.to(
+            dtype=model.prior_text_encoder.get_input_embeddings().weight.dtype,
+            device=self.train_device,
+        ).detach()
+
+        model.embedding = WuerstchenModelEmbedding(
+            config.embedding.uuid, embedding_state, config.embedding.placeholder,
+        )
+        self._add_embedding_to_tokenizer(model.prior_tokenizer, model.embedding.text_tokens)
+
+    def _setup_embedding_wrapper(
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
+    ):
+        model.prior_embedding_wrapper = AdditionalEmbeddingWrapper(
+            tokenizer=model.prior_tokenizer,
+            orig_module=model.prior_text_encoder.text_model.embeddings.token_embedding,
+            additional_embeddings=[embedding.prior_text_encoder_vector for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.prior_text_encoder_vector]),
+            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+        )
+        model.prior_embedding_wrapper.hook_to_module()
 
     def __alpha_cumprod(
             self,
@@ -150,7 +231,7 @@ class BaseWuerstchenSetup(
                 self.__alpha_cumprod,
             )
 
-            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.train_any_embedding():
                 text_encoder_output = model.prior_text_encoder(
                     batch['tokens'], output_hidden_states=True, return_dict=True
                 )

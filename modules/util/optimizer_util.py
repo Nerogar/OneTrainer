@@ -1,3 +1,6 @@
+from modules.model.BaseModel import BaseModel
+from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 
@@ -39,6 +42,21 @@ def update_optimizer_config(train_config: TrainConfig):
         optimizer_donfig = TrainOptimizerConfig.default_values()
         optimizer_donfig.from_dict(train_config.optimizer.to_dict())
         train_config.optimizer_defaults[str(optimizer)] = optimizer_donfig
+
+
+def init_model_parameters(
+        model: BaseModel,
+        parameters: NamedParameterGroupCollection,
+):
+    model.parameters = parameters
+
+    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    model.optimizer_state_dict = None
+
+    model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    model.ema_state_dict = None
+
+    model.param_group_mapping = parameters.unique_name_mapping
 
 
 # Optimizer Key map with defaults
@@ -184,6 +202,22 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "min_8bit_size": 4096,
         "percentile_clipping": 100,
         "block_wise": True,
+    },
+    Optimizer.SCHEDULE_FREE_ADAMW: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-8,
+        "weight_decay": 1e-2,
+        "r": 0.0,
+        "weight_lr_power": 2.0,
+        "foreach": False,
+    },
+    Optimizer.SCHEDULE_FREE_SGD: {
+        "momentum": 0,
+        "weight_decay": 1e-2,
+        "r": 0.0,
+        "weight_lr_power": 2.0,
+        "foreach": False,
     },
     Optimizer.PRODIGY: {
         "beta1": 0.9,

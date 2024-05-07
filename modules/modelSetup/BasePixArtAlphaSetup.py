@@ -7,14 +7,18 @@ from diffusers.utils import is_xformers_available
 from torch import Tensor
 from torch.utils.checkpoint import checkpoint
 
-from modules.model.PixArtAlphaModel import PixArtAlphaModel
+from modules.model.PixArtAlphaModel import PixArtAlphaModel, PixArtAlphaModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import create_checkpointed_forward
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
+from modules.modelSetup.stableDiffusion.checkpointing_util import create_checkpointed_forward, \
+    enable_checkpointing_for_t5_encoder_layers, enable_checkpointing_for_transformer_blocks
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -25,6 +29,7 @@ class BasePixArtAlphaSetup(
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupDiffusionNoiseMixin,
+    ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):
 
@@ -65,12 +70,17 @@ class BasePixArtAlphaSetup(
                         f" correctly and a GPU is available: {e}"
                     )
 
-
         if config.gradient_checkpointing:
             model.vae.enable_gradient_checkpointing()
-            model.transformer.enable_gradient_checkpointing()
-            if config.text_encoder.train:
-                model.text_encoder.encoder.gradient_checkpointing_enable()
+            enable_checkpointing_for_transformer_blocks(model.transformer, self.train_device)
+            if config.text_encoder.train or config.train_any_embedding():
+                enable_checkpointing_for_t5_encoder_layers(model.text_encoder, self.train_device)
+
+        if config.force_circular_padding:
+            apply_circular_padding_to_conv2d(model.vae)
+            apply_circular_padding_to_conv2d(model.transformer)
+            if model.transformer_lora is not None:
+                apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().prior,
@@ -92,6 +102,75 @@ class BasePixArtAlphaSetup(
             config.enable_autocast_cache,
         )
 
+    def _setup_additional_embeddings(
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
+    ):
+        model.additional_embeddings = []
+        for i, embedding_config in enumerate(config.additional_embeddings):
+            embedding_state = model.additional_embedding_states[i]
+            if embedding_state is None:
+                embedding_state = self._create_new_embedding(
+                    model.tokenizer,
+                    model.text_encoder,
+                    config.additional_embeddings[i].initial_embedding_text,
+                    config.additional_embeddings[i].token_count,
+                )
+
+            embedding_state = embedding_state.to(
+                dtype=model.text_encoder.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
+
+            embedding = PixArtAlphaModelEmbedding(
+                embedding_config.uuid, embedding_state, embedding_config.placeholder,
+            )
+            model.additional_embeddings.append(embedding)
+            self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
+
+    def _setup_embedding(
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
+    ):
+        model.embedding = None
+
+        embedding_state = model.embedding_state
+        if embedding_state is None:
+            embedding_state = self._create_new_embedding(
+                model.tokenizer,
+                model.text_encoder,
+                config.embedding.initial_embedding_text,
+                config.embedding.token_count,
+            )
+
+        embedding_state = embedding_state.to(
+            dtype=model.text_encoder.get_input_embeddings().weight.dtype,
+            device=self.train_device,
+        ).detach()
+
+        model.embedding = PixArtAlphaModelEmbedding(
+            config.embedding.uuid, embedding_state, config.embedding.placeholder,
+        )
+        self._add_embedding_to_tokenizer(model.tokenizer, model.embedding.text_tokens)
+
+    def _setup_embedding_wrapper(
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
+    ):
+        model.embedding_wrapper = AdditionalEmbeddingWrapper(
+            tokenizer=model.tokenizer,
+            orig_module=model.text_encoder.encoder.embed_tokens,
+            additional_embeddings=[embedding.text_encoder_vector for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.text_encoder_vector]),
+            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+        )
+        model.embedding_wrapper.hook_to_module()
 
     def __encode_text(
             self,
@@ -147,7 +226,7 @@ class BasePixArtAlphaSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            if config.text_encoder.train or config.training_method == TrainingMethod.EMBEDDING:
+            if config.text_encoder.train or config.train_any_embedding():
                 text_encoder_output, text_encoder_attention_mask = self.__encode_text(
                     model,
                     config,
@@ -176,7 +255,7 @@ class BasePixArtAlphaSetup(
                     config,
                     text="",
                 )
-                negative_text_encoder_output = negative_text_encoder_output\
+                negative_text_encoder_output = negative_text_encoder_output \
                     .expand((scaled_latent_image.shape[0], -1, -1))
                 negative_text_encoder_attention_mask = negative_text_encoder_attention_mask \
                     .expand((scaled_latent_image.shape[0], -1, -1))
@@ -187,7 +266,8 @@ class BasePixArtAlphaSetup(
 
                 timestep_high = int(config.align_prop_steps * config.max_noising_strength)
                 timestep_low = \
-                    int(config.align_prop_steps * config.max_noising_strength * (1.0 - config.align_prop_truncate_steps))
+                    int(config.align_prop_steps * config.max_noising_strength * (
+                                1.0 - config.align_prop_truncate_steps))
 
                 batch_size = scaled_latent_image.shape[0]
                 height = scaled_latent_image.shape[2] * 8
@@ -225,7 +305,8 @@ class BasePixArtAlphaSetup(
                     negative_predicted_latent_noise = checkpointed_transformer(
                         latent_input.to(dtype=config.train_dtype.torch_dtype()),
                         encoder_hidden_states=negative_text_encoder_output.to(dtype=config.train_dtype.torch_dtype()),
-                        encoder_attention_mask=negative_text_encoder_attention_mask.to(dtype=config.train_dtype.torch_dtype()),
+                        encoder_attention_mask=negative_text_encoder_attention_mask.to(
+                            dtype=config.train_dtype.torch_dtype()),
                         timestep=timestep,
                         added_cond_kwargs=added_cond_kwargs,
                     ).sample

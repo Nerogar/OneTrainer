@@ -1,4 +1,3 @@
-import json
 import os
 
 import torch
@@ -30,6 +29,7 @@ from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
+from mgds.pipelineModules.ReplaceText import ReplaceText
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -48,8 +48,6 @@ from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.util import path_util
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.torch_util import torch_gc
 
 
@@ -114,6 +112,15 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
+        replace_embedding_text = []
+        for embedding in model.additional_embeddings:
+            all_token_string = ''.join(embedding.text_tokens)
+            replace_embedding_text.append(ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text=embedding.placeholder, new_text=all_token_string))
+
+        if model.embedding is not None:
+            all_token_string = ''.join(model.embedding.text_tokens)
+            replace_embedding_text.append(ReplaceText(text_in_name='prompt', text_out_name='prompt', old_text=model.embedding.placeholder, new_text=all_token_string))
+
         modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 
         if config.masked_training:
@@ -121,6 +128,8 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
             modules.append(load_mask)
         elif config.model_type.has_mask_input():
             modules.append(generate_mask)
+
+        modules.append(replace_embedding_text)
 
         return modules
 
@@ -242,7 +251,7 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and not config.train_any_embedding():
             modules.append(encode_prompt)
 
         return modules
@@ -280,9 +289,9 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
             model.eval()
             torch_gc()
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
         modules = []
 
@@ -293,12 +302,12 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
+            if not config.text_encoder.train and not config.train_any_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
         if len(sort_names) > 0:
-            variation_sorting = VariationSorting(names=sort_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
+            variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
             modules.append(variation_sorting)
 
         return modules
@@ -313,7 +322,7 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not config.text_encoder.train and config.training_method != TrainingMethod.EMBEDDING:
+        if not config.text_encoder.train and not config.train_any_embedding():
             output_names.append('text_encoder_hidden_state')
 
         sort_names = output_names + ['concept']

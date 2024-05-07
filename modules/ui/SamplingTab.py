@@ -12,8 +12,14 @@ class SamplingTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super(SamplingTab, self).__init__(
-            master, train_config, ui_state, "sample_definition_file_name",
-            "training_samples", "samples.json", "add sample",
+            master,
+            train_config,
+            ui_state,
+            from_external_file=True,
+            attr_name="sample_definition_file_name",
+            config_dir="training_samples",
+            default_config_name="samples.json",
+            add_button_text="add sample",
             is_full_width=True,
         )
 
@@ -93,6 +99,7 @@ class SampleWidget(ctk.CTkFrame):
 
         # button
         self.button = components.icon_button(self, 0, 11, "...", lambda: open_command(self.i, self.ui_state))
+        self.button.configure(width=40)
 
         self.__set_enabled()
 

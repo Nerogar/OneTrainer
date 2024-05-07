@@ -30,6 +30,10 @@ open-clip-torch==2.23.0
 dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.1.2 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer
+schedulefree==1.2.5 # schedule-free optimizers
+
+# Profiling
+scalene==1.5.39
 
 # ui
 customtkinter==5.2.1

@@ -2,10 +2,11 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.util.ModelNames import ModelNames
+from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
+from uuid import uuid4
 
 
 def main():
@@ -28,7 +29,7 @@ def main():
             model_type=args.model_type,
             model_names=ModelNames(
                 lora=args.input_name,
-                embedding=[args.input_name],
+                embedding=EmbeddingName(str(uuid4()), args.input_name),
             ),
             weight_dtypes=args.weight_dtypes(),
         )

@@ -1,8 +1,9 @@
 import json
+import uuid
 from copy import deepcopy
 from typing import Any
 
-from modules.util.ModelNames import ModelNames
+from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -63,6 +64,7 @@ class TrainOptimizerConfig(BaseConfig):
     no_prox: bool
     optim_bits: int
     percentile_clipping: float
+    r: float
     relative_step: bool
     safeguard_warmup: bool
     scale_parameter: bool
@@ -71,6 +73,7 @@ class TrainOptimizerConfig(BaseConfig):
     use_triton: bool
     warmup_init: bool
     weight_decay: float
+    weight_lr_power: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainOptimizerConfig, self).__init__(data)
@@ -117,6 +120,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("no_prox", False, bool, False))
         data.append(("optim_bits", None, int, True))
         data.append(("percentile_clipping", None, float, True))
+        data.append(("r", None, float, True))
         data.append(("relative_step", False, bool, False))
         data.append(("safeguard_warmup", False, bool, False))
         data.append(("scale_parameter", False, bool, False))
@@ -125,6 +129,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_triton", False, bool, False))
         data.append(("warmup_init", False, bool, False))
         data.append(("weight_decay", None, float, True))
+        data.append(("weight_lr_power", None, float, True))
 
         return TrainOptimizerConfig(data)
 
@@ -154,14 +159,16 @@ class TrainModelPartConfig(BaseConfig):
 
         return TrainModelPartConfig(data)
 
+
 class TrainEmbeddingConfig(BaseConfig):
+    uuid: str
     model_name: str
+    placeholder: str
     train: bool
     stop_training_after: int
     stop_training_after_unit: TimeUnit
     token_count: int
     initial_embedding_text: str
-    weight_dtype: DataType
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainEmbeddingConfig, self).__init__(data)
@@ -171,16 +178,16 @@ class TrainEmbeddingConfig(BaseConfig):
         data = []
 
         # name, default value, data type, nullable
+        data.append(("uuid", str(uuid.uuid4()), str, False))
         data.append(("model_name", "", str, False))
+        data.append(("placeholder", "<embedding>", str, False))
         data.append(("train", True, bool, False))
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("token_count", 1, int, False))
         data.append(("initial_embedding_text", "*", str, False))
-        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
 
         return TrainEmbeddingConfig(data)
-
 
 
 class TrainConfig(BaseConfig):
@@ -202,6 +209,7 @@ class TrainConfig(BaseConfig):
     output_model_format: ModelFormat
     output_model_destination: str
     gradient_checkpointing: bool
+    force_circular_padding: bool
 
     # data settings
     concept_file_name: str
@@ -223,6 +231,7 @@ class TrainConfig(BaseConfig):
     ema: EMAMode
     ema_decay: float
     ema_update_step_interval: int
+    dataloader_threads: int
     train_device: str
     temp_device: str
     train_dtype: DataType
@@ -294,7 +303,10 @@ class TrainConfig(BaseConfig):
     normalize_masked_area_loss: bool
 
     # embedding
-    embeddings: list[TrainEmbeddingConfig]
+    embedding_learning_rate: float
+    preserve_embedding_norm: bool
+    embedding: TrainEmbeddingConfig
+    additional_embeddings: list[TrainEmbeddingConfig]
     embedding_weight_dtype: DataType
 
     # lora
@@ -446,7 +458,7 @@ class TrainConfig(BaseConfig):
                 migrated_data[key] = value
 
         return migrated_data
-    
+
     def __migration_2(self, data: dict) -> dict:
         migrated_data = data.copy()
         min_snr_gamma = migrated_data.pop("min_snr_gamma", 0.0)
@@ -457,7 +469,7 @@ class TrainConfig(BaseConfig):
         elif model_type.is_wuerstchen():
             migrated_data["loss_weight_fn"] = LossWeight.P2
             migrated_data["loss_weight_strength"] = 1.0
-        
+
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
@@ -483,8 +495,14 @@ class TrainConfig(BaseConfig):
             decoder_model=self.decoder.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
-            embedding=[embedding.model_name for embedding in self.embeddings],
+            embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
+            additional_embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in
+                                   self.additional_embeddings],
         )
+
+    def train_any_embedding(self) -> bool:
+        return self.training_method == TrainingMethod.EMBEDDING \
+            or any(embedding.train for embedding in self.additional_embeddings)
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
@@ -542,6 +560,7 @@ class TrainConfig(BaseConfig):
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", True, bool, False))
+        data.append(("force_circular_padding", False, bool, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -563,6 +582,7 @@ class TrainConfig(BaseConfig):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
+        data.append(("dataloader_threads", 2, int, False))
         data.append(("train_device", default_device.type, str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
@@ -670,7 +690,10 @@ class TrainConfig(BaseConfig):
         data.append(("normalize_masked_area_loss", False, bool, False))
 
         # embedding
-        data.append(("embeddings", [TrainEmbeddingConfig.default_values()], list[TrainEmbeddingConfig], False))
+        data.append(("embedding_learning_rate", None, float, True))
+        data.append(("preserve_embedding_norm", False, bool, False))
+        data.append(("embedding", TrainEmbeddingConfig.default_values(), TrainEmbeddingConfig, False))
+        data.append(("additional_embeddings", [], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # lora
