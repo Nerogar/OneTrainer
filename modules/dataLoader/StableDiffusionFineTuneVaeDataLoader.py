@@ -11,9 +11,9 @@ from mgds.pipelineModules.CollectPaths import CollectPaths
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.ModifyPath import ModifyPath
-from mgds.pipelineModules.RamCache import RamCache
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomContrast import RandomContrast
 from mgds.pipelineModules.RandomFlip import RandomFlip
@@ -224,19 +224,14 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         def before_cache_fun():
             self._setup_cache_device(model, self.train_device, self.temp_device, config)
 
-        disk_cache = DiskCache(cache_dir=config.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
-        ram_cache = RamCache(cache_names=split_names + aggregate_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
-
-        variation_sorting = VariationSorting(names=sort_names, repeats_in_name='concept.repeats', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
+        disk_cache = DiskCache(cache_dir=config.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+        variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
 
         modules = []
 
         if config.latent_caching:
             modules.append(disk_cache)
-        else:
-            modules.append(ram_cache)
-
-        modules.append(variation_sorting)
+            modules.append(variation_sorting)
 
         return modules
 
@@ -251,7 +246,12 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
-        batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+
+        if config.latent_caching:
+            batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+        else:
+            batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+
         output = OutputPipelineModule(names=output_names)
 
         modules = [image_sample]

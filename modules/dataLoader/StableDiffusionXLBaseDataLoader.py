@@ -19,7 +19,6 @@ from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorti
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.ModifyPath import ModifyPath
-from mgds.pipelineModules.RamCache import RamCache
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
