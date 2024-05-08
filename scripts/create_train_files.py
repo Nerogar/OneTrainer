@@ -2,6 +2,7 @@ from util.import_util import script_imports
 
 script_imports()
 
+import os
 import json
 
 from pathlib import Path
