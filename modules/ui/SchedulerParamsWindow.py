@@ -105,7 +105,7 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         if self.train_config.learning_rate_scheduler is LearningRateScheduler.CUSTOM:
             components.label(master, 0, 0, "Class Name",
                              tooltip="Python class module and name for the custom scheduler class, in the form of <module>.<class_name>.")
-            components.entry(master, 0, 1, self.ui_state, "custom_scheduler")
+            components.entry(master, 0, 1, self.ui_state, "custom_learning_rate_scheduler")
 
         # Any additional parameters, in key-value form.
         self.params = KvParams(self.expand_frame, self.train_config, self.ui_state)

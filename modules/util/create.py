@@ -798,12 +798,12 @@ def create_lr_scheduler(
             )
         case LearningRateScheduler.CUSTOM:
             # Special case. Unlike the others, we return from here.
-            if not config.custom_scheduler:
+            if not config.custom_learning_rate_scheduler:
                 raise AssertionError("Must specify a class when using a custom LR scheduler.")
-            if "." not in config.custom_scheduler:
+            if "." not in config.custom_learning_rate_scheduler:
                 raise AssertionError("Custom class name must be in the format <module>.<class>")
-            klass = config.custom_scheduler.split(".")[-1]
-            module = config.custom_scheduler.removesuffix("." + klass)
+            klass = config.custom_learning_rate_scheduler.split(".")[-1]
+            module = config.custom_learning_rate_scheduler.removesuffix("." + klass)
             module = importlib.import_module(module)
             klass = getattr(module, klass)
             # Compile arguments into single dict.
