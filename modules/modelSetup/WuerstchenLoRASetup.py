@@ -134,11 +134,13 @@ class WuerstchenLoRASetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
+        effnet_on_train_device = not config.latent_caching
+
         if model.model_type.is_wuerstchen_v2():
             model.decoder_text_encoder_to(self.temp_device)
         model.decoder_decoder_to(self.temp_device)
         model.decoder_vqgan_to(self.temp_device)
-        model.effnet_encoder_to(self.temp_device)
+        model.effnet_encoder_to(self.train_device if effnet_on_train_device else self.temp_device)
 
         text_encoder_on_train_device = \
             config.text_encoder.train \

@@ -110,7 +110,7 @@ class StableDiffusionFineTuneSetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or config.align_prop
+        vae_on_train_device = self.debug_mode or config.align_prop or not config.latent_caching
         text_encoder_on_train_device = \
             config.text_encoder.train \
             or config.train_any_embedding() \

@@ -97,7 +97,7 @@ class StableDiffusionXLEmbeddingSetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = config.align_prop
+        vae_on_train_device = config.align_prop or not config.latent_caching
 
         model.text_encoder_to(self.train_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
