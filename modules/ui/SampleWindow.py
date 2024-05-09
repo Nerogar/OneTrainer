@@ -102,6 +102,7 @@ class SampleWindow(ctk.CTkToplevel):
             model_names=self.train_config.model_names(),
             weight_dtypes=self.train_config.weight_dtypes(),
         )
+        model.train_config = self.train_config
 
         model_setup.setup_model(model, self.train_config)
 

@@ -1,3 +1,4 @@
+from modules.util.ModelNames import ModelNames
 from util.import_util import script_imports
 
 script_imports()
@@ -24,9 +25,10 @@ def main():
     print("Loading model " + args.base_model_name)
     model = model_loader.load(
         model_type=args.model_type,
-
+        model_names=ModelNames(base_model=args.base_model_name),
         weight_dtypes=args.weight_dtypes(),
     )
+
     model.to(device)
     model.eval()
 

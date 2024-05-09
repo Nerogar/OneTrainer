@@ -58,6 +58,7 @@ class GenerateLossesModel:
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
         )
+        self.model.train_config = self.config
 
         self.model_setup.setup_model(self.model, self.config)
         self.model.eval()
