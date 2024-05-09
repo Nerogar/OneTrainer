@@ -6,6 +6,7 @@ from PIL import Image
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
 
@@ -81,6 +82,8 @@ def file_entry(
         master, row, column, ui_state: UIState, var_name: str,
         is_output: bool = False,
         path_modifier: Callable[[str], str] = None,
+        allow_model_files: bool = True,
+        allow_image_files: bool = False,
         command: Callable[[str], None] = None,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
@@ -92,20 +95,25 @@ def file_entry(
     entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
 
     def __open_dialog():
+        filetypes = [
+            ("All Files", "*.*"),
+        ]
+
+        if allow_model_files:
+            filetypes.extend([
+                ("Diffusers", "model_index.json"),
+                ("Checkpoint", "*.ckpt *.pt *.bin"),
+                ("Safetensors", "*.safetensors"),
+            ])
+        if allow_image_files:
+            filetypes.extend([
+                ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
+            ])
+
         if is_output:
-            file_path = filedialog.asksaveasfilename(filetypes=[
-                ("All Files", "*.*"),
-                ("Diffusers", "model_index.json"),
-                ("Checkpoint", "*.ckpt *.pt *.bin"),
-                ("Safetensors", "*.safetensors"),
-            ])
+            file_path = filedialog.asksaveasfilename(filetypes=filetypes)
         else:
-            file_path = filedialog.askopenfilename(filetypes=[
-                ("All Files", "*.*"),
-                ("Diffusers", "model_index.json"),
-                ("Checkpoint", "*.ckpt *.pt *.bin"),
-                ("Safetensors", "*.safetensors"),
-            ])
+            file_path = filedialog.askopenfilename(filetypes=filetypes)
 
         if file_path:
             if path_modifier:
