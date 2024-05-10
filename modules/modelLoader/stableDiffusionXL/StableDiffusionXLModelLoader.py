@@ -119,7 +119,7 @@ class StableDiffusionXLModelLoader(
         pipeline = StableDiffusionXLPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
             original_config_file=model.sd_config_filename,
-            load_safety_checker=False,
+            safety_checker=None,
         )
 
         noise_scheduler = create.create_noise_scheduler(
@@ -160,7 +160,7 @@ class StableDiffusionXLModelLoader(
         pipeline = StableDiffusionXLPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
             original_config_file=model.sd_config_filename,
-            load_safety_checker=False,
+            safety_checker=None,
             use_safetensors=True,
         )
 
