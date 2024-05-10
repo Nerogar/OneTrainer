@@ -26,7 +26,8 @@ class WuerstchenLoRAModelSaver(
         embedding_model_saver = WuerstchenEmbeddingSaver()
 
         lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
-        embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
+        if not model.train_config.bundle_additional_embeddings:
+            embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
 
         if output_model_format == ModelFormat.INTERNAL:
             self._save_internal_data(model, output_model_destination)
