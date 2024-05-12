@@ -44,9 +44,9 @@ class CaptionUI(ctk.CTkToplevel):
         self.config_ui_state = UIState(self, self.config_ui_data)
         self.image_size = 850
 
-        self.title("OneTrainer")
+        self.title("Dataset Tools - Create or edit captions and masks")
         self.geometry("1280x980")
-        self.resizable(False, False)
+        self.resizable(True, True)
         self.wait_visibility()
         self.focus_set()
 
