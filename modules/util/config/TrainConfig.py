@@ -74,6 +74,18 @@ class TrainOptimizerConfig(BaseConfig):
     warmup_init: bool
     weight_decay: float
     weight_lr_power: float
+    decoupled_decay: bool
+    fixed_decay: bool
+    weight_decouple: bool
+    rectify: bool
+    degenerated_to_sgd: bool
+    k: int
+    xi: float
+    n_sma_threshold: int
+    ams_bound: bool
+    r: float
+    adanorm: bool
+    adam_debias: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainOptimizerConfig, self).__init__(data)
@@ -130,6 +142,17 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("warmup_init", False, bool, False))
         data.append(("weight_decay", None, float, True))
         data.append(("weight_lr_power", None, float, True))
+        data.append(("decoupled_decay", False, bool, False))
+        data.append(("fixed_decay", False, bool, False))
+        data.append(("rectify", False, bool, False))
+        data.append(("degenerated_to_sgd", False, bool, False))
+        data.append(("k", None, int, True))
+        data.append(("xi", None, float, True))
+        data.append(("n_sma_threshold", None, int, True))
+        data.append(("ams_bound", False, bool, False))
+        data.append(("r", None, float, True))
+        data.append(("adanorm", False, bool, False))
+        data.append(("adam_debias", False, bool, False))
 
         return TrainOptimizerConfig(data)
 

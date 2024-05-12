@@ -71,7 +71,6 @@ from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.lr_scheduler_util import *
-from modules.util.optimizer.CAME import CAME
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
@@ -703,6 +702,7 @@ def create_optimizer(
 
         # CAME Optimizer
         case Optimizer.CAME:
+            from modules.util.optimizer.CAME import CAME
             optimizer = CAME(
                 params=parameters,
                 lr=config.learning_rate,
@@ -714,6 +714,117 @@ def create_optimizer(
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 stochastic_rounding=optimizer_config.stochastic_rounding
             )
+
+        # ADABELIEF Optimizer
+        case Optimizer.ADABELIEF:
+            from timm.optim.adabelief import AdaBelief
+            optimizer = AdaBelief(
+                params=parameters,
+                lr=config.learning_rate if config.learning_rate is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-16,
+                amsgrad=optimizer_config.amsgrad if optimizer_config.amsgrad is not None else False,
+                decoupled_decay=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                rectify=optimizer_config.rectify if optimizer_config.rectify is not None else True,
+                degenerated_to_sgd=optimizer_config.degenerated_to_sgd if optimizer_config.degenerated_to_sgd is not None else True,
+            )
+
+        # TIGER Optimizer
+        case Optimizer.TIGER:
+            from pytorch_optimizer.optimizer.tiger import Tiger
+            optimizer = Tiger(
+                params=parameters,
+                lr=config.learning_rate if config.learning_rate is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                beta=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+            )
+
+        # AIDA Optimizer
+        case Optimizer.AIDA:
+            from pytorch_optimizer.optimizer.aida import Aida
+            optimizer = Aida(
+                params=parameters,
+                lr=config.learning_rate if config.learning_rate is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                k=optimizer_config.k if optimizer_config.k is not None else 2,
+                xi=optimizer_config.xi if optimizer_config.xi is not None else 1e-20,
+                rectify=optimizer_config.rectify if optimizer_config.rectify is not None else False,
+                n_sma_threshold=optimizer_config.n_sma_threshold if optimizer_config.n_sma_threshold is not None else 5,
+                degenerated_to_sgd=optimizer_config.degenerated_to_sgd if optimizer_config.degenerated_to_sgd is not None else True,
+                ams_bound=optimizer_config.ams_bound if optimizer_config.ams_bound is not None else False,
+                r=optimizer_config.r if optimizer_config.r is not None else 0.95,
+                adanorm=optimizer_config.adanorm if optimizer_config.adanorm is not None else False,
+                adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+            )
+
+        # AIDA8BIT Optimizer
+        case Optimizer.AIDA8BIT:
+            from pytorch_optimizer.optimizer.aida8bit import Aida8bit
+            optimizer = Aida8bit(
+                params=parameters,
+                lr=config.learning_rate if config.learning_rate is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                k=optimizer_config.k if optimizer_config.k is not None else 2,
+                xi=optimizer_config.xi if optimizer_config.xi is not None else 1e-20,
+                rectify=optimizer_config.rectify if optimizer_config.rectify is not None else False,
+                n_sma_threshold=optimizer_config.n_sma_threshold if optimizer_config.n_sma_threshold is not None else 5,
+                degenerated_to_sgd=optimizer_config.degenerated_to_sgd if optimizer_config.degenerated_to_sgd is not None else True,
+                ams_bound=optimizer_config.ams_bound if optimizer_config.ams_bound is not None else False,
+                r=optimizer_config.r if optimizer_config.r is not None else 0.95,
+                adanorm=optimizer_config.adanorm if optimizer_config.adanorm is not None else False,
+                adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+            )
+
+        # AIDAFactor Optimizer
+        case Optimizer.AIDAFACTOR:
+            from pytorch_optimizer.optimizer.aidafactor import Aida8bit
+
+            if optimizer_config.relative_step:
+                for parameter in parameters:
+                    if isinstance(parameter, dict) and 'lr' in parameter:
+                        parameter.pop('lr')
+
+            optimizer = Aida8bit(
+                params=parameters,
+                lr=None if optimizer_config.relative_step == True else config.learning_rate,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
+                clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 1.0,
+                decay_rate=optimizer_config.decay_rate if optimizer_config.decay_rate is not None else -0.8,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                scale_parameter=optimizer_config.scale_parameter if optimizer_config.scale_parameter is not None else True,
+                relative_step=optimizer_config.relative_step if optimizer_config.relative_step is not None else True,
+                warmup_init=optimizer_config.warmup_init if optimizer_config.warmup_init is not None else False,
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                k=optimizer_config.k if optimizer_config.k is not None else 2,
+                xi=optimizer_config.xi if optimizer_config.xi is not None else 1e-20,
+                rectify=optimizer_config.rectify if optimizer_config.rectify is not None else False,
+                n_sma_threshold=optimizer_config.n_sma_threshold if optimizer_config.n_sma_threshold is not None else 5,
+                degenerated_to_sgd=optimizer_config.degenerated_to_sgd if optimizer_config.degenerated_to_sgd is not None else True,
+                ams_bound=optimizer_config.ams_bound if optimizer_config.ams_bound is not None else False,
+                r=optimizer_config.r if optimizer_config.r is not None else 0.95,
+                adanorm=optimizer_config.adanorm if optimizer_config.adanorm is not None else False,
+                adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
+            )
+
+            # patch_adafactor(optimizer, optimizer_config.stochastic_rounding)
 
     if state_dict is not None:
         if 'param_group_mapping' not in state_dict:
