@@ -735,7 +735,8 @@ def create_optimizer(
                     new_group = new_param_groups[new_group_index]
                     old_group = old_param_groups[old_group_index]
                     for i, old_state_index in enumerate(old_group['params']):
-                        state[state_index] = old_state[old_state_index]
+                        if old_state_index in old_state:
+                            state[state_index] = old_state[old_state_index]
                         old_group['params'][i] = state_index
                         state_index += 1
                     param_groups.append(old_group)
