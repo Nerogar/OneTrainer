@@ -5,7 +5,7 @@ from typing import Any
 
 from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.config.BaseConfig import BaseConfig
+from modules.util.config.BaseConfig import BaseConfig 
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
@@ -338,6 +338,10 @@ class TrainConfig(BaseConfig):
     save_after: float
     save_after_unit: TimeUnit
     save_filename_prefix: str
+    
+    # automation
+    automation_directory_enabled: bool
+    automation_queued_dir: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
@@ -726,5 +730,9 @@ class TrainConfig(BaseConfig):
         data.append(("save_after", 0, int, False))
         data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("save_filename_prefix", "", str, False))
+        
+        # automation settings
+        data.append(("automation_directory_enabled", "", str, False))
+        data.append(("automation_queued_dir", "", str, False))
 
         return TrainConfig(data)

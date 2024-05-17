@@ -9,6 +9,7 @@ from typing import Callable
 import customtkinter as ctk
 
 from modules.trainer.GenericTrainer import GenericTrainer
+from modules.ui.AutomationTab import AutomationTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
@@ -27,6 +28,7 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.replacement_util import parse_directory_for_folders, process_parsed_directories, replace_text, replace_text_in_trainconfig
 from modules.util.torch_util import torch_gc
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -53,6 +55,7 @@ class TrainUI(ctk.CTk):
 
         self.train_config = TrainConfig.default_values()
         self.ui_state = UIState(self, self.train_config)
+        self.functional_train_config = self.train_config
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -67,6 +70,7 @@ class TrainUI(ctk.CTk):
         self.model_tab = None
         self.training_tab = None
         self.additional_embeddings_tab = None
+        self.automation_tab = None
 
         self.top_bar_component = self.top_bar(self)
         self.content_frame(self)
@@ -75,6 +79,7 @@ class TrainUI(ctk.CTk):
         self.training_thread = None
         self.training_callbacks = None
         self.training_commands = None
+        self.stopping = False
 
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
@@ -136,6 +141,7 @@ class TrainUI(ctk.CTk):
         self.create_backup_tab(self.tabview.add("backup"))
         self.create_tools_tab(self.tabview.add("tools"))
         self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
+        self.automation_tab = self.create_automation_tab(self.tabview.add("automation"))
 
         self.change_training_method(self.train_config.training_method)
 
@@ -408,6 +414,10 @@ class TrainUI(ctk.CTk):
     def create_additional_embeddings_tab(self, master):
         return AdditionalEmbeddingsTab(master, self.train_config, self.ui_state)
 
+    def create_automation_tab(self, master):
+        return AutomationTab(master, self.train_config, self.ui_state)
+
+
     def create_tools_tab(self, master):
         master.grid_columnconfigure(0, weight=0)
         master.grid_columnconfigure(1, weight=1)
@@ -512,16 +522,35 @@ class TrainUI(ctk.CTk):
             training_callbacks.set_on_sample_custom()
 
     def __training_thread_function(self):
-        error_caught = False
+
 
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
             on_update_status=self.on_update_status,
         )
+        
+        if self.train_config.automation_directory_enabled:
+            directories = parse_directory_for_folders(self.train_config.automation_queued_dir, self.train_config)
+            results = process_parsed_directories(directories, self.train_config, False)
+            for result in results:
+                if self.stopping:
+                    continue
+                
+                self.functional_train_config = result
+                self.__train_thread_impl()
+        else:
+            self.__train_thread_impl()
+            
+        self.stopping = False
+        self.training_thread = None
+        self.training_commands = None
+        self.training_button.configure(text="Start Training", state="normal")
+        
+    def __train_thread_impl(self):
+        error_caught = False
+        ZLUDA.initialize_devices(self.functional_train_config)
 
-        ZLUDA.initialize_devices(self.train_config)
-
-        trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
+        trainer = GenericTrainer(self.functional_train_config, self.training_callbacks, self.training_commands)
 
         try:
             trainer.start()
@@ -540,10 +569,6 @@ class TrainUI(ctk.CTk):
         else:
             self.on_update_status("stopped")
 
-        self.training_thread = None
-        self.training_commands = None
-        self.training_button.configure(text="Start Training", state="normal")
-
     def start_training(self):
         if self.training_thread is None:
             self.top_bar_component.save_default()
@@ -558,6 +583,7 @@ class TrainUI(ctk.CTk):
             self.training_button.configure(state="disabled")
             self.on_update_status("stopping")
             self.training_commands.stop()
+            self.stopping = True;
 
     def export_training(self):
         file_path = filedialog.asksaveasfilename(filetypes=[
@@ -578,3 +604,4 @@ class TrainUI(ctk.CTk):
         train_commands = self.training_commands
         if train_commands:
             train_commands.backup()
+            
