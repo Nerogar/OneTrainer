@@ -4,7 +4,7 @@ import customtkinter as ctk
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
-from modules.util.replacement_util import parse_directory_for_folders, process_parsed_directories, replace_text_in_trainconfig
+from modules.util.replacement_util import parse_directory_for_folders, process_parsed_directories
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 

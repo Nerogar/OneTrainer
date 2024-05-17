@@ -28,7 +28,7 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.replacement_util import parse_directory_for_folders, process_parsed_directories, replace_text, replace_text_in_trainconfig
+from modules.util.replacement_util import parse_directory_for_folders, process_parsed_directories
 from modules.util.torch_util import torch_gc
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState

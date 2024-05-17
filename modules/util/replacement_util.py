@@ -11,48 +11,6 @@ from modules.util.config.SampleConfig import SampleConfig
 
 from modules.util.config.TrainConfig import TrainConfig
 
-def replace_text_in_trainconfig(original: TrainConfig, test_only: bool)  -> TrainConfig:
-    new_train_config = deepcopy(original)
-    new_train_config.workspace_dir = replace_text(new_train_config.workspace_dir, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-    new_train_config.cache_dir = replace_text(new_train_config.cache_dir, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-    new_train_config.output_model_destination = replace_text(new_train_config.output_model_destination, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-    instanceguid = str(uuid1())
-    
-    if new_train_config.concepts is not None:
-        for c in new_train_config.concepts:
-            c.name = replace_text(c.name, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-            c.path = replace_text(c.path, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-    else:
-        concepts = read_file(original.concept_file_name)
-        concepts = replace_text(concepts, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-        tempfilename = "%s_concepts.json" % (instanceguid)
-        save_to_directory(concepts, new_train_config.workspace_dir, tempfilename)
-        tempconceptsfilepath = os.path.join(new_train_config.workspace_dir, tempfilename)
-        new_train_config.concept_file_name = tempconceptsfilepath
-        
-
-    if new_train_config.samples is not None:
-        for s in new_train_config.samples:
-            s.prompt = replace_text(c.name, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-    else:
-        samples = read_file(original.sample_definition_file_name)
-        samples = replace_text(samples, new_train_config.automation_replacement_keyword, new_train_config.automation_replacement_text)
-        samplestempfilename = "%s_samples.json" % (instanceguid)
-        save_to_directory(samples, new_train_config.workspace_dir, samplestempfilename)
-        tempsamplesfilepath = os.path.join(new_train_config.workspace_dir, samplestempfilename)
-        new_train_config.sample_definition_file_name = tempsamplesfilepath
-    
-    return new_train_config
-
-def replace_text_in_sampleconfig(original: SampleConfig, keyword: str, replacement_text:str) -> SampleConfig:
-    new_sample_config = deepcopy(original)
-    new_sample_config.prompt = replace_text(c.name, keyword, replacement_text)
-    return new_sample_config
-        
-
-def replace_text(original: str, keyword: str, replacement_text: str):
-    return chevron.render(original, {keyword: replacement_text})
-
 def replace_text_from_dict(original: str, replacement_text_dict: dict[str, Any]):
     return chevron.render(original, replacement_text_dict)
 
