@@ -42,6 +42,8 @@ def entry(
         ui_state: UIState,
         var_name: str,
         command: Callable[[], None] = None,
+        tooltip: str = "",
+        wide_tooltip: bool = False
 ):
     var = ui_state.get_var(var_name)
     if command:
@@ -68,6 +70,9 @@ def entry(
 
     destroy = create_destroy(component)
     component.destroy = lambda: destroy(component)
+
+    if tooltip:
+        ToolTip(component, tooltip, wide=wide_tooltip)
 
     return component
 
@@ -277,7 +282,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
     destroy = create_destroy(component._dropdown_menu)
     component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
 
-    return frame
+    return frame, {'component': component, 'button_component': button_component}
 
 
 def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
