@@ -8,8 +8,8 @@ from modules.zluda import ZLUDAInstaller
 
 if __name__ == '__main__':
     try:
-        ZLUDAInstaller.install()
-        zluda_path = ZLUDAInstaller.find()
+        zluda_path = ZLUDAInstaller.get_path()
+        ZLUDAInstaller.install(zluda_path)
         ZLUDAInstaller.make_copy(zluda_path)
     except Exception as e:
         print(f'Failed to install ZLUDA: {e}')
