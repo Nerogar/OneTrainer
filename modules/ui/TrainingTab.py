@@ -236,7 +236,7 @@ class TrainingTab:
 
         # resolution
         components.label(frame, 8, 0, "Resolution",
-                         tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma.")
+                         tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
         components.entry(frame, 8, 1, self.ui_state, "resolution")
 
         # force circular padding

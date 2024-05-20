@@ -1,5 +1,5 @@
-import json
 import os
+import re
 
 import torch
 from mgds.MGDS import TrainDataLoader, MGDS
@@ -111,7 +111,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __mask_augmentation_modules(self, config: TrainConfig) -> list:
         inputs = ['image']
 
-        lowest_resolution = min(int(res.strip()) for res in config.resolution.split(','))
+        lowest_resolution = min([int(x.strip()) for x in re.split('\D', config.resolution) if x.strip() != ''])
 
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='latent_mask', additional_names=inputs, min_size=lowest_resolution,
                                                        min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20,

@@ -173,7 +173,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         # resolution override
         components.label(master, 8, 0, "Resolution Override",
-                         tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma.")
+                         tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
         components.switch(master, 8, 2, self.image_ui_state, "enable_resolution_override")
         components.entry(master, 8, 3, self.image_ui_state, "resolution_override")
 
