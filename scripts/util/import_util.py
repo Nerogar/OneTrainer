@@ -13,7 +13,7 @@ def script_imports():
     if sys.platform.startswith('win'):
         from modules.zluda import ZLUDAInstaller
 
-        zluda_path = ZLUDAInstaller.find()
+        zluda_path = ZLUDAInstaller.get_path()
 
         if os.path.exists(zluda_path):
             try:
