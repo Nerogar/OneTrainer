@@ -115,7 +115,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='latent_mask', additional_names=inputs, min_size=lowest_resolution,
                                                        min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20,
-                                                       enabled_in_name='settings.enable_random_circular_mask_shrink')
+                                                       enabled_in_name='concept.image.enable_random_circular_mask_shrink')
 
         modules = []
 

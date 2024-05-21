@@ -208,30 +208,20 @@ class TrainUI(ctk.CTk):
         master.grid_columnconfigure(3, weight=0)
         master.grid_columnconfigure(4, weight=1)
 
-        # circular mask generation
-        components.label(master, 0, 0, "Circular Mask Generation",
-                         tooltip="Automatically create circular masks for masked training")
-        components.switch(master, 0, 1, self.ui_state, "circular_mask_generation")
-
-        # random rotate and crop
-        components.label(master, 1, 0, "Random Rotate and Crop",
-                         tooltip="Randomly rotate the training samples and crop to the masked region")
-        components.switch(master, 1, 1, self.ui_state, "random_rotate_and_crop")
-
         # aspect ratio bucketing
-        components.label(master, 2, 0, "Aspect Ratio Bucketing",
+        components.label(master, 0, 0, "Aspect Ratio Bucketing",
                          tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
-        components.switch(master, 2, 1, self.ui_state, "aspect_ratio_bucketing")
+        components.switch(master, 0, 1, self.ui_state, "aspect_ratio_bucketing")
 
         # latent caching
-        components.label(master, 3, 0, "Latent Caching",
+        components.label(master, 1, 0, "Latent Caching",
                          tooltip="Caching of intermediate training data that can be re-used between epochs")
-        components.switch(master, 3, 1, self.ui_state, "latent_caching")
+        components.switch(master, 1, 1, self.ui_state, "latent_caching")
 
         # clear cache before training
-        components.label(master, 4, 0, "Clear cache before training",
+        components.label(master, 2, 0, "Clear cache before training",
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
-        components.switch(master, 4, 1, self.ui_state, "clear_cache_before_training")
+        components.switch(master, 2, 1, self.ui_state, "clear_cache_before_training")
 
     def create_concepts_tab(self, master):
         ConceptTab(master, self.train_config, self.ui_state)

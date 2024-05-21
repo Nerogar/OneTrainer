@@ -34,6 +34,10 @@ class ConceptImageConfig(BaseConfig):
     enable_resolution_override: bool
     resolution_override: str
 
+    enable_random_circular_mask_shrink: bool
+
+    enable_random_mask_rotate_crop: bool
+
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(ConceptImageConfig, self).__init__(data)
 
@@ -68,6 +72,10 @@ class ConceptImageConfig(BaseConfig):
 
         data.append(("enable_resolution_override", False, bool, False))
         data.append(("resolution_override", "512", str, False))
+
+        data.append(("enable_random_circular_mask_shrink", False, bool, False))
+
+        data.append(("enable_random_mask_rotate_crop", False, bool, False))
 
         return ConceptImageConfig(data)
 
