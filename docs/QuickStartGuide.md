@@ -1,7 +1,7 @@
 # Quick Start Guide
 
 This Guide is intended to explain the basic principles of fine-tuning a model with OneTrainer in the order you will see
-them in the UI. For more in-depth explanations, read the specific topics. (When they become available)
+them in the UI. For more in-depth explanations, please check the wiki here: https://github.com/Nerogar/OneTrainer/wiki
 
 ### Preparing a Dataset
 
