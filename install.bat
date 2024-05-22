@@ -22,8 +22,8 @@ echo installing dependencies
 
 :check_cuda
 echo checking if CUDA is available
-for /f "tokens=*" %%i in ('%PYTHON% -c "import torch; print(torch.cuda.is_available())"') do set CUDA_AVAILABLE=%%i
-if %CUDA_AVAILABLE% == "True" goto :end_success
+for /f "tokens=*" %%i in ('CALL %PYTHON% -c "import torch; print(torch.cuda.is_available())"') do set CUDA_AVAILABLE=%%i
+if %CUDA_AVAILABLE% == True goto :end_success
 set /p USE_ZLUDA=CUDA is not available. Are you using AMD GPUs on Windows? (y/n) 
 if "%USE_ZLUDA%" == "y" goto :install_zluda
 if "%USE_ZLUDA%" == "Y" goto :install_zluda
