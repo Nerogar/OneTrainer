@@ -55,6 +55,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
             ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
             ("PixArt Alpha", ModelType.PIXART_ALPHA),
+            ("PixArt Sigma", ModelType.PIXART_SIGMA),
         ], self.ui_state, "model_type")
 
         # training method

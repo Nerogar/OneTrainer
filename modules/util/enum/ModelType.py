@@ -18,6 +18,7 @@ class ModelType(Enum):
     STABLE_CASCADE_1 = 'STABLE_CASCADE_1'
 
     PIXART_ALPHA = 'PIXART_ALPHA'
+    PIXART_SIGMA = 'PIXART_SIGMA'
 
     def __str__(self):
         return self.value
@@ -42,6 +43,9 @@ class ModelType(Enum):
 
     def is_pixart_alpha(self):
         return self == ModelType.PIXART_ALPHA
+
+    def is_pixart_sigma(self):
+        return self == ModelType.PIXART_SIGMA
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \

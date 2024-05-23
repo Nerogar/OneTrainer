@@ -14,7 +14,7 @@ tensorboard==2.15.1
 pytorch-lightning==2.1.3
 
 # stable diffusion
--e git+https://github.com/huggingface/diffusers.git@5d848ec#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@baab065#egg=diffusers
 transformers==4.36.2
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline

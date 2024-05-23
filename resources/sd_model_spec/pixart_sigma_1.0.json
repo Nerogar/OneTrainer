@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "pixart-sigma",
+    "modelspec.implementation": "https://github.com/PixArt-alpha/PixArt-sigma",
+    "modelspec.title": "PixArt Sigma 1.0"
+}
