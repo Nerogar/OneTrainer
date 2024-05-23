@@ -114,7 +114,7 @@ class TopBar:
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_config.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

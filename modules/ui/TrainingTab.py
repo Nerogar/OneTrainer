@@ -62,7 +62,7 @@ class TrainingTab:
             self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui(column_0, column_1, column_2)
-        elif self.train_config.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):

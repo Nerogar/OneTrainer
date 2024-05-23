@@ -41,6 +41,10 @@ class ModelType(Enum):
         return self == ModelType.WUERSTCHEN_2 \
             or self == ModelType.STABLE_CASCADE_1
 
+    def is_pixart(self):
+        return self == ModelType.PIXART_ALPHA \
+            or self == ModelType.PIXART_SIGMA
+
     def is_pixart_alpha(self):
         return self == ModelType.PIXART_ALPHA
 
