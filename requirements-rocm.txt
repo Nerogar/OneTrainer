@@ -1,8 +1,8 @@
 # pytorch
 --index-url https://download.pytorch.org/whl/rocm5.7
-torch==2.2.0+rocm5.7
-torchvision==0.17.0+rocm5.7
-onnxruntime-gpu==1.16.3
+torch==2.3.0+rocm5.7
+torchvision==0.18.0+rocm5.7
+onnxruntime-gpu==1.18.0
 
 # xformers
 # TODO
