@@ -524,13 +524,15 @@ class StableDiffusionXLSampler(BaseModelSampler):
             generator=generator,
             device=self.train_device,
             dtype=torch.float32,
-        ) * noise_scheduler.init_noise_sigma
+        )
 
         if sample_inpainting:
             # SDXL inpainting is terrible at reconstructing from pure noise.
             # This removes the last timestep to let the model know about the general image composition and brightness
             timesteps = timesteps[1:]
-            latent_image = noise_scheduler.add_noise(latent_conditioning_image, latent_image, timesteps[0])
+            latent_image = noise_scheduler.add_noise(latent_conditioning_image, latent_image, timesteps[:1])
+        else:
+            latent_image = latent_image * noise_scheduler.init_noise_sigma
 
         added_cond_kwargs = {
             "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
