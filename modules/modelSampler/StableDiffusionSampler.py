@@ -230,7 +230,7 @@ class StableDiffusionSampler(BaseModelSampler):
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image.Image:
-        with (self.model.autocast_context):
+        with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
             if random_seed:
                 generator.seed()
@@ -270,10 +270,10 @@ class StableDiffusionSampler(BaseModelSampler):
 
                 erode_kernel = self.__create_erode_kernel(self.train_device)
                 eroded_mask = erode_kernel(mask)
-                eroded_mask = (eroded_mask == 1).float()
+                eroded_mask = (eroded_mask > 0.5).float()
 
-                conditioning_image = (image * (1 - eroded_mask)) + (eroded_mask * 0.5)
-                conditioning_image = (conditioning_image * 2.0) - 1.0
+                image = (image * 2.0) - 1.0
+                conditioning_image = (image * (1 - eroded_mask))
                 conditioning_image = conditioning_image.unsqueeze(0)
 
                 latent_conditioning_image = vae.encode(
