@@ -1,6 +1,7 @@
 import traceback
 
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, StableDiffusionXLPipeline
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, StableDiffusionXLPipeline, \
+    StableDiffusionXLInpaintPipeline
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
@@ -25,8 +26,8 @@ class StableDiffusionXLModelLoader(
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
                 return "resources/model_config/stable_diffusion_xl/sd_xl_base.yaml"
-            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING:  # TODO: find the actual yml file
-                return "resources/model_config/stable_diffusion_xl/sd_xl_base.yaml"
+            case ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING:
+                return "resources/model_config/stable_diffusion_xl/sd_xl_base-inpainting.yaml"
             case _:
                 return None
 
@@ -157,12 +158,20 @@ class StableDiffusionXLModelLoader(
             base_model_name: str,
             vae_model_name: str,
     ):
-        pipeline = StableDiffusionXLPipeline.from_single_file(
-            pretrained_model_link_or_path=base_model_name,
-            original_config_file=model.sd_config_filename,
-            safety_checker=None,
-            use_safetensors=True,
-        )
+        if model_type.has_conditioning_image_input():
+            pipeline = StableDiffusionXLInpaintPipeline.from_single_file(
+                pretrained_model_link_or_path=base_model_name,
+                original_config_file=model.sd_config_filename,
+                safety_checker=None,
+                use_safetensors=True,
+            )
+        else:
+            pipeline = StableDiffusionXLPipeline.from_single_file(
+                pretrained_model_link_or_path=base_model_name,
+                original_config_file=model.sd_config_filename,
+                safety_checker=None,
+                use_safetensors=True,
+            )
 
         noise_scheduler = create.create_noise_scheduler(
             noise_scheduler=NoiseScheduler.DDIM,
