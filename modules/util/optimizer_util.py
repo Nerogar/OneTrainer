@@ -292,6 +292,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "differentiable": False,
         "fused": True,
         "stochastic_rounding": False,
+        "fused_back_pass": False,
     },
     Optimizer.ADAMW: {
         "beta1": 0.9,

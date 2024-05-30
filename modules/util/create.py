@@ -313,7 +313,8 @@ def create_optimizer(
 
         # ADAM Optimizer
         case Optimizer.ADAM:
-            if optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
+            if (optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass) \
+                    and (optimizer_config.fused or optimizer_config.foreach):
                 raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
 
             optimizer = torch.optim.Adam(
@@ -331,14 +332,13 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
-            if optimizer_config.stochastic_rounding:
-                # TODO: only patch if fused/foreach is disabled
+            if optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass:
                 patch_adam(optimizer, optimizer_config.stochastic_rounding)
 
         # ADAMW Optimizer
         case Optimizer.ADAMW:
-            if (optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass) and (
-                    optimizer_config.fused or optimizer_config.foreach):
+            if (optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass) \
+                    and (optimizer_config.fused or optimizer_config.foreach):
                 raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
 
             optimizer = torch.optim.AdamW(
