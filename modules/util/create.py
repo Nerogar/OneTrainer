@@ -337,7 +337,8 @@ def create_optimizer(
 
         # ADAMW Optimizer
         case Optimizer.ADAMW:
-            if optimizer_config.stochastic_rounding and (optimizer_config.fused or optimizer_config.foreach):
+            if (optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass) and (
+                    optimizer_config.fused or optimizer_config.foreach):
                 raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
 
             optimizer = torch.optim.AdamW(
@@ -355,8 +356,7 @@ def create_optimizer(
                 fused=optimizer_config.fused if optimizer_config.fused is not None else False,
             )
 
-            if optimizer_config.stochastic_rounding:
-                # TODO: only patch if fused/foreach is disabled
+            if optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass:
                 patch_adamw(optimizer, optimizer_config.stochastic_rounding)
 
         # ADAM_8BIT Optimizer
@@ -539,8 +539,7 @@ def create_optimizer(
 
         # Schedule-free AdamW
         case Optimizer.SCHEDULE_FREE_ADAMW:
-            if (config.model_type.is_wuerstchen_v2() or
-                config.model_type.is_stable_cascade()):
+            if config.model_type.is_wuerstchen_v2() or config.model_type.is_stable_cascade():
                 raise NotImplementedError("Cannot use schedule-free optimizers with Wuerstchen-based models.")
             from schedulefree import AdamWScheduleFree
             optimizer = AdamWScheduleFree(
@@ -558,8 +557,7 @@ def create_optimizer(
 
         # Schedule-free SGD
         case Optimizer.SCHEDULE_FREE_SGD:
-            if (config.model_type.is_wuerstchen_v2() or
-                config.model_type.is_stable_cascade()):
+            if config.model_type.is_wuerstchen_v2() or config.model_type.is_stable_cascade():
                 raise NotImplementedError("Cannot use schedule-free optimizers with Wuerstchen models.")
             from schedulefree import SGDScheduleFree
             optimizer = SGDScheduleFree(
