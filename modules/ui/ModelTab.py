@@ -7,6 +7,7 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.enum.ModelType import ModelType  # Import ModelType
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -78,6 +79,10 @@ class ModelTab:
             has_text_encoder_2=True,
             has_vae=True,
         )
+
+        # Automatically insert VAE override for SDXL
+        self.ui_state.get_var("vae.model_name").set("madebyollin/sdxl-vae-fp16-fix")
+
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
@@ -388,3 +393,4 @@ class ModelTab:
         row += 1
 
         return row
+        
