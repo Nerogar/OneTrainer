@@ -80,7 +80,7 @@ class ModelTab:
             has_vae=True,
         )
 
-        # Automatically insert VAE override for SDXL
+        # Automatically insert VAE override, if "Stable Diffusion XL 1.0 Base" is selected in UI.
         self.ui_state.get_var("vae.model_name").set("madebyollin/sdxl-vae-fp16-fix")
 
         row = self.__create_output_components(
