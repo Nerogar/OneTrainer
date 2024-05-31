@@ -16,6 +16,10 @@ class SampleConfig(BaseConfig):
     cfg_scale: float
     noise_scheduler: NoiseScheduler
 
+    sample_inpainting: bool
+    base_image_path: str
+    mask_image_path: str
+
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(SampleConfig, self).__init__(data)
 
@@ -33,5 +37,9 @@ class SampleConfig(BaseConfig):
         data.append(("diffusion_steps", 20, int, False))
         data.append(("cfg_scale", 7.0, float, False))
         data.append(("noise_scheduler", NoiseScheduler.DDIM, NoiseScheduler, False))
+
+        data.append(("sample_inpainting", False, bool, False))
+        data.append(("base_image_path", "", str, False))
+        data.append(("mask_image_path", "", str, False))
 
         return SampleConfig(data)

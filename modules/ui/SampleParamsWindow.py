@@ -14,7 +14,7 @@ class SampleParamsWindow(ctk.CTkToplevel):
         self.ui_state = ui_state
 
         self.title("Sample")
-        self.geometry("800x400")
+        self.geometry("800x500")
         self.resizable(True, True)
         self.wait_visibility()
         self.grab_set()

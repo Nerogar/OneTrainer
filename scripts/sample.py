@@ -16,8 +16,6 @@ def main():
     device = default_device
 
     training_method = TrainingMethod.FINE_TUNE
-    if args.embedding_name is not None:
-        training_method = TrainingMethod.EMBEDDING
 
     model_loader = create.create_model_loader(args.model_type, training_method=training_method)
     model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
@@ -45,9 +43,12 @@ def main():
             {
                 "prompt": args.prompt,
                 "negative_prompt": args.negative_prompt,
-                "height": 512,
-                "width": 512,
+                "height": args.height,
+                "width": args.width,
                 "seed": 42,
+                "sample_inpainting": args.sample_inpainting,
+                "base_image_path": args.base_image_path,
+                "mask_image_path": args.mask_image_path,
             }
         ),
         image_format=ImageFormat.JPG,

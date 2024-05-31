@@ -50,16 +50,20 @@ class LoRAModule(metaclass=ABCMeta):
         return list(self.lora_down.parameters()) + list(self.lora_up.parameters())
 
     def load_state_dict(self, state_dict: dict):
-        down_state_dict = {
-            "weight": state_dict.pop(self.prefix + ".lora_down.weight")
-        }
-        up_state_dict = {
-            "weight": state_dict.pop(self.prefix + ".lora_up.weight")
-        }
-        self.alpha = state_dict.pop(self.prefix + ".alpha")
+        if self.prefix + ".lora_down.weight" in state_dict:
+            down_state_dict = {
+                "weight": state_dict.pop(self.prefix + ".lora_down.weight")
+            }
+            self.lora_down.load_state_dict(down_state_dict, strict=False)
 
-        self.lora_down.load_state_dict(down_state_dict)
-        self.lora_up.load_state_dict(up_state_dict)
+        if self.prefix + ".lora_up.weight" in state_dict:
+            up_state_dict = {
+                "weight": state_dict.pop(self.prefix + ".lora_up.weight")
+            }
+            self.lora_up.load_state_dict(up_state_dict, strict=False)
+
+        if self.prefix + ".alpha" in state_dict:
+            self.alpha = state_dict.pop(self.prefix + ".alpha")
 
     def state_dict(self) -> dict:
         state_dict = {}

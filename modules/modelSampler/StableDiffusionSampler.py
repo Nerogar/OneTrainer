@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Callable
 
 import torch
-from PIL.Image import Image
+from PIL import Image
+from torch import nn
+from torchvision.transforms import transforms
 from tqdm import tqdm
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
@@ -47,7 +49,7 @@ class StableDiffusionSampler(BaseModelSampler):
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-    ) -> Image:
+    ) -> Image.Image:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
             if random_seed:
@@ -194,6 +196,20 @@ class StableDiffusionSampler(BaseModelSampler):
 
             return image[0]
 
+    def __create_erode_kernel(self, device):
+        kernel_radius = 2
+
+        kernel_size = kernel_radius * 2 + 1
+        kernel_weights = torch.ones(1, 1, kernel_size, kernel_size) / (kernel_size * kernel_size)
+        kernel = nn.Conv2d(
+            in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
+            padding=kernel_radius
+        )
+        kernel.weight.data = kernel_weights
+        kernel.requires_grad_(False)
+        kernel.to(device)
+        return kernel
+
     @torch.no_grad()
     def __sample_inpainting(
             self,
@@ -207,10 +223,13 @@ class StableDiffusionSampler(BaseModelSampler):
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
+            sample_inpainting: bool = False,
+            base_image_path: str = "",
+            mask_image_path: str = "",
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-    ) -> Image:
+    ) -> Image.Image:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
             if random_seed:
@@ -228,18 +247,59 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # prepare conditioning image
             self.model.vae_to(self.train_device)
-            conditioning_image = torch.zeros(
-                (1, 3, height, width),
-                dtype=self.model.train_dtype.torch_dtype(),
-                device=self.train_device,
-            )
-            conditioning_image = conditioning_image
-            latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
-            latent_mask = torch.ones(
-                size=(1, 1, latent_conditioning_image.shape[2], latent_conditioning_image.shape[3]),
-                dtype=self.model.train_dtype.torch_dtype(),
-                device=self.train_device
-            )
+
+            if sample_inpainting:
+                t = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Resize(
+                        (height, width), interpolation=transforms.InterpolationMode.BILINEAR,antialias=True
+                    ),
+                ])
+
+                image = Image.open(base_image_path).convert("RGB")
+                image = t(image).to(
+                    dtype=self.model.train_dtype.torch_dtype(),
+                    device=self.train_device,
+                )
+
+                mask = Image.open(mask_image_path).convert("L")
+                mask = t(mask).to(
+                    dtype=self.model.train_dtype.torch_dtype(),
+                    device=self.train_device,
+                )
+
+                erode_kernel = self.__create_erode_kernel(self.train_device)
+                eroded_mask = erode_kernel(mask)
+                eroded_mask = (eroded_mask > 0.5).float()
+
+                image = (image * 2.0) - 1.0
+                conditioning_image = (image * (1 - eroded_mask))
+                conditioning_image = conditioning_image.unsqueeze(0)
+
+                latent_conditioning_image = vae.encode(
+                    conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+
+                rescale_mask = transforms.Resize(
+                    (round(mask.shape[1] // 8), round(mask.shape[2] // 8)),
+                    interpolation=transforms.InterpolationMode.BILINEAR,
+                    antialias=True
+                )
+                latent_mask = rescale_mask(mask)
+                latent_mask = (latent_mask > 0).float()
+                latent_mask = latent_mask.unsqueeze(0)
+            else:
+                conditioning_image = torch.zeros(
+                    (1, 3, height, width),
+                    dtype=self.model.train_dtype.torch_dtype(),
+                    device=self.train_device,
+                )
+                latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+                latent_mask = torch.ones(
+                    size=(1, 1, latent_conditioning_image.shape[2], latent_conditioning_image.shape[3]),
+                    dtype=self.model.train_dtype.torch_dtype(),
+                    device=self.train_device
+                )
+
             self.model.vae_to(self.temp_device)
             torch_gc()
 
@@ -384,7 +444,7 @@ class StableDiffusionSampler(BaseModelSampler):
             image_format: ImageFormat,
             text_encoder_layer_skip: int,
             force_last_timestep: bool = False,
-            on_sample: Callable[[Image], None] = lambda _: None,
+            on_sample: Callable[[Image.Image], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         prompt = self.model.add_embeddings_to_prompt(sample_params.prompt)
@@ -402,6 +462,9 @@ class StableDiffusionSampler(BaseModelSampler):
                 cfg_scale=sample_params.cfg_scale,
                 noise_scheduler=sample_params.noise_scheduler,
                 cfg_rescale=0.7 if force_last_timestep else 0.0,
+                sample_inpainting=sample_params.sample_inpainting,
+                base_image_path=sample_params.base_image_path,
+                mask_image_path=sample_params.mask_image_path,
                 text_encoder_layer_skip=text_encoder_layer_skip,
                 force_last_timestep=force_last_timestep,
                 on_update_progress=on_update_progress,
