@@ -262,8 +262,9 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # decode
             self.model.vae_to(self.train_device)
 
-            latent_image = latent_image.to(dtype=vae.dtype)
-            image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
+            latent_image = latent_image.to(dtype=self.model.vae_train_dtype.torch_dtype())
+            with self.model.vae_autocast_context:
+                image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
@@ -588,8 +589,9 @@ class StableDiffusionXLSampler(BaseModelSampler):
         # decode
         self.model.vae_to(self.train_device)
 
-        latent_image = latent_image.to(dtype=vae.dtype)
-        image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
+        latent_image = latent_image.to(dtype=self.model.vae_train_dtype.torch_dtype())
+        with self.model.vae_autocast_context:
+            image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
         do_denormalize = [True] * image.shape[0]
         image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
