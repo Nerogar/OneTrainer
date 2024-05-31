@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import torch
 from diffusers import AutoencoderKL, DiffusionPipeline, DDIMScheduler, Transformer2DModel, \
-    PixArtAlphaPipeline
+    PixArtAlphaPipeline, PixArtSigmaPipeline
 from torch import Tensor
 from transformers import T5Tokenizer, \
     T5EncoderModel
@@ -139,13 +139,23 @@ class PixArtAlphaModel(BaseModel):
         self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
-        return PixArtAlphaPipeline(
-            tokenizer=self.tokenizer,
-            text_encoder=self.text_encoder,
-            vae=self.vae,
-            transformer=self.transformer,
-            scheduler=self.noise_scheduler,
-        )
+        match self.model_type:
+            case ModelType.PIXART_ALPHA:
+                return PixArtAlphaPipeline(
+                    tokenizer=self.tokenizer,
+                    text_encoder=self.text_encoder,
+                    vae=self.vae,
+                    transformer=self.transformer,
+                    scheduler=self.noise_scheduler,
+                )
+            case ModelType.PIXART_SIGMA:
+                return PixArtSigmaPipeline(
+                    tokenizer=self.tokenizer,
+                    text_encoder=self.text_encoder,
+                    vae=self.vae,
+                    transformer=self.transformer,
+                    scheduler=self.noise_scheduler,
+                )
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
         for embedding in self.additional_embeddings:

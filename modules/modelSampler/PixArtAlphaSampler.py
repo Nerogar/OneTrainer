@@ -165,7 +165,7 @@ class PixArtAlphaSampler(BaseModelSampler):
                         dtype=self.model.train_dtype.torch_dtype()),
                     encoder_attention_mask=combined_prompt_attention_mask.to(
                         dtype=self.model.train_dtype.torch_dtype()),
-                    timestep=timestep.unsqueeze(0),
+                    timestep=timestep.expand(latent_model_input.shape[0]),
                     added_cond_kwargs=added_cond_kwargs,
                 ).sample
 

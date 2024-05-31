@@ -57,6 +57,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
             ("Stable Cascade", ModelType.STABLE_CASCADE_1),
             ("PixArt Alpha", ModelType.PIXART_ALPHA),
+            ("PixArt Sigma", ModelType.PIXART_SIGMA),
         ], self.ui_state, "model_type")
 
         # training method

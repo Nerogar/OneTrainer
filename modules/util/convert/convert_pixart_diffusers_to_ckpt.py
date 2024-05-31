@@ -3,6 +3,7 @@ from diffusers.models.embeddings import PatchEmbed
 from torch import Tensor
 
 import modules.util.convert.convert_diffusers_to_ckpt_util as util
+from modules.util.enum.ModelType import ModelType
 
 
 def __map_transformer_attention_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
@@ -65,14 +66,15 @@ def __generate_y_embedding() -> Tensor:
     #     hidden_size=16*72,
     # )
 
-def __map_transformer(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
+def __map_transformer(in_states: dict, out_prefix: str, in_prefix: str, model_type: ModelType) -> dict:
     out_states = {}
 
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "ar_embedder.mlp.0"), util.combine(in_prefix, "adaln_single.emb.aspect_ratio_embedder.linear_1"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "ar_embedder.mlp.2"), util.combine(in_prefix, "adaln_single.emb.aspect_ratio_embedder.linear_2"))
+    if model_type.is_pixart_alpha():
+        out_states |= util.map_wb(in_states, util.combine(out_prefix, "ar_embedder.mlp.0"), util.combine(in_prefix, "adaln_single.emb.aspect_ratio_embedder.linear_1"))
+        out_states |= util.map_wb(in_states, util.combine(out_prefix, "ar_embedder.mlp.2"), util.combine(in_prefix, "adaln_single.emb.aspect_ratio_embedder.linear_2"))
 
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "csize_embedder.mlp.0"), util.combine(in_prefix, "adaln_single.emb.resolution_embedder.linear_1"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "csize_embedder.mlp.2"), util.combine(in_prefix, "adaln_single.emb.resolution_embedder.linear_2"))
+        out_states |= util.map_wb(in_states, util.combine(out_prefix, "csize_embedder.mlp.0"), util.combine(in_prefix, "adaln_single.emb.resolution_embedder.linear_1"))
+        out_states |= util.map_wb(in_states, util.combine(out_prefix, "csize_embedder.mlp.2"), util.combine(in_prefix, "adaln_single.emb.resolution_embedder.linear_2"))
 
     #out_states[util.combine(out_prefix, "y_embedder.y_embedding")] = __generate_y_embedding() #TODO
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "y_embedder.y_proj.fc1"), util.combine(in_prefix, "caption_projection.linear_1"))
@@ -97,10 +99,11 @@ def __map_transformer(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
 
 
 def convert_pixart_diffusers_to_ckpt(
+        model_type: ModelType,
         transformer_state_dict: dict,
 ) -> dict:
     state_dict = {}
 
-    state_dict |= __map_transformer(transformer_state_dict, "", "")
+    state_dict |= __map_transformer(transformer_state_dict, "", "", model_type)
 
     return state_dict

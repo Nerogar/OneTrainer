@@ -48,6 +48,7 @@ class PixArtAlphaModelSaver(
             dtype: torch.dtype | None,
     ):
         state_dict = convert_pixart_diffusers_to_ckpt(
+            model.model_type,
             model.transformer.state_dict(),
         )
 
@@ -66,6 +67,7 @@ class PixArtAlphaModelSaver(
             dtype: torch.dtype | None,
     ):
         state_dict = convert_pixart_diffusers_to_ckpt(
+            model.model_type,
             model.transformer.state_dict(),
         )
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)

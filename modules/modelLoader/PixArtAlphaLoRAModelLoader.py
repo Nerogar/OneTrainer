@@ -25,6 +25,8 @@ class PixArtAlphaLoRAModelLoader(
         match model_type:
             case ModelType.PIXART_ALPHA:
                 return "resources/sd_model_spec/pixart_alpha_1.0-lora.json"
+            case ModelType.PIXART_SIGMA:
+                return "resources/sd_model_spec/pixart_sigma_1.0-lora.json"
             case _:
                 return None
 

@@ -82,6 +82,7 @@ class TopBar:
                 ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
                 ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
+                ("PixArt Sigma", ModelType.PIXART_SIGMA),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -113,7 +114,7 @@ class TopBar:
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_config.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

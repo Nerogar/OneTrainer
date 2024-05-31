@@ -46,7 +46,7 @@ class ModelTab:
             self.__setup_stable_diffusion_xl_ui()
         elif self.train_config.model_type.is_wuerstchen():
             self.__setup_wuerstchen_ui()
-        elif self.train_config.model_type.is_pixart_alpha():
+        elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui()
 
     def __setup_stable_diffusion_ui(self):

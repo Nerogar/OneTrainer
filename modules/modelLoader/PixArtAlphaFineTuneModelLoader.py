@@ -24,6 +24,8 @@ class PixArtAlphaFineTuneModelLoader(
         match model_type:
             case ModelType.PIXART_ALPHA:
                 return "resources/sd_model_spec/pixart_alpha_1.0.json"
+            case ModelType.PIXART_SIGMA:
+                return "resources/sd_model_spec/pixart_sigma_1.0.json"
             case _:
                 return None
 
