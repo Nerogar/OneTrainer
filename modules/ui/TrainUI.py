@@ -7,6 +7,7 @@ from tkinter import filedialog
 from typing import Callable
 
 import customtkinter as ctk
+import torch
 
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.CaptionUI import CaptionUI
@@ -526,6 +527,10 @@ class TrainUI(ctk.CTk):
         trainer.end()
 
         # clear gpu memory
+        del trainer
+        self.training_thread = None
+        self.training_commands = None
+        torch.clear_autocast_cache()
         torch_gc()
 
         if error_caught:
@@ -533,8 +538,6 @@ class TrainUI(ctk.CTk):
         else:
             self.on_update_status("stopped")
 
-        self.training_thread = None
-        self.training_commands = None
         self.training_button.configure(text="Start Training", state="normal")
 
     def start_training(self):
