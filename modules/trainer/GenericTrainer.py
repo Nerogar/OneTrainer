@@ -257,6 +257,34 @@ class GenericTrainer(BaseTrainer):
 
                 torch_gc()
 
+        current_epoch = train_progress.epoch
+
+        for i, sample_params in enumerate(sample_params_list):
+            if sample_params.enabled:
+                safe_prompt = path_util.safe_filename(sample_params.prompt)
+                sample_dir = os.path.join(
+                    self.config.workspace_dir,
+                    "samples",
+                    f"{str(i)} - {safe_prompt}",
+                )
+
+                # Find the most recent sample generated during the current epoch
+                latest_sample = None
+                latest_timestamp = None
+                for filename in os.listdir(sample_dir):
+                    if filename.lower().endswith((".png", ".jpg", ".jpeg")):
+                        parts = filename.split("-")
+                        epoch = int(parts[-2])  # Extract the epoch number from the second-to-last part
+                        if epoch == current_epoch and (latest_timestamp is None or filename > latest_timestamp):
+                            latest_timestamp = filename
+                            latest_sample = filename
+
+                # Copy the most recent sample from the current epoch to the epoch-specific folder
+                if latest_sample is not None:
+                    src_path = os.path.join(sample_dir, latest_sample)
+                    dst_path = os.path.join(os.path.join(self.config.workspace_dir, "samples", f"epoch_{current_epoch}"), f"{safe_prompt}_{latest_sample}")
+                    shutil.copy2(src_path, dst_path)
+
     def __sample_during_training(
             self,
             train_progress: TrainProgress,
@@ -286,6 +314,32 @@ class GenericTrainer(BaseTrainer):
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+
+        # Create a directory to save the samples for the current epoch
+        epoch_sample_dir = os.path.join(self.config.workspace_dir, "samples", f"epoch_{train_progress.epoch}")
+        os.makedirs(epoch_sample_dir, exist_ok=True)
+
+        for i, sample_params in enumerate(sample_params_list):
+            if sample_params.enabled:
+                try:
+                    safe_prompt = path_util.safe_filename(sample_params.prompt)
+                    sample_dir = os.path.join(
+                        self.config.workspace_dir,
+                        "samples",
+                        f"{str(i)} - {safe_prompt}",
+                    )
+
+                    # Create the prompt-specific folder if it doesn't exist
+                    os.makedirs(sample_dir, exist_ok=True)
+
+                except:
+                    traceback.print_exc()
+                    print("Error during sampling, proceeding without sampling")
+
+                torch_gc()
+
+        if self.model.ema:
+            self.model.ema.copy_temp_to(self.parameters)
 
         self.__sample_loop(
             train_progress=train_progress,
