@@ -422,10 +422,13 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
-    def __needs_sample(self, train_progress: TrainProgress):
-        return self.repeating_action_needed(
-            "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
-        )
+    def __needs_sample(self, train_progress: TrainProgress, is_last_epoch: bool):
+        if is_last_epoch:
+            return True
+        else:
+            return self.repeating_action_needed(
+                "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
+            )
 
     def __needs_backup(self, train_progress: TrainProgress):
         return self.repeating_action_needed(
@@ -540,11 +543,6 @@ class GenericTrainer(BaseTrainer):
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
             for epoch_step, batch in enumerate(step_tqdm):
-                if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
-                    self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, train_device)
-                    )
-
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
                 if sample_commands:
                     def create_sample_commands_fun(sample_commands):
@@ -635,10 +633,21 @@ class GenericTrainer(BaseTrainer):
                     return
 
             train_progress.next_epoch()
+
+            # Check if the current epoch is the last one
+            is_last_epoch = train_progress.epoch == self.config.epochs - 1
+
+            # Check if sampling is needed after the epoch is completed
+            if self.__needs_sample(train_progress, is_last_epoch) or self.commands.get_and_reset_sample_default_command():
+                self.__sample_during_training(train_progress, train_device)  # Directly sample
+
             self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
             if self.commands.get_stop_command():
                 return
+            
+        # Ensure sampling after the training loop
+        self.__execute_sample_during_training()
 
     def end(self):
         if self.one_step_trained:
