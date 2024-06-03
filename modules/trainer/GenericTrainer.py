@@ -6,6 +6,7 @@ import sys
 import traceback
 from pathlib import Path
 from typing import Callable
+import ctypes
 
 import torch
 from PIL.Image import Image
@@ -230,7 +231,7 @@ class GenericTrainer(BaseTrainer):
                     def on_sample_default(image: Image):
                         if self.config.samples_to_tensorboard:
                             self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                                       train_progress.global_step)
+                                                    train_progress.global_step)
                         self.callbacks.on_sample_default(image)
 
                     def on_sample_custom(image: Image):
@@ -282,7 +283,8 @@ class GenericTrainer(BaseTrainer):
                 # Copy the most recent sample from the current epoch to the epoch-specific folder
                 if latest_sample is not None:
                     src_path = os.path.join(sample_dir, latest_sample)
-                    dst_path = os.path.join(os.path.join(self.config.workspace_dir, "samples", f"epoch_{current_epoch}"), f"{safe_prompt}_{latest_sample}")
+                    dst_path = os.path.join(os.path.join(self.config.workspace_dir, "epochs", f"epoch_{current_epoch}"), f"{safe_prompt}_{latest_sample}")
+                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     shutil.copy2(src_path, dst_path)
 
     def __sample_during_training(
@@ -315,9 +317,12 @@ class GenericTrainer(BaseTrainer):
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
-        # Create a directory to save the samples for the current epoch
-        epoch_sample_dir = os.path.join(self.config.workspace_dir, "samples", f"epoch_{train_progress.epoch}")
+        # Create a hidden directory to save the samples for the current epoch
+        epoch_sample_dir = os.path.join(self.config.workspace_dir, "epochs", f"epoch_{train_progress.epoch}")
         os.makedirs(epoch_sample_dir, exist_ok=True)
+
+        # Set the "Hidden" attribute for the "epochs" folder
+        ctypes.windll.kernel32.SetFileAttributesW(os.path.join(self.config.workspace_dir, "epochs"), 0x02)
 
         for i, sample_params in enumerate(sample_params_list):
             if sample_params.enabled:
