@@ -12,6 +12,7 @@ accelerate==0.30.1
 safetensors==0.4.3
 tensorboard==2.16.2
 pytorch-lightning==2.2.5
+torch-fidelity==0.3.0
 
 # stable diffusion
 -e git+https://github.com/huggingface/diffusers.git@0ab63ff#egg=diffusers
