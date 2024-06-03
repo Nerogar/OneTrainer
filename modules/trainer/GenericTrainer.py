@@ -37,6 +37,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
+from scripts.calculate_fid_scores import calculate_fid_scores
 
 
 class GenericTrainer(BaseTrainer):
@@ -283,7 +284,7 @@ class GenericTrainer(BaseTrainer):
                 # Copy the most recent sample from the current epoch to the epoch-specific folder
                 if latest_sample is not None:
                     src_path = os.path.join(sample_dir, latest_sample)
-                    dst_path = os.path.join(os.path.join(self.config.workspace_dir, "epochs", f"epoch_{current_epoch}"), f"{safe_prompt}_{latest_sample}")
+                    dst_path = os.path.join(os.path.join(self.config.workspace_dir, "epochs", f"class_{current_epoch}"), f"{safe_prompt}_{latest_sample}")
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     shutil.copy2(src_path, dst_path)
 
@@ -293,12 +294,40 @@ class GenericTrainer(BaseTrainer):
             train_device: torch.device,
             sample_params_list: list[SampleConfig] = None,
     ):
+        # Get the path to the "training_concepts" directory
+        training_concepts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "training_concepts")
+
+        # Construct the path to the "concepts.json" file
+        concepts_file = os.path.join(training_concepts_dir, "concepts.json")
+
+        # Read the concepts.json file
+        with open(concepts_file, "r") as f:
+            concepts = json.load(f)
+
+        # Find the concept named "validation_images"
+        validation_images_path = None
+        for concept in concepts:
+            if concept["name"] == "validation_images":
+                validation_images_path = concept["path"]
+                break
+
+        epochs_path = None
+        if validation_images_path is not None:
+            # Get the path to the "scripts" directory
+            scripts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "scripts")
+            # Add the "scripts" directory to the Python module search path
+            sys.path.append(scripts_dir)
+            # Define the epochs_path variable pointing to the hidden "epochs" directory
+            epochs_path = os.path.join(self.config.workspace_dir, "epochs")
+        else:
+            print("No 'validation_images' concept found in concepts.json. Skipping FID score calculation.")
+
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
-        torch_gc()
 
+        torch_gc()
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
@@ -318,7 +347,7 @@ class GenericTrainer(BaseTrainer):
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
         # Create a hidden directory to save the samples for the current epoch
-        epoch_sample_dir = os.path.join(self.config.workspace_dir, "epochs", f"epoch_{train_progress.epoch}")
+        epoch_sample_dir = os.path.join(self.config.workspace_dir, "epochs", f"class_{train_progress.epoch}")
         os.makedirs(epoch_sample_dir, exist_ok=True)
 
         # Set the "Hidden" attribute for the "epochs" folder
@@ -343,9 +372,6 @@ class GenericTrainer(BaseTrainer):
 
                 torch_gc()
 
-        if self.model.ema:
-            self.model.ema.copy_temp_to(self.parameters)
-
         self.__sample_loop(
             train_progress=train_progress,
             train_device=train_device,
@@ -367,7 +393,12 @@ class GenericTrainer(BaseTrainer):
                 folder_postfix=" - no-ema",
             )
 
+        # Call the FID calculation script after the sampling loop
+        if epochs_path is not None:
+            calculate_fid_scores(validation_images_path, epochs_path)
+
         self.model_setup.setup_train_device(self.model, self.config)
+        
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
             torch.clear_autocast_cache()
