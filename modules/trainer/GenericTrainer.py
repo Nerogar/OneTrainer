@@ -402,7 +402,7 @@ class GenericTrainer(BaseTrainer):
         if epochs_path is not None:
             fid_scores = calculate_fid_scores(validation_images_path, epochs_path)
             for epoch, fid_score in fid_scores.items():
-                self.tensorboard.add_scalar("FID Score", fid_score, epoch)  # Log to TensorBoard
+                self.tensorboard.add_scalar("loss/validation loss", fid_score, epoch)  # Log to TensorBoard
         else:
             print("No 'validation_images' concept found in concepts.json. Skipping FID score calculation.")
 
