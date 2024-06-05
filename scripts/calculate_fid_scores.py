@@ -76,3 +76,5 @@ def calculate_fid_scores(validation_images_path, epochs_path):
     for epoch, fid_score in epoch_fid_scores.items():
         print(f"Epoch {epoch}: FID score = {fid_score}")
         
+    # Return the epoch_fid_scores dictionary
+    return epoch_fid_scores
