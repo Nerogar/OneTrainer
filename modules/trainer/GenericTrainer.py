@@ -398,9 +398,13 @@ class GenericTrainer(BaseTrainer):
                 folder_postfix=" - no-ema",
             )
 
-        # Call the FID calculation script after the sampling loop
+        # Calculate and log FID score
         if epochs_path is not None:
-            calculate_fid_scores(validation_images_path, epochs_path)
+            fid_scores = calculate_fid_scores(validation_images_path, epochs_path)
+            for epoch, fid_score in fid_scores.items():
+                self.tensorboard.add_scalar("FID Score", fid_score, epoch)  # Log to TensorBoard
+        else:
+            print("No 'validation_images' concept found in concepts.json. Skipping FID score calculation.")
 
         self.model_setup.setup_train_device(self.model, self.config)
         
