@@ -54,6 +54,9 @@ def calculate_fid_scores(validation_images_path, epochs_path):
     # Get the latest epoch folder
     latest_epoch_folder = epoch_folders[-1]
 
+    # Extract the epoch number from the latest epoch folder name
+    latest_epoch_number = int(latest_epoch_folder.split("_")[-1])
+
     # Calculate FID score only for the latest epoch
     epoch_path = os.path.join(epochs_path, latest_epoch_folder)
     # Load the generated images for the latest epoch using the custom dataset
@@ -67,8 +70,8 @@ def calculate_fid_scores(validation_images_path, epochs_path):
         fid.update(torch.stack([img.to(device) for img in generated_dataset]), real=False)
         fid_score = fid.compute()
 
-        # Store the FID score for the latest epoch
-        epoch_fid_scores[latest_epoch_folder] = fid_score.item()
+        # Store the FID score for the latest epoch using the epoch number as the key
+        epoch_fid_scores[latest_epoch_number] = fid_score.item()
     else:
         print(f"Skipping FID calculation for epoch {latest_epoch_folder} due to insufficient samples.")
 
