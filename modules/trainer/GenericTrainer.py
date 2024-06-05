@@ -288,12 +288,7 @@ class GenericTrainer(BaseTrainer):
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     shutil.copy2(src_path, dst_path)
 
-    def __sample_during_training(
-            self,
-            train_progress: TrainProgress,
-            train_device: torch.device,
-            sample_params_list: list[SampleConfig] = None,
-    ):
+    def get_validation_and_epochs_paths(self):
         # Get the path to the "training_concepts" directory
         training_concepts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "training_concepts")
 
@@ -321,6 +316,16 @@ class GenericTrainer(BaseTrainer):
             epochs_path = os.path.join(self.config.workspace_dir, "epochs")
         else:
             print("No 'validation_images' concept found in concepts.json. Skipping FID score calculation.")
+
+        return validation_images_path, epochs_path
+
+    def __sample_during_training(
+            self,
+            train_progress: TrainProgress,
+            train_device: torch.device,
+            sample_params_list: list[SampleConfig] = None,
+    ):
+        validation_images_path, epochs_path = self.get_validation_and_epochs_paths()
 
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
