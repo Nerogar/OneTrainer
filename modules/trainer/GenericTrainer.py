@@ -85,7 +85,19 @@ class GenericTrainer(BaseTrainer):
 
         self.grad_hook_handles = []
 
+    def pre_training_check(self):
+        epochs_dir = "workspace/run/epochs"  # Use relative path directly
+        if os.path.exists(epochs_dir):
+            try:
+                print(f"Found existing 'epochs' folder. Deleting...")
+                shutil.rmtree(epochs_dir)
+                print("Deletion successful.")
+            except Exception as e:
+                print(f"Error deleting 'epochs' folder: {e}")
+
     def start(self):
+        self.pre_training_check()
+
         if self.config.clear_cache_before_training and self.config.latent_caching:
             self.__clear_cache()
 
