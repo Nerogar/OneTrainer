@@ -5,6 +5,7 @@ from torchvision.datasets import ImageFolder
 from torchmetrics.image.fid import FrechetInceptionDistance
 from torch.utils.data import Dataset
 from PIL import Image
+import json
 
 # Set up the device (GPU if available, else CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,8 +46,13 @@ def calculate_fid_scores(validation_images_path, epochs_path):
     # Create an instance of the FrechetInceptionDistance metric
     fid = FrechetInceptionDistance(normalize=True).to(device)
 
-    # Calculate FID scores for each epoch
-    epoch_fid_scores = {}
+    # Load existing FID scores if the file exists
+    fid_scores_file = os.path.join(epochs_path, "fid_scores.json")
+    if os.path.exists(fid_scores_file):
+        with open(fid_scores_file, "r") as f:
+            epoch_fid_scores = json.load(f)
+    else:
+        epoch_fid_scores = {}
 
     # Get the list of epoch folders sorted in ascending order
     epoch_folders = sorted([folder for folder in os.listdir(epochs_path) if folder.startswith("class_")])
@@ -71,13 +77,17 @@ def calculate_fid_scores(validation_images_path, epochs_path):
         fid_score = fid.compute()
 
         # Store the FID score for the latest epoch using the epoch number as the key
-        epoch_fid_scores[latest_epoch_number] = fid_score.item()
+        epoch_fid_scores[str(latest_epoch_number)] = fid_score.item()
     else:
         print(f"Skipping FID calculation for epoch {latest_epoch_folder} due to insufficient samples.")
 
     # Print the FID scores for each epoch
     for epoch, fid_score in epoch_fid_scores.items():
         print(f"Epoch {epoch}: FID score = {fid_score}")
+
+    # Store updated FID scores in the JSON file
+    with open(fid_scores_file, "w") as f:
+        json.dump(epoch_fid_scores, f)
         
     # Return the epoch_fid_scores dictionary
     return epoch_fid_scores
