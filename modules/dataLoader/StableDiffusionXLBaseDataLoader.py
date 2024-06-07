@@ -184,13 +184,14 @@ class StableDiffusionXLBaseDataLoader(BaseDataLoader):
         return modules
 
     def _crop_modules(self, config: TrainConfig):
-        scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='image', crop_offset_out_name='crop_offset')
-        scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='mask', crop_offset_out_name='crop_offset')
-
-        modules = [scale_crop_image]
+        inputs = ['image']
 
         if config.masked_training or config.model_type.has_mask_input():
-            modules.append(scale_crop_mask)
+            inputs.append('mask')
+
+        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
+
+        modules = [scale_crop]
 
         return modules
 
