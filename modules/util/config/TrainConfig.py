@@ -283,6 +283,10 @@ class TrainConfig(BaseConfig):
     text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
 
+    # text encoder 3
+    text_encoder_3: TrainModelPartConfig
+    text_encoder_3_layer_skip: int
+
     # vae
     vae: TrainModelPartConfig
 
@@ -481,6 +485,7 @@ class TrainConfig(BaseConfig):
             self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
             self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
+            self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
             self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
             self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
             self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
