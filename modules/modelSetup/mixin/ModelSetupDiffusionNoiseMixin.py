@@ -3,7 +3,7 @@ from typing import Callable
 
 import torch
 import numpy as np
-from diffusers import DDIMScheduler
+from diffusers import DDIMScheduler, FlowMatchEulerDiscreteScheduler
 from torch import Tensor, Generator
 
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
@@ -51,7 +51,7 @@ class ModelSetupDiffusionNoiseMixin(metaclass=ABCMeta):
 
     def _get_timestep_discrete(
             self,
-            noise_scheduler: DDIMScheduler,
+            noise_scheduler: DDIMScheduler | FlowMatchEulerDiscreteScheduler,
             deterministic: bool,
             generator: Generator,
             batch_size: int,

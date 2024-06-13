@@ -114,93 +114,90 @@ class StableDiffusion3Sampler(BaseModelSampler):
                     padding="max_length",
                     truncation=True,
                     max_length=tokenizer_1.model_max_length,  # Matching diffusers implementation
-                    add_special_tokens=True,
                     return_tensors="pt")
                 negative_tokenizer_3_output = tokenizer_3(
                     negative_prompt,
                     padding="max_length",
                     truncation=True,
                     max_length=tokenizer_1.model_max_length,  # Matching diffusers implementation
-                    add_special_tokens=True,
                     return_tensors="pt")
                 tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
                 negative_tokens_3 = negative_tokenizer_3_output.input_ids.to(self.train_device)
 
-            with torch.autocast(self.train_device.type):
-                text_encoder_1_output = text_encoder_1(
-                    tokens_1,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                pooled_text_encoder_1_output = text_encoder_1_output[0]
-                text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            text_encoder_1_output = text_encoder_1(
+                tokens_1,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            pooled_text_encoder_1_output = text_encoder_1_output[0]
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
-                text_encoder_2_output = text_encoder_2(
-                    tokens_2,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                pooled_text_encoder_2_output = text_encoder_2_output[0]
-                text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            text_encoder_2_output = text_encoder_2(
+                tokens_2,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            pooled_text_encoder_2_output = text_encoder_2_output[0]
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
-                if text_encoder_3:
-                    text_encoder_3_output = text_encoder_3(tokens_3)[0]
-                else:
-                    text_encoder_3_output = torch.zeros(
-                        (1, tokenizer_1.model_max_length, transformer.config.joint_attention_dim),
-                        device=self.train_device,
-                        dtype=self.model.train_dtype.torch_dtype(),
-                    )
+            if text_encoder_3:
+                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0]
+            else:
+                text_encoder_3_output = torch.zeros(
+                    (1, tokenizer_1.model_max_length, transformer.config.joint_attention_dim),
+                    device=self.train_device,
+                    dtype=self.model.train_dtype.torch_dtype(),
+                )
 
-                prompt_embedding = torch.concat(
-                    [text_encoder_1_output, text_encoder_2_output], dim=-1
-                )
-                prompt_embedding = nn.functional.pad(
-                    prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
-                )
-                prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
-                pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
+            prompt_embedding = torch.concat(
+                [text_encoder_1_output, text_encoder_2_output], dim=-1
+            )
+            prompt_embedding = nn.functional.pad(
+                prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
+            )
+            prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
+            pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
 
-                negative_text_encoder_1_output = text_encoder_1(
-                    negative_tokens_1,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                negative_pooled_text_encoder_1_output = negative_text_encoder_1_output[0]
-                negative_text_encoder_1_output = \
-                    negative_text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            negative_text_encoder_1_output = text_encoder_1(
+                negative_tokens_1,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            negative_pooled_text_encoder_1_output = negative_text_encoder_1_output[0]
+            negative_text_encoder_1_output = \
+                negative_text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
-                negative_text_encoder_2_output = text_encoder_2(
-                    negative_tokens_2,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                negative_pooled_text_encoder_2_output = negative_text_encoder_2_output[0]
-                negative_text_encoder_2_output = \
-                    negative_text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            negative_text_encoder_2_output = text_encoder_2(
+                negative_tokens_2,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            negative_pooled_text_encoder_2_output = negative_text_encoder_2_output[0]
+            negative_text_encoder_2_output = \
+                negative_text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
 
-                if text_encoder_3:
-                    negative_text_encoder_3_output = text_encoder_3(negative_tokens_3)[0]
-                else:
-                    negative_text_encoder_3_output = torch.zeros(
-                        (1, tokenizer_1.model_max_length, transformer.config.joint_attention_dim),
-                        device=self.train_device,
-                        dtype=self.model.train_dtype.torch_dtype(),
-                    )
+            if text_encoder_3:
+                negative_text_encoder_3_output = text_encoder_3(negative_tokens_3)[0]
+            else:
+                negative_text_encoder_3_output = torch.zeros(
+                    (1, tokenizer_1.model_max_length, transformer.config.joint_attention_dim),
+                    device=self.train_device,
+                    dtype=self.model.train_dtype.torch_dtype(),
+                )
 
-                negative_prompt_embedding = torch.concat(
-                    [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
-                )
-                negative_prompt_embedding = nn.functional.pad(
-                    negative_prompt_embedding,
-                    (0, negative_text_encoder_3_output.shape[-1] - negative_prompt_embedding.shape[-1])
-                )
-                negative_prompt_embedding = torch.cat(
-                    [negative_prompt_embedding, negative_text_encoder_3_output],
-                    dim=-2)
-                negative_pooled_prompt_embedding = torch.cat(
-                    [negative_pooled_text_encoder_1_output, negative_pooled_text_encoder_2_output],
-                    dim=-1)
+            negative_prompt_embedding = torch.concat(
+                [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
+            )
+            negative_prompt_embedding = nn.functional.pad(
+                negative_prompt_embedding,
+                (0, negative_text_encoder_3_output.shape[-1] - negative_prompt_embedding.shape[-1])
+            )
+            negative_prompt_embedding = torch.cat(
+                [negative_prompt_embedding, negative_text_encoder_3_output],
+                dim=-2)
+            negative_pooled_prompt_embedding = torch.cat(
+                [negative_pooled_text_encoder_1_output, negative_pooled_text_encoder_2_output],
+                dim=-1)
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding], dim=0)
             combined_pooled_prompt_embedding = torch.cat(

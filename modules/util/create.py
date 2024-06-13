@@ -9,6 +9,7 @@ from torch.nn import Parameter
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler, SequentialLR
 
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
+from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3BaseDataLoader
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLBaseDataLoader import StableDiffusionXLBaseDataLoader
@@ -260,6 +261,8 @@ def create_data_loader(
                 return WuerstchenBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_pixart():
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress)
@@ -272,6 +275,8 @@ def create_data_loader(
                 return WuerstchenBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_pixart():
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
@@ -281,6 +286,8 @@ def create_data_loader(
                 return WuerstchenBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_pixart():
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
 
 
 def create_optimizer(

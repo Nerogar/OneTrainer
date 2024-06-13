@@ -56,9 +56,9 @@ class StableDiffusion3Model(BaseModel):
 
     # persistent embedding training data
     embedding: StableDiffusion3ModelEmbedding | None
-    embedding_state: tuple[Tensor, Tensor] | None
+    embedding_state: tuple[Tensor, Tensor, Tensor] | None
     additional_embeddings: list[StableDiffusion3ModelEmbedding] | None
-    additional_embedding_states: list[tuple[Tensor, Tensor] | None]
+    additional_embedding_states: list[tuple[Tensor, Tensor, Tensor] | None]
     embedding_wrapper_1: AdditionalEmbeddingWrapper
     embedding_wrapper_2: AdditionalEmbeddingWrapper
     embedding_wrapper_3: AdditionalEmbeddingWrapper
@@ -89,9 +89,9 @@ class StableDiffusion3Model(BaseModel):
             ema_state_dict: dict | None = None,
             train_progress: TrainProgress = None,
             embedding: StableDiffusion3ModelEmbedding | None = None,
-            embedding_state: tuple[Tensor, Tensor] | None = None,
+            embedding_state: tuple[Tensor, Tensor, Tensor] | None = None,
             additional_embeddings: list[StableDiffusion3ModelEmbedding] | None = None,
-            additional_embedding_states: list[tuple[Tensor, Tensor] | None] = None,
+            additional_embedding_states: list[tuple[Tensor, Tensor, Tensor] | None] = None,
             embedding_wrapper_1: AdditionalEmbeddingWrapper | None = None,
             embedding_wrapper_2: AdditionalEmbeddingWrapper | None = None,
             embedding_wrapper_3: AdditionalEmbeddingWrapper | None = None,
@@ -158,6 +158,24 @@ class StableDiffusion3Model(BaseModel):
 
         if self.text_encoder_2_lora is not None:
             self.text_encoder_2_lora.to(device)
+
+        if self.text_encoder_3_lora is not None:
+            self.text_encoder_3_lora.to(device)
+
+    def text_encoder_1_to(self, device: torch.device):
+        self.text_encoder_1.to(device=device)
+
+        if self.text_encoder_1_lora is not None:
+            self.text_encoder_1_lora.to(device)
+
+    def text_encoder_2_to(self, device: torch.device):
+        self.text_encoder_2.to(device=device)
+
+        if self.text_encoder_2_lora is not None:
+            self.text_encoder_2_lora.to(device)
+
+    def text_encoder_3_to(self, device: torch.device):
+        self.text_encoder_3.to(device=device)
 
         if self.text_encoder_3_lora is not None:
             self.text_encoder_3_lora.to(device)
