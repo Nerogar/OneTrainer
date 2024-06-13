@@ -10,7 +10,6 @@ from tqdm import tqdm
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
-from modules.util import create
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
@@ -108,22 +107,21 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
             # T5 may not be present.
             tokens_3 = None
-            tokenizer_3_output = None
             negative_tokens_3 = None
-            negative_tokenizer_3_output = None
-            # FIXME: Attention mask for SD3?
             if tokenizer_3 and text_encoder_3:
                 tokenizer_3_output = tokenizer_3(
                     prompt,
                     padding="max_length",
                     truncation=True,
                     max_length=tokenizer_1.model_max_length,  # Matching diffusers implementation
+                    add_special_tokens=True,
                     return_tensors="pt")
                 negative_tokenizer_3_output = tokenizer_3(
                     negative_prompt,
                     padding="max_length",
                     truncation=True,
                     max_length=tokenizer_1.model_max_length,  # Matching diffusers implementation
+                    add_special_tokens=True,
                     return_tensors="pt")
                 tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
                 negative_tokens_3 = negative_tokenizer_3_output.input_ids.to(self.train_device)
