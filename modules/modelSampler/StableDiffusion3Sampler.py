@@ -62,7 +62,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             text_encoder_1 = self.model.text_encoder_1
             text_encoder_2 = self.model.text_encoder_2
             text_encoder_3 = self.model.text_encoder_3
-            noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.model.noise_scheduler, diffusion_steps)
+            noise_scheduler = self.model.noise_scheduler
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -244,13 +244,13 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
                 # predict the noise residual
                 with torch.autocast(self.train_device.type):
-                    # TODO: joint_attention_kwargs
                     noise_pred = transformer(
                         hidden_states=latent_model_input,
-                        timestep=timestep,
+                        timestep=expanded_timestep,
                         encoder_hidden_states=combined_prompt_embedding,
-                        pooled_projection=combined_pooled_prompt_embedding,
-                        return_dict=False)[0]
+                        pooled_projections=combined_pooled_prompt_embedding,
+                        return_dict=False
+                    )[0]
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -279,10 +279,8 @@ class StableDiffusion3Sampler(BaseModelSampler):
             # decode
             self.model.vae_to(self.train_device)
 
-            latent_image = latent_image.to(dtype=self.model.vae_train_dtype.torch_dtype())
-            with self.model.vae_autocast_context:
-                latents = (latents / vae.config.scaling_factor) + vae.config.shift_factor
-                image = vae.decode(latents, return_dict=False)[0]
+            latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
+            image = vae.decode(latents, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)

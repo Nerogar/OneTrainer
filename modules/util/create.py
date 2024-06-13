@@ -30,6 +30,7 @@ from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTune
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
+from modules.modelSampler.StableDiffusion3Sampler import StableDiffusion3Sampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
@@ -211,6 +212,8 @@ def create_model_sampler(
                 return WuerstchenSampler(train_device, temp_device, model, model_type)
             if model_type.is_pixart():
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
@@ -223,6 +226,8 @@ def create_model_sampler(
                 return WuerstchenSampler(train_device, temp_device, model, model_type)
             if model_type.is_pixart():
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
@@ -232,6 +237,8 @@ def create_model_sampler(
                 return WuerstchenSampler(train_device, temp_device, model, model_type)
             if model_type.is_pixart():
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
 
 
 def create_data_loader(

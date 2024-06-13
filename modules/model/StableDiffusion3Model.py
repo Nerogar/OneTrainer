@@ -51,10 +51,8 @@ class StableDiffusion3Model(BaseModel):
 
     # autocast context
     autocast_context: torch.autocast | nullcontext
-    vae_autocast_context: torch.autocast | nullcontext
 
     train_dtype: DataType
-    vae_train_dtype: DataType
 
     # persistent embedding training data
     embedding: StableDiffusion3ModelEmbedding | None
