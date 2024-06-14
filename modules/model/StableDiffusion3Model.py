@@ -5,7 +5,7 @@ import torch
 from diffusers import AutoencoderKL, DiffusionPipeline, SD3Transformer2DModel, \
     StableDiffusion3Pipeline, FlowMatchEulerDiscreteScheduler
 from torch import Tensor
-from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5EncoderModel, T5TokenizerFast
+from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5EncoderModel, T5Tokenizer
 
 from modules.model.BaseModel import BaseModel
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
@@ -41,7 +41,7 @@ class StableDiffusion3Model(BaseModel):
     model_type: ModelType
     tokenizer_1: CLIPTokenizer
     tokenizer_2: CLIPTokenizer
-    tokenizer_3: T5TokenizerFast
+    tokenizer_3: T5Tokenizer
     noise_scheduler: FlowMatchEulerDiscreteScheduler
     text_encoder_1: CLIPTextModelWithProjection
     text_encoder_2: CLIPTextModelWithProjection
@@ -78,7 +78,7 @@ class StableDiffusion3Model(BaseModel):
             model_type: ModelType,
             tokenizer_1: CLIPTokenizer | None = None,
             tokenizer_2: CLIPTokenizer | None = None,
-            tokenizer_3: T5TokenizerFast | None = None,
+            tokenizer_3: T5Tokenizer | None = None,
             noise_scheduler: FlowMatchEulerDiscreteScheduler | None = None,
             text_encoder_1: CLIPTextModelWithProjection | None = None,
             text_encoder_2: CLIPTextModelWithProjection | None = None,

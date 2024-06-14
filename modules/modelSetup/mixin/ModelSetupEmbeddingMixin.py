@@ -2,8 +2,7 @@ from abc import ABCMeta
 
 import torch
 from torch import Tensor
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel, \
-    T5TokenizerFast
+from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 from transformers.tokenization_utils import Trie
 
 
@@ -24,7 +23,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _create_new_embedding(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | T5TokenizerFast,
+            tokenizer: CLIPTokenizer | T5Tokenizer,
             text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel,
             initial_embedding_text: str,
             token_count: int,
@@ -48,7 +47,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _add_embedding_to_tokenizer(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | T5TokenizerFast,
+            tokenizer: CLIPTokenizer | T5Tokenizer,
             embedding: list[str],
     ) -> (Tensor, list[bool]):
         tokenizer.add_tokens(embedding)

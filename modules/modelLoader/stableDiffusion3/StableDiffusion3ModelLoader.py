@@ -1,7 +1,7 @@
 import traceback
 
 from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transformer2DModel
-from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5TokenizerFast, T5EncoderModel
+from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.util.ModelNames import ModelNames
@@ -41,7 +41,7 @@ class StableDiffusion3ModelLoader:
             subfolder="tokenizer_2",
         )
 
-        tokenizer_3 = T5TokenizerFast.from_pretrained(
+        tokenizer_3 = T5Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer_3",
         )
