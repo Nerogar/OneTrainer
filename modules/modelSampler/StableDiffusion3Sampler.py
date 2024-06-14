@@ -1,3 +1,4 @@
+import copy
 import inspect
 import os
 from pathlib import Path
@@ -61,7 +62,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             text_encoder_1 = self.model.text_encoder_1
             text_encoder_2 = self.model.text_encoder_2
             text_encoder_3 = self.model.text_encoder_3
-            noise_scheduler = self.model.noise_scheduler
+            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -238,14 +239,13 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 # Don't seem to scale the latents in SD3.
 
                 # predict the noise residual
-                with torch.autocast(self.train_device.type):
-                    noise_pred = transformer(
-                        hidden_states=latent_model_input,
-                        timestep=expanded_timestep,
-                        encoder_hidden_states=combined_prompt_embedding,
-                        pooled_projections=combined_pooled_prompt_embedding,
-                        return_dict=False
-                    )[0]
+                noise_pred = transformer(
+                    hidden_states=latent_model_input,
+                    timestep=expanded_timestep,
+                    encoder_hidden_states=combined_prompt_embedding,
+                    pooled_projections=combined_pooled_prompt_embedding,
+                    return_dict=False
+                )[0]
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)

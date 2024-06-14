@@ -53,6 +53,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
 from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.PixArtAlphaLoRASetup import PixArtAlphaLoRASetup
+from modules.modelSetup.StableDiffusion3FineTuneSetup import StableDiffusion3FineTuneSetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
 from modules.modelSetup.StableDiffusionFineTuneSetup import StableDiffusionFineTuneSetup
 from modules.modelSetup.StableDiffusionFineTuneVaeSetup import StableDiffusionFineTuneVaeSetup
@@ -173,6 +174,8 @@ def create_model_setup(
                 return WuerstchenFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_pixart():
                 return PixArtAlphaFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3FineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)

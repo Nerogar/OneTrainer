@@ -68,14 +68,14 @@ class StableDiffusion3ModelLoader:
             subfolder="text_encoder_2",
             torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
         )
-        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(supports_fp8=False))
 
         text_encoder_3 = T5EncoderModel.from_pretrained(
             base_model_name,
             subfolder="text_encoder_3",
             torch_dtype=weight_dtypes.text_encoder_3.torch_dtype(),
         )
-        text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+        text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(supports_fp8=False))
 
         if vae_model_name:
             vae = AutoencoderKL.from_pretrained(

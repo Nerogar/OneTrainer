@@ -58,6 +58,8 @@ class TrainingTab:
 
         if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui(column_0, column_1, column_2)
+        if self.train_config.model_type.is_stable_diffusion_3():
+            self.__setup_stable_diffusion_3_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_stable_diffusion_xl():
             self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_wuerstchen():
@@ -72,6 +74,21 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_unet_frame(column_1, 1)
+        self.__create_noise_frame(column_1, 2)
+
+        self.__create_align_prop_frame(column_2, 0)
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2, supports_vb_loss=False)
+
+    def __setup_stable_diffusion_3_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_1_frame(column_0, 1)
+        self.__create_text_encoder_2_frame(column_0, 2)
+        self.__create_text_encoder_3_frame(column_0, 3)
+        self.__create_embedding_frame(column_0, 4)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_align_prop_frame(column_2, 0)
@@ -348,7 +365,7 @@ class TrainingTab:
 
         # train text encoder epochs
         components.label(frame, 1, 0, "Stop Training After",
-                         tooltip="When to stop training the text encoder 1")
+                         tooltip="When to stop training the text encoder 2")
         components.time_entry(frame, 1, 1, self.ui_state, "text_encoder_2.stop_training_after",
                               "text_encoder_2.stop_training_after_unit", supports_time_units=False)
 
@@ -361,6 +378,32 @@ class TrainingTab:
         components.label(frame, 3, 0, "Text Encoder 2 Clip Skip",
                          tooltip="The number of additional clip layers to skip. 0 = the model default")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder_2_layer_skip")
+
+    def __create_text_encoder_3_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+
+        # train text encoder
+        components.label(frame, 0, 0, "Train Text Encoder 3",
+                         tooltip="Enables training the text encoder 3 model")
+        components.switch(frame, 0, 1, self.ui_state, "text_encoder_3.train")
+
+        # train text encoder epochs
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the text encoder 3")
+        components.time_entry(frame, 1, 1, self.ui_state, "text_encoder_3.stop_training_after",
+                              "text_encoder_3.stop_training_after_unit", supports_time_units=False)
+
+        # text encoder learning rate
+        components.label(frame, 2, 0, "Text Encoder 3 Learning Rate",
+                         tooltip="The learning rate of the text encoder 3. Overrides the base learning rate")
+        components.entry(frame, 2, 1, self.ui_state, "text_encoder_3.learning_rate")
+
+        # text encoder layer skip (clip skip)
+        components.label(frame, 3, 0, "Text Encoder 3 Clip Skip",
+                         tooltip="The number of additional clip layers to skip. 0 = the model default")
+        components.entry(frame, 3, 1, self.ui_state, "text_encoder_3_layer_skip")
 
     def __create_embedding_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -422,6 +465,28 @@ class TrainingTab:
         components.label(frame, 2, 0, "Prior Learning Rate",
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
+
+    def __create_transformer_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+
+        # train transformer
+        components.label(frame, 0, 0, "Train Transformer",
+                         tooltip="Enables training the Transformer model")
+        components.switch(frame, 0, 1, self.ui_state, "prior.train")
+
+        # train unet epochs
+        components.label(frame, 1, 0, "Stop Training After",
+                         tooltip="When to stop training the Transformer")
+        components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
+                              supports_time_units=False)
+
+        # unet learning rate
+        components.label(frame, 2, 0, "Transformer Learning Rate",
+                         tooltip="The learning rate of the Transformer. Overrides the base learning rate")
+        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
+
 
     def __create_noise_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

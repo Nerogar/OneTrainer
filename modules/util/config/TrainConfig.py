@@ -663,6 +663,16 @@ class TrainConfig(BaseConfig):
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
 
+        # text encoder 3
+        text_encoder_3 = TrainModelPartConfig.default_values()
+        text_encoder_3.train = True
+        text_encoder_3.stop_training_after = 30
+        text_encoder_3.stop_training_after_unit = TimeUnit.EPOCH
+        text_encoder_3.learning_rate = None
+        text_encoder_3.weight_dtype = DataType.NONE
+        data.append(("text_encoder_3", text_encoder_3, TrainModelPartConfig, False))
+        data.append(("text_encoder_3_layer_skip", 0, int, False))
+
         # vae
         vae = TrainModelPartConfig.default_values()
         vae.model_name = ""

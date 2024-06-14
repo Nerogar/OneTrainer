@@ -156,6 +156,18 @@ class BaseModelSetup(
             train_progress,
         )
 
+    def stop_text_encoder_3_training_elapsed(
+            self,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_text_encoder_3_training",
+            config.text_encoder_3.stop_training_after,
+            config.text_encoder_3.stop_training_after_unit,
+            train_progress,
+        )
+
     def stop_additional_embedding_training_elapsed(
             self,
             config: TrainEmbeddingConfig,

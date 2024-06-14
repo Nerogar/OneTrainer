@@ -235,9 +235,9 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
     def _preparation_modules(self, config: TrainConfig, model: StableDiffusion3Model):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_3 = Tokenize(in_name='prompt', tokens_out_name='tokens_3', mask_out_name='tokens_mask_3', tokenizer=model.tokenizer_3, max_token_length=model.tokenizer_1.model_max_length)
@@ -294,7 +294,7 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         if not config.text_encoder.train and not config.train_any_embedding():
             text_split_names.append('tokens_1')
             text_split_names.append('text_encoder_1_hidden_state')
-            text_split_names.append('text_encoder_3_pooled_state')
+            text_split_names.append('text_encoder_1_pooled_state')
 
         if not config.text_encoder_2.train and not config.train_any_embedding():
             text_split_names.append('tokens_2')

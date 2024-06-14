@@ -2,7 +2,7 @@ from abc import ABCMeta
 from random import Random
 
 import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0
+from diffusers.models.attention_processor import JointAttnProcessor2_0
 from diffusers.utils import is_xformers_available
 from torch import Tensor
 from torch.utils.checkpoint import checkpoint
@@ -11,8 +11,9 @@ from modules.model.StableDiffusion3Model import StableDiffusion3Model, StableDif
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
-from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
+from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
+from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_clip_encoder_layers, \
     create_checkpointed_forward, enable_checkpointing_for_t5_encoder_layers
@@ -29,7 +30,8 @@ class BaseStableDiffusion3Setup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
-    ModelSetupDiffusionNoiseMixin,
+    ModelSetupNoiseMixin,
+    ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
@@ -40,10 +42,12 @@ class BaseStableDiffusion3Setup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            model.transformer.set_attn_processor(AttnProcessor())
+            pass
+            # model.transformer.set_attn_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                model.transformer.set_attn_processor(XFormersAttnProcessor())
+                # TODO: there is no xformers attention processor like JointAttnProcessor2_0 yet
+                # model.transformer.set_attn_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
             except Exception as e:
                 print(
@@ -51,7 +55,7 @@ class BaseStableDiffusion3Setup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            model.transformer.set_attn_processor(AttnProcessor2_0())
+            model.transformer.set_attn_processor(JointAttnProcessor2_0())
 
             if is_xformers_available():
                 try:
@@ -78,9 +82,10 @@ class BaseStableDiffusion3Setup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().unet,
+            config.weight_dtypes().prior,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().text_encoder_2,
+            config.weight_dtypes().text_encoder_3,
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.train_any_embedding() else None,
@@ -231,7 +236,7 @@ class BaseStableDiffusion3Setup(
         )
         model.embedding_wrapper_3 = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer_3,
-            orig_module=model.text_encoder_3.text_model.embeddings.token_embedding,
+            orig_module=model.text_encoder_3.encoder.embed_tokens,
             additional_embeddings=[embedding.text_encoder_3_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_3_vector]),
             additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
@@ -498,7 +503,7 @@ class BaseStableDiffusion3Setup(
                     scaled_latent_image,
                     latent_noise,
                     timestep,
-                    model.noise_scheduler.betas,
+                    model.noise_scheduler.sigmas,
                 )
 
                 if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
