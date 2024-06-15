@@ -245,7 +245,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
-        # Apply minimum SNR weighting.
+        # Apply timestep based loss weighting.
         if 'timestep' in data and not data['loss_type'] == 'align_prop':
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
@@ -255,5 +255,38 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
                 case LossWeight.P2:
                     losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
+
+        return losses
+
+    def _flow_matching_losses(
+            self,
+            batch: dict,
+            data: dict,
+            config: TrainConfig,
+            train_device: torch.device,
+            sigmas: Tensor | None = None,
+    ) -> Tensor:
+        loss_weight = batch['loss_weight']
+        batch_size_scale = \
+            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] \
+                else config.batch_size
+        gradient_accumulation_steps_scale = \
+            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
+                else config.gradient_accumulation_steps
+
+        if data['loss_type'] == 'align_prop':
+            losses = self.__align_prop_losses(batch, data, config, train_device)
+        else:
+            # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
+            #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
+            if config.masked_training and not config.model_type.has_conditioning_image_input():
+                losses = self.__masked_losses(batch, data, config)
+            else:
+                losses = self.__unmasked_losses(batch, data, config)
+
+        # Scale Losses by Batch and/or GA (if enabled)
+        losses = losses * batch_size_scale * gradient_accumulation_steps_scale
+
+        losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         return losses

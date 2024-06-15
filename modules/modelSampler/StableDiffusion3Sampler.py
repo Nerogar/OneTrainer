@@ -244,8 +244,8 @@ class StableDiffusion3Sampler(BaseModelSampler):
                     timestep=expanded_timestep,
                     encoder_hidden_states=combined_prompt_embedding,
                     pooled_projections=combined_pooled_prompt_embedding,
-                    return_dict=False
-                )[0]
+                    return_dict=True
+                ).sample
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)

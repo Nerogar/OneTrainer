@@ -464,7 +464,7 @@ class BaseStableDiffusion3Setup(
                     if self.debug_mode:
                         with torch.no_grad():
                             # predicted image
-                            predicted_image = self._project_latent_to_image_sdxl(scaled_noisy_latent_image)
+                            predicted_image = self._project_latent_to_image(scaled_noisy_latent_image)
                             self._save_image(
                                 predicted_image,
                                 config.debug_dir + "/training_batches",
@@ -513,31 +513,21 @@ class BaseStableDiffusion3Setup(
                 else:
                     latent_input = scaled_noisy_latent_image
 
-                predicted_latent_noise = model.transformer(
+                predicted_flow = model.transformer(
                     hidden_states=latent_input,
                     timestep=timestep,
                     encoder_hidden_states=text_encoder_output,
                     pooled_projections=pooled_text_encoder_output,
-                    return_dict=False,
+                    return_dict=True
                 ).sample
+                predicted_scaled_latent_image = self._add_model_precondition(predicted_flow, latent_input, timestep)
 
-                model_output_data = {}
-
-                if model.noise_scheduler.config.prediction_type == 'epsilon':
-                    model_output_data = {
-                        'loss_type': 'target',
-                        'timestep': timestep,
-                        'predicted': predicted_latent_noise,
-                        'target': latent_noise,
-                    }
-                elif model.noise_scheduler.config.prediction_type == 'v_prediction':
-                    target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
-                    model_output_data = {
-                        'loss_type': 'target',
-                        'timestep': timestep,
-                        'predicted': predicted_latent_noise,
-                        'target': target_velocity,
-                    }
+                model_output_data = {
+                    'loss_type': 'target',
+                    'timestep': timestep,
+                    'predicted': predicted_scaled_latent_image,
+                    'target': scaled_latent_image,
+                }
 
             if config.debug_mode:
                 with torch.no_grad():
@@ -551,78 +541,70 @@ class BaseStableDiffusion3Setup(
                     if is_align_prop_step:
                         # noise
                         self._save_image(
-                            self._project_latent_to_image_sdxl(latent_noise),
+                            self._project_latent_to_image(latent_noise),
                             config.debug_dir + "/training_batches",
                             "1-noise",
                             train_progress.global_step,
-                            True
                         )
 
                         # image
                         self._save_image(
-                            self._project_latent_to_image_sdxl(scaled_latent_image),
+                            self._project_latent_to_image(scaled_latent_image),
                             config.debug_dir + "/training_batches",
                             "2-image",
                             model.train_progress.global_step,
-                            True
                         )
                     else:
                         # noise
                         self._save_image(
-                            self._project_latent_to_image_sdxl(latent_noise),
+                            self._project_latent_to_image(latent_noise),
                             config.debug_dir + "/training_batches",
                             "1-noise",
                             train_progress.global_step,
-                            True
-                        )
-
-                        # predicted noise
-                        self._save_image(
-                            self._project_latent_to_image_sdxl(predicted_latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "2-predicted_noise",
-                            train_progress.global_step,
-                            True
                         )
 
                         # noisy image
                         self._save_image(
-                            self._project_latent_to_image_sdxl(scaled_noisy_latent_image),
+                            self._project_latent_to_image(scaled_noisy_latent_image),
                             config.debug_dir + "/training_batches",
-                            "3-noisy_image",
+                            "2-noisy_image",
                             train_progress.global_step,
-                            True
+                        )
+
+                        # predicted flow
+                        self._save_image(
+                            self._project_latent_to_image(predicted_flow),
+                            config.debug_dir + "/training_batches",
+                            "3-predicted_flow",
+                            train_progress.global_step,
+                        )
+
+                        # flow
+                        flow = latent_noise - scaled_latent_image
+                        self._save_image(
+                            self._project_latent_to_image(flow),
+                            config.debug_dir + "/training_batches",
+                            "4-flow",
+                            train_progress.global_step,
                         )
 
                         # predicted image
-                        alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(config.train_device)
-                        sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
-                        sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
-
-                        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
-                        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
-
-                        scaled_predicted_latent_image = \
-                            (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
-                            / sqrt_alpha_prod
                         self._save_image(
-                            self._project_latent_to_image_sdxl(scaled_predicted_latent_image),
+                            self._project_latent_to_image(predicted_scaled_latent_image),
                             config.debug_dir + "/training_batches",
-                            "4-predicted_image",
-                            model.train_progress.global_step,
-                            True
+                            "5-predicted_image",
+                            train_progress.global_step,
                         )
 
                         # image
                         self._save_image(
-                            self._project_latent_to_image_sdxl(scaled_latent_image),
+                            self._project_latent_to_image(scaled_latent_image),
                             config.debug_dir + "/training_batches",
-                            "5-image",
+                            "6-image",
                             model.train_progress.global_step,
-                            True
                         )
 
-        model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
+        # model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(
@@ -632,10 +614,10 @@ class BaseStableDiffusion3Setup(
             data: dict,
             config: TrainConfig,
     ) -> Tensor:
-        return self._diffusion_losses(
+        return self._flow_matching_losses(
             batch=batch,
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
         ).mean()
