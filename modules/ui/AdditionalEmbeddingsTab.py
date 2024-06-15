@@ -34,7 +34,7 @@ class AdditionalEmbeddingsTab(ConfigList):
         pass
 
 
-class EmbeddingWidget(ctk.CTkFrame):
+class EmbeddingWidget(ctk.CTkScrollableFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
         super(EmbeddingWidget, self).__init__(
             master=master, corner_radius=10, bg_color="transparent"

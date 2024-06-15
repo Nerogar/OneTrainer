@@ -6,7 +6,7 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 
-class SampleFrame(ctk.CTkFrame):
+class SampleFrame(ctk.CTkScrollableFrame):
     def __init__(
             self,
             parent,

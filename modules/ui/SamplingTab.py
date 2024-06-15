@@ -33,7 +33,7 @@ class SamplingTab(ConfigList):
         return SampleParamsWindow(self.master, self.current_config[i], ui_state)
 
 
-class SampleWidget(ctk.CTkFrame):
+class SampleWidget(ctk.CTkScrollableFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
         super(SampleWidget, self).__init__(
             master=master, corner_radius=10, bg_color="transparent"
