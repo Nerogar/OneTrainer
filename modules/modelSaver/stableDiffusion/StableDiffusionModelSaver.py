@@ -25,17 +25,19 @@ class StableDiffusionModelSaver(
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
-        original_device = pipeline.device
         pipeline.to("cpu")
-        pipeline_copy = copy.deepcopy(pipeline)
-        pipeline.to(original_device)
 
-        pipeline_copy.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
+        if dtype is not None:
+            save_pipeline = copy.deepcopy(pipeline)
+            save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
+        else:
+            save_pipeline = pipeline
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
-        pipeline_copy.save_pretrained(destination)
+        save_pipeline.save_pretrained(destination)
 
-        del pipeline_copy
+        if dtype is not None:
+            del save_pipeline
 
     def __save_ckpt(
             self,
