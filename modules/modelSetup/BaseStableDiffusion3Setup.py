@@ -150,7 +150,6 @@ class BaseStableDiffusion3Setup(
             self._add_embedding_to_tokenizer(model.tokenizer_2, embedding.text_tokens)
             self._add_embedding_to_tokenizer(model.tokenizer_3, embedding.text_tokens)
 
-
     def _setup_embedding(
             self,
             model: StableDiffusion3Model,
@@ -220,9 +219,9 @@ class BaseStableDiffusion3Setup(
             additional_embeddings=[embedding.text_encoder_1_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_1_vector]),
             additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+                                              + ([] if model.embedding is None else [model.embedding.placeholder]),
             additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+                                       + ([] if model.embedding is None else [model.embedding.uuid]),
         )
         model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer_2,
@@ -230,9 +229,9 @@ class BaseStableDiffusion3Setup(
             additional_embeddings=[embedding.text_encoder_2_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_2_vector]),
             additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+                                              + ([] if model.embedding is None else [model.embedding.placeholder]),
             additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+                                       + ([] if model.embedding is None else [model.embedding.uuid]),
         )
         model.embedding_wrapper_3 = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer_3,
@@ -240,9 +239,9 @@ class BaseStableDiffusion3Setup(
             additional_embeddings=[embedding.text_encoder_3_vector for embedding in model.additional_embeddings]
                                   + ([] if model.embedding is None else [model.embedding.text_encoder_3_vector]),
             additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+                                              + ([] if model.embedding is None else [model.embedding.placeholder]),
             additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+                                       + ([] if model.embedding is None else [model.embedding.uuid]),
         )
 
         model.embedding_wrapper_1.hook_to_module()
@@ -490,7 +489,7 @@ class BaseStableDiffusion3Setup(
                     'predicted': predicted_image,
                 }
             else:
-                timestep = self._get_timestep_discrete(
+                timestep_index = self._get_timestep_discrete(
                     model.noise_scheduler,
                     deterministic,
                     generator,
@@ -499,11 +498,12 @@ class BaseStableDiffusion3Setup(
                     train_progress.global_step,
                 )
 
-                scaled_noisy_latent_image = self._add_noise_discrete(
+                scaled_noisy_latent_image, timestep = self._add_noise_discrete(
                     scaled_latent_image,
                     latent_noise,
-                    timestep,
+                    timestep_index,
                     model.noise_scheduler.sigmas,
+                    model.noise_scheduler.timesteps,
                 )
 
                 if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
@@ -520,7 +520,9 @@ class BaseStableDiffusion3Setup(
                     pooled_projections=pooled_text_encoder_output,
                     return_dict=True
                 ).sample
-                predicted_scaled_latent_image = self._add_model_precondition(predicted_flow, latent_input, timestep)
+                predicted_scaled_latent_image = self._add_model_precondition(
+                    predicted_flow, latent_input, timestep_index
+                )
 
                 model_output_data = {
                     'loss_type': 'target',
