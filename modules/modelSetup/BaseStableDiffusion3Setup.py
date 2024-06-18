@@ -338,7 +338,7 @@ class BaseStableDiffusion3Setup(
                 text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
             else:
                 pooled_text_encoder_1_output = torch.zeros(
-                    size=(batch_size, 1, 768),
+                    size=(batch_size, 768),
                     device=self.train_device,
                     dtype=model.train_dtype.torch_dtype(),
                 )
@@ -357,7 +357,7 @@ class BaseStableDiffusion3Setup(
                 text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
             else:
                 pooled_text_encoder_1_output = torch.zeros(
-                    size=(batch_size, 1, 1024),
+                    size=(batch_size, 1024),
                     device=self.train_device,
                     dtype=model.train_dtype.torch_dtype(),
                 )

@@ -164,7 +164,7 @@ class StableDiffusion3ModelLoader:
             print("text encoder 3 (t5) not loaded, continuing without it")
 
         vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
-        transformer = pipeline.transformer.to(dtype=weight_dtypes.unet.torch_dtype())
+        transformer = pipeline.transformer.to(dtype=weight_dtypes.prior.torch_dtype())
 
         model.model_type = model_type
         model.tokenizer_1 = pipeline.tokenizer
