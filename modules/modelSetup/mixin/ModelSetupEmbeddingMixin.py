@@ -14,12 +14,13 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             self,
             tokenizer: CLIPTokenizer | T5Tokenizer,
     ):
-        added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
-        for key, added_token in added_tokens:
-            tokenizer._added_tokens_decoder.pop(key)
-            tokenizer._added_tokens_encoder.pop(added_token.content)
-        tokenizer.tokens_trie = Trie()
-        tokenizer._update_trie()
+        if tokenizer:
+            added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
+            for key, added_token in added_tokens:
+                tokenizer._added_tokens_decoder.pop(key)
+                tokenizer._added_tokens_encoder.pop(added_token.content)
+            tokenizer.tokens_trie = Trie()
+            tokenizer._update_trie()
 
     def _create_new_embedding(
             self,

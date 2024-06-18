@@ -46,7 +46,9 @@ class StableDiffusion3ModelSaver(
             # Saving a safetensors file copies all tensors in RAM.
             # Setting the max_shard_size to 2GB reduces this memory overhead a bit.
             # This parameter is set by patching the function, because it's not exposed to the pipeline.
-            text_encoder_3_save_pretrained(*args, max_shard_size = '2GB', **kwargs)
+            kwargs = dict(kwargs)
+            kwargs['max_shard_size'] = '2GB'
+            text_encoder_3_save_pretrained(*args, **kwargs)
 
         text_encoder_3.save_pretrained = save_pretrained_t5.__get__(text_encoder_3, T5EncoderModel)
 

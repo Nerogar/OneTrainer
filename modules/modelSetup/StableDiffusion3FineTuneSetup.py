@@ -100,25 +100,32 @@ class StableDiffusion3FineTuneSetup(
             model: StableDiffusion3Model,
             config: TrainConfig,
     ):
-        train_text_encoder_1 = config.text_encoder.train and \
-                               not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-        model.text_encoder_1.requires_grad_(train_text_encoder_1)
+        if model.text_encoder_1 is not None:
+            train_text_encoder_1 = config.text_encoder.train and \
+                                   not self.stop_text_encoder_training_elapsed(config, model.train_progress)
+            model.text_encoder_1.requires_grad_(train_text_encoder_1)
 
-        train_text_encoder_2 = config.text_encoder_2.train and \
-                               not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
-        model.text_encoder_2.requires_grad_(train_text_encoder_2)
+        if model.text_encoder_2 is not None:
+            train_text_encoder_2 = config.text_encoder_2.train and \
+                                   not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
+            model.text_encoder_2.requires_grad_(train_text_encoder_2)
 
-        train_text_encoder_3 = config.text_encoder_3.train and \
-                               not self.stop_text_encoder_3_training_elapsed(config, model.train_progress)
-        model.text_encoder_3.requires_grad_(train_text_encoder_3)
+        if model.text_encoder_3 is not None:
+            train_text_encoder_3 = config.text_encoder_3.train and \
+                                   not self.stop_text_encoder_3_training_elapsed(config, model.train_progress)
+            model.text_encoder_3.requires_grad_(train_text_encoder_3)
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
             train_embedding = embedding_config.train and \
                               not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.text_encoder_1_vector.requires_grad_(train_embedding)
-            embedding.text_encoder_2_vector.requires_grad_(train_embedding)
-            embedding.text_encoder_3_vector.requires_grad_(train_embedding)
+
+            if embedding.text_encoder_1_vector is not None:
+                embedding.text_encoder_1_vector.requires_grad_(train_embedding)
+            if embedding.text_encoder_2_vector is not None:
+                embedding.text_encoder_2_vector.requires_grad_(train_embedding)
+            if embedding.text_encoder_3_vector is not None:
+                embedding.text_encoder_3_vector.requires_grad_(train_embedding)
 
         train_transformer = config.prior.train and \
                      not self.stop_prior_training_elapsed(config, model.train_progress)
@@ -132,9 +139,12 @@ class StableDiffusion3FineTuneSetup(
             config: TrainConfig,
     ):
         if config.train_any_embedding():
-            model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
-            model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
-            model.text_encoder_3.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+            if model.text_encoder_1 is not None:
+                model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+            if model.text_encoder_2 is not None:
+                model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+            if model.text_encoder_3 is not None:
+                model.text_encoder_3.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
@@ -177,22 +187,25 @@ class StableDiffusion3FineTuneSetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if config.text_encoder.train:
-            model.text_encoder_1.train()
-        else:
-            model.text_encoder_1.eval()
+        if model.text_encoder_1:
+            if config.text_encoder.train:
+                model.text_encoder_1.train()
+            else:
+                model.text_encoder_1.eval()
 
-        if config.text_encoder_2.train:
-            model.text_encoder_2.train()
-        else:
-            model.text_encoder_2.eval()
+        if model.text_encoder_2:
+            if config.text_encoder_2.train:
+                model.text_encoder_2.train()
+            else:
+                model.text_encoder_2.eval()
 
-        if config.text_encoder_3.train:
-            model.text_encoder_3.train()
-        else:
-            model.text_encoder_3.eval()
+        if model.text_encoder_3:
+            if config.text_encoder_3.train:
+                model.text_encoder_3.train()
+            else:
+                model.text_encoder_3.eval()
 
-        model.vae.train()
+        model.vae.eval()
 
         if config.prior.train:
             model.transformer.train()
@@ -206,7 +219,10 @@ class StableDiffusion3FineTuneSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
-            model.embedding_wrapper_1.normalize_embeddings()
-            model.embedding_wrapper_2.normalize_embeddings()
-            model.embedding_wrapper_3.normalize_embeddings()
+            if model.embedding_wrapper_1 is not None:
+                model.embedding_wrapper_1.normalize_embeddings()
+            if model.embedding_wrapper_2 is not None:
+                model.embedding_wrapper_2.normalize_embeddings()
+            if model.embedding_wrapper_3 is not None:
+                model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)

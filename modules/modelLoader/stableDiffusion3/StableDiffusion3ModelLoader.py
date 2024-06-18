@@ -1,6 +1,6 @@
 import traceback
 
-from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transformer2DModel
+from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transformer2DModel, StableDiffusion3Pipeline
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
@@ -125,8 +125,57 @@ class StableDiffusion3ModelLoader:
             base_model_name: str,
             vae_model_name: str,
     ):
-        # TODO
-        pass
+        pipeline = StableDiffusion3Pipeline.from_single_file(
+            pretrained_model_link_or_path=base_model_name,
+            safety_checker=None,
+        )
+
+        # replace T5TokenizerFast with T5Tokenizer, loaded from the same repository
+        pipeline.tokenizer_3 = T5Tokenizer.from_pretrained(
+            pretrained_model_name_or_path="stabilityai/stable-diffusion-3-medium-diffusers",
+            subfolder="tokenizer_3",
+        )
+
+        if vae_model_name:
+            pipeline.vae = AutoencoderKL.from_pretrained(
+                vae_model_name,
+                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
+
+        if pipeline.text_encoder is not None:
+            text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
+            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        else:
+            text_encoder_1 = None
+            print("text encoder 1 (clip l) not loaded, continuing without it")
+
+        if pipeline.text_encoder_2 is not None:
+            text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
+            text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(False))
+        else:
+            text_encoder_2 = None
+            print("text encoder 2 (clip g) not loaded, continuing without it")
+
+        if pipeline.text_encoder_3 is not None:
+            text_encoder_3 = pipeline.text_encoder_3.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
+            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(supports_fp8=False))
+        else:
+            text_encoder_3 = None
+            print("text encoder 3 (t5) not loaded, continuing without it")
+
+        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
+        transformer = pipeline.transformer.to(dtype=weight_dtypes.unet.torch_dtype())
+
+        model.model_type = model_type
+        model.tokenizer_1 = pipeline.tokenizer
+        model.tokenizer_2 = pipeline.tokenizer_2
+        model.tokenizer_3 = pipeline.tokenizer_3
+        model.noise_scheduler = pipeline.scheduler
+        model.text_encoder_1 = text_encoder_1
+        model.text_encoder_2 = text_encoder_2
+        model.text_encoder_3 = text_encoder_3
+        model.vae = vae
+        model.transformer = transformer
 
     def load(
             self,

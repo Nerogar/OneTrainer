@@ -247,10 +247,14 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
 
         modules = [
             rescale_image, encode_image,
-            tokenize_prompt_1,
-            tokenize_prompt_2,
-            tokenize_prompt_3,
         ]
+
+        if model.tokenizer_1:
+            modules.append(tokenize_prompt_1)
+        if model.tokenizer_2:
+            modules.append(tokenize_prompt_2)
+        if model.tokenizer_3:
+            modules.append(tokenize_prompt_3)
 
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -259,13 +263,13 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.text_encoder.train and not config.train_any_embedding() and model.text_encoder_1:
             modules.append(encode_prompt_1)
 
-        if not config.text_encoder_2.train and not config.train_any_embedding():
+        if not config.text_encoder_2.train and not config.train_any_embedding() and model.text_encoder_2:
             modules.append(encode_prompt_2)
 
-        if not config.text_encoder_3.train and not config.train_any_embedding():
+        if not config.text_encoder_3.train and not config.train_any_embedding() and model.text_encoder_3:
             modules.append(encode_prompt_3)
 
         return modules

@@ -16,7 +16,8 @@ from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowM
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import \
     enable_checkpointing_for_clip_encoder_layers, \
-    create_checkpointed_forward, enable_checkpointing_for_t5_encoder_layers
+    create_checkpointed_forward, enable_checkpointing_for_t5_encoder_layers, \
+    enable_checkpointing_for_stable_diffusion_3_transformer
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
@@ -67,9 +68,7 @@ class BaseStableDiffusion3Setup(
                     )
 
         if config.gradient_checkpointing:
-            model.transformer.enable_gradient_checkpointing()
-            # TODO
-            # enable_checkpointing_for_transformer_blocks(model.transformer, self.train_device)
+            enable_checkpointing_for_stable_diffusion_3_transformer(model.transformer, self.train_device)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
             if config.text_encoder_3.train or config.train_any_embedding():
@@ -100,43 +99,55 @@ class BaseStableDiffusion3Setup(
         for i, embedding_config in enumerate(config.additional_embeddings):
             embedding_state = model.additional_embedding_states[i]
             if embedding_state is None:
-                embedding_state_1 = self._create_new_embedding(
-                    model.tokenizer_1,
-                    model.text_encoder_1,
-                    config.additional_embeddings[i].initial_embedding_text,
-                    config.additional_embeddings[i].token_count,
-                )
+                if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
+                    embedding_state_1 = self._create_new_embedding(
+                        model.tokenizer_1,
+                        model.text_encoder_1,
+                        config.additional_embeddings[i].initial_embedding_text,
+                        config.additional_embeddings[i].token_count,
+                    )
+                else:
+                    embedding_state_1 = None
 
-                embedding_state_2 = self._create_new_embedding(
-                    model.tokenizer_2,
-                    model.text_encoder_2,
-                    config.additional_embeddings[i].initial_embedding_text,
-                    config.additional_embeddings[i].token_count,
-                )
+                if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
+                    embedding_state_2 = self._create_new_embedding(
+                        model.tokenizer_2,
+                        model.text_encoder_2,
+                        config.additional_embeddings[i].initial_embedding_text,
+                        config.additional_embeddings[i].token_count,
+                    )
+                else:
+                    embedding_state_2 = None
 
-                embedding_state_3 = self._create_new_embedding(
-                    model.tokenizer_3,
-                    model.text_encoder_3,
-                    config.additional_embeddings[i].initial_embedding_text,
-                    config.additional_embeddings[i].token_count,
-                )
+                if model.tokenizer_3 is not None and model.text_encoder_3 is not None:
+                    embedding_state_3 = self._create_new_embedding(
+                        model.tokenizer_3,
+                        model.text_encoder_3,
+                        config.additional_embeddings[i].initial_embedding_text,
+                        config.additional_embeddings[i].token_count,
+                    )
+                else:
+                    embedding_state_3 = None
             else:
                 embedding_state_1, embedding_state_2, embedding_state_3 = embedding_state
 
-            embedding_state_1 = embedding_state_1.to(
-                dtype=model.text_encoder_1.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
+            if embedding_state_1 is not None:
+                embedding_state_1 = embedding_state_1.to(
+                    dtype=model.text_encoder_1.get_input_embeddings().weight.dtype,
+                    device=self.train_device,
+                ).detach()
 
-            embedding_state_2 = embedding_state_2.to(
-                dtype=model.text_encoder_2.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
+            if embedding_state_2 is not None:
+                embedding_state_2 = embedding_state_2.to(
+                    dtype=model.text_encoder_2.get_input_embeddings().weight.dtype,
+                    device=self.train_device,
+                ).detach()
 
-            embedding_state_3 = embedding_state_3.to(
-                dtype=model.text_encoder_3.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
+            if embedding_state_3 is not None:
+                embedding_state_3 = embedding_state_3.to(
+                    dtype=model.text_encoder_3.get_input_embeddings().weight.dtype,
+                    device=self.train_device,
+                ).detach()
 
             embedding = StableDiffusion3ModelEmbedding(
                 embedding_config.uuid,
@@ -146,9 +157,12 @@ class BaseStableDiffusion3Setup(
                 embedding_config.placeholder,
             )
             model.additional_embeddings.append(embedding)
-            self._add_embedding_to_tokenizer(model.tokenizer_1, embedding.text_tokens)
-            self._add_embedding_to_tokenizer(model.tokenizer_2, embedding.text_tokens)
-            self._add_embedding_to_tokenizer(model.tokenizer_3, embedding.text_tokens)
+            if model.tokenizer_1 is not None:
+                self._add_embedding_to_tokenizer(model.tokenizer_1, embedding.text_tokens)
+            if model.tokenizer_2 is not None:
+                self._add_embedding_to_tokenizer(model.tokenizer_2, embedding.text_tokens)
+            if model.tokenizer_3 is not None:
+                self._add_embedding_to_tokenizer(model.tokenizer_3, embedding.text_tokens)
 
     def _setup_embedding(
             self,
@@ -159,43 +173,55 @@ class BaseStableDiffusion3Setup(
 
         embedding_state = model.embedding_state
         if embedding_state is None:
-            embedding_state_1 = self._create_new_embedding(
-                model.tokenizer_1,
-                model.text_encoder_1,
-                config.embedding.initial_embedding_text,
-                config.embedding.token_count,
-            )
+            if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
+                embedding_state_1 = self._create_new_embedding(
+                    model.tokenizer_1,
+                    model.text_encoder_1,
+                    config.embedding.initial_embedding_text,
+                    config.embedding.token_count,
+                )
+            else:
+                embedding_state_1 = None
 
-            embedding_state_2 = self._create_new_embedding(
-                model.tokenizer_2,
-                model.text_encoder_2,
-                config.embedding.initial_embedding_text,
-                config.embedding.token_count,
-            )
+            if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
+                embedding_state_2 = self._create_new_embedding(
+                    model.tokenizer_2,
+                    model.text_encoder_2,
+                    config.embedding.initial_embedding_text,
+                    config.embedding.token_count,
+                )
+            else:
+                embedding_state_2 = None
 
-            embedding_state_3 = self._create_new_embedding(
-                model.tokenizer_3,
-                model.text_encoder_3,
-                config.embedding.initial_embedding_text,
-                config.embedding.token_count,
-            )
+            if model.tokenizer_3 is not None and model.text_encoder_3 is not None:
+                embedding_state_3 = self._create_new_embedding(
+                    model.tokenizer_3,
+                    model.text_encoder_3,
+                    config.embedding.initial_embedding_text,
+                    config.embedding.token_count,
+                )
+            else:
+                embedding_state_3 = None
         else:
             embedding_state_1, embedding_state_2, embedding_state_3 = embedding_state
 
-        embedding_state_1 = embedding_state_1.to(
-            dtype=model.text_encoder_1.get_input_embeddings().weight.dtype,
-            device=self.train_device,
-        ).detach()
+        if embedding_state_1 is not None:
+            embedding_state_1 = embedding_state_1.to(
+                dtype=model.text_encoder_1.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
 
-        embedding_state_2 = embedding_state_2.to(
-            dtype=model.text_encoder_2.get_input_embeddings().weight.dtype,
-            device=self.train_device,
-        ).detach()
+        if embedding_state_2 is not None:
+            embedding_state_2 = embedding_state_2.to(
+                dtype=model.text_encoder_2.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
 
-        embedding_state_3 = embedding_state_3.to(
-            dtype=model.text_encoder_3.get_input_embeddings().weight.dtype,
-            device=self.train_device,
-        ).detach()
+        if embedding_state_3 is not None:
+            embedding_state_3 = embedding_state_3.to(
+                dtype=model.text_encoder_3.get_input_embeddings().weight.dtype,
+                device=self.train_device,
+            ).detach()
 
         model.embedding = StableDiffusion3ModelEmbedding(
             config.embedding.uuid,
@@ -204,55 +230,65 @@ class BaseStableDiffusion3Setup(
             embedding_state_3,
             config.embedding.placeholder,
         )
-        self._add_embedding_to_tokenizer(model.tokenizer_1, model.embedding.text_tokens)
-        self._add_embedding_to_tokenizer(model.tokenizer_2, model.embedding.text_tokens)
-        self._add_embedding_to_tokenizer(model.tokenizer_3, model.embedding.text_tokens)
+        if model.tokenizer_1 is not None:
+            self._add_embedding_to_tokenizer(model.tokenizer_1, model.embedding.text_tokens)
+        if model.tokenizer_2 is not None:
+            self._add_embedding_to_tokenizer(model.tokenizer_2, model.embedding.text_tokens)
+        if model.tokenizer_3 is not None:
+            self._add_embedding_to_tokenizer(model.tokenizer_3, model.embedding.text_tokens)
 
     def _setup_embedding_wrapper(
             self,
             model: StableDiffusion3Model,
             config: TrainConfig,
     ):
-        model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
-            tokenizer=model.tokenizer_1,
-            orig_module=model.text_encoder_1.text_model.embeddings.token_embedding,
-            additional_embeddings=[embedding.text_encoder_1_vector for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.text_encoder_1_vector]),
-            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                              + ([] if model.embedding is None else [model.embedding.placeholder]),
-            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                       + ([] if model.embedding is None else [model.embedding.uuid]),
-        )
-        model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
-            tokenizer=model.tokenizer_2,
-            orig_module=model.text_encoder_2.text_model.embeddings.token_embedding,
-            additional_embeddings=[embedding.text_encoder_2_vector for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.text_encoder_2_vector]),
-            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                              + ([] if model.embedding is None else [model.embedding.placeholder]),
-            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                       + ([] if model.embedding is None else [model.embedding.uuid]),
-        )
-        model.embedding_wrapper_3 = AdditionalEmbeddingWrapper(
-            tokenizer=model.tokenizer_3,
-            orig_module=model.text_encoder_3.encoder.embed_tokens,
-            additional_embeddings=[embedding.text_encoder_3_vector for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.text_encoder_3_vector]),
-            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                              + ([] if model.embedding is None else [model.embedding.placeholder]),
-            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                       + ([] if model.embedding is None else [model.embedding.uuid]),
-        )
+        if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
+            model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
+                tokenizer=model.tokenizer_1,
+                orig_module=model.text_encoder_1.text_model.embeddings.token_embedding,
+                additional_embeddings=[embedding.text_encoder_1_vector for embedding in model.additional_embeddings]
+                                      + ([] if model.embedding is None else [model.embedding.text_encoder_1_vector]),
+                additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+                additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                           + ([] if model.embedding is None else [model.embedding.uuid]),
+            )
+        if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
+            model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
+                tokenizer=model.tokenizer_2,
+                orig_module=model.text_encoder_2.text_model.embeddings.token_embedding,
+                additional_embeddings=[embedding.text_encoder_2_vector for embedding in model.additional_embeddings]
+                                      + ([] if model.embedding is None else [model.embedding.text_encoder_2_vector]),
+                additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+                additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                           + ([] if model.embedding is None else [model.embedding.uuid]),
+            )
+        if model.tokenizer_3 is not None and model.text_encoder_3 is not None:
+            model.embedding_wrapper_3 = AdditionalEmbeddingWrapper(
+                tokenizer=model.tokenizer_3,
+                orig_module=model.text_encoder_3.encoder.embed_tokens,
+                additional_embeddings=[embedding.text_encoder_3_vector for embedding in model.additional_embeddings]
+                                      + ([] if model.embedding is None else [model.embedding.text_encoder_3_vector]),
+                additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
+                                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
+                additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
+                                           + ([] if model.embedding is None else [model.embedding.uuid]),
+            )
 
-        model.embedding_wrapper_1.hook_to_module()
-        model.embedding_wrapper_2.hook_to_module()
-        model.embedding_wrapper_3.hook_to_module()
+        if model.embedding_wrapper_1 is not None:
+            model.embedding_wrapper_1.hook_to_module()
+        if model.embedding_wrapper_2 is not None:
+            model.embedding_wrapper_2.hook_to_module()
+        if model.embedding_wrapper_3 is not None:
+            model.embedding_wrapper_3.hook_to_module()
 
     def __encode_text(
             self,
             model: StableDiffusion3Model,
             text_encoder_layer_skip: int,
             text_encoder_2_layer_skip: int,
+            batch_size: int,
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
             tokens_3: Tensor = None,
@@ -263,7 +299,7 @@ class BaseStableDiffusion3Setup(
             text_encoder_3_output: Tensor = None,
             text: str = None,
     ):
-        if tokens_1 is None and text is not None:
+        if tokens_1 is None and text is not None and model.tokenizer_1 is not None:
             tokenizer_output = model.tokenizer_1(
                 text,
                 padding='max_length',
@@ -273,7 +309,7 @@ class BaseStableDiffusion3Setup(
             )
             tokens_1 = tokenizer_output.input_ids.to(model.text_encoder_1.device)
 
-        if tokens_2 is None and text is not None:
+        if tokens_2 is None and text is not None and model.tokenizer_2 is not None:
             tokenizer_output = model.tokenizer_2(
                 text,
                 padding='max_length',
@@ -283,7 +319,7 @@ class BaseStableDiffusion3Setup(
             )
             tokens_2 = tokenizer_output.input_ids.to(model.text_encoder_2.device)
 
-        if tokens_3 is None and text is not None:
+        if tokens_3 is None and text is not None and model.tokenizer_3 is not None:
             tokenizer_output = model.tokenizer_3(
                 text,
                 padding='max_length',
@@ -294,24 +330,55 @@ class BaseStableDiffusion3Setup(
             tokens_3 = tokenizer_output.input_ids.to(model.text_encoder_3.device)
 
         if text_encoder_1_output is None or pooled_text_encoder_1_output is None:
-            text_encoder_1_output = model.text_encoder_1(
-                tokens_1, output_hidden_states=True, return_dict=True
-            )
-            pooled_text_encoder_1_output = text_encoder_1_output.text_embeds
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            if model.text_encoder_1 is not None:
+                text_encoder_1_output = model.text_encoder_1(
+                    tokens_1, output_hidden_states=True, return_dict=True
+                )
+                pooled_text_encoder_1_output = text_encoder_1_output.text_embeds
+                text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            else:
+                pooled_text_encoder_1_output = torch.zeros(
+                    size=(batch_size, 1, 768),
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype(),
+                )
+                text_encoder_1_output = torch.zeros(
+                    size=(batch_size, 77, 768),
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype(),
+                )
 
         if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
-            text_encoder_2_output = model.text_encoder_2(
-                tokens_2, output_hidden_states=True, return_dict=True
-            )
-            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
+            if model.text_encoder_2 is not None:
+                text_encoder_2_output = model.text_encoder_2(
+                    tokens_2, output_hidden_states=True, return_dict=True
+                )
+                pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
+                text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
+            else:
+                pooled_text_encoder_1_output = torch.zeros(
+                    size=(batch_size, 1, 1024),
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype(),
+                )
+                text_encoder_1_output = torch.zeros(
+                    size=(batch_size, 77, 1280),
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype(),
+                )
 
         if text_encoder_3_output is None:
-            text_encoder_3_output = model.text_encoder_3(
-                tokens_2, output_hidden_states=True, return_dict=True
-            )
-            text_encoder_3_output = text_encoder_3_output.last_hidden_state
+            if model.text_encoder_3 is not None:
+                text_encoder_3_output = model.text_encoder_3(
+                    tokens_3, output_hidden_states=True, return_dict=True
+                )
+                text_encoder_3_output = text_encoder_3_output.last_hidden_state
+            else:
+                text_encoder_3_output = torch.zeros(
+                    size=(batch_size, 77, model.transformer.config.joint_attention_dim),
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype(),
+                )
 
         prompt_embedding = torch.concat(
             [text_encoder_1_output, text_encoder_2_output], dim=-1
@@ -346,19 +413,25 @@ class BaseStableDiffusion3Setup(
                 model,
                 config.text_encoder_layer_skip,
                 config.text_encoder_2_layer_skip,
-                tokens_1=batch['tokens_1'],
-                tokens_2=batch['tokens_2'],
-                tokens_3=batch['tokens_3'],
-                text_encoder_1_output=batch[
-                    'text_encoder_1_hidden_state'] if not config.text_encoder.train and not config.train_any_embedding() else None,
-                pooled_text_encoder_1_output=batch[
-                    'text_encoder_1_pooled_state'] if not config.text_encoder.train and not config.train_any_embedding() else None,
-                text_encoder_2_output=batch[
-                    'text_encoder_2_hidden_state'] if not config.text_encoder_2.train and not config.train_any_embedding() else None,
-                pooled_text_encoder_2_output=batch[
-                    'text_encoder_2_pooled_state'] if not config.text_encoder_2.train and not config.train_any_embedding() else None,
-                text_encoder_3_output=batch[
-                    'text_encoder_3_hidden_state'] if not config.text_encoder_3.train and not config.train_any_embedding() else None,
+                batch_size=batch['latent_image'].shape[0],
+                tokens_1=batch['tokens_1'] if 'tokens_1' in batch else None,
+                tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
+                tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,
+                text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
+                    if 'text_encoder_1_hidden_state' in batch \
+                       and not config.text_encoder.train and not config.train_any_embedding() else None,
+                pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
+                    if 'text_encoder_1_pooled_state' in batch and not config.text_encoder.train \
+                       and not config.train_any_embedding() else None,
+                text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
+                    if 'text_encoder_2_hidden_state' in batch and not config.text_encoder_2.train \
+                       and not config.train_any_embedding() else None,
+                pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
+                    if 'text_encoder_2_pooled_state' in batch and not config.text_encoder_2.train \
+                       and not config.train_any_embedding() else None,
+                text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
+                    if 'text_encoder_3_hidden_state' in batch and not config.text_encoder_3.train \
+                       and not config.train_any_embedding() else None,
             )
 
             latent_image = batch['latent_image']

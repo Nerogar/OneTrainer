@@ -149,33 +149,27 @@ class StableDiffusion3Model(BaseModel):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
-        self.text_encoder_1.to(device=device)
-        self.text_encoder_2.to(device=device)
-        self.text_encoder_3.to(device=device)
-
-        if self.text_encoder_1_lora is not None:
-            self.text_encoder_1_lora.to(device)
-
-        if self.text_encoder_2_lora is not None:
-            self.text_encoder_2_lora.to(device)
-
-        if self.text_encoder_3_lora is not None:
-            self.text_encoder_3_lora.to(device)
+        self.text_encoder_1_to(device=device)
+        self.text_encoder_2_to(device=device)
+        self.text_encoder_3_to(device=device)
 
     def text_encoder_1_to(self, device: torch.device):
-        self.text_encoder_1.to(device=device)
+        if self.text_encoder_1 is not None:
+            self.text_encoder_1.to(device=device)
 
         if self.text_encoder_1_lora is not None:
             self.text_encoder_1_lora.to(device)
 
     def text_encoder_2_to(self, device: torch.device):
-        self.text_encoder_2.to(device=device)
+        if self.text_encoder_2 is not None:
+            self.text_encoder_2.to(device=device)
 
         if self.text_encoder_2_lora is not None:
             self.text_encoder_2_lora.to(device)
 
     def text_encoder_3_to(self, device: torch.device):
-        self.text_encoder_3.to(device=device)
+        if self.text_encoder_3 is not None:
+            self.text_encoder_3.to(device=device)
 
         if self.text_encoder_3_lora is not None:
             self.text_encoder_3_lora.to(device)
@@ -193,9 +187,12 @@ class StableDiffusion3Model(BaseModel):
 
     def eval(self):
         self.vae.eval()
-        self.text_encoder_1.eval()
-        self.text_encoder_2.eval()
-        self.text_encoder_3.eval()
+        if self.text_encoder_1 is not None:
+            self.text_encoder_1.eval()
+        if self.text_encoder_2 is not None:
+            self.text_encoder_2.eval()
+        if self.text_encoder_3 is not None:
+            self.text_encoder_3.eval()
         self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
