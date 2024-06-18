@@ -1,21 +1,77 @@
 import math
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
+from typing import Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
 
-class LoRAModule(metaclass=ABCMeta):
+class PeftBase(metaclass=ABCMeta):
     prefix: str
-    orig_module: nn.Module
+    orig_module: nn.Module | None
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None):
+        self.prefix = prefix
+        self.orig_module = orig_module
+
+    @abstractmethod
+    def forward(self, x, *args, **kwargs) -> Any:
+        pass
+
+    @abstractmethod
+    def requires_grad_(self, requires_grad: bool):
+        pass
+
+    @abstractmethod
+    def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> Any:
+        pass
+
+    @abstractmethod
+    def parameters(self) -> list[Parameter]:
+        pass
+
+    @abstractmethod
+    def load_state_dict(self, state_dict: dict):
+        pass
+
+    @abstractmethod
+    def state_dict(self) -> dict:
+        pass
+
+    @abstractmethod
+    def modules(self) -> list[nn.Module]:
+        pass
+
+    @abstractmethod
+    def hook_to_module(self):
+        pass
+
+    @abstractmethod
+    def remove_hook_from_module(self):
+        pass
+
+    @abstractmethod
+    def apply_to_module(self):
+        pass
+
+    @abstractmethod
+    def extract_from_module(self, base_module: nn.Module):
+        pass
+
+
+class LoRAModule(PeftBase):
     lora_down: nn.Module
     lora_up: nn.Module
     alpha: torch.Tensor
     dropout: Dropout
 
+    # Note there's a few times in this class where we assert the existence of
+    # optional members. This is because these members might not exist at
+    # construction, but definitely exist by the time those methods are called.
+
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
-        super(LoRAModule, self).__init__()
+        super(LoRAModule, self).__init__(prefix, orig_module)
 
         self.prefix = prefix.replace('.', '_')
         self.orig_module = orig_module
@@ -30,6 +86,10 @@ class LoRAModule(metaclass=ABCMeta):
         self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
 
     def forward(self, x, *args, **kwargs):
+        # They definitely exist at this point in the execution.
+        assert self.orig_module
+        assert self.orig_forward
+
         if self.orig_module.training:
             ld = self.lora_up(self.dropout(self.lora_down(x)))
             return self.orig_forward(x) + ld * (self.alpha / self.rank)
@@ -40,7 +100,7 @@ class LoRAModule(metaclass=ABCMeta):
         self.lora_down.requires_grad_(requires_grad)
         self.lora_up.requires_grad_(requires_grad)
 
-    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModule':
+    def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> 'LoRAModule':
         self.lora_down.to(device, dtype)
         self.lora_up.to(device, dtype)
         self.alpha.to(device, dtype)
@@ -76,11 +136,16 @@ class LoRAModule(metaclass=ABCMeta):
         return [self.lora_down, self.lora_up, self.dropout]
 
     def hook_to_module(self):
+        assert self.orig_module
+
         if not self.is_applied:
             self.orig_module.forward = self.forward
             self.is_applied = True
 
     def remove_hook_from_module(self):
+        assert self.orig_forward
+        assert self.orig_module
+
         if self.is_applied:
             self.orig_module.forward = self.orig_forward
             self.is_applied = False
