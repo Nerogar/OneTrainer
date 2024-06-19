@@ -563,6 +563,5 @@ Mouse wheel: increase or decrease brush size"""
         new = min(event.width, event.height)
         margin = 980 - 850
         self.image_size = new - margin
-        print("image_size: %d" % self.image_size)
         if self.current_image_index >= 0:
             self.switch_image(self.current_image_index)
