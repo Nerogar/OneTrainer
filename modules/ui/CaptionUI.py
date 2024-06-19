@@ -47,6 +47,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.title("OneTrainer")
         self.geometry("1280x980")
         self.resizable(True, True)
+        self.bind('<Configure>', self._resize)
         self.wait_visibility()
         self.focus_set()
 
@@ -555,3 +556,13 @@ Mouse wheel: increase or decrease brush size"""
 
     def print_help(self):
         print(self.help_text)
+
+    def _resize(self, event):
+        if not event.widget == self:
+            return
+        new = min(event.width, event.height)
+        margin = 980 - 850
+        self.image_size = new - margin
+        print("image_size: %d" % self.image_size)
+        if self.current_image_index >= 0:
+            self.switch_image(self.current_image_index)

@@ -15,7 +15,7 @@ class SampleFrame(ctk.CTkScrollableFrame):
             include_prompt: bool = True,
             include_settings: bool = True,
     ):
-        ctk.CTkFrame.__init__(self, parent, fg_color="transparent")
+        ctk.CTkScrollableFrame.__init__(self, parent, fg_color="transparent")
 
         self.sample = sample
         self.ui_state = ui_state
