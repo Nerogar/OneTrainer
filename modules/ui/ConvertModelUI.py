@@ -24,7 +24,7 @@ class ConvertModelUI(ctk.CTkToplevel):
 
         self.title("Convert models")
         self.geometry("550x350")
-        self.resizable(False, False)
+        self.resizable(True, True)
         self.wait_visibility()
         self.focus_set()
 

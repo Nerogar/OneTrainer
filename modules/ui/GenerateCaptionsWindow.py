@@ -21,7 +21,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         self.title("Batch generate captions")
         self.geometry("360x360")
-        self.resizable(False, False)
+        self.resizable(True, True)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
