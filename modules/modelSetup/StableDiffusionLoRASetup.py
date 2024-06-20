@@ -10,6 +10,14 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 
 
+# Matches the ones from Lycoris.
+PRESETS = {
+    "full": [],
+    "attn-mlp": ["attentions"],
+    "attn-only": ["attn"],
+}
+
+
 class StableDiffusionLoRASetup(
     BaseStableDiffusionSetup,
 ):
