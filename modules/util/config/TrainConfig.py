@@ -329,6 +329,8 @@ class TrainConfig(BaseConfig):
     lora_rank: int
     lora_alpha: float
     lora_weight_dtype: DataType
+    lora_layers: str  # comma-separated
+    lora_layer_preset: str
     bundle_additional_embeddings: bool
 
     # optimizer
@@ -762,6 +764,8 @@ class TrainConfig(BaseConfig):
         data.append(("lora_rank", 16, int, False))
         data.append(("lora_alpha", 1.0, float, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("lora_layers", "", str, False))
+        data.append(("lora_layer_preset", None, str, True))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # optimizer

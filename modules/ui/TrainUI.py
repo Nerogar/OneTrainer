@@ -14,6 +14,7 @@ from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
+from modules.ui.LoraTab import LoraTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
@@ -466,7 +467,7 @@ class TrainUI(ctk.CTk):
             self.tabview.delete("embedding")
 
         if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
-            self.lora_tab(self.tabview.add("LoRA"))
+            self.lora_tab = LoraTab(self.tabview.add("LoRA"), self.train_config, self.ui_state)
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
 
