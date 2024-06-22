@@ -105,7 +105,7 @@ class WuerstchenLoRASetup(
         ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
-            model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, ["attention"]
+            model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, config.lora_layers.split(",")
         )
 
         if model.lora_state_dict:

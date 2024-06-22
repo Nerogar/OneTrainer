@@ -101,7 +101,7 @@ class PixArtAlphaLoRASetup(
         ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, ["attn1", "attn2"]
+            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, config.lora_layers.split(",")
         )
 
         if model.lora_state_dict:
