@@ -69,9 +69,11 @@ class BaseStableDiffusion3Setup(
 
         if config.gradient_checkpointing:
             enable_checkpointing_for_stable_diffusion_3_transformer(model.transformer, self.train_device)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
-            if config.text_encoder_3.train or config.train_any_embedding():
+            if model.text_encoder_1 is not None:
+                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
+            if model.text_encoder_2 is not None:
+                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
+            if model.text_encoder_3 is not None and config.text_encoder_3.train or config.train_any_embedding():
                 enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, self.train_device)
 
         if config.force_circular_padding:
