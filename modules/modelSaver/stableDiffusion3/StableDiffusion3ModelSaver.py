@@ -37,25 +37,27 @@ class StableDiffusion3ModelSaver(
             save_pipeline = pipeline
 
         text_encoder_3 = save_pipeline.text_encoder_3
-        text_encoder_3_save_pretrained = text_encoder_3.save_pretrained
-        def save_pretrained_t5(
-                self,
-                *args,
-                **kwargs,
-        ):
-            # Saving a safetensors file copies all tensors in RAM.
-            # Setting the max_shard_size to 2GB reduces this memory overhead a bit.
-            # This parameter is set by patching the function, because it's not exposed to the pipeline.
-            kwargs = dict(kwargs)
-            kwargs['max_shard_size'] = '2GB'
-            text_encoder_3_save_pretrained(*args, **kwargs)
+        if text_encoder_3 is not None:
+            text_encoder_3_save_pretrained = text_encoder_3.save_pretrained
+            def save_pretrained_t5(
+                    self,
+                    *args,
+                    **kwargs,
+            ):
+                # Saving a safetensors file copies all tensors in RAM.
+                # Setting the max_shard_size to 2GB reduces this memory overhead a bit.
+                # This parameter is set by patching the function, because it's not exposed to the pipeline.
+                kwargs = dict(kwargs)
+                kwargs['max_shard_size'] = '2GB'
+                text_encoder_3_save_pretrained(*args, **kwargs)
 
-        text_encoder_3.save_pretrained = save_pretrained_t5.__get__(text_encoder_3, T5EncoderModel)
+            text_encoder_3.save_pretrained = save_pretrained_t5.__get__(text_encoder_3, T5EncoderModel)
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
         save_pipeline.save_pretrained(destination)
 
-        text_encoder_3.save_pretrained = text_encoder_3_save_pretrained
+        if text_encoder_3 is not None:
+            text_encoder_3.save_pretrained = text_encoder_3_save_pretrained
 
         if dtype is not None:
             del save_pipeline

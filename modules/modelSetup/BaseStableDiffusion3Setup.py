@@ -289,6 +289,8 @@ class BaseStableDiffusion3Setup(
             text_encoder_layer_skip: int,
             text_encoder_2_layer_skip: int,
             batch_size: int,
+            rand: Random,
+            config: TrainConfig,
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
             tokens_3: Tensor = None,
@@ -329,56 +331,65 @@ class BaseStableDiffusion3Setup(
             )
             tokens_3 = tokenizer_output.input_ids.to(model.text_encoder_3.device)
 
-        if text_encoder_1_output is None or pooled_text_encoder_1_output is None:
-            if model.text_encoder_1 is not None:
-                text_encoder_1_output = model.text_encoder_1(
-                    tokens_1, output_hidden_states=True, return_dict=True
-                )
-                pooled_text_encoder_1_output = text_encoder_1_output.text_embeds
-                text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
-            else:
-                pooled_text_encoder_1_output = torch.zeros(
-                    size=(batch_size, 768),
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype(),
-                )
-                text_encoder_1_output = torch.zeros(
-                    size=(batch_size, 77, 768),
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype(),
-                )
+        dropout_text_encoder_1 = rand.random() < config.text_encoder.dropout_probability
+        if (text_encoder_1_output is None or pooled_text_encoder_1_output is None) \
+                and not dropout_text_encoder_1 \
+                and model.text_encoder_1 is not None:
+                    text_encoder_1_output = model.text_encoder_1(
+                        tokens_1, output_hidden_states=True, return_dict=True
+                    )
+                    pooled_text_encoder_1_output = text_encoder_1_output.text_embeds
+                    text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+        if (text_encoder_1_output is None or pooled_text_encoder_1_output is None) \
+                or dropout_text_encoder_1:
+                    pooled_text_encoder_1_output = torch.zeros(
+                        size=(batch_size, 768),
+                        device=self.train_device,
+                        dtype=model.train_dtype.torch_dtype(),
+                    )
+                    text_encoder_1_output = torch.zeros(
+                        size=(batch_size, 77, 768),
+                        device=self.train_device,
+                        dtype=model.train_dtype.torch_dtype(),
+                    )
 
-        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
-            if model.text_encoder_2 is not None:
-                text_encoder_2_output = model.text_encoder_2(
-                    tokens_2, output_hidden_states=True, return_dict=True
-                )
-                pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-                text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
-            else:
-                pooled_text_encoder_1_output = torch.zeros(
-                    size=(batch_size, 1024),
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype(),
-                )
-                text_encoder_1_output = torch.zeros(
-                    size=(batch_size, 77, 1280),
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype(),
-                )
+        dropout_text_encoder_2 = rand.random() < config.text_encoder_2.dropout_probability
+        if (text_encoder_2_output is None or pooled_text_encoder_2_output is None) \
+                and not dropout_text_encoder_2 \
+                and model.text_encoder_2 is not None:
+                    text_encoder_2_output = model.text_encoder_2(
+                        tokens_2, output_hidden_states=True, return_dict=True
+                    )
+                    pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
+                    text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
+        if (text_encoder_2_output is None or pooled_text_encoder_2_output is None) \
+                or dropout_text_encoder_2:
+                    pooled_text_encoder_2_output = torch.zeros(
+                        size=(batch_size, 1280),
+                        device=self.train_device,
+                        dtype=model.train_dtype.torch_dtype(),
+                    )
+                    text_encoder_2_output = torch.zeros(
+                        size=(batch_size, 77, 1280),
+                        device=self.train_device,
+                        dtype=model.train_dtype.torch_dtype(),
+                    )
 
-        if text_encoder_3_output is None:
-            if model.text_encoder_3 is not None:
-                text_encoder_3_output = model.text_encoder_3(
-                    tokens_3, output_hidden_states=True, return_dict=True
-                )
-                text_encoder_3_output = text_encoder_3_output.last_hidden_state
-            else:
-                text_encoder_3_output = torch.zeros(
-                    size=(batch_size, 77, model.transformer.config.joint_attention_dim),
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype(),
-                )
+        dropout_text_encoder_3 = rand.random() < config.text_encoder_3.dropout_probability
+        if text_encoder_3_output is None \
+                and not dropout_text_encoder_3 \
+                and model.text_encoder_3 is not None:
+                    text_encoder_3_output = model.text_encoder_3(
+                        tokens_3, output_hidden_states=True, return_dict=True
+                    )
+                    text_encoder_3_output = text_encoder_3_output.last_hidden_state
+        if text_encoder_3_output is None \
+                or dropout_text_encoder_3:
+                    text_encoder_3_output = torch.zeros(
+                        size=(batch_size, 77, model.transformer.config.joint_attention_dim),
+                        device=self.train_device,
+                        dtype=model.train_dtype.torch_dtype(),
+                    )
 
         prompt_embedding = torch.concat(
             [text_encoder_1_output, text_encoder_2_output], dim=-1
@@ -386,8 +397,10 @@ class BaseStableDiffusion3Setup(
         prompt_embedding = torch.nn.functional.pad(
             prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
         )
-        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
-        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
+        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)\
+            .to(dtype=model.train_dtype.torch_dtype())
+        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)\
+            .to(dtype=model.train_dtype.torch_dtype())
 
         return prompt_embedding, pooled_prompt_embedding
 
@@ -414,6 +427,8 @@ class BaseStableDiffusion3Setup(
                 config.text_encoder_layer_skip,
                 config.text_encoder_2_layer_skip,
                 batch_size=batch['latent_image'].shape[0],
+                rand=rand,
+                config=config,
                 tokens_1=batch['tokens_1'] if 'tokens_1' in batch else None,
                 tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
                 tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,

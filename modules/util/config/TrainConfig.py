@@ -142,6 +142,7 @@ class TrainModelPartConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     learning_rate: float
     weight_dtype: DataType
+    dropout_probability: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainModelPartConfig, self).__init__(data)
@@ -158,6 +159,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("learning_rate", None, float, True))
         data.append(("weight_dtype", DataType.NONE, DataType, False))
+        data.append(("dropout_probability", 0.0, float, False))
 
         return TrainModelPartConfig(data)
 

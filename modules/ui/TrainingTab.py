@@ -346,6 +346,13 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
         row += 1
 
+        if supports_include: # TODO: enable this for all models
+            # dropout
+            components.label(frame, row, 0, "Dropout Probability",
+                             tooltip="The Probability for dropping the text encoder 1 conditioning")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+            row += 1
+
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
                          tooltip="When to stop training the text encoder 1")
@@ -384,6 +391,13 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "text_encoder_2.train")
         row += 1
 
+        if supports_include: # TODO: enable this for all models
+            # dropout
+            components.label(frame, row, 0, "Dropout Probability",
+                             tooltip="The Probability for dropping the text encoder 2 conditioning")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder_2.dropout_probability")
+            row += 1
+
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
                          tooltip="When to stop training the text encoder 2")
@@ -421,6 +435,13 @@ class TrainingTab:
                          tooltip="Enables training the text encoder 3 model")
         components.switch(frame, row, 1, self.ui_state, "text_encoder_3.train")
         row += 1
+
+        if supports_include: # TODO: enable this for all models
+            # dropout
+            components.label(frame, row, 0, "Dropout Probability",
+                             tooltip="The Probability for dropping the text encoder 3 conditioning")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder_3.dropout_probability")
+            row += 1
 
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
