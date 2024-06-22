@@ -99,7 +99,7 @@ class PixArtAlphaLoRASetup(
         )
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, ["attn1", "attn2"]
+            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, ["attn1", "attn2", "ff.net"]
         )
 
         if model.lora_state_dict:
