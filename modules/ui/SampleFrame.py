@@ -33,8 +33,8 @@ class SampleFrame(ctk.CTkFrame):
             top_frame.grid_columnconfigure(1, weight=1)
 
         if include_settings:
-            # Minimum width enforcement so the ScrollableFrame doesn't collapse.
-            bottom_frame = ctk.CTkScrollableFrame(self, fg_color="transparent", width=600)
+            bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
+            bottom_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
             bottom_frame.grid_columnconfigure(0, weight=0)
             bottom_frame.grid_columnconfigure(1, weight=1)
@@ -110,7 +110,3 @@ class SampleFrame(ctk.CTkFrame):
                                   allow_model_files=False,
                                   allow_image_files=True,
                                   )
-
-            # Now that we're gridded out, switch to pack to expand it out.
-            # Grid and scrollbar don't play nicely together.
-            bottom_frame.pack(fill="both", expand=1)
