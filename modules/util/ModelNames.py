@@ -19,6 +19,9 @@ class ModelNames:
             lora: str = "",
             embedding: EmbeddingName = None,
             additional_embeddings: list[EmbeddingName] = None,
+            include_text_encoder: bool = True,
+            include_text_encoder_2: bool = True,
+            include_text_encoder_3: bool = True,
     ):
         self.base_model = base_model
         self.prior_model = prior_model
@@ -28,3 +31,6 @@ class ModelNames:
         self.lora = lora
         self.embedding = EmbeddingName if embedding is None else embedding
         self.additional_embeddings = [] if additional_embeddings is None else additional_embeddings
+        self.include_text_encoder = include_text_encoder
+        self.include_text_encoder_2 = include_text_encoder_2
+        self.include_text_encoder_3 = include_text_encoder_3

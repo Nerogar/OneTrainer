@@ -136,6 +136,7 @@ class TrainOptimizerConfig(BaseConfig):
 
 class TrainModelPartConfig(BaseConfig):
     model_name: str
+    include: bool
     train: bool
     stop_training_after: int
     stop_training_after_unit: TimeUnit
@@ -151,6 +152,7 @@ class TrainModelPartConfig(BaseConfig):
 
         # name, default value, data type, nullable
         data.append(("model_name", "", str, False))
+        data.append(("include", True, bool, False))
         data.append(("train", True, bool, False))
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
@@ -506,6 +508,9 @@ class TrainConfig(BaseConfig):
             embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
             additional_embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in
                                    self.additional_embeddings],
+            include_text_encoder=self.text_encoder.include,
+            include_text_encoder_2=self.text_encoder_2.include,
+            include_text_encoder_3=self.text_encoder_3.include,
         )
 
     def train_any_embedding(self) -> bool:

@@ -262,7 +262,7 @@ def options(master, row, column, values, ui_state: UIState, var_name: str, comma
 
 
 def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
-                command: Callable[[str], None] = None, adv_command: Callable[[str], None] = None):
+                command: Callable[[str], None] = None, adv_command: Callable[[], None] = None):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
