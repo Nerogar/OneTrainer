@@ -71,6 +71,6 @@ class WDModel(BaseImageCaptionModel):
             for label
             in sorted_general_labels
         ])
-        predicted_caption = (caption_prefix + predicted_caption + caption_postfix).strip()
+        predicted_caption = (initial_caption + caption_prefix + predicted_caption + caption_postfix).strip()
 
         return predicted_caption
