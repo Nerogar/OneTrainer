@@ -7,6 +7,7 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection, Name
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.torch_util import state_dict_has_prefix
 
 
 class StableDiffusionXLLoRASetup(
@@ -115,34 +116,43 @@ class StableDiffusionXLLoRASetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
+        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
+        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
         model.text_encoder_1_lora = LoRAModuleWrapper(
             model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha
-        )
+        ) if create_te1 else None
 
         model.text_encoder_2_lora = LoRAModuleWrapper(
             model.text_encoder_2, config.lora_rank, "lora_te2", config.lora_alpha
-        )
+        ) if create_te2 else None
 
         model.unet_lora = LoRAModuleWrapper(
             model.unet, config.lora_rank, "lora_unet", config.lora_alpha, ["attentions"]
         )
 
         if model.lora_state_dict:
-            model.text_encoder_1_lora.load_state_dict(model.lora_state_dict)
-            model.text_encoder_2_lora.load_state_dict(model.lora_state_dict)
+            if create_te1:
+                model.text_encoder_1_lora.load_state_dict(model.lora_state_dict)
+            if create_te2:
+                model.text_encoder_2_lora.load_state_dict(model.lora_state_dict)
+
             model.unet_lora.load_state_dict(model.lora_state_dict)
             model.lora_state_dict = None
 
-        model.text_encoder_1_lora.set_dropout(config.dropout_probability)
-        model.text_encoder_2_lora.set_dropout(config.dropout_probability)
+        if config.text_encoder.train:
+            model.text_encoder_1_lora.set_dropout(config.dropout_probability)
+        if config.text_encoder_2.train:
+            model.text_encoder_2_lora.set_dropout(config.dropout_probability)
         model.unet_lora.set_dropout(config.dropout_probability)
 
-        model.text_encoder_1_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
-        model.text_encoder_2_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
-        model.unet_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+        if create_te1:
+            model.text_encoder_1_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+            model.text_encoder_1_lora.hook_to_module()
+        if create_te2:
+            model.text_encoder_2_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+            model.text_encoder_2_lora.hook_to_module()
 
-        model.text_encoder_1_lora.hook_to_module()
-        model.text_encoder_2_lora.hook_to_module()
+        model.unet_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.unet_lora.hook_to_module()
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
