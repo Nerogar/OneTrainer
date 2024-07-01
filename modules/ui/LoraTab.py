@@ -2,7 +2,10 @@ import copy
 
 import customtkinter as ctk
 
+from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
 from modules.modelSetup.StableDiffusionLoRASetup import PRESETS as sd_presets
+from modules.modelSetup.StableDiffusionXLLoRASetup import PRESETS as sdxl_presets
+from modules.modelSetup.WuerstchenLoRASetup import PRESETS as sc_presets
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.ui import components
@@ -19,7 +22,8 @@ class LoraTab:
         self.ui_state = ui_state
         self.layer_entry = None
         self.layer_selector = None
-        self.presets = []
+        self.presets = {}
+        self.presets_list = []
         self.prior_custom = ""
         self.prior_selected = None
         self.scroll_frame = None
@@ -34,8 +38,15 @@ class LoraTab:
 
         if self.train_config.model_type.is_stable_diffusion():
             self.presets = sd_presets
+        elif self.train_config.model_type.is_stable_diffusion_xl():
+            self.presets = sdxl_presets
+        elif self.train_config.model_type.is_wuerstchen():
+            self.presets = sc_presets
+        elif self.train_config.model_type.is_pixart():
+            self.presets = pixart_presets
         else:
-            self.presets = []
+            self.presets = {"full": []}
+        self.presets_list = list(self.presets.keys()) + ["custom"]
         self.setup_lora()
 
     def setup_lora(self):
@@ -86,7 +97,7 @@ class LoraTab:
         components.label(master, 6, 0, "Layer Preset",
                          tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own")
         self.layer_selector = components.options(
-            master, 6, 1, self.presets, self.ui_state, "lora_layer_preset",
+            master, 6, 1, self.presets_list, self.ui_state, "lora_layer_preset",
             command=self.__preset_set_layer_choice
         )
 
@@ -96,10 +107,18 @@ class LoraTab:
         )
         self.prior_custom = self.train_config.lora_layers or ""
         self.layer_entry.grid(row=6, column=2, columnspan=3, sticky="ew")
+        # Some configs will come with the lora_layer_preset unset or wrong for
+        # the new model, so let's set it now to a reasonable default so it hits
+        # the UI correctly.
+        v = self.ui_state.get_var("lora_layer_preset")
+        if v.get() not in self.presets_list:
+            v.set(self.presets_list[0])
         self.__preset_set_layer_choice(self.layer_selector.get())
-        print("self.layer_selector.get(): ", self.layer_selector.get())
 
     def __preset_set_layer_choice(self, selected: str):
+        if not selected:
+            selected = self.presets_list[0]
+
         if selected == "custom":
             self.layer_entry.configure(state="normal")
             self.layer_entry.cget('textvariable').set(self.prior_custom)

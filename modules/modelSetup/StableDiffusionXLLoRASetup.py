@@ -10,6 +10,13 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 
 
+PRESETS = {
+    "attn-mlp": ["attentions"],
+    "attn-only": ["attn"],
+    "full": [],
+}
+
+
 class StableDiffusionXLLoRASetup(
     BaseStableDiffusionXLSetup,
 ):

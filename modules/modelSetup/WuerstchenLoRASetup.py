@@ -10,6 +10,18 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 
 
+# This is correct for the latest cascade, but other Wuerstchen models may have
+# different names. I honestly don't know what makes a good preset here so I'm
+# just guessing.
+PRESETS = {
+    "attn-only": ["attention"],
+    "full": [],
+    "down-blocks": ["down_blocks"],
+    "up-blocks": ["up_blocks"],
+    "mapper-only": ["mapper"],
+}
+
+
 class WuerstchenLoRASetup(
     BaseWuerstchenSetup,
 ):
