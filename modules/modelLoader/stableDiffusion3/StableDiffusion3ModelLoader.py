@@ -1,11 +1,13 @@
 import traceback
 
+import torch
 from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transformer2DModel, StableDiffusion3Pipeline
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 
 
@@ -195,8 +197,19 @@ class StableDiffusion3ModelLoader:
             print("text encoder 2 (clip g) not loaded, continuing without it")
 
         if pipeline.text_encoder_3 is not None and include_text_encoder_3:
-            text_encoder_3 = pipeline.text_encoder_3.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
-            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(supports_fp8=False))
+            dtype = weight_dtypes.text_encoder_3
+            text_encoder_3 = pipeline.text_encoder_3
+            if dtype in [DataType.FLOAT_16, DataType.FLOAT_8]:
+                fp32_modules = text_encoder_3._keep_in_fp32_modules
+                for name, param in text_encoder_3.named_parameters():
+                    if any(fp32_module in name.split(".") for fp32_module in fp32_modules):
+                        param.data = param.data.to(dtype=torch.float32)
+                    else:
+                        param.data = param.data.to(dtype=dtype.torch_dtype())
+            else:
+                text_encoder_3.to(dtype=dtype.torch_dtype())
+
+            text_encoder_3.encoder.embed_tokens.to(dtype=dtype.torch_dtype(supports_fp8=False))
             tokenizer_3 = pipeline.tokenizer_3
         else:
             text_encoder_3 = None
