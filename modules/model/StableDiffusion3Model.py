@@ -142,9 +142,6 @@ class StableDiffusion3Model(BaseModel):
         self.transformer_lora = transformer_lora
         self.lora_state_dict = lora_state_dict
 
-        self.sd_config = sd_config
-        self.sd_config_filename = sd_config_filename
-
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 

@@ -256,15 +256,15 @@ class StableDiffusion3ModelLoader:
         except:
             stacktraces.append(traceback.format_exc())
 
-        try:
-            self.__load_ckpt(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
-            )
-            return
-        except:
-            stacktraces.append(traceback.format_exc())
+        # try:
+        #     self.__load_ckpt(
+        #         model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+        #         model_names.include_text_encoder, model_names.include_text_encoder_2,
+        #         model_names.include_text_encoder_3,
+        #     )
+        #     return
+        # except:
+        #     stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)
