@@ -423,6 +423,7 @@ class BaseStableDiffusion3Setup(
             is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
 
             vae_scaling_factor = model.vae.config['scaling_factor']
+            vae_shift_factor = model.vae.config['shift_factor']
 
             text_encoder_output, pooled_text_encoder_output = self.__encode_text(
                 model,
@@ -452,11 +453,12 @@ class BaseStableDiffusion3Setup(
             )
 
             latent_image = batch['latent_image']
-            scaled_latent_image = latent_image * vae_scaling_factor
+            scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
             if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
+                scaled_latent_conditioning_image = \
+                    (batch['latent_conditioning_image'] - vae_shift_factor) * vae_scaling_factor
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
