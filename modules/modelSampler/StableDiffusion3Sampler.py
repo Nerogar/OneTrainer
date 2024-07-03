@@ -107,22 +107,23 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 dtype=train_dtype.torch_dtype(),
             )
 
-        if tokenizer_3 is not None and text_encoder_3 is not None:
-            tokenizer_3_output = tokenizer_3(
-                prompt,
-                padding="max_length",
-                truncation=True,
-                max_length=77,
-                return_tensors="pt")
-            tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
+        with self.model.text_encoder_3_autocast_context:
+            if tokenizer_3 is not None and text_encoder_3 is not None:
+                tokenizer_3_output = tokenizer_3(
+                    prompt,
+                    padding="max_length",
+                    truncation=True,
+                    max_length=77,
+                    return_tensors="pt")
+                tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
 
-            text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0]
-        else:
-            text_encoder_3_output = torch.zeros(
-                (1, 77, joint_attention_dim),
-                device=self.train_device,
-                dtype=self.model.train_dtype.torch_dtype(),
-            )
+                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0]
+            else:
+                text_encoder_3_output = torch.zeros(
+                    (1, 77, joint_attention_dim),
+                    device=self.train_device,
+                    dtype=self.model.train_dtype.torch_dtype(),
+                )
 
         prompt_embedding = torch.concat(
             [text_encoder_1_output, text_encoder_2_output], dim=-1

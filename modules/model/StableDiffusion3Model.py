@@ -125,8 +125,10 @@ class StableDiffusion3Model(BaseModel):
         self.transformer = transformer
 
         self.autocast_context = nullcontext()
+        self.text_encoder_3_autocast_context = nullcontext()
 
         self.train_dtype = DataType.FLOAT_32
+        self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
         self.embedding = embedding
         self.embedding_state = embedding_state

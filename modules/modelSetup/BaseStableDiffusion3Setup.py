@@ -22,7 +22,7 @@ from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
-from modules.util.dtype_util import create_autocast_context
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 
@@ -91,6 +91,19 @@ class BaseStableDiffusion3Setup(
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
+
+        model.text_encoder_3_autocast_context, model.text_encoder_3_train_dtype = \
+            disable_fp16_autocast_context(
+                self.train_device,
+                config.train_dtype,
+                config.fallback_train_dtype,
+                [
+                    config.weight_dtypes().text_encoder_3,
+                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                    config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
+                ],
+                config.enable_autocast_cache,
+            )
 
     def _setup_additional_embeddings(
             self,
@@ -377,21 +390,22 @@ class BaseStableDiffusion3Setup(
                         dtype=model.train_dtype.torch_dtype(),
                     )
 
-        dropout_text_encoder_3 = rand.random() < config.text_encoder_3.dropout_probability
-        if text_encoder_3_output is None \
-                and not dropout_text_encoder_3 \
-                and model.text_encoder_3 is not None:
-                    text_encoder_3_output = model.text_encoder_3(
-                        tokens_3, output_hidden_states=True, return_dict=True
-                    )
-                    text_encoder_3_output = text_encoder_3_output.last_hidden_state
-        if text_encoder_3_output is None \
-                or dropout_text_encoder_3:
-                    text_encoder_3_output = torch.zeros(
-                        size=(batch_size, 77, model.transformer.config.joint_attention_dim),
-                        device=self.train_device,
-                        dtype=model.train_dtype.torch_dtype(),
-                    )
+        with model.text_encoder_3_autocast_context:
+            dropout_text_encoder_3 = rand.random() < config.text_encoder_3.dropout_probability
+            if text_encoder_3_output is None \
+                    and not dropout_text_encoder_3 \
+                    and model.text_encoder_3 is not None:
+                        text_encoder_3_output = model.text_encoder_3(
+                            tokens_3, output_hidden_states=True, return_dict=True
+                        )
+                        text_encoder_3_output = text_encoder_3_output.last_hidden_state
+            if text_encoder_3_output is None \
+                    or dropout_text_encoder_3:
+                        text_encoder_3_output = torch.zeros(
+                            size=(batch_size, 77, model.transformer.config.joint_attention_dim),
+                            device=self.train_device,
+                            dtype=model.train_dtype.torch_dtype(),
+                        )
 
         prompt_embedding = torch.concat(
             [text_encoder_1_output, text_encoder_2_output], dim=-1
