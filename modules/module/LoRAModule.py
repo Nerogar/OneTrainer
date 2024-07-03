@@ -90,11 +90,12 @@ class PeftBase(metaclass=ABCMeta):
         pass
 
 
+# TODO(surgo): Tucker decomposition, scalar.
 class LoHaModule(PeftBase):
-    w1d: nn.Module
-    w1u: nn.Module
-    w2d: nn.Module
-    w2u: nn.Module
+    w1d: Parameter
+    w1u: Parameter
+    w2d: Parameter
+    w2u: Parameter
     alpha: Tensor
     dropout: Dropout
 
@@ -105,10 +106,26 @@ class LoHaModule(PeftBase):
         self.dropout = Dropout(0)
 
         if orig_module is not None:
+            self.initialize_weights()
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
 
         self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
+
+    def initialize_weights(self):
+        assert self.orig_module
+
+        device = self.orig_module.weight.device
+        out_dim, in_dim, *k = self.orig_module.weight.shape
+
+        self.w1d = Parameter(torch.empty(self.rank, in_dim))
+        self.w1u = Parameter(torch.empty(out_dim, self.rank))
+        self.w2d = Parameter(torch.empty(self.rank, in_dim))
+        self.w2u = Parameter(torch.empty(out_dim, self.rank))
+        nn.init.normal_(self.w1d, std=1)
+        nn.init.constant_(self.w1u, 0)
+        nn.init.normal_(self.w2d, std=1)
+        nn.init.normal_(self.w2u, std=0.1)
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
@@ -125,6 +142,56 @@ class LoHaModule(PeftBase):
         return self.orig_forward(x) + \
             self.op(cast(Tensor, W), x, **self.layer_kwargs) * \
             (self.alpha / self.rank)
+
+    def requires_grad_(self, requires_grad: bool):
+        self.w1d.requires_grad_(requires_grad)
+        self.w1u.requires_grad_(requires_grad)
+        self.w2d.requires_grad_(requires_grad)
+        self.w2u.requires_grad_(requires_grad)
+
+    def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> 'LoHaModule':
+        self.w1d = self.w1d.to(device, dtype)
+        self.w1u = self.w1u.to(device, dtype)
+        self.w2d = self.w2d.to(device, dtype)
+        self.w2u = self.w2u.to(device, dtype)
+        self.alpha = self.alpha.to(device, dtype)
+        return self
+
+    def parameters(self) -> list[Parameter]:
+        return [self.w1d, self.w1u, self.w2d, self.w2u]
+
+    def load_state_dict(self, state_dict: dict):
+        items = [self.prefix + "." + x for x in
+                 ["hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"]]
+        if any(x in state_dict for x in items) and not \
+           all(x in state_dict for x in items):
+            raise ValueError("LoHa layer %s is missing pieces." % self.prefix)
+
+        self.w1d = state_dict.pop(self.prefix + ".hada_w1_a")
+        self.w1u = state_dict.pop(self.prefix + ".hada_w1_b")
+        self.w2d = state_dict.pop(self.prefix + ".hada_w2_a")
+        self.w2u = state_dict.pop(self.prefix + ".hada_w2_b")
+        self.alpha = state_dict.pop(self.prefix + ".alpha")
+
+    def state_dict(self) -> dict:
+        state_dict = {}
+        state_dict[self.prefix + ".hada_w1_a"] = self.w1d
+        state_dict[self.prefix + ".hada_w1_b"] = self.w1u
+        state_dict[self.prefix + ".hada_w2_a"] = self.w2d
+        state_dict[self.prefix + ".hada_w2_b"] = self.w2u
+        state_dict[self.prefix + ".alpha"] = self.alpha
+        return state_dict
+
+    def modules(self) -> list[nn.Module]:
+        return []
+
+    def apply_to_module(self):
+        # TODO
+        pass
+
+    def extract_from_module(self, base_module: nn.Module):
+        # TODO
+        pass
 
 
 class LoRAModule(PeftBase):
@@ -146,6 +213,7 @@ class LoRAModule(PeftBase):
         self.alpha = torch.tensor(alpha)
         self.dropout = Dropout(0)
         if orig_module is not None:
+            self.initialize_weights()
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
 
@@ -189,7 +257,7 @@ class LoRAModule(PeftBase):
     def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> 'LoRAModule':
         self.lora_down.to(device, dtype)
         self.lora_up.to(device, dtype)
-        self.alpha.to(device, dtype)
+        self.alpha = self.alpha.to(device, dtype)
         return self
 
     def parameters(self) -> list[Parameter]:
