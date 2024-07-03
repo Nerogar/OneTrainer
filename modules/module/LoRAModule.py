@@ -1,19 +1,57 @@
 import math
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Any, Callable, cast
 
 import torch
+import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
+from modules.util import custom_passes
+
 
 class PeftBase(metaclass=ABCMeta):
-    prefix: str
+    is_applied: bool
+    orig_forward: Any | None
     orig_module: nn.Module | None
+    prefix: str
+    layer_kwargs: dict
+    op: Callable[[Tensor, Tensor], Tensor] | None
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, layer_kwargs: dict = {}):
         self.prefix = prefix
         self.orig_module = orig_module
+        self.is_applied = False
+        self.layer_kwargs = layer_kwargs
+
+        # For modules that have a custom backward pass and use functional ops.
+        if orig_module is not None:
+            match orig_module:
+                case nn.Linear():
+                    self.op = F.linear
+                case nn.Conv2d():
+                    self.op = F.conv2d
+                case _:
+                    raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+
+    def hook_to_module(self):
+        assert self.orig_module
+
+        if not self.is_applied:
+            self.orig_module.forward = self.forward
+            self.is_applied = True
+
+    def remove_hook_from_module(self):
+        assert self.orig_forward
+        assert self.orig_module
+
+        if self.is_applied:
+            self.orig_module.forward = self.orig_forward
+            self.is_applied = False
+
+    @abstractmethod
+    def initialize_weights(self):
+        pass
 
     @abstractmethod
     def forward(self, x, *args, **kwargs) -> Any:
@@ -44,20 +82,49 @@ class PeftBase(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def hook_to_module(self):
-        pass
-
-    @abstractmethod
-    def remove_hook_from_module(self):
-        pass
-
-    @abstractmethod
     def apply_to_module(self):
         pass
 
     @abstractmethod
     def extract_from_module(self, base_module: nn.Module):
         pass
+
+
+class LoHaModule(PeftBase):
+    w1d: nn.Module
+    w1u: nn.Module
+    w2d: nn.Module
+    w2u: nn.Module
+    alpha: Tensor
+    dropout: Dropout
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, layer_kwargs: dict = {}):
+        super().__init__(prefix, orig_module, layer_kwargs)
+        self.rank = rank
+        self.alpha = torch.tensor(alpha)
+        self.dropout = Dropout(0)
+
+        if orig_module is not None:
+            self.alpha = self.alpha.to(orig_module.weight.device)
+        self.alpha.requires_grad_(False)
+
+        self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
+
+    def forward(self, x, *args, **kwargs):
+        # They definitely exist at this point in the execution.
+        assert self.op
+        assert self.orig_module
+        assert self.orig_forward
+
+        train = self.orig_module.training
+        ww1d = self.dropout(self.w1d) if train else self.w1d
+        ww1u = self.dropout(self.w1u) if train else self.w1u
+        ww2d = self.dropout(self.w2d) if train else self.w2d
+        ww2u = self.dropout(self.w2u) if train else self.w2u
+        W = custom_passes.LohaWeight.apply(ww1d, ww1u, ww2d, ww2u)
+        return self.orig_forward(x) + \
+            self.op(cast(Tensor, W), x, **self.layer_kwargs) * \
+            (self.alpha / self.rank)
 
 
 class LoRAModule(PeftBase):
@@ -70,8 +137,8 @@ class LoRAModule(PeftBase):
     # optional members. This is because these members might not exist at
     # construction, but definitely exist by the time those methods are called.
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
-        super(LoRAModule, self).__init__(prefix, orig_module)
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, layer_kwargs: dict = {}):
+        super(LoRAModule, self).__init__(prefix, orig_module, layer_kwargs)
 
         self.prefix = prefix.replace('.', '_')
         self.orig_module = orig_module
@@ -82,8 +149,27 @@ class LoRAModule(PeftBase):
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
 
-        self.is_applied = False
         self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
+
+    def initialize_weights(self):
+        assert self.orig_module
+
+        device = self.orig_module.weight.device
+        match self.orig_module:
+            case nn.Linear():
+                in_features = self.orig_module.in_features
+                out_features = self.orig_module.out_features
+                self.lora_down = nn.Linear(in_features, self.rank, bias=False, device=device, **self.layer_kwargs)
+                self.lora_up = nn.Linear(self.rank, out_features, bias=False, device=device, **self.layer_kwargs)
+
+            case nn.Conv2d():
+                in_channels = self.orig_module.in_channels
+                out_channels = self.orig_module.out_channels
+                self.lora_down = Conv2d(in_channels, self.rank, (1, 1), bias=False, device=device, **self.layer_kwargs)
+                self.lora_up = Conv2d(self.rank, out_channels, (1, 1), bias=False, device=device, **self.layer_kwargs)
+
+        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
+        nn.init.zeros_(self.lora_up.weight)
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
@@ -135,21 +221,6 @@ class LoRAModule(PeftBase):
     def modules(self) -> list[nn.Module]:
         return [self.lora_down, self.lora_up, self.dropout]
 
-    def hook_to_module(self):
-        assert self.orig_module
-
-        if not self.is_applied:
-            self.orig_module.forward = self.forward
-            self.is_applied = True
-
-    def remove_hook_from_module(self):
-        assert self.orig_forward
-        assert self.orig_module
-
-        if self.is_applied:
-            self.orig_module.forward = self.orig_forward
-            self.is_applied = False
-
     def apply_to_module(self):
         # TODO
         pass
@@ -157,33 +228,6 @@ class LoRAModule(PeftBase):
     def extract_from_module(self, base_module: nn.Module):
         # TODO
         pass
-
-
-class LinearLoRAModule(LoRAModule):
-    def __init__(self, prefix: str, orig_module: Linear, rank: int, alpha: float):
-        super(LinearLoRAModule, self).__init__(prefix, orig_module, rank, alpha)
-
-        in_features = orig_module.in_features
-        out_features = orig_module.out_features
-
-        self.lora_down = Linear(in_features, rank, bias=False, device=orig_module.weight.device)
-        self.lora_up = Linear(rank, out_features, bias=False, device=orig_module.weight.device)
-
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_up.weight)
-
-
-class Conv2dLoRAModule(LoRAModule):
-    def __init__(self, prefix: str, orig_module: Conv2d, rank: int, alpha: float):
-        super(Conv2dLoRAModule, self).__init__(prefix, orig_module, rank, alpha)
-        in_channels = orig_module.in_channels
-        out_channels = orig_module.out_channels
-
-        self.lora_down = Conv2d(in_channels, rank, (1, 1), bias=False, device=orig_module.weight.device)
-        self.lora_up = Conv2d(rank, out_channels, (1, 1), bias=False, device=orig_module.weight.device)
-
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_up.weight)
 
 
 class DummyLoRAModule(LoRAModule):
@@ -257,10 +301,9 @@ class LoRAModuleWrapper:
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
-                    if isinstance(child_module, Linear):
-                        lora_modules[name] = LinearLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
-                    elif isinstance(child_module, Conv2d):
-                        lora_modules[name] = Conv2dLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
+                    if isinstance(child_module, Linear) or \
+                       isinstance(child_module, Conv2d):
+                        lora_modules[name] = LoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
 
         return lora_modules
 
