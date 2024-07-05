@@ -326,8 +326,10 @@ class GenericTrainer(BaseTrainer):
 
         with open(args_path, "w") as f:
             json.dump(self.config.to_dict(), f, indent=4)
-        shutil.copy2(self.config.concept_file_name, concepts_path)
-        shutil.copy2(self.config.sample_definition_file_name, samples_path)
+        if os.path.isfile(self.config.concept_file_name):
+            shutil.copy2(self.config.concept_file_name, concepts_path)
+        if os.path.isfile(self.config.sample_definition_file_name):
+            shutil.copy2(self.config.sample_definition_file_name, samples_path)
 
     def backup(self, train_progress: TrainProgress):
         torch_gc()
