@@ -7,6 +7,7 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection, Name
 from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.torch_util import state_dict_has_prefix
 
 
 class WuerstchenLoRASetup(
@@ -98,26 +99,29 @@ class WuerstchenLoRASetup(
         if config.train_any_embedding():
             model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_prior_te")
         model.prior_text_encoder_lora = LoRAModuleWrapper(
             model.prior_text_encoder, config.lora_rank, "lora_prior_te", config.lora_alpha
-        )
+        ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
             model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, ["attention"]
         )
 
         if model.lora_state_dict:
-            model.prior_text_encoder_lora.load_state_dict(model.lora_state_dict)
+            if create_te:
+                model.prior_text_encoder_lora.load_state_dict(model.lora_state_dict)
             model.prior_prior_lora.load_state_dict(model.lora_state_dict)
             model.lora_state_dict = None
 
-        model.prior_text_encoder_lora.set_dropout(config.dropout_probability)
+        if config.text_encoder.train:
+            model.prior_text_encoder_lora.set_dropout(config.dropout_probability)
+        if create_te:
+            model.prior_text_encoder_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+            model.prior_text_encoder_lora.hook_to_module()
+
         model.prior_prior_lora.set_dropout(config.dropout_probability)
-
-        model.prior_text_encoder_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.prior_prior_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
-
-        model.prior_text_encoder_lora.hook_to_module()
         model.prior_prior_lora.hook_to_module()
 
         self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
