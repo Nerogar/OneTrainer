@@ -1,0 +1,25 @@
+{
+    "base_model_name": "stabilityai/stable-diffusion-3-medium-diffusers",
+    "model_type": "STABLE_DIFFUSION_3",
+    "output_dtype": "FLOAT_16",
+    "output_model_destination": "models/model.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "prior": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "resolution": "1024",
+    "text_encoder": {
+        "train": false
+    },
+    "text_encoder_2": {
+        "train": false
+    },
+    "text_encoder_3": {
+        "train": false
+    },
+    "training_method": "FINE_TUNE",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "weight_dtype": "FLOAT_16"
+}
