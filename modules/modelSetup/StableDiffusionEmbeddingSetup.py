@@ -67,6 +67,10 @@ class StableDiffusionEmbeddingSetup(
     ):
         model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
+        if config.rescale_noise_scheduler_to_zero_terminal_snr:
+            model.rescale_noise_scheduler_to_zero_terminal_snr()
+            model.force_v_prediction()
+
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_additional_embeddings(model, config)
         self._setup_embedding(model, config)

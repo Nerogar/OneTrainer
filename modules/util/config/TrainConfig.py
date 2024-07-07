@@ -159,11 +159,13 @@ class TrainOptimizerConfig(BaseConfig):
 
 class TrainModelPartConfig(BaseConfig):
     model_name: str
+    include: bool
     train: bool
     stop_training_after: int
     stop_training_after_unit: TimeUnit
     learning_rate: float
     weight_dtype: DataType
+    dropout_probability: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainModelPartConfig, self).__init__(data)
@@ -174,11 +176,13 @@ class TrainModelPartConfig(BaseConfig):
 
         # name, default value, data type, nullable
         data.append(("model_name", "", str, False))
+        data.append(("include", True, bool, False))
         data.append(("train", True, bool, False))
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("learning_rate", None, float, True))
         data.append(("weight_dtype", DataType.NONE, DataType, False))
+        data.append(("dropout_probability", 0.0, float, False))
 
         return TrainModelPartConfig(data)
 
@@ -305,6 +309,10 @@ class TrainConfig(BaseConfig):
     # text encoder 2
     text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
+
+    # text encoder 3
+    text_encoder_3: TrainModelPartConfig
+    text_encoder_3_layer_skip: int
 
     # vae
     vae: TrainModelPartConfig
@@ -504,6 +512,7 @@ class TrainConfig(BaseConfig):
             self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
             self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
+            self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
             self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
             self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
             self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
@@ -524,6 +533,9 @@ class TrainConfig(BaseConfig):
             embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
             additional_embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in
                                    self.additional_embeddings],
+            include_text_encoder=self.text_encoder.include,
+            include_text_encoder_2=self.text_encoder_2.include,
+            include_text_encoder_3=self.text_encoder_3.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -680,6 +692,16 @@ class TrainConfig(BaseConfig):
         text_encoder_2.weight_dtype = DataType.NONE
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
+
+        # text encoder 3
+        text_encoder_3 = TrainModelPartConfig.default_values()
+        text_encoder_3.train = True
+        text_encoder_3.stop_training_after = 30
+        text_encoder_3.stop_training_after_unit = TimeUnit.EPOCH
+        text_encoder_3.learning_rate = None
+        text_encoder_3.weight_dtype = DataType.NONE
+        data.append(("text_encoder_3", text_encoder_3, TrainModelPartConfig, False))
+        data.append(("text_encoder_3_layer_skip", 0, int, False))
 
         # vae
         vae = TrainModelPartConfig.default_values()

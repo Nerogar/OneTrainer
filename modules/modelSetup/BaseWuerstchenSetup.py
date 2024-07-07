@@ -9,8 +9,9 @@ from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedd
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
-from modules.modelSetup.mixin.ModelSetupDiffusionNoiseMixin import ModelSetupDiffusionNoiseMixin
+from modules.modelSetup.mixin.ModelSetupDiffusionMixin import ModelSetupDiffusionMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
+from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers, \
     enable_checkpointing_for_stable_cascade_blocks
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
@@ -27,7 +28,8 @@ class BaseWuerstchenSetup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
-    ModelSetupDiffusionNoiseMixin,
+    ModelSetupNoiseMixin,
+    ModelSetupDiffusionMixin,
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):

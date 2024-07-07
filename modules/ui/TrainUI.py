@@ -128,14 +128,14 @@ class TrainUI(ctk.CTk):
         self.tabview = ctk.CTkTabview(frame)
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
-        self.create_general_tab(self.tabview.add("general"))
+        self.general_tab = self.create_general_tab(self.tabview.add("general"))
         self.model_tab = self.create_model_tab(self.tabview.add("model"))
-        self.create_data_tab(self.tabview.add("data"))
+        self.data_tab = self.create_data_tab(self.tabview.add("data"))
         self.create_concepts_tab(self.tabview.add("concepts"))
         self.training_tab = self.create_training_tab(self.tabview.add("training"))
         self.create_sampling_tab(self.tabview.add("sampling"))
-        self.create_backup_tab(self.tabview.add("backup"))
-        self.create_tools_tab(self.tabview.add("tools"))
+        self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
+        self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
         self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
 
         self.change_training_method(self.train_config.training_method)
@@ -143,86 +143,94 @@ class TrainUI(ctk.CTk):
         return frame
 
     def create_general_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, weight=0)
-        master.grid_columnconfigure(3, weight=1)
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_columnconfigure(2, weight=0)
+        frame.grid_columnconfigure(3, weight=1)
 
         # workspace dir
-        components.label(master, 0, 0, "Workspace Directory",
+        components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        components.dir_entry(master, 0, 1, self.ui_state, "workspace_dir")
+        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
-        components.label(master, 1, 0, "Cache Directory",
+        components.label(frame, 1, 0, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.dir_entry(master, 1, 1, self.ui_state, "cache_dir")
+        components.dir_entry(frame, 1, 1, self.ui_state, "cache_dir")
 
         # continue from previous backup
-        components.label(master, 2, 0, "Continue from last backup",
+        components.label(frame, 2, 0, "Continue from last backup",
                          tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
-        components.switch(master, 2, 1, self.ui_state, "continue_last_backup")
+        components.switch(frame, 2, 1, self.ui_state, "continue_last_backup")
 
         # only cache
-        components.label(master, 3, 0, "Only Cache",
+        components.label(frame, 3, 0, "Only Cache",
                          tooltip="Only populate the cache, without any training")
-        components.switch(master, 3, 1, self.ui_state, "only_cache")
+        components.switch(frame, 3, 1, self.ui_state, "only_cache")
 
         # debug
-        components.label(master, 4, 0, "Debug mode",
+        components.label(frame, 4, 0, "Debug mode",
                          tooltip="Save debug information during the training into the debug directory")
-        components.switch(master, 4, 1, self.ui_state, "debug_mode")
+        components.switch(frame, 4, 1, self.ui_state, "debug_mode")
 
-        components.label(master, 5, 0, "Debug Directory",
+        components.label(frame, 5, 0, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(master, 5, 1, self.ui_state, "debug_dir")
+        components.dir_entry(frame, 5, 1, self.ui_state, "debug_dir")
 
         # tensorboard
-        components.label(master, 6, 0, "Tensorboard",
+        components.label(frame, 6, 0, "Tensorboard",
                          tooltip="Starts the Tensorboard Web UI during training")
-        components.switch(master, 6, 1, self.ui_state, "tensorboard")
+        components.switch(frame, 6, 1, self.ui_state, "tensorboard")
 
-        components.label(master, 7, 0, "Expose Tensorboard",
+        components.label(frame, 7, 0, "Expose Tensorboard",
                          tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-        components.switch(master, 7, 1, self.ui_state, "tensorboard_expose")
+        components.switch(frame, 7, 1, self.ui_state, "tensorboard_expose")
 
         # device
-        components.label(master, 8, 0, "Dataloader Threads",
+        components.label(frame, 8, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(master, 8, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 8, 1, self.ui_state, "dataloader_threads")
 
-        components.label(master, 9, 0, "Train Device",
+        components.label(frame, 9, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
-        components.entry(master, 9, 1, self.ui_state, "train_device")
+        components.entry(frame, 9, 1, self.ui_state, "train_device")
 
-        components.label(master, 10, 0, "Temp Device",
+        components.label(frame, 10, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(master, 10, 1, self.ui_state, "temp_device")
+        components.entry(frame, 10, 1, self.ui_state, "temp_device")
+
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def create_model_tab(self, master):
         return ModelTab(master, self.train_config, self.ui_state)
 
     def create_data_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_columnconfigure(2, minsize=50)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
 
         # aspect ratio bucketing
-        components.label(master, 0, 0, "Aspect Ratio Bucketing",
+        components.label(frame, 0, 0, "Aspect Ratio Bucketing",
                          tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
-        components.switch(master, 0, 1, self.ui_state, "aspect_ratio_bucketing")
+        components.switch(frame, 0, 1, self.ui_state, "aspect_ratio_bucketing")
 
         # latent caching
-        components.label(master, 1, 0, "Latent Caching",
+        components.label(frame, 1, 0, "Latent Caching",
                          tooltip="Caching of intermediate training data that can be re-used between epochs")
-        components.switch(master, 1, 1, self.ui_state, "latent_caching")
+        components.switch(frame, 1, 1, self.ui_state, "latent_caching")
 
         # clear cache before training
-        components.label(master, 2, 0, "Clear cache before training",
+        components.label(frame, 2, 0, "Clear cache before training",
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
-        components.switch(master, 2, 1, self.ui_state, "clear_cache_before_training")
+        components.switch(frame, 2, 1, self.ui_state, "clear_cache_before_training")
+
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def create_concepts_tab(self, master):
         ConceptTab(master, self.train_config, self.ui_state)
@@ -270,165 +278,173 @@ class TrainUI(ctk.CTk):
         SamplingTab(frame, self.train_config, self.ui_state)
 
     def create_backup_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_columnconfigure(2, minsize=50)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
 
         # backup after
-        components.label(master, 0, 0, "Backup After",
+        components.label(frame, 0, 0, "Backup After",
                          tooltip="The interval used when automatically creating model backups during training")
-        components.time_entry(master, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
+        components.time_entry(frame, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
         # backup now
-        components.button(master, 0, 3, "backup now", self.backup_now)
+        components.button(frame, 0, 3, "backup now", self.backup_now)
 
         # rolling backup
-        components.label(master, 1, 0, "Rolling Backup",
+        components.label(frame, 1, 0, "Rolling Backup",
                          tooltip="If rolling backups are enabled, older backups are deleted automatically")
-        components.switch(master, 1, 1, self.ui_state, "rolling_backup")
+        components.switch(frame, 1, 1, self.ui_state, "rolling_backup")
 
         # rolling backup count
-        components.label(master, 1, 3, "Rolling Backup Count",
+        components.label(frame, 1, 3, "Rolling Backup Count",
                          tooltip="Defines the number of backups to keep if rolling backups are enabled")
-        components.entry(master, 1, 4, self.ui_state, "rolling_backup_count")
+        components.entry(frame, 1, 4, self.ui_state, "rolling_backup_count")
 
         # backup before save
-        components.label(master, 2, 0, "Backup Before Save",
+        components.label(frame, 2, 0, "Backup Before Save",
                          tooltip="Create a full backup before saving the final model")
-        components.switch(master, 2, 1, self.ui_state, "backup_before_save")
+        components.switch(frame, 2, 1, self.ui_state, "backup_before_save")
 
         # save after
-        components.label(master, 3, 0, "Save After",
+        components.label(frame, 3, 0, "Save After",
                          tooltip="The interval used when automatically saving the model during training")
-        components.time_entry(master, 3, 1, self.ui_state, "save_after", "save_after_unit")
+        components.time_entry(frame, 3, 1, self.ui_state, "save_after", "save_after_unit")
 
         # save now
-        components.button(master, 3, 3, "save now", self.save_now)
+        components.button(frame, 3, 3, "save now", self.save_now)
 
         # save filename prefix
-        components.label(master, 4, 0, "Save Filename Prefix",
+        components.label(frame, 4, 0, "Save Filename Prefix",
                          tooltip="The prefix for filenames used when saving the model during training")
-        components.entry(master, 4, 1, self.ui_state, "save_filename_prefix")
+        components.entry(frame, 4, 1, self.ui_state, "save_filename_prefix")
+
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def lora_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_columnconfigure(2, minsize=50)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
 
         # lora model name
-        components.label(master, 0, 0, "LoRA base model",
+        components.label(frame, 0, 0, "LoRA base model",
                          tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
         components.file_entry(
-            master, 0, 1, self.ui_state, "lora_model_name",
+            frame, 0, 1, self.ui_state, "lora_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # lora rank
-        components.label(master, 1, 0, "LoRA rank",
+        components.label(frame, 1, 0, "LoRA rank",
                          tooltip="The rank parameter used when creating a new LoRA")
-        components.entry(master, 1, 1, self.ui_state, "lora_rank")
+        components.entry(frame, 1, 1, self.ui_state, "lora_rank")
 
         # lora rank
-        components.label(master, 2, 0, "LoRA alpha",
+        components.label(frame, 2, 0, "LoRA alpha",
                          tooltip="The alpha parameter used when creating a new LoRA")
-        components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+        components.entry(frame, 2, 1, self.ui_state, "lora_alpha")
 
         # Dropout Percentage
-        components.label(master, 3, 0, "Dropout Probability",
+        components.label(frame, 3, 0, "Dropout Probability",
                          tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+        components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
 
         # lora weight dtype
-        components.label(master, 4, 0, "LoRA Weight Data Type",
+        components.label(frame, 4, 0, "LoRA Weight Data Type",
                          tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 4, 1, [
+        components.options_kv(frame, 4, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "lora_weight_dtype")
 
         # For use with additional embeddings.
-        components.label(master, 5, 0, "Bundle Embeddings",
+        components.label(frame, 5, 0, "Bundle Embeddings",
                          tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
-        components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
+        components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
-        return master
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def embedding_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_columnconfigure(2, minsize=50)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
 
         # embedding model name
-        components.label(master, 0, 0, "Base embedding",
+        components.label(frame, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.file_entry(
-            master, 0, 1, self.ui_state, "embedding.model_name",
+            frame, 0, 1, self.ui_state, "embedding.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
-        components.label(master, 1, 0, "Token count",
+        components.label(frame, 1, 0, "Token count",
                          tooltip="The token count used when creating a new embedding")
-        components.entry(master, 1, 1, self.ui_state, "embedding.token_count")
+        components.entry(frame, 1, 1, self.ui_state, "embedding.token_count")
 
         # initial embedding text
-        components.label(master, 2, 0, "Initial embedding text",
+        components.label(frame, 2, 0, "Initial embedding text",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(master, 2, 1, self.ui_state, "embedding.initial_embedding_text")
+        components.entry(frame, 2, 1, self.ui_state, "embedding.initial_embedding_text")
 
         # embedding weight dtype
-        components.label(master, 3, 0, "Embedding Weight Data Type",
+        components.label(frame, 3, 0, "Embedding Weight Data Type",
                          tooltip="The Embedding weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 3, 1, [
+        components.options_kv(frame, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "embedding_weight_dtype")
 
         # placeholder
-        components.label(master, 4, 0, "Placeholder",
+        components.label(frame, 4, 0, "Placeholder",
                          tooltip="The placeholder used when using the embedding in a prompt")
-        components.entry(master, 4, 1, self.ui_state, "embedding.placeholder")
+        components.entry(frame, 4, 1, self.ui_state, "embedding.placeholder")
 
-
-
-        return master
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def create_additional_embeddings_tab(self, master):
         return AdditionalEmbeddingsTab(master, self.train_config, self.ui_state)
 
     def create_tools_tab(self, master):
-        master.grid_columnconfigure(0, weight=0)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, minsize=50)
-        master.grid_columnconfigure(3, weight=0)
-        master.grid_columnconfigure(4, weight=1)
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_columnconfigure(2, minsize=50)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
 
         # dataset
-        components.label(master, 0, 0, "Dataset Tools",
+        components.label(frame, 0, 0, "Dataset Tools",
                          tooltip="Open the captioning tool")
-        components.button(master, 0, 1, "Open", self.open_dataset_tool)
+        components.button(frame, 0, 1, "Open", self.open_dataset_tool)
 
         # convert model
-        components.label(master, 1, 0, "Convert Model Tools",
+        components.label(frame, 1, 0, "Convert Model Tools",
                          tooltip="Open the model conversion tool")
-        components.button(master, 1, 1, "Open", self.open_convert_model_tool)
+        components.button(frame, 1, 1, "Open", self.open_convert_model_tool)
 
         # sample
-        components.label(master, 2, 0, "Sampling Tool",
+        components.label(frame, 2, 0, "Sampling Tool",
                          tooltip="Open the model sampling tool")
-        components.button(master, 2, 1, "Open", self.open_sampling_tool)
+        components.button(frame, 2, 1, "Open", self.open_sampling_tool)
 
-        components.label(master, 3, 0, "Profiling Tool",
+        components.label(frame, 3, 0, "Profiling Tool",
                          tooltip="Open the profiling tools.")
-        components.button(master, 3, 1, "Open", self.open_profiling_tool)
+        components.button(frame, 3, 1, "Open", self.open_profiling_tool)
 
-        return master
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def change_model_type(self, model_type: ModelType):
         if self.model_tab:

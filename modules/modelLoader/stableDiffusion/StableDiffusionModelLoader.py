@@ -242,8 +242,8 @@ class StableDiffusionModelLoader(
     ):
         stacktraces = []
 
-        model.sd_config = self._load_sd_config(model_type)
-        model.sd_config_filename = self._get_sd_config_name(model_type)
+        model.sd_config = self._load_sd_config(model_type, model_names.base_model)
+        model.sd_config_filename = self._get_sd_config_name(model_type, model_names.base_model)
 
         try:
             self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)

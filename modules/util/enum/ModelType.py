@@ -11,6 +11,8 @@ class ModelType(Enum):
     STABLE_DIFFUSION_21 = 'STABLE_DIFFUSION_21'
     STABLE_DIFFUSION_21_BASE = 'STABLE_DIFFUSION_21_BASE'
 
+    STABLE_DIFFUSION_3 = 'STABLE_DIFFUSION_3'
+
     STABLE_DIFFUSION_XL_10_BASE = 'STABLE_DIFFUSION_XL_10_BASE'
     STABLE_DIFFUSION_XL_10_BASE_INPAINTING = 'STABLE_DIFFUSION_XL_10_BASE_INPAINTING'
 
@@ -44,6 +46,9 @@ class ModelType(Enum):
     def is_pixart(self):
         return self == ModelType.PIXART_ALPHA \
             or self == ModelType.PIXART_SIGMA
+
+    def is_stable_diffusion_3(self):
+        return self == ModelType.STABLE_DIFFUSION_3
 
     def is_pixart_alpha(self):
         return self == ModelType.PIXART_ALPHA

@@ -23,23 +23,26 @@ class PixArtAlphaModelSaver(
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
-        original_device = pipeline.device
         pipeline.to("cpu")
 
-        # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
-        # the tokenizer tries to reload from the file system otherwise
-        tokenizer = pipeline.tokenizer
-        tokenizer.__deepcopy__ = lambda memo: tokenizer
-        pipeline_copy = copy.deepcopy(pipeline)
-        delattr(tokenizer, '__deepcopy__')
-        pipeline.to(original_device)
+        if dtype is not None:
+            # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
+            # the tokenizer tries to reload from the file system otherwise
+            tokenizer = pipeline.tokenizer
+            tokenizer.__deepcopy__ = lambda memo: tokenizer
 
-        pipeline_copy.to("cpu", dtype, silence_dtype_warnings=True)
+            save_pipeline = copy.deepcopy(pipeline)
+            save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
+
+            delattr(tokenizer, '__deepcopy__')
+        else:
+            save_pipeline = pipeline
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
-        pipeline_copy.save_pretrained(destination)
+        save_pipeline.save_pretrained(destination)
 
-        del pipeline_copy
+        if dtype is not None:
+            del save_pipeline
 
     def __save_ckpt(
             self,
