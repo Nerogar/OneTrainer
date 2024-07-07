@@ -632,10 +632,10 @@ class BaseStableDiffusion3Setup(
                     latent_input = scaled_noisy_latent_image
 
                 predicted_flow = model.transformer(
-                    hidden_states=latent_input,
+                    hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
                     timestep=timestep,
-                    encoder_hidden_states=text_encoder_output,
-                    pooled_projections=pooled_text_encoder_output,
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     return_dict=True
                 ).sample
                 predicted_scaled_latent_image = self._add_model_precondition(

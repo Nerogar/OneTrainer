@@ -241,10 +241,10 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
                 # predict the noise residual
                 noise_pred = transformer(
-                    hidden_states=latent_model_input,
+                    hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
                     timestep=expanded_timestep,
-                    encoder_hidden_states=combined_prompt_embedding,
-                    pooled_projections=combined_pooled_prompt_embedding,
+                    encoder_hidden_states=combined_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
+                    pooled_projections=combined_pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     return_dict=True
                 ).sample
 
