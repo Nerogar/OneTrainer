@@ -58,8 +58,6 @@ class Optimizer(Enum):
     ADABELIEF = 'ADABELIEF'
     TIGER = 'TIGER'
     AIDA = 'AIDA'
-    AIDA8BIT = 'AIDA8BIT'
-    AIDAFACTOR = 'AIDAFACTOR'
 
     @property
     def is_adaptive(self):

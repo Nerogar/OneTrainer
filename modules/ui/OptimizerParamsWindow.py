@@ -37,7 +37,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.grid_rowconfigure(1, weight=0)
         self.grid_columnconfigure(0, weight=1)
 
-        self.frame = ctk.CTkFrame(self)
+        self.frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         self.frame.grid_columnconfigure(0, weight=0)
