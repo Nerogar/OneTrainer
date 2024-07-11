@@ -11,19 +11,6 @@ class ModelSetupFlowMatchingMixin(metaclass=ABCMeta):
         self.__sigma = None
         self.__one_minus_sigma = None
 
-    def _add_model_precondition(
-            self,
-            model_output: Tensor,
-            model_input: Tensor,
-            timestep_index: Tensor,
-    ) -> Tensor:
-        sigmas = self.__sigma[timestep_index].to(dtype=model_output.dtype)
-
-        while sigmas.dim() < model_output.dim():
-            sigmas = sigmas.unsqueeze(-1)
-
-        return model_output * (-sigmas) + model_input
-
     # TODO: Not sure which version should be used.
     #       Sampling from FlowMatchEulerDiscreteScheduler timesteps or a uniform distribution
     # def _add_noise_discrete(

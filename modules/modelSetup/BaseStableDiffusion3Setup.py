@@ -633,15 +633,13 @@ class BaseStableDiffusion3Setup(
                     pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     return_dict=True
                 ).sample
-                predicted_scaled_latent_image = self._add_model_precondition(
-                    predicted_flow, latent_input, timestep_index
-                )
 
+                flow = latent_noise - scaled_latent_image
                 model_output_data = {
                     'loss_type': 'target',
                     'timestep': timestep,
-                    'predicted': predicted_scaled_latent_image,
-                    'target': scaled_latent_image,
+                    'predicted': predicted_flow,
+                    'target': flow,
                 }
 
             if config.debug_mode:
