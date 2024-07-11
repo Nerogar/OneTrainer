@@ -1,6 +1,6 @@
 import math
 from abc import ABCMeta, abstractmethod
-from typing import Any, Callable, cast
+from typing import Any, Callable, cast, no_type_check
 
 import torch
 import torch.nn.functional as F
@@ -13,7 +13,7 @@ from modules.util import custom_passes
 class PeftBase(nn.Module):
     is_applied: bool
     orig_forward: Any | None
-    orig_module: nn.Module | None
+    _orig_module: list[nn.Module] | None  # list prevents it from registering
     prefix: str
     layer_kwargs: dict
     op: Callable[[Tensor, Tensor], Tensor] | None
@@ -21,7 +21,7 @@ class PeftBase(nn.Module):
     def __init__(self, prefix: str, orig_module: nn.Module | None, layer_kwargs: dict = {}):
         super().__init__()
         self.prefix = prefix.replace('.', '_')
-        self.orig_module = [orig_module] if orig_module else None
+        self._orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = layer_kwargs
 
@@ -36,20 +36,21 @@ class PeftBase(nn.Module):
                     raise NotImplementedError("Only Linear and Conv2d are supported layers.")
 
     def hook_to_module(self):
-        assert self.orig_module
-
         if not self.is_applied:
-            self.orig_forward = self.orig_module[0].forward
-            self.orig_module[0].forward = self.forward
+            self.orig_forward = self.orig_module.forward
+            self.orig_module.forward = self.forward
             self.is_applied = True
 
     def remove_hook_from_module(self):
         assert self.orig_forward
-        assert self.orig_module
-
         if self.is_applied:
-            self.orig_module[0].forward = self.orig_forward
+            self.orig_module.forward = self.orig_forward
             self.is_applied = False
+
+    @property
+    def orig_module(self) -> nn.Module:
+        assert self._orig_module
+        return self._orig_module[0]
 
     @abstractmethod
     def initialize_weights(self):
@@ -85,8 +86,6 @@ class LoHaModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        assert self.orig_module
-
         device = self.orig_module.weight.device
         out_dim, in_dim, *k = self.orig_module.weight.shape
 
@@ -171,8 +170,6 @@ class LoRAModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        assert self.orig_module
-
         device = self.orig_module.weight.device
         match self.orig_module:
             case nn.Linear():
@@ -192,7 +189,6 @@ class LoRAModule(PeftBase):
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
-        assert self.orig_module
         assert self.orig_forward
 
         if self.orig_module.training:
@@ -224,9 +220,6 @@ class LoRAModule(PeftBase):
         state_dict[self.prefix + ".alpha"] = self.alpha
         return state_dict
 
-    def modules(self) -> list[nn.Module]:
-        return [self.lora_down, self.lora_up, self.dropout]
-
     def apply_to_module(self):
         # TODO
         pass
@@ -236,6 +229,7 @@ class LoRAModule(PeftBase):
         pass
 
 
+@no_type_check
 class DummyLoRAModule(LoRAModule):
     def __init__(self, prefix: str):
         super(DummyLoRAModule, self).__init__(prefix, None, 1, 1)
