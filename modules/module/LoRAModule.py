@@ -10,7 +10,7 @@ from torch.nn import Dropout, Linear, Conv2d, Parameter
 from modules.util import custom_passes
 
 
-class PeftBase(metaclass=ABCMeta):
+class PeftBase(nn.Module):
     is_applied: bool
     orig_forward: Any | None
     orig_module: nn.Module | None
@@ -19,8 +19,9 @@ class PeftBase(metaclass=ABCMeta):
     op: Callable[[Tensor, Tensor], Tensor] | None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, layer_kwargs: dict = {}):
-        self.prefix = prefix
-        self.orig_module = orig_module
+        super().__init__()
+        self.prefix = prefix.replace('.', '_')
+        self.orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = layer_kwargs
 
@@ -38,7 +39,8 @@ class PeftBase(metaclass=ABCMeta):
         assert self.orig_module
 
         if not self.is_applied:
-            self.orig_module.forward = self.forward
+            self.orig_forward = self.orig_module[0].forward
+            self.orig_module[0].forward = self.forward
             self.is_applied = True
 
     def remove_hook_from_module(self):
@@ -46,39 +48,11 @@ class PeftBase(metaclass=ABCMeta):
         assert self.orig_module
 
         if self.is_applied:
-            self.orig_module.forward = self.orig_forward
+            self.orig_module[0].forward = self.orig_forward
             self.is_applied = False
 
     @abstractmethod
     def initialize_weights(self):
-        pass
-
-    @abstractmethod
-    def forward(self, x, *args, **kwargs) -> Any:
-        pass
-
-    @abstractmethod
-    def requires_grad_(self, requires_grad: bool):
-        pass
-
-    @abstractmethod
-    def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> Any:
-        pass
-
-    @abstractmethod
-    def parameters(self) -> list[Parameter]:
-        pass
-
-    @abstractmethod
-    def load_state_dict(self, state_dict: dict):
-        pass
-
-    @abstractmethod
-    def state_dict(self) -> dict:
-        pass
-
-    @abstractmethod
-    def modules(self) -> list[nn.Module]:
         pass
 
     @abstractmethod
@@ -110,8 +84,6 @@ class LoHaModule(PeftBase):
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
 
-        self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
-
     def initialize_weights(self):
         assert self.orig_module
 
@@ -142,23 +114,6 @@ class LoHaModule(PeftBase):
         return self.orig_forward(x) + \
             self.op(cast(Tensor, W), x, **self.layer_kwargs) * \
             (self.alpha / self.rank)
-
-    def requires_grad_(self, requires_grad: bool):
-        self.w1d.requires_grad_(requires_grad)
-        self.w1u.requires_grad_(requires_grad)
-        self.w2d.requires_grad_(requires_grad)
-        self.w2u.requires_grad_(requires_grad)
-
-    def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> 'LoHaModule':
-        self.w1d = self.w1d.to(device, dtype)
-        self.w1u = self.w1u.to(device, dtype)
-        self.w2d = self.w2d.to(device, dtype)
-        self.w2u = self.w2u.to(device, dtype)
-        self.alpha = self.alpha.to(device, dtype)
-        return self
-
-    def parameters(self) -> list[Parameter]:
-        return [self.w1d, self.w1u, self.w2d, self.w2u]
 
     def load_state_dict(self, state_dict: dict):
         items = [self.prefix + "." + x for x in
@@ -207,8 +162,6 @@ class LoRAModule(PeftBase):
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, layer_kwargs: dict = {}):
         super(LoRAModule, self).__init__(prefix, orig_module, layer_kwargs)
 
-        self.prefix = prefix.replace('.', '_')
-        self.orig_module = orig_module
         self.rank = rank
         self.alpha = torch.tensor(alpha)
         self.dropout = Dropout(0)
@@ -216,8 +169,6 @@ class LoRAModule(PeftBase):
             self.initialize_weights()
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
-
-        self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
 
     def initialize_weights(self):
         assert self.orig_module
@@ -249,19 +200,6 @@ class LoRAModule(PeftBase):
             return self.orig_forward(x) + ld * (self.alpha / self.rank)
 
         return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
-
-    def requires_grad_(self, requires_grad: bool):
-        self.lora_down.requires_grad_(requires_grad)
-        self.lora_up.requires_grad_(requires_grad)
-
-    def to(self, device: torch.device|None = None, dtype: torch.dtype|None = None) -> 'LoRAModule':
-        self.lora_down.to(device, dtype)
-        self.lora_up.to(device, dtype)
-        self.alpha = self.alpha.to(device, dtype)
-        return self
-
-    def parameters(self) -> list[Parameter]:
-        return list(self.lora_down.parameters()) + list(self.lora_up.parameters())
 
     def load_state_dict(self, state_dict: dict):
         if self.prefix + ".lora_down.weight" in state_dict:
@@ -305,15 +243,6 @@ class DummyLoRAModule(LoRAModule):
         self.lora_up = None
 
         self.save_state_dict = {}
-
-    def requires_grad_(self, requires_grad: bool):
-        pass
-
-    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModule':
-        pass
-
-    def parameters(self) -> list[Parameter]:
-        return []
 
     def load_state_dict(self, state_dict: dict):
         self.save_state_dict = {
