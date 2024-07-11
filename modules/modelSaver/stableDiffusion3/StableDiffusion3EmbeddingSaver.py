@@ -26,9 +26,12 @@ class StableDiffusion3EmbeddingSaver:
             text_encoder_2_vector_cpu = embedding_state[1]
             text_encoder_3_vector_cpu = embedding_state[2]
         else:
-            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype)
-            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype)
-            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype)
+            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_1_vector is not None else None
+            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_2_vector is not None else None
+            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_3_vector is not None else None
 
         torch.save(
             {
@@ -53,9 +56,12 @@ class StableDiffusion3EmbeddingSaver:
             text_encoder_2_vector_cpu = embedding_state[1]
             text_encoder_3_vector_cpu = embedding_state[2]
         else:
-            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype)
-            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype)
-            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype)
+            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_1_vector is not None else None
+            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_2_vector is not None else None
+            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_3_vector is not None else None
 
         save_file(
             {

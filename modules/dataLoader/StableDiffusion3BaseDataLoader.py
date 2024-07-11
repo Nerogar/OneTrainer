@@ -263,13 +263,13 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if not config.text_encoder.train and not config.train_any_embedding() and model.text_encoder_1:
+        if not config.text_encoder.train and model.text_encoder_1:
             modules.append(encode_prompt_1)
 
-        if not config.text_encoder_2.train and not config.train_any_embedding() and model.text_encoder_2:
+        if not config.text_encoder_2.train and model.text_encoder_2:
             modules.append(encode_prompt_2)
 
-        if not config.text_encoder_3.train and not config.train_any_embedding() and model.text_encoder_3:
+        if not config.text_encoder_3.train and model.text_encoder_3:
             modules.append(encode_prompt_3)
 
         return modules
@@ -295,17 +295,17 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             'concept'
         ]
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.text_encoder.train:
             text_split_names.append('tokens_1')
             text_split_names.append('text_encoder_1_hidden_state')
             text_split_names.append('text_encoder_1_pooled_state')
 
-        if not config.text_encoder_2.train and not config.train_any_embedding():
+        if not config.text_encoder_2.train:
             text_split_names.append('tokens_2')
             text_split_names.append('text_encoder_2_hidden_state')
             text_split_names.append('text_encoder_2_pooled_state')
 
-        if not config.text_encoder_3.train and not config.train_any_embedding():
+        if not config.text_encoder_3.train:
             text_split_names.append('tokens_3')
             text_split_names.append('text_encoder_3_hidden_state')
 
@@ -321,13 +321,13 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         def before_cache_text_fun():
             model.to(self.temp_device)
 
-            if not config.text_encoder.train and not config.train_any_embedding():
+            if not config.text_encoder.train :
                 model.text_encoder_1_to(self.train_device)
 
-            if not config.text_encoder_2.train and not config.train_any_embedding():
+            if not config.text_encoder_2.train:
                 model.text_encoder_2_to(self.train_device)
 
-            if not config.text_encoder_3.train and not config.train_any_embedding():
+            if not config.text_encoder_3.train:
                 model.text_encoder_3_to(self.train_device)
 
             model.eval()
@@ -346,7 +346,7 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if (not config.text_encoder.train or not config.text_encoder_2.train or not config.text_encoder_3.train) and not config.train_any_embedding():
+            if not config.text_encoder.train or not config.text_encoder_2.train or not config.text_encoder_3.train:
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -369,15 +369,15 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.text_encoder.train:
             output_names.append('text_encoder_1_hidden_state')
             output_names.append('text_encoder_1_pooled_state')
 
-        if not config.text_encoder_2.train and not config.train_any_embedding():
+        if not config.text_encoder_2.train:
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
 
-        if not config.text_encoder_3.train and not config.train_any_embedding():
+        if not config.text_encoder_3.train:
             output_names.append('text_encoder_3_hidden_state')
 
         sort_names = output_names + ['concept']

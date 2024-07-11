@@ -73,7 +73,7 @@ class BaseStableDiffusion3Setup(
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
             if model.text_encoder_2 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
-            if model.text_encoder_3 is not None and config.text_encoder_3.train or config.train_any_embedding():
+            if model.text_encoder_3 is not None and config.text_encoder_3.train:
                 enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, self.train_device)
 
         if config.force_circular_padding:
@@ -100,7 +100,7 @@ class BaseStableDiffusion3Setup(
                 [
                     config.weight_dtypes().text_encoder_3,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                    config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
+                    config.weight_dtypes().embedding if config.train_any_embedding() else None,
                 ],
                 config.enable_autocast_cache,
             )
@@ -462,20 +462,15 @@ class BaseStableDiffusion3Setup(
                 tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
                 tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,
                 text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
-                    if 'text_encoder_1_hidden_state' in batch \
-                       and not config.text_encoder.train and not config.train_any_embedding() else None,
+                    if 'text_encoder_1_hidden_state' in batch and not config.text_encoder.train else None,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
-                    if 'text_encoder_1_pooled_state' in batch and not config.text_encoder.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_1_pooled_state' in batch and not config.text_encoder.train else None,
                 text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
-                    if 'text_encoder_2_hidden_state' in batch and not config.text_encoder_2.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_2_hidden_state' in batch and not config.text_encoder_2.train else None,
                 pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
-                    if 'text_encoder_2_pooled_state' in batch and not config.text_encoder_2.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_2_pooled_state' in batch and not config.text_encoder_2.train else None,
                 text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
-                    if 'text_encoder_3_hidden_state' in batch and not config.text_encoder_3.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_3_hidden_state' in batch and not config.text_encoder_3.train else None,
             )
 
             latent_image = batch['latent_image']

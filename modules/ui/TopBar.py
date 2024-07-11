@@ -107,7 +107,7 @@ class TopBar:
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
-                # ("Embedding", TrainingMethod.EMBEDDING),  # TODO: enable once embedding training is supported
+                ("Embedding", TrainingMethod.EMBEDDING),
             ]
         elif self.train_config.model_type.is_stable_diffusion_xl():
             values = [
