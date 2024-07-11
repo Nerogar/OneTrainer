@@ -1,6 +1,6 @@
 import math
 from abc import ABCMeta, abstractmethod
-from typing import Any, Callable, cast, no_type_check
+from typing import Any, Callable, Mapping, cast, no_type_check
 
 import torch
 import torch.nn.functional as F
@@ -20,7 +20,7 @@ class PeftBase(nn.Module):
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, layer_kwargs: dict = {}):
         super().__init__()
-        self.prefix = prefix.replace('.', '_')
+        self.prefix = prefix.replace('.', '_') + '.'
         self._orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = layer_kwargs
@@ -52,6 +52,11 @@ class PeftBase(nn.Module):
         assert self._orig_module
         return self._orig_module[0]
 
+    def load_state_dict(self, state_dict: Mapping[str, Any],
+                        strict: bool = True, assign: bool = False):
+        state_dict = {k.removeprefix(self.prefix): v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
+        return super().load_state_dict(state_dict, strict, assign)
+
     @abstractmethod
     def initialize_weights(self):
         pass
@@ -71,14 +76,13 @@ class LoHaModule(PeftBase):
     w1u: Parameter
     w2d: Parameter
     w2u: Parameter
-    alpha: Tensor
     dropout: Dropout
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, layer_kwargs: dict = {}):
         super().__init__(prefix, orig_module, layer_kwargs)
         self.rank = rank
-        self.alpha = torch.tensor(alpha)
         self.dropout = Dropout(0)
+        self.register_buffer("alpha", torch.tensor(alpha))
 
         if orig_module is not None:
             self.initialize_weights()
@@ -115,25 +119,25 @@ class LoHaModule(PeftBase):
             (self.alpha / self.rank)
 
     def load_state_dict(self, state_dict: dict):
-        items = [self.prefix + "." + x for x in
+        items = [self.prefix + x for x in
                  ["hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"]]
         if any(x in state_dict for x in items) and not \
            all(x in state_dict for x in items):
             raise ValueError("LoHa layer %s is missing pieces." % self.prefix)
 
-        self.w1d = state_dict.pop(self.prefix + ".hada_w1_a")
-        self.w1u = state_dict.pop(self.prefix + ".hada_w1_b")
-        self.w2d = state_dict.pop(self.prefix + ".hada_w2_a")
-        self.w2u = state_dict.pop(self.prefix + ".hada_w2_b")
-        self.alpha = state_dict.pop(self.prefix + ".alpha")
+        self.w1d = state_dict.pop(self.prefix + "hada_w1_a")
+        self.w1u = state_dict.pop(self.prefix + "hada_w1_b")
+        self.w2d = state_dict.pop(self.prefix + "hada_w2_a")
+        self.w2u = state_dict.pop(self.prefix + "hada_w2_b")
+        self.alpha = state_dict.pop(self.prefix + "alpha")
 
     def state_dict(self) -> dict:
         state_dict = {}
-        state_dict[self.prefix + ".hada_w1_a"] = self.w1d
-        state_dict[self.prefix + ".hada_w1_b"] = self.w1u
-        state_dict[self.prefix + ".hada_w2_a"] = self.w2d
-        state_dict[self.prefix + ".hada_w2_b"] = self.w2u
-        state_dict[self.prefix + ".alpha"] = self.alpha
+        state_dict[self.prefix + "hada_w1_a"] = self.w1d
+        state_dict[self.prefix + "hada_w1_b"] = self.w1u
+        state_dict[self.prefix + "hada_w2_a"] = self.w2d
+        state_dict[self.prefix + "hada_w2_b"] = self.w2u
+        state_dict[self.prefix + "alpha"] = self.alpha
         return state_dict
 
     def modules(self) -> list[nn.Module]:
@@ -162,8 +166,9 @@ class LoRAModule(PeftBase):
         super(LoRAModule, self).__init__(prefix, orig_module, layer_kwargs)
 
         self.rank = rank
-        self.alpha = torch.tensor(alpha)
         self.dropout = Dropout(0)
+        self.register_buffer("alpha", torch.tensor(alpha))
+
         if orig_module is not None:
             self.initialize_weights()
             self.alpha = self.alpha.to(orig_module.weight.device)
@@ -197,29 +202,6 @@ class LoRAModule(PeftBase):
 
         return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
 
-    def load_state_dict(self, state_dict: dict):
-        if self.prefix + ".lora_down.weight" in state_dict:
-            down_state_dict = {
-                "weight": state_dict.pop(self.prefix + ".lora_down.weight")
-            }
-            self.lora_down.load_state_dict(down_state_dict, strict=False)
-
-        if self.prefix + ".lora_up.weight" in state_dict:
-            up_state_dict = {
-                "weight": state_dict.pop(self.prefix + ".lora_up.weight")
-            }
-            self.lora_up.load_state_dict(up_state_dict, strict=False)
-
-        if self.prefix + ".alpha" in state_dict:
-            self.alpha = state_dict.pop(self.prefix + ".alpha")
-
-    def state_dict(self) -> dict:
-        state_dict = {}
-        state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
-        state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
-        state_dict[self.prefix + ".alpha"] = self.alpha
-        return state_dict
-
     def apply_to_module(self):
         # TODO
         pass
@@ -240,12 +222,12 @@ class DummyLoRAModule(LoRAModule):
 
     def load_state_dict(self, state_dict: dict):
         self.save_state_dict = {
-            self.prefix + ".lora_down.weight": state_dict.pop(self.prefix + ".lora_down.weight"),
-            self.prefix + ".lora_up.weight": state_dict.pop(self.prefix + ".lora_up.weight"),
-            self.prefix + ".alpha": state_dict.pop(self.prefix + ".alpha"),
+            self.prefix + "lora_down.weight": state_dict.pop(self.prefix + "lora_down.weight"),
+            self.prefix + "lora_up.weight": state_dict.pop(self.prefix + "lora_up.weight"),
+            self.prefix + "alpha": state_dict.pop(self.prefix + "alpha"),
         }
 
-    def state_dict(self) -> dict:
+    def state_dict(self, prefix='') -> dict:
         return self.save_state_dict
 
     def modules(self) -> list[nn.Module]:
@@ -327,8 +309,10 @@ class LoRAModuleWrapper:
         for name, module in self.lora_modules.items():
             module.load_state_dict(state_dict)
 
+        # Temporarily re-create the state dict, so we can see what keys were left.
+        remaining_names = set(state_dict) - set(self.state_dict())
+
         # create dummy modules for the remaining keys
-        remaining_names = list(state_dict.keys())
         for name in remaining_names:
             if name.endswith(".alpha"):
                 prefix = name.removesuffix(".alpha")
@@ -343,7 +327,7 @@ class LoRAModuleWrapper:
         state_dict = {}
 
         for name, module in self.lora_modules.items():
-            state_dict |= module.state_dict()
+            state_dict |= module.state_dict(prefix=module.prefix)
 
         return state_dict
 
