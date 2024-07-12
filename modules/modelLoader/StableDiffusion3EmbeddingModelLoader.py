@@ -37,7 +37,7 @@ class StableDiffusion3EmbeddingModelLoader(
         embedding_loader = StableDiffusion3EmbeddingLoader()
 
         model = StableDiffusion3Model(model_type=model_type)
-        self._load_internal_data(model, model_names.lora)
+        self._load_internal_data(model, model_names.embedding.model_name)
         model.model_spec = self._load_default_model_spec(model_type)
 
         if model_names.base_model is not None:
