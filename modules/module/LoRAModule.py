@@ -186,8 +186,11 @@ class LoRAModule(PeftBase):
             case nn.Conv2d():
                 in_channels = self.orig_module.in_channels
                 out_channels = self.orig_module.out_channels
-                self.lora_down = Conv2d(in_channels, self.rank, (1, 1), bias=False, device=device, **self.layer_kwargs)
-                self.lora_up = Conv2d(self.rank, out_channels, (1, 1), bias=False, device=device, **self.layer_kwargs)
+                kernel_size = self.orig_module.kernel_size
+                stride = self.orig_module.stride
+                padding = self.orig_module.padding
+                self.lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, bias=False, device=device, **self.layer_kwargs)
+                self.lora_up = Conv2d(self.rank, out_channels, (1, 1), 1, bias=False, device=device, **self.layer_kwargs)
 
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
