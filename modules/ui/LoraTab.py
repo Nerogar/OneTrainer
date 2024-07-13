@@ -61,10 +61,11 @@ class LoraTab:
         # lora model name
         components.label(master, 0, 0, "LoRA base model",
                          tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.file_entry(
+        entry = components.file_entry(
             master, 0, 1, self.ui_state, "lora_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
+        entry.grid(row=0, column=1, columnspan=4)
 
         # lora rank
         components.label(master, 1, 0, "LoRA rank",
