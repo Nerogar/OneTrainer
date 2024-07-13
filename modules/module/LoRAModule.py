@@ -1,3 +1,4 @@
+import copy
 import math
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Mapping, cast, no_type_check
@@ -68,6 +69,41 @@ class PeftBase(nn.Module):
     @abstractmethod
     def extract_from_module(self, base_module: nn.Module):
         pass
+
+    @classmethod
+    def make_dummy(cls):
+        """Create a dummy version of a PEFT class.
+
+        Acts identically to one of the above regular PEFT modules, but doesn't
+        actually train or hook to the module at all. Generally used to hold
+        extra keys that aren't specified in the training configuration.
+        """
+        class Dummy(cls):
+            def forward(self, *args, **kwargs):
+                assert self.orig_module
+                return PeftBase.forward(self, *args, **kwargs)
+
+            def load_state_dict(self, state_dict: Mapping[str, Any],
+                                strict: bool = True, assign: bool = False):
+                self._state_dict = copy.deepcopy(state_dict)
+                return nn.modules.module._IncompatibleKeys([], [])
+
+            def state_dict(self, *args, **kwargs):  # type: ignore
+                return self._state_dict
+
+            def hook_to_module(self):
+                pass
+
+            def remove_hook_from_module(self):
+                pass
+
+            def apply_to_module(self):
+                pass
+
+            def extract_from_module(self, base_module: nn.Module):
+                pass
+
+        return Dummy
 
 
 # TODO(surgo): Tucker decomposition, scalar.
@@ -214,44 +250,13 @@ class LoRAModule(PeftBase):
         pass
 
 
-@no_type_check
-class DummyLoRAModule(LoRAModule):
-    def __init__(self, prefix: str):
-        super(DummyLoRAModule, self).__init__(prefix, None, 1, 1)
-        self.lora_down = None
-        self.lora_up = None
-
-        self.save_state_dict = {}
-
-    def load_state_dict(self, state_dict: dict):
-        self.save_state_dict = {
-            self.prefix + "lora_down.weight": state_dict.pop(self.prefix + "lora_down.weight"),
-            self.prefix + "lora_up.weight": state_dict.pop(self.prefix + "lora_up.weight"),
-            self.prefix + "alpha": state_dict.pop(self.prefix + "alpha"),
-        }
-
-    def state_dict(self, prefix='') -> dict:
-        return self.save_state_dict
-
-    def modules(self) -> list[nn.Module]:
-        return []
-
-    def hook_to_module(self):
-        pass
-
-    def remove_hook_from_module(self):
-        pass
-
-    def apply_to_module(self):
-        pass
-
-    def extract_from_module(self, base_module: nn.Module):
-        pass
+DummyLoRAModule = LoRAModule.make_dummy()
 
 
 class LoRAModuleWrapper:
     orig_module: nn.Module
     rank: int
+    alpha: float
 
     lora_modules: dict[str, LoRAModule]
 
@@ -266,6 +271,7 @@ class LoRAModuleWrapper:
         super(LoRAModuleWrapper, self).__init__()
         self.orig_module = orig_module
         self.rank = rank
+        self.alpha = alpha
         self.prefix = prefix
         self.module_filter = module_filter if module_filter is not None else []
 
@@ -322,7 +328,7 @@ class LoRAModuleWrapper:
         for name in remaining_names:
             if name.endswith(".alpha"):
                 prefix = name.removesuffix(".alpha")
-                module = DummyLoRAModule(prefix)
+                module = DummyLoRAModule(prefix, None, self.rank, self.alpha)
                 module.load_state_dict(state_dict)
                 self.lora_modules[prefix] = module
 
