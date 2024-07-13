@@ -55,35 +55,38 @@ class StableDiffusion3FineTuneSetup(
             ))
 
         if config.train_any_embedding():
-            for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
-                                                    model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_1.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_1/{name}",
-                    display_name=f"embeddings_1/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
+                                                        model.embedding_wrapper_1.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_1.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_1/{name}",
+                        display_name=f"embeddings_1/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
-            for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
-                                                    model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_2.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_2/{name}",
-                    display_name=f"embeddings_2/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder_2.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
+                                                        model.embedding_wrapper_2.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_2.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_2/{name}",
+                        display_name=f"embeddings_2/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
-            for parameter, placeholder, name in zip(model.embedding_wrapper_3.additional_embeddings,
-                                                    model.embedding_wrapper_3.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_3.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_3/{name}",
-                    display_name=f"embeddings_3/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder_3.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_3.additional_embeddings,
+                                                        model.embedding_wrapper_3.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_3.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_3/{name}",
+                        display_name=f"embeddings_3/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
         if config.prior.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -117,15 +120,24 @@ class StableDiffusion3FineTuneSetup(
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-
-            if embedding.text_encoder_1_vector is not None:
-                embedding.text_encoder_1_vector.requires_grad_(train_embedding)
-            if embedding.text_encoder_2_vector is not None:
-                embedding.text_encoder_2_vector.requires_grad_(train_embedding)
-            if embedding.text_encoder_3_vector is not None:
-                embedding.text_encoder_3_vector.requires_grad_(train_embedding)
+            if model.text_encoder_1 is not None:
+                train_embedding_1 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                embedding.text_encoder_1_vector.requires_grad_(train_embedding_1)
+            if model.text_encoder_2 is not None:
+                train_embedding_2 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                embedding.text_encoder_2_vector.requires_grad_(train_embedding_2)
+            if model.text_encoder_3 is not None:
+                train_embedding_3 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                embedding.text_encoder_3_vector.requires_grad_(train_embedding_3)
 
         train_transformer = config.prior.train and \
                      not self.stop_prior_training_elapsed(config, model.train_progress)
@@ -164,20 +176,17 @@ class StableDiffusion3FineTuneSetup(
     ):
         vae_on_train_device = config.align_prop or not config.latent_caching
         text_encoder_1_on_train_device = \
-            config.text_encoder.train \
-            or config.train_any_embedding() \
+            config.train_text_encoder_or_embedding() \
             or config.align_prop \
             or not config.latent_caching
 
         text_encoder_2_on_train_device = \
-            config.text_encoder_2.train \
-            or config.train_any_embedding() \
+            config.train_text_encoder_2_or_embedding() \
             or config.align_prop \
             or not config.latent_caching
 
         text_encoder_3_on_train_device = \
-            config.text_encoder_3.train \
-            or config.train_any_embedding() \
+            config.train_text_encoder_3_or_embedding() \
             or config.align_prop \
             or not config.latent_caching
 

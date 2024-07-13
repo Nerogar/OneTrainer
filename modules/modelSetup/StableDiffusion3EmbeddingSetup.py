@@ -30,7 +30,7 @@ class StableDiffusion3EmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
+        if config.text_encoder.train_embedding:
             for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
                                                     model.embedding_wrapper_1.additional_embedding_placeholders,
                                                     model.embedding_wrapper_1.additional_embedding_names):
@@ -41,7 +41,7 @@ class StableDiffusion3EmbeddingSetup(
                     learning_rate=config.embedding_learning_rate,
                 ))
 
-        if config.text_encoder_2.train:
+        if config.text_encoder_2.train_embedding:
             for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
                                                     model.embedding_wrapper_2.additional_embedding_placeholders,
                                                     model.embedding_wrapper_2.additional_embedding_names):
@@ -52,7 +52,7 @@ class StableDiffusion3EmbeddingSetup(
                     learning_rate=config.embedding_learning_rate,
                 ))
 
-        if config.text_encoder_3.train:
+        if config.text_encoder_3.train_embedding:
             for parameter, placeholder, name in zip(model.embedding_wrapper_3.additional_embeddings,
                                                     model.embedding_wrapper_3.additional_embedding_placeholders,
                                                     model.embedding_wrapper_3.additional_embedding_names):
@@ -80,20 +80,32 @@ class StableDiffusion3EmbeddingSetup(
         model.transformer.requires_grad_(False)
 
         if model.text_encoder_1 is not None:
-            model.embedding.text_encoder_1_vector.requires_grad_(config.text_encoder.train)
+            model.embedding.text_encoder_1_vector.requires_grad_(config.text_encoder.train_embedding)
         if model.text_encoder_2 is not None:
-            model.embedding.text_encoder_2_vector.requires_grad_(config.text_encoder_2.train)
+            model.embedding.text_encoder_2_vector.requires_grad_(config.text_encoder_2.train_embedding)
         if model.text_encoder_3 is not None:
-            model.embedding.text_encoder_3_vector.requires_grad_(config.text_encoder_3.train)
+            model.embedding.text_encoder_3_vector.requires_grad_(config.text_encoder_3.train_embedding)
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
-            train_embedding = \
-                embedding_config.train \
-                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.text_encoder_1_vector.requires_grad_(train_embedding)
-            embedding.text_encoder_2_vector.requires_grad_(train_embedding)
-            embedding.text_encoder_3_vector.requires_grad_(train_embedding)
+            if model.text_encoder_1 is not None:
+                train_embedding_1 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                embedding.text_encoder_1_vector.requires_grad_(train_embedding_1)
+            if model.text_encoder_2 is not None:
+                train_embedding_2 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                embedding.text_encoder_2_vector.requires_grad_(train_embedding_2)
+            if model.text_encoder_3 is not None:
+                train_embedding_3 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+                embedding.text_encoder_3_vector.requires_grad_(train_embedding_3)
 
     def setup_model(
             self,
@@ -126,9 +138,9 @@ class StableDiffusion3EmbeddingSetup(
     ):
         vae_on_train_device = config.align_prop or not config.latent_caching
 
-        model.text_encoder_1_to(self.train_device if config.text_encoder.train else self.temp_device)
-        model.text_encoder_2_to(self.train_device if config.text_encoder_2.train else self.temp_device)
-        model.text_encoder_3_to(self.train_device if config.text_encoder_3.train else self.temp_device)
+        model.text_encoder_1_to(self.train_device if config.text_encoder.train_embedding else self.temp_device)
+        model.text_encoder_2_to(self.train_device if config.text_encoder_2.train_embedding else self.temp_device)
+        model.text_encoder_3_to(self.train_device if config.text_encoder_3.train_embedding else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
@@ -148,7 +160,10 @@ class StableDiffusion3EmbeddingSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
-            model.embedding_wrapper_1.normalize_embeddings()
-            model.embedding_wrapper_2.normalize_embeddings()
-            model.embedding_wrapper_3.normalize_embeddings()
+            if model.embedding_wrapper_1 is not None:
+                model.embedding_wrapper_1.normalize_embeddings()
+            if model.embedding_wrapper_2 is not None:
+                model.embedding_wrapper_2.normalize_embeddings()
+            if model.embedding_wrapper_3 is not None:
+                model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)

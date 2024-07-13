@@ -143,6 +143,7 @@ class TrainModelPartConfig(BaseConfig):
     learning_rate: float
     weight_dtype: DataType
     dropout_probability: float
+    train_embedding: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainModelPartConfig, self).__init__(data)
@@ -160,6 +161,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("learning_rate", None, float, True))
         data.append(("weight_dtype", DataType.NONE, DataType, False))
         data.append(("dropout_probability", 0.0, float, False))
+        data.append(("train_embedding", True, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -518,6 +520,18 @@ class TrainConfig(BaseConfig):
     def train_any_embedding(self) -> bool:
         return self.training_method == TrainingMethod.EMBEDDING \
             or any(embedding.train for embedding in self.additional_embeddings)
+
+    def train_text_encoder_or_embedding(self) -> bool:
+        return (self.text_encoder.train and self.training_method != TrainingMethod.EMBEDDING) \
+            or (self.text_encoder.train_embedding and self.train_any_embedding())
+
+    def train_text_encoder_2_or_embedding(self) -> bool:
+        return (self.text_encoder_2.train and self.training_method != TrainingMethod.EMBEDDING) \
+            or (self.text_encoder_2.train_embedding and self.train_any_embedding())
+
+    def train_text_encoder_3_or_embedding(self) -> bool:
+        return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING) \
+            or (self.text_encoder_3.train_embedding and self.train_any_embedding())
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())

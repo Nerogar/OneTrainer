@@ -311,21 +311,26 @@ class TrainingTab:
                          tooltip="Enables training the text encoder model")
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
+        # train text encoder embedding
+        components.label(frame, 1, 0, "Train Text Encoder Embedding",
+                         tooltip="Enables training embeddings for the text encoder model")
+        components.switch(frame, 1, 1, self.ui_state, "text_encoder.train_embedding")
+
         # train text encoder epochs
-        components.label(frame, 1, 0, "Stop Training After",
+        components.label(frame, 2, 0, "Stop Training After",
                          tooltip="When to stop training the text encoder")
-        components.time_entry(frame, 1, 1, self.ui_state, "text_encoder.stop_training_after",
+        components.time_entry(frame, 2, 1, self.ui_state, "text_encoder.stop_training_after",
                               "text_encoder.stop_training_after_unit", supports_time_units=False)
 
         # text encoder learning rate
-        components.label(frame, 2, 0, "Text Encoder Learning Rate",
+        components.label(frame, 3, 0, "Text Encoder Learning Rate",
                          tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "text_encoder.learning_rate")
+        components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate")
 
         # text encoder layer skip (clip skip)
-        components.label(frame, 3, 0, "Clip Skip",
+        components.label(frame, 4, 0, "Clip Skip",
                          tooltip="The number of additional clip layers to skip. 0 = the model default")
-        components.entry(frame, 3, 1, self.ui_state, "text_encoder_layer_skip")
+        components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
 
     def __create_text_encoder_1_frame(self, master, row, supports_include: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -344,6 +349,12 @@ class TrainingTab:
         components.label(frame, row, 0, "Train Text Encoder 1",
                          tooltip="Enables training the text encoder 1 model")
         components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
+        row += 1
+
+        # train text encoder embedding
+        components.label(frame, row, 0, "Train Text Encoder 1 Embedding",
+                         tooltip="Enables training embeddings for the text encoder 1 model")
+        components.switch(frame, row, 1, self.ui_state, "text_encoder.train_embedding")
         row += 1
 
         if supports_include: # TODO: enable this for all models
@@ -391,6 +402,12 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "text_encoder_2.train")
         row += 1
 
+        # train text encoder embedding
+        components.label(frame, row, 0, "Train Text Encoder 2 Embedding",
+                         tooltip="Enables training embeddings for the text encoder 2 model")
+        components.switch(frame, row, 1, self.ui_state, "text_encoder_2.train_embedding")
+        row += 1
+
         if supports_include: # TODO: enable this for all models
             # dropout
             components.label(frame, row, 0, "Dropout Probability",
@@ -434,6 +451,12 @@ class TrainingTab:
         components.label(frame, row, 0, "Train Text Encoder 3",
                          tooltip="Enables training the text encoder 3 model")
         components.switch(frame, row, 1, self.ui_state, "text_encoder_3.train")
+        row += 1
+
+        # train text encoder embedding
+        components.label(frame, row, 0, "Train Text Encoder 3 Embedding",
+                         tooltip="Enables training embeddings for the text encoder 3 model")
+        components.switch(frame, row, 1, self.ui_state, "text_encoder_3.train_embedding")
         row += 1
 
         if supports_include: # TODO: enable this for all models
