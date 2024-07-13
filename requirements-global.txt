@@ -10,7 +10,7 @@ scipy==1.13.1; sys_platform != 'win32'
 # pytorch
 accelerate==0.30.1
 safetensors==0.4.3
-tensorboard==2.16.2
+tensorboard==2.17.0
 pytorch-lightning==2.2.5
 
 # stable diffusion
