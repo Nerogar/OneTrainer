@@ -310,7 +310,10 @@ class LoRAModuleWrapper:
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
         for name, module in self.lora_modules.items():
-            module.load_state_dict(state_dict)
+            try:
+                module.load_state_dict(state_dict)
+            except RuntimeError:
+                print(f"Missing key for {name}; initializing it to zero.")
 
         # Temporarily re-create the state dict, so we can see what keys were left.
         remaining_names = set(state_dict) - set(self.state_dict())
