@@ -24,7 +24,7 @@ pooch==1.8.1
 open-clip-torch==2.24.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@ae9019f#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@0ab2f97#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
