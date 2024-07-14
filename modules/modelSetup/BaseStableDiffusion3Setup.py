@@ -615,7 +615,6 @@ class BaseStableDiffusion3Setup(
                     scaled_latent_image,
                     latent_noise,
                     timestep_index,
-                    model.noise_scheduler.sigmas,
                     model.noise_scheduler.timesteps,
                 )
 
