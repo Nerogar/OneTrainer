@@ -237,12 +237,14 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=120)
         encode_prompt = EncodeT5Text(tokens_in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_autocast_context], dtype=model.text_encoder_train_dtype.torch_dtype())
 
-        modules = [rescale_image, encode_image, tokenize_prompt]
+        modules = [rescale_image, encode_image, image_sample, tokenize_prompt]
 
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -250,6 +252,7 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
+            modules.append(conditioning_image_sample)
 
         if not config.text_encoder.train and not config.train_any_embedding():
             modules.append(encode_prompt)
@@ -258,13 +261,13 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
 
 
     def _cache_modules(self, config: TrainConfig, model: PixArtAlphaModel):
-        image_split_names = ['latent_image_distribution']
+        image_split_names = ['latent_image']
 
         if config.masked_training or config.model_type.has_mask_input():
             image_split_names.append('latent_mask')
 
         if config.model_type.has_conditioning_image_input():
-            image_split_names.append('latent_conditioning_image_distribution')
+            image_split_names.append('latent_conditioning_image')
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
@@ -334,8 +337,6 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
             model.eval()
             torch_gc()
 
-        image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
-        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
             replace_probability=config.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions',
@@ -349,10 +350,7 @@ class PixArtAlphaBaseDataLoader(BaseDataLoader):
 
         output = OutputPipelineModule(names=output_names)
 
-        modules = [image_sample]
-
-        if config.model_type.has_conditioning_image_input():
-            modules.append(conditioning_image_sample)
+        modules = []
 
         if config.model_type.has_mask_input():
             modules.append(mask_remove)

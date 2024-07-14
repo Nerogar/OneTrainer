@@ -251,13 +251,15 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         downscale_depth = ScaleImage(in_name='depth', out_name='latent_depth', factor=0.125)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=model.tokenizer.model_max_length)
         encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
-        modules = [rescale_image, encode_image, tokenize_prompt]
+        modules = [rescale_image, encode_image, image_sample, tokenize_prompt]
 
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -265,6 +267,7 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
+            modules.append(conditioning_image_sample)
 
         if config.model_type.has_depth_input():
             modules.append(downscale_depth)
@@ -276,13 +279,13 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
 
 
     def _cache_modules(self, config: TrainConfig, model: StableDiffusionModel):
-        image_split_names = ['latent_image_distribution']
+        image_split_names = ['latent_image']
 
         if config.masked_training or config.model_type.has_mask_input():
             image_split_names.append('latent_mask')
 
         if config.model_type.has_conditioning_image_input():
-            image_split_names.append('latent_conditioning_image_distribution')
+            image_split_names.append('latent_conditioning_image')
 
         if config.model_type.has_depth_input():
             image_split_names.append('latent_depth')
@@ -358,8 +361,6 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
             model.eval()
             torch_gc()
 
-        image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
-        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
             replace_probability=config.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions',
@@ -374,10 +375,7 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
 
         output = OutputPipelineModule(names=output_names)
 
-        modules = [image_sample]
-
-        if config.model_type.has_conditioning_image_input():
-            modules.append(conditioning_image_sample)
+        modules = []
 
         if config.model_type.has_mask_input():
             modules.append(mask_remove)
