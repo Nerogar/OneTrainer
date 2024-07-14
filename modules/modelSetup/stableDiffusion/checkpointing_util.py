@@ -27,16 +27,19 @@ def create_checkpointed_forward(orig_module: nn.Module, device: torch.device) ->
             *args,
             **kwargs
     ):
-        dummy = torch.zeros((1,), device=device)
-        dummy.requires_grad_(True)
+        if torch.is_grad_enabled():
+            dummy = torch.zeros((1,), device=device)
+            dummy.requires_grad_(True)
 
-        return checkpoint(
-            custom_forward,
-            dummy,
-            *args,
-            **kwargs,
-            use_reentrant=False
-        )
+            return checkpoint(
+                custom_forward,
+                dummy,
+                *args,
+                **kwargs,
+                use_reentrant=False
+            )
+        else:
+            return custom_forward(None, *args, **kwargs)
 
     return forward
 

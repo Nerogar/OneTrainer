@@ -10,7 +10,7 @@ scipy==1.13.1; sys_platform != 'win32'
 # pytorch
 accelerate==0.30.1
 safetensors==0.4.3
-tensorboard==2.16.2
+tensorboard==2.17.0
 pytorch-lightning==2.2.5
 
 # stable diffusion
@@ -24,7 +24,7 @@ pooch==1.8.1
 open-clip-torch==2.24.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@ae9019f#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@5ea389a#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
