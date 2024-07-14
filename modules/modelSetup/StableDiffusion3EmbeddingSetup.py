@@ -30,7 +30,7 @@ class StableDiffusion3EmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train_embedding:
+        if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
             for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
                                                     model.embedding_wrapper_1.additional_embedding_placeholders,
                                                     model.embedding_wrapper_1.additional_embedding_names):
@@ -41,7 +41,7 @@ class StableDiffusion3EmbeddingSetup(
                     learning_rate=config.embedding_learning_rate,
                 ))
 
-        if config.text_encoder_2.train_embedding:
+        if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
             for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
                                                     model.embedding_wrapper_2.additional_embedding_placeholders,
                                                     model.embedding_wrapper_2.additional_embedding_names):
@@ -52,7 +52,7 @@ class StableDiffusion3EmbeddingSetup(
                     learning_rate=config.embedding_learning_rate,
                 ))
 
-        if config.text_encoder_3.train_embedding:
+        if config.text_encoder_3.train_embedding and model.text_encoder_3 is not None:
             for parameter, placeholder, name in zip(model.embedding_wrapper_3.additional_embeddings,
                                                     model.embedding_wrapper_3.additional_embedding_placeholders,
                                                     model.embedding_wrapper_3.additional_embedding_names):

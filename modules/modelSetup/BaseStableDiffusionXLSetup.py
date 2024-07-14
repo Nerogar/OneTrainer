@@ -282,11 +282,11 @@ class BaseStableDiffusionXLSetup(
                 tokens_1=batch['tokens_1'],
                 tokens_2=batch['tokens_2'],
                 text_encoder_1_output=batch[
-                    'text_encoder_1_hidden_state'] if not config.text_encoder.train and not config.train_any_embedding() else None,
+                    'text_encoder_1_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
                 text_encoder_2_output=batch[
-                    'text_encoder_2_hidden_state'] if not config.text_encoder_2.train and not config.train_any_embedding() else None,
+                    'text_encoder_2_hidden_state'] if not config.train_text_encoder_2_or_embedding() else None,
                 pooled_text_encoder_2_output=batch[
-                    'text_encoder_2_pooled_state'] if not config.text_encoder_2.train and not config.train_any_embedding() else None,
+                    'text_encoder_2_pooled_state'] if not config.train_text_encoder_2_or_embedding() else None,
             )
 
             latent_image = batch['latent_image']

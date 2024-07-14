@@ -311,11 +311,6 @@ class TrainingTab:
                          tooltip="Enables training the text encoder model")
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
-        # train text encoder embedding
-        components.label(frame, 1, 0, "Train Text Encoder Embedding",
-                         tooltip="Enables training embeddings for the text encoder model")
-        components.switch(frame, 1, 1, self.ui_state, "text_encoder.train_embedding")
-
         # train text encoder epochs
         components.label(frame, 2, 0, "Stop Training After",
                          tooltip="When to stop training the text encoder")
