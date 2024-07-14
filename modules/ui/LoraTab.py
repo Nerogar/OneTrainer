@@ -1,5 +1,3 @@
-import copy
-
 import customtkinter as ctk
 
 from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
@@ -71,6 +69,11 @@ class LoraTab:
         components.label(master, 1, 0, "LoRA rank",
                          tooltip="The rank parameter used when creating a new LoRA")
         components.entry(master, 1, 1, self.ui_state, "lora_rank")
+
+        # decomposition
+        components.label(master, 1, 3, "Decompose Weights",
+                         tooltip="Decompose LoRA Weights (aka, DoRA)")
+        components.switch(master, 1, 4, self.ui_state, "lora_decompose")
 
         # lora rank
         components.label(master, 2, 0, "LoRA alpha",
