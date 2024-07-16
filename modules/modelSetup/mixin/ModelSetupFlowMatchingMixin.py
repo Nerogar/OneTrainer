@@ -17,7 +17,7 @@ class ModelSetupFlowMatchingMixin(metaclass=ABCMeta):
             latent_noise: Tensor,
             timestep_index: Tensor,
             timesteps: Tensor,
-    ) -> tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor]:
         if self.__sigma is None:
             num_timesteps = timesteps.shape[-1]
             self.__timesteps = torch.arange(start=num_timesteps, end=0, step=-1, dtype=torch.int32, device=scaled_latent_image.device)
@@ -37,4 +37,4 @@ class ModelSetupFlowMatchingMixin(metaclass=ABCMeta):
         scaled_noisy_latent_image = latent_noise.to(dtype=sigmas.dtype) * sigmas \
                                     + scaled_latent_image.to(dtype=sigmas.dtype) * one_minus_sigmas
 
-        return scaled_noisy_latent_image.to(dtype=orig_dtype), timestep
+        return scaled_noisy_latent_image.to(dtype=orig_dtype), timestep, sigmas

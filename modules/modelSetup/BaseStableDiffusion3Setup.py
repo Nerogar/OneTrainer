@@ -611,7 +611,7 @@ class BaseStableDiffusion3Setup(
                     train_progress.global_step,
                 )
 
-                scaled_noisy_latent_image, timestep = self._add_noise_discrete(
+                scaled_noisy_latent_image, timestep, sigma = self._add_noise_discrete(
                     scaled_latent_image,
                     latent_noise,
                     timestep_index,
@@ -699,6 +699,8 @@ class BaseStableDiffusion3Setup(
                             "4-flow",
                             train_progress.global_step,
                         )
+
+                        predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
 
                         # predicted image
                         self._save_image(
