@@ -12,6 +12,7 @@ from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -588,17 +589,23 @@ class TrainingTab:
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
         components.entry(frame, 3, 1, self.ui_state, "max_noising_strength")
 
+        # timestep distribution
+        components.label(frame, 4, 0, "Timestep Distribution",
+                         tooltip="Selects the funktion to sample timesteps during training",
+                         wide_tooltip=True)
+        components.options(frame, 4, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution")
+
         # noising weight
-        components.label(frame, 4, 0, "Noising Weight",
+        components.label(frame, 5, 0, "Noising Weight",
                          tooltip="Controls the emphasis on certain noise levels during training. A value of 0 disables this feature, leading to a uniform distribution where all noise levels are equally likely. Positive values increase the likelihood of selecting higher noise levels at any particular training step (resulting in smoother, low-frequency details), while negative values favor lower noise levels (sharper, high-frequency details). Note that extreme values (like -10 or 10) create a strong emphasis, significantly changing the focus of training.\n\nThe distribution function is as follows for a noise strength from 0 to 1: chance(noise_strength) = 1 / (1 + exp(-noising_weight * (noise_strength - noising_bias)))",
                          wide_tooltip=True)
-        components.entry(frame, 4, 1, self.ui_state, "noising_weight")
+        components.entry(frame, 5, 1, self.ui_state, "noising_weight")
 
         # noising bias
-        components.label(frame, 5, 0, "Noising Bias",
+        components.label(frame, 6, 0, "Noising Bias",
                          tooltip="Adjusts the balance point in the noise level selection process. The setting ranges from 0 to 1. At 0.5, the selection is balanced, neither favoring lower nor higher noise levels. Lower values shift the distribution curve left towards training lower noise levels (fine details), while higher values shift the distribution towards high noise levels (low-frequency details or image composition).\n\nThe distribution function is as follows for a noise strength from 0 to 1: chance(noise_strength) = 1 / (1 + exp(-noising_weight * (noise_strength - noising_bias)))",
                          wide_tooltip=True)
-        components.entry(frame, 5, 1, self.ui_state, "noising_bias")
+        components.entry(frame, 6, 1, self.ui_state, "noising_bias")
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

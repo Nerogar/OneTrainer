@@ -355,12 +355,11 @@ class BasePixArtAlphaSetup(
                 }
             else:
                 timestep = self._get_timestep_discrete(
-                    model.noise_scheduler,
+                    model.noise_scheduler.config['num_train_timesteps'],
                     deterministic,
                     generator,
                     scaled_latent_image.shape[0],
                     config,
-                    train_progress.global_step,
                 )
 
                 scaled_noisy_latent_image = self._add_noise_discrete(

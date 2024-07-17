@@ -22,6 +22,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import default_device
 
@@ -270,8 +271,10 @@ class TrainConfig(BaseConfig):
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
     force_epsilon_prediction: bool
+    timestep_distribution: TimestepDistribution
     min_noising_strength: float
     max_noising_strength: float
+
     noising_weight: float
     noising_bias: float
 
@@ -354,11 +357,12 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=3,
+            config_version=4,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
                 2: self.__migration_2,
+                3: self.__migration_3,
             }
         )
 
@@ -482,6 +486,23 @@ class TrainConfig(BaseConfig):
         elif model_type.is_wuerstchen():
             migrated_data["loss_weight_fn"] = LossWeight.P2
             migrated_data["loss_weight_strength"] = 1.0
+
+        return migrated_data
+
+    def __migration_3(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        noising_weight = migrated_data.pop("noising_weight", 0.0)
+        noising_bias = migrated_data.pop("noising_bias", 0.5)
+
+        if noising_weight != 0:
+            migrated_data["timestep_distribution"] = TimestepDistribution.SIGMOID
+            migrated_data["noising_weight"] = noising_weight
+            migrated_data["noising_bias"] = noising_bias - 0.5
+        else:
+            migrated_data["timestep_distribution"] = TimestepDistribution.UNIFORM
+            migrated_data["noising_weight"] = 0.0
+            migrated_data["noising_bias"] = 0.0
 
         return migrated_data
 
@@ -644,6 +665,7 @@ class TrainConfig(BaseConfig):
         data.append(("force_epsilon_prediction", False, bool, False))
         data.append(("min_noising_strength", 0.0, float, False))
         data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
         data.append(("noising_weight", 0.0, float, False))
         data.append(("noising_bias", 0.5, float, False))
 

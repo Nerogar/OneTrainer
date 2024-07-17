@@ -1,17 +1,20 @@
+import math
 from abc import ABCMeta
 
 import numpy as np
 import torch
-from diffusers import DDIMScheduler, FlowMatchEulerDiscreteScheduler
 from torch import Tensor, Generator
 
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 
 class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
     def __init__(self):
         super(ModelSetupNoiseMixin, self).__init__()
+
+        self.__weights = None
 
     def _create_noise(
             self,
@@ -48,17 +51,25 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
     def _get_timestep_discrete(
             self,
-            noise_scheduler: DDIMScheduler | FlowMatchEulerDiscreteScheduler,
+            num_train_timesteps: int,
             deterministic: bool,
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
-            global_step: int,
     ) -> Tensor:
-        if not deterministic:
-            min_timestep = int(noise_scheduler.config['num_train_timesteps'] * config.min_noising_strength)
-            max_timestep = int(noise_scheduler.config['num_train_timesteps'] * config.max_noising_strength)
-            if config.noising_weight == 0:
+        if deterministic:
+            # -1 is for zero-based indexing
+            return torch.tensor(
+                int(num_train_timesteps * 0.5) - 1,
+                dtype=torch.long,
+                device=generator.device,
+            ).unsqueeze(0)
+        else:
+            min_timestep = int(num_train_timesteps * config.min_noising_strength)
+            max_timestep = int(num_train_timesteps * config.max_noising_strength)
+            num_timestep = max_timestep - min_timestep
+
+            if config.timestep_distribution == TimestepDistribution.UNIFORM:
                 return torch.randint(
                     low=min_timestep,
                     high=max_timestep,
@@ -66,20 +77,59 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     generator=generator,
                     device=generator.device,
                 ).long()
-            else:
-                rng = np.random.default_rng(global_step)
-                weights = np.linspace(0, 1, max_timestep - min_timestep)
-                weights = 1 / (1 + np.exp(-config.noising_weight * (weights - config.noising_bias))) # Sigmoid
-                weights /= np.sum(weights)
-                samples = rng.choice(np.arange(min_timestep, max_timestep), size=(batch_size,), p=weights)
-                return torch.tensor(samples, dtype=torch.long, device=generator.device)
-        else:
-            # -1 is for zero-based indexing
-            return torch.tensor(
-                int(noise_scheduler.config['num_train_timesteps'] * 0.5) - 1,
-                dtype=torch.long,
-                device=generator.device,
-            ).unsqueeze(0)
+            elif config.timestep_distribution == TimestepDistribution.SIGMOID:
+                if self.__weights is None:
+                    bias = config.noising_bias + 0.5
+                    weight = config.noising_weight
+
+                    weights = torch.linspace(0, 1, num_timestep)
+                    weights = 1 / (1 + torch.exp(-weight * (weights - bias)))  # Sigmoid
+                    self.__weights = weights
+
+                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
+                return samples.to(dtype=torch.long, device=generator.device)
+            elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:  ## multinomial implementation
+                if self.__weights is None:
+                    bias = config.noising_bias
+                    scale = config.noising_weight + 1.0
+
+                    weights = torch.linspace(0, 1, num_timestep)
+                    weights = \
+                        (1.0 / (scale * math.sqrt(2.0 * torch.pi))) \
+                        * (1.0 / (weights * (1.0 - weights))) \
+                        * torch.exp(
+                            -((torch.logit(weights) - bias) ** 2.0) / (2.0 * scale ** 2.0)
+                        )
+                    weights.nan_to_num_(0)
+                    self.__weights = weights
+
+                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
+                return samples.to(dtype=torch.long, device=generator.device)
+            elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
+                bias = config.noising_bias
+                scale = config.noising_weight + 1.0
+
+                normal = torch.normal(bias, scale, size=(batch_size,), generator=generator, device=generator.device)
+                logit_normal = normal.sigmoid()
+                return (logit_normal * num_timestep + min_timestep).int()
+            elif config.timestep_distribution == TimestepDistribution.HEAVY_TAIL:
+                scale = config.noising_weight
+
+                u = torch.rand(
+                    size=(batch_size,),
+                    generator=generator,
+                    device=generator.device,
+                )
+                u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
+                return (u * num_timestep + min_timestep).int()
+            elif config.timestep_distribution == TimestepDistribution.COS_MAP:
+                if self.__weights is None:
+                    weights = torch.linspace(0, 1, num_timestep)
+                    weights = 2.0 / (math.pi - 2.0 * math.pi * weights + 2.0 * math.pi * weights ** 2.0)
+                    self.__weights = weights
+
+                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
+                return samples.to(dtype=torch.long, device=generator.device)
 
     def _get_timestep_continuous(
             self,
@@ -87,26 +137,22 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
-            global_step: int,
     ) -> Tensor:
-        if not deterministic:
-            if config.noising_weight == 0:
-                return (1 - torch.rand(
-                    size=(batch_size,),
-                    generator=generator,
-                    device=generator.device,
-                )) * (config.max_noising_strength - config.min_noising_strength) + config.min_noising_strength
-            else:
-                rng = np.random.default_rng(global_step)
-                choices = np.linspace(np.finfo(float).eps, 1, 5000)  # Discretize range (0, 1]
-                weights = 1 / (1 + np.exp(-config.noising_weight * (choices - config.noising_bias)))  # Sigmoid
-                weights /= np.sum(weights)
-                samples = rng.choice(choices, size=(batch_size,), p=weights)
-                samples = samples * (config.max_noising_strength - config.min_noising_strength) + config.min_noising_strength
-                return torch.tensor(samples, dtype=torch.float, device=generator.device)
-        else:
+        if deterministic:
             return torch.full(
                 size=(batch_size,),
                 fill_value=0.5,
                 device=generator.device,
             )
+        else:
+            discrete_timesteps = 10000  # Discretize to 10000 timesteps
+            discrete = self._get_timestep_discrete(
+                num_train_timesteps=discrete_timesteps,
+                deterministic=False,
+                generator=generator,
+                batch_size=batch_size,
+                config=config,
+            ) + 1
+
+            continuous = (discrete.float() / discrete_timesteps)
+            return continuous
