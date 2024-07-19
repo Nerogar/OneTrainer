@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
+from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -579,33 +580,30 @@ class TrainingTab:
                          tooltip="The weight of perturbation noise added to each training step")
         components.entry(frame, 1, 1, self.ui_state, "perturbation_noise_weight")
 
+        # timestep distribution
+        components.label(frame, 2, 0, "Timestep Distribution",
+                         tooltip="Selects the function to sample timesteps during training",
+                         wide_tooltip=True)
+        components.options_adv(frame, 2, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution",
+                               adv_command=self.__open_timestep_distribution_window)
+
         # min noising strength
-        components.label(frame, 2, 0, "Min Noising Strength",
+        components.label(frame, 3, 0, "Min Noising Strength",
                          tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        components.entry(frame, 2, 1, self.ui_state, "min_noising_strength")
+        components.entry(frame, 3, 1, self.ui_state, "min_noising_strength")
 
         # max noising strength
-        components.label(frame, 3, 0, "Max Noising Strength",
+        components.label(frame, 4, 0, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(frame, 3, 1, self.ui_state, "max_noising_strength")
-
-        # timestep distribution
-        components.label(frame, 4, 0, "Timestep Distribution",
-                         tooltip="Selects the funktion to sample timesteps during training",
-                         wide_tooltip=True)
-        components.options(frame, 4, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution")
+        components.entry(frame, 4, 1, self.ui_state, "max_noising_strength")
 
         # noising weight
         components.label(frame, 5, 0, "Noising Weight",
-                         tooltip="Controls the emphasis on certain noise levels during training. A value of 0 disables this feature, leading to a uniform distribution where all noise levels are equally likely. Positive values increase the likelihood of selecting higher noise levels at any particular training step (resulting in smoother, low-frequency details), while negative values favor lower noise levels (sharper, high-frequency details). Note that extreme values (like -10 or 10) create a strong emphasis, significantly changing the focus of training.\n\nThe distribution function is as follows for a noise strength from 0 to 1: chance(noise_strength) = 1 / (1 + exp(-noising_weight * (noise_strength - noising_bias)))",
-                         wide_tooltip=True)
-        components.entry(frame, 5, 1, self.ui_state, "noising_weight")
+                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
 
         # noising bias
         components.label(frame, 6, 0, "Noising Bias",
-                         tooltip="Adjusts the balance point in the noise level selection process. The setting ranges from 0 to 1. At 0.5, the selection is balanced, neither favoring lower nor higher noise levels. Lower values shift the distribution curve left towards training lower noise levels (fine details), while higher values shift the distribution towards high noise levels (low-frequency details or image composition).\n\nThe distribution function is as follows for a noise strength from 0 to 1: chance(noise_strength) = 1 / (1 + exp(-noising_weight * (noise_strength - noising_bias)))",
-                         wide_tooltip=True)
-        components.entry(frame, 6, 1, self.ui_state, "noising_bias")
+                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -674,6 +672,10 @@ class TrainingTab:
 
     def __open_scheduler_params_window(self):
         window = SchedulerParamsWindow(self.master, self.train_config, self.ui_state)
+        self.master.wait_window(window)
+
+    def __open_timestep_distribution_window(self):
+        window = TimestepDistributionWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
     def __restore_optimizer_config(self, *args):
