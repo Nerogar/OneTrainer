@@ -2,7 +2,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu118
 torch==2.3.1+cu118
 torchvision==0.18.1+cu118
-onnxruntime-gpu==1.18.1
+onnxruntime-gpu==1.18.0
 
 # xformers
 xformers==0.0.27+cu118
