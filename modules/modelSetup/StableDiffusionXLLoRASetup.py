@@ -137,15 +137,15 @@ class StableDiffusionXLLoRASetup(
         create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
 
         model.text_encoder_1_lora = LoRAModuleWrapper(
-            model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha
+            model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha, config.lora_decompose
         ) if create_te1 else None
 
         model.text_encoder_2_lora = LoRAModuleWrapper(
-            model.text_encoder_2, config.lora_rank, "lora_te2", config.lora_alpha
+            model.text_encoder_2, config.lora_rank, "lora_te2", config.lora_alpha, config.lora_decompose
         ) if create_te2 else None
 
         model.unet_lora = LoRAModuleWrapper(
-            model.unet, config.lora_rank, "lora_unet", config.lora_alpha, config.lora_layers.split(",")
+            model.unet, config.lora_rank, "lora_unet", config.lora_alpha, config.lora_decompose, config.lora_layers.split(",")
         )
 
         if model.lora_state_dict:
