@@ -49,25 +49,27 @@ class StableDiffusionXLLoRASetup(
             ))
 
         if config.train_any_embedding():
-            for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
-                                                    model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_1.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_1/{name}",
-                    display_name=f"embeddings_1/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
+                                                        model.embedding_wrapper_1.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_1.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_1/{name}",
+                        display_name=f"embeddings_1/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
-            for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
-                                                    model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_2.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_2/{name}",
-                    display_name=f"embeddings_2/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder_2.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
+                                                        model.embedding_wrapper_2.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_2.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_2/{name}",
+                        display_name=f"embeddings_2/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -96,10 +98,18 @@ class StableDiffusionXLLoRASetup(
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.text_encoder_1_vector.requires_grad_(train_embedding)
-            embedding.text_encoder_2_vector.requires_grad_(train_embedding)
+
+            train_embedding_1 = \
+                embedding_config.train \
+                and config.text_encoder.train_embedding \
+                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.text_encoder_1_vector.requires_grad_(train_embedding_1)
+
+            train_embedding_2 = \
+                embedding_config.train \
+                and config.text_encoder_2.train_embedding \
+                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+            embedding.text_encoder_2_vector.requires_grad_(train_embedding_2)
 
         if model.text_encoder_2_lora is not None:
             train_text_encoder_2 = config.text_encoder_2.train and \
@@ -118,6 +128,7 @@ class StableDiffusionXLLoRASetup(
     ):
         create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
         create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
+
         model.text_encoder_1_lora = LoRAModuleWrapper(
             model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha
         ) if create_te1 else None
@@ -172,13 +183,11 @@ class StableDiffusionXLLoRASetup(
     ):
         vae_on_train_device = config.align_prop or not config.latent_caching
         text_encoder_1_on_train_device = \
-            config.text_encoder.train \
-            or config.train_any_embedding() \
+            config.train_text_encoder_or_embedding()\
             or config.align_prop \
             or not config.latent_caching
         text_encoder_2_on_train_device = \
-            config.text_encoder_2.train \
-            or config.train_any_embedding() \
+            config.train_text_encoder_2_or_embedding() \
             or config.align_prop \
             or not config.latent_caching
 

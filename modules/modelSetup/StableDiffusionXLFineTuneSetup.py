@@ -47,25 +47,27 @@ class StableDiffusionXLFineTuneSetup(
             ))
 
         if config.train_any_embedding():
-            for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
-                                                    model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_1.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_1/{name}",
-                    display_name=f"embeddings_1/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
+                                                        model.embedding_wrapper_1.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_1.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_1/{name}",
+                        display_name=f"embeddings_1/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
-            for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
-                                                    model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_2.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_2/{name}",
-                    display_name=f"embeddings_2/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            if config.text_encoder_2.train_embedding:
+                for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
+                                                        model.embedding_wrapper_2.additional_embedding_placeholders,
+                                                        model.embedding_wrapper_2.additional_embedding_names):
+                    parameter_group_collection.add_group(NamedParameterGroup(
+                        unique_name=f"embeddings_2/{name}",
+                        display_name=f"embeddings_2/{placeholder}",
+                        parameters=[parameter],
+                        learning_rate=config.embedding_learning_rate,
+                    ))
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
@@ -92,9 +94,18 @@ class StableDiffusionXLFineTuneSetup(
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+
+            train_embedding = \
+                embedding_config.train \
+                and config.text_encoder.train_embedding \
+                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
             embedding.text_encoder_1_vector.requires_grad_(train_embedding)
+
+            train_embedding = \
+                embedding_config.train \
+                and config.text_encoder_2.train_embedding \
+                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
+
             embedding.text_encoder_2_vector.requires_grad_(train_embedding)
 
         train_unet = config.unet.train and \

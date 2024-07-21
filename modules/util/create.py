@@ -19,6 +19,7 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.PixArtAlphaEmbeddingModelLoader import PixArtAlphaEmbeddingModelLoader
 from modules.modelLoader.PixArtAlphaFineTuneModelLoader import PixArtAlphaFineTuneModelLoader
 from modules.modelLoader.PixArtAlphaLoRAModelLoader import PixArtAlphaLoRAModelLoader
+from modules.modelLoader.StableDiffusion3EmbeddingModelLoader import StableDiffusion3EmbeddingModelLoader
 from modules.modelLoader.StableDiffusion3FineTuneModelLoader import StableDiffusion3FineTuneModelLoader
 from modules.modelLoader.StableDiffusion3LoRAModelLoader import StableDiffusion3LoRAModelLoader
 from modules.modelLoader.StableDiffusionEmbeddingModelLoader import StableDiffusionEmbeddingModelLoader
@@ -41,6 +42,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.PixArtAlphaEmbeddingModelSaver import PixArtAlphaEmbeddingModelSaver
 from modules.modelSaver.PixArtAlphaFineTuneModelSaver import PixArtAlphaFineTuneModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
+from modules.modelSaver.StableDiffusion3EmbeddingModelSaver import StableDiffusion3EmbeddingModelSaver
 from modules.modelSaver.StableDiffusion3FineTuneModelSaver import StableDiffusion3FineTuneModelSaver
 from modules.modelSaver.StableDiffusion3LoRAModelSaver import StableDiffusion3LoRAModelSaver
 from modules.modelSaver.StableDiffusionEmbeddingModelSaver import StableDiffusionEmbeddingModelSaver
@@ -56,6 +58,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
 from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.PixArtAlphaLoRASetup import PixArtAlphaLoRASetup
+from modules.modelSetup.StableDiffusion3EmbeddingSetup import StableDiffusion3EmbeddingSetup
 from modules.modelSetup.StableDiffusion3FineTuneSetup import StableDiffusion3FineTuneSetup
 from modules.modelSetup.StableDiffusion3LoRASetup import StableDiffusion3LoRASetup
 from modules.modelSetup.StableDiffusionEmbeddingSetup import StableDiffusionEmbeddingSetup
@@ -124,6 +127,8 @@ def create_model_loader(
                 return WuerstchenEmbeddingModelLoader()
             if model_type.is_pixart():
                 return PixArtAlphaEmbeddingModelLoader()
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3EmbeddingModelLoader()
 
 
 def create_model_saver(
@@ -165,6 +170,8 @@ def create_model_saver(
                 return WuerstchenEmbeddingModelSaver()
             if model_type.is_pixart():
                 return PixArtAlphaEmbeddingModelSaver()
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3EmbeddingModelSaver()
 
 
 def create_model_setup(
@@ -209,6 +216,8 @@ def create_model_setup(
                 return WuerstchenEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_pixart():
                 return PixArtAlphaEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_stable_diffusion_3():
+                return StableDiffusion3EmbeddingSetup(train_device, temp_device, debug_mode)
 
 
 def create_model_sampler(

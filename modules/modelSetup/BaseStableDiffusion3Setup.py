@@ -73,7 +73,7 @@ class BaseStableDiffusion3Setup(
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
             if model.text_encoder_2 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
-            if model.text_encoder_3 is not None and config.text_encoder_3.train or config.train_any_embedding():
+            if model.text_encoder_3 is not None and config.train_text_encoder_3_or_embedding():
                 enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, self.train_device)
 
         if config.force_circular_padding:
@@ -100,7 +100,7 @@ class BaseStableDiffusion3Setup(
                 [
                     config.weight_dtypes().text_encoder_3,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                    config.weight_dtypes().embedding if config.training_method == TrainingMethod.EMBEDDING else None,
+                    config.weight_dtypes().embedding if config.train_any_embedding() else None,
                 ],
                 config.enable_autocast_cache,
             )
@@ -403,13 +403,13 @@ class BaseStableDiffusion3Setup(
         # apply dropout
         dropout_text_encoder_1_mask = (torch.tensor(
             [rand.random() > config.text_encoder.dropout_probability for _ in range(batch_size)],
-            device = self.train_device)).float()
+            device=self.train_device)).float()
         dropout_text_encoder_2_mask = (torch.tensor(
             [rand.random() > config.text_encoder_2.dropout_probability for _ in range(batch_size)],
-            device = self.train_device)).float()
+            device=self.train_device)).float()
         dropout_text_encoder_3_mask = (torch.tensor(
             [rand.random() > config.text_encoder_3.dropout_probability for _ in range(batch_size)],
-            device = self.train_device)).float()
+            device=self.train_device)).float()
 
         text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
         text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
@@ -462,20 +462,15 @@ class BaseStableDiffusion3Setup(
                 tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
                 tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,
                 text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
-                    if 'text_encoder_1_hidden_state' in batch \
-                       and not config.text_encoder.train and not config.train_any_embedding() else None,
+                    if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
-                    if 'text_encoder_1_pooled_state' in batch and not config.text_encoder.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
-                    if 'text_encoder_2_hidden_state' in batch and not config.text_encoder_2.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
                 pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
-                    if 'text_encoder_2_pooled_state' in batch and not config.text_encoder_2.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
                 text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
-                    if 'text_encoder_3_hidden_state' in batch and not config.text_encoder_3.train \
-                       and not config.train_any_embedding() else None,
+                    if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
             )
 
             latent_image = batch['latent_image']
@@ -608,19 +603,17 @@ class BaseStableDiffusion3Setup(
                 }
             else:
                 timestep_index = self._get_timestep_discrete(
-                    model.noise_scheduler,
+                    model.noise_scheduler.config['num_train_timesteps'],
                     deterministic,
                     generator,
                     scaled_latent_image.shape[0],
                     config,
-                    train_progress.global_step,
                 )
 
-                scaled_noisy_latent_image, timestep = self._add_noise_discrete(
+                scaled_noisy_latent_image, timestep, sigma = self._add_noise_discrete(
                     scaled_latent_image,
                     latent_noise,
                     timestep_index,
-                    model.noise_scheduler.sigmas,
                     model.noise_scheduler.timesteps,
                 )
 
@@ -638,15 +631,13 @@ class BaseStableDiffusion3Setup(
                     pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     return_dict=True
                 ).sample
-                predicted_scaled_latent_image = self._add_model_precondition(
-                    predicted_flow, latent_input, timestep_index
-                )
 
+                flow = latent_noise - scaled_latent_image
                 model_output_data = {
                     'loss_type': 'target',
                     'timestep': timestep,
-                    'predicted': predicted_scaled_latent_image,
-                    'target': scaled_latent_image,
+                    'predicted': predicted_flow,
+                    'target': flow,
                 }
 
             if config.debug_mode:
@@ -707,6 +698,8 @@ class BaseStableDiffusion3Setup(
                             "4-flow",
                             train_progress.global_step,
                         )
+
+                        predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
 
                         # predicted image
                         self._save_image(
