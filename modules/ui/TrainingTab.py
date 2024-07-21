@@ -600,10 +600,13 @@ class TrainingTab:
         # noising weight
         components.label(frame, 5, 0, "Noising Weight",
                          tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
+        components.entry(frame, 5, 1, self.ui_state, "noising_weight")
 
         # noising bias
         components.label(frame, 6, 0, "Noising Bias",
                          tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
+        components.entry(frame, 6, 1, self.ui_state, "noising_bias")
+
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
