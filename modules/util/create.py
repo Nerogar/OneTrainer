@@ -747,7 +747,7 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding
             )
 
-    if state_dict is not None:
+    if state_dict is not None and optimizer is not None:
         if 'param_group_mapping' not in state_dict:
             # Old method of loading the optimizer state. This only works if the param groups did not change.
             for i, params in enumerate(parameters):
