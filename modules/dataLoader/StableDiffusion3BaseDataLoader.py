@@ -290,24 +290,27 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
 
         sort_names = image_aggregate_names + image_split_names + [
             'prompt',
-            'tokens_1', 'text_encoder_1_hidden_state', 'text_encoder_1_pooled_state',
-            'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
-            'tokens_3', 'text_encoder_3_hidden_state',
+            'tokens_1', 'tokens_mask_1', 'text_encoder_1_hidden_state', 'text_encoder_1_pooled_state',
+            'tokens_2', 'tokens_mask_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
+            'tokens_3', 'tokens_mask_3', 'text_encoder_3_hidden_state',
             'concept'
         ]
 
         if not config.train_text_encoder_or_embedding():
             text_split_names.append('tokens_1')
+            text_split_names.append('tokens_mask_1')
             text_split_names.append('text_encoder_1_hidden_state')
             text_split_names.append('text_encoder_1_pooled_state')
 
         if not config.train_text_encoder_2_or_embedding():
             text_split_names.append('tokens_2')
+            text_split_names.append('tokens_mask_2')
             text_split_names.append('text_encoder_2_hidden_state')
             text_split_names.append('text_encoder_2_pooled_state')
 
         if not config.train_text_encoder_3_or_embedding():
             text_split_names.append('tokens_3')
+            text_split_names.append('tokens_mask_3')
             text_split_names.append('text_encoder_3_hidden_state')
 
         image_cache_dir = os.path.join(config.cache_dir, "image")
@@ -361,6 +364,7 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         output_names = [
             'image_path', 'latent_image',
             'tokens_1', 'tokens_2', 'tokens_3',
+            'tokens_mask_1', 'tokens_mask_2', 'tokens_mask_3',
             'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
         ]
 

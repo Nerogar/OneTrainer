@@ -309,6 +309,9 @@ class BaseStableDiffusion3Setup(
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
             tokens_3: Tensor = None,
+            tokens_mask_1: Tensor = None,
+            tokens_mask_2: Tensor = None,
+            tokens_mask_3: Tensor = None,
             text_encoder_1_output: Tensor = None,
             pooled_text_encoder_1_output: Tensor = None,
             text_encoder_2_output: Tensor = None,
@@ -366,6 +369,11 @@ class BaseStableDiffusion3Setup(
                 device=self.train_device,
                 dtype=model.train_dtype.torch_dtype(),
             )
+            tokens_mask_1 = torch.zeros(
+                size=(batch_size, 1),
+                device=self.train_device,
+                dtype=model.train_dtype.torch_dtype(),
+            )
 
         if (text_encoder_2_output is None or pooled_text_encoder_2_output is None) \
                 and model.text_encoder_2 is not None:
@@ -385,6 +393,11 @@ class BaseStableDiffusion3Setup(
                 device=self.train_device,
                 dtype=model.train_dtype.torch_dtype(),
             )
+            tokens_mask_2 = torch.zeros(
+                size=(batch_size, 1),
+                device=self.train_device,
+                dtype=model.train_dtype.torch_dtype(),
+            )
 
         with model.text_encoder_3_autocast_context:
             if text_encoder_3_output is None \
@@ -396,6 +409,11 @@ class BaseStableDiffusion3Setup(
             if text_encoder_3_output is None:
                 text_encoder_3_output = torch.zeros(
                     size=(batch_size, 77, model.transformer.config.joint_attention_dim),
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype(),
+                )
+                tokens_mask_3 = torch.zeros(
+                    size=(batch_size, 1),
                     device=self.train_device,
                     dtype=model.train_dtype.torch_dtype(),
                 )
@@ -411,9 +429,9 @@ class BaseStableDiffusion3Setup(
             [rand.random() > config.text_encoder_3.dropout_probability for _ in range(batch_size)],
             device=self.train_device)).float()
 
-        text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
-        text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
-        text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
+        text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None] * tokens_mask_1[:, :, None]
+        text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None] * tokens_mask_2[:, :, None]
+        text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None] * tokens_mask_3[:, :, None]
 
         pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
         pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
@@ -461,6 +479,9 @@ class BaseStableDiffusion3Setup(
                 tokens_1=batch['tokens_1'] if 'tokens_1' in batch else None,
                 tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
                 tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,
+                tokens_mask_1=batch['tokens_mask_1'] if 'tokens_mask_1' in batch else None,
+                tokens_mask_2=batch['tokens_mask_2'] if 'tokens_mask_2' in batch else None,
+                tokens_mask_3=batch['tokens_mask_3'] if 'tokens_mask_3' in batch else None,
                 text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
                     if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \

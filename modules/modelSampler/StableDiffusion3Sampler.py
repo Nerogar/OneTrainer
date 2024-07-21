@@ -56,15 +56,17 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 return_tensors="pt",
             )
             tokens_1 = tokenizer_1_output.input_ids.to(self.train_device)
+            tokens_1_attention_mask = tokenizer_1_output.attention_mask.to(self.train_device)
 
             text_encoder_1_output = text_encoder_1(
                 tokens_1,
+                # attention_mask=tokens_1_attention_mask,
                 output_hidden_states=True,
                 return_dict=True,
             )
 
             pooled_text_encoder_1_output = text_encoder_1_output[0]
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)] * tokens_1_attention_mask[:, :, None]
         else:
             pooled_text_encoder_1_output = torch.zeros(
                 size=(1, 768),
@@ -86,15 +88,17 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_2_output.input_ids.to(self.train_device)
+            tokens_2_attention_mask = tokenizer_2_output.attention_mask.to(self.train_device)
 
             text_encoder_2_output = text_encoder_2(
                 tokens_2,
+                # attention_mask=tokens_2_attention_mask,
                 output_hidden_states=True,
                 return_dict=True,
             )
 
             pooled_text_encoder_2_output = text_encoder_2_output[0]
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)] * tokens_2_attention_mask[:, :, None]
         else:
             pooled_text_encoder_2_output = torch.zeros(
                 size=(1, 1280),
@@ -116,8 +120,9 @@ class StableDiffusion3Sampler(BaseModelSampler):
                     max_length=77,
                     return_tensors="pt")
                 tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
+                tokens_3_attention_mask = tokenizer_3_output.attention_mask.to(self.train_device)
 
-                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0]
+                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0] * tokens_3_attention_mask[:, :, None]
             else:
                 text_encoder_3_output = torch.zeros(
                     (1, 77, joint_attention_dim),
