@@ -3,6 +3,7 @@ import customtkinter as ctk
 from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
 from modules.modelSetup.StableDiffusionLoRASetup import PRESETS as sd_presets
 from modules.modelSetup.StableDiffusionXLLoRASetup import PRESETS as sdxl_presets
+from modules.modelSetup.StableDiffusion3LoRASetup import PRESETS as sd3_presets
 from modules.modelSetup.WuerstchenLoRASetup import PRESETS as sc_presets
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
@@ -38,6 +39,8 @@ class LoraTab:
             self.presets = sd_presets
         elif self.train_config.model_type.is_stable_diffusion_xl():
             self.presets = sdxl_presets
+        elif self.train_config.model_type.is_stable_diffusion_3():
+            self.presets = sd3_presets
         elif self.train_config.model_type.is_wuerstchen():
             self.presets = sc_presets
         elif self.train_config.model_type.is_pixart():

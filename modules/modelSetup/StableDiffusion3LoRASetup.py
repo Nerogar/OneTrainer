@@ -10,6 +10,11 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 
 
+PRESETS = {
+    "attn-only": ["attn"],
+}
+
+
 class StableDiffusion3LoRASetup(
     BaseStableDiffusion3Setup,
 ):
@@ -182,7 +187,7 @@ class StableDiffusion3LoRASetup(
             ) if create_te3 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, config.lora_decompose, ["attn"]
+            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, config.lora_decompose, config.lora_layers.split(",")
         )
 
         if model.lora_state_dict:
