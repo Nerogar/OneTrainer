@@ -30,10 +30,10 @@ class PeftBase(nn.Module):
             match orig_module:
                 case nn.Linear():
                     self.op = F.linear
-                    self.shape = (orig_module.out_features, orig_module.in_features)
+                    self.shape = orig_module.weight.shape
                 case nn.Conv2d():
                     self.op = F.conv2d
-                    self.shape = (orig_module.out_channels, orig_module.in_channels, *orig_module.kernel_size)
+                    self.shape = orig_module.weight.shape
                     self.layer_kwargs.setdefault("stride", orig_module.stride)
                     self.layer_kwargs.setdefault("padding", orig_module.padding)
                     self.layer_kwargs.setdefault("dilation", orig_module.dilation)
@@ -248,8 +248,14 @@ class LoRAModule(PeftBase):
                 kernel_size = self.orig_module.kernel_size
                 stride = self.orig_module.stride
                 padding = self.orig_module.padding
-                self.lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, bias=False, device=device)
-                self.lora_up = Conv2d(self.rank, out_channels, (1, 1), 1, bias=False, device=device)
+                dilation = self.orig_module.dilation
+                groups = self.orig_module.groups
+                self.lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, dilation=dilation, bias=False, device=device)
+                # Note: small departure here from part of the community.
+                # The original Mcrosoft repo does it this way. The cloneofsimo
+                # repo handles the groups in lora_down. We follow the Microsoft
+                # way. In reality, there shouldn't be any difference.
+                self.lora_up = Conv2d(self.rank, out_channels // groups, (1, 1), 1, bias=False, device=device)
 
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
