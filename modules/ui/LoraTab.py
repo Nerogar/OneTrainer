@@ -137,9 +137,8 @@ class LoraTab:
         # Some configs will come with the lora_layer_preset unset or wrong for
         # the new model, so let's set it now to a reasonable default so it hits
         # the UI correctly.
-        v = self.ui_state.get_var("lora_layer_preset")
-        if v.get() not in self.presets_list:
-            v.set(self.presets_list[0])
+        if self.layer_selector.get() not in self.presets_list:
+            self.layer_selector.set(self.presets_list[0])
         self.__preset_set_layer_choice(self.layer_selector.get())
 
     def __preset_set_layer_choice(self, selected: str):
