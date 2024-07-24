@@ -68,6 +68,7 @@ class TrainUI(ctk.CTk):
 
         self.model_tab = None
         self.training_tab = None
+        self.lora_tab = None
         self.additional_embeddings_tab = None
 
         self.top_bar_component = self.top_bar(self)
@@ -454,6 +455,9 @@ class TrainUI(ctk.CTk):
         if self.training_tab:
             self.training_tab.refresh_ui()
 
+        if self.lora_tab:
+            self.lora_tab.refresh_ui()
+
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:
             return
@@ -463,6 +467,7 @@ class TrainUI(ctk.CTk):
 
         if training_method != TrainingMethod.LORA and "LoRA" in self.tabview._tab_dict:
             self.tabview.delete("LoRA")
+            self.lora_tab = None
         if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:
             self.tabview.delete("embedding")
 
