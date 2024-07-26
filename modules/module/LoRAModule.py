@@ -154,7 +154,12 @@ class LoHaModule(PeftBase):
     def initialize_weights(self):
         out_dim, in_dim, *k = self.orig_module.weight.shape
 
-        if k and self.tucker:
+        if not k or not any(i != 1 for i in k):
+            # Tucker decomposition is only valid on convolutional layers with
+            # a non-unity kernel.
+            self.tucker = False
+
+        if self.tucker:
             self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
             self.hada_w1_b = Parameter(torch.empty(self.rank, out_dim))
             self.hada_t1 = Parameter(torch.empty(self.rank, self.rank, *k))
@@ -213,7 +218,7 @@ class LoHaModule(PeftBase):
 
         W = self.make_weight()
         return self.orig_forward(x) + \
-            self.op(W, x, **self.layer_kwargs) * \
+            self.op(x, W, bias=None, **self.layer_kwargs) * \
             (self.alpha / self.rank)
 
     def apply_to_module(self):
