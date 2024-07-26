@@ -1,14 +1,13 @@
 import copy
 import math
-from abc import ABCMeta, abstractmethod
-from typing import Any, Callable, Mapping, cast, no_type_check
+from abc import abstractmethod
+from typing import Any, Mapping, Tuple, cast
 
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
-from modules.util import custom_passes
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 
@@ -27,7 +26,6 @@ class PeftBase(nn.Module):
         self.is_applied = False
         self.layer_kwargs = {}
 
-        # For modules that have a custom backward pass and use functional ops.
         if orig_module is not None:
             match orig_module:
                 case nn.Linear():
@@ -94,6 +92,45 @@ class PeftBase(nn.Module):
     def extract_from_module(self, base_module: nn.Module):
         pass
 
+    def create_layer(self) -> Tuple[nn.Module, nn.Module]:
+        """Generic helper function for creating a PEFT layer, like LoRA.
+
+        Creates down/up layer modules for the given layer type in the
+        orig_module, for the given rank.
+
+        Does not perform initialization, as that usually depends on the PEFT
+        method.
+        """
+        device = self.orig_module.weight.device
+        lora_down = None
+        lora_up = None
+        match self.orig_module:
+            case nn.Linear():
+                in_features = self.orig_module.in_features
+                out_features = self.orig_module.out_features
+                lora_down = nn.Linear(in_features, self.rank, bias=False, device=device)
+                lora_up = nn.Linear(self.rank, out_features, bias=False, device=device)
+
+            case nn.Conv2d():
+                in_channels = self.orig_module.in_channels
+                out_channels = self.orig_module.out_channels
+                kernel_size = self.orig_module.kernel_size
+                stride = self.orig_module.stride
+                padding = self.orig_module.padding
+                dilation = self.orig_module.dilation
+                groups = self.orig_module.groups
+                lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, dilation=dilation, bias=False, device=device)
+                # Note: small departure here from part of the community.
+                # The original Mcrosoft repo does it this way. The cloneofsimo
+                # repo handles the groups in lora_down. We follow the Microsoft
+                # way. In reality, there shouldn't be any difference.
+                lora_up = Conv2d(self.rank, out_channels // groups, (1, 1), 1, bias=False, device=device)
+
+            case _:
+                    raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+
+        return lora_down, lora_up
+
     @classmethod
     def make_dummy(cls):
         """Create a dummy version of a PEFT class.
@@ -130,19 +167,17 @@ class PeftBase(nn.Module):
         return Dummy
 
 
-# TODO(surgo): scalar.
 class LoHaModule(PeftBase):
     """Implementation of LoHa from Lycoris.
 
-    This (probably) could be rewritten to use the supported PeftBase layer types
-    directly, but instead I have implemented it 1:1 with the Lycoris reference
-    implementation to start.
+    Does not support Tucker decomposition, extra scalar, or weight decomposition
+    (DoRA). Those could be supported eventually, but currently no burning demand
+    and it was tough to do them in a sufficiently generic fashion.
     """
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, tucker: bool):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super().__init__(prefix, orig_module)
         self.rank = rank
-        self.tucker = tucker
         self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
 
@@ -152,57 +187,13 @@ class LoHaModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        out_dim, in_dim, *k = self.orig_module.weight.shape
+        self.hada_w1_a, self.hada_w1_b = self.create_layer()
+        self.hada_w2_a, self.hada_w2_b = self.create_layer()
 
-        if k and any(n != 1 for n in k) and self.tucker:
-            self.hada_w1_a = Parameter(torch.empty(self.rank, out_dim))
-            self.hada_w1_b = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_t1 = Parameter(torch.empty(self.rank, self.rank, *k))
-            self.hada_w2_a = Parameter(torch.empty(self.rank, out_dim))
-            self.hada_w2_b = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_t2 = Parameter(torch.empty(self.rank, self.rank, *k))
-            nn.init.normal_(self.hada_t1, std=0.1)
-            nn.init.normal_(self.hada_t2, std=0.1)
-        else:
-            self.hada_w1_a = Parameter(torch.empty(out_dim, self.rank))
-            self.hada_w1_b = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_w2_a = Parameter(torch.empty(out_dim, self.rank))
-            self.hada_w2_b = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_t1 = None
-            self.hada_t2 = None
-        nn.init.normal_(self.hada_w1_a, std=0.1)
-        nn.init.normal_(self.hada_w1_b, std=1)
-        nn.init.constant_(self.hada_w2_a, 0)
-        nn.init.normal_(self.hada_w2_b, std=1)
-
-    def make_weight(self) -> Tensor:
-        """Reshape the stored parameters into appropriately-shaped matrices.
-
-        Turns the 2D parameters into matrices that match the layer shapes, and
-        then puts them together into the overall delta-W.
-        """
-        train = self.orig_module.training
-        w1a = self.dropout(self.hada_w1_a) if train else self.hada_w1_a
-        w1b = self.dropout(self.hada_w1_b) if train else self.hada_w1_b
-        w2a = self.dropout(self.hada_w2_a) if train else self.hada_w2_a
-        w2b = self.dropout(self.hada_w2_b) if train else self.hada_w2_b
-        if self.tucker and self.hada_t1:
-            R, I = w1b.shape
-            R, O = w1a.shape
-            R, R, *k = self.hada_t1.shape
-            W = custom_passes.LohaWeightTucker.apply(
-                self.hada_t1, w1b, w1a, self.hada_t2, w2b, w2a)
-        else:
-            R, I, *k = w1b.shape
-            O, R, *_ = w1a.shape
-            w1b = w1b.reshape(w1b.size(0), -1)
-            w1a = w1a.reshape(-1, w1a.size(1))
-            w2b = w2b.reshape(w2b.size(0), -1)
-            w2a = w2a.reshape(-1, w2a.size(1))
-            W = custom_passes.LohaWeight.apply(w1b, w1a, w2b, w2a)
-
-        W = cast(Tensor, W).reshape(O, I, *k) * (self.alpha / self.rank)
-        return W
+        nn.init.normal_(self.hada_w1_a.weight, std=0.1)
+        nn.init.normal_(self.hada_w1_b.weight, std=1)
+        nn.init.constant_(self.hada_w2_a.weight, 0)
+        nn.init.normal_(self.hada_w2_b.weight, std=1)
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
@@ -210,7 +201,11 @@ class LoHaModule(PeftBase):
         assert self.orig_module
         assert self.orig_forward
 
-        W = self.make_weight()
+        W1 = self.make_weight(self.dropout(self.hada_w1_a.weight),
+                              self.dropout(self.hada_w1_b.weight))
+        W2 = self.make_weight(self.dropout(self.hada_w2_a.weight),
+                              self.dropout(self.hada_w2_b.weight))
+        W = (W1 * W2) * (self.alpha / self.rank)
         return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
 
     def apply_to_module(self):
@@ -246,29 +241,7 @@ class LoRAModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        device = self.orig_module.weight.device
-        match self.orig_module:
-            case nn.Linear():
-                in_features = self.orig_module.in_features
-                out_features = self.orig_module.out_features
-                self.lora_down = nn.Linear(in_features, self.rank, bias=False, device=device)
-                self.lora_up = nn.Linear(self.rank, out_features, bias=False, device=device)
-
-            case nn.Conv2d():
-                in_channels = self.orig_module.in_channels
-                out_channels = self.orig_module.out_channels
-                kernel_size = self.orig_module.kernel_size
-                stride = self.orig_module.stride
-                padding = self.orig_module.padding
-                dilation = self.orig_module.dilation
-                groups = self.orig_module.groups
-                self.lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, dilation=dilation, bias=False, device=device)
-                # Note: small departure here from part of the community.
-                # The original Mcrosoft repo does it this way. The cloneofsimo
-                # repo handles the groups in lora_down. We follow the Microsoft
-                # way. In reality, there shouldn't be any difference.
-                self.lora_up = Conv2d(self.rank, out_channels // groups, (1, 1), 1, bias=False, device=device)
-
+        self.lora_down, self.lora_up = self.create_layer()
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
 
@@ -384,7 +357,7 @@ class LoRAModuleWrapper:
         elif self.peft_type == PeftType.LOHA:
             self.klass = LoHaModule
             self.dummy_klass = DummyLoHaModule
-            self.additional_args = [self.rank, self.alpha, config.tucker_decompose]
+            self.additional_args = [self.rank, self.alpha]
 
         self.lora_modules = self.__create_modules(orig_module)
 
