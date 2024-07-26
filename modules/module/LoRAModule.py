@@ -154,31 +154,26 @@ class LoHaModule(PeftBase):
     def initialize_weights(self):
         out_dim, in_dim, *k = self.orig_module.weight.shape
 
-        if not k or not any(i != 1 for i in k):
-            # Tucker decomposition is only valid on convolutional layers with
-            # a non-unity kernel.
-            self.tucker = False
-
-        if self.tucker:
-            self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_w1_b = Parameter(torch.empty(self.rank, out_dim))
+        if k and any(n != 1 for n in k) and self.tucker:
+            self.hada_w1_a = Parameter(torch.empty(self.rank, out_dim))
+            self.hada_w1_b = Parameter(torch.empty(self.rank, in_dim))
             self.hada_t1 = Parameter(torch.empty(self.rank, self.rank, *k))
-            self.hada_w2_a = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_w2_b = Parameter(torch.empty(self.rank, out_dim))
+            self.hada_w2_a = Parameter(torch.empty(self.rank, out_dim))
+            self.hada_w2_b = Parameter(torch.empty(self.rank, in_dim))
             self.hada_t2 = Parameter(torch.empty(self.rank, self.rank, *k))
             nn.init.normal_(self.hada_t1, std=0.1)
             nn.init.normal_(self.hada_t2, std=0.1)
         else:
-            self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_w1_b = Parameter(torch.empty(out_dim, self.rank))
-            self.hada_w2_a = Parameter(torch.empty(self.rank, in_dim))
-            self.hada_w2_b = Parameter(torch.empty(out_dim, self.rank))
+            self.hada_w1_a = Parameter(torch.empty(out_dim, self.rank))
+            self.hada_w1_b = Parameter(torch.empty(self.rank, in_dim))
+            self.hada_w2_a = Parameter(torch.empty(out_dim, self.rank))
+            self.hada_w2_b = Parameter(torch.empty(self.rank, in_dim))
             self.hada_t1 = None
             self.hada_t2 = None
-        nn.init.normal_(self.hada_w1_a, std=1)
-        nn.init.constant_(self.hada_w1_b, 0)
-        nn.init.normal_(self.hada_w2_a, std=1)
-        nn.init.normal_(self.hada_w1_b, std=0.1)
+        nn.init.normal_(self.hada_w1_a, std=0.1)
+        nn.init.normal_(self.hada_w1_b, std=1)
+        nn.init.constant_(self.hada_w2_a, 0)
+        nn.init.normal_(self.hada_w2_b, std=1)
 
     def make_weight(self) -> Tensor:
         """Reshape the stored parameters into appropriately-shaped matrices.
@@ -187,27 +182,26 @@ class LoHaModule(PeftBase):
         then puts them together into the overall delta-W.
         """
         train = self.orig_module.training
-        w1d = self.dropout(self.hada_w1_a) if train else self.hada_w1_a
-        w1u = self.dropout(self.hada_w1_b) if train else self.hada_w1_b
-        w2d = self.dropout(self.hada_w2_a) if train else self.hada_w2_a
-        w2u = self.dropout(self.hada_w2_b) if train else self.hada_w2_b
-        if self.tucker:
-            assert self.hada_t1
-            R, I = w1d.shape
-            R, O = w1u.shape
+        w1a = self.dropout(self.hada_w1_a) if train else self.hada_w1_a
+        w1b = self.dropout(self.hada_w1_b) if train else self.hada_w1_b
+        w2a = self.dropout(self.hada_w2_a) if train else self.hada_w2_a
+        w2b = self.dropout(self.hada_w2_b) if train else self.hada_w2_b
+        if self.tucker and self.hada_t1:
+            R, I = w1b.shape
+            R, O = w1a.shape
             R, R, *k = self.hada_t1.shape
             W = custom_passes.LohaWeightTucker.apply(
-                self.hada_t1, w1d, w1u, self.hada_t2, w2d, w2u)
+                self.hada_t1, w1b, w1a, self.hada_t2, w2b, w2a)
         else:
-            R, I, *k = w1d.shape
-            O, R, *_ = w1u.shape
-            w1d = w1d.reshape(w1d.size(0), -1)
-            w1u = w1u.reshape(-1, w1u.size(1))
-            w2d = w2d.reshape(w2d.size(0), -1)
-            w2u = w2u.reshape(-1, w2u.size(1))
-            W = custom_passes.LohaWeight.apply(w1d, w1u, w2d, w2u)
+            R, I, *k = w1b.shape
+            O, R, *_ = w1a.shape
+            w1b = w1b.reshape(w1b.size(0), -1)
+            w1a = w1a.reshape(-1, w1a.size(1))
+            w2b = w2b.reshape(w2b.size(0), -1)
+            w2a = w2a.reshape(-1, w2a.size(1))
+            W = custom_passes.LohaWeight.apply(w1b, w1a, w2b, w2a)
 
-        W = cast(Tensor, W).reshape(O, I, *k)
+        W = cast(Tensor, W).reshape(O, I, *k) * (self.alpha / self.rank)
         return W
 
     def forward(self, x, *args, **kwargs):
@@ -217,9 +211,7 @@ class LoHaModule(PeftBase):
         assert self.orig_forward
 
         W = self.make_weight()
-        return self.orig_forward(x) + \
-            self.op(x, W, bias=None, **self.layer_kwargs) * \
-            (self.alpha / self.rank)
+        return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
 
     def apply_to_module(self):
         # TODO
