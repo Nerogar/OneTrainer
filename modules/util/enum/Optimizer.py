@@ -53,6 +53,11 @@ class Optimizer(Enum):
 
     # CAME
     CAME = 'CAME'
+    
+    #Pytorch Optimizers
+    ADABELIEF = 'ADABELIEF'
+    TIGER = 'TIGER'
+    AIDA = 'AIDA'
 
     @property
     def is_adaptive(self):
