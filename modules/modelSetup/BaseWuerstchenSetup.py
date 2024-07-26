@@ -218,7 +218,6 @@ class BaseWuerstchenSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                train_progress.global_step,
             )
 
             if model.model_type.is_wuerstchen_v2():

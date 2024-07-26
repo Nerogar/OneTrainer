@@ -219,9 +219,9 @@ def map_vae(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
     out_states |= __map_vae_encoder(in_states, combine(out_prefix, "encoder"), combine(in_prefix, "encoder"))
-    if combine(in_prefix, "quant_conv") in in_states:
+    if combine(in_prefix, "quant_conv.weight") in in_states:
         out_states |= __map_vae_quant_conv(in_states, combine(out_prefix, "quant_conv"), combine(in_prefix, "quant_conv"))
-    if combine(in_prefix, "post_quant_conv") in in_states:
+    if combine(in_prefix, "post_quant_conv.weight") in in_states:
         out_states |= __map_vae_post_quant_conv(in_states, combine(out_prefix, "post_quant_conv"), combine(in_prefix, "post_quant_conv"))
     out_states |= __map_vae_decoder(in_states, combine(out_prefix, "decoder"), combine(in_prefix, "decoder"))
 

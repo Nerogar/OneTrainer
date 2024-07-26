@@ -21,5 +21,6 @@
     "vae": {
         "weight_dtype": "FLOAT_32"
     },
-    "weight_dtype": "FLOAT_16"
+    "weight_dtype": "FLOAT_16",
+    "timestep_distribution": "LOGIT_NORMAL"
 }

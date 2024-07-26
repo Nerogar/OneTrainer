@@ -22,6 +22,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import default_device
 
@@ -166,6 +167,7 @@ class TrainModelPartConfig(BaseConfig):
     learning_rate: float
     weight_dtype: DataType
     dropout_probability: float
+    train_embedding: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainModelPartConfig, self).__init__(data)
@@ -183,6 +185,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("learning_rate", None, float, True))
         data.append(("weight_dtype", DataType.NONE, DataType, False))
         data.append(("dropout_probability", 0.0, float, False))
+        data.append(("train_embedding", True, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -291,8 +294,10 @@ class TrainConfig(BaseConfig):
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
     force_epsilon_prediction: bool
+    timestep_distribution: TimestepDistribution
     min_noising_strength: float
     max_noising_strength: float
+
     noising_weight: float
     noising_bias: float
 
@@ -375,11 +380,12 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=3,
+            config_version=4,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
                 2: self.__migration_2,
+                3: self.__migration_3,
             }
         )
 
@@ -506,6 +512,23 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_3(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        noising_weight = migrated_data.pop("noising_weight", 0.0)
+        noising_bias = migrated_data.pop("noising_bias", 0.5)
+
+        if noising_weight != 0:
+            migrated_data["timestep_distribution"] = TimestepDistribution.SIGMOID
+            migrated_data["noising_weight"] = noising_weight
+            migrated_data["noising_bias"] = noising_bias - 0.5
+        else:
+            migrated_data["timestep_distribution"] = TimestepDistribution.UNIFORM
+            migrated_data["noising_weight"] = 0.0
+            migrated_data["noising_bias"] = 0.0
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
@@ -541,6 +564,18 @@ class TrainConfig(BaseConfig):
     def train_any_embedding(self) -> bool:
         return self.training_method == TrainingMethod.EMBEDDING \
             or any(embedding.train for embedding in self.additional_embeddings)
+
+    def train_text_encoder_or_embedding(self) -> bool:
+        return (self.text_encoder.train and self.training_method != TrainingMethod.EMBEDDING) \
+            or (self.text_encoder.train_embedding and self.train_any_embedding())
+
+    def train_text_encoder_2_or_embedding(self) -> bool:
+        return (self.text_encoder_2.train and self.training_method != TrainingMethod.EMBEDDING) \
+            or (self.text_encoder_2.train_embedding and self.train_any_embedding())
+
+    def train_text_encoder_3_or_embedding(self) -> bool:
+        return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING) \
+            or (self.text_encoder_3.train_embedding and self.train_any_embedding())
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
@@ -653,8 +688,9 @@ class TrainConfig(BaseConfig):
         data.append(("force_epsilon_prediction", False, bool, False))
         data.append(("min_noising_strength", 0.0, float, False))
         data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
         data.append(("noising_weight", 0.0, float, False))
-        data.append(("noising_bias", 0.5, float, False))
+        data.append(("noising_bias", 0.0, float, False))
 
         # unet
         unet = TrainModelPartConfig.default_values()

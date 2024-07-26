@@ -26,18 +26,22 @@ class StableDiffusion3EmbeddingSaver:
             text_encoder_2_vector_cpu = embedding_state[1]
             text_encoder_3_vector_cpu = embedding_state[2]
         else:
-            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype)
-            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype)
-            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype)
+            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_1_vector is not None else None
+            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_2_vector is not None else None
+            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_3_vector is not None else None
 
-        torch.save(
-            {
-                "clip_l": text_encoder_1_vector_cpu,
-                "clip_g": text_encoder_2_vector_cpu,
-                "t5": text_encoder_3_vector_cpu,
-            },
-            destination
-        )
+        file = {}
+        if text_encoder_1_vector_cpu is not None:
+            file["clip_l"] = text_encoder_1_vector_cpu
+        if text_encoder_2_vector_cpu is not None:
+            file["clip_g"] = text_encoder_2_vector_cpu
+        if text_encoder_3_vector_cpu is not None:
+            file["t5"] = text_encoder_3_vector_cpu
+
+        torch.save(file, destination)
 
     def __save_safetensors(
             self,
@@ -53,18 +57,22 @@ class StableDiffusion3EmbeddingSaver:
             text_encoder_2_vector_cpu = embedding_state[1]
             text_encoder_3_vector_cpu = embedding_state[2]
         else:
-            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype)
-            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype)
-            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype)
+            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_1_vector is not None else None
+            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_2_vector is not None else None
+            text_encoder_3_vector_cpu = embedding.text_encoder_3_vector.to(device="cpu", dtype=dtype) \
+                if embedding.text_encoder_3_vector is not None else None
 
-        save_file(
-            {
-                "clip_l": text_encoder_1_vector_cpu,
-                "clip_g": text_encoder_2_vector_cpu,
-                "t5": text_encoder_3_vector_cpu,
-            },
-            destination
-        )
+        file = {}
+        if text_encoder_1_vector_cpu is not None:
+            file["clip_l"] = text_encoder_1_vector_cpu
+        if text_encoder_2_vector_cpu is not None:
+            file["clip_g"] = text_encoder_2_vector_cpu
+        if text_encoder_3_vector_cpu is not None:
+            file["t5"] = text_encoder_3_vector_cpu
+
+        save_file(file, destination)
 
     def __save_internal(
             self,
@@ -76,13 +84,13 @@ class StableDiffusion3EmbeddingSaver:
         if save_single:
             safetensors_embedding_name = os.path.join(
                 destination,
-                "additional_embeddings",
+                "embedding",
                 f"embedding.safetensors",
             )
         else:
             safetensors_embedding_name = os.path.join(
                 destination,
-                "embedding",
+                "additional_embeddings",
                 f"{embedding.uuid}.safetensors",
             )
         self.__save_safetensors(

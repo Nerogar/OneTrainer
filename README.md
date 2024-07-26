@@ -2,12 +2,14 @@
 
 OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
-<a href="https://discord.gg/KwgcQd5scF"><img src="https://discord.com/api/guilds/1102003518203756564/widget.png" alt="OneTrainer Discord"/></a>
+<a href="https://discord.gg/KwgcQd5scF"><img src="https://discord.com/api/guilds/1102003518203756564/widget.png" alt="OneTrainer Discord"/></a><br>
+Hardware for development sponsored by https://shakker.ai
+
 
 ## Features
 
-- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha, PixArt-Sigma
-  and inpainting models
+- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, 3.0, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha, 
+  PixArt-Sigma and inpainting models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.

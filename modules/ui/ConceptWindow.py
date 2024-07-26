@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
-from mgds.PipelineModule import PipelineState, PipelineModule
+from mgds.PipelineModule import PipelineModule
 from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
@@ -16,7 +16,7 @@ from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
-from torchvision.transforms import functional, InterpolationMode
+from torchvision.transforms import functional
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig

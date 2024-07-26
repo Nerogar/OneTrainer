@@ -23,9 +23,9 @@ class StableDiffusion3EmbeddingLoader:
         try:
             embedding_state = torch.load(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l']
-            text_encoder_2_vector = embedding_state['clip_g']
-            text_encoder_3_vector = embedding_state['t5']
+            text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
+            text_encoder_2_vector = embedding_state['clip_g'] if 'clip_g' in embedding_state else None
+            text_encoder_3_vector = embedding_state['t5'] if 't5' in embedding_state else None
 
             return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
         except:
@@ -34,9 +34,9 @@ class StableDiffusion3EmbeddingLoader:
         try:
             embedding_state = load_file(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l']
-            text_encoder_2_vector = embedding_state['clip_g']
-            text_encoder_3_vector = embedding_state['t5']
+            text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
+            text_encoder_2_vector = embedding_state['clip_g'] if 'clip_g' in embedding_state else None
+            text_encoder_3_vector = embedding_state['t5'] if 't5' in embedding_state else None
 
             return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
         except:

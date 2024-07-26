@@ -236,8 +236,10 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_1.model_max_length)
         tokenize_prompt_3 = Tokenize(in_name='prompt', tokens_out_name='tokens_3', mask_out_name='tokens_mask_3', tokenizer=model.tokenizer_3, max_token_length=model.tokenizer_1.model_max_length)
@@ -245,9 +247,7 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         encode_prompt_3 = EncodeT5Text(tokens_in_name='tokens_3', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_3_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder_3, hidden_state_output_index=-(1 + config.text_encoder_3_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_3_autocast_context], dtype=model.text_encoder_3_train_dtype.torch_dtype())
 
-        modules = [
-            rescale_image, encode_image,
-        ]
+        modules = [rescale_image, encode_image, image_sample]
 
         if model.tokenizer_1:
             modules.append(tokenize_prompt_1)
@@ -262,26 +262,27 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
+            modules.append(conditioning_image_sample)
 
-        if not config.text_encoder.train and not config.train_any_embedding() and model.text_encoder_1:
+        if not config.train_text_encoder_or_embedding() and model.text_encoder_1:
             modules.append(encode_prompt_1)
 
-        if not config.text_encoder_2.train and not config.train_any_embedding() and model.text_encoder_2:
+        if not config.train_text_encoder_2_or_embedding() and model.text_encoder_2:
             modules.append(encode_prompt_2)
 
-        if not config.text_encoder_3.train and not config.train_any_embedding() and model.text_encoder_3:
+        if not config.train_text_encoder_3_or_embedding() and model.text_encoder_3:
             modules.append(encode_prompt_3)
 
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: StableDiffusion3Model):
-        image_split_names = ['latent_image_distribution', 'original_resolution', 'crop_offset']
+        image_split_names = ['latent_image', 'original_resolution', 'crop_offset']
 
         if config.masked_training or config.model_type.has_mask_input():
             image_split_names.append('latent_mask')
 
         if config.model_type.has_conditioning_image_input():
-            image_split_names.append('latent_conditioning_image_distribution')
+            image_split_names.append('latent_conditioning_image')
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
@@ -295,17 +296,17 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             'concept'
         ]
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             text_split_names.append('tokens_1')
             text_split_names.append('text_encoder_1_hidden_state')
             text_split_names.append('text_encoder_1_pooled_state')
 
-        if not config.text_encoder_2.train and not config.train_any_embedding():
+        if not config.train_text_encoder_2_or_embedding():
             text_split_names.append('tokens_2')
             text_split_names.append('text_encoder_2_hidden_state')
             text_split_names.append('text_encoder_2_pooled_state')
 
-        if not config.text_encoder_3.train and not config.train_any_embedding():
+        if not config.train_text_encoder_3_or_embedding():
             text_split_names.append('tokens_3')
             text_split_names.append('text_encoder_3_hidden_state')
 
@@ -321,13 +322,13 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         def before_cache_text_fun():
             model.to(self.temp_device)
 
-            if not config.text_encoder.train and not config.train_any_embedding():
+            if not config.train_text_encoder_or_embedding():
                 model.text_encoder_1_to(self.train_device)
 
-            if not config.text_encoder_2.train and not config.train_any_embedding():
+            if not config.train_text_encoder_2_or_embedding():
                 model.text_encoder_2_to(self.train_device)
 
-            if not config.text_encoder_3.train and not config.train_any_embedding():
+            if not config.train_text_encoder_3_or_embedding():
                 model.text_encoder_3_to(self.train_device)
 
             model.eval()
@@ -346,7 +347,7 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if (not config.text_encoder.train or not config.text_encoder_2.train or not config.text_encoder_3.train) and not config.train_any_embedding():
+            if not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding() or not config.train_text_encoder_3_or_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -369,15 +370,15 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
         if config.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_1_hidden_state')
             output_names.append('text_encoder_1_pooled_state')
 
-        if not config.text_encoder_2.train and not config.train_any_embedding():
+        if not config.train_text_encoder_2_or_embedding():
             output_names.append('text_encoder_2_hidden_state')
             output_names.append('text_encoder_2_pooled_state')
 
-        if not config.text_encoder_3.train and not config.train_any_embedding():
+        if not config.train_text_encoder_3_or_embedding():
             output_names.append('text_encoder_3_hidden_state')
 
         sort_names = output_names + ['concept']
@@ -389,8 +390,6 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
             model.eval()
             torch_gc()
 
-        image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
-        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image',
             replace_probability=config.unmasked_probability, vae=model.vae, possible_resolutions_in_name='possible_resolutions',
@@ -405,10 +404,7 @@ class StableDiffusion3BaseDataLoader(BaseDataLoader):
 
         output = OutputPipelineModule(names=output_names)
 
-        modules = [image_sample]
-
-        if config.model_type.has_conditioning_image_input():
-            modules.append(conditioning_image_sample)
+        modules = []
 
         if config.model_type.has_mask_input():
             modules.append(mask_remove)
