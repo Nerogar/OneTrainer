@@ -132,11 +132,6 @@ class PeftBase(nn.Module):
 
 # TODO(surgo): Tucker decomposition, scalar.
 class LoHaModule(PeftBase):
-    w1d: Parameter
-    w1u: Parameter
-    w2d: Parameter
-    w2u: Parameter
-    dropout: Dropout
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super().__init__(prefix, orig_module)
@@ -153,14 +148,14 @@ class LoHaModule(PeftBase):
         device = self.orig_module.weight.device
         out_dim, in_dim, *k = self.orig_module.weight.shape
 
-        self.w1d = Parameter(torch.empty(self.rank, in_dim))
-        self.w1u = Parameter(torch.empty(out_dim, self.rank))
-        self.w2d = Parameter(torch.empty(self.rank, in_dim))
-        self.w2u = Parameter(torch.empty(out_dim, self.rank))
-        nn.init.normal_(self.w1d, std=1)
-        nn.init.constant_(self.w1u, 0)
-        nn.init.normal_(self.w2d, std=1)
-        nn.init.normal_(self.w2u, std=0.1)
+        self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
+        self.hada_w1_b = Parameter(torch.empty(out_dim, self.rank))
+        self.hada_w2_a = Parameter(torch.empty(self.rank, in_dim))
+        self.hada_w2_b = Parameter(torch.empty(out_dim, self.rank))
+        nn.init.normal_(self.hada_w1_a, std=1)
+        nn.init.constant_(self.hada_w1_b, 0)
+        nn.init.normal_(self.hada_w2_a, std=1)
+        nn.init.normal_(self.hada_w1_b, std=0.1)
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
@@ -169,39 +164,14 @@ class LoHaModule(PeftBase):
         assert self.orig_forward
 
         train = self.orig_module.training
-        ww1d = self.dropout(self.w1d) if train else self.w1d
-        ww1u = self.dropout(self.w1u) if train else self.w1u
-        ww2d = self.dropout(self.w2d) if train else self.w2d
-        ww2u = self.dropout(self.w2u) if train else self.w2u
+        ww1d = self.dropout(self.hada_w1_a) if train else self.hada_w1_a
+        ww1u = self.dropout(self.hada_w1_b) if train else self.hada_w1_b
+        ww2d = self.dropout(self.hada_w2_a) if train else self.hada_w2_a
+        ww2u = self.dropout(self.hada_w2_b) if train else self.hada_w2_b
         W = custom_passes.LohaWeight.apply(ww1d, ww1u, ww2d, ww2u)
         return self.orig_forward(x) + \
             self.op(cast(Tensor, W), x, **self.layer_kwargs) * \
             (self.alpha / self.rank)
-
-    def load_state_dict(self, state_dict: dict):
-        items = [self.prefix + x for x in
-                 ["hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"]]
-        if any(x in state_dict for x in items) and not \
-           all(x in state_dict for x in items):
-            raise ValueError("LoHa layer %s is missing pieces." % self.prefix)
-
-        self.w1d = state_dict.pop(self.prefix + "hada_w1_a")
-        self.w1u = state_dict.pop(self.prefix + "hada_w1_b")
-        self.w2d = state_dict.pop(self.prefix + "hada_w2_a")
-        self.w2u = state_dict.pop(self.prefix + "hada_w2_b")
-        self.alpha = state_dict.pop(self.prefix + "alpha")
-
-    def state_dict(self) -> dict:
-        state_dict = {}
-        state_dict[self.prefix + "hada_w1_a"] = self.w1d
-        state_dict[self.prefix + "hada_w1_b"] = self.w1u
-        state_dict[self.prefix + "hada_w2_a"] = self.w2d
-        state_dict[self.prefix + "hada_w2_b"] = self.w2u
-        state_dict[self.prefix + "alpha"] = self.alpha
-        return state_dict
-
-    def modules(self) -> list[nn.Module]:
-        return []
 
     def apply_to_module(self):
         # TODO
