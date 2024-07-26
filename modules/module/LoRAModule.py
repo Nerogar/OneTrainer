@@ -130,12 +130,19 @@ class PeftBase(nn.Module):
         return Dummy
 
 
-# TODO(surgo): Tucker decomposition, scalar.
+# TODO(surgo): scalar.
 class LoHaModule(PeftBase):
+    """Implementation of LoHa from Lycoris.
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+    This (probably) could be rewritten to use the supported PeftBase layer types
+    directly, but instead I have implemented it 1:1 with the Lycoris reference
+    implementation to start.
+    """
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, tucker: bool):
         super().__init__(prefix, orig_module)
         self.rank = rank
+        self.tucker = tucker
         self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
 
@@ -145,17 +152,58 @@ class LoHaModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        device = self.orig_module.weight.device
         out_dim, in_dim, *k = self.orig_module.weight.shape
 
-        self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
-        self.hada_w1_b = Parameter(torch.empty(out_dim, self.rank))
-        self.hada_w2_a = Parameter(torch.empty(self.rank, in_dim))
-        self.hada_w2_b = Parameter(torch.empty(out_dim, self.rank))
+        if k and self.tucker:
+            self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
+            self.hada_w1_b = Parameter(torch.empty(self.rank, out_dim))
+            self.hada_t1 = Parameter(torch.empty(self.rank, self.rank, *k))
+            self.hada_w2_a = Parameter(torch.empty(self.rank, in_dim))
+            self.hada_w2_b = Parameter(torch.empty(self.rank, out_dim))
+            self.hada_t2 = Parameter(torch.empty(self.rank, self.rank, *k))
+            nn.init.normal_(self.hada_t1, std=0.1)
+            nn.init.normal_(self.hada_t2, std=0.1)
+        else:
+            self.hada_w1_a = Parameter(torch.empty(self.rank, in_dim))
+            self.hada_w1_b = Parameter(torch.empty(out_dim, self.rank))
+            self.hada_w2_a = Parameter(torch.empty(self.rank, in_dim))
+            self.hada_w2_b = Parameter(torch.empty(out_dim, self.rank))
+            self.hada_t1 = None
+            self.hada_t2 = None
         nn.init.normal_(self.hada_w1_a, std=1)
         nn.init.constant_(self.hada_w1_b, 0)
         nn.init.normal_(self.hada_w2_a, std=1)
         nn.init.normal_(self.hada_w1_b, std=0.1)
+
+    def make_weight(self) -> Tensor:
+        """Reshape the stored parameters into appropriately-shaped matrices.
+
+        Turns the 2D parameters into matrices that match the layer shapes, and
+        then puts them together into the overall delta-W.
+        """
+        train = self.orig_module.training
+        w1d = self.dropout(self.hada_w1_a) if train else self.hada_w1_a
+        w1u = self.dropout(self.hada_w1_b) if train else self.hada_w1_b
+        w2d = self.dropout(self.hada_w2_a) if train else self.hada_w2_a
+        w2u = self.dropout(self.hada_w2_b) if train else self.hada_w2_b
+        if self.tucker:
+            assert self.hada_t1
+            R, I = w1d.shape
+            R, O = w1u.shape
+            R, R, *k = self.hada_t1.shape
+            W = custom_passes.LohaWeightTucker.apply(
+                self.hada_t1, w1d, w1u, self.hada_t2, w2d, w2u)
+        else:
+            R, I, *k = w1d.shape
+            O, R, *_ = w1u.shape
+            w1d = w1d.reshape(w1d.size(0), -1)
+            w1u = w1u.reshape(-1, w1u.size(1))
+            w2d = w2d.reshape(w2d.size(0), -1)
+            w2u = w2u.reshape(-1, w2u.size(1))
+            W = custom_passes.LohaWeight.apply(w1d, w1u, w2d, w2u)
+
+        W = cast(Tensor, W).reshape(O, I, *k)
+        return W
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
@@ -163,14 +211,9 @@ class LoHaModule(PeftBase):
         assert self.orig_module
         assert self.orig_forward
 
-        train = self.orig_module.training
-        ww1d = self.dropout(self.hada_w1_a) if train else self.hada_w1_a
-        ww1u = self.dropout(self.hada_w1_b) if train else self.hada_w1_b
-        ww2d = self.dropout(self.hada_w2_a) if train else self.hada_w2_a
-        ww2u = self.dropout(self.hada_w2_b) if train else self.hada_w2_b
-        W = custom_passes.LohaWeight.apply(ww1d, ww1u, ww2d, ww2u)
+        W = self.make_weight()
         return self.orig_forward(x) + \
-            self.op(cast(Tensor, W), x, **self.layer_kwargs) * \
+            self.op(W, x, **self.layer_kwargs) * \
             (self.alpha / self.rank)
 
     def apply_to_module(self):
@@ -330,21 +373,21 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        self.module_filter = module_filter if module_filter is not None or []
+        self.module_filter = module_filter if module_filter is not None else []
         weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
             if weight_decompose:
                 self.klass = DoRAModule
                 self.dummy_klass = DummyDoRAModule
-                self.dummy_args = (self.rank, self.alpha)
+                self.additional_args = [self.rank, self.alpha]
             else:
                 self.klass = LoRAModule
                 self.dummy_klass = DummyLoRAModule
-                self.dummy_args = (self.rank, self.alpha)
+                self.additional_args = [self.rank, self.alpha]
         elif self.peft_type == PeftType.LOHA:
             self.klass = LoHaModule
             self.dummy_klass = DummyLoHaModule
-            self.dummy_args = (self.rank, self.alpha)
+            self.additional_args = [self.rank, self.alpha, config.tucker_decompose]
 
         self.lora_modules = self.__create_modules(orig_module)
 
@@ -356,7 +399,7 @@ class LoRAModuleWrapper:
                 if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
                     if isinstance(child_module, Linear) or \
                        isinstance(child_module, Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, self.rank, self.alpha)
+                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args)
 
         return lora_modules
 
@@ -399,7 +442,7 @@ class LoRAModuleWrapper:
         for name in remaining_names:
             if name.endswith(".alpha"):
                 prefix = name.removesuffix(".alpha")
-                module = self.dummy_klass(prefix, None, *self.dummy_args)
+                module = self.dummy_klass(prefix, None, *self.additional_args)
                 module.load_state_dict(state_dict)
                 self.lora_modules[prefix] = module
 

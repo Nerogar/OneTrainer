@@ -97,6 +97,10 @@ class LoraTab:
             components.label(master, 1, 3, "Decompose Weights",
                              tooltip="Decompose LoRA Weights (aka, DoRA).")
             components.switch(master, 1, 4, self.ui_state, "lora_decompose")
+        elif peft_type == PeftType.LOHA:
+            components.label(master, 1, 3, "Use Tucker Decomposition",
+                             tooltip="Use the Tucker decomposition method with LoHa.")
+            components.switch(master, 1, 4, self.ui_state, "tucker_decompose")
 
         # lora rank
         components.label(master, 2, 0, f"{name} alpha",
