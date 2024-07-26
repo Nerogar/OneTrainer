@@ -9,6 +9,8 @@ from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
 from modules.util import custom_passes
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import PeftType
 
 
 class PeftBase(nn.Module):
@@ -336,6 +338,7 @@ class DoRAModule(LoRAModule):
 
 DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
+DummyLoHaModule = LoHaModule.make_dummy()
 
 
 class LoRAModuleWrapper:
@@ -348,24 +351,34 @@ class LoRAModuleWrapper:
     def __init__(
             self,
             orig_module: nn.Module | None,
-            rank: int,
             prefix: str,
-            alpha: float = 1.0,
-            weight_decompose: bool = False,
+            config: TrainConfig,
             module_filter: list[str] = None,
     ):
-        super(LoRAModuleWrapper, self).__init__()
         self.orig_module = orig_module
-        self.rank = rank
-        self.alpha = alpha
         self.prefix = prefix
-        self.module_filter = module_filter if module_filter is not None else []
-        self.klass = DoRAModule if weight_decompose else LoRAModule
-        self.dummy_klass = DummyDoRAModule if weight_decompose else DummyLoRAModule
+        self.peft_type = config.peft_type
+        self.rank = config.lora_rank
+        self.alpha = config.lora_alpha
+        self.module_filter = module_filter if module_filter is not None or []
+        weight_decompose = config.lora_decompose
+        if self.peft_type == PeftType.LORA:
+            if weight_decompose:
+                self.klass = DoRAModule
+                self.dummy_klass = DummyDoRAModule
+                self.dummy_args = (self.rank, self.alpha)
+            else:
+                self.klass = LoRAModule
+                self.dummy_klass = DummyLoRAModule
+                self.dummy_args = (self.rank, self.alpha)
+        elif self.peft_type == PeftType.LOHA:
+            self.klass = LoHaModule
+            self.dummy_klass = DummyLoHaModule
+            self.dummy_args = (self.rank, self.alpha)
 
-        self.lora_modules = self.__create_modules(orig_module, alpha, weight_decompose)
+        self.lora_modules = self.__create_modules(orig_module)
 
-    def __create_modules(self, orig_module: nn.Module | None, alpha: float, weight_decompose: bool) -> dict[str, LoRAModule]:
+    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, LoRAModule]:
         lora_modules = {}
 
         if orig_module is not None:
@@ -373,7 +386,7 @@ class LoRAModuleWrapper:
                 if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
                     if isinstance(child_module, Linear) or \
                        isinstance(child_module, Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, self.rank, alpha)
+                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, self.rank, self.alpha)
 
         return lora_modules
 
@@ -416,7 +429,7 @@ class LoRAModuleWrapper:
         for name in remaining_names:
             if name.endswith(".alpha"):
                 prefix = name.removesuffix(".alpha")
-                module = self.dummy_klass(prefix, None, self.rank, self.alpha)
+                module = self.dummy_klass(prefix, None, *self.dummy_args)
                 module.load_state_dict(state_dict)
                 self.lora_modules[prefix] = module
 

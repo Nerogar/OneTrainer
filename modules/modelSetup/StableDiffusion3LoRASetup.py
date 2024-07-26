@@ -173,21 +173,21 @@ class StableDiffusion3LoRASetup(
 
         if model.text_encoder_1 is not None:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, config.lora_rank, "lora_te1", config.lora_alpha, config.lora_decompose
+                model.text_encoder_1, "lora_te1", config
             ) if create_te1 else None
 
         if model.text_encoder_2 is not None:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, config.lora_rank, "lora_te2", config.lora_alpha, config.lora_decompose
+                model.text_encoder_2, "lora_te2", config
             ) if create_te2 else None
 
         if model.text_encoder_3 is not None:
             model.text_encoder_3_lora = LoRAModuleWrapper(
-                model.text_encoder_3, config.lora_rank, "lora_te3", config.lora_alpha, config.lora_decompose
+                model.text_encoder_3, "lora_te3", config
             ) if create_te3 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, config.lora_rank, "lora_transformer", config.lora_alpha, config.lora_decompose, config.lora_layers.split(",")
+            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
         )
 
         if model.lora_state_dict:

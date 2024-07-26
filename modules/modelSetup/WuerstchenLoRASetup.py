@@ -113,11 +113,11 @@ class WuerstchenLoRASetup(
 
         create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_prior_te")
         model.prior_text_encoder_lora = LoRAModuleWrapper(
-            model.prior_text_encoder, config.lora_rank, "lora_prior_te", config.lora_alpha, config.lora_decompose
+            model.prior_text_encoder, "lora_prior_te", config
         ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
-            model.prior_prior, config.lora_rank, "lora_prior_unet", config.lora_alpha, config.lora_decompose, config.lora_layers.split(",")
+            model.prior_prior, "lora_prior_unet", config, config.lora_layers.split(",")
         )
 
         if model.lora_state_dict:
