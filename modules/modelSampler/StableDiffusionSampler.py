@@ -196,15 +196,15 @@ class StableDiffusionSampler(BaseModelSampler):
 
             return image[0]
 
-    def __create_erode_kernel(self, device):
+    def __create_erode_kernel(self, device, dtype=torch.float32):
         kernel_radius = 2
 
         kernel_size = kernel_radius * 2 + 1
-        kernel_weights = torch.ones(1, 1, kernel_size, kernel_size) / (kernel_size * kernel_size)
+        kernel_weights = torch.ones(1, 1, kernel_size, kernel_size, dtype=dtype) / (kernel_size * kernel_size)
         kernel = nn.Conv2d(
             in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
             padding=kernel_radius
-        )
+        ).to(dtype)
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
         kernel.to(device)
@@ -268,9 +268,9 @@ class StableDiffusionSampler(BaseModelSampler):
                     device=self.train_device,
                 )
 
-                erode_kernel = self.__create_erode_kernel(self.train_device)
+                erode_kernel = self.__create_erode_kernel(self.train_device, dtype=self.model.train_dtype.torch_dtype())
                 eroded_mask = erode_kernel(mask)
-                eroded_mask = (eroded_mask > 0.5).float()
+                eroded_mask = (eroded_mask > 0.5).to(dtype=self.model.train_dtype.torch_dtype())
 
                 image = (image * 2.0) - 1.0
                 conditioning_image = (image * (1 - eroded_mask))
@@ -285,7 +285,7 @@ class StableDiffusionSampler(BaseModelSampler):
                     antialias=True
                 )
                 latent_mask = rescale_mask(mask)
-                latent_mask = (latent_mask > 0).float()
+                latent_mask = (latent_mask > 0).to(dtype=self.model.train_dtype.torch_dtype())
                 latent_mask = latent_mask.unsqueeze(0)
             else:
                 conditioning_image = torch.zeros(
