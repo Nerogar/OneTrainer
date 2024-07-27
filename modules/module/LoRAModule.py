@@ -194,8 +194,8 @@ class LoHaModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        hada_w1_a, hada_w1_b = self.create_layer()
-        hada_w2_a, hada_w2_b = self.create_layer()
+        hada_w1_b, hada_w1_a = self.create_layer()
+        hada_w2_b, hada_w2_a = self.create_layer()
         self.hada_w1_a = hada_w1_a.weight
         self.hada_w1_b = hada_w1_b.weight
         self.hada_w2_a = hada_w2_a.weight
@@ -212,10 +212,12 @@ class LoHaModule(PeftBase):
         assert self.orig_module
         assert self.orig_forward
 
-        W1 = self.make_weight(self.dropout(self.hada_w1_a),
-                              self.dropout(self.hada_w1_b))
-        W2 = self.make_weight(self.dropout(self.hada_w2_a),
-                              self.dropout(self.hada_w2_b))
+        # Yeah, yeah, it's different from the A/B parameters in make_weight.
+        # Lycoris defines them in the opposite order. Yeah, it's confusing.
+        W1 = self.make_weight(self.dropout(self.hada_w1_b),
+                              self.dropout(self.hada_w1_a))
+        W2 = self.make_weight(self.dropout(self.hada_w2_b),
+                              self.dropout(self.hada_w2_a))
         W = (W1 * W2) * (self.alpha / self.rank)
         return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
 
