@@ -432,7 +432,7 @@ class BaseStableDiffusionSetup(
                         )
 
                         # predicted image
-                        alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(config.train_device)
+                        alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(config.train_device, dtype=model.vae.dtype)
                         sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
                         sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
