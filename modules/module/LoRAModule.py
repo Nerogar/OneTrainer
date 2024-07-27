@@ -175,6 +175,13 @@ class LoHaModule(PeftBase):
     and it was tough to do them in a sufficiently generic fashion.
     """
 
+    rank: int
+    dropout: Dropout
+    hada_weight_w1_a: Tensor
+    hada_weight_w1_b: Tensor
+    hada_weight_w2_a: Tensor
+    hada_weight_w2_b: Tensor
+
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super().__init__(prefix, orig_module)
         self.rank = rank
@@ -187,13 +194,17 @@ class LoHaModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
-        self.hada_w1_a, self.hada_w1_b = self.create_layer()
-        self.hada_w2_a, self.hada_w2_b = self.create_layer()
+        hada_w1_a, hada_w1_b = self.create_layer()
+        hada_w2_a, hada_w2_b = self.create_layer()
+        self.hada_w1_a = hada_w1_a.weight
+        self.hada_w1_b = hada_w1_b.weight
+        self.hada_w2_a = hada_w2_a.weight
+        self.hada_w2_b = hada_w2_b.weight
 
-        nn.init.normal_(self.hada_w1_a.weight, std=0.1)
-        nn.init.normal_(self.hada_w1_b.weight, std=1)
-        nn.init.constant_(self.hada_w2_a.weight, 0)
-        nn.init.normal_(self.hada_w2_b.weight, std=1)
+        nn.init.normal_(self.hada_w1_a, std=0.1)
+        nn.init.normal_(self.hada_w1_b, std=1)
+        nn.init.constant_(self.hada_w2_a, 0)
+        nn.init.normal_(self.hada_w2_b, std=1)
 
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
@@ -201,10 +212,10 @@ class LoHaModule(PeftBase):
         assert self.orig_module
         assert self.orig_forward
 
-        W1 = self.make_weight(self.dropout(self.hada_w1_a.weight),
-                              self.dropout(self.hada_w1_b.weight))
-        W2 = self.make_weight(self.dropout(self.hada_w2_a.weight),
-                              self.dropout(self.hada_w2_b.weight))
+        W1 = self.make_weight(self.dropout(self.hada_w1_a),
+                              self.dropout(self.hada_w1_b))
+        W2 = self.make_weight(self.dropout(self.hada_w2_a),
+                              self.dropout(self.hada_w2_b))
         W = (W1 * W2) * (self.alpha / self.rank)
         return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
 
