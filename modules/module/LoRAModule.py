@@ -321,7 +321,7 @@ class DoRAModule(LoRAModule):
                  .reshape(WP.shape[1], -1) \
                  .norm(dim=1, keepdim=True) \
                  .reshape(WP.shape[1], *[1] * self.dora_num_dims) \
-                 .transpose(0, 1) + torch.finfo(WP.dtype).eps
+                 .transpose(0, 1)
         WP = self.dora_scale * (WP / norm)
         # In the DoRA codebase (and thus the paper results), they perform
         # dropout on the *input*, rather than between layers, so we duplicate
