@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import shutil
@@ -199,15 +200,15 @@ class GenericTrainer(BaseTrainer):
             self,
             train_progress: TrainProgress,
             train_device: torch.device,
-            sample_params_list: list[SampleConfig],
+            sample_config_list: list[SampleConfig],
             folder_postfix: str = "",
             image_format: ImageFormat = ImageFormat.JPG,
             is_custom_sample: bool = False,
     ):
-        for i, sample_params in enumerate(sample_params_list):
-            if sample_params.enabled:
+        for i, sample_config in enumerate(sample_config_list):
+            if sample_config.enabled:
                 try:
-                    safe_prompt = path_util.safe_filename(sample_params.prompt)
+                    safe_prompt = path_util.safe_filename(sample_config.prompt)
 
                     if is_custom_sample:
                         sample_dir = os.path.join(
@@ -242,12 +243,13 @@ class GenericTrainer(BaseTrainer):
                     self.model.to(self.temp_device)
                     self.model.eval()
 
+                    sample_config = copy.copy(sample_config)
+                    sample_config.from_train_config(self.config)
+
                     self.model_sampler.sample(
-                        sample_params=sample_params,
+                        sample_config=sample_config,
                         destination=sample_path,
                         image_format=self.config.sample_image_format,
-                        text_encoder_layer_skip=self.config.text_encoder_layer_skip,
-                        force_last_timestep=self.config.rescale_noise_scheduler_to_zero_terminal_snr,
                         on_sample=on_sample,
                         on_update_progress=on_update_progress,
                     )
@@ -290,7 +292,7 @@ class GenericTrainer(BaseTrainer):
         self.__sample_loop(
             train_progress=train_progress,
             train_device=train_device,
-            sample_params_list=sample_params_list,
+            sample_config_list=sample_params_list,
             image_format=self.config.sample_image_format,
             is_custom_sample=is_custom_sample,
         )
@@ -303,7 +305,7 @@ class GenericTrainer(BaseTrainer):
             self.__sample_loop(
                 train_progress=train_progress,
                 train_device=train_device,
-                sample_params_list=sample_params_list,
+                sample_config_list=sample_params_list,
                 image_format=self.config.sample_image_format,
                 folder_postfix=" - no-ema",
             )

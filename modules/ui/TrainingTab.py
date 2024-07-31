@@ -553,17 +553,21 @@ class TrainingTab:
                          tooltip="Enables training the Transformer model")
         components.switch(frame, 0, 1, self.ui_state, "prior.train")
 
-        # train unet epochs
+        # train transformer epochs
         components.label(frame, 1, 0, "Stop Training After",
                          tooltip="When to stop training the Transformer")
         components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
                               supports_time_units=False)
 
-        # unet learning rate
+        # transformer learning rate
         components.label(frame, 2, 0, "Transformer Learning Rate",
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
+        # transformer learning rate
+        components.label(frame, 3, 0, "Force Attention Mask",
+                         tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
+        components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
 
     def __create_noise_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

@@ -429,9 +429,14 @@ class BaseStableDiffusion3Setup(
             [rand.random() > config.text_encoder_3.dropout_probability for _ in range(batch_size)],
             device=self.train_device)).float()
 
-        text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None] * tokens_mask_1[:, :, None]
-        text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None] * tokens_mask_2[:, :, None]
-        text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None] * tokens_mask_3[:, :, None]
+        text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
+        text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
+        text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
+
+        if config.prior.attention_mask:
+            text_encoder_1_output *= tokens_mask_1[:, :, None]
+            text_encoder_2_output *= tokens_mask_2[:, :, None]
+            text_encoder_3_output *= tokens_mask_3[:, :, None]
 
         pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
         pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]

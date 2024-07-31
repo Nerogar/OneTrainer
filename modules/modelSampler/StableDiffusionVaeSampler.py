@@ -28,16 +28,14 @@ class StableDiffusionVaeSampler(BaseModelSampler):
 
     def sample(
             self,
-            sample_params: SampleConfig,
+            sample_config: SampleConfig,
             destination: str,
             image_format: ImageFormat,
-            text_encoder_layer_skip: int,
-            force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
-        image = Image.open(sample_params.prompt)
+        image = Image.open(sample_config.prompt)
         image = image.convert("RGB")
 
         t_in = transforms.ToTensor()

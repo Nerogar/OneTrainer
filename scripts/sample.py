@@ -46,6 +46,9 @@ def main():
                 "height": args.height,
                 "width": args.width,
                 "seed": 42,
+                "text_encoder_1_layer_skip": args.text_encoder_layer_skip,
+                "text_encoder_2_layer_skip": args.text_encoder_layer_skip,
+                "text_encoder_3_layer_skip": args.text_encoder_layer_skip,
                 "sample_inpainting": args.sample_inpainting,
                 "base_image_path": args.base_image_path,
                 "mask_image_path": args.mask_image_path,
@@ -53,7 +56,6 @@ def main():
         ),
         image_format=ImageFormat.JPG,
         destination=args.destination,
-        text_encoder_layer_skip=args.text_encoder_layer_skip,
     )
 
 

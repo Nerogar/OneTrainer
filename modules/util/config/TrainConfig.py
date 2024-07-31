@@ -168,6 +168,7 @@ class TrainModelPartConfig(BaseConfig):
     weight_dtype: DataType
     dropout_probability: float
     train_embedding: bool
+    attention_mask: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainModelPartConfig, self).__init__(data)
@@ -186,6 +187,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("weight_dtype", DataType.NONE, DataType, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
+        data.append(("attention_mask", False, bool, False))
 
         return TrainModelPartConfig(data)
 

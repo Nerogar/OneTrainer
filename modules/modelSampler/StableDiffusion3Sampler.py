@@ -46,6 +46,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             text_encoder_layer_skip: int,
             joint_attention_dim: int,
             train_dtype: DataType,
+            prior_attention_mask: bool = False,
     ):
         if tokenizer_1 is not None and text_encoder_1 is not None:
             tokenizer_1_output = tokenizer_1(
@@ -60,13 +61,15 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
             text_encoder_1_output = text_encoder_1(
                 tokens_1,
-                # attention_mask=tokens_1_attention_mask,
                 output_hidden_states=True,
                 return_dict=True,
             )
 
             pooled_text_encoder_1_output = text_encoder_1_output[0]
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)] * tokens_1_attention_mask[:, :, None]
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
+
+            if prior_attention_mask:
+                text_encoder_1_output *= tokens_1_attention_mask[:, :, None]
         else:
             pooled_text_encoder_1_output = torch.zeros(
                 size=(1, 768),
@@ -92,13 +95,15 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
             text_encoder_2_output = text_encoder_2(
                 tokens_2,
-                # attention_mask=tokens_2_attention_mask,
                 output_hidden_states=True,
                 return_dict=True,
             )
 
             pooled_text_encoder_2_output = text_encoder_2_output[0]
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)] * tokens_2_attention_mask[:, :, None]
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
+
+            if prior_attention_mask:
+                text_encoder_2_output *= tokens_2_attention_mask[:, :, None]
         else:
             pooled_text_encoder_2_output = torch.zeros(
                 size=(1, 1280),
@@ -122,12 +127,15 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
                 tokens_3_attention_mask = tokenizer_3_output.attention_mask.to(self.train_device)
 
-                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0] * tokens_3_attention_mask[:, :, None]
+                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0]
+
+            if prior_attention_mask:
+                text_encoder_3_output *= tokens_3_attention_mask[:, :, None]
             else:
                 text_encoder_3_output = torch.zeros(
                     (1, 77, joint_attention_dim),
                     device=self.train_device,
-                    dtype=self.model.train_dtype.torch_dtype(),
+                    dtype=train_dtype.torch_dtype(),
                 )
 
         prompt_embedding = torch.concat(
@@ -156,6 +164,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
+            prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image.Image:
         with self.model.autocast_context:
@@ -191,6 +200,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 text_encoder_layer_skip=text_encoder_layer_skip,
                 joint_attention_dim=transformer.config.joint_attention_dim,
                 train_dtype=self.model.train_dtype,
+                prior_attention_mask=prior_attention_mask,
             )
 
             negative_prompt_embedding, negative_pooled_prompt_embedding = self.__encode_prompt(
@@ -204,6 +214,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 text_encoder_layer_skip=text_encoder_layer_skip,
                 joint_attention_dim=transformer.config.joint_attention_dim,
                 train_dtype=self.model.train_dtype,
+                prior_attention_mask=prior_attention_mask,
             )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding], dim=0)
@@ -292,30 +303,29 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
     def sample(
             self,
-            sample_params: SampleConfig,
+            sample_config: SampleConfig,
             destination: str,
             image_format: ImageFormat,
-            text_encoder_layer_skip: int,
-            force_last_timestep: bool = False,
             on_sample: Callable[[Image], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = self.model.add_embeddings_to_prompt(sample_params.prompt)
-        negative_prompt = self.model.add_embeddings_to_prompt(sample_params.negative_prompt)
+        prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
+        negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
 
         image = self.__sample_base(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            height=sample_params.height,
-            width=sample_params.width,
-            seed=sample_params.seed,
-            random_seed=sample_params.random_seed,
-            diffusion_steps=sample_params.diffusion_steps,
-            cfg_scale=sample_params.cfg_scale,
-            noise_scheduler=sample_params.noise_scheduler,
-            cfg_rescale=0.7 if force_last_timestep else 0.0,
-            text_encoder_layer_skip=text_encoder_layer_skip,
-            force_last_timestep=force_last_timestep,
+            height=sample_config.height,
+            width=sample_config.width,
+            seed=sample_config.seed,
+            random_seed=sample_config.random_seed,
+            diffusion_steps=sample_config.diffusion_steps,
+            cfg_scale=sample_config.cfg_scale,
+            noise_scheduler=sample_config.noise_scheduler,
+            cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
+            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+            force_last_timestep=sample_config.force_last_timestep,
+            prior_attention_mask=sample_config.prior_attention_mask,
             on_update_progress=on_update_progress,
         )
 
