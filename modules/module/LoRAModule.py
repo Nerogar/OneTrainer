@@ -50,7 +50,7 @@ class PeftBase(nn.Module):
             self.is_applied = True
 
     def remove_hook_from_module(self):
-        assert self.orig_forward
+        assert self.orig_forward is not None
         if self.is_applied:
             self.orig_module.forward = self.orig_forward
             self.is_applied = False
@@ -72,9 +72,19 @@ class PeftBase(nn.Module):
         W = B.view(B.size(0), -1) @ A.view(A.size(0), -1)
         return W.view(self.shape)
 
+    def check_initialized(self):
+        """Checks, and raises an exception, if the module is not initialized."""
+        if not self._initialized:
+            raise RuntimeError("Module %s is not initialized." % self.prefix)
+
+        # Perform assertions to make pytype happy.
+        assert self.orig_forward is not None
+        assert self.orig_module is not None
+        assert self.op is not None
+
     @property
     def orig_module(self) -> nn.Module:
-        assert self._orig_module
+        assert self._orig_module is not None
         return self._orig_module[0]
 
     def load_state_dict(self, state_dict: Mapping[str, Any],
@@ -145,7 +155,7 @@ class PeftBase(nn.Module):
                 self._state_dict = {}
 
             def forward(self, *args, **kwargs):
-                assert self.orig_module
+                assert self.orig_module is not None
                 return PeftBase.forward(self, *args, **kwargs)
 
             def load_state_dict(self, state_dict: Mapping[str, Any],
@@ -223,11 +233,16 @@ class LoHaModule(PeftBase):
         nn.init.constant_(self.hada_w2_a, 0)
         nn.init.normal_(self.hada_w2_b, std=1)
 
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.hada_w1_a is not None
+        assert self.hada_w1_b is not None
+        assert self.hada_w2_a is not None
+        assert self.hada_w2_b is not None
+
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
-        assert self.op
-        assert self.orig_module
-        assert self.orig_forward
+        self.check_initialized()
 
         # Yeah, yeah, it's different from the A/B parameters in make_weight.
         # Lycoris defines them in the opposite order. Yeah, it's confusing.
@@ -278,11 +293,13 @@ class LoRAModule(PeftBase):
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
 
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.lora_down is not None
+        assert self.lora_up is not None
+
     def forward(self, x, *args, **kwargs):
-        # They definitely exist at this point in the execution.
-        assert self.orig_forward
-        assert self.lora_down
-        assert self.lora_up
+        self.check_initialized()
 
         if self.orig_module.training:
             ld = self.lora_up(self.dropout(self.lora_down(x)))
@@ -330,11 +347,12 @@ class DoRAModule(LoRAModule):
                 device=self.orig_module.weight.device)
         )
 
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.dora_scale is not None
+
     def forward(self, x, *args, **kwargs):
-        # They definitely exist at this point in the execution.
-        assert self.orig_forward
-        assert self.lora_down
-        assert self.lora_up
+        self.check_initialized()
 
         A = self.lora_down.weight
         B = self.lora_up.weight
