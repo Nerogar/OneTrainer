@@ -198,10 +198,10 @@ class LoHaModule(PeftBase):
 
     rank: int
     dropout: Dropout
-    hada_weight_w1_a: Tensor|None
-    hada_weight_w1_b: Tensor|None
-    hada_weight_w2_a: Tensor|None
-    hada_weight_w2_b: Tensor|None
+    hada_weight_w1_a: Tensor | None
+    hada_weight_w1_b: Tensor | None
+    hada_weight_w2_a: Tensor | None
+    hada_weight_w2_b: Tensor | None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super().__init__(prefix, orig_module)
@@ -263,8 +263,8 @@ class LoHaModule(PeftBase):
 
 
 class LoRAModule(PeftBase):
-    lora_down: nn.Module|None
-    lora_up: nn.Module|None
+    lora_down: nn.Module | None
+    lora_up: nn.Module | None
     rank: int
     alpha: torch.Tensor
     dropout: Dropout
@@ -323,7 +323,7 @@ class DoRAModule(LoRAModule):
     complicated, as it involves taking the norm of the directional result.
     """
     dora_num_dims: int
-    dora_scale: Tensor|None
+    dora_scale: Tensor | None
 
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
