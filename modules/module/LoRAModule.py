@@ -383,7 +383,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        self.module_filter = module_filter if module_filter is not None else []
+        self.module_filter = [x.strip() for x in module_filter] if module_filter is not None else []
         weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
             if weight_decompose:

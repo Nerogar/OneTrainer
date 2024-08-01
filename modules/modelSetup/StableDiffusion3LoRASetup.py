@@ -12,6 +12,7 @@ from modules.util.torch_util import state_dict_has_prefix
 
 PRESETS = {
     "attn-only": ["attn"],
+    "full": [],
 }
 
 
