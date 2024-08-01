@@ -1,7 +1,7 @@
 import copy
 import math
 from abc import abstractmethod
-from typing import Any, Mapping, Tuple, cast
+from typing import Any, Mapping, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -18,6 +18,7 @@ class PeftBase(nn.Module):
     _orig_module: list[nn.Module] | None  # list prevents it from registering
     prefix: str
     layer_kwargs: dict  # Applied during the forward op() call.
+    _initialized: bool  # Tracks whether we've created the layers or not.
 
     def __init__(self, prefix: str, orig_module: nn.Module | None):
         super().__init__()
@@ -25,6 +26,7 @@ class PeftBase(nn.Module):
         self._orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = {}
+        self._initialized = False
 
         if orig_module is not None:
             match orig_module:
@@ -102,8 +104,6 @@ class PeftBase(nn.Module):
         method.
         """
         device = self.orig_module.weight.device
-        lora_down = None
-        lora_up = None
         match self.orig_module:
             case nn.Linear():
                 in_features = self.orig_module.in_features
@@ -127,7 +127,7 @@ class PeftBase(nn.Module):
                 lora_up = Conv2d(self.rank, out_channels // groups, (1, 1), 1, bias=False, device=device)
 
             case _:
-                    raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+                raise NotImplementedError("Only Linear and Conv2d are supported layers.")
 
         return lora_down, lora_up
 
@@ -140,29 +140,40 @@ class PeftBase(nn.Module):
         extra keys that aren't specified in the training configuration.
         """
         class Dummy(cls):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._state_dict = {}
+
             def forward(self, *args, **kwargs):
                 assert self.orig_module
                 return PeftBase.forward(self, *args, **kwargs)
 
             def load_state_dict(self, state_dict: Mapping[str, Any],
                                 strict: bool = True, assign: bool = False):
+                self._initialized = True
                 self._state_dict = copy.deepcopy(state_dict)
+                # noinspection PyProtectedMember
                 return nn.modules.module._IncompatibleKeys([], [])
 
             def state_dict(self, *args, **kwargs):  # type: ignore
+                if not self._initialized:
+                    raise RuntimeError("A state dict must be loaded before one can be returned.")
                 return self._state_dict
 
+            def initialize_weights(self):
+                raise NotImplementedError("Should never be called on a dummy module.")
+
             def hook_to_module(self):
-                pass
+                raise NotImplementedError("Should never be called on a dummy module.")
 
             def remove_hook_from_module(self):
-                pass
+                raise NotImplementedError("Should never be called on a dummy module.")
 
             def apply_to_module(self):
-                pass
+                raise NotImplementedError("Should never be called on a dummy module.")
 
             def extract_from_module(self, base_module: nn.Module):
-                pass
+                raise NotImplementedError("Should never be called on a dummy module.")
 
         return Dummy
 
@@ -177,16 +188,20 @@ class LoHaModule(PeftBase):
 
     rank: int
     dropout: Dropout
-    hada_weight_w1_a: Tensor
-    hada_weight_w1_b: Tensor
-    hada_weight_w2_a: Tensor
-    hada_weight_w2_b: Tensor
+    hada_weight_w1_a: Tensor|None
+    hada_weight_w1_b: Tensor|None
+    hada_weight_w2_a: Tensor|None
+    hada_weight_w2_b: Tensor|None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super().__init__(prefix, orig_module)
         self.rank = rank
         self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
+        self.hada_weight_w1_a = None
+        self.hada_weight_w1_b = None
+        self.hada_weight_w2_a = None
+        self.hada_weight_w2_b = None
 
         if orig_module is not None:
             self.initialize_weights()
@@ -194,6 +209,8 @@ class LoHaModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
+        self._initialized = True
+
         hada_w1_b, hada_w1_a = self.create_layer()
         hada_w2_b, hada_w2_a = self.create_layer()
         self.hada_w1_a = hada_w1_a.weight
@@ -231,8 +248,8 @@ class LoHaModule(PeftBase):
 
 
 class LoRAModule(PeftBase):
-    lora_down: nn.Module
-    lora_up: nn.Module
+    lora_down: nn.Module|None
+    lora_up: nn.Module|None
     rank: int
     alpha: torch.Tensor
     dropout: Dropout
@@ -247,6 +264,8 @@ class LoRAModule(PeftBase):
         self.rank = rank
         self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
+        self.lora_down = None
+        self.lora_up = None
 
         if orig_module is not None:
             self.initialize_weights()
@@ -261,6 +280,8 @@ class LoRAModule(PeftBase):
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
         assert self.orig_forward
+        assert self.lora_down
+        assert self.lora_up
 
         if self.orig_module.training:
             ld = self.lora_up(self.dropout(self.lora_down(x)))
@@ -284,7 +305,11 @@ class DoRAModule(LoRAModule):
     complicated, as it involves taking the norm of the directional result.
     """
     dora_num_dims: int
-    dora_scale: nn.Parameter
+    dora_scale: Tensor|None
+
+    def __init__(self, *args, **kwargs):
+        self.dora_scale = None
+        super().__init__(*args, **kwargs)
 
     def initialize_weights(self):
         super().initialize_weights()
@@ -307,6 +332,8 @@ class DoRAModule(LoRAModule):
     def forward(self, x, *args, **kwargs):
         # They definitely exist at this point in the execution.
         assert self.orig_forward
+        assert self.lora_down
+        assert self.lora_up
 
         A = self.lora_down.weight
         B = self.lora_up.weight
@@ -342,7 +369,7 @@ class LoRAModuleWrapper:
     rank: int
     alpha: float
 
-    lora_modules: dict[str, LoRAModule]
+    lora_modules: dict[str, PeftBase]
 
     def __init__(
             self,
@@ -374,7 +401,7 @@ class LoRAModuleWrapper:
 
         self.lora_modules = self.__create_modules(orig_module)
 
-    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, LoRAModule]:
+    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, PeftBase]:
         lora_modules = {}
 
         if orig_module is not None:
