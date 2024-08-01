@@ -273,6 +273,7 @@ class LoRAModule(PeftBase):
         self.alpha.requires_grad_(False)
 
     def initialize_weights(self):
+        self._initialized = True
         self.lora_down, self.lora_up = self.create_layer()
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
