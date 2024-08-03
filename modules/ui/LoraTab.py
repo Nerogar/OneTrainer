@@ -94,7 +94,7 @@ class LoraTab:
 
         # decomposition
         if peft_type == PeftType.LORA:
-            components.label(master, 1, 3, "Decompose Weights",
+            components.label(master, 1, 3, "Decompose Weights (DoRA)",
                              tooltip="Decompose LoRA Weights (aka, DoRA).")
             components.switch(master, 1, 4, self.ui_state, "lora_decompose")
 
