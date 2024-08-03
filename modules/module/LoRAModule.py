@@ -198,20 +198,20 @@ class LoHaModule(PeftBase):
 
     rank: int
     dropout: Dropout
-    hada_weight_w1_a: Tensor | None
-    hada_weight_w1_b: Tensor | None
-    hada_weight_w2_a: Tensor | None
-    hada_weight_w2_b: Tensor | None
+    hada_w1_a: Tensor | None
+    hada_w1_b: Tensor | None
+    hada_w2_a: Tensor | None
+    hada_w2_b: Tensor | None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
         super().__init__(prefix, orig_module)
         self.rank = rank
         self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
-        self.hada_weight_w1_a = None
-        self.hada_weight_w1_b = None
-        self.hada_weight_w2_a = None
-        self.hada_weight_w2_b = None
+        self.hada_w1_a = None
+        self.hada_w1_b = None
+        self.hada_w2_a = None
+        self.hada_w2_b = None
 
         if orig_module is not None:
             self.initialize_weights()
