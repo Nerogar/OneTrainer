@@ -1,90 +1,312 @@
+import copy
 import math
-from abc import ABCMeta
+from abc import abstractmethod
+from typing import Any, Mapping, Tuple
 
 import torch
+import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn import Dropout, Linear, Conv2d, Parameter
 
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import PeftType
 
-class LoRAModule(metaclass=ABCMeta):
+
+class PeftBase(nn.Module):
+    is_applied: bool
+    orig_forward: Any | None
+    _orig_module: list[nn.Module] | None  # list prevents it from registering
     prefix: str
-    orig_module: nn.Module
-    lora_down: nn.Module
-    lora_up: nn.Module
-    alpha: torch.Tensor
+    layer_kwargs: dict  # Applied during the forward op() call.
+    _initialized: bool  # Tracks whether we've created the layers or not.
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None):
+        super().__init__()
+        self.prefix = prefix.replace('.', '_') + '.'
+        self._orig_module = [orig_module] if orig_module else None
+        self.is_applied = False
+        self.layer_kwargs = {}
+        self._initialized = False
+
+        if orig_module is not None:
+            match orig_module:
+                case nn.Linear():
+                    self.op = F.linear
+                    self.shape = orig_module.weight.shape
+                case nn.Conv2d():
+                    self.op = F.conv2d
+                    self.shape = orig_module.weight.shape
+                    self.layer_kwargs.setdefault("stride", orig_module.stride)
+                    self.layer_kwargs.setdefault("padding", orig_module.padding)
+                    self.layer_kwargs.setdefault("dilation", orig_module.dilation)
+                    self.layer_kwargs.setdefault("groups", orig_module.groups)
+                case _:
+                    raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+
+    def hook_to_module(self):
+        if not self.is_applied:
+            self.orig_forward = self.orig_module.forward
+            self.orig_module.forward = self.forward
+            self.is_applied = True
+
+    def remove_hook_from_module(self):
+        assert self.orig_forward is not None
+        if self.is_applied:
+            self.orig_module.forward = self.orig_forward
+            self.is_applied = False
+
+    def make_weight(self, A: Tensor, B: Tensor):
+        """Layer-type-independent way of creating a weight matrix from LoRA A/B.
+
+        While linear layer types are a straightforward matrix multiplication of
+        the weights, convolution is a little less straightforward. This function
+        will take a PEFT A/B matrix and return the full-sized weight matrix.
+
+        A should be the equivalent of "LoRA Down" in most code, and likewise B
+        the equivalent of "LoRA Up".
+
+        Thanks to KohakuBlueLeaf (author of LyCORIS) for showing me how to do
+        this in a layer-independent fashion. I was tearing my hair out over
+        wrangling the matrix shapes in a functionally correct manner before.
+        """
+        W = B.view(B.size(0), -1) @ A.view(A.size(0), -1)
+        return W.view(self.shape)
+
+    def check_initialized(self):
+        """Checks, and raises an exception, if the module is not initialized."""
+        if not self._initialized:
+            raise RuntimeError("Module %s is not initialized." % self.prefix)
+
+        # Perform assertions to make pytype happy.
+        assert self.orig_forward is not None
+        assert self.orig_module is not None
+        assert self.op is not None
+
+    @property
+    def orig_module(self) -> nn.Module:
+        assert self._orig_module is not None
+        return self._orig_module[0]
+
+    def load_state_dict(self, state_dict: Mapping[str, Any],
+                        strict: bool = True, assign: bool = False):
+        state_dict = {k.removeprefix(self.prefix): v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
+        return super().load_state_dict(state_dict, strict, assign)
+
+    @abstractmethod
+    def initialize_weights(self):
+        pass
+
+    @abstractmethod
+    def apply_to_module(self):
+        pass
+
+    @abstractmethod
+    def extract_from_module(self, base_module: nn.Module):
+        pass
+
+    def create_layer(self) -> Tuple[nn.Module, nn.Module]:
+        """Generic helper function for creating a PEFT layer, like LoRA.
+
+        Creates down/up layer modules for the given layer type in the
+        orig_module, for the given rank.
+
+        Does not perform initialization, as that usually depends on the PEFT
+        method.
+        """
+        device = self.orig_module.weight.device
+        match self.orig_module:
+            case nn.Linear():
+                in_features = self.orig_module.in_features
+                out_features = self.orig_module.out_features
+                lora_down = nn.Linear(in_features, self.rank, bias=False, device=device)
+                lora_up = nn.Linear(self.rank, out_features, bias=False, device=device)
+
+            case nn.Conv2d():
+                in_channels = self.orig_module.in_channels
+                out_channels = self.orig_module.out_channels
+                kernel_size = self.orig_module.kernel_size
+                stride = self.orig_module.stride
+                padding = self.orig_module.padding
+                dilation = self.orig_module.dilation
+                groups = self.orig_module.groups
+                lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, dilation=dilation, bias=False, device=device)
+                # Note: small departure here from part of the community.
+                # The original Mcrosoft repo does it this way. The cloneofsimo
+                # repo handles the groups in lora_down. We follow the Microsoft
+                # way. In reality, there shouldn't be any difference.
+                lora_up = Conv2d(self.rank, out_channels // groups, (1, 1), 1, bias=False, device=device)
+
+            case _:
+                raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+
+        return lora_down, lora_up
+
+    @classmethod
+    def make_dummy(cls):
+        """Create a dummy version of a PEFT class.
+
+        Acts identically to one of the above regular PEFT modules, but doesn't
+        actually train or hook to the module at all. Generally used to hold
+        extra keys that aren't specified in the training configuration.
+        """
+        class Dummy(cls):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._state_dict = {}
+
+            def forward(self, *args, **kwargs):
+                assert self.orig_module is not None
+                return PeftBase.forward(self, *args, **kwargs)
+
+            def load_state_dict(self, state_dict: Mapping[str, Any],
+                                strict: bool = True, assign: bool = False):
+                self._initialized = True
+                self._state_dict = copy.deepcopy(state_dict)
+                # noinspection PyProtectedMember
+                return nn.modules.module._IncompatibleKeys([], [])
+
+            def state_dict(self, *args, **kwargs):  # type: ignore
+                if not self._initialized:
+                    raise RuntimeError("A state dict must be loaded before one can be returned.")
+                return self._state_dict
+
+            def initialize_weights(self):
+                raise NotImplementedError("Should never be called on a dummy module.")
+
+            def hook_to_module(self):
+                raise NotImplementedError("Should never be called on a dummy module.")
+
+            def remove_hook_from_module(self):
+                raise NotImplementedError("Should never be called on a dummy module.")
+
+            def apply_to_module(self):
+                raise NotImplementedError("Should never be called on a dummy module.")
+
+            def extract_from_module(self, base_module: nn.Module):
+                raise NotImplementedError("Should never be called on a dummy module.")
+
+        return Dummy
+
+
+class LoHaModule(PeftBase):
+    """Implementation of LoHa from Lycoris.
+
+    Does not support Tucker decomposition, extra scalar, or weight decomposition
+    (DoRA). Those could be supported eventually, but currently no burning demand
+    and it was tough to do them in a sufficiently generic fashion.
+    """
+
+    rank: int
     dropout: Dropout
+    hada_weight_w1_a: Tensor | None
+    hada_weight_w1_b: Tensor | None
+    hada_weight_w2_a: Tensor | None
+    hada_weight_w2_b: Tensor | None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
-        super(LoRAModule, self).__init__()
-
-        self.prefix = prefix.replace('.', '_')
-        self.orig_module = orig_module
+        super().__init__(prefix, orig_module)
         self.rank = rank
-        self.alpha = torch.tensor(alpha)
         self.dropout = Dropout(0)
+        self.register_buffer("alpha", torch.tensor(alpha))
+        self.hada_weight_w1_a = None
+        self.hada_weight_w1_b = None
+        self.hada_weight_w2_a = None
+        self.hada_weight_w2_b = None
+
         if orig_module is not None:
+            self.initialize_weights()
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
 
-        self.is_applied = False
-        self.orig_forward = self.orig_module.forward if self.orig_module is not None else None
+    def initialize_weights(self):
+        self._initialized = True
+
+        hada_w1_b, hada_w1_a = self.create_layer()
+        hada_w2_b, hada_w2_a = self.create_layer()
+        self.hada_w1_a = hada_w1_a.weight
+        self.hada_w1_b = hada_w1_b.weight
+        self.hada_w2_a = hada_w2_a.weight
+        self.hada_w2_b = hada_w2_b.weight
+
+        nn.init.normal_(self.hada_w1_a, std=0.1)
+        nn.init.normal_(self.hada_w1_b, std=1)
+        nn.init.constant_(self.hada_w2_a, 0)
+        nn.init.normal_(self.hada_w2_b, std=1)
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.hada_w1_a is not None
+        assert self.hada_w1_b is not None
+        assert self.hada_w2_a is not None
+        assert self.hada_w2_b is not None
 
     def forward(self, x, *args, **kwargs):
+        # They definitely exist at this point in the execution.
+        self.check_initialized()
+
+        # Yeah, yeah, it's different from the A/B parameters in make_weight.
+        # Lycoris defines them in the opposite order. Yeah, it's confusing.
+        W1 = self.make_weight(self.dropout(self.hada_w1_b),
+                              self.dropout(self.hada_w1_a))
+        W2 = self.make_weight(self.dropout(self.hada_w2_b),
+                              self.dropout(self.hada_w2_a))
+        W = (W1 * W2) * (self.alpha / self.rank)
+        return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
+
+    def apply_to_module(self):
+        # TODO
+        pass
+
+    def extract_from_module(self, base_module: nn.Module):
+        # TODO
+        pass
+
+
+class LoRAModule(PeftBase):
+    lora_down: nn.Module | None
+    lora_up: nn.Module | None
+    rank: int
+    alpha: torch.Tensor
+    dropout: Dropout
+
+    # Note there's a few times in this class where we assert the existence of
+    # optional members. This is because these members might not exist at
+    # construction, but definitely exist by the time those methods are called.
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+        super(LoRAModule, self).__init__(prefix, orig_module)
+
+        self.rank = rank
+        self.dropout = Dropout(0)
+        self.register_buffer("alpha", torch.tensor(alpha))
+        self.lora_down = None
+        self.lora_up = None
+
+        if orig_module is not None:
+            self.initialize_weights()
+            self.alpha = self.alpha.to(orig_module.weight.device)
+        self.alpha.requires_grad_(False)
+
+    def initialize_weights(self):
+        self._initialized = True
+        self.lora_down, self.lora_up = self.create_layer()
+        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
+        nn.init.zeros_(self.lora_up.weight)
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.lora_down is not None
+        assert self.lora_up is not None
+
+    def forward(self, x, *args, **kwargs):
+        self.check_initialized()
+
         if self.orig_module.training:
             ld = self.lora_up(self.dropout(self.lora_down(x)))
             return self.orig_forward(x) + ld * (self.alpha / self.rank)
 
         return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
 
-    def requires_grad_(self, requires_grad: bool):
-        self.lora_down.requires_grad_(requires_grad)
-        self.lora_up.requires_grad_(requires_grad)
-
-    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModule':
-        self.lora_down.to(device, dtype)
-        self.lora_up.to(device, dtype)
-        self.alpha.to(device, dtype)
-        return self
-
-    def parameters(self) -> list[Parameter]:
-        return list(self.lora_down.parameters()) + list(self.lora_up.parameters())
-
-    def load_state_dict(self, state_dict: dict):
-        if self.prefix + ".lora_down.weight" in state_dict:
-            down_state_dict = {
-                "weight": state_dict.pop(self.prefix + ".lora_down.weight")
-            }
-            self.lora_down.load_state_dict(down_state_dict, strict=False)
-
-        if self.prefix + ".lora_up.weight" in state_dict:
-            up_state_dict = {
-                "weight": state_dict.pop(self.prefix + ".lora_up.weight")
-            }
-            self.lora_up.load_state_dict(up_state_dict, strict=False)
-
-        if self.prefix + ".alpha" in state_dict:
-            self.alpha = state_dict.pop(self.prefix + ".alpha")
-
-    def state_dict(self) -> dict:
-        state_dict = {}
-        state_dict[self.prefix + ".lora_down.weight"] = self.lora_down.weight.data
-        state_dict[self.prefix + ".lora_up.weight"] = self.lora_up.weight.data
-        state_dict[self.prefix + ".alpha"] = self.alpha
-        return state_dict
-
-    def modules(self) -> list[nn.Module]:
-        return [self.lora_down, self.lora_up, self.dropout]
-
-    def hook_to_module(self):
-        if not self.is_applied:
-            self.orig_module.forward = self.forward
-            self.is_applied = True
-
-    def remove_hook_from_module(self):
-        if self.is_applied:
-            self.orig_module.forward = self.orig_forward
-            self.is_applied = False
-
     def apply_to_module(self):
         # TODO
         pass
@@ -94,108 +316,119 @@ class LoRAModule(metaclass=ABCMeta):
         pass
 
 
-class LinearLoRAModule(LoRAModule):
-    def __init__(self, prefix: str, orig_module: Linear, rank: int, alpha: float):
-        super(LinearLoRAModule, self).__init__(prefix, orig_module, rank, alpha)
+class DoRAModule(LoRAModule):
+    """Weight-decomposed low rank adaptation.
 
-        in_features = orig_module.in_features
-        out_features = orig_module.out_features
+    Not unlike LoRA in theory but the forward pass is significantly more
+    complicated, as it involves taking the norm of the directional result.
+    """
+    dora_num_dims: int
+    dora_scale: Tensor | None
 
-        self.lora_down = Linear(in_features, rank, bias=False, device=orig_module.weight.device)
-        self.lora_up = Linear(rank, out_features, bias=False, device=orig_module.weight.device)
+    def __init__(self, *args, **kwargs):
+        self.dora_scale = None
+        super().__init__(*args, **kwargs)
 
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_up.weight)
+    def initialize_weights(self):
+        super().initialize_weights()
+
+        # Thanks to KohakuBlueLeaf once again for figuring out the shape
+        # wrangling that works for both Linear and Convolutional layers. If you
+        # were just doing this for Linear, it would be substantially simpler.
+        orig_weight = self.orig_module.weight.detach().float()
+        self.dora_num_dims = orig_weight.dim() - 1
+        self.dora_scale = nn.Parameter(
+            torch.norm(
+                orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1),
+                dim=1, keepdim=True)
+            .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
+            .transpose(1, 0)
+            .to(dtype=self.orig_module.weight.dtype,
+                device=self.orig_module.weight.device)
+        )
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.dora_scale is not None
+
+    def forward(self, x, *args, **kwargs):
+        self.check_initialized()
+
+        A = self.lora_down.weight
+        B = self.lora_up.weight
+        WP = self.orig_module.weight + (self.make_weight(A, B) * (self.alpha / self.rank))
+        # A norm should never really end up zero at any point, but epsilon just
+        # to be safe if we underflow or something. Also, as per section 4.3 of
+        # the paper, we treat the norm as a constant for the purposes of
+        # backpropagation in order to save VRAM (to do this, we detach it from
+        # the gradient graph).
+        norm = WP.detach() \
+                 .transpose(0, 1) \
+                 .reshape(WP.shape[1], -1) \
+                 .norm(dim=1, keepdim=True) \
+                 .reshape(WP.shape[1], *[1] * self.dora_num_dims) \
+                 .transpose(0, 1)
+        WP = self.dora_scale * (WP / norm)
+        # In the DoRA codebase (and thus the paper results), they perform
+        # dropout on the *input*, rather than between layers, so we duplicate
+        # that here.
+        return self.op(self.dropout(x),
+                       WP,
+                       self.orig_module.bias,
+                       **self.layer_kwargs)
 
 
-class Conv2dLoRAModule(LoRAModule):
-    def __init__(self, prefix: str, orig_module: Conv2d, rank: int, alpha: float):
-        super(Conv2dLoRAModule, self).__init__(prefix, orig_module, rank, alpha)
-        in_channels = orig_module.in_channels
-        out_channels = orig_module.out_channels
-
-        self.lora_down = Conv2d(in_channels, rank, (1, 1), bias=False, device=orig_module.weight.device)
-        self.lora_up = Conv2d(rank, out_channels, (1, 1), bias=False, device=orig_module.weight.device)
-
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_up.weight)
-
-
-class DummyLoRAModule(LoRAModule):
-    def __init__(self, prefix: str):
-        super(DummyLoRAModule, self).__init__(prefix, None, 1, 1)
-        self.lora_down = None
-        self.lora_up = None
-
-        self.save_state_dict = {}
-
-    def requires_grad_(self, requires_grad: bool):
-        pass
-
-    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModule':
-        pass
-
-    def parameters(self) -> list[Parameter]:
-        return []
-
-    def load_state_dict(self, state_dict: dict):
-        self.save_state_dict = {
-            self.prefix + ".lora_down.weight": state_dict.pop(self.prefix + ".lora_down.weight"),
-            self.prefix + ".lora_up.weight": state_dict.pop(self.prefix + ".lora_up.weight"),
-            self.prefix + ".alpha": state_dict.pop(self.prefix + ".alpha"),
-        }
-
-    def state_dict(self) -> dict:
-        return self.save_state_dict
-
-    def modules(self) -> list[nn.Module]:
-        return []
-
-    def hook_to_module(self):
-        pass
-
-    def remove_hook_from_module(self):
-        pass
-
-    def apply_to_module(self):
-        pass
-
-    def extract_from_module(self, base_module: nn.Module):
-        pass
+DummyLoRAModule = LoRAModule.make_dummy()
+DummyDoRAModule = DoRAModule.make_dummy()
+DummyLoHaModule = LoHaModule.make_dummy()
 
 
 class LoRAModuleWrapper:
     orig_module: nn.Module
     rank: int
+    alpha: float
 
-    lora_modules: dict[str, LoRAModule]
+    lora_modules: dict[str, PeftBase]
 
     def __init__(
             self,
             orig_module: nn.Module | None,
-            rank: int,
             prefix: str,
-            alpha: float = 1.0,
+            config: TrainConfig,
             module_filter: list[str] = None,
     ):
-        super(LoRAModuleWrapper, self).__init__()
         self.orig_module = orig_module
-        self.rank = rank
         self.prefix = prefix
-        self.module_filter = module_filter if module_filter is not None else []
+        self.peft_type = config.peft_type
+        self.rank = config.lora_rank
+        self.alpha = config.lora_alpha
+        self.module_filter = [x.strip() for x in module_filter] if module_filter is not None else []
+        weight_decompose = config.lora_decompose
+        if self.peft_type == PeftType.LORA:
+            if weight_decompose:
+                self.klass = DoRAModule
+                self.dummy_klass = DummyDoRAModule
+                self.additional_args = [self.rank, self.alpha]
+            else:
+                self.klass = LoRAModule
+                self.dummy_klass = DummyLoRAModule
+                self.additional_args = [self.rank, self.alpha]
+        elif self.peft_type == PeftType.LOHA:
+            self.klass = LoHaModule
+            self.dummy_klass = DummyLoHaModule
+            self.additional_args = [self.rank, self.alpha]
 
-        self.lora_modules = self.__create_modules(orig_module, alpha)
+        self.lora_modules = self.__create_modules(orig_module)
 
-    def __create_modules(self, orig_module: nn.Module | None, alpha: float) -> dict[str, LoRAModule]:
+    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, PeftBase]:
         lora_modules = {}
 
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
-                    if isinstance(child_module, Linear):
-                        lora_modules[name] = LinearLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
-                    elif isinstance(child_module, Conv2d):
-                        lora_modules[name] = Conv2dLoRAModule(self.prefix + "_" + name, child_module, self.rank, alpha)
+                    if isinstance(child_module, Linear) or \
+                       isinstance(child_module, Conv2d):
+                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args)
 
         return lora_modules
 
@@ -226,14 +459,19 @@ class LoRAModuleWrapper:
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
         for name, module in self.lora_modules.items():
-            module.load_state_dict(state_dict)
+            try:
+                module.load_state_dict(state_dict)
+            except RuntimeError:
+                print(f"Missing key for {name}; initializing it to zero.")
+
+        # Temporarily re-create the state dict, so we can see what keys were left.
+        remaining_names = set(state_dict) - set(self.state_dict())
 
         # create dummy modules for the remaining keys
-        remaining_names = list(state_dict.keys())
         for name in remaining_names:
             if name.endswith(".alpha"):
                 prefix = name.removesuffix(".alpha")
-                module = DummyLoRAModule(prefix)
+                module = self.dummy_klass(prefix, None, *self.additional_args)
                 module.load_state_dict(state_dict)
                 self.lora_modules[prefix] = module
 
@@ -244,7 +482,7 @@ class LoRAModuleWrapper:
         state_dict = {}
 
         for name, module in self.lora_modules.items():
-            state_dict |= module.state_dict()
+            state_dict |= module.state_dict(prefix=module.prefix)
 
         return state_dict
 
@@ -290,7 +528,7 @@ class LoRAModuleWrapper:
         """
         Removes all dummy modules
         """
-        self.lora_modules = {k: v for (k, v) in self.lora_modules.items() if not isinstance(v, DummyLoRAModule)}
+        self.lora_modules = {k: v for (k, v) in self.lora_modules.items() if not isinstance(v, self.dummy_klass)}
 
     def set_dropout(self, dropout_probability: float):
         """

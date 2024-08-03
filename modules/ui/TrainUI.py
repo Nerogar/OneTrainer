@@ -14,6 +14,7 @@ from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
+from modules.ui.LoraTab import LoraTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
@@ -67,6 +68,7 @@ class TrainUI(ctk.CTk):
 
         self.model_tab = None
         self.training_tab = None
+        self.lora_tab = None
         self.additional_embeddings_tab = None
 
         self.top_bar_component = self.top_bar(self)
@@ -453,6 +455,9 @@ class TrainUI(ctk.CTk):
         if self.training_tab:
             self.training_tab.refresh_ui()
 
+        if self.lora_tab:
+            self.lora_tab.refresh_ui()
+
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:
             return
@@ -462,11 +467,12 @@ class TrainUI(ctk.CTk):
 
         if training_method != TrainingMethod.LORA and "LoRA" in self.tabview._tab_dict:
             self.tabview.delete("LoRA")
+            self.lora_tab = None
         if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:
             self.tabview.delete("embedding")
 
         if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
-            self.lora_tab(self.tabview.add("LoRA"))
+            self.lora_tab = LoraTab(self.tabview.add("LoRA"), self.train_config, self.ui_state)
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
 

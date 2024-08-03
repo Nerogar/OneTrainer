@@ -86,3 +86,11 @@ class ModelType(Enum):
 
     def is_stable_cascade(self):
         return self == ModelType.STABLE_CASCADE_1
+
+
+class PeftType(Enum):
+    LORA = 'LORA'
+    LOHA = 'LOHA'
+
+    def __str__(self):
+        return self.value

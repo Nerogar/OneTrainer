@@ -19,7 +19,7 @@ from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
-from modules.util.enum.ModelType import ModelType
+from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TimestepDistribution import TimestepDistribution
@@ -348,10 +348,14 @@ class TrainConfig(BaseConfig):
     embedding_weight_dtype: DataType
 
     # lora
+    peft_type: PeftType
     lora_model_name: str
     lora_rank: int
     lora_alpha: float
+    lora_decompose: bool
     lora_weight_dtype: DataType
+    lora_layers: str  # comma-separated
+    lora_layer_preset: str
     bundle_additional_embeddings: bool
 
     # optimizer
@@ -781,10 +785,14 @@ class TrainConfig(BaseConfig):
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
 
         # lora
+        data.append(("peft_type", PeftType.LORA, PeftType, False))
         data.append(("lora_model_name", "", str, False))
         data.append(("lora_rank", 16, int, False))
         data.append(("lora_alpha", 1.0, float, False))
+        data.append(("lora_decompose", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("lora_layers", "", str, False))
+        data.append(("lora_layer_preset", None, str, True))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # optimizer
