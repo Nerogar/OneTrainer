@@ -4,6 +4,7 @@ import shutil
 import zipfile
 import platform
 import urllib.request
+import re
 from typing import Union
 
 
@@ -13,7 +14,7 @@ DLL_MAPPING = {
     'cusparse.dll': 'cusparse64_11.dll',
     'nvrtc.dll': 'nvrtc64_112_0.dll',
 }
-HIP_TARGETS = ['rocblas.dll', 'rocsolver.dll', 'hiprtc0507.dll', 'hiprtc0601.dll']
+HIP_TARGETS_COMMON = ['rocblas.dll', 'rocsolver.dll']
 ZLUDA_TARGETS = ('nvcuda.dll', 'nvml.dll')
 
 
@@ -55,11 +56,25 @@ def make_copy(zluda_path: os.PathLike) -> None:
                 shutil.copyfile(os.path.join(zluda_path, k), os.path.join(zluda_path, v))
 
 
+def find_hiprtc(hip_path: os.PathLike) -> str:
+    hip_bin_path = os.path.join(hip_path, 'bin')
+    for v in os.listdir(hip_bin_path):
+        if re.match(r'hiprtc\d+\.dll', v):
+            return os.path.join(hip_bin_path, v)
+
+
 def load(zluda_path: os.PathLike) -> None:
     hip_path = find_hip_sdk()
     if hip_path is None:
         raise RuntimeError('Could not find AMD HIP SDK, please install it from https://www.amd.com/en/developer/resources/rocm-hub/hip-sdk.html')
-    for v in HIP_TARGETS:
+
+    hiptrc_path = find_hiprtc(hip_path)
+    if hiptrc_path:
+        ctypes.windll.LoadLibrary(hiptrc_path)
+    else:
+        raise RuntimeError('Could not find hiprtc*.dll in the AMD HIP SDK')
+
+    for v in HIP_TARGETS_COMMON:
         ctypes.windll.LoadLibrary(os.path.join(hip_path, 'bin', v))
     for v in ZLUDA_TARGETS:
         ctypes.windll.LoadLibrary(os.path.join(zluda_path, v))
