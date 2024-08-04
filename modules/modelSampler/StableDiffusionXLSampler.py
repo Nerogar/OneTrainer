@@ -47,7 +47,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
-            text_encoder_layer_skip: int = 0,
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image.Image:
@@ -58,10 +59,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            tokenizer_1 = self.model.tokenizer_1
-            tokenizer_2 = self.model.tokenizer_2
-            text_encoder_1 = self.model.text_encoder_1
-            text_encoder_2 = self.model.text_encoder_2
             noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.model.noise_scheduler, diffusion_steps)
             image_processor = self.pipeline.image_processor
             unet = self.pipeline.unet
@@ -70,102 +67,18 @@ class StableDiffusionXLSampler(BaseModelSampler):
 
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
-            tokenizer_1_output = tokenizer_1(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer_1.model_max_length,
-                return_tensors="pt",
+
+            prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
+                text=prompt,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )
-            tokens_1 = tokenizer_1_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder_1.config, "use_attention_mask") and text_encoder_1.config.use_attention_mask:
-                tokens_1_attention_mask = tokenizer_1_output.attention_mask.to(self.train_device)
-            else:
-                tokens_1_attention_mask = None
 
-            tokenizer_2_output = tokenizer_2(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer_2.model_max_length,
-                return_tensors="pt",
+            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
+                text=negative_prompt,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )
-            tokens_2 = tokenizer_2_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder_2.config, "use_attention_mask") and text_encoder_2.config.use_attention_mask:
-                tokens_2_attention_mask = tokenizer_2_output.attention_mask.to(self.train_device)
-            else:
-                tokens_2_attention_mask = None
-
-            negative_tokenizer_1_output = tokenizer_1(
-                negative_prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer_1.model_max_length,
-                return_tensors="pt",
-            )
-            negative_tokens_1 = negative_tokenizer_1_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder_1.config, "use_attention_mask") and text_encoder_1.config.use_attention_mask:
-                negative_tokens_1_attention_mask = negative_tokenizer_1_output.attention_mask.to(self.train_device)
-            else:
-                negative_tokens_1_attention_mask = None
-
-            negative_tokenizer_2_output = tokenizer_2(
-                negative_prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer_2.model_max_length,
-                return_tensors="pt",
-            )
-            negative_tokens_2 = negative_tokenizer_2_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder_2.config, "use_attention_mask") and text_encoder_2.config.use_attention_mask:
-                negative_tokens_2_attention_mask = negative_tokenizer_2_output.attention_mask.to(self.train_device)
-            else:
-                negative_tokens_2_attention_mask = None
-
-            with torch.autocast(self.train_device.type):
-                text_encoder_1_output = text_encoder_1(
-                    tokens_1,
-                    attention_mask=tokens_1_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-                text_encoder_2_output = text_encoder_2(
-                    tokens_2,
-                    attention_mask=tokens_2_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-                text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-                prompt_embedding = torch.concat(
-                    [text_encoder_1_output, text_encoder_2_output], dim=-1
-                )
-
-                negative_text_encoder_1_output = text_encoder_1(
-                    negative_tokens_1,
-                    attention_mask=negative_tokens_1_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                negative_text_encoder_1_output = \
-                    negative_text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-                negative_text_encoder_2_output = text_encoder_2(
-                    negative_tokens_2,
-                    attention_mask=negative_tokens_2_attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                negative_pooled_text_encoder_2_output = negative_text_encoder_2_output.text_embeds
-                negative_text_encoder_2_output = \
-                    negative_text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-                negative_prompt_embedding = torch.concat(
-                    [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
-                )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
@@ -304,7 +217,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
             sample_inpainting: bool = False,
             base_image_path: str = "",
             mask_image_path: str = "",
-            text_encoder_layer_skip: int = 0,
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image.Image:
@@ -314,10 +228,6 @@ class StableDiffusionXLSampler(BaseModelSampler):
         else:
             generator.manual_seed(seed)
 
-        tokenizer_1 = self.model.tokenizer_1
-        tokenizer_2 = self.model.tokenizer_2
-        text_encoder_1 = self.model.text_encoder_1
-        text_encoder_2 = self.model.text_encoder_2
         noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.model.noise_scheduler, diffusion_steps)
         image_processor = self.pipeline.image_processor
         unet = self.pipeline.unet
@@ -386,102 +296,18 @@ class StableDiffusionXLSampler(BaseModelSampler):
 
         # prepare prompt
         self.model.text_encoder_to(self.train_device)
-        tokenizer_1_output = tokenizer_1(
-            prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=tokenizer_1.model_max_length,
-            return_tensors="pt",
+
+        prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
+            text=prompt,
+            text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=text_encoder_2_layer_skip,
         )
-        tokens_1 = tokenizer_1_output.input_ids.to(self.train_device)
-        if hasattr(text_encoder_1.config, "use_attention_mask") and text_encoder_1.config.use_attention_mask:
-            tokens_1_attention_mask = tokenizer_1_output.attention_mask.to(self.train_device)
-        else:
-            tokens_1_attention_mask = None
 
-        tokenizer_2_output = tokenizer_2(
-            prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=tokenizer_2.model_max_length,
-            return_tensors="pt",
+        negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
+            text=negative_prompt,
+            text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=text_encoder_2_layer_skip,
         )
-        tokens_2 = tokenizer_2_output.input_ids.to(self.train_device)
-        if hasattr(text_encoder_2.config, "use_attention_mask") and text_encoder_2.config.use_attention_mask:
-            tokens_2_attention_mask = tokenizer_2_output.attention_mask.to(self.train_device)
-        else:
-            tokens_2_attention_mask = None
-
-        negative_tokenizer_1_output = tokenizer_1(
-            negative_prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=tokenizer_1.model_max_length,
-            return_tensors="pt",
-        )
-        negative_tokens_1 = negative_tokenizer_1_output.input_ids.to(self.train_device)
-        if hasattr(text_encoder_1.config, "use_attention_mask") and text_encoder_1.config.use_attention_mask:
-            negative_tokens_1_attention_mask = negative_tokenizer_1_output.attention_mask.to(self.train_device)
-        else:
-            negative_tokens_1_attention_mask = None
-
-        negative_tokenizer_2_output = tokenizer_2(
-            negative_prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=tokenizer_2.model_max_length,
-            return_tensors="pt",
-        )
-        negative_tokens_2 = negative_tokenizer_2_output.input_ids.to(self.train_device)
-        if hasattr(text_encoder_2.config, "use_attention_mask") and text_encoder_2.config.use_attention_mask:
-            negative_tokens_2_attention_mask = negative_tokenizer_2_output.attention_mask.to(self.train_device)
-        else:
-            negative_tokens_2_attention_mask = None
-
-        with torch.autocast(self.train_device.type):
-            text_encoder_1_output = text_encoder_1(
-                tokens_1,
-                attention_mask=tokens_1_attention_mask,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-            text_encoder_2_output = text_encoder_2(
-                tokens_2,
-                attention_mask=tokens_2_attention_mask,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-            prompt_embedding = torch.concat(
-                [text_encoder_1_output, text_encoder_2_output], dim=-1
-            )
-
-            negative_text_encoder_1_output = text_encoder_1(
-                negative_tokens_1,
-                attention_mask=negative_tokens_1_attention_mask,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-            negative_text_encoder_1_output = \
-                negative_text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-            negative_text_encoder_2_output = text_encoder_2(
-                negative_tokens_2,
-                attention_mask=negative_tokens_2_attention_mask,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-            negative_pooled_text_encoder_2_output = negative_text_encoder_2_output.text_embeds
-            negative_text_encoder_2_output = \
-                negative_text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-            negative_prompt_embedding = torch.concat(
-                [negative_text_encoder_1_output, negative_text_encoder_2_output], dim=-1
-            )
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
 
@@ -627,7 +453,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 sample_inpainting=sample_config.sample_inpainting,
                 base_image_path=sample_config.base_image_path,
                 mask_image_path=sample_config.mask_image_path,
-                text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+                text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 force_last_timestep=sample_config.force_last_timestep,
                 on_update_progress=on_update_progress,
             )
@@ -643,7 +470,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
                 cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
-                text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+                text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 force_last_timestep=sample_config.force_last_timestep,
                 on_update_progress=on_update_progress,
             )

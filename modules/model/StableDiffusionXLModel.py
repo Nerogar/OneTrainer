@@ -198,3 +198,51 @@ class StableDiffusionXLModel(BaseModel):
             prompt = prompt.replace(self.embedding.placeholder, embedding_string)
 
         return prompt
+
+    def encode_text(
+            self,
+            text: str = None,
+            tokens_1: Tensor = None,
+            tokens_2: Tensor = None,
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
+            text_encoder_1_output: Tensor = None,
+            text_encoder_2_output: Tensor = None,
+            pooled_text_encoder_2_output: Tensor = None,
+    ):
+        if tokens_1 is None and text is not None:
+            tokenizer_output = self.tokenizer_1(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
+
+        if tokens_2 is None and text is not None:
+            tokenizer_output = self.tokenizer_2(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
+
+        if text_encoder_1_output is None:
+            text_encoder_1_output = self.text_encoder_1(
+                tokens_1, output_hidden_states=True, return_dict=True
+            )
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_1_layer_skip)]
+
+        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
+            text_encoder_2_output = self.text_encoder_2(
+                tokens_2, output_hidden_states=True, return_dict=True
+            )
+            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
+
+        text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
+
+        return text_encoder_output, pooled_text_encoder_2_output
