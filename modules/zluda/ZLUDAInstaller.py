@@ -13,8 +13,8 @@ DLL_MAPPING = {
     'cusparse.dll': 'cusparse64_11.dll',
     'nvrtc.dll': 'nvrtc64_112_0.dll',
 }
-HIP_TARGETS = ['rocblas.dll', 'rocsolver.dll', 'hiprtc0507.dll',]
-ZLUDA_TARGETS = ('nvcuda.dll', 'nvml.dll',)
+HIP_TARGETS = ['rocblas.dll', 'rocsolver.dll', 'hiprtc0507.dll', 'hiprtc0601.dll']
+ZLUDA_TARGETS = ('nvcuda.dll', 'nvml.dll')
 
 
 def get_path() -> str:
