@@ -7,7 +7,7 @@ import urllib.request
 from typing import Union
 
 
-RELEASE = f"rel.{os.environ.get('ZLUDA_HASH', '11cc5844514f93161e0e74387f04e2c537705a82')}"
+RELEASE = f"rel.{os.environ.get('ZLUDA_HASH', '86cdab3b14b556e95eafe370b8e8a1a80e8d093b')}"
 DLL_MAPPING = {
     'cublas.dll': 'cublas64_11.dll',
     'cusparse.dll': 'cusparse64_11.dll',
