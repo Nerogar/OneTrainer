@@ -221,3 +221,27 @@ class StableDiffusionModel(BaseModel):
             prompt = prompt.replace(self.embedding.placeholder, embedding_string)
 
         return prompt
+
+    def encode_text(
+            self,
+            text: str = None,
+            tokens: Tensor = None,
+            text_encoder_layer_skip: int = 0,
+    ):
+        if tokens is None:
+            tokenizer_output = self.tokenizer(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
+
+        text_encoder_output = self.text_encoder(tokens, return_dict=True, output_hidden_states=True)
+        final_layer_norm = self.text_encoder.text_model.final_layer_norm
+        prompt_embeds = final_layer_norm(
+            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+        )
+
+        return prompt_embeds

@@ -160,34 +160,6 @@ class BaseStableDiffusionSetup(
         )
         model.embedding_wrapper.hook_to_module()
 
-    def __encode_text(
-            self,
-            model: StableDiffusionModel,
-            config: TrainConfig,
-            text_encoder_layer_skip: int,
-            tokens: Tensor = None,
-            text: str = None,
-    ):
-        if tokens is None:
-            tokenizer_output = model.tokenizer(
-                text,
-                padding='max_length',
-                truncation=True,
-                max_length=77,
-                return_tensors="pt",
-            )
-            tokens = tokenizer_output.input_ids.to(model.text_encoder.device)
-
-        # TODO: use attention mask if this is true:
-        # hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-        text_encoder_output = model.text_encoder(tokens, return_dict=True, output_hidden_states=True)
-        final_layer_norm = model.text_encoder.text_model.final_layer_norm
-        prompt_embeds = final_layer_norm(
-            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-        )
-
-        return prompt_embeds
-
     def predict(
             self,
             model: StableDiffusionModel,
@@ -207,11 +179,9 @@ class BaseStableDiffusionSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             if config.text_encoder.train or config.train_any_embedding():
-                text_encoder_output = self.__encode_text(
-                    model,
-                    config,
-                    config.text_encoder_layer_skip,
+                text_encoder_output = model.encode_text(
                     tokens=batch['tokens'],
+                    text_encoder_layer_skip=config.text_encoder_layer_skip,
                 )
             else:
                 text_encoder_output = batch['text_encoder_hidden_state']
@@ -226,11 +196,9 @@ class BaseStableDiffusionSetup(
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             if is_align_prop_step and not deterministic:
-                negative_text_encoder_output = self.__encode_text(
-                    model,
-                    config,
-                    config.text_encoder_layer_skip,
+                negative_text_encoder_output = model.encode_text(
                     text="",
+                    text_encoder_layer_skip=config.text_encoder_layer_skip,
                 ).expand((scaled_latent_image.shape[0], -1, -1))
 
                 model.noise_scheduler.set_timesteps(config.align_prop_steps)

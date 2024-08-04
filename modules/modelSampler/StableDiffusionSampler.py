@@ -58,8 +58,6 @@ class StableDiffusionSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            tokenizer = self.pipeline.tokenizer
-            text_encoder = self.pipeline.text_encoder
             noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.pipeline.scheduler, diffusion_steps)
             image_processor = self.pipeline.image_processor
             unet = self.pipeline.unet
@@ -68,52 +66,14 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
-            tokenizer_output = tokenizer(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer.model_max_length,
-                return_tensors="pt",
-            )
-            tokens = tokenizer_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-                tokens_attention_mask = tokenizer_output.attention_mask.to(self.train_device)
-            else:
-                tokens_attention_mask = None
 
-            negative_tokenizer_output = tokenizer(
-                negative_prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer.model_max_length,
-                return_tensors="pt",
+            prompt_embedding = self.model.encode_text(
+                text=prompt,
+                text_encoder_layer_skip=text_encoder_layer_skip,
             )
-            negative_tokens = negative_tokenizer_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-                negative_tokens_attention_mask = negative_tokenizer_output.attention_mask.to(self.train_device)
-            else:
-                negative_tokens_attention_mask = None
-
-            text_encoder_output = text_encoder(
-                tokens,
-                attention_mask=tokens_attention_mask,
-                return_dict=True,
-                output_hidden_states=True,
-            )
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-
-            text_encoder_output = text_encoder(
-                negative_tokens,
-                attention_mask=negative_tokens_attention_mask,
-                return_dict=True,
-                output_hidden_states=True,
-            )
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            negative_prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            negative_prompt_embedding = self.model.encode_text(
+                text=negative_prompt,
+                text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
@@ -238,8 +198,6 @@ class StableDiffusionSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            tokenizer = self.pipeline.tokenizer
-            text_encoder = self.pipeline.text_encoder
             noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.pipeline.scheduler, diffusion_steps)
             image_processor = self.pipeline.image_processor
             unet = self.pipeline.unet
@@ -306,52 +264,14 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
-            tokenizer_output = tokenizer(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer.model_max_length,
-                return_tensors="pt",
-            )
-            tokens = tokenizer_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-                tokens_attention_mask = tokenizer_output.attention_mask.to(self.train_device)
-            else:
-                tokens_attention_mask = None
 
-            negative_tokenizer_output = tokenizer(
-                negative_prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=tokenizer.model_max_length,
-                return_tensors="pt",
+            prompt_embedding = self.model.encode_text(
+                text=prompt,
+                text_encoder_layer_skip=text_encoder_layer_skip,
             )
-            negative_tokens = negative_tokenizer_output.input_ids.to(self.train_device)
-            if hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-                negative_tokens_attention_mask = negative_tokenizer_output.attention_mask.to(self.train_device)
-            else:
-                negative_tokens_attention_mask = None
-
-            text_encoder_output = text_encoder(
-                tokens,
-                attention_mask=tokens_attention_mask,
-                return_dict=True,
-                output_hidden_states=True,
-            )
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-
-            text_encoder_output = text_encoder(
-                negative_tokens,
-                attention_mask=negative_tokens_attention_mask,
-                return_dict=True,
-                output_hidden_states=True,
-            )
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            negative_prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            negative_prompt_embedding = self.model.encode_text(
+                text=negative_prompt,
+                text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])

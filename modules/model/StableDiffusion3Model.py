@@ -241,6 +241,7 @@ class StableDiffusion3Model(BaseModel):
             train_device: torch.device,
             batch_size: int,
             rand: Random | None = None,
+            text: str = None,
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
             tokens_3: Tensor = None,
@@ -259,7 +260,6 @@ class StableDiffusion3Model(BaseModel):
             text_encoder_2_output: Tensor = None,
             pooled_text_encoder_2_output: Tensor = None,
             text_encoder_3_output: Tensor = None,
-            text: str = None,
     ) -> tuple[Tensor, Tensor]:
         # tokenize prompt
         if tokens_1 is None and text is not None and self.tokenizer_1 is not None:
