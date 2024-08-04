@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from random import Random
 from uuid import uuid4
 
 from modules.model.BaseModel import BaseModel
@@ -234,3 +235,174 @@ class StableDiffusion3Model(BaseModel):
             prompt = prompt.replace(self.embedding.placeholder, embedding_string)
 
         return prompt
+
+    def encode_text(
+            self,
+            train_device: torch.device,
+            batch_size: int,
+            rand: Random | None = None,
+            tokens_1: Tensor = None,
+            tokens_2: Tensor = None,
+            tokens_3: Tensor = None,
+            tokens_mask_1: Tensor = None,
+            tokens_mask_2: Tensor = None,
+            tokens_mask_3: Tensor = None,
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
+            text_encoder_3_layer_skip: int = 0,
+            text_encoder_1_dropout_probability: float | None = None,
+            text_encoder_2_dropout_probability: float | None = None,
+            text_encoder_3_dropout_probability: float | None = None,
+            apply_attention_mask: bool = False,
+            text_encoder_1_output: Tensor = None,
+            pooled_text_encoder_1_output: Tensor = None,
+            text_encoder_2_output: Tensor = None,
+            pooled_text_encoder_2_output: Tensor = None,
+            text_encoder_3_output: Tensor = None,
+            text: str = None,
+    ) -> tuple[Tensor, Tensor]:
+        # tokenize prompt
+        if tokens_1 is None and text is not None and self.tokenizer_1 is not None:
+            tokenizer_output = self.tokenizer_1(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
+            tokens_mask_1 = tokenizer_output.attention_mask.to(self.text_encoder_1.device)
+
+        if tokens_2 is None and text is not None and self.tokenizer_2 is not None:
+            tokenizer_output = self.tokenizer_2(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
+            tokens_mask_2 = tokenizer_output.attention_mask.to(self.text_encoder_1.device)
+
+        if tokens_3 is None and text is not None and self.tokenizer_3 is not None:
+            tokenizer_output = self.tokenizer_3(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens_3 = tokenizer_output.input_ids.to(self.text_encoder_3.device)
+            tokens_mask_3 = tokenizer_output.attention_mask.to(self.text_encoder_1.device)
+
+        # encode prompt if it's not already encoded and the text encoders exist, otherwise pad with zeros
+        if (text_encoder_1_output is None or pooled_text_encoder_1_output is None) \
+                and self.text_encoder_1 is not None:
+            text_encoder_1_output = self.text_encoder_1(
+                tokens_1, output_hidden_states=True, return_dict=True
+            )
+            pooled_text_encoder_1_output = text_encoder_1_output.text_embeds
+            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_1_layer_skip)]
+        if text_encoder_1_output is None or pooled_text_encoder_1_output is None:
+            pooled_text_encoder_1_output = torch.zeros(
+                size=(batch_size, 768),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+            text_encoder_1_output = torch.zeros(
+                size=(batch_size, 77, 768),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+            tokens_mask_1 = torch.zeros(
+                size=(batch_size, 1),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+
+        if (text_encoder_2_output is None or pooled_text_encoder_2_output is None) \
+                and self.text_encoder_2 is not None:
+            text_encoder_2_output = self.text_encoder_2(
+                tokens_2, output_hidden_states=True, return_dict=True
+            )
+            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
+            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
+        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
+            pooled_text_encoder_2_output = torch.zeros(
+                size=(batch_size, 1280),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+            text_encoder_2_output = torch.zeros(
+                size=(batch_size, 77, 1280),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+            tokens_mask_2 = torch.zeros(
+                size=(batch_size, 1),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+
+        with self.text_encoder_3_autocast_context:
+            if text_encoder_3_output is None \
+                    and self.text_encoder_3 is not None:
+                text_encoder_3_output = self.text_encoder_3(
+                    tokens_3, output_hidden_states=True, return_dict=True
+                )
+                hidden_state_output_index = -(1 + text_encoder_3_layer_skip)
+                add_layer_norm = True # TODO: add a parameter for this when creating an external function
+                text_encoder_3_output = text_encoder_3_output.hidden_states[hidden_state_output_index]
+                if hidden_state_output_index != -1 and add_layer_norm:
+                    text_encoder_3_output = self.text_encoder_3.encoder.final_layer_norm(text_encoder_3_output)
+            if text_encoder_3_output is None:
+                text_encoder_3_output = torch.zeros(
+                    size=(batch_size, 77, self.transformer.config.joint_attention_dim),
+                    device=train_device,
+                    dtype=self.train_dtype.torch_dtype(),
+                )
+                tokens_mask_3 = torch.zeros(
+                    size=(batch_size, 1),
+                    device=train_device,
+                    dtype=self.train_dtype.torch_dtype(),
+                )
+
+        if apply_attention_mask:
+            text_encoder_1_output *= tokens_mask_1[:, :, None]
+            text_encoder_2_output *= tokens_mask_2[:, :, None]
+            text_encoder_3_output *= tokens_mask_3[:, :, None]
+
+        # apply dropout
+        if text_encoder_1_dropout_probability is not None:
+            dropout_text_encoder_1_mask = (torch.tensor(
+                [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
+            pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
+
+        if text_encoder_2_dropout_probability is not None:
+            dropout_text_encoder_2_mask = (torch.tensor(
+                [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
+            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
+
+        if text_encoder_3_dropout_probability is not None:
+            dropout_text_encoder_3_mask = (torch.tensor(
+                [rand.random() > text_encoder_3_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
+
+        # build the conditioning tensor
+        prompt_embedding = torch.concat(
+            [text_encoder_1_output, text_encoder_2_output], dim=-1
+        )
+        prompt_embedding = torch.nn.functional.pad(
+            prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
+        )
+        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2) \
+            .to(dtype=self.train_dtype.torch_dtype())
+        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
+            .to(dtype=self.train_dtype.torch_dtype())
+
+        return prompt_embedding, pooled_prompt_embedding

@@ -36,121 +36,6 @@ class StableDiffusion3Sampler(BaseModelSampler):
         self.model_type = model_type
         self.pipeline = model.create_pipeline()
 
-    def __encode_prompt(
-            self,
-            prompt: str,
-            tokenizer_1: CLIPTokenizer,
-            tokenizer_2: CLIPTokenizer,
-            tokenizer_3: T5Tokenizer,
-            text_encoder_1: CLIPTextModelWithProjection,
-            text_encoder_2: CLIPTextModelWithProjection,
-            text_encoder_3: T5EncoderModel,
-            text_encoder_layer_skip: int,
-            joint_attention_dim: int,
-            train_dtype: DataType,
-            prior_attention_mask: bool = False,
-    ):
-        if tokenizer_1 is not None and text_encoder_1 is not None:
-            tokenizer_1_output = tokenizer_1(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=77,
-                return_tensors="pt",
-            )
-            tokens_1 = tokenizer_1_output.input_ids.to(self.train_device)
-            tokens_1_attention_mask = tokenizer_1_output.attention_mask.to(self.train_device)
-
-            text_encoder_1_output = text_encoder_1(
-                tokens_1,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-
-            pooled_text_encoder_1_output = text_encoder_1_output[0]
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-            if prior_attention_mask:
-                text_encoder_1_output *= tokens_1_attention_mask[:, :, None]
-        else:
-            pooled_text_encoder_1_output = torch.zeros(
-                size=(1, 768),
-                device=self.train_device,
-                dtype=train_dtype.torch_dtype(),
-            )
-            text_encoder_1_output = torch.zeros(
-                size=(1, 77, 768),
-                device=self.train_device,
-                dtype=train_dtype.torch_dtype(),
-            )
-
-        if tokenizer_2 is not None and text_encoder_2 is not None:
-            tokenizer_2_output = tokenizer_2(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=77,
-                return_tensors="pt",
-            )
-            tokens_2 = tokenizer_2_output.input_ids.to(self.train_device)
-            tokens_2_attention_mask = tokenizer_2_output.attention_mask.to(self.train_device)
-
-            text_encoder_2_output = text_encoder_2(
-                tokens_2,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-
-            pooled_text_encoder_2_output = text_encoder_2_output[0]
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_layer_skip)]
-
-            if prior_attention_mask:
-                text_encoder_2_output *= tokens_2_attention_mask[:, :, None]
-        else:
-            pooled_text_encoder_2_output = torch.zeros(
-                size=(1, 1280),
-                device=self.train_device,
-                dtype=train_dtype.torch_dtype(),
-            )
-            text_encoder_2_output = torch.zeros(
-                size=(1, 77, 1280),
-                device=self.train_device,
-                dtype=train_dtype.torch_dtype(),
-            )
-
-        with self.model.text_encoder_3_autocast_context:
-            if tokenizer_3 is not None and text_encoder_3 is not None:
-                tokenizer_3_output = tokenizer_3(
-                    prompt,
-                    padding="max_length",
-                    truncation=True,
-                    max_length=77,
-                    return_tensors="pt")
-                tokens_3 = tokenizer_3_output.input_ids.to(self.train_device)
-                tokens_3_attention_mask = tokenizer_3_output.attention_mask.to(self.train_device)
-
-                text_encoder_3_output = text_encoder_3(tokens_3, output_hidden_states=True)[0]
-
-            if prior_attention_mask:
-                text_encoder_3_output *= tokens_3_attention_mask[:, :, None]
-            else:
-                text_encoder_3_output = torch.zeros(
-                    (1, 77, joint_attention_dim),
-                    device=self.train_device,
-                    dtype=train_dtype.torch_dtype(),
-                )
-
-        prompt_embedding = torch.concat(
-            [text_encoder_1_output, text_encoder_2_output], dim=-1
-        )
-        prompt_embedding = nn.functional.pad(
-            prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
-        )
-        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
-        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
-
-        return prompt_embedding, pooled_prompt_embedding
-
     @torch.no_grad()
     def __sample_base(
             self,
@@ -164,7 +49,9 @@ class StableDiffusion3Sampler(BaseModelSampler):
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
-            text_encoder_layer_skip: int = 0,
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
+            text_encoder_3_layer_skip: int = 0,
             force_last_timestep: bool = False,
             prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
@@ -176,12 +63,6 @@ class StableDiffusion3Sampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            tokenizer_1 = self.model.tokenizer_1
-            tokenizer_2 = self.model.tokenizer_2
-            tokenizer_3 = self.model.tokenizer_3
-            text_encoder_1 = self.model.text_encoder_1
-            text_encoder_2 = self.model.text_encoder_2
-            text_encoder_3 = self.model.text_encoder_3
             noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
@@ -191,32 +72,24 @@ class StableDiffusion3Sampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            prompt_embedding, pooled_prompt_embedding = self.__encode_prompt(
-                prompt=prompt,
-                tokenizer_1=tokenizer_1,
-                tokenizer_2=tokenizer_2,
-                tokenizer_3=tokenizer_3,
-                text_encoder_1=text_encoder_1,
-                text_encoder_2=text_encoder_2,
-                text_encoder_3=text_encoder_3,
-                text_encoder_layer_skip=text_encoder_layer_skip,
-                joint_attention_dim=transformer.config.joint_attention_dim,
-                train_dtype=self.model.train_dtype,
-                prior_attention_mask=prior_attention_mask,
+            prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
+                train_device = self.train_device,
+                batch_size=1,
+                text_encoder_1_layer_skip = text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip = text_encoder_2_layer_skip,
+                text_encoder_3_layer_skip = text_encoder_3_layer_skip,
+                apply_attention_mask = prior_attention_mask,
+                text = prompt,
             )
 
-            negative_prompt_embedding, negative_pooled_prompt_embedding = self.__encode_prompt(
-                prompt=negative_prompt,
-                tokenizer_1=tokenizer_1,
-                tokenizer_2=tokenizer_2,
-                tokenizer_3=tokenizer_3,
-                text_encoder_1=text_encoder_1,
-                text_encoder_2=text_encoder_2,
-                text_encoder_3=text_encoder_3,
-                text_encoder_layer_skip=text_encoder_layer_skip,
-                joint_attention_dim=transformer.config.joint_attention_dim,
-                train_dtype=self.model.train_dtype,
-                prior_attention_mask=prior_attention_mask,
+            negative_prompt_embedding, negative_pooled_prompt_embedding = self.model.encode_text(
+                train_device=self.train_device,
+                batch_size=1,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                text_encoder_3_layer_skip=text_encoder_3_layer_skip,
+                apply_attention_mask=prior_attention_mask,
+                text=negative_prompt,
             )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding], dim=0)
@@ -325,7 +198,9 @@ class StableDiffusion3Sampler(BaseModelSampler):
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
             cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
-            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+            text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+            text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
             force_last_timestep=sample_config.force_last_timestep,
             prior_attention_mask=sample_config.prior_attention_mask,
             on_update_progress=on_update_progress,
