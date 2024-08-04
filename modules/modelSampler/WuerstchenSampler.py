@@ -44,66 +44,25 @@ class WuerstchenSampler(BaseModelSampler):
             text_encoder_layer_skip,
             prior_noise_scheduler,
             prior_prior,
-            prior_text_encoder,
-            prior_tokenizer,
             on_update_progress,
     ):
         # prepare prompt
         self.model.prior_text_encoder_to(self.train_device)
-        tokenizer_output = prior_tokenizer(
-            prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=prior_tokenizer.model_max_length,
-            return_tensors="pt",
-        )
-        tokens = tokenizer_output.input_ids.to(self.train_device)
-        tokens_attention_mask = tokenizer_output.attention_mask.to(self.train_device)
 
-        negative_tokenizer_output = prior_tokenizer(
-            negative_prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=prior_tokenizer.model_max_length,
-            return_tensors="pt",
+        prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
+            text=prompt,
+            text_encoder_layer_skip=text_encoder_layer_skip,
         )
-        negative_tokens = negative_tokenizer_output.input_ids.to(self.train_device)
-        negative_tokens_attention_mask = negative_tokenizer_output.attention_mask.to(self.train_device)
 
-        text_encoder_output = prior_text_encoder(
-            tokens,
-            attention_mask=tokens_attention_mask,
-            return_dict=True,
-            output_hidden_states=True,
+        negative_prompt_embedding, pooled_negative_prompt_embedding = self.model.encode_text(
+            text=negative_prompt,
+            text_encoder_layer_skip=text_encoder_layer_skip,
         )
-        if self.model_type.is_wuerstchen_v2():
-            final_layer_norm = prior_text_encoder.text_model.final_layer_norm
-            prompt_embedding = final_layer_norm(
-                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-        elif self.model_type.is_stable_cascade():
-            prompt_embedding = text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            pooled_prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
-
-        negative_text_encoder_output = prior_text_encoder(
-            negative_tokens,
-            attention_mask=negative_tokens_attention_mask,
-            return_dict=True,
-            output_hidden_states=True,
-        )
-        if self.model_type.is_wuerstchen_v2():
-            final_layer_norm = prior_text_encoder.text_model.final_layer_norm
-            negative_prompt_embedding = final_layer_norm(
-                negative_text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            )
-        if self.model_type.is_stable_cascade():
-            negative_prompt_embedding = negative_text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-            pooled_negative_prompt_embedding = negative_text_encoder_output.text_embeds.unsqueeze(1)
 
         combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
             .to(dtype=self.model.prior_train_dtype.torch_dtype())
         if self.model_type.is_stable_cascade():
-            pooled_combined_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding]) \
+            combined_pooled_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding]) \
                 .to(dtype=self.model.prior_train_dtype.torch_dtype())
 
         self.model.prior_text_encoder_to(self.temp_device)
@@ -146,7 +105,7 @@ class WuerstchenSampler(BaseModelSampler):
                 elif self.model_type.is_stable_cascade():
                     prior_kwargs = {
                         'clip_text': combined_prompt_embedding,
-                        'clip_text_pooled': pooled_combined_prompt_embedding,
+                        'clip_text_pooled': combined_pooled_prompt_embedding,
                         'clip_img': clip_img,
                     }
 
@@ -353,9 +312,7 @@ class WuerstchenSampler(BaseModelSampler):
                 text_encoder_layer_skip,
                 prior_noise_scheduler,
                 prior_prior,
-                prior_text_encoder,
-                prior_tokenizer,
-                on_update_progress
+                on_update_progress,
             )
 
             latent_image = self.__sample_decoder(

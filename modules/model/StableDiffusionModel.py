@@ -227,6 +227,7 @@ class StableDiffusionModel(BaseModel):
             text: str = None,
             tokens: Tensor = None,
             text_encoder_layer_skip: int = 0,
+            text_encoder_output: Tensor | None = None,
     ):
         if tokens is None:
             tokenizer_output = self.tokenizer(
@@ -238,10 +239,11 @@ class StableDiffusionModel(BaseModel):
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
 
-        text_encoder_output = self.text_encoder(tokens, return_dict=True, output_hidden_states=True)
-        final_layer_norm = self.text_encoder.text_model.final_layer_norm
-        prompt_embeds = final_layer_norm(
-            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-        )
+        if text_encoder_output is None:
+            text_encoder_output = self.text_encoder(tokens, return_dict=True, output_hidden_states=True)
+            final_layer_norm = self.text_encoder.text_model.final_layer_norm
+            text_encoder_output = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            )
 
-        return prompt_embeds
+        return text_encoder_output

@@ -238,23 +238,14 @@ class BaseWuerstchenSetup(
                 self.__alpha_cumprod,
             )
 
-            if config.text_encoder.train or config.train_any_embedding():
-                text_encoder_output = model.prior_text_encoder(
-                    batch['tokens'], output_hidden_states=True, return_dict=True
-                )
-                if model.model_type.is_wuerstchen_v2():
-                    final_layer_norm = model.prior_text_encoder.text_model.final_layer_norm
-                    text_embedding = final_layer_norm(
-                        text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
-                    )
-                if model.model_type.is_stable_cascade():
-                    text_embedding = text_encoder_output.hidden_states[-(1 + config.text_encoder_layer_skip)]
-                    if model.model_type.is_stable_cascade():
-                        pooled_text_text_embedding = text_encoder_output.text_embeds.unsqueeze(1)
-            else:
-                text_embedding = batch['text_encoder_hidden_state']
-                if model.model_type.is_stable_cascade():
-                    pooled_text_text_embedding = batch['pooled_text_encoder_output'].unsqueeze(1)
+            text_embedding, pooled_text_text_embedding = model.encode_text(
+                tokens=batch['tokens'],
+                text_encoder_layer_skip=config.text_encoder_layer_skip,
+                text_encoder_output=batch[
+                    'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
+                pooled_text_encoder_output=batch[
+                    'pooled_text_encoder_output'] if not config.train_text_encoder_or_embedding() else None,
+            )
 
             latent_input = scaled_noisy_latent_image
 

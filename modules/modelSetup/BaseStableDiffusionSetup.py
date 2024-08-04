@@ -178,13 +178,12 @@ class BaseStableDiffusionSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            if config.text_encoder.train or config.train_any_embedding():
-                text_encoder_output = model.encode_text(
-                    tokens=batch['tokens'],
-                    text_encoder_layer_skip=config.text_encoder_layer_skip,
-                )
-            else:
-                text_encoder_output = batch['text_encoder_hidden_state']
+            text_encoder_output = model.encode_text(
+                tokens=batch['tokens'],
+                text_encoder_layer_skip=config.text_encoder_layer_skip,
+                text_encoder_output=batch[
+                    'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
+            )
 
             latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor

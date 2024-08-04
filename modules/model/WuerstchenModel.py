@@ -236,3 +236,37 @@ class WuerstchenModel(BaseModel):
             prompt = prompt.replace(self.embedding.placeholder, embedding_string)
 
         return prompt
+
+    def encode_text(
+            self,
+            text: str = None,
+            tokens: Tensor = None,
+            text_encoder_layer_skip: int = 0,
+            text_encoder_output: Tensor | None = None,
+            pooled_text_encoder_output: Tensor | None = None,
+    ) -> tuple[Tensor, Tensor]:
+        if tokens is None and text is not None:
+            tokenizer_output = self.prior_tokenizer(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens = tokenizer_output.input_ids.to(self.prior_text_encoder.device)
+
+        if text_encoder_output is None:
+            text_encoder_output = self.prior_text_encoder(
+                tokens, output_hidden_states=True, return_dict=True
+            )
+            if self.model_type.is_wuerstchen_v2():
+                final_layer_norm = self.prior_text_encoder.text_model.final_layer_norm
+                pooled_text_encoder_output = None
+                text_encoder_output = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
+            if self.model_type.is_stable_cascade():
+                pooled_text_encoder_output = text_encoder_output.text_embeds.unsqueeze(1)
+                text_encoder_output = text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+
+        return text_encoder_output, pooled_text_encoder_output
