@@ -355,6 +355,7 @@ class TrainConfig(BaseConfig):
     lora_rank: int
     lora_alpha: float
     lora_decompose: bool
+    lora_decompose_norm_epsilon: bool
     lora_weight_dtype: DataType
     lora_layers: str  # comma-separated
     lora_layer_preset: str
@@ -792,6 +793,7 @@ class TrainConfig(BaseConfig):
         data.append(("lora_rank", 16, int, False))
         data.append(("lora_alpha", 1.0, float, False))
         data.append(("lora_decompose", False, bool, False))
+        data.append(("lora_decompose_norm_epsilon", True, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("lora_layers", "", str, False))
         data.append(("lora_layer_preset", None, str, True))

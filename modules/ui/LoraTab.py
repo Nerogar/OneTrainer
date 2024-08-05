@@ -100,6 +100,10 @@ class LoraTab:
                              tooltip="Decompose LoRA Weights (aka, DoRA).")
             components.switch(master, 1, 4, self.ui_state, "lora_decompose")
 
+            components.label(master, 2, 3, "Use Norm Espilon (DoRA Only)",
+                             tooltip="Add an epsilon to the norm divison calculation in DoRA. Can aid in training stability, and also acts as regularization.")
+            components.switch(master, 2, 4, self.ui_state, "lora_decompose_norm_epsilon")
+
         # lora rank
         components.label(master, 2, 0, f"{name} alpha",
                          tooltip="The alpha parameter used when creating a new f{name}")
