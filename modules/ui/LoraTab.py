@@ -30,7 +30,6 @@ class LoraTab:
         self.prior_selected = None
         self.scroll_frame = None
         self.options_frame = None
-        self.norm_epsilon_switch = None
 
         self.refresh_ui()
 
@@ -99,12 +98,11 @@ class LoraTab:
         if peft_type == PeftType.LORA:
             components.label(master, 1, 3, "Decompose Weights (DoRA)",
                              tooltip="Decompose LoRA Weights (aka, DoRA).")
-            components.switch(master, 1, 4, self.ui_state, "lora_decompose",
-                              command=self.__decompose_switched)
+            components.switch(master, 1, 4, self.ui_state, "lora_decompose")
 
             components.label(master, 2, 3, "Use Norm Espilon (DoRA Only)",
                              tooltip="Add an epsilon to the norm divison calculation in DoRA. Can aid in training stability, and also acts as regularization.")
-            self.norm_epsilon_switch = components.switch(master, 2, 4, self.ui_state, "lora_decompose_norm_epsilon")
+            components.switch(master, 2, 4, self.ui_state, "lora_decompose_norm_epsilon")
 
         # lora rank
         components.label(master, 2, 0, f"{name} alpha",
@@ -148,11 +146,6 @@ class LoraTab:
         if self.layer_selector.get() not in self.presets_list:
             self.layer_selector.set(self.presets_list[0])
         self.__preset_set_layer_choice(self.layer_selector.get())
-
-    def __decompose_switched(self):
-        if self.norm_epsilon_switch:
-            state = "normal" if self.train_config.lora_decompose else "disabled"
-            self.norm_epsilon_switch.configure(state=state)
 
     def __preset_set_layer_choice(self, selected: str):
         if not selected:
