@@ -56,8 +56,6 @@ class PixArtAlphaSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            tokenizer = self.pipeline.tokenizer
-            text_encoder = self.pipeline.text_encoder
             noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.pipeline.scheduler, diffusion_steps)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
@@ -66,50 +64,16 @@ class PixArtAlphaSampler(BaseModelSampler):
 
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
-            tokenizer_output = tokenizer(
-                prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=120,
-                return_tensors="pt",
+
+            prompt_embedding, tokens_attention_mask = self.model.encode_text(
+                text=prompt,
+                text_encoder_layer_skip=text_encoder_layer_skip,
             )
-            tokens = tokenizer_output.input_ids.to(self.train_device)
-            tokens_attention_mask = tokenizer_output.attention_mask.to(self.train_device)
 
-            negative_tokenizer_output = tokenizer(
-                negative_prompt,
-                padding='max_length',
-                truncation=True,
-                max_length=120,
-                return_tensors="pt",
+            negative_prompt_embedding, negative_tokens_attention_mask = self.model.encode_text(
+                text=prompt,
+                text_encoder_layer_skip=text_encoder_layer_skip,
             )
-            negative_tokens = negative_tokenizer_output.input_ids.to(self.train_device)
-            negative_tokens_attention_mask = negative_tokenizer_output.attention_mask.to(self.train_device)
-
-            with self.model.text_encoder_autocast_context:
-                text_encoder_output = text_encoder(
-                    tokens,
-                    attention_mask=tokens_attention_mask,
-                    return_dict=True,
-                    output_hidden_states=True,
-                )
-                text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]  # remove normalized output
-                final_layer_norm = text_encoder.encoder.final_layer_norm
-                prompt_embedding = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
-
-                text_encoder_output = text_encoder(
-                    negative_tokens,
-                    attention_mask=negative_tokens_attention_mask,
-                    return_dict=True,
-                    output_hidden_states=True,
-                )
-                text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]  # remove normalized output
-                final_layer_norm = text_encoder.encoder.final_layer_norm
-                negative_prompt_embedding = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
             combined_prompt_attention_mask = torch.cat([negative_tokens_attention_mask, tokens_attention_mask])

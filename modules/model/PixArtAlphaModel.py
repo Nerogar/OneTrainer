@@ -173,3 +173,40 @@ class PixArtAlphaModel(BaseModel):
             prompt = prompt.replace(self.embedding.placeholder, embedding_string)
 
         return prompt
+
+    def encode_text(
+            self,
+            text: str = None,
+            tokens: Tensor = None,
+            text_encoder_layer_skip: int = 0,
+            text_encoder_output: Tensor = None,
+            attention_mask: Tensor = None,
+    ) -> tuple[Tensor, Tensor]:
+        if tokens is None and text is not None:
+            tokenizer_output = self.tokenizer(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=120,
+                return_tensors="pt",
+            )
+            tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
+
+            attention_mask = tokenizer_output.attention_mask
+            attention_mask = attention_mask.to(self.text_encoder.device)
+
+        if text_encoder_output is None:
+            with self.text_encoder_autocast_context:
+                text_encoder_output = self.text_encoder(
+                    tokens,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                    return_dict=True,
+                )
+                text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]
+                final_layer_norm = self.text_encoder.encoder.final_layer_norm
+                text_encoder_output = final_layer_norm(
+                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+                )
+
+        return text_encoder_output, attention_mask
