@@ -324,9 +324,11 @@ class DoRAModule(LoRAModule):
     """
     dora_num_dims: int
     dora_scale: Tensor | None
+    norm_epsilon: bool
 
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
+        self.norm_epsilon = kwargs.pop('norm_epsilon', False)
         super().__init__(*args, **kwargs)
 
     def initialize_weights(self):
@@ -362,12 +364,13 @@ class DoRAModule(LoRAModule):
         # the paper, we treat the norm as a constant for the purposes of
         # backpropagation in order to save VRAM (to do this, we detach it from
         # the gradient graph).
+        eps = torch.finfo(WP.dtype).eps if self.norm_epsilon else 0.0
         norm = WP.detach() \
                  .transpose(0, 1) \
                  .reshape(WP.shape[1], -1) \
                  .norm(dim=1, keepdim=True) \
                  .reshape(WP.shape[1], *[1] * self.dora_num_dims) \
-                 .transpose(0, 1)
+                 .transpose(0, 1) + eps
         WP = self.dora_scale * (WP / norm)
         # In the DoRA codebase (and thus the paper results), they perform
         # dropout on the *input*, rather than between layers, so we duplicate
@@ -409,14 +412,17 @@ class LoRAModuleWrapper:
                 self.klass = DoRAModule
                 self.dummy_klass = DummyDoRAModule
                 self.additional_args = [self.rank, self.alpha]
+                self.additional_kwargs = {'norm_epsilon': config.lora_decompose_norm_epsilon}
             else:
                 self.klass = LoRAModule
                 self.dummy_klass = DummyLoRAModule
                 self.additional_args = [self.rank, self.alpha]
+                self.additional_kwargs = {}
         elif self.peft_type == PeftType.LOHA:
             self.klass = LoHaModule
             self.dummy_klass = DummyLoHaModule
             self.additional_args = [self.rank, self.alpha]
+            self.additional_kwargs = {}
 
         self.lora_modules = self.__create_modules(orig_module)
 
@@ -428,7 +434,7 @@ class LoRAModuleWrapper:
                 if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
                     if isinstance(child_module, Linear) or \
                        isinstance(child_module, Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args)
+                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
 
         return lora_modules
 
@@ -471,7 +477,7 @@ class LoRAModuleWrapper:
         for name in remaining_names:
             if name.endswith(".alpha"):
                 prefix = name.removesuffix(".alpha")
-                module = self.dummy_klass(prefix, None, *self.additional_args)
+                module = self.dummy_klass(prefix, None, *self.additional_args, **self.additional_kwargs)
                 module.load_state_dict(state_dict)
                 self.lora_modules[prefix] = module
 
