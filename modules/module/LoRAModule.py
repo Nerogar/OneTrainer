@@ -15,6 +15,8 @@ from modules.util.enum.ModelType import PeftType
 class PeftBase(nn.Module):
     is_applied: bool
     orig_forward: Any | None
+    orig_eval: Any | None
+    orig_train: Any | None
     _orig_module: list[nn.Module] | None  # list prevents it from registering
     prefix: str
     layer_kwargs: dict  # Applied during the forward op() call.
@@ -46,14 +48,28 @@ class PeftBase(nn.Module):
     def hook_to_module(self):
         if not self.is_applied:
             self.orig_forward = self.orig_module.forward
+            self.orig_train = self.orig_module.train
+            self.orig_eval = self.orig_module.eval
             self.orig_module.forward = self.forward
+            self.orig_module.train = self._wrap_train
+            self.orig_module.eval = self._wrap_eval
             self.is_applied = True
 
     def remove_hook_from_module(self):
         assert self.orig_forward is not None
         if self.is_applied:
             self.orig_module.forward = self.orig_forward
+            self.orig_module.train = self.orig_train
+            self.orig_module.eval = self.orig_eval
             self.is_applied = False
+
+    def _wrap_train(self, mode=True):
+        self.orig_train(mode)
+        self.train(mode)
+
+    def _wrap_eval(self):
+        self.orig_eval()
+        self.eval()
 
     def make_weight(self, A: Tensor, B: Tensor):
         """Layer-type-independent way of creating a weight matrix from LoRA A/B.
