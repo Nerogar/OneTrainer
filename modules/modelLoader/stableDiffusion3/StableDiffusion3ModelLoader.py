@@ -1,3 +1,4 @@
+import os
 import traceback
 
 import torch
@@ -26,10 +27,13 @@ class StableDiffusion3ModelLoader:
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
     ):
-        self.__load_diffusers(
-            model, model_type, weight_dtypes, base_model_name, vae_model_name,
-            include_text_encoder_1, include_text_encoder_2, include_text_encoder_3,
-        )
+        if os.path.isfile(os.path.join(base_model_name, "meta.json")):
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, base_model_name, vae_model_name,
+                include_text_encoder_1, include_text_encoder_2, include_text_encoder_3,
+            )
+        else:
+            raise Exception("not an internal model")
 
     def __load_diffusers(
             self,

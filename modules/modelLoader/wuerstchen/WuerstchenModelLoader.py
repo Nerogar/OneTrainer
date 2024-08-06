@@ -1,4 +1,5 @@
 import json
+import os.path
 import traceback
 
 from diffusers import DDPMWuerstchenScheduler
@@ -28,15 +29,18 @@ class WuerstchenModelLoader:
             effnet_encoder_model_name: str,
             decoder_model_name: str,
     ):
-        self.__load_diffusers(
-            model,
-            model_type,
-            weight_dtypes,
-            prior_model_name,
-            "",  # pass an empty prior name, so it's always loaded from the backup
-            effnet_encoder_model_name,
-            decoder_model_name,
-        )
+        if os.path.isfile(os.path.join(prior_model_name, "meta.json")):
+            self.__load_diffusers(
+                model,
+                model_type,
+                weight_dtypes,
+                prior_model_name,
+                "",  # pass an empty prior name, so it's always loaded from the backup
+                effnet_encoder_model_name,
+                decoder_model_name,
+            )
+        else:
+            raise Exception("not an internal model")
 
     def __load_diffusers(
             self,
@@ -47,7 +51,7 @@ class WuerstchenModelLoader:
             prior_prior_model_name: str,
             effnet_encoder_model_name: str,
             decoder_model_name: str,
-    ) -> WuerstchenModel | None:
+    ):
         if model_type.is_wuerstchen_v2():
             decoder_tokenizer = CLIPTokenizer.from_pretrained(
                 decoder_model_name,
