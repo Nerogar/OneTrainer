@@ -1,3 +1,4 @@
+import contextlib
 import os
 import traceback
 
@@ -21,21 +22,13 @@ class WuerstchenEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = torch.load(embedding_name)
-
             return embedding_state['clip_g']
 
-        except Exception:
-            pass
-
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = load_file(embedding_name)
-
             return embedding_state['clip_g']
-
-        except Exception:
-            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 

@@ -1,3 +1,4 @@
+import contextlib
 import os
 import traceback
 
@@ -21,25 +22,21 @@ class StableDiffusionXLEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = torch.load(embedding_name)
 
             text_encoder_1_vector = embedding_state['clip_l']
             text_encoder_2_vector = embedding_state['clip_g']
 
             return text_encoder_1_vector, text_encoder_2_vector
-        except Exception:
-            pass
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = load_file(embedding_name)
 
             text_encoder_1_vector = embedding_state['clip_l']
             text_encoder_2_vector = embedding_state['clip_g']
 
             return text_encoder_1_vector, text_encoder_2_vector
-        except Exception:
-            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 
