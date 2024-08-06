@@ -317,11 +317,8 @@ class LoRAModule(PeftBase):
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
 
-        if self.orig_module.training:
-            ld = self.lora_up(self.dropout(self.lora_down(x)))
-            return self.orig_forward(x) + ld * (self.alpha / self.rank)
-
-        return self.orig_forward(x) + self.lora_up(self.lora_down(x)) * (self.alpha / self.rank)
+        ld = self.lora_up(self.dropout(self.lora_down(x)))
+        return self.orig_forward(x) + ld * (self.alpha / self.rank)
 
     def apply_to_module(self):
         # TODO
