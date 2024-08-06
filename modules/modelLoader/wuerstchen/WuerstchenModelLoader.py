@@ -1,23 +1,24 @@
 import json
 import traceback
 
-from diffusers import DDPMWuerstchenScheduler
-from diffusers.models import StableCascadeUNet
-from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
-from safetensors import safe_open
-from safetensors.torch import load_file
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
-
-from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
-from modules.util.ModelNames import ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder, WuerstchenModel
 from modules.util.convert.convert_stable_cascade_ckpt_to_diffusers import convert_stable_cascade_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
+from modules.util.ModelNames import ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
+
+from diffusers import DDPMWuerstchenScheduler
+from diffusers.models import StableCascadeUNet
+from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+
+from safetensors import safe_open
+from safetensors.torch import load_file
 
 
 class WuerstchenModelLoader:
     def __init__(self):
-        super(WuerstchenModelLoader, self).__init__()
+        super().__init__()
 
     def __load_internal(
             self,
@@ -111,11 +112,11 @@ class WuerstchenModelLoader:
         elif model_type.is_stable_cascade():
             if prior_prior_model_name:
                 with safe_open(prior_prior_model_name, framework="pt") as f:
-                    if any(key.startswith("down_blocks.0.23") for key in f.keys()):
+                    if any(key.startswith("down_blocks.0.23") for key in f):
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_3.6b.json"
                     else:
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_1.0b.json"
-                    with open(config_filename, "r") as config_file:
+                    with open(config_filename) as config_file:
                         prior_config = json.load(config_file)
                 prior_prior = StableCascadeUNet(**prior_config)
                 prior_prior.load_state_dict(convert_stable_cascade_ckpt_to_diffusers(load_file(prior_prior_model_name)))
@@ -188,7 +189,7 @@ class WuerstchenModelLoader:
                 decoder_model_name,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
@@ -202,7 +203,7 @@ class WuerstchenModelLoader:
                 decoder_model_name,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

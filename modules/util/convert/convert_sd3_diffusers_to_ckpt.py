@@ -1,9 +1,8 @@
+import modules.util.convert.convert_diffusers_to_ckpt_util as util
+
 import torch
-from diffusers import DDIMScheduler
 from torch import Tensor
 
-import modules.util.convert.convert_diffusers_to_ckpt_util as util
-from modules.util.enum.ModelType import ModelType
 
 def __swap_chunks(tensor:Tensor) -> Tensor:
     chunk_0, chunk_1 = tensor.chunk(2, dim=0)

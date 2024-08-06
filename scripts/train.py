@@ -4,11 +4,11 @@ script_imports()
 
 import json
 
-from modules.util.config.TrainConfig import TrainConfig
+from modules.trainer.GenericTrainer import GenericTrainer
+from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.args.TrainArgs import TrainArgs
-from modules.trainer.GenericTrainer import GenericTrainer
+from modules.util.config.TrainConfig import TrainConfig
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
     commands = TrainCommands()
 
     train_config = TrainConfig.default_values()
-    with open(args.config_path, "r") as f:
+    with open(args.config_path) as f:
         train_config.from_dict(json.load(f))
 
     trainer = GenericTrainer(train_config, callbacks, commands)

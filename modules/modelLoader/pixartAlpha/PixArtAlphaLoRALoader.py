@@ -1,16 +1,17 @@
 import os
 import traceback
 
-import torch
-from safetensors.torch import load_file
-
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.util.ModelNames import ModelNames
+
+import torch
+
+from safetensors.torch import load_file
 
 
 class PixArtAlphaLoRALoader:
     def __init__(self):
-        super(PixArtAlphaLoRALoader, self).__init__()
+        super().__init__()
 
     def __load_safetensors(
             self,
@@ -46,25 +47,25 @@ class PixArtAlphaLoRALoader:
         stacktraces = []
 
         if model_names.lora == "":
-            return
+            return None
 
         if model_names.lora:
             try:
                 self.__load_internal(model, model_names.lora)
-                return
-            except:
+                return None
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
             try:
                 self.__load_ckpt(model, model_names.lora)
-                return
-            except:
+                return None
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
             try:
                 self.__load_safetensors(model, model_names.lora)
-                return
-            except:
+                return None
+            except Exception:
                 stacktraces.append(traceback.format_exc())
         else:
             return model

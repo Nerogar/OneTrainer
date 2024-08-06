@@ -1,9 +1,10 @@
 from abc import ABCMeta, abstractmethod
 
-import torch
-from mgds.MGDS import MGDS, TrainDataLoader
-
 from modules.dataLoader.mixin.DataLoaderMgdsMixin import DataLoaderMgdsMixin
+
+import torch
+
+from mgds.MGDS import MGDS, TrainDataLoader
 
 
 class BaseDataLoader(
@@ -16,7 +17,7 @@ class BaseDataLoader(
             train_device: torch.device,
             temp_device: torch.device,
     ):
-        super(BaseDataLoader, self).__init__()
+        super().__init__()
 
         self.train_device = train_device
         self.temp_device = temp_device

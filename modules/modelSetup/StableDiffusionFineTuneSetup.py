@@ -1,11 +1,11 @@
-import torch
-
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class StableDiffusionFineTuneSetup(
@@ -17,7 +17,7 @@ class StableDiffusionFineTuneSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(StableDiffusionFineTuneSetup, self).__init__(
+        super().__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -41,7 +41,7 @@ class StableDiffusionFineTuneSetup(
         if config.train_any_embedding():
             for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
                                                     model.embedding_wrapper.additional_embedding_placeholders,
-                                                    model.embedding_wrapper.additional_embedding_names):
+                                                    model.embedding_wrapper.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings/{name}",
                     display_name=f"embeddings/{placeholder}",

@@ -1,17 +1,18 @@
 import os
 import traceback
 
+from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util.ModelNames import EmbeddingName, ModelNames
+
 import torch
-from safetensors.torch import load_file
 from torch import Tensor
 
-from modules.model.WuerstchenModel import WuerstchenModel
-from modules.util.ModelNames import ModelNames, EmbeddingName
+from safetensors.torch import load_file
 
 
 class WuerstchenEmbeddingLoader:
     def __init__(self):
-        super(WuerstchenEmbeddingLoader, self).__init__()
+        super().__init__()
 
     def __load_embedding(
             self,
@@ -23,19 +24,17 @@ class WuerstchenEmbeddingLoader:
         try:
             embedding_state = torch.load(embedding_name)
 
-            prior_text_encoder_vector = embedding_state['clip_g']
+            return embedding_state['clip_g']
 
-            return prior_text_encoder_vector
-        except:
+        except Exception:
             pass
 
         try:
             embedding_state = load_file(embedding_name)
 
-            prior_text_encoder_vector = embedding_state['clip_g']
+            return embedding_state['clip_g']
 
-            return prior_text_encoder_vector
-        except:
+        except Exception:
             pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
@@ -51,7 +50,7 @@ class WuerstchenEmbeddingLoader:
                 safetensors_embedding_name = os.path.join(
                     directory,
                     "embedding",
-                    f"embedding.safetensors",
+                    "embedding.safetensors",
                 )
             else:
                 safetensors_embedding_name = os.path.join(
@@ -62,10 +61,10 @@ class WuerstchenEmbeddingLoader:
 
             if os.path.exists(safetensors_embedding_name):
                 return self.__load_embedding(safetensors_embedding_name)
-            else:
-                return self.__load_embedding(embedding_name.model_name)
-        else:
-            raise Exception("not an internal model")
+
+            return self.__load_embedding(embedding_name.model_name)
+
+        raise Exception("not an internal model")
 
     def load_multiple(
             self,
@@ -80,18 +79,18 @@ class WuerstchenEmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except:
+            except Exception as e:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except:
+                except Exception:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
 
                 for stacktrace in stacktraces:
                     print(stacktrace)
-                raise Exception("could not load embedding: " + str(model_names.embedding))
+                raise Exception(f"could not load embedding: {model_names.embedding}") from e
 
     def load_single(
             self,
@@ -105,13 +104,13 @@ class WuerstchenEmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except:
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

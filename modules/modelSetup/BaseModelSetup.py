@@ -1,15 +1,15 @@
 from abc import ABCMeta, abstractmethod
 
+from modules.model.BaseModel import BaseModel
+from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.TimedActionMixin import TimedActionMixin
+from modules.util.TrainProgress import TrainProgress
+
 import torch
 from torch import Tensor
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.tensorboard import SummaryWriter
-
-from modules.model.BaseModel import BaseModel
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.TimedActionMixin import TimedActionMixin
-from modules.util.TrainProgress import TrainProgress
-from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 
 
 class BaseModelSetup(
@@ -22,7 +22,7 @@ class BaseModelSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(BaseModelSetup, self).__init__()
+        super().__init__()
 
         self.train_device = train_device
         self.temp_device = temp_device
@@ -94,7 +94,7 @@ class BaseModelSetup(
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
-        for lr, parameter in zip(lrs, parameters):
+        for lr, parameter in zip(lrs, parameters, strict=False):
             # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
             name = parameter.split('/')[0]
 

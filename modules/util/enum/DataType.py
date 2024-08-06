@@ -20,10 +20,10 @@ class DataType(Enum):
     ):
         match self:
             case DataType.FLOAT_8:
-                if supports_fp8:
-                    return torch.float8_e4m3fn
-                else:
+                if not supports_fp8:
                     return torch.float16
+
+                return torch.float8_e4m3fn
             case DataType.FLOAT_16:
                 return torch.float16
             case DataType.FLOAT_32:

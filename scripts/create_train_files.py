@@ -2,10 +2,10 @@ from util.import_util import script_imports
 
 script_imports()
 
-import os
 import json
-
+import os
 from pathlib import Path
+
 from modules.util.args.CreateTrainFilesArgs import CreateTrainFilesArgs
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig

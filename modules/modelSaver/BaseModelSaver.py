@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
 
-import torch
-
 from modules.model.BaseModel import BaseModel
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+
+import torch
 
 
 class BaseModelSaver(metaclass=ABCMeta):
