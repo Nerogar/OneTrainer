@@ -46,6 +46,7 @@ class GenericTrainer(BaseTrainer):
     model_saver: BaseModelSaver
     model_sampler: BaseModelSampler
     model: BaseModel
+    data_loader_validation: BaseDataLoader
 
     previous_sample_time: float
     sample_queue: list[Callable]
@@ -134,7 +135,7 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
-            self.model, self.model.train_progress
+            self.model, self.model.train_progress, is_validation=False
         )
         self.model_saver = self.create_model_saver()
 
@@ -143,6 +144,8 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue = []
 
         self.parameters = self.model.parameters.parameters()
+        if self.config.validation:
+            self.data_loader_validation = self.create_data_loader(self.model, self.model.train_progress, is_validation=True)
 
     def __clear_cache(self):
         print(
@@ -444,6 +447,11 @@ class GenericTrainer(BaseTrainer):
     def __needs_gc(self, train_progress: TrainProgress):
         return self.repeating_action_needed("gc", 5, TimeUnit.MINUTE, train_progress, start_at_zero=False)
 
+    def __needs_validate(self, train_progress: TrainProgress):
+        return self.repeating_action_needed(
+            "validate", self.config.validate_after, self.config.validate_after_unit, train_progress
+        )
+
     def __is_update_step(self, train_progress: TrainProgress) -> bool:
         return self.repeating_action_needed(
             "update_step", self.config.gradient_accumulation_steps, TimeUnit.STEP, train_progress, start_at_zero=False
@@ -507,6 +515,7 @@ class GenericTrainer(BaseTrainer):
         lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
+        ema_loss_validation = {}
         for epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -607,14 +616,14 @@ class GenericTrainer(BaseTrainer):
                         self.model, self.config, lr_scheduler, self.tensorboard
                     )
 
-                    self.tensorboard.add_scalar("loss/loss", accumulated_loss, train_progress.global_step)
+                    self.tensorboard.add_scalar("loss/train_step", accumulated_loss, train_progress.global_step)
                     ema_loss = ema_loss or accumulated_loss
                     ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
                     step_tqdm.set_postfix({
                         'loss': accumulated_loss,
                         'smooth loss': ema_loss,
                     })
-                    self.tensorboard.add_scalar("loss/smooth loss", ema_loss, train_progress.global_step)
+                    self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
                     accumulated_loss = 0.0
 
                     self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
@@ -631,6 +640,68 @@ class GenericTrainer(BaseTrainer):
                         )
 
                     self.one_step_trained = True
+
+                    # validation
+                    self.data_loader_validation.get_data_set().start_next_epoch()
+                    current_epoch_length_validation = self.data_loader_validation.get_data_set().approximate_length()
+                    if (self.config.validation
+                            and current_epoch_length_validation > 0
+                            and self.__needs_validate(train_progress)):
+
+                        torch_gc()
+
+                        step_tqdm_validation = tqdm(
+                            self.data_loader_validation.get_data_loader(),
+                            desc="validation_step",
+                            total=current_epoch_length_validation,
+                            initial=0)
+
+                        accumulated_loss_per_concept = {}
+                        concept_counts = {}
+                        mapping_seed_to_label = {}
+                        mapping_label_to_seed = {}
+
+                        for epoch_step_validation, batch in enumerate(step_tqdm_validation):
+
+                            if self.__needs_gc(train_progress):
+                                torch_gc()
+
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                            loss_validation = self.model_setup.calculate_loss(self.model, batch, model_output_data,
+                                                                              self.config, mean=False)
+
+                            for concept_name, concept_seed, image_path, loss in zip(batch["concept_name"],
+                                                                                    batch["concept_seed"],
+                                                                                    batch["image_path"],
+                                                                                    loss_validation):
+                                concept_seed = concept_seed.item()
+
+                                label = concept_name if concept_name else os.path.basename(os.path.dirname(image_path))
+                                # check and fix collision to display both graphs in tensorboard
+                                if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
+                                    label += '*'
+                                if concept_seed not in mapping_seed_to_label:
+                                    mapping_seed_to_label[concept_seed] = label
+                                    mapping_label_to_seed[label] = concept_seed
+
+                                accumulated_loss_per_concept[concept_seed] = accumulated_loss_per_concept.get(concept_seed, 0) + loss.item()
+                                concept_counts[concept_seed] = concept_counts.get(concept_seed, 0) + 1
+
+                        for concept_seed, total_loss in accumulated_loss_per_concept.items():
+                            average_loss = total_loss / concept_counts[concept_seed]
+
+                            if concept_seed not in ema_loss_validation:
+                                ema_loss_validation[concept_seed] = average_loss
+                            else:
+                                ema_loss_validation[concept_seed] = (ema_loss_validation[concept_seed] * 0.99) + (
+                                            average_loss * 0.01)
+
+                            self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                                                        average_loss,
+                                                        train_progress.global_step)
+                            self.tensorboard.add_scalar(f"smooth_loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                                                        ema_loss_validation[concept_seed],
+                                                        train_progress.global_step)
 
                 train_progress.next_step(self.config.batch_size)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)

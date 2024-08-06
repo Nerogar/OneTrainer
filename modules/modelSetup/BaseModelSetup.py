@@ -71,6 +71,7 @@ class BaseModelSetup(
             batch: dict,
             data: dict,
             config: TrainConfig,
+            mean: bool = True
     ) -> Tensor:
         pass
 

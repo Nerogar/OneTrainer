@@ -60,6 +60,7 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
             config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
+            is_validation: bool = False
     ):
         super(StableDiffusionBaseDataLoader, self).__init__(
             train_device,
@@ -70,6 +71,7 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
             config=config,
             model=model,
             train_progress=train_progress,
+            is_validation=is_validation
         )
         self.__dl = TrainDataLoader(self.__ds, config.batch_size)
 
@@ -355,6 +357,11 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
 
+        # add for calculating loss per concept
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.seed', 'concept_seed'))
+
         def before_cache_image_fun():
             model.to(self.temp_device)
             model.vae_to(self.train_device)
@@ -433,6 +440,7 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
             config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
+            is_validation: bool = False
     ):
         enumerate_input = self._enumerate_input_modules(config)
         load_input = self._load_input_modules(config, model)
@@ -464,5 +472,6 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
                 debug_modules if config.debug_mode else None,
                 # inserted before output_modules, which contains a sorting operation
             ],
-            train_progress
+            train_progress,
+            is_validation
         )

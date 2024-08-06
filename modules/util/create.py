@@ -273,11 +273,12 @@ def create_data_loader(
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
         config: TrainConfig = None,
         train_progress: TrainProgress = TrainProgress(),
+        is_validation: bool = False
 ):
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
+                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_stable_diffusion_xl():
                 return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_wuerstchen():
