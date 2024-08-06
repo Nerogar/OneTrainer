@@ -83,7 +83,7 @@ class GenerateLossesModel:
         filename_loss_list: list[tuple[str, float]] = []
         # Don't really need a backward pass here, so we can make the calculation MUCH faster.
         with torch.inference_mode():
-            for _epoch_step, batch in enumerate(step_tqdm):
+            for batch in step_tqdm:
                     model_output_data = self.model_setup.predict(
                         self.model,
                         batch,
