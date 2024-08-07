@@ -7,6 +7,7 @@ import sys
 import traceback
 from pathlib import Path
 from typing import Callable
+import ctypes
 
 import torch
 from PIL.Image import Image
@@ -37,6 +38,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
+from scripts.calculate_fid_scores import calculate_fid_scores
 
 
 class GenericTrainer(BaseTrainer):
@@ -84,7 +86,19 @@ class GenericTrainer(BaseTrainer):
 
         self.grad_hook_handles = []
 
+    def pre_training_check(self):
+        epochs_dir = "workspace/run/epochs"  # Use relative path directly
+        if os.path.exists(epochs_dir):
+            try:
+                print(f"Found existing 'epochs' folder. Deleting...")
+                shutil.rmtree(epochs_dir)
+                print("Deletion successful.")
+            except Exception as e:
+                print(f"Error deleting 'epochs' folder: {e}")
+
     def start(self):
+        self.pre_training_check()
+
         if self.config.clear_cache_before_training and self.config.latent_caching:
             self.__clear_cache()
 
@@ -231,7 +245,7 @@ class GenericTrainer(BaseTrainer):
                     def on_sample_default(image: Image):
                         if self.config.samples_to_tensorboard:
                             self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                                       train_progress.global_step)
+                                                    train_progress.global_step)
                         self.callbacks.on_sample_default(image)
 
                     def on_sample_custom(image: Image):
@@ -259,18 +273,80 @@ class GenericTrainer(BaseTrainer):
 
                 torch_gc()
 
+        current_epoch = train_progress.epoch
+
+        for i, sample_params in enumerate(sample_params_list):
+            if sample_params.enabled:
+                safe_prompt = path_util.safe_filename(sample_params.prompt)
+                sample_dir = os.path.join(
+                    self.config.workspace_dir,
+                    "samples",
+                    f"{str(i)} - {safe_prompt}",
+                )
+
+                # Find the most recent sample generated during the current epoch
+                latest_sample = None
+                latest_timestamp = None
+                for filename in os.listdir(sample_dir):
+                    if filename.lower().endswith((".png", ".jpg", ".jpeg")):
+                        parts = filename.split("-")
+                        epoch = int(parts[-2])  # Extract the epoch number from the second-to-last part
+                        if epoch == current_epoch and (latest_timestamp is None or filename > latest_timestamp):
+                            latest_timestamp = filename
+                            latest_sample = filename
+
+                # Copy the most recent sample from the current epoch to the epoch-specific folder
+                if latest_sample is not None:
+                    src_path = os.path.join(sample_dir, latest_sample)
+                    dst_path = os.path.join(os.path.join(self.config.workspace_dir, "epochs", f"class_{current_epoch}"), f"{safe_prompt}_{latest_sample}")
+                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                    shutil.copy2(src_path, dst_path)
+
+    def get_validation_and_epochs_paths(self):
+        # Get the path to the "training_concepts" directory
+        training_concepts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "training_concepts")
+
+        # Construct the path to the "concepts.json" file
+        concepts_file = os.path.join(training_concepts_dir, "concepts.json")
+
+        # Read the concepts.json file
+        with open(concepts_file, "r") as f:
+            concepts = json.load(f)
+
+        # Find the concept named "validation_images"
+        validation_images_path = None
+        for concept in concepts:
+            if concept["name"] == "validation_images":
+                validation_images_path = concept["path"]
+                break
+
+        epochs_path = None
+        if validation_images_path is not None:
+            # Get the path to the "scripts" directory
+            scripts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "scripts")
+            # Add the "scripts" directory to the Python module search path
+            sys.path.append(scripts_dir)
+            # Define the epochs_path variable pointing to the hidden "epochs" directory
+            epochs_path = os.path.join(self.config.workspace_dir, "epochs")
+        else:
+            print("No 'validation_images' concept found in concepts.json. Skipping FID score calculation.")
+
+        return validation_images_path, epochs_path
+
     def __sample_during_training(
             self,
             train_progress: TrainProgress,
             train_device: torch.device,
             sample_params_list: list[SampleConfig] = None,
     ):
+        validation_images_path, epochs_path = self.get_validation_and_epochs_paths()
+
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
-        torch_gc()
 
+        torch_gc()
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
@@ -288,6 +364,32 @@ class GenericTrainer(BaseTrainer):
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+
+        # Create a hidden directory to save the samples for the current epoch
+        epoch_sample_dir = os.path.join(self.config.workspace_dir, "epochs", f"class_{train_progress.epoch}")
+        os.makedirs(epoch_sample_dir, exist_ok=True)
+
+        # Set the "Hidden" attribute for the "epochs" folder
+        ctypes.windll.kernel32.SetFileAttributesW(os.path.join(self.config.workspace_dir, "epochs"), 0x02)
+
+        for i, sample_params in enumerate(sample_params_list):
+            if sample_params.enabled:
+                try:
+                    safe_prompt = path_util.safe_filename(sample_params.prompt)
+                    sample_dir = os.path.join(
+                        self.config.workspace_dir,
+                        "samples",
+                        f"{str(i)} - {safe_prompt}",
+                    )
+
+                    # Create the prompt-specific folder if it doesn't exist
+                    os.makedirs(sample_dir, exist_ok=True)
+
+                except:
+                    traceback.print_exc()
+                    print("Error during sampling, proceeding without sampling")
+
+                torch_gc()
 
         self.__sample_loop(
             train_progress=train_progress,
@@ -310,7 +412,26 @@ class GenericTrainer(BaseTrainer):
                 folder_postfix=" - no-ema",
             )
 
+        # Define the relative path to the fid_scores.json file
+        fid_scores_file = os.path.join("workspace", "run", "epochs", "fid_scores.json")
+
+        # Calculate and log FID score
+        if epochs_path is not None:
+            fid_scores = calculate_fid_scores(validation_images_path, epochs_path)
+            
+            # Read FID scores from the JSON file
+            if os.path.exists(fid_scores_file):
+                with open(fid_scores_file, "r") as f:
+                    fid_scores = json.load(f)
+                for epoch, fid_score in fid_scores.items():
+                    self.tensorboard.add_scalar("loss/validation loss", fid_score, int(epoch))  # Log to TensorBoard
+            else:
+                print("FID scores JSON file not found. No scores to log to TensorBoard.")
+        else:
+            print("No 'validation_images' concept found in concepts.json. Skipping FID score calculation.")
+
         self.model_setup.setup_train_device(self.model, self.config)
+        
         # Special case for schedule-free optimizers.
         if self.config.optimizer.optimizer.is_schedule_free:
             torch.clear_autocast_cache()
@@ -426,10 +547,13 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
-    def __needs_sample(self, train_progress: TrainProgress):
-        return self.repeating_action_needed(
-            "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
-        )
+    def __needs_sample(self, train_progress: TrainProgress, is_last_epoch: bool):
+        if is_last_epoch:
+            return True
+        else:
+            return self.repeating_action_needed(
+                "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
+            )
 
     def __needs_backup(self, train_progress: TrainProgress):
         return self.repeating_action_needed(
@@ -544,11 +668,6 @@ class GenericTrainer(BaseTrainer):
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
             for epoch_step, batch in enumerate(step_tqdm):
-                if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
-                    self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, train_device)
-                    )
-
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
                 if sample_commands:
                     def create_sample_commands_fun(sample_commands):
@@ -639,10 +758,21 @@ class GenericTrainer(BaseTrainer):
                     return
 
             train_progress.next_epoch()
+
+            # Check if the current epoch is the last one
+            is_last_epoch = train_progress.epoch == self.config.epochs - 1
+
+            # Check if sampling is needed after the epoch is completed
+            if self.__needs_sample(train_progress, is_last_epoch) or self.commands.get_and_reset_sample_default_command():
+                self.__sample_during_training(train_progress, train_device)  # Directly sample
+
             self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
             if self.commands.get_stop_command():
                 return
+            
+        # Ensure sampling after the training loop
+        self.__execute_sample_during_training()
 
     def end(self):
         if self.one_step_trained:
@@ -675,3 +805,7 @@ class GenericTrainer(BaseTrainer):
 
         for handle in self.grad_hook_handles:
             handle.remove()
+
+        epochs_dir = os.path.join(self.config.workspace_dir, "epochs")
+        if os.path.exists(epochs_dir):
+            shutil.rmtree(epochs_dir)
