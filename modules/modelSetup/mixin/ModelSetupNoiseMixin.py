@@ -87,23 +87,23 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
             samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
             return samples.to(dtype=torch.long, device=generator.device)
-        if config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:  ## multinomial implementation
-            if self.__weights is None:
-                bias = config.noising_bias
-                scale = config.noising_weight + 1.0
-
-                weights = torch.linspace(0, 1, num_timestep)
-                weights = \
-                    (1.0 / (scale * math.sqrt(2.0 * torch.pi))) \
-                    * (1.0 / (weights * (1.0 - weights))) \
-                    * torch.exp(
-                        -((torch.logit(weights) - bias) ** 2.0) / (2.0 * scale ** 2.0)
-                    )
-                weights.nan_to_num_(0)
-                self.__weights = weights
-
-            samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-            return samples.to(dtype=torch.long, device=generator.device)
+        # if config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:  ## multinomial implementation
+        #     if self.__weights is None:
+        #         bias = config.noising_bias
+        #         scale = config.noising_weight + 1.0
+        #
+        #         weights = torch.linspace(0, 1, num_timestep)
+        #         weights = \
+        #             (1.0 / (scale * math.sqrt(2.0 * torch.pi))) \
+        #             * (1.0 / (weights * (1.0 - weights))) \
+        #             * torch.exp(
+        #                 -((torch.logit(weights) - bias) ** 2.0) / (2.0 * scale ** 2.0)
+        #             )
+        #         weights.nan_to_num_(0)
+        #         self.__weights = weights
+        #
+        #     samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
+        #     return samples.to(dtype=torch.long, device=generator.device)
         if config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
             bias = config.noising_bias
             scale = config.noising_weight + 1.0
