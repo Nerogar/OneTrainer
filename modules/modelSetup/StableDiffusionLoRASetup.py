@@ -47,15 +47,9 @@ class StableDiffusionLoRASetup(
             ))
 
         if config.train_any_embedding():
-            for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
-                                                    model.embedding_wrapper.additional_embedding_placeholders,
-                                                    model.embedding_wrapper.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings/{name}",
-                    display_name=f"embeddings/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            self._add_embedding_param_groups(
+                model.embedding_wrapper, parameter_group_collection, config.embedding_learning_rate, "embeddings"
+            )
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(

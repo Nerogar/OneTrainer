@@ -56,26 +56,16 @@ class StableDiffusionXLLoRASetup(
 
         if config.train_any_embedding():
             if config.text_encoder.train_embedding:
-                for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
-                                                        model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                        model.embedding_wrapper_1.additional_embedding_names):
-                    parameter_group_collection.add_group(NamedParameterGroup(
-                        unique_name=f"embeddings_1/{name}",
-                        display_name=f"embeddings_1/{placeholder}",
-                        parameters=[parameter],
-                        learning_rate=config.embedding_learning_rate,
-                    ))
+                self._add_embedding_param_groups(
+                    model.embedding_wrapper_1, parameter_group_collection, config.embedding_learning_rate,
+                    "embeddings_1"
+                )
 
             if config.text_encoder_2.train_embedding:
-                for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
-                                                        model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                        model.embedding_wrapper_2.additional_embedding_names):
-                    parameter_group_collection.add_group(NamedParameterGroup(
-                        unique_name=f"embeddings_2/{name}",
-                        display_name=f"embeddings_2/{placeholder}",
-                        parameters=[parameter],
-                        learning_rate=config.embedding_learning_rate,
-                    ))
+                self._add_embedding_param_groups(
+                    model.embedding_wrapper_2, parameter_group_collection, config.embedding_learning_rate,
+                    "embeddings_2"
+                )
 
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(

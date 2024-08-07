@@ -1,7 +1,7 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
@@ -30,15 +30,9 @@ class StableDiffusionEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
-                                                model.embedding_wrapper.additional_embedding_placeholders,
-                                                model.embedding_wrapper.additional_embedding_names):
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name=f"embeddings/{name}",
-                display_name=f"embeddings/{placeholder}",
-                parameters=[parameter],
-                learning_rate=config.embedding_learning_rate,
-            ))
+        self._add_embedding_param_groups(
+            model.embedding_wrapper, parameter_group_collection, config.embedding_learning_rate, "embeddings"
+        )
 
         return parameter_group_collection
 

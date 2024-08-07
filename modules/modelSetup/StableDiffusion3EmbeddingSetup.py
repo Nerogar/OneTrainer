@@ -1,7 +1,7 @@
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSetup.BaseStableDiffusion3Setup import BaseStableDiffusion3Setup
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
@@ -31,37 +31,19 @@ class StableDiffusion3EmbeddingSetup(
         parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
-            for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
-                                                    model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_1.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_1/{name}",
-                    display_name=f"embeddings_1/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            self._add_embedding_param_groups(
+                model.embedding_wrapper_1, parameter_group_collection, config.embedding_learning_rate, "embeddings_1"
+            )
 
         if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
-            for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
-                                                    model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_2.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_2/{name}",
-                    display_name=f"embeddings_2/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            self._add_embedding_param_groups(
+                model.embedding_wrapper_2, parameter_group_collection, config.embedding_learning_rate, "embeddings_2"
+            )
 
         if config.text_encoder_3.train_embedding and model.text_encoder_3 is not None:
-            for parameter, placeholder, name in zip(model.embedding_wrapper_3.additional_embeddings,
-                                                    model.embedding_wrapper_3.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_3.additional_embedding_names):
-                parameter_group_collection.add_group(NamedParameterGroup(
-                    unique_name=f"embeddings_3/{name}",
-                    display_name=f"embeddings_3/{placeholder}",
-                    parameters=[parameter],
-                    learning_rate=config.embedding_learning_rate,
-                ))
+            self._add_embedding_param_groups(
+                model.embedding_wrapper_3, parameter_group_collection, config.embedding_learning_rate, "embeddings_3"
+            )
 
         return parameter_group_collection
 

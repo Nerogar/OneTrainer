@@ -1,7 +1,7 @@
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
@@ -30,15 +30,10 @@ class WuerstchenEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        for parameter, placeholder, name in zip(model.prior_embedding_wrapper.additional_embeddings,
-                                                model.prior_embedding_wrapper.additional_embedding_placeholders,
-                                                model.prior_embedding_wrapper.additional_embedding_names):
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name=f"prior_embeddings/{name}",
-                display_name=f"prior_embeddings/{placeholder}",
-                parameters=[parameter],
-                learning_rate=config.embedding_learning_rate,
-            ))
+        self._add_embedding_param_groups(
+            model.prior_embedding_wrapper, parameter_group_collection, config.embedding_learning_rate,
+            "prior_embeddings"
+        )
 
         return parameter_group_collection
 
