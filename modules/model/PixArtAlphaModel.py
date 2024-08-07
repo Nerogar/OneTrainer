@@ -1,7 +1,7 @@
 from contextlib import nullcontext
-from uuid import uuid4
 
-from modules.model.BaseModel import BaseModel
+from modules.model.BaseModel import BaseModel, BaseModelEmbedding
+from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
@@ -24,19 +24,20 @@ from diffusers import (
 from transformers import T5EncoderModel, T5Tokenizer
 
 
-class PixArtAlphaModelEmbedding:
+class PixArtAlphaModelEmbedding(BaseModelEmbedding):
     def __init__(
             self,
             uuid: str,
             text_encoder_vector: Tensor,
             placeholder: str,
     ):
-        token_count = text_encoder_vector.shape[0]
+        super().__init__(
+            uuid=uuid,
+            token_count=text_encoder_vector.shape[0],
+            placeholder=placeholder,
+        )
 
-        self.uuid = uuid
         self.text_encoder_vector = text_encoder_vector
-        self.placeholder = placeholder
-        self.text_tokens = [f"<{uuid4()}>" for _ in range(token_count)]
 
 
 class PixArtAlphaModel(BaseModel):
@@ -164,15 +165,7 @@ class PixArtAlphaModel(BaseModel):
                 )
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
-        for embedding in self.additional_embeddings:
-            embedding_string = ''.join(embedding.text_tokens)
-            prompt = prompt.replace(embedding.placeholder, embedding_string)
-
-        if self.embedding is not None:
-            embedding_string = ''.join(self.embedding.text_tokens)
-            prompt = prompt.replace(self.embedding.placeholder, embedding_string)
-
-        return prompt
+        return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
 
     def encode_text(
             self,
@@ -195,18 +188,14 @@ class PixArtAlphaModel(BaseModel):
             attention_mask = tokenizer_output.attention_mask
             attention_mask = attention_mask.to(self.text_encoder.device)
 
-        if text_encoder_output is None:
-            with self.text_encoder_autocast_context:
-                text_encoder_output = self.text_encoder(
-                    tokens,
-                    attention_mask=attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True,
-                )
-                text_encoder_output.hidden_states = text_encoder_output.hidden_states[:-1]
-                final_layer_norm = self.text_encoder.encoder.final_layer_norm
-                text_encoder_output = final_layer_norm(
-                    text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-                )
+        with self.text_encoder_autocast_context:
+            text_encoder_output = encode_t5(
+                text_encoder=self.text_encoder,
+                tokens=tokens,
+                default_layer=-1,
+                layer_skip=text_encoder_layer_skip,
+                text_encoder_output=text_encoder_output,
+                attention_mask=attention_mask,
+            )
 
         return text_encoder_output, attention_mask

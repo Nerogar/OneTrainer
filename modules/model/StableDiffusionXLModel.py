@@ -1,7 +1,7 @@
 from contextlib import nullcontext
-from uuid import uuid4
 
-from modules.model.BaseModel import BaseModel
+from modules.model.BaseModel import BaseModel, BaseModelEmbedding
+from modules.model.util.clip_util import encode_clip
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
@@ -17,7 +17,7 @@ from diffusers import AutoencoderKL, DDIMScheduler, DiffusionPipeline, StableDif
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 
-class StableDiffusionXLModelEmbedding:
+class StableDiffusionXLModelEmbedding(BaseModelEmbedding):
     def __init__(
             self,
             uuid: str,
@@ -25,13 +25,14 @@ class StableDiffusionXLModelEmbedding:
             text_encoder_2_vector: Tensor,
             placeholder: str,
     ):
-        token_count = text_encoder_1_vector.shape[0]
+        super().__init__(
+            uuid=uuid,
+            token_count=text_encoder_1_vector.shape[0],
+            placeholder=placeholder,
+        )
 
-        self.uuid = uuid
         self.text_encoder_1_vector = text_encoder_1_vector
         self.text_encoder_2_vector = text_encoder_2_vector
-        self.placeholder = placeholder
-        self.text_tokens = [f"<{uuid4()}>" for _ in range(token_count)]
 
 
 class StableDiffusionXLModel(BaseModel):
@@ -189,15 +190,7 @@ class StableDiffusionXLModel(BaseModel):
         )
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
-        for embedding in self.additional_embeddings:
-            embedding_string = ''.join(embedding.text_tokens)
-            prompt = prompt.replace(embedding.placeholder, embedding_string)
-
-        if self.embedding is not None:
-            embedding_string = ''.join(self.embedding.text_tokens)
-            prompt = prompt.replace(self.embedding.placeholder, embedding_string)
-
-        return prompt
+        return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
 
     def encode_text(
             self,
@@ -230,18 +223,28 @@ class StableDiffusionXLModel(BaseModel):
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
 
-        if text_encoder_1_output is None:
-            text_encoder_1_output = self.text_encoder_1(
-                tokens_1, output_hidden_states=True, return_dict=True
-            )
-            text_encoder_1_output = text_encoder_1_output.hidden_states[-(2 + text_encoder_1_layer_skip)]
+        text_encoder_1_output, _ = encode_clip(
+            text_encoder=self.text_encoder_1,
+            tokens=tokens_1,
+            default_layer=-2,
+            layer_skip=text_encoder_1_layer_skip,
+            text_encoder_output=text_encoder_1_output,
+            add_pooled_output=False,
+            use_attention_mask=False,
+            add_layer_norm=False,
+        )
 
-        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
-            text_encoder_2_output = self.text_encoder_2(
-                tokens_2, output_hidden_states=True, return_dict=True
-            )
-            pooled_text_encoder_2_output = text_encoder_2_output.text_embeds
-            text_encoder_2_output = text_encoder_2_output.hidden_states[-(2 + text_encoder_2_layer_skip)]
+        text_encoder_2_output, pooled_text_encoder_2_output = encode_clip(
+            text_encoder=self.text_encoder_2,
+            tokens=tokens_2,
+            default_layer=-2,
+            layer_skip=text_encoder_2_layer_skip,
+            text_encoder_output=text_encoder_2_output,
+            add_pooled_output=True,
+            pooled_text_encoder_output=pooled_text_encoder_2_output,
+            use_attention_mask=False,
+            add_layer_norm=False,
+        )
 
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 

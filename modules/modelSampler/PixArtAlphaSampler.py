@@ -71,7 +71,7 @@ class PixArtAlphaSampler(BaseModelSampler):
             )
 
             negative_prompt_embedding, negative_tokens_attention_mask = self.model.encode_text(
-                text=prompt,
+                text=negative_prompt,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 

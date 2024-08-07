@@ -503,12 +503,13 @@ class TrainUI(ctk.CTk):
         self.wait_window(window)
 
     def open_sampling_tool(self):
-        window = SampleWindow(
-            self,
-            train_config=self.train_config,
-        )
-        self.wait_window(window)
-        torch_gc()
+        if not self.training_callbacks and not self.training_commands:
+            window = SampleWindow(
+                self,
+                train_config=self.train_config,
+            )
+            self.wait_window(window)
+            torch_gc()
 
     def open_profiling_tool(self):
         self.profiling_window.deiconify()

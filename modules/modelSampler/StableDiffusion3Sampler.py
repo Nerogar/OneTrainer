@@ -7,16 +7,12 @@ from typing import Callable
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.config.SampleConfig import SampleConfig
-from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.torch_util import torch_gc
 
 import torch
-from torch import nn
-
-from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from PIL import Image
 from tqdm import tqdm

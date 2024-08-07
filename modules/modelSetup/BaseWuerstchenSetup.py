@@ -240,6 +240,7 @@ class BaseWuerstchenSetup(
 
             text_embedding, pooled_text_text_embedding = model.encode_text(
                 tokens=batch['tokens'],
+                tokens_mask=batch['tokens_mask'],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_output=batch[
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,

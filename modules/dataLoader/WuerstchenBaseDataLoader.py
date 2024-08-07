@@ -261,7 +261,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
-        text_split_names = ['tokens', 'text_encoder_hidden_state']
+        text_split_names = ['tokens', 'tokens_mask', 'text_encoder_hidden_state']
         if model.model_type.is_stable_cascade():
             text_split_names.append('pooled_text_encoder_output')
 
@@ -311,7 +311,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
     def _output_modules(self, config: TrainConfig, model: WuerstchenModel):
         output_names = [
             'image_path', 'latent_image',
-            'tokens',
+            'tokens', 'tokens_mask',
             'original_resolution', 'crop_resolution', 'crop_offset',
         ]
 
