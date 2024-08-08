@@ -1,17 +1,16 @@
-import torch
-
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
+from modules.util.TrainProgress import TrainProgress
 
+import torch
 
 PRESETS = {
-    "attn-mlp": ["attn1" "attn2", "ff.net"],
+    "attn-mlp": ["attn1attn2", "ff.net"],
     "attn-only": ["attn1", "attn2"],
     "full": [],
 }
@@ -26,7 +25,7 @@ class PixArtAlphaLoRASetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(PixArtAlphaLoRASetup, self).__init__(
+        super().__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -50,7 +49,7 @@ class PixArtAlphaLoRASetup(
         if config.train_any_embedding():
             for parameter, placeholder, name in zip(model.embedding_wrapper.additional_embeddings,
                                                     model.embedding_wrapper.additional_embedding_placeholders,
-                                                    model.embedding_wrapper.additional_embedding_names):
+                                                    model.embedding_wrapper.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings/{name}",
                     display_name=f"embeddings/{placeholder}",

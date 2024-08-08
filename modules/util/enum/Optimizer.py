@@ -53,7 +53,7 @@ class Optimizer(Enum):
 
     # CAME
     CAME = 'CAME'
-    
+
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
     TIGER = 'TIGER'

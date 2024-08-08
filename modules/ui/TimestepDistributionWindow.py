@@ -1,15 +1,16 @@
-import customtkinter as ctk
-import torch
-from customtkinter import ThemeManager, AppearanceModeTracker
-from matplotlib import pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from torch import Tensor
-
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import torch
+from torch import Tensor
+
+import customtkinter as ctk
+from customtkinter import AppearanceModeTracker, ThemeManager
+from matplotlib import pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class TimestepGenerator(ModelSetupNoiseMixin):
@@ -22,7 +23,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             noising_weight: float,
             noising_bias: float,
     ):
-        super(TimestepGenerator, self).__init__()
+        super().__init__()
 
         self.timestep_distribution = timestep_distribution
         self.min_noising_strength = min_noising_strength

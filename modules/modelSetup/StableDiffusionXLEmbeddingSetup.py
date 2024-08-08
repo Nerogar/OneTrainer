@@ -1,11 +1,11 @@
-import torch
-
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class StableDiffusionXLEmbeddingSetup(
@@ -17,7 +17,7 @@ class StableDiffusionXLEmbeddingSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(StableDiffusionXLEmbeddingSetup, self).__init__(
+        super().__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -33,7 +33,7 @@ class StableDiffusionXLEmbeddingSetup(
         if config.text_encoder.train_embedding:
             for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
                                                     model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_1.additional_embedding_names):
+                                                    model.embedding_wrapper_1.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings_1/{name}",
                     display_name=f"embeddings_1/{placeholder}",
@@ -44,7 +44,7 @@ class StableDiffusionXLEmbeddingSetup(
         if config.text_encoder_2.train_embedding:
             for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
                                                     model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_2.additional_embedding_names):
+                                                    model.embedding_wrapper_2.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings_2/{name}",
                     display_name=f"embeddings_2/{placeholder}",

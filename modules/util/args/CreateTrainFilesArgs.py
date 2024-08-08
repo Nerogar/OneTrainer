@@ -10,7 +10,7 @@ class CreateTrainFilesArgs(BaseArgs):
     samples_output_destination: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(CreateTrainFilesArgs, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def parse_args() -> 'CreateTrainFilesArgs':

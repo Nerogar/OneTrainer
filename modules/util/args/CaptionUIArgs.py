@@ -9,7 +9,7 @@ class CaptionUIArgs(BaseArgs):
     include_subdirectories: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(CaptionUIArgs, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def parse_args() -> 'CaptionUIArgs':

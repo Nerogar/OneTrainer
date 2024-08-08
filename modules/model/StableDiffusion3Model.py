@@ -1,20 +1,26 @@
 from contextlib import nullcontext
 from uuid import uuid4
 
-import torch
-from diffusers import AutoencoderKL, DiffusionPipeline, SD3Transformer2DModel, \
-    StableDiffusion3Pipeline, FlowMatchEulerDiscreteScheduler
-from torch import Tensor
-from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5EncoderModel, T5Tokenizer
-
 from modules.model.BaseModel import BaseModel
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch import Tensor
+
+from diffusers import (
+    AutoencoderKL,
+    DiffusionPipeline,
+    FlowMatchEulerDiscreteScheduler,
+    SD3Transformer2DModel,
+    StableDiffusion3Pipeline,
+)
+from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 
 class StableDiffusion3ModelEmbedding:
@@ -105,7 +111,7 @@ class StableDiffusion3Model(BaseModel):
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
-        super(StableDiffusion3Model, self).__init__(
+        super().__init__(
             model_type=model_type,
             optimizer_state_dict=optimizer_state_dict,
             ema_state_dict=ema_state_dict,

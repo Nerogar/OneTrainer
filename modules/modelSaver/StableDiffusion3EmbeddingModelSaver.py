@@ -1,11 +1,11 @@
-import torch
-
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
 from modules.modelSaver.stableDiffusion3.StableDiffusion3EmbeddingSaver import StableDiffusion3EmbeddingSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+
+import torch
 
 
 class StableDiffusion3EmbeddingModelSaver(

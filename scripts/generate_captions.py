@@ -2,12 +2,13 @@ from util.import_util import script_imports
 
 script_imports()
 
-import torch
-from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
-from modules.util.args.GenerateCaptionsArgs import GenerateCaptionsArgs
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.WDModel import WDModel
+from modules.util.args.GenerateCaptionsArgs import GenerateCaptionsArgs
+from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
+
+import torch
 
 
 def main():

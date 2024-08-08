@@ -1,12 +1,6 @@
 from abc import ABCMeta
 from random import Random
 
-import torch
-from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
-from diffusers.utils import is_xformers_available
-from torch import Tensor
-from torch.utils.checkpoint import checkpoint
-
 from modules.model.PixArtAlphaModel import PixArtAlphaModel, PixArtAlphaModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -14,15 +8,25 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionMixin import ModelSetupDiffusionMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import create_checkpointed_forward, \
-    enable_checkpointing_for_t5_encoder_layers, enable_checkpointing_for_transformer_blocks
+from modules.modelSetup.stableDiffusion.checkpointing_util import (
+    create_checkpointed_forward,
+    enable_checkpointing_for_t5_encoder_layers,
+    enable_checkpointing_for_transformer_blocks,
+)
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch import Tensor
+from torch.utils.checkpoint import checkpoint
+
+from diffusers.models.attention_processor import Attention, AttnProcessor, AttnProcessor2_0, XFormersAttnProcessor
+from diffusers.utils import is_xformers_available
 
 
 class BasePixArtAlphaSetup(
@@ -36,7 +40,7 @@ class BasePixArtAlphaSetup(
 ):
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
-        super(BasePixArtAlphaSetup, self).__init__(train_device, temp_device, debug_mode)
+        super().__init__(train_device, temp_device, debug_mode)
 
     def setup_optimizations(
             self,
@@ -44,12 +48,12 @@ class BasePixArtAlphaSetup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            for name, child_module in model.transformer.named_modules():
+            for _name, child_module in model.transformer.named_modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                for name, child_module in model.transformer.named_modules():
+                for _name, child_module in model.transformer.named_modules():
                     if isinstance(child_module, Attention):
                         child_module.set_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
@@ -59,7 +63,7 @@ class BasePixArtAlphaSetup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            for name, child_module in model.transformer.named_modules():
+            for _name, child_module in model.transformer.named_modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor2_0())
 

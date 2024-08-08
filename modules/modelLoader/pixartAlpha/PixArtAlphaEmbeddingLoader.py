@@ -1,17 +1,19 @@
+import contextlib
 import os
 import traceback
 
+from modules.model.PixArtAlphaModel import PixArtAlphaModel
+from modules.util.ModelNames import EmbeddingName, ModelNames
+
 import torch
-from safetensors.torch import load_file
 from torch import Tensor
 
-from modules.model.PixArtAlphaModel import PixArtAlphaModel
-from modules.util.ModelNames import ModelNames, EmbeddingName
+from safetensors.torch import load_file
 
 
 class PixArtAlphaEmbeddingLoader:
     def __init__(self):
-        super(PixArtAlphaEmbeddingLoader, self).__init__()
+        super().__init__()
 
     def __load_embedding(
             self,
@@ -20,23 +22,13 @@ class PixArtAlphaEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = torch.load(embedding_name)
+            return embedding_state['t5']
 
-            prior_text_encoder_vector = embedding_state['t5']
-
-            return prior_text_encoder_vector
-        except:
-            pass
-
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = load_file(embedding_name)
-
-            prior_text_encoder_vector = embedding_state['t5']
-
-            return prior_text_encoder_vector
-        except:
-            pass
+            return embedding_state['t5']
 
         raise Exception(f"could not load embedding: {embedding_name}")
 
@@ -46,26 +38,26 @@ class PixArtAlphaEmbeddingLoader:
             embedding_name: EmbeddingName,
             load_single: bool,
     ) -> Tensor | None:
-        if os.path.exists(os.path.join(directory, "meta.json")):
-            if load_single:
-                safetensors_embedding_name = os.path.join(
-                    directory,
-                    "embedding",
-                    f"embedding.safetensors",
-                )
-            else:
-                safetensors_embedding_name = os.path.join(
-                    directory,
-                    "embedding",
-                    f"{embedding_name.uuid}.safetensors",
-                )
-
-            if os.path.exists(safetensors_embedding_name):
-                return self.__load_embedding(safetensors_embedding_name)
-            else:
-                return self.__load_embedding(embedding_name.model_name)
-        else:
+        if not os.path.exists(os.path.join(directory, "meta.json")):
             raise Exception("not an internal model")
+
+        if load_single:
+            safetensors_embedding_name = os.path.join(
+                directory,
+                "embedding",
+                "embedding.safetensors",
+            )
+        else:
+            safetensors_embedding_name = os.path.join(
+                directory,
+                "embedding",
+                f"{embedding_name.uuid}.safetensors",
+            )
+
+        if os.path.exists(safetensors_embedding_name):
+            return self.__load_embedding(safetensors_embedding_name)
+
+        return self.__load_embedding(embedding_name.model_name)
 
     def load_multiple(
             self,
@@ -80,18 +72,18 @@ class PixArtAlphaEmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except:
+            except Exception as e:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except:
+                except Exception:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
 
                 for stacktrace in stacktraces:
                     print(stacktrace)
-                raise Exception("could not load embedding: " + str(model_names.embedding))
+                raise Exception(f"could not load embedding: {model_names.embedding}") from e
 
     def load_single(
             self,
@@ -105,13 +97,13 @@ class PixArtAlphaEmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except:
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

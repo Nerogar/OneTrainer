@@ -1,5 +1,3 @@
-import torch
-
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
@@ -7,6 +5,8 @@ from modules.modelSaver.stableDiffusionXL.StableDiffusionXLEmbeddingSaver import
 from modules.modelSaver.stableDiffusionXL.StableDiffusionXLModelSaver import StableDiffusionXLModelSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+
+import torch
 
 
 class StableDiffusionXLFineTuneModelSaver(

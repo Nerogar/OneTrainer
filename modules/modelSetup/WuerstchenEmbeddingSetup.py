@@ -1,11 +1,11 @@
-import torch
-
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class WuerstchenEmbeddingSetup(
@@ -17,7 +17,7 @@ class WuerstchenEmbeddingSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(WuerstchenEmbeddingSetup, self).__init__(
+        super().__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -32,7 +32,7 @@ class WuerstchenEmbeddingSetup(
 
         for parameter, placeholder, name in zip(model.prior_embedding_wrapper.additional_embeddings,
                                                 model.prior_embedding_wrapper.additional_embedding_placeholders,
-                                                model.prior_embedding_wrapper.additional_embedding_names):
+                                                model.prior_embedding_wrapper.additional_embedding_names, strict=False):
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name=f"prior_embeddings/{name}",
                 display_name=f"prior_embeddings/{placeholder}",

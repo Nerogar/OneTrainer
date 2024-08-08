@@ -1,11 +1,11 @@
-import torch
-
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSetup.BaseStableDiffusion3Setup import BaseStableDiffusion3Setup
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class StableDiffusion3EmbeddingSetup(
@@ -17,7 +17,7 @@ class StableDiffusion3EmbeddingSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(StableDiffusion3EmbeddingSetup, self).__init__(
+        super().__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,
@@ -33,7 +33,7 @@ class StableDiffusion3EmbeddingSetup(
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
             for parameter, placeholder, name in zip(model.embedding_wrapper_1.additional_embeddings,
                                                     model.embedding_wrapper_1.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_1.additional_embedding_names):
+                                                    model.embedding_wrapper_1.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings_1/{name}",
                     display_name=f"embeddings_1/{placeholder}",
@@ -44,7 +44,7 @@ class StableDiffusion3EmbeddingSetup(
         if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
             for parameter, placeholder, name in zip(model.embedding_wrapper_2.additional_embeddings,
                                                     model.embedding_wrapper_2.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_2.additional_embedding_names):
+                                                    model.embedding_wrapper_2.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings_2/{name}",
                     display_name=f"embeddings_2/{placeholder}",
@@ -55,7 +55,7 @@ class StableDiffusion3EmbeddingSetup(
         if config.text_encoder_3.train_embedding and model.text_encoder_3 is not None:
             for parameter, placeholder, name in zip(model.embedding_wrapper_3.additional_embeddings,
                                                     model.embedding_wrapper_3.additional_embedding_placeholders,
-                                                    model.embedding_wrapper_3.additional_embedding_names):
+                                                    model.embedding_wrapper_3.additional_embedding_names, strict=False):
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings_3/{name}",
                     display_name=f"embeddings_3/{placeholder}",

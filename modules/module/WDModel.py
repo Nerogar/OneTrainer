@@ -1,11 +1,12 @@
 import csv
 
+from modules.module.BaseImageCaptionModel import BaseImageCaptionModel, CaptionSample
+
+import torch
+
 import huggingface_hub
 import numpy as np
 import onnxruntime
-import torch
-
-from modules.module.BaseImageCaptionModel import CaptionSample, BaseImageCaptionModel
 
 
 class WDModel(BaseImageCaptionModel):
@@ -63,7 +64,7 @@ class WDModel(BaseImageCaptionModel):
         probs = probs[0].astype(float)
 
         general_labels = [(self.tag_names[i], probs[i]) for i in self.general_indexes if probs[i] > 0.35]
-        character_labels = [(self.tag_names[i], probs[i]) for i in self.character_indexes if probs[i] > 0.8]
+        [(self.tag_names[i], probs[i]) for i in self.character_indexes if probs[i] > 0.8]
 
         sorted_general_labels = sorted(general_labels, key=lambda label: label[1], reverse=True)
         predicted_caption = ", ".join([
@@ -71,6 +72,5 @@ class WDModel(BaseImageCaptionModel):
             for label
             in sorted_general_labels
         ])
-        predicted_caption = (caption_prefix + predicted_caption + caption_postfix).strip()
+        return (caption_prefix + predicted_caption + caption_postfix).strip()
 
-        return predicted_caption

@@ -2,9 +2,9 @@ import json
 import os
 from abc import ABCMeta
 
-import torch
-
 from modules.model.BaseModel import BaseModel
+
+import torch
 
 
 class InternalModelSaverMixin(metaclass=ABCMeta):

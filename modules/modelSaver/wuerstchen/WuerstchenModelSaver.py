@@ -2,13 +2,14 @@ import copy
 import os.path
 from pathlib import Path
 
-import torch
-from safetensors.torch import save_file
-
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert.convert_stable_cascade_diffusers_to_ckpt import convert_stable_cascade_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
+
+import torch
+
+from safetensors.torch import save_file
 
 
 class WuerstchenModelSaver(

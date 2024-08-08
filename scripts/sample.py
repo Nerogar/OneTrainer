@@ -1,13 +1,14 @@
 from modules.util.ModelNames import ModelNames
+
 from util.import_util import script_imports
 
 script_imports()
 
+from modules.util import create
+from modules.util.args.SampleArgs import SampleArgs
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util import create
-from modules.util.args.SampleArgs import SampleArgs
 from modules.util.torch_util import default_device
 
 
@@ -18,7 +19,7 @@ def main():
     training_method = TrainingMethod.FINE_TUNE
 
     model_loader = create.create_model_loader(args.model_type, training_method=training_method)
-    model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
+    create.create_model_setup(args.model_type, device, device, training_method=training_method)
 
     print("Loading model " + args.base_model_name)
     model = model_loader.load(

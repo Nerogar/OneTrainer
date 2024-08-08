@@ -1,25 +1,26 @@
 import os
 import traceback
 
-import torch
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
-from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
-from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
-
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
-from modules.util.ModelNames import ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.ModelNames import ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
+
+import torch
+
+from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel
+from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
+from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DPTImageProcessor
 
 
 class StableDiffusionModelLoader(
     SDConfigModelLoaderMixin,
 ):
     def __init__(self):
-        super(StableDiffusionModelLoader, self).__init__()
+        super().__init__()
 
     def _default_sd_config_name(
             self,
@@ -252,25 +253,25 @@ class StableDiffusionModelLoader(
         try:
             self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

@@ -1,10 +1,10 @@
 from contextlib import nullcontext
 
-import torch
-from torch.nn import Parameter
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+
+import torch
+from torch.nn import Parameter
 
 
 def allow_mixed_precision(train_config: TrainConfig):
@@ -16,7 +16,7 @@ def allow_mixed_precision(train_config: TrainConfig):
 
 
 def enable_grad_scaling(train_dtype: DataType, parameters: list[Parameter]):
-    trainable_parameter_dtype = list(set([parameter.dtype for parameter in parameters]))
+    trainable_parameter_dtype = list({parameter.dtype for parameter in parameters})
     return train_dtype == DataType.FLOAT_16 and all(dtype == torch.float32 for dtype in trainable_parameter_dtype)
 
 
@@ -43,9 +43,9 @@ def create_autocast_context(
 
     if len(weight_dtypes) == 1 and train_dtype == weight_dtypes[0]:
         return torch.autocast(device_type=device.type, enabled=False), train_dtype
-    else:
-        return torch.autocast(device_type=device.type, dtype=train_dtype.torch_dtype(),
-                              cache_enabled=enable_autocast_cache), train_dtype
+
+    return torch.autocast(device_type=device.type, dtype=train_dtype.torch_dtype(),
+                            cache_enabled=enable_autocast_cache), train_dtype
 
 
 def disable_fp16_autocast_context(

@@ -5,7 +5,7 @@ def __map_unet_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
     i = 2
-    while any(key.startswith(in_prefix + f"_{i}") for key in in_states.keys()):
+    while any(key.startswith(in_prefix + f"_{i}") for key in in_states):
         # attention block
         out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_to_q", in_prefix + f"_{i}_attention_to_q")
         out_states |= util.map_prefix(in_states, out_prefix + f"_{i}_attention_attn_to_k", in_prefix + f"_{i}_attention_to_k")

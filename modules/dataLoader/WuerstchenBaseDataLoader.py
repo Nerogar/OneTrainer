@@ -1,8 +1,17 @@
 import os
 import re
 
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
+from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
+from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util import path_util
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
+
 import torch
-from mgds.MGDS import TrainDataLoader, MGDS
+
+from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
@@ -39,14 +48,6 @@ from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
 from mgds.pipelineModules.VariationSorting import VariationSorting
 
-from modules.dataLoader.BaseDataLoader import BaseDataLoader
-from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
-from modules.model.WuerstchenModel import WuerstchenModel
-from modules.util import path_util
-from modules.util.TrainProgress import TrainProgress
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.torch_util import torch_gc
-
 
 class WuerstchenBaseDataLoader(BaseDataLoader):
     def __init__(
@@ -57,7 +58,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
             model: WuerstchenModel,
             train_progress: TrainProgress,
     ):
-        super(WuerstchenBaseDataLoader, self).__init__(
+        super().__init__(
             train_device,
             temp_device,
         )
@@ -135,7 +136,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
     def _mask_augmentation_modules(self, config: TrainConfig) -> list:
         inputs = ['image']
 
-        lowest_resolution = min([int(x.strip()) for x in re.split('\D', config.resolution) if x.strip() != ''])
+        lowest_resolution = min([int(x.strip()) for x in re.split(r'\D', config.resolution) if x.strip() != ''])
         circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='concept.image.enable_random_circular_mask_shrink')
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=lowest_resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='concept.image.enable_random_mask_rotate_crop')
 
@@ -192,9 +193,8 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
 
         scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
 
-        modules = [scale_crop]
+        return [scale_crop]
 
-        return modules
 
 
     def _augmentation_modules(self, config: TrainConfig):
@@ -211,7 +211,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
         random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
         shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.text.enable_tag_shuffling', delimiter_in_name='concept.text.tag_delimiter', keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt')
 
-        modules = [
+        return [
             random_flip,
             random_rotate,
             random_brightness,
@@ -221,7 +221,6 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
             shuffle_tags,
         ]
 
-        return modules
 
 
     def _preparation_modules(self, config: TrainConfig, model: WuerstchenModel):

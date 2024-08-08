@@ -3,11 +3,12 @@
 #     ADM:   https://github.com/openai/guided-diffusion/blob/main/guided_diffusion
 #     IDDPM: https://github.com/openai/improved-diffusion/blob/main/improved_diffusion/gaussian_diffusion.py
 
-import numpy as np
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+
 import torch
 from torch import Tensor
 
-from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+import numpy as np
 
 
 def normal_kl(
@@ -61,12 +62,11 @@ def discretized_gaussian_log_likelihood(
     log_cdf_plus = torch.log(cdf_plus.clamp(min=1e-12))
     log_one_minus_cdf_min = torch.log((1.0 - cdf_min).clamp(min=1e-12))
     cdf_delta = cdf_plus - cdf_min
-    log_probs = torch.where(
+    return torch.where(
         x < -0.999,
         log_cdf_plus,
         torch.where(x > 0.999, log_one_minus_cdf_min, torch.log(cdf_delta.clamp(min=1e-12))),
     )
-    return log_probs
 
 
 def __q_posterior_mean_variance(
@@ -171,8 +171,7 @@ def __vb_terms_bpd(
     # otherwise return KL(q(x_{t-1}|x_t,x_0) || p(x_{t-1}|x_t))
     while t.dim() < decoder_nll.dim():
         t = t.unsqueeze(-1)
-    output = torch.where((t == 0), decoder_nll, kl)
-    return output
+    return torch.where((t == 0), decoder_nll, kl)
 
 
 def __extract_into_tensor(

@@ -1,7 +1,4 @@
-import time
 from abc import ABCMeta, abstractmethod
-
-import torch
 
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -9,11 +6,13 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
-from modules.util.TimedActionMixin import TimedActionMixin
-from modules.util.TrainProgress import TrainProgress
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.TimedActionMixin import TimedActionMixin
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class BaseTrainer(
@@ -21,7 +20,7 @@ class BaseTrainer(
     metaclass=ABCMeta,
 ):
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
-        super(BaseTrainer, self).__init__()
+        super().__init__()
         self.config = config
         self.callbacks = callbacks
         self.commands = commands

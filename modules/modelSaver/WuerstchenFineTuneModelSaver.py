@@ -1,5 +1,3 @@
-import torch
-
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
@@ -7,6 +5,8 @@ from modules.modelSaver.wuerstchen.WuerstchenEmbeddingSaver import WuerstchenEmb
 from modules.modelSaver.wuerstchen.WuerstchenModelSaver import WuerstchenModelSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+
+import torch
 
 
 class WuerstchenFineTuneModelSaver(

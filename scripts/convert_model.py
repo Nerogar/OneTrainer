@@ -2,11 +2,12 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.util.ModelNames import ModelNames, EmbeddingName
-from modules.util.enum.TrainingMethod import TrainingMethod
+from uuid import uuid4
+
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
-from uuid import uuid4
+from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModelNames import EmbeddingName, ModelNames
 
 
 def main():

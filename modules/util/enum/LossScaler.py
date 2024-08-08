@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class LossScaler(Enum):
     NONE = 'NONE'
     BATCH = 'BATCH'

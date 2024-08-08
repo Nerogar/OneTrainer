@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import torch
 
@@ -41,7 +41,7 @@ class EMAModuleWrapper:
         one_minus_decay = 1 - self.get_current_decay(optimization_step)
 
         if (optimization_step + 1) % self.update_step_interval == 0:
-            for ema_parameter, parameter in zip(self.ema_parameters, parameters):
+            for ema_parameter, parameter in zip(self.ema_parameters, parameters, strict=False):
                 if parameter.requires_grad:
                     if ema_parameter.device == parameter.device:
                         ema_parameter.add_(one_minus_decay * (parameter - ema_parameter))
@@ -65,18 +65,18 @@ class EMAModuleWrapper:
             self.temp_stored_parameters = [parameter.detach().cpu() for parameter in parameters]
 
         parameters = list(parameters)
-        for ema_parameter, parameter in zip(self.ema_parameters, parameters):
+        for ema_parameter, parameter in zip(self.ema_parameters, parameters, strict=False):
             parameter.data.copy_(ema_parameter.to(parameter.device).data)
 
     def copy_temp_to(self, parameters: Iterable[torch.nn.Parameter]) -> None:
-        for temp_parameter, parameter in zip(self.temp_stored_parameters, parameters):
+        for temp_parameter, parameter in zip(self.temp_stored_parameters, parameters, strict=False):
             parameter.data.copy_(temp_parameter.data)
 
         self.temp_stored_parameters = None
 
     def load_state_dict(self, state_dict: dict) -> None:
         self.decay = self.decay if self.decay else state_dict.get("decay", self.decay)
-        self.ema_parameters = state_dict.get("ema_parameters", None)
+        self.ema_parameters = state_dict.get("ema_parameters")
         self.to(self.device)
 
     def state_dict(self) -> dict:

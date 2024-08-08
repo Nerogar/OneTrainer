@@ -1,6 +1,6 @@
-from torch import nn
-
 from modules.module.LoRAModule import LoRAModuleWrapper
+
+from torch import nn
 
 
 def apply_circular_padding_to_conv2d(module: nn.Module | LoRAModuleWrapper):

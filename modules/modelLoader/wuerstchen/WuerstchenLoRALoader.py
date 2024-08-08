@@ -1,18 +1,20 @@
 import os
 import traceback
 
-import torch
-from safetensors.torch import load_file
-
 from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import (
+    convert_stable_cascade_lora_ckpt_to_diffusers,
+)
 from modules.util.ModelNames import ModelNames
-from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import \
-    convert_stable_cascade_lora_ckpt_to_diffusers
+
+import torch
+
+from safetensors.torch import load_file
 
 
 class WuerstchenLoRALoader:
     def __init__(self):
-        super(WuerstchenLoRALoader, self).__init__()
+        super().__init__()
 
     def __load_safetensors(
             self,
@@ -57,19 +59,19 @@ class WuerstchenLoRALoader:
         try:
             self.__load_internal(model, model_names.lora)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_ckpt(model, model_names.lora)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_safetensors(model, model_names.lora)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

@@ -1,15 +1,15 @@
-import customtkinter as ctk
-
 from modules.ui.ConfigList import ConfigList
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
+import customtkinter as ctk
+
 
 class KvParams(ConfigList):
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(KvParams, self).__init__(
+        super().__init__(
             master,
             train_config,
             ui_state,
@@ -34,7 +34,7 @@ class KvParams(ConfigList):
 
 class KvWidget(ctk.CTkFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super(KvWidget, self).__init__(master=master, bg_color="transparent")
+        super().__init__(master=master, bg_color="transparent")
         self.element = element
         self.ui_state = UIState(self, element)
         self.i = i
