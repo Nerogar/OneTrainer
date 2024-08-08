@@ -1,5 +1,4 @@
 [tool.ruff]
-exclude = ["sparse/_version.py"]
 line-length = 120
 
 [tool.ruff.lint]
