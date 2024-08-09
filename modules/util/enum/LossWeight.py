@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class LossWeight(Enum):
     CONSTANT = 'CONSTANT'
     P2 = 'P2'

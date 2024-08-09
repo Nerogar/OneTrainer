@@ -1,11 +1,7 @@
 import inspect
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
-
-import torch
-from PIL import Image
-from tqdm import tqdm
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -14,6 +10,11 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.torch_util import torch_gc
+
+import torch
+
+from PIL import Image
+from tqdm import tqdm
 
 
 class WuerstchenSampler(BaseModelSampler):
@@ -24,7 +25,7 @@ class WuerstchenSampler(BaseModelSampler):
             model: WuerstchenModel,
             model_type: ModelType,
     ):
-        super(WuerstchenSampler, self).__init__(train_device, temp_device)
+        super().__init__(train_device, temp_device)
 
         self.model = model
         self.model_type = model_type
@@ -184,9 +185,8 @@ class WuerstchenSampler(BaseModelSampler):
         if self.model_type.is_wuerstchen_v2():
             latent_image = latent_image * 42.0 - 1.0
 
-        latent_image = latent_image.to(dtype=self.model.prior_train_dtype.torch_dtype())
+        return latent_image.to(dtype=self.model.prior_train_dtype.torch_dtype())
 
-        return latent_image
 
     def __sample_decoder(
             self,

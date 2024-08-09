@@ -1,15 +1,15 @@
 from abc import ABCMeta
-from typing import Callable
-
-from torch import Tensor
+from collections.abc import Callable
 
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+
+from torch import Tensor
 
 
 class ModelSetupDiffusionMixin(metaclass=ABCMeta):
 
     def __init__(self):
-        super(ModelSetupDiffusionMixin, self).__init__()
+        super().__init__()
         self.__coefficients = None
 
     def _add_noise_discrete(

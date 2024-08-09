@@ -2,14 +2,16 @@ import copy
 import os.path
 from pathlib import Path
 
-import torch
-from safetensors.torch import save_file
-from transformers import T5EncoderModel
-
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert.convert_sd3_diffusers_to_ckpt import convert_sd3_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
+
+import torch
+
+from transformers import T5EncoderModel
+
+from safetensors.torch import save_file
 
 
 class StableDiffusion3ModelSaver(

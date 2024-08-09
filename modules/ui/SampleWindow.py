@@ -1,22 +1,23 @@
 import copy
 import os
 
-import customtkinter as ctk
-import torch
-from PIL import Image
-
 from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.ui.SampleFrame import SampleFrame
 from modules.util import create
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import torch
+
+import customtkinter as ctk
+from PIL import Image
 
 
 class SampleWindow(ctk.CTkToplevel):

@@ -4,13 +4,6 @@ import subprocess
 import traceback
 from tkinter import filedialog
 
-import customtkinter as ctk
-import cv2
-import numpy as np
-import torch
-from PIL import Image, ImageDraw
-from customtkinter import ThemeManager, ScalingTracker
-
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
@@ -21,9 +14,17 @@ from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
+from modules.util.torch_util import default_device
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
-from modules.util.torch_util import default_device
+
+import torch
+
+import customtkinter as ctk
+import cv2
+import numpy as np
+from customtkinter import ScalingTracker, ThemeManager
+from PIL import Image, ImageDraw
 
 
 class CaptionUI(ctk.CTkToplevel):
@@ -255,7 +256,7 @@ Mouse wheel: increase or decrease brush size"""
 
         try:
             return Image.open(image_name).convert('RGB')
-        except:
+        except Exception:
             print(f'Could not open image {image_name}')
 
     def load_mask(self):
@@ -266,7 +267,7 @@ Mouse wheel: increase or decrease brush size"""
 
             try:
                 return Image.open(mask_name).convert('RGB')
-            except:
+            except Exception:
                 return None
         else:
             return None
@@ -278,9 +279,9 @@ Mouse wheel: increase or decrease brush size"""
             prompt_name = os.path.join(self.dir, prompt_name)
 
             try:
-                with open(prompt_name, "r", encoding='utf-8') as f:
+                with open(prompt_name, encoding='utf-8') as f:
                     return f.readlines()[0].strip()
-            except:
+            except Exception:
                 return ""
         else:
             return ""
@@ -399,7 +400,7 @@ Mouse wheel: increase or decrease brush size"""
         if is_left:
             try:
                 alpha = float(self.mask_editing_alpha.get())
-            except:
+            except Exception:
                 alpha = 1.0
             rgb_value = int(max(0.0, min(alpha, 1.0)) * 255)  # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
@@ -434,7 +435,7 @@ Mouse wheel: increase or decrease brush size"""
         if is_left:
             try:
                 alpha = float(self.mask_editing_alpha.get())
-            except:
+            except Exception:
                 alpha = 1.0
             rgb_value = int(max(0.0, min(alpha, 1.0)) * 255)  # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
@@ -469,14 +470,14 @@ Mouse wheel: increase or decrease brush size"""
             try:
                 with open(prompt_name, "w", encoding='utf-8') as f:
                     f.write(self.prompt_var.get())
-            except:
+            except Exception:
                 return ""
 
             if self.pil_mask:
                 self.pil_mask.save(mask_name)
-
-        else:
-            return ""
+                return None
+            return None
+        return ""
 
     def draw_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'draw'
@@ -484,6 +485,7 @@ Mouse wheel: increase or decrease brush size"""
         if args:
             # disable default event
             return "break"
+        return None
 
     def fill_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'fill'
@@ -514,9 +516,8 @@ Mouse wheel: increase or decrease brush size"""
             image_name = self.image_rel_paths[self.current_image_index]
             image_name = os.path.realpath(os.path.join(self.dir, image_name))
             subprocess.Popen(f"explorer /select,{image_name}")
-        except:
+        except Exception:
             traceback.print_exc()
-            pass
 
     def load_masking_model(self, model):
         self.captioning_model = None
@@ -533,8 +534,7 @@ Mouse wheel: increase or decrease brush size"""
             if self.masking_model is None or not isinstance(self.masking_model, RembgHumanModel):
                 print("loading Rembg-Human model, this may take a while")
                 self.masking_model = RembgHumanModel(default_device, torch.float32)
-        elif model == "Hex Color":
-            if self.masking_model is None or not isinstance(self.masking_model, MaskByColor):
+        elif model == "Hex Color" and self.masking_model is None or not isinstance(self.masking_model, MaskByColor):
                 self.masking_model = MaskByColor(default_device, torch.float32)
 
     def load_captioning_model(self, model):
@@ -548,8 +548,7 @@ Mouse wheel: increase or decrease brush size"""
             if self.captioning_model is None or not isinstance(self.captioning_model, Blip2Model):
                 print("loading Blip2 model, this may take a while")
                 self.captioning_model = Blip2Model(default_device, torch.float16)
-        elif model == "WD14 VIT v2":
-            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
+        elif model == "WD14 VIT v2" and self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
                 print("loading WD14_VIT_v2 model, this may take a while")
                 self.captioning_model = WDModel(default_device, torch.float16)
 

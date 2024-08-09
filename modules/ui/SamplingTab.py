@@ -1,17 +1,17 @@
-import customtkinter as ctk
-
 from modules.ui.ConfigList import ConfigList
 from modules.ui.SampleParamsWindow import SampleParamsWindow
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
 
 
 class SamplingTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(SamplingTab, self).__init__(
+        super().__init__(
             master,
             train_config,
             ui_state,
@@ -35,7 +35,7 @@ class SamplingTab(ConfigList):
 
 class SampleWidget(ctk.CTkFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super(SampleWidget, self).__init__(
+        super().__init__(
             master=master, corner_radius=10, bg_color="transparent"
         )
 

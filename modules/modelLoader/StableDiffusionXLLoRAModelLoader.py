@@ -5,9 +5,9 @@ from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLo
 from modules.modelLoader.stableDiffusionXL.StableDiffusionXLEmbeddingLoader import StableDiffusionXLEmbeddingLoader
 from modules.modelLoader.stableDiffusionXL.StableDiffusionXLLoRALoader import StableDiffusionXLLoRALoader
 from modules.modelLoader.stableDiffusionXL.StableDiffusionXLModelLoader import StableDiffusionXLModelLoader
+from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.enum.ModelType import ModelType
 
 
 class StableDiffusionXLLoRAModelLoader(
@@ -16,7 +16,7 @@ class StableDiffusionXLLoRAModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super(StableDiffusionXLLoRAModelLoader, self).__init__()
+        super().__init__()
 
     def _default_model_spec_name(
             self,

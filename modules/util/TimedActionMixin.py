@@ -1,12 +1,12 @@
 import time
 
-from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.TrainProgress import TrainProgress
 
 
 class TimedActionMixin:
     def __init__(self):
-        super(TimedActionMixin, self).__init__()
+        super().__init__()
         self.__previous_action = {}
         self.__start_time = time.time()
 
@@ -25,15 +25,13 @@ class TimedActionMixin:
             case TimeUnit.EPOCH:
                 if start_at_zero:
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0
-                else:
-                    # should actually be the last step of each epoch, but we don't know how many steps an epoch has
-                    return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
-                        and train_progress.epoch > 0
+                # should actually be the last step of each epoch, but we don't know how many steps an epoch has
+                return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
+                    and train_progress.epoch > 0
             case TimeUnit.STEP:
                 if start_at_zero:
                     return train_progress.global_step % int(interval) == 0
-                else:
-                    return (train_progress.global_step + 1) % int(interval) == 0
+                return (train_progress.global_step + 1) % int(interval) == 0
             case TimeUnit.SECOND:
                 if not start_at_zero and self.__previous_action[name] < 0:
                     self.__previous_action[name] = time.time()
@@ -42,8 +40,7 @@ class TimedActionMixin:
                 if seconds_since_previous_action > interval:
                     self.__previous_action[name] = time.time()
                     return True
-                else:
-                    return False
+                return False
             case TimeUnit.MINUTE:
                 if not start_at_zero and self.__previous_action[name] < 0:
                     self.__previous_action[name] = time.time()
@@ -52,8 +49,8 @@ class TimedActionMixin:
                 if seconds_since_previous_action > (interval * 60):
                     self.__previous_action[name] = time.time()
                     return True
-                else:
-                    return False
+
+                return False
             case TimeUnit.HOUR:
                 if not start_at_zero and self.__previous_action[name] < 0:
                     self.__previous_action[name] = time.time()
@@ -62,8 +59,8 @@ class TimedActionMixin:
                 if seconds_since_previous_action > (interval * 60 * 60):
                     self.__previous_action[name] = time.time()
                     return True
-                else:
-                    return False
+
+                return False
             case TimeUnit.NEVER:
                 return False
             case TimeUnit.ALWAYS:
