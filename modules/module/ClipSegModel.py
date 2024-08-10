@@ -1,11 +1,11 @@
-
-from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
+from typing import Optional
 
 import torch
 from torch import Tensor, nn
 from torchvision.transforms import functional
+from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation
 
-from transformers import CLIPSegForImageSegmentation, CLIPSegProcessor
+from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
 
 class ClipSegModel(BaseImageMaskModel):
@@ -25,7 +25,7 @@ class ClipSegModel(BaseImageMaskModel):
         self.expand_kernel_radius = None
         self.expand_kernel = self.__create_average_kernel(self.expand_kernel_radius)
 
-    def __create_average_kernel(self, kernel_radius: int | None):
+    def __create_average_kernel(self, kernel_radius: Optional[int]):
         if kernel_radius is None:
             return None
 
@@ -52,8 +52,9 @@ class ClipSegModel(BaseImageMaskModel):
         mask = (mask > threshold).float()
         if self.expand_kernel is not None:
             mask = self.expand_kernel(mask)
-        return (mask > 0).float()
+        mask = (mask > 0).float()
 
+        return mask
 
     def mask_image(
             self,

@@ -1,7 +1,6 @@
 import gc
 
 import torch
-
 import accelerate
 
 accelerator = accelerate.Accelerator()
@@ -11,7 +10,7 @@ default_device = accelerator.device
 def state_dict_has_prefix(state_dict: dict|None, prefix: str):
     if not state_dict:
         return False
-    return any(k.startswith(prefix) for k in state_dict)
+    return any(k.startswith(prefix) for k in state_dict.keys())
 
 
 def torch_gc():

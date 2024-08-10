@@ -1,16 +1,15 @@
-import contextlib
 import copy
 import json
 import os
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod, ABCMeta
+
+import customtkinter as ctk
 
 from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
 
 
 class ConfigList(metaclass=ABCMeta):
@@ -189,21 +188,21 @@ class ConfigList(metaclass=ABCMeta):
 
     def __load_current_config(self, filename):
         try:
-            with open(filename) as f:
+            with open(filename, "r") as f:
                 self.current_config = []
 
                 loaded_config_json = json.load(f)
                 for element_json in loaded_config_json:
                     element = self.create_new_element().from_dict(element_json)
                     self.current_config.append(element)
-        except Exception:
+        except:
             self.current_config = []
 
         self._create_element_list()
 
     def __save_current_config(self):
         if self.from_external_file:
-            with contextlib.suppress(Exception):
+            try:
                 if not os.path.exists(self.config_dir):
                     os.mkdir(self.config_dir)
 
@@ -212,6 +211,8 @@ class ConfigList(metaclass=ABCMeta):
                         [element.to_dict() for element in self.current_config],
                         f, indent=4
                     )
+            except:
+                pass
 
     def __open_element_window(self, i, ui_state):
         window = self.open_element_window(i, ui_state)

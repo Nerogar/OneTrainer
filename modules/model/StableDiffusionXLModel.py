@@ -1,20 +1,19 @@
 from contextlib import nullcontext
 from uuid import uuid4
 
+import torch
+from diffusers import AutoencoderKL, UNet2DConditionModel, DiffusionPipeline, StableDiffusionXLPipeline, DDIMScheduler
+from torch import Tensor
+from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextModelWithProjection
+
 from modules.model.BaseModel import BaseModel
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-from torch import Tensor
-
-from diffusers import AutoencoderKL, DDIMScheduler, DiffusionPipeline, StableDiffusionXLPipeline, UNet2DConditionModel
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 
 class StableDiffusionXLModelEmbedding:
@@ -97,7 +96,7 @@ class StableDiffusionXLModel(BaseModel):
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
-        super().__init__(
+        super(StableDiffusionXLModel, self).__init__(
             model_type=model_type,
             optimizer_state_dict=optimizer_state_dict,
             ema_state_dict=ema_state_dict,

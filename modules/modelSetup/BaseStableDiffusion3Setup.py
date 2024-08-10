@@ -1,6 +1,12 @@
 from abc import ABCMeta
 from random import Random
 
+import torch
+from diffusers.models.attention_processor import JointAttnProcessor2_0
+from diffusers.utils import is_xformers_available
+from torch import Tensor
+from torch.utils.checkpoint import checkpoint
+
 from modules.model.StableDiffusion3Model import StableDiffusion3Model, StableDiffusion3ModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -8,25 +14,17 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import (
-    create_checkpointed_forward,
-    enable_checkpointing_for_clip_encoder_layers,
-    enable_checkpointing_for_stable_diffusion_3_transformer,
-    enable_checkpointing_for_t5_encoder_layers,
-)
+from modules.modelSetup.stableDiffusion.checkpointing_util import \
+    enable_checkpointing_for_clip_encoder_layers, \
+    create_checkpointed_forward, enable_checkpointing_for_t5_encoder_layers, \
+    enable_checkpointing_for_stable_diffusion_3_transformer
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
+from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-from torch import Tensor
-
-from diffusers.models.attention_processor import JointAttnProcessor2_0
-from diffusers.utils import is_xformers_available
 
 
 class BaseStableDiffusion3Setup(
@@ -483,12 +481,12 @@ class BaseStableDiffusion3Setup(
                 batch_size=batch['latent_image'].shape[0],
                 rand=rand,
                 config=config,
-                tokens_1=batch.get("tokens_1"),
-                tokens_2=batch.get("tokens_2"),
-                tokens_3=batch.get("tokens_3"),
-                tokens_mask_1=batch.get("tokens_mask_1"),
-                tokens_mask_2=batch.get("tokens_mask_2"),
-                tokens_mask_3=batch.get("tokens_mask_3"),
+                tokens_1=batch['tokens_1'] if 'tokens_1' in batch else None,
+                tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
+                tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,
+                tokens_mask_1=batch['tokens_mask_1'] if 'tokens_mask_1' in batch else None,
+                tokens_mask_2=batch['tokens_mask_2'] if 'tokens_mask_2' in batch else None,
+                tokens_mask_3=batch['tokens_mask_3'] if 'tokens_mask_3' in batch else None,
                 text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
                     if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
@@ -559,7 +557,7 @@ class BaseStableDiffusion3Setup(
                     device=scaled_noisy_latent_image.device,
                 )
 
-                added_cond_kwargs = {"text_embeds": batch['text_encoder_2_pooled_state'], "time_ids": add_time_ids}
+                added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
                 negative_added_cond_kwargs = {"text_embeds": negative_pooled_text_encoder_2_output,
                                               "time_ids": add_time_ids}
 

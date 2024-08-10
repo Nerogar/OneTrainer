@@ -1,15 +1,14 @@
-from collections.abc import Callable
 from tkinter import filedialog
-from typing import Any
+from typing import Tuple, Any, Callable
+
+import customtkinter as ctk
+from PIL import Image
+from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
-from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
-from PIL import Image
 
 PAD = 10
 
@@ -294,7 +293,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
     return frame, {'component': component, 'button_component': button_component}
 
 
-def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
+def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
                command: Callable[[Any], None] = None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
@@ -322,7 +321,8 @@ def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIS
     def update_var():
         if not deactivate_update_var:
             for key, value in values:
-                if var.get() == str(value) and component.winfo_exists():  # the component could already be destroyed
+                if var.get() == str(value):
+                    if component.winfo_exists():  # the component could already be destroyed
                         component.set(key)
                         if command:
                             command(value)
@@ -414,10 +414,10 @@ def double_progress(master, row, column, label_1, label_2):
 
     def set_1(value, max_value):
         progress_1_component.set(value / max_value)
-        description_1_component.configure(text=f"{value}/{max_value}")
+        description_1_component.configure(text="{0}/{1}".format(value, max_value))
 
     def set_2(value, max_value):
         progress_2_component.set(value / max_value)
-        description_2_component.configure(text=f"{value}/{max_value}")
+        description_2_component.configure(text="{0}/{1}".format(value, max_value))
 
     return set_1, set_2

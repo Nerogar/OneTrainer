@@ -1,16 +1,16 @@
 import os
-
-from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
-
-import torch
-from torch import Tensor, nn
-from torchvision.transforms import functional, transforms
+from typing import Optional, Tuple
 
 import numpy as np
 import onnxruntime
 import pooch
-from numpy import ndarray
+import torch
 from PIL import Image
+from numpy import ndarray
+from torch import Tensor, nn
+from torchvision.transforms import functional, transforms
+
+from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
 
 class BaseRembgModel(BaseImageMaskModel):
@@ -57,7 +57,7 @@ class BaseRembgModel(BaseImageMaskModel):
             provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in onnxruntime.get_available_providers() else "CPUExecutionProvider"
         return onnxruntime.InferenceSession(os.path.join(path, self.model_filename), providers=[provider])
 
-    def __create_average_kernel(self, kernel_radius: int | None):
+    def __create_average_kernel(self, kernel_radius: Optional[int]):
         if kernel_radius is None:
             return None
 
@@ -83,15 +83,16 @@ class BaseRembgModel(BaseImageMaskModel):
         mask = (mask > threshold).float()
         if self.expand_kernel is not None:
             mask = self.expand_kernel(mask)
-        return (mask > 0).float()
+        mask = (mask > 0).float()
 
+        return mask
 
     def __normalize(
             self,
             img: Image.Image,
-            mean: tuple[float, float, float],
-            std: tuple[float, float, float],
-            size: tuple[int, int],
+            mean: Tuple[float, float, float],
+            std: Tuple[float, float, float],
+            size: Tuple[int, int],
     ) -> ndarray:
         im = img.resize(size, Image.LANCZOS)
 

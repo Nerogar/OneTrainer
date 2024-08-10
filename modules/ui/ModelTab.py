@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import customtkinter as ctk
+
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -8,13 +10,11 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
-import customtkinter as ctk
-
 
 class ModelTab:
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super().__init__()
+        super(ModelTab, self).__init__()
 
         self.master = master
         self.train_config = train_config

@@ -1,8 +1,7 @@
-from modules.module.BaseImageCaptionModel import BaseImageCaptionModel, CaptionSample
-
 import torch
-
 from transformers import AutoProcessor, Blip2ForConditionalGeneration
+
+from modules.module.BaseImageCaptionModel import CaptionSample, BaseImageCaptionModel
 
 
 class Blip2Model(BaseImageCaptionModel):
@@ -31,5 +30,6 @@ class Blip2Model(BaseImageCaptionModel):
         with torch.no_grad():
             outputs = self.model.generate(**inputs)
         predicted_caption = self.processor.decode(outputs[0], skip_special_tokens=True)
-        return (caption_prefix + initial_caption + predicted_caption + caption_postfix).strip()
+        predicted_caption = (caption_prefix + initial_caption + predicted_caption + caption_postfix).strip()
 
+        return predicted_caption

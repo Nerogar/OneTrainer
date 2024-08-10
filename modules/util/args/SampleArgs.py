@@ -1,12 +1,12 @@
 import argparse
 from typing import Any
 
+from modules.util.ModelNames import ModelNames, EmbeddingName
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ModelNames import EmbeddingName, ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
 
 class SampleArgs(BaseArgs):
@@ -25,7 +25,7 @@ class SampleArgs(BaseArgs):
     mask_image_path:str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super(SampleArgs, self).__init__(data)
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes.from_single_dtype(self.weight_dtype)

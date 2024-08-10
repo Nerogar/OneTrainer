@@ -2,14 +2,13 @@ import copy
 import os.path
 from pathlib import Path
 
+import torch
+from safetensors.torch import save_file
+
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert.convert_pixart_diffusers_to_ckpt import convert_pixart_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
-
-import torch
-
-from safetensors.torch import save_file
 
 
 class PixArtAlphaModelSaver(

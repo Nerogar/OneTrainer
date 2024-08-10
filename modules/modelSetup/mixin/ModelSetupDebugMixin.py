@@ -2,15 +2,14 @@ import os
 from abc import ABCMeta
 
 import torch
+from PIL import Image
 from torch import Tensor
 from torchvision import transforms
-
-from PIL import Image
 
 
 class ModelSetupDebugMixin(metaclass=ABCMeta):
     def __init__(self):
-        super().__init__()
+        super(ModelSetupDebugMixin, self).__init__()
 
     def _save_image(self, image_tensor: Tensor, directory: str, name: str, step: int, fromarray: bool = False):
         path = os.path.join(directory, "step-" + str(step) + "-" + name + ".png")
@@ -47,7 +46,7 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
             clean_up_tokenization_spaces=True,
         )
 
-    # Decodes 4-channel latent to 3-channel RGB - technique appropriated from
+    # Decodes 4-channel latent to 3-channel RGB - technique appropriated from 
     # https://huggingface.co/blog/TimothyAlexisVass/explaining-the-sdxl-latent-space
     # Uses linear approximation based on first three channels of latent image (luminance, cyan/red, lime/purple)
     def _project_latent_to_image_sdxl(self, latent_tensor: Tensor):
@@ -62,8 +61,9 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         rgb_tensor = torch.einsum("...lxy,lr -> ...rxy", latent_tensor, weights_tensor) \
                      + biases_tensor.unsqueeze(-1).unsqueeze(-1)
         image_array = rgb_tensor.clamp(0, 255)[0].byte().cpu().numpy()
-        return image_array.transpose(1, 2, 0)
+        image_array = image_array.transpose(1, 2, 0)
 
+        return image_array
 
     def _project_latent_to_image(self, latent_tensor: Tensor):
         generator = torch.Generator(device=latent_tensor.device)

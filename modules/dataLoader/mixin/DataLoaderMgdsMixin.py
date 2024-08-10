@@ -1,14 +1,13 @@
 import json
 from abc import ABCMeta
 
-from modules.util.config.ConceptConfig import ConceptConfig
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.TrainProgress import TrainProgress
-
 import torch
-
 from mgds.MGDS import MGDS
 from mgds.PipelineModule import PipelineState
+
+from modules.util.TrainProgress import TrainProgress
+from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.config.TrainConfig import TrainConfig
 
 
 class DataLoaderMgdsMixin(metaclass=ABCMeta):
@@ -22,7 +21,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
         if config.concepts is not None:
             concepts = [concept.to_dict() for concept in config.concepts]
         else:
-            with open(config.concept_file_name) as f:
+            with open(config.concept_file_name, 'r') as f:
                 concepts = json.load(f)
                 for i in range(len(concepts)):
                     concepts[i] = ConceptConfig.default_values().from_dict(concepts[i]).to_dict()
@@ -32,7 +31,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
         }
 
         # Just defaults for now.
-        return MGDS(
+        ds = MGDS(
             torch.device(config.train_device),
             concepts,
             settings,
@@ -43,3 +42,4 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             initial_epoch_sample=train_progress.epoch_sample,
         )
 
+        return ds

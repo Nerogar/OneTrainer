@@ -1,5 +1,5 @@
 import torch
-from torch.cuda.amp.grad_scaler import GradScaler, OptState
+from torch.cuda.amp.grad_scaler import OptState, GradScaler
 
 
 class DummyOptimizer:
@@ -11,7 +11,7 @@ class DummyOptimizer:
 
 class CustomGradScaler(GradScaler):
     def __init__(self):
-        super().__init__()
+        super(CustomGradScaler, self).__init__()
 
     def unscale_parameter_(self, parameter, optimizer):
         if not self._enabled:
@@ -25,7 +25,7 @@ class CustomGradScaler(GradScaler):
             raise RuntimeError(
                 "unscale_() has already been called on this optimizer since the last update()."
             )
-        if optimizer_state["stage"] is OptState.STEPPED:
+        elif optimizer_state["stage"] is OptState.STEPPED:
             raise RuntimeError("unscale_() is being called after step().")
 
         # FP32 division can be imprecise for certain compile options, so we carry out the reciprocal in FP64.

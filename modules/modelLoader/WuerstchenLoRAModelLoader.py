@@ -5,9 +5,9 @@ from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLo
 from modules.modelLoader.wuerstchen.WuerstchenEmbeddingLoader import WuerstchenEmbeddingLoader
 from modules.modelLoader.wuerstchen.WuerstchenLoRALoader import WuerstchenLoRALoader
 from modules.modelLoader.wuerstchen.WuerstchenModelLoader import WuerstchenModelLoader
-from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.enum.ModelType import ModelType
 
 
 class WuerstchenLoRAModelLoader(
@@ -16,7 +16,7 @@ class WuerstchenLoRAModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super().__init__()
+        super(WuerstchenLoRAModelLoader, self).__init__()
 
     def _default_model_spec_name(
             self,

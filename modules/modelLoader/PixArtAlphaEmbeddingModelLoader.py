@@ -4,9 +4,9 @@ from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoad
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.modelLoader.pixartAlpha.PixArtAlphaEmbeddingLoader import PixArtAlphaEmbeddingLoader
 from modules.modelLoader.pixartAlpha.PixArtAlphaModelLoader import PixArtAlphaModelLoader
-from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.enum.ModelType import ModelType
 
 
 class PixArtAlphaEmbeddingModelLoader(
@@ -15,7 +15,7 @@ class PixArtAlphaEmbeddingModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super().__init__()
+        super(PixArtAlphaEmbeddingModelLoader, self).__init__()
 
     def _default_model_spec_name(
             self,

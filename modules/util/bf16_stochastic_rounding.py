@@ -39,7 +39,10 @@ def add_stochastic_(input: Tensor, other: Tensor, alpha: float = 1.0):
         other: the other tensor
         alpha: a multiplier for other
     """
-    result = other.clone() if other.dtype == torch.float32 else other.to(dtype=torch.float32)
+    if other.dtype == torch.float32:
+        result = other.clone()
+    else:
+        result = other.to(dtype=torch.float32)
 
     result.add_(input, alpha=alpha)
     copy_stochastic_(input, result)
@@ -55,7 +58,10 @@ def addcdiv_stochastic_(input: Tensor, tensor1: Tensor, tensor2: Tensor, value: 
         tensor2: the denominator tensor
         value: a multiplier for tensor1/tensor2
     """
-    result = input.clone() if input.dtype == torch.float32 else input.to(dtype=torch.float32)
+    if input.dtype == torch.float32:
+        result = input.clone()
+    else:
+        result = input.to(dtype=torch.float32)
 
     result.addcdiv_(tensor1, tensor2, value=value)
     copy_stochastic_(input, result)

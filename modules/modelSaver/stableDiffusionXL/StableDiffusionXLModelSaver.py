@@ -2,15 +2,14 @@ import copy
 import os.path
 from pathlib import Path
 
+import torch
+import yaml
+from safetensors.torch import save_file
+
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert.convert_sdxl_diffusers_to_ckpt import convert_sdxl_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
-
-import torch
-
-import yaml
-from safetensors.torch import save_file
 
 
 class StableDiffusionXLModelSaver(

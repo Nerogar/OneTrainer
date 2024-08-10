@@ -1,15 +1,14 @@
-import contextlib
 import json
 import os
 from abc import ABCMeta, abstractmethod
 
+import torch
+
 from modules.model.BaseModel import BaseModel
-from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
-
-import torch
+from modules.util.enum.ModelType import ModelType
 
 
 class BaseModelLoader(metaclass=ABCMeta):
@@ -19,7 +18,7 @@ class BaseModelLoader(metaclass=ABCMeta):
             model: BaseModel,
             base_model_name: str,
     ):
-        with open(os.path.join(base_model_name, "meta.json")) as meta_file:
+        with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
             meta = json.load(meta_file)
             train_progress = TrainProgress(
                 epoch=meta['train_progress']['epoch'],
@@ -29,12 +28,16 @@ class BaseModelLoader(metaclass=ABCMeta):
             )
 
         # optimizer
-        with contextlib.suppress(FileNotFoundError):
+        try:
             model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
+        except FileNotFoundError:
+            pass
 
         # ema
-        with contextlib.suppress(FileNotFoundError):
+        try:
             model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
+        except FileNotFoundError:
+            pass
 
         # meta
         model.train_progress = train_progress

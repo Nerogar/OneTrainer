@@ -1,19 +1,17 @@
-import contextlib
 import os
 import traceback
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.util.ModelNames import EmbeddingName, ModelNames
-
 import torch
+from safetensors.torch import load_file
 from torch import Tensor
 
-from safetensors.torch import load_file
+from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.util.ModelNames import ModelNames, EmbeddingName
 
 
 class StableDiffusionEmbeddingLoader:
     def __init__(self):
-        super().__init__()
+        super(StableDiffusionEmbeddingLoader, self).__init__()
 
     def __load_embedding(
             self,
@@ -22,11 +20,15 @@ class StableDiffusionEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        with contextlib.suppress(Exception):
+        try:
             return torch.load(embedding_name)['string_to_param']['*']
+        except:
+            pass
 
-        with contextlib.suppress(Exception):
+        try:
             return load_file(embedding_name)["emp_params"]
+        except:
+            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 
@@ -36,26 +38,26 @@ class StableDiffusionEmbeddingLoader:
             embedding_name: EmbeddingName,
             load_single: bool,
     ) -> Tensor | None:
-        if not os.path.exists(os.path.join(directory, "meta.json")):
-            raise Exception("not an internal model")
+        if os.path.exists(os.path.join(directory, "meta.json")):
+            if load_single:
+                safetensors_embedding_name = os.path.join(
+                    directory,
+                    "embedding",
+                    f"embedding.safetensors",
+                )
+            else:
+                safetensors_embedding_name = os.path.join(
+                    directory,
+                    "embedding",
+                    f"{embedding_name.uuid}.safetensors",
+                )
 
-        if load_single:
-            safetensors_embedding_name = os.path.join(
-                directory,
-                "embedding",
-                "embedding.safetensors",
-            )
+            if os.path.exists(safetensors_embedding_name):
+                return self.__load_embedding(safetensors_embedding_name)
+            else:
+                return self.__load_embedding(embedding_name.model_name)
         else:
-            safetensors_embedding_name = os.path.join(
-                directory,
-                "embedding",
-                f"{embedding_name.uuid}.safetensors",
-            )
-
-        if os.path.exists(safetensors_embedding_name):
-            return self.__load_embedding(safetensors_embedding_name)
-
-        return self.__load_embedding(embedding_name.model_name)
+            raise Exception("not an internal model")
 
     def load_multiple(
             self,
@@ -70,18 +72,18 @@ class StableDiffusionEmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except Exception as e:
+            except:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except Exception:
+                except:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
 
                 for stacktrace in stacktraces:
                     print(stacktrace)
-                raise Exception(f"could not load embedding: {model_names.embedding}") from e
+                raise Exception("could not load embedding: " + str(model_names.embedding))
 
     def load_single(
             self,
@@ -95,13 +97,13 @@ class StableDiffusionEmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except Exception:
+        except:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except Exception:
+            except:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

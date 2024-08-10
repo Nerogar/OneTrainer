@@ -1,21 +1,21 @@
 import os
 
+import customtkinter as ctk
+from PIL import Image
+
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
-from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
-from PIL import Image
 
 
 class ConceptTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super().__init__(
+        super(ConceptTab, self).__init__(
             master,
             train_config,
             ui_state,
@@ -39,7 +39,7 @@ class ConceptTab(ConfigList):
 
 class ConceptWidget(ctk.CTkFrame):
     def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command):
-        super().__init__(
+        super(ConceptWidget, self).__init__(
             master=master, width=150, height=170, corner_radius=10, bg_color="transparent"
         )
 
@@ -108,9 +108,10 @@ class ConceptWidget(ctk.CTkFrame):
     def __get_display_name(self):
         if self.concept.name:
             return self.concept.name
-        if self.concept.path:
+        elif self.concept.path:
             return os.path.basename(self.concept.path)
-        return ""
+        else:
+            return ""
 
     def configure_element(self):
         self.name_label.configure(text=self.__get_display_name())
@@ -137,7 +138,8 @@ class ConceptWidget(ctk.CTkFrame):
             (image.width - size) // 2 + size,
             (image.height - size) // 2 + size,
         ))
-        return image.resize((150, 150), Image.Resampling.LANCZOS)
+        image = image.resize((150, 150), Image.Resampling.LANCZOS)
+        return image
 
     def place_in_list(self):
         x = self.i % 6

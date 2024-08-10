@@ -1,9 +1,11 @@
-import ctypes
 import os
-import platform
+import ctypes
 import shutil
-import urllib.request
 import zipfile
+import platform
+import urllib.request
+from typing import Union
+
 
 RELEASE = f"rel.{os.environ.get('ZLUDA_HASH', '11cc5844514f93161e0e74387f04e2c537705a82')}"
 DLL_MAPPING = {
@@ -19,8 +21,8 @@ def get_path() -> str:
     return os.path.abspath(os.environ.get('ZLUDA', '.zluda'))
 
 
-def find_hip_sdk() -> str | None:
-    program_files = os.environ.get('ProgramFiles', r'C:\Program Files')  # noqa: SIM112
+def find_hip_sdk() -> Union[str, None]:
+    program_files = os.environ.get('ProgramFiles', r'C:\Program Files')
     hip_path_default = rf'{program_files}\AMD\ROCm\5.7'
     if not os.path.exists(hip_path_default):
         hip_path_default = None

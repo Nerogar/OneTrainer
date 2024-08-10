@@ -1,14 +1,13 @@
 import os.path
 from pathlib import Path
 
+import torch
+from safetensors.torch import save_file
+from torch import Tensor
+
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
-
-import torch
-from torch import Tensor
-
-from safetensors.torch import save_file
 
 
 class StableDiffusionXLLoRASaver(

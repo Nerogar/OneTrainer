@@ -1,9 +1,9 @@
-from modules.util.config.SampleConfig import SampleConfig
+import customtkinter as ctk
+
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.config.SampleConfig import SampleConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
 
 
 class SampleFrame(ctk.CTkFrame):

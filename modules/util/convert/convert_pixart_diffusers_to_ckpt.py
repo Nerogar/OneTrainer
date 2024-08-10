@@ -1,10 +1,9 @@
-import modules.util.convert.convert_diffusers_to_ckpt_util as util
-from modules.util.enum.ModelType import ModelType
-
 import torch
+from diffusers.models.embeddings import PatchEmbed
 from torch import Tensor
 
-from diffusers.models.embeddings import PatchEmbed
+import modules.util.convert.convert_diffusers_to_ckpt_util as util
+from modules.util.enum.ModelType import ModelType
 
 
 def __map_transformer_attention_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:

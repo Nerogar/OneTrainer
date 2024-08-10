@@ -1,8 +1,8 @@
 from modules.model.BaseModel import BaseModel
 from modules.util import create
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 
 
 def change_optimizer(train_config: TrainConfig) -> TrainOptimizerConfig:

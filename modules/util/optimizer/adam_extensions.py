@@ -5,13 +5,14 @@
 #
 
 import math
-
-from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
+from typing import Optional
 
 import torch
 from torch import Tensor
 from torch.optim import Adam
 from torch.optim.optimizer import _use_grad_for_differentiable
+
+from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
 
 
 @torch.no_grad()
@@ -99,7 +100,10 @@ def step_adam_parameter(self, p, group, i):
 
         if group['amsgrad']:
             # Maintains the maximum of all 2nd moment running avg. till now
-            max_exp_avg_sq = state["max_exp_avg_sq"].clone() if group["differentiable"] else state["max_exp_avg_sq"]
+            if group["differentiable"]:
+                max_exp_avg_sq = state["max_exp_avg_sq"].clone()
+            else:
+                max_exp_avg_sq = state["max_exp_avg_sq"]
 
             state["max_exp_avg_sq"].copy_(torch.maximum(max_exp_avg_sq, exp_avg_sq))
 
@@ -159,8 +163,8 @@ def _get_scalar_dtype(is_fused=None):
 def _single_tensor_adam(
         self,
         group,
-        grad_scale: Tensor | None,
-        found_inf: Tensor | None,
+        grad_scale: Optional[Tensor],
+        found_inf: Optional[Tensor],
 ):
     assert grad_scale is None and found_inf is None
 

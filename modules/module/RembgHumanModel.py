@@ -1,6 +1,6 @@
-from modules.module.BaseRembgModel import BaseRembgModel
-
 import torch
+
+from modules.module.BaseRembgModel import BaseRembgModel
 
 
 class RembgHumanModel(BaseRembgModel):

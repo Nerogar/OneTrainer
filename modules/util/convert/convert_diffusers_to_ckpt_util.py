@@ -1,18 +1,17 @@
-from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
-
 import torch
+from diffusers import DDIMScheduler
 from torch import Tensor
 
-from diffusers import DDIMScheduler
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 
 
 def combine(left: str, right: str) -> str:
     if left == "":
         return right
-    if right == "":
+    elif right == "":
         return left
-
-    return left + "." + right
+    else:
+        return left + "." + right
 
 
 def map_wb(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dict[str, Tensor]:
@@ -27,7 +26,7 @@ def map_wb(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dic
 def map_prefix(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dict[str, Tensor]:
     out_states = {}
 
-    for key in in_states:
+    for key, tensor in in_states.items():
         if key.startswith(in_prefix):
             out_key = out_prefix + key.removeprefix(in_prefix)
             out_states[out_key] = in_states[key]
@@ -92,22 +91,22 @@ def __map_vae_attention_block(in_states: dict, out_prefix: str, in_prefix: str) 
     out_states |= map_wb(in_states, combine(out_prefix, "norm"), combine(in_prefix, "group_norm"))
 
     # support for both deprecated and current attention block names
-    if combine(in_prefix, "query") in in_states:
+    if combine(in_prefix, "query") in in_states.keys():
         out_states |= map_wb(in_states, combine(out_prefix, "q"), combine(in_prefix, "query"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "q"), combine(in_prefix, "to_q"))  # current
 
-    if combine(in_prefix, "key") in in_states:
+    if combine(in_prefix, "key") in in_states.keys():
         out_states |= map_wb(in_states, combine(out_prefix, "k"), combine(in_prefix, "key"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "k"), combine(in_prefix, "to_k"))  # current
 
-    if combine(in_prefix, "value") in in_states:
+    if combine(in_prefix, "value") in in_states.keys():
         out_states |= map_wb(in_states, combine(out_prefix, "v"), combine(in_prefix, "value"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "v"), combine(in_prefix, "to_v"))  # current
 
-    if combine(in_prefix, "proj_attn") in in_states:
+    if combine(in_prefix, "proj_attn") in in_states.keys():
         out_states |= map_wb(in_states, combine(out_prefix, "proj_out"), combine(in_prefix, "proj_attn"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "proj_out"), combine(in_prefix, "to_out.0"))  # current

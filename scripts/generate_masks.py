@@ -2,14 +2,14 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.module.ClipSegModel import ClipSegModel
-from modules.module.MaskByColor import MaskByColor
 from modules.module.RembgHumanModel import RembgHumanModel
-from modules.module.RembgModel import RembgModel
-from modules.util.args.GenerateMasksArgs import GenerateMasksArgs
-from modules.util.enum.GenerateMasksModel import GenerateMasksModel
 
 import torch
+from modules.util.enum.GenerateMasksModel import GenerateMasksModel
+from modules.util.args.GenerateMasksArgs import GenerateMasksArgs
+from modules.module.RembgModel import RembgModel
+from modules.module.ClipSegModel import ClipSegModel
+from modules.module.MaskByColor import MaskByColor
 
 
 def main():

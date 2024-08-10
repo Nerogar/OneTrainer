@@ -4,10 +4,10 @@
 # Implements stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192)
 #
 
-from modules.util.bf16_stochastic_rounding import add_stochastic_
-
 import torch
 import torch.optim
+
+from modules.util.bf16_stochastic_rounding import add_stochastic_
 
 
 class CAME(torch.optim.Optimizer):
@@ -39,17 +39,17 @@ class CAME(torch.optim.Optimizer):
         stochastic_rounding=False
     ):
         assert lr > 0.
-        assert all(0. <= beta <= 1. for beta in betas)
+        assert all([0. <= beta <= 1. for beta in betas])
 
-        defaults = {
-            "lr": lr,
-            "eps": eps,
-            "clip_threshold": clip_threshold,
-            "betas": betas,
-            "weight_decay": weight_decay,
-        }
+        defaults = dict(
+            lr=lr,
+            eps=eps,
+            clip_threshold=clip_threshold,
+            betas=betas,
+            weight_decay=weight_decay,
+        )
         self.stochastic_rounding = stochastic_rounding
-        super().__init__(params, defaults)
+        super(CAME, self).__init__(params, defaults)
 
     @property
     def supports_memory_efficient_fp16(self):
@@ -61,7 +61,8 @@ class CAME(torch.optim.Optimizer):
 
 
     def _get_options(self, param_shape):
-        return len(param_shape) >= 2
+        factored = len(param_shape) >= 2
+        return factored
 
     def _rms(self, tensor):
         return tensor.norm(2) / (tensor.numel() ** 0.5)

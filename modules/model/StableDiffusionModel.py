@@ -1,31 +1,22 @@
 from contextlib import nullcontext
 from uuid import uuid4
 
+import torch
+from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
+    StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline, DDIMScheduler
+from torch import Tensor
+from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
+
 from modules.model.BaseModel import BaseModel
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
-    rescale_noise_scheduler_to_zero_terminal_snr,
-)
+from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import \
+    rescale_noise_scheduler_to_zero_terminal_snr
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-from torch import Tensor
-
-from diffusers import (
-    AutoencoderKL,
-    DDIMScheduler,
-    DiffusionPipeline,
-    StableDiffusionDepth2ImgPipeline,
-    StableDiffusionInpaintPipeline,
-    StableDiffusionPipeline,
-    UNet2DConditionModel,
-)
-from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DPTImageProcessor
 
 
 class StableDiffusionModelEmbedding:
@@ -100,7 +91,7 @@ class StableDiffusionModel(BaseModel):
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
-        super().__init__(
+        super(StableDiffusionModel, self).__init__(
             model_type=model_type,
             optimizer_state_dict=optimizer_state_dict,
             ema_state_dict=ema_state_dict,
@@ -177,7 +168,7 @@ class StableDiffusionModel(BaseModel):
                 depth_estimator=self.depth_estimator,
                 feature_extractor=self.image_depth_processor,
             )
-        if self.model_type.has_conditioning_image_input():
+        elif self.model_type.has_conditioning_image_input():
             return StableDiffusionInpaintPipeline(
                 vae=self.vae,
                 text_encoder=self.text_encoder,
@@ -188,16 +179,17 @@ class StableDiffusionModel(BaseModel):
                 feature_extractor=None,
                 requires_safety_checker=False,
             )
-        return StableDiffusionPipeline(
-            vae=self.vae,
-            text_encoder=self.text_encoder,
-            tokenizer=self.tokenizer,
-            unet=self.unet,
-            scheduler=self.noise_scheduler,
-            safety_checker=None,
-            feature_extractor=None,
-            requires_safety_checker=False,
-        )
+        else:
+            return StableDiffusionPipeline(
+                vae=self.vae,
+                text_encoder=self.text_encoder,
+                tokenizer=self.tokenizer,
+                unet=self.unet,
+                scheduler=self.noise_scheduler,
+                safety_checker=None,
+                feature_extractor=None,
+                requires_safety_checker=False,
+            )
 
     def force_v_prediction(self):
         self.noise_scheduler.config.prediction_type = 'v_prediction'

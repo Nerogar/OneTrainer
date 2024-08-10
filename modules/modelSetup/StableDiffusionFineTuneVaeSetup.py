@@ -1,11 +1,11 @@
+import torch
+
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
-from modules.util.optimizer_util import init_model_parameters
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
 from modules.util.TrainProgress import TrainProgress
-
-import torch
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.optimizer_util import init_model_parameters
 
 
 class StableDiffusionFineTuneVaeSetup(
@@ -17,7 +17,7 @@ class StableDiffusionFineTuneVaeSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super().__init__(
+        super(StableDiffusionFineTuneVaeSetup, self).__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,

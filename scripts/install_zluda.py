@@ -5,6 +5,7 @@ sys.path.append(os.getcwd())
 
 from modules.zluda import ZLUDAInstaller
 
+
 if __name__ == '__main__':
     try:
         zluda_path = ZLUDAInstaller.get_path()

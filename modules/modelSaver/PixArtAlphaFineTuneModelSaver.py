@@ -1,3 +1,5 @@
+import torch
+
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
@@ -5,8 +7,6 @@ from modules.modelSaver.pixartAlpha.PixArtAlphaEmbeddingSaver import PixArtAlpha
 from modules.modelSaver.pixartAlpha.PixArtAlphaModelSaver import PixArtAlphaModelSaver
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-
-import torch
 
 
 class PixArtAlphaFineTuneModelSaver(

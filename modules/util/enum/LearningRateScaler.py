@@ -1,6 +1,5 @@
 from enum import Enum
 
-
 class LearningRateScaler(Enum):
     NONE = 'NONE'
     BATCH = 'BATCH'

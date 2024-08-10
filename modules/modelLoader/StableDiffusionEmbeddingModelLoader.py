@@ -4,9 +4,9 @@ from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoad
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
-from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.enum.ModelType import ModelType
 
 
 class StableDiffusionEmbeddingModelLoader(
@@ -15,7 +15,7 @@ class StableDiffusionEmbeddingModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super().__init__()
+        super(StableDiffusionEmbeddingModelLoader, self).__init__()
 
     def _default_model_spec_name(
             self,

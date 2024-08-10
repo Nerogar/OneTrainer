@@ -1,12 +1,11 @@
-import contextlib
 import json
 import os
 from abc import ABCMeta
 
+import torch
+
 from modules.model.BaseModel import BaseModel
 from modules.util.TrainProgress import TrainProgress
-
-import torch
 
 
 class InternalModelLoaderMixin(metaclass=ABCMeta):
@@ -17,7 +16,7 @@ class InternalModelLoaderMixin(metaclass=ABCMeta):
     ):
         if os.path.exists(os.path.join(model_name, "meta.json")):
             # train progress
-            with open(os.path.join(model_name, "meta.json")) as meta_file:
+            with open(os.path.join(model_name, "meta.json"), "r") as meta_file:
                 meta = json.load(meta_file)
                 train_progress = TrainProgress(
                     epoch=meta['train_progress']['epoch'],
@@ -27,12 +26,16 @@ class InternalModelLoaderMixin(metaclass=ABCMeta):
                 )
 
             # optimizer
-            with contextlib.suppress(FileNotFoundError):
+            try:
                 model.optimizer_state_dict = torch.load(os.path.join(model_name, "optimizer", "optimizer.pt"))
+            except FileNotFoundError:
+                pass
 
             # ema
-            with contextlib.suppress(FileNotFoundError):
+            try:
                 model.ema_state_dict = torch.load(os.path.join(model_name, "ema", "ema.pt"))
+            except FileNotFoundError:
+                pass
 
             # meta
             model.train_progress = train_progress

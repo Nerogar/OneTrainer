@@ -2,18 +2,19 @@ import traceback
 from pathlib import Path
 from uuid import uuid4
 
+import customtkinter as ctk
+import torch
+
 from modules.util import create
+from modules.util.ModelNames import ModelNames, EmbeddingName
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ModelNames import EmbeddingName, ModelNames
-from modules.util.torch_util import torch_gc
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
+from modules.util.torch_util import torch_gc
 
 
 class ConvertModelUI(ctk.CTkToplevel):
@@ -143,7 +144,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                 dtype=self.convert_model_args.output_dtype.torch_dtype(),
             )
             print("Model converted")
-        except Exception:
+        except:
             traceback.print_exc()
 
         torch_gc()

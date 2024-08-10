@@ -1,13 +1,13 @@
 import math
-from collections.abc import Callable
+from typing import Callable
 
 
 def lr_lambda_warmup(warmup_steps: int, lr_lambda: Callable[[int], float]):
     def warmup(current_step: int):
         if current_step < warmup_steps:
             return float(current_step) / float(warmup_steps)
-
-        return lr_lambda(current_step - warmup_steps)
+        else:
+            return lr_lambda(current_step - warmup_steps)
 
     return warmup
 
@@ -76,7 +76,7 @@ def lr_lambda_rex(
             progress = (current_step / scheduler_steps)
             div = (1 - d) + (d * (1 - progress))
             return min_lr + (max_lr - min_lr) * ((1 - progress) / div)
-
-        return min_lr
+        else:
+            return min_lr
 
     return lr_lambda

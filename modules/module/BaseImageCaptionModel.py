@@ -1,12 +1,11 @@
-import contextlib
 import os
 from abc import ABCMeta, abstractmethod
-from collections.abc import Callable
-
-from modules.util import path_util
+from typing import Callable
 
 from PIL import Image
 from tqdm import tqdm
+
+from modules.util import path_util
 
 
 class CaptionSample:
@@ -31,9 +30,9 @@ class CaptionSample:
     def get_caption(self) -> str:
         if self.captions is None and os.path.exists(self.caption_filename):
             try:
-                with open(self.caption_filename) as f:
+                with open(self.caption_filename, "r") as f:
                     self.captions = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
-            except Exception:
+            except:
                 self.captions = []
 
         return self.captions
@@ -46,8 +45,11 @@ class CaptionSample:
 
     def save_caption(self):
         if self.captions is not None:
-            with contextlib.suppress(Exception), open(self.caption_filename, "w", encoding='utf-8') as f:
-                f.write('\n'.join(self.captions))
+            try:
+                with open(self.caption_filename, "w", encoding='utf-8') as f:
+                    f.write('\n'.join(self.captions))
+            except:
+                pass
 
 
 class BaseImageCaptionModel(metaclass=ABCMeta):
@@ -57,12 +59,16 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             ext = os.path.splitext(filename)[1]
             return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
 
+        filenames = []
         if include_subdirectories:
-            filenames = []
             for root, _, files in os.walk(sample_dir):
-                filenames.extend([os.path.join(root, fn) for fn in files if __is_supported_image_extension(fn)])
+                for filename in files:
+                    if __is_supported_image_extension(filename):
+                        filenames.append(os.path.join(root, filename))
         else:
-            filenames = [os.path.join(sample_dir, fn) for fn in os.listdir(sample_dir) if __is_supported_image_extension(fn)]
+            for filename in os.listdir(sample_dir):
+                if __is_supported_image_extension(filename):
+                    filenames.append(os.path.join(sample_dir, filename))
 
         return filenames
 
@@ -81,6 +87,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
 
         Returns: the generated caption
         """
+        pass
 
     def caption_image(
             self,
@@ -150,7 +157,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         for i, filename in enumerate(tqdm(filenames)):
             try:
                 self.caption_image(filename, initial_caption, caption_prefix, caption_postfix, mode)
-            except Exception:
+            except Exception as e:
                 if error_callback is not None:
                     error_callback(filename)
             if progress_callback is not None:

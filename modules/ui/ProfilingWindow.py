@@ -1,9 +1,9 @@
 import faulthandler
 
-from modules.util.ui import components
-
 import customtkinter as ctk
 from scalene import scalene_profiler
+
+from modules.util.ui import components
 
 
 class ProfilingWindow(ctk.CTkToplevel):

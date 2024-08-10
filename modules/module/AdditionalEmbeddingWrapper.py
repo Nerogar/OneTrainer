@@ -2,8 +2,7 @@ from abc import ABCMeta
 
 import torch
 import torch.nn.functional as F
-from torch import Tensor, nn
-
+from torch import nn, Tensor
 from transformers import CLIPTokenizer, T5Tokenizer
 
 
@@ -23,7 +22,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
             additional_embedding_placeholders: list[str],
             additional_embedding_names: list[str],
     ):
-        super().__init__()
+        super(AdditionalEmbeddingWrapper, self).__init__()
 
         self.orig_module = orig_module
         self.additional_embeddings = additional_embeddings

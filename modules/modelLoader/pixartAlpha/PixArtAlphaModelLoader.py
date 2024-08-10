@@ -1,18 +1,18 @@
 import os
 import traceback
 
+from diffusers import DDIMScheduler, AutoencoderKL, Transformer2DModel
+from transformers import T5Tokenizer, T5EncoderModel
+
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
-from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-
-from diffusers import AutoencoderKL, DDIMScheduler, Transformer2DModel
-from transformers import T5EncoderModel, T5Tokenizer
+from modules.util.enum.ModelType import ModelType
 
 
 class PixArtAlphaModelLoader:
     def __init__(self):
-        super().__init__()
+        super(PixArtAlphaModelLoader, self).__init__()
 
     def __load_internal(
             self,
@@ -91,13 +91,13 @@ class PixArtAlphaModelLoader:
         try:
             self.__load_internal(model, model_type, weight_dtypes, base_model_name, model_names.vae_model)
             return
-        except Exception:
+        except:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, model_names.vae_model)
             return
-        except Exception:
+        except:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

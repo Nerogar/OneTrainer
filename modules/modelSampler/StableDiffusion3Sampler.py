@@ -1,8 +1,14 @@
 import copy
 import inspect
 import os
-from collections.abc import Callable
 from pathlib import Path
+from typing import Callable
+
+import torch
+from PIL import Image
+from torch import nn
+from tqdm import tqdm
+from transformers import CLIPTokenizer, T5Tokenizer, CLIPTextModelWithProjection, T5EncoderModel
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -13,14 +19,6 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.torch_util import torch_gc
 
-import torch
-from torch import nn
-
-from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
-
-from PIL import Image
-from tqdm import tqdm
-
 
 class StableDiffusion3Sampler(BaseModelSampler):
     def __init__(
@@ -30,7 +28,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             model: StableDiffusion3Model,
             model_type: ModelType,
     ):
-        super().__init__(train_device, temp_device)
+        super(StableDiffusion3Sampler, self).__init__(train_device, temp_device)
 
         self.model = model
         self.model_type = model_type

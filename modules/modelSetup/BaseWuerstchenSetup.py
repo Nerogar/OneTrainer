@@ -1,5 +1,10 @@
 from abc import ABCMeta
 
+import torch
+from diffusers.models.attention_processor import AttnProcessor, XFormersAttnProcessor, AttnProcessor2_0, Attention
+from diffusers.utils import is_xformers_available
+from torch import Tensor
+
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -7,27 +12,16 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionMixin import ModelSetupDiffusionMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.modelSetup.stableDiffusion.checkpointing_util import (
-    enable_checkpointing_for_clip_encoder_layers,
-    enable_checkpointing_for_stable_cascade_blocks,
-)
+from modules.modelSetup.stableDiffusion.checkpointing_util import enable_checkpointing_for_clip_encoder_layers, \
+    enable_checkpointing_for_stable_cascade_blocks
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
+from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
-from modules.util.dtype_util import (
-    create_autocast_context,
-    disable_bf16_on_fp16_autocast_context,
-    disable_fp16_autocast_context,
-)
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context, \
+    disable_bf16_on_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-from torch import Tensor
-
-from diffusers.models.attention_processor import Attention, AttnProcessor, AttnProcessor2_0, XFormersAttnProcessor
-from diffusers.utils import is_xformers_available
 
 
 class BaseWuerstchenSetup(
@@ -46,12 +40,12 @@ class BaseWuerstchenSetup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            for _name, child_module in model.prior_prior.named_modules():
+            for name, child_module in model.prior_prior.named_modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                for _name, child_module in model.prior_prior.named_modules():
+                for name, child_module in model.prior_prior.named_modules():
                     if isinstance(child_module, Attention):
                         child_module.set_processor(XFormersAttnProcessor())
             except Exception as e:
@@ -60,7 +54,7 @@ class BaseWuerstchenSetup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            for _name, child_module in model.prior_prior.named_modules():
+            for name, child_module in model.prior_prior.named_modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor2_0())
 

@@ -1,3 +1,4 @@
+import torch
 
 import modules.util.convert.convert_diffusers_to_ckpt_util as util
 
@@ -6,7 +7,7 @@ def __map_unet_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
     i = 0
-    while any(key.startswith(util.combine(in_prefix, f"{i}")) for key in in_states):
+    while any(key.startswith(util.combine(in_prefix, f"{i}")) for key in in_states.keys()):
         if i % 3 == 0:
             # resblock
             out_states[util.combine(out_prefix, f"{i}.channelwise.0.weight")] = in_states[util.combine(in_prefix, f"{i}.channelwise.0.weight")]

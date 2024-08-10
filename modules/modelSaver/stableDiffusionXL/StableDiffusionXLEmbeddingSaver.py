@@ -1,14 +1,13 @@
 import os.path
 from pathlib import Path
 
+import torch
+from safetensors.torch import save_file
+from torch import Tensor
+
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
-
-import torch
-from torch import Tensor
-
-from safetensors.torch import save_file
 
 
 class StableDiffusionXLEmbeddingSaver:
@@ -72,7 +71,7 @@ class StableDiffusionXLEmbeddingSaver:
             safetensors_embedding_name = os.path.join(
                 destination,
                 "embedding",
-                "embedding.safetensors",
+                f"embedding.safetensors",
             )
         else:
             safetensors_embedding_name = os.path.join(

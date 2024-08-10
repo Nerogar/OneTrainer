@@ -1,19 +1,13 @@
 import os
 import random
 
-from modules.util import path_util
-from modules.util.config.ConceptConfig import ConceptConfig
-from modules.util.enum.BalancingStrategy import BalancingStrategy
-from modules.util.ui import components
-from modules.util.ui.UIState import UIState
-
-import torch
-from torchvision.transforms import functional
-
 import customtkinter as ctk
+import torch
+from PIL import Image
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.PipelineModule import PipelineModule
+from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
@@ -22,8 +16,13 @@ from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
-from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
-from PIL import Image
+from torchvision.transforms import functional
+
+from modules.util import path_util
+from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.ui import components
+from modules.util.ui.UIState import UIState
 
 
 class InputPipelineModule(
@@ -31,7 +30,7 @@ class InputPipelineModule(
     RandomAccessPipelineModule,
 ):
     def __init__(self, data: dict):
-        super().__init__()
+        super(InputPipelineModule, self).__init__()
         self.data = data
 
     def length(self) -> int:

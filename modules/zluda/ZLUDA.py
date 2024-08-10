@@ -1,8 +1,7 @@
-
-from modules.util.config.TrainConfig import TrainConfig
-
+from typing import Union
 import torch
 from torch._prims_common import DeviceLikeType
+from modules.util.config.TrainConfig import TrainConfig
 
 
 def is_zluda(device: DeviceLikeType):
@@ -12,7 +11,7 @@ def is_zluda(device: DeviceLikeType):
     return torch.cuda.get_device_name(device).endswith("[ZLUDA]")
 
 
-def test(device: DeviceLikeType) -> Exception | None:
+def test(device: DeviceLikeType) -> Union[Exception, None]:
     device = torch.device(device)
     try:
         ten1 = torch.randn((2, 4,), device=device)

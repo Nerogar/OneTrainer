@@ -1,12 +1,12 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
-from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
-from modules.util.enum.ModelType import ModelType
+from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.enum.ModelType import ModelType
 
 
 class StableDiffusionFineTuneModelLoader(
@@ -15,7 +15,7 @@ class StableDiffusionFineTuneModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super().__init__()
+        super(StableDiffusionFineTuneModelLoader, self).__init__()
 
     def _default_model_spec_name(
             self,

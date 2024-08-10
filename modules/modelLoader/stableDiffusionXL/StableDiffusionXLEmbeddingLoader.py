@@ -1,19 +1,17 @@
-import contextlib
 import os
 import traceback
 
-from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
-from modules.util.ModelNames import EmbeddingName, ModelNames
-
 import torch
+from safetensors.torch import load_file
 from torch import Tensor
 
-from safetensors.torch import load_file
+from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.util.ModelNames import ModelNames, EmbeddingName
 
 
 class StableDiffusionXLEmbeddingLoader:
     def __init__(self):
-        super().__init__()
+        super(StableDiffusionXLEmbeddingLoader, self).__init__()
 
     def __load_embedding(
             self,
@@ -22,21 +20,25 @@ class StableDiffusionXLEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        with contextlib.suppress(Exception):
+        try:
             embedding_state = torch.load(embedding_name)
 
             text_encoder_1_vector = embedding_state['clip_l']
             text_encoder_2_vector = embedding_state['clip_g']
 
             return text_encoder_1_vector, text_encoder_2_vector
+        except:
+            pass
 
-        with contextlib.suppress(Exception):
+        try:
             embedding_state = load_file(embedding_name)
 
             text_encoder_1_vector = embedding_state['clip_l']
             text_encoder_2_vector = embedding_state['clip_g']
 
             return text_encoder_1_vector, text_encoder_2_vector
+        except:
+            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 
@@ -46,26 +48,26 @@ class StableDiffusionXLEmbeddingLoader:
             embedding_name: EmbeddingName,
             load_single: bool,
     ) -> tuple[Tensor, Tensor] | None:
-        if not os.path.exists(os.path.join(directory, "meta.json")):
-            raise Exception("not an internal model")
+        if os.path.exists(os.path.join(directory, "meta.json")):
+            if load_single:
+                safetensors_embedding_name = os.path.join(
+                    directory,
+                    "embedding",
+                    f"embedding.safetensors",
+                )
+            else:
+                safetensors_embedding_name = os.path.join(
+                    directory,
+                    "embedding",
+                    f"{embedding_name.uuid}.safetensors",
+                )
 
-        if load_single:
-            safetensors_embedding_name = os.path.join(
-                directory,
-                "embedding",
-                "embedding.safetensors",
-            )
+            if os.path.exists(safetensors_embedding_name):
+                return self.__load_embedding(safetensors_embedding_name)
+            else:
+                return self.__load_embedding(embedding_name.model_name)
         else:
-            safetensors_embedding_name = os.path.join(
-                directory,
-                "embedding",
-                f"{embedding_name.uuid}.safetensors",
-            )
-
-        if os.path.exists(safetensors_embedding_name):
-            return self.__load_embedding(safetensors_embedding_name)
-
-        return self.__load_embedding(embedding_name.model_name)
+            raise Exception("not an internal model")
 
     def load_multiple(
             self,
@@ -80,18 +82,18 @@ class StableDiffusionXLEmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except Exception as e:
+            except:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except Exception:
+                except:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
 
                 for stacktrace in stacktraces:
                     print(stacktrace)
-                raise Exception(f"could not load embedding: {model_names.embedding}") from e
+                raise Exception("could not load embedding: " + str(model_names.embedding))
 
     def load_single(
             self,
@@ -105,13 +107,13 @@ class StableDiffusionXLEmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except Exception:
+        except:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except Exception:
+            except:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

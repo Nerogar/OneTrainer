@@ -1,7 +1,7 @@
 import customtkinter as ctk
 
 
-class ToolTip:
+class ToolTip(object):
     """
     create a tooltip for a given widget
     """

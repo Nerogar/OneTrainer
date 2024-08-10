@@ -1,12 +1,11 @@
 from abc import ABCMeta, abstractmethod
-from collections.abc import Callable
-
-from modules.util.config.SampleConfig import SampleConfig
-from modules.util.enum.ImageFormat import ImageFormat
+from typing import Callable
 
 import torch
-
 from PIL.Image import Image
+
+from modules.util.enum.ImageFormat import ImageFormat
+from modules.util.config.SampleConfig import SampleConfig
 
 
 class BaseModelSampler(metaclass=ABCMeta):
@@ -16,7 +15,7 @@ class BaseModelSampler(metaclass=ABCMeta):
             train_device: torch.device,
             temp_device: torch.device,
     ):
-        super().__init__()
+        super(BaseModelSampler, self).__init__()
 
         self.train_device = train_device
         self.temp_device = temp_device

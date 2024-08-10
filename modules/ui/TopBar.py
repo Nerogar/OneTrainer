@@ -1,7 +1,9 @@
 import json
 import os
 import traceback
-from collections.abc import Callable
+from typing import Callable
+
+import customtkinter as ctk
 
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
@@ -10,8 +12,6 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
 
 
 class TopBar:
@@ -103,10 +103,25 @@ class TopBar:
                 ("Embedding", TrainingMethod.EMBEDDING),
                 ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
             ]
-        elif self.train_config.model_type.is_stable_diffusion_3() \
-                or self.train_config.model_type.is_stable_diffusion_xl() \
-                or self.train_config.model_type.is_wuerstchen() \
-                or self.train_config.model_type.is_pixart():
+        elif self.train_config.model_type.is_stable_diffusion_3():
+            values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_config.model_type.is_stable_diffusion_xl():
+            values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_config.model_type.is_wuerstchen():
+            values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_config.model_type.is_pixart():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
@@ -187,7 +202,7 @@ class TopBar:
             basename = os.path.basename(filename)
             is_built_in_preset = basename.startswith("#") and basename != "#.json"
 
-            with open(filename) as f:
+            with open(filename, "r") as f:
                 loaded_dict = json.load(f)
                 default_config = TrainConfig.default_values()
                 if is_built_in_preset:

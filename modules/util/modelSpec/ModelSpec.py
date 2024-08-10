@@ -54,7 +54,7 @@ class ModelSpec:
             try:
                 if isinstance(value, str):
                     setattr(model_spec, key, data["modelspec." + key])
-            except Exception: # noqa: PERF203
+            except:
                 pass
 
         return model_spec

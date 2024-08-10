@@ -7,7 +7,7 @@ from torch import Tensor
 class ModelSetupFlowMatchingMixin(metaclass=ABCMeta):
 
     def __init__(self):
-        super().__init__()
+        super(ModelSetupFlowMatchingMixin, self).__init__()
         self.__sigma = None
         self.__one_minus_sigma = None
 

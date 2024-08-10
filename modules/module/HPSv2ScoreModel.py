@@ -1,9 +1,8 @@
+import huggingface_hub
+import open_clip
 import torch
 from torch import nn
 from torchvision.transforms import transforms
-
-import huggingface_hub
-import open_clip
 
 
 class HPSv2ScoreModel(nn.Module):
@@ -11,7 +10,7 @@ class HPSv2ScoreModel(nn.Module):
             self,
             dtype: torch.dtype,
     ):
-        super().__init__()
+        super(HPSv2ScoreModel, self).__init__()
         self.dtype = dtype
 
         self.model = self.__load_open_clip_model()

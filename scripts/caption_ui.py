@@ -2,8 +2,8 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.ui.CaptionUI import CaptionUI
 from modules.util.args.CaptionUIArgs import CaptionUIArgs
+from modules.ui.CaptionUI import CaptionUI
 
 
 def main():

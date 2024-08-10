@@ -1,6 +1,12 @@
 import ast
 import importlib
-from collections.abc import Iterable
+from typing import Iterable
+
+import torch
+from diffusers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, \
+    DPMSolverMultistepScheduler, UniPCMultistepScheduler, SchedulerMixin
+from torch.nn import Parameter
+from torch.optim.lr_scheduler import LambdaLR, LRScheduler, SequentialLR
 
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
 from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3BaseDataLoader
@@ -66,6 +72,8 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -73,33 +81,10 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.lr_scheduler_util import (
-    lr_lambda_constant,
-    lr_lambda_cosine,
-    lr_lambda_cosine_with_hard_restarts,
-    lr_lambda_cosine_with_restarts,
-    lr_lambda_linear,
-    lr_lambda_rex,
-    lr_lambda_warmup,
-)
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.lr_scheduler_util import *
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-from torch.nn import Parameter
-from torch.optim.lr_scheduler import LambdaLR, LRScheduler, SequentialLR
-
-from diffusers import (
-    DDIMScheduler,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-    SchedulerMixin,
-    UniPCMultistepScheduler,
-)
 
 
 def create_model_loader(
@@ -143,7 +128,6 @@ def create_model_loader(
                 return PixArtAlphaEmbeddingModelLoader()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingModelLoader()
-    return None
 
 
 def create_model_saver(
@@ -187,7 +171,6 @@ def create_model_saver(
                 return PixArtAlphaEmbeddingModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingModelSaver()
-    return None
 
 
 def create_model_setup(
@@ -234,7 +217,6 @@ def create_model_setup(
                 return PixArtAlphaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingSetup(train_device, temp_device, debug_mode)
-    return None
 
 
 def create_model_sampler(
@@ -256,11 +238,9 @@ def create_model_sampler(
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
-            return None
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
-            return None
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
@@ -272,7 +252,6 @@ def create_model_sampler(
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
-            return None
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
@@ -284,7 +263,6 @@ def create_model_sampler(
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
-            return None
 
 
 def create_data_loader(
@@ -294,10 +272,8 @@ def create_data_loader(
         model_type: ModelType,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
         config: TrainConfig = None,
-        train_progress: TrainProgress | None = None,
+        train_progress: TrainProgress = TrainProgress(),
 ):
-    if train_progress is None:
-        train_progress = TrainProgress()
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
@@ -335,7 +311,6 @@ def create_data_loader(
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
-    return None
 
 
 def create_optimizer(
@@ -752,7 +727,7 @@ def create_optimizer(
 
             optimizer = Adafactor(
                 params=parameters,
-                lr=None if optimizer_config.relative_step is True else config.learning_rate,
+                lr=None if optimizer_config.relative_step == True else config.learning_rate,
                 eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
                      optimizer_config.eps2 if optimizer_config.eps2 is not None else 1e-3),
                 clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 1.0,
@@ -872,7 +847,7 @@ def create_optimizer(
                 else:
                     # the group state was not saved, initialize with an empty group state
                     new_group = new_param_groups[new_group_index]
-                    for i in range(len(new_group['params'])):
+                    for i, old_state_index in enumerate(new_group['params']):
                         new_group['params'][i] = state_index
                         state_index += 1
                     param_groups.append(new_group)

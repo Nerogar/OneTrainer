@@ -1,9 +1,11 @@
 from pathlib import Path
 
+import customtkinter as ctk
+
 from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
-from modules.modelSetup.StableDiffusion3LoRASetup import PRESETS as sd3_presets
 from modules.modelSetup.StableDiffusionLoRASetup import PRESETS as sd_presets
 from modules.modelSetup.StableDiffusionXLLoRASetup import PRESETS as sdxl_presets
+from modules.modelSetup.StableDiffusion3LoRASetup import PRESETS as sd3_presets
 from modules.modelSetup.WuerstchenLoRASetup import PRESETS as sc_presets
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
@@ -11,13 +13,11 @@ from modules.util.enum.ModelType import PeftType
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
-import customtkinter as ctk
-
 
 class LoraTab:
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super().__init__()
+        super(LoraTab, self).__init__()
 
         self.master = master
         self.train_config = train_config

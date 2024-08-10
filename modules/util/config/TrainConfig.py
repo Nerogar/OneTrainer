@@ -3,6 +3,8 @@ import uuid
 from copy import deepcopy
 from typing import Any
 
+from modules.util.ModelNames import ModelNames, EmbeddingName
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
@@ -19,11 +21,9 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ModelNames import EmbeddingName, ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
 
 
@@ -89,7 +89,7 @@ class TrainOptimizerConfig(BaseConfig):
     adam_debias: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super(TrainOptimizerConfig, self).__init__(data)
 
     @staticmethod
     def default_values():
@@ -171,7 +171,7 @@ class TrainModelPartConfig(BaseConfig):
     attention_mask: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super(TrainModelPartConfig, self).__init__(data)
 
     @staticmethod
     def default_values():
@@ -203,7 +203,7 @@ class TrainEmbeddingConfig(BaseConfig):
     initial_embedding_text: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super(TrainEmbeddingConfig, self).__init__(data)
 
     @staticmethod
     def default_values():
@@ -385,7 +385,7 @@ class TrainConfig(BaseConfig):
     save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(
+        super(TrainConfig, self).__init__(
             data,
             config_version=4,
             config_migrations={
@@ -595,13 +595,13 @@ class TrainConfig(BaseConfig):
     def to_pack_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
 
-        with open(config.concept_file_name) as f:
+        with open(config.concept_file_name, 'r') as f:
             concepts = json.load(f)
             for i in range(len(concepts)):
                 concepts[i] = ConceptConfig.default_values().from_dict(concepts[i])
             config.concepts = concepts
 
-        with open(config.sample_definition_file_name) as f:
+        with open(config.sample_definition_file_name, 'r') as f:
             samples = json.load(f)
             for i in range(len(samples)):
                 samples[i] = SampleConfig.default_values().from_dict(samples[i])

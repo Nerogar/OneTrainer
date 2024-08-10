@@ -9,7 +9,7 @@ class CalculateLossArgs(BaseArgs):
     output_path: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super(CalculateLossArgs, self).__init__(data)
 
     @staticmethod
     def parse_args() -> 'CalculateLossArgs':

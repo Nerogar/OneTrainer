@@ -1,3 +1,5 @@
+import customtkinter as ctk
+
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
@@ -16,13 +18,11 @@ from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
-import customtkinter as ctk
-
 
 class TrainingTab:
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super().__init__()
+        super(TrainingTab, self).__init__()
 
         self.master = master
         self.train_config = train_config
