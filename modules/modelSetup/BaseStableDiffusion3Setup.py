@@ -358,11 +358,14 @@ class BaseStableDiffusion3Setup(
                 dummy = torch.zeros((1,), device=self.train_device)
                 dummy.requires_grad_(True)
 
-                negative_text_encoder_output, negative_pooled_text_encoder_2_output = self.__encode_text(
-                    model,
-                    config.text_encoder_layer_skip,
-                    config.text_encoder_2_layer_skip,
+                negative_text_encoder_output, negative_pooled_text_encoder_2_output = model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch['latent_image'].shape[0],
+                    rand=rand,
                     text="",
+                    text_encoder_1_layer_skip=config.text_encoder_layer_skip,
+                    text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                    text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
                 )
                 negative_text_encoder_output = negative_text_encoder_output \
                     .expand((scaled_latent_image.shape[0], -1, -1))
