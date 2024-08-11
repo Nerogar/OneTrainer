@@ -43,32 +43,32 @@ class PixArtAlphaLoRALoader:
             self,
             model: PixArtAlphaModel,
             model_names: ModelNames,
-    ) -> PixArtAlphaModel | None:
+    ):
         stacktraces = []
 
         if model_names.lora == "":
-            return None
+            return
 
         if model_names.lora:
             try:
                 self.__load_internal(model, model_names.lora)
-                return None
+                return
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
                 self.__load_ckpt(model, model_names.lora)
-                return None
+                return
             except:
                 stacktraces.append(traceback.format_exc())
 
             try:
                 self.__load_safetensors(model, model_names.lora)
-                return None
+                return
             except:
                 stacktraces.append(traceback.format_exc())
         else:
-            return model
+            return
 
         for stacktrace in stacktraces:
             print(stacktrace)
