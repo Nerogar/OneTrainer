@@ -1,11 +1,12 @@
 from abc import ABCMeta, abstractmethod
 from typing import Callable
 
-import torch
-from PIL.Image import Image
-
-from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.enum.ImageFormat import ImageFormat
+
+import torch
+
+from PIL.Image import Image
 
 
 class BaseModelSampler(metaclass=ABCMeta):

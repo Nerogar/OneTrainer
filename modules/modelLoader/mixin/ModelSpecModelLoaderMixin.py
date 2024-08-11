@@ -1,10 +1,10 @@
 import json
 from abc import ABCMeta
 
-from safetensors import safe_open
-
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
+
+from safetensors import safe_open
 
 
 class ModelSpecModelLoaderMixin(metaclass=ABCMeta):

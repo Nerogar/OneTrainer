@@ -1,18 +1,19 @@
 import os
 import traceback
 
-import torch
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
-from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
-from transformers import CLIPTokenizer, CLIPTextModel, DPTImageProcessor, DPTForDepthEstimation
-
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
-from modules.util.ModelNames import ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.ModelNames import ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
+
+import torch
+
+from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel
+from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
+from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DPTImageProcessor
 
 
 class StableDiffusionModelLoader(

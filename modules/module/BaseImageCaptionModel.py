@@ -2,10 +2,10 @@ import os
 from abc import ABCMeta, abstractmethod
 from typing import Callable
 
+from modules.util import path_util
+
 from PIL import Image
 from tqdm import tqdm
-
-from modules.util import path_util
 
 
 class CaptionSample:
@@ -87,7 +87,6 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
 
         Returns: the generated caption
         """
-        pass
 
     def caption_image(
             self,
@@ -157,7 +156,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         for i, filename in enumerate(tqdm(filenames)):
             try:
                 self.caption_image(filename, initial_caption, caption_prefix, caption_postfix, mode)
-            except Exception as e:
+            except Exception:
                 if error_callback is not None:
                     error_callback(filename)
             if progress_callback is not None:

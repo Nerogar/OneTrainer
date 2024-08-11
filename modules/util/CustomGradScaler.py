@@ -1,5 +1,5 @@
 import torch
-from torch.cuda.amp.grad_scaler import OptState, GradScaler
+from torch.cuda.amp.grad_scaler import GradScaler, OptState
 
 
 class DummyOptimizer:

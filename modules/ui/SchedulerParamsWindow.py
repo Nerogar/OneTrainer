@@ -1,10 +1,10 @@
-import customtkinter as ctk
-
 from modules.ui.ConfigList import ConfigList
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
 
 
 class KvParams(ConfigList):

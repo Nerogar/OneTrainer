@@ -1,11 +1,12 @@
 from typing import Optional
 
+from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
+
 import torch
 from torch import Tensor, nn
 from torchvision.transforms import functional
-from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation
 
-from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
+from transformers import CLIPSegForImageSegmentation, CLIPSegProcessor
 
 
 class ClipSegModel(BaseImageMaskModel):

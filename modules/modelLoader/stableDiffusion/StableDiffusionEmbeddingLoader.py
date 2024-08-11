@@ -1,12 +1,13 @@
 import os
 import traceback
 
+from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.util.ModelNames import EmbeddingName, ModelNames
+
 import torch
-from safetensors.torch import load_file
 from torch import Tensor
 
-from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.util.ModelNames import ModelNames, EmbeddingName
+from safetensors.torch import load_file
 
 
 class StableDiffusionEmbeddingLoader:
@@ -43,7 +44,7 @@ class StableDiffusionEmbeddingLoader:
                 safetensors_embedding_name = os.path.join(
                     directory,
                     "embedding",
-                    f"embedding.safetensors",
+                    "embedding.safetensors",
                 )
             else:
                 safetensors_embedding_name = os.path.join(

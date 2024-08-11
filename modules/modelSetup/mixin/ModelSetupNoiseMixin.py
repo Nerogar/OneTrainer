@@ -1,12 +1,11 @@
 import math
 from abc import ABCMeta
 
-import numpy as np
-import torch
-from torch import Tensor, Generator
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
+
+import torch
+from torch import Generator, Tensor
 
 
 class ModelSetupNoiseMixin(metaclass=ABCMeta):

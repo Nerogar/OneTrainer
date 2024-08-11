@@ -1,15 +1,15 @@
 import os
 
-import customtkinter as ctk
-from PIL import Image
-
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
+from PIL import Image
 
 
 class ConceptTab(ConfigList):

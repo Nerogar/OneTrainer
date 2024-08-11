@@ -1,14 +1,13 @@
-import torch
-
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
+from modules.util.TrainProgress import TrainProgress
 
+import torch
 
 # This is correct for the latest cascade, but other Wuerstchen models may have
 # different names. I honestly don't know what makes a good preset here so I'm

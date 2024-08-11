@@ -1,11 +1,12 @@
 import os
 import traceback
 
-import torch
-from safetensors.torch import load_file
-
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.util.ModelNames import ModelNames
+
+import torch
+
+from safetensors.torch import load_file
 
 
 class StableDiffusion3LoRALoader:

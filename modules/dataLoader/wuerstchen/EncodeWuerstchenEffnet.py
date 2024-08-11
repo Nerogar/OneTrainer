@@ -1,10 +1,11 @@
-from contextlib import nullcontext, ExitStack
-
-import torch
-from mgds.MGDS import PipelineModule
-from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
+from contextlib import nullcontext
 
 from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder
+
+import torch
+
+from mgds.MGDS import PipelineModule
+from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 
 
 class EncodeWuerstchenEffnet(

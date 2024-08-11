@@ -2,13 +2,13 @@ import json
 import os
 from abc import ABCMeta, abstractmethod
 
-import torch
-
 from modules.model.BaseModel import BaseModel
+from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.TrainProgress import TrainProgress
-from modules.util.enum.ModelType import ModelType
+
+import torch
 
 
 class BaseModelLoader(metaclass=ABCMeta):

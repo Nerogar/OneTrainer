@@ -1,11 +1,11 @@
 from pathlib import Path
 
-import customtkinter as ctk
-
 from modules.ui.ConfigList import ConfigList
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
 
 
 class AdditionalEmbeddingsTab(ConfigList):

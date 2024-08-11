@@ -1,10 +1,10 @@
 from contextlib import nullcontext
 
-import torch
-from torch.nn import Parameter
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+
+import torch
+from torch.nn import Parameter
 
 
 def allow_mixed_precision(train_config: TrainConfig):

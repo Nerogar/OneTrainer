@@ -1,12 +1,13 @@
 import os
 import traceback
 
+from modules.model.PixArtAlphaModel import PixArtAlphaModel
+from modules.util.ModelNames import EmbeddingName, ModelNames
+
 import torch
-from safetensors.torch import load_file
 from torch import Tensor
 
-from modules.model.PixArtAlphaModel import PixArtAlphaModel
-from modules.util.ModelNames import ModelNames, EmbeddingName
+from safetensors.torch import load_file
 
 
 class PixArtAlphaEmbeddingLoader:
@@ -51,7 +52,7 @@ class PixArtAlphaEmbeddingLoader:
                 safetensors_embedding_name = os.path.join(
                     directory,
                     "embedding",
-                    f"embedding.safetensors",
+                    "embedding.safetensors",
                 )
             else:
                 safetensors_embedding_name = os.path.join(

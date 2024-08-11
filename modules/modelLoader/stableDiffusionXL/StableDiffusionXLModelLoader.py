@@ -1,17 +1,22 @@
 import os
 import traceback
 
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, StableDiffusionXLPipeline, \
-    StableDiffusionXLInpaintPipeline
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
-
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
-from modules.util.ModelNames import ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.ModelNames import ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
+
+from diffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    StableDiffusionXLInpaintPipeline,
+    StableDiffusionXLPipeline,
+    UNet2DConditionModel,
+)
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 
 class StableDiffusionXLModelLoader(

@@ -5,9 +5,9 @@ from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLo
 from modules.modelLoader.stableDiffusion3.StableDiffusion3EmbeddingLoader import StableDiffusion3EmbeddingLoader
 from modules.modelLoader.stableDiffusion3.StableDiffusion3LoRALoader import StableDiffusion3LoRALoader
 from modules.modelLoader.stableDiffusion3.StableDiffusion3ModelLoader import StableDiffusion3ModelLoader
+from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.enum.ModelType import ModelType
 
 
 class StableDiffusion3LoRAModelLoader(

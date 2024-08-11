@@ -1,17 +1,16 @@
-import torch
-
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
+from modules.util.TrainProgress import TrainProgress
 
+import torch
 
 PRESETS = {
-    "attn-mlp": ["attn1" "attn2", "ff.net"],
+    "attn-mlp": ["attn1", "attn2", "ff.net"],
     "attn-only": ["attn1", "attn2"],
     "full": [],
 }

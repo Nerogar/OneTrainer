@@ -1,13 +1,19 @@
 import os
 import random
 
-import customtkinter as ctk
+from modules.util import path_util
+from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.ui import components
+from modules.util.ui.UIState import UIState
+
 import torch
-from PIL import Image
+from torchvision.transforms import functional
+
+import customtkinter as ctk
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.PipelineModule import PipelineModule
-from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
@@ -16,13 +22,8 @@ from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
-from torchvision.transforms import functional
-
-from modules.util import path_util
-from modules.util.config.ConceptConfig import ConceptConfig
-from modules.util.enum.BalancingStrategy import BalancingStrategy
-from modules.util.ui import components
-from modules.util.ui.UIState import UIState
+from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
+from PIL import Image
 
 
 class InputPipelineModule(

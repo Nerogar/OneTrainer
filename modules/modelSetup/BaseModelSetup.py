@@ -1,15 +1,15 @@
 from abc import ABCMeta, abstractmethod
 
+from modules.model.BaseModel import BaseModel
+from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.TimedActionMixin import TimedActionMixin
+from modules.util.TrainProgress import TrainProgress
+
 import torch
 from torch import Tensor
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.tensorboard import SummaryWriter
-
-from modules.model.BaseModel import BaseModel
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.TimedActionMixin import TimedActionMixin
-from modules.util.TrainProgress import TrainProgress
-from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 
 
 class BaseModelSetup(

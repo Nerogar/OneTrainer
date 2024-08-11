@@ -1,19 +1,19 @@
 from abc import ABCMeta
 from typing import Callable
 
-import torch
-import torch.nn.functional as F
-from torch import Tensor
-
 from modules.module.AestheticScoreModel import AestheticScoreModel
 from modules.module.HPSv2ScoreModel import HPSv2ScoreModel
-from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.loss.masked_loss import masked_losses
 from modules.util.loss.vb_loss import vb_losses
+
+import torch
+import torch.nn.functional as F
+from torch import Tensor
 
 
 class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
@@ -150,7 +150,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             losses /= mask_mean
 
         return losses
-    
+
     def __snr(self, timesteps: Tensor, device: torch.device):
         if self.__coefficients:
             all_snr = (self.__coefficients.sqrt_alphas_cumprod /
@@ -160,9 +160,9 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         else:
             alphas_cumprod = self.__alphas_cumprod_fun(timesteps, 1)
             snr = alphas_cumprod / (1.0 - alphas_cumprod)
-        
+
         return snr
-        
+
 
     def __min_snr_weight(
             self,
@@ -178,7 +178,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             snr += 1.0
         snr_weight = (min_snr_gamma / snr).to(device)
         return snr_weight
-    
+
     def __debiased_estimation_weight(
         self,
         timesteps: Tensor,
@@ -195,7 +195,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             weight += 1.0
         torch.rsqrt(weight, out=weight)
         return weight
-    
+
     def __p2_loss_weight(
         self,
         timesteps: Tensor,
@@ -246,7 +246,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         # Apply timestep based loss weighting.
-        if 'timestep' in data and not data['loss_type'] == 'align_prop':
+        if 'timestep' in data and data['loss_type'] != 'align_prop':
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
                 case LossWeight.MIN_SNR_GAMMA:

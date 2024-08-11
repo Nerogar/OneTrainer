@@ -2,9 +2,10 @@ import os
 from abc import ABCMeta
 
 import torch
-from PIL import Image
 from torch import Tensor
 from torchvision import transforms
+
+from PIL import Image
 
 
 class ModelSetupDebugMixin(metaclass=ABCMeta):
@@ -46,7 +47,7 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
             clean_up_tokenization_spaces=True,
         )
 
-    # Decodes 4-channel latent to 3-channel RGB - technique appropriated from 
+    # Decodes 4-channel latent to 3-channel RGB - technique appropriated from
     # https://huggingface.co/blog/TimothyAlexisVass/explaining-the-sdxl-latent-space
     # Uses linear approximation based on first three channels of latent image (luminance, cyan/red, lime/purple)
     def _project_latent_to_image_sdxl(self, latent_tensor: Tensor):

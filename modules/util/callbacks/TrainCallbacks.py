@@ -1,8 +1,8 @@
 from typing import Callable
 
-from PIL.Image import Image
-
 from modules.util.TrainProgress import TrainProgress
+
+from PIL.Image import Image
 
 
 class TrainCallbacks:

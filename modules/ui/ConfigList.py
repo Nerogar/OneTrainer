@@ -1,15 +1,15 @@
 import copy
 import json
 import os
-from abc import abstractmethod, ABCMeta
-
-import customtkinter as ctk
+from abc import ABCMeta, abstractmethod
 
 from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
 
 
 class ConfigList(metaclass=ABCMeta):

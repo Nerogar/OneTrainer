@@ -1,10 +1,11 @@
 from typing import Callable
 
 import torch
-from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
-from diffusers.models.unets.unet_stable_cascade import SDCascadeTimestepBlock, SDCascadeAttnBlock, SDCascadeResBlock
 from torch import nn
 from torch.utils.checkpoint import checkpoint
+
+from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
+from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 

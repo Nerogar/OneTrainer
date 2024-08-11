@@ -1,7 +1,8 @@
-import torch
-from transformers import BlipProcessor, BlipForConditionalGeneration
+from modules.module.BaseImageCaptionModel import BaseImageCaptionModel, CaptionSample
 
-from modules.module.BaseImageCaptionModel import CaptionSample, BaseImageCaptionModel
+import torch
+
+from transformers import BlipForConditionalGeneration, BlipProcessor
 
 
 class BlipModel(BaseImageCaptionModel):

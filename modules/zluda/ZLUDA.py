@@ -1,7 +1,9 @@
 from typing import Union
+
+from modules.util.config.TrainConfig import TrainConfig
+
 import torch
 from torch._prims_common import DeviceLikeType
-from modules.util.config.TrainConfig import TrainConfig
 
 
 def is_zluda(device: DeviceLikeType):

@@ -1,8 +1,9 @@
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+
 import torch
-from diffusers import DDIMScheduler
 from torch import Tensor
 
-from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+from diffusers import DDIMScheduler
 
 
 def combine(left: str, right: str) -> str:
@@ -91,22 +92,22 @@ def __map_vae_attention_block(in_states: dict, out_prefix: str, in_prefix: str) 
     out_states |= map_wb(in_states, combine(out_prefix, "norm"), combine(in_prefix, "group_norm"))
 
     # support for both deprecated and current attention block names
-    if combine(in_prefix, "query") in in_states.keys():
+    if combine(in_prefix, "query") in in_states:
         out_states |= map_wb(in_states, combine(out_prefix, "q"), combine(in_prefix, "query"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "q"), combine(in_prefix, "to_q"))  # current
 
-    if combine(in_prefix, "key") in in_states.keys():
+    if combine(in_prefix, "key") in in_states:
         out_states |= map_wb(in_states, combine(out_prefix, "k"), combine(in_prefix, "key"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "k"), combine(in_prefix, "to_k"))  # current
 
-    if combine(in_prefix, "value") in in_states.keys():
+    if combine(in_prefix, "value") in in_states:
         out_states |= map_wb(in_states, combine(out_prefix, "v"), combine(in_prefix, "value"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "v"), combine(in_prefix, "to_v"))  # current
 
-    if combine(in_prefix, "proj_attn") in in_states.keys():
+    if combine(in_prefix, "proj_attn") in in_states:
         out_states |= map_wb(in_states, combine(out_prefix, "proj_out"), combine(in_prefix, "proj_attn"))  # deprecated
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "proj_out"), combine(in_prefix, "to_out.0"))  # current

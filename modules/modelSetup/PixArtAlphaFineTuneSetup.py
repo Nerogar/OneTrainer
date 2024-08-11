@@ -1,11 +1,11 @@
-import torch
-
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection, NamedParameterGroup
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class PixArtAlphaFineTuneSetup(

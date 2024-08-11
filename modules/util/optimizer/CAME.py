@@ -4,10 +4,10 @@
 # Implements stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192)
 #
 
+from modules.util.bf16_stochastic_rounding import add_stochastic_
+
 import torch
 import torch.optim
-
-from modules.util.bf16_stochastic_rounding import add_stochastic_
 
 
 class CAME(torch.optim.Optimizer):

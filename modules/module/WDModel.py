@@ -1,11 +1,12 @@
 import csv
 
+from modules.module.BaseImageCaptionModel import BaseImageCaptionModel, CaptionSample
+
+import torch
+
 import huggingface_hub
 import numpy as np
 import onnxruntime
-import torch
-
-from modules.module.BaseImageCaptionModel import CaptionSample, BaseImageCaptionModel
 
 
 class WDModel(BaseImageCaptionModel):

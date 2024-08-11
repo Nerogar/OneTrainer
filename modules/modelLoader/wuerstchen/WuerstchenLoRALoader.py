@@ -1,13 +1,15 @@
 import os
 import traceback
 
-import torch
-from safetensors.torch import load_file
-
 from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import (
+    convert_stable_cascade_lora_ckpt_to_diffusers,
+)
 from modules.util.ModelNames import ModelNames
-from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import \
-    convert_stable_cascade_lora_ckpt_to_diffusers
+
+import torch
+
+from safetensors.torch import load_file
 
 
 class WuerstchenLoRALoader:

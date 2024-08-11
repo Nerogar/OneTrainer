@@ -1,12 +1,12 @@
 import argparse
 from typing import Any
 
-from modules.util.ModelNames import ModelNames, EmbeddingName
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.args.BaseArgs import BaseArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModelNames import EmbeddingName, ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
 
 class SampleArgs(BaseArgs):

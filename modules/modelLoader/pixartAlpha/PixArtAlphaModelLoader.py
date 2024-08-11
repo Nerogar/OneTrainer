@@ -1,13 +1,13 @@
 import os
 import traceback
 
-from diffusers import DDIMScheduler, AutoencoderKL, Transformer2DModel
-from transformers import T5Tokenizer, T5EncoderModel
-
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
+from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.enum.ModelType import ModelType
+
+from diffusers import AutoencoderKL, DDIMScheduler, Transformer2DModel
+from transformers import T5EncoderModel, T5Tokenizer
 
 
 class PixArtAlphaModelLoader:

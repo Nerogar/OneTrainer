@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import customtkinter as ctk
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -9,6 +7,8 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
 
 
 class ModelTab:

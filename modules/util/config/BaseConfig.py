@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, get_origin, get_args, Callable
+from typing import Any, Callable, get_args, get_origin
 
 
 class BaseConfig:
@@ -56,9 +56,7 @@ class BaseConfig:
                 data[name] = value
             elif issubclass(self.types[name], Enum):
                 data[name] = None if value is None else str(value)
-            elif self.types[name] == bool:
-                data[name] = value
-            elif self.types[name] == int:
+            elif self.types[name] == bool or self.types[name] == int:
                 data[name] = value
             elif self.types[name] == float:
                 if value in [float('inf'), float('-inf')]:
