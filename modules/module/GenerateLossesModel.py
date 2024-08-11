@@ -1,5 +1,4 @@
 import json
-import os
 
 from modules.dataLoader import StableDiffusionFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
@@ -37,12 +36,12 @@ class GenerateLossesModel:
         self.output_path = output_path
         self.train_device = torch.device(self.config.train_device)
         self.temp_device = torch.device(self.config.temp_device)
-    
+
     def start(self):
         if self.config.train_dtype.enable_tf():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
-        
+
         self.model_loader = create.create_model_loader(self.config.model_type, self.config.training_method)
         self.model_setup = create.create_model_setup(
             self.config.model_type,

@@ -24,7 +24,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
-from torch.utils.checkpoint import checkpoint
 
 from diffusers.models.attention_processor import JointAttnProcessor2_0
 from diffusers.utils import is_xformers_available

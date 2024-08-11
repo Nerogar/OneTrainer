@@ -103,25 +103,7 @@ class TopBar:
                 ("Embedding", TrainingMethod.EMBEDDING),
                 ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
             ]
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            values = [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ]
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            values = [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ]
-        elif self.train_config.model_type.is_wuerstchen():
-            values = [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ]
-        elif self.train_config.model_type.is_pixart():
+        elif self.train_config.model_type.is_stable_diffusion_3() or self.train_config.model_type.is_stable_diffusion_xl() or self.train_config.model_type.is_wuerstchen() or self.train_config.model_type.is_pixart():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

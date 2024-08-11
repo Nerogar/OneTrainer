@@ -13,8 +13,6 @@ from modules.util.torch_util import torch_gc
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
-import torch
-
 import customtkinter as ctk
 
 

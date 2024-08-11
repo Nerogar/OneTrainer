@@ -1,4 +1,4 @@
-from contextlib import ExitStack, nullcontext
+from contextlib import nullcontext
 
 from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder
 

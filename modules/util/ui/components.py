@@ -414,10 +414,10 @@ def double_progress(master, row, column, label_1, label_2):
 
     def set_1(value, max_value):
         progress_1_component.set(value / max_value)
-        description_1_component.configure(text="{0}/{1}".format(value, max_value))
+        description_1_component.configure(text=f"{value}/{max_value}")
 
     def set_2(value, max_value):
         progress_2_component.set(value / max_value)
-        description_2_component.configure(text="{0}/{1}".format(value, max_value))
+        description_2_component.configure(text=f"{value}/{max_value}")
 
     return set_1, set_2

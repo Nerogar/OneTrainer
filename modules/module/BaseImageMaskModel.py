@@ -161,7 +161,6 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
         """
-        pass
 
     def mask_images(
             self,
@@ -200,7 +199,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
         for i, filename in enumerate(tqdm(filenames)):
             try:
                 self.mask_image(filename, prompts, mode, alpha, threshold, smooth_pixels, expand_pixels)
-            except Exception as e:
+            except Exception:
                 if error_callback is not None:
                     error_callback(filename)
             if progress_callback is not None:

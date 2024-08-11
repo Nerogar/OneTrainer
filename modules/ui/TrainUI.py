@@ -490,11 +490,9 @@ class TrainUI(ctk.CTk):
     def on_update_train_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
         self.set_step_progress(train_progress.epoch_step, max_sample)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
-        pass
 
     def on_update_status(self, status: str):
         self.status_label.configure(text=status)
-        pass
 
     def open_dataset_tool(self):
         window = CaptionUI(self, None, False)

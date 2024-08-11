@@ -23,7 +23,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
-from torch.utils.checkpoint import checkpoint
 
 from diffusers.models.attention_processor import AttnProcessor, AttnProcessor2_0, XFormersAttnProcessor
 from diffusers.utils import is_xformers_available

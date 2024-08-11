@@ -76,7 +76,7 @@ class EMAModuleWrapper:
 
     def load_state_dict(self, state_dict: dict) -> None:
         self.decay = self.decay if self.decay else state_dict.get("decay", self.decay)
-        self.ema_parameters = state_dict.get("ema_parameters", None)
+        self.ema_parameters = state_dict.get("ema_parameters")
         self.to(self.device)
 
     def state_dict(self) -> dict:

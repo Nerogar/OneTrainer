@@ -1,4 +1,3 @@
-import time
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel

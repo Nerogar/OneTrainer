@@ -2,12 +2,9 @@ import os
 import traceback
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
-from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-
-import torch
 
 from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transformer2DModel, StableDiffusion3Pipeline
 from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer

@@ -7,8 +7,6 @@ from modules.util.enum.TimestepDistribution import TimestepDistribution
 import torch
 from torch import Generator, Tensor
 
-import numpy as np
-
 
 class ModelSetupNoiseMixin(metaclass=ABCMeta):
 

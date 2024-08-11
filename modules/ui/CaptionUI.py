@@ -517,7 +517,6 @@ Mouse wheel: increase or decrease brush size"""
             subprocess.Popen(f"explorer /select,{image_name}")
         except:
             traceback.print_exc()
-            pass
 
     def load_masking_model(self, model):
         self.captioning_model = None

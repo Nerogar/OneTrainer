@@ -110,7 +110,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
     def set_progress(self, value, max_value):
         progress = value / max_value
         self.progress.set(progress)
-        self.progress_label.configure(text="{0}/{1}".format(value, max_value))
+        self.progress_label.configure(text=f"{value}/{max_value}")
         self.progress.update()
 
     def create_masks(self):

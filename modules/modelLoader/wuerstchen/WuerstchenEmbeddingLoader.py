@@ -52,7 +52,7 @@ class WuerstchenEmbeddingLoader:
                 safetensors_embedding_name = os.path.join(
                     directory,
                     "embedding",
-                    f"embedding.safetensors",
+                    "embedding.safetensors",
                 )
             else:
                 safetensors_embedding_name = os.path.join(

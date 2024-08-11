@@ -114,7 +114,7 @@ class GenericTrainer(BaseTrainer):
 
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
-                print(f"No backup found, continuing without backup...")
+                print("No backup found, continuing without backup...")
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
@@ -184,10 +184,10 @@ class GenericTrainer(BaseTrainer):
                 dirpath = os.path.join(backup_dirpath, dirpath)
                 try:
                     shutil.rmtree(dirpath)
-                except Exception as e:
+                except Exception:
                     print(f"Could not delete old rolling backup {dirpath}")
 
-        return None
+        return
 
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
@@ -368,7 +368,6 @@ class GenericTrainer(BaseTrainer):
             except:
                 traceback.print_exc()
                 print("Could not delete partial backup")
-                pass
         finally:
             if self.config.rolling_backup:
                 self.__prune_backups(self.config.rolling_backup_count)
@@ -420,7 +419,6 @@ class GenericTrainer(BaseTrainer):
             except:
                 traceback.print_exc()
                 print("Could not delete partial save")
-                pass
         finally:
             if self.model.ema:
                 self.model.ema.copy_temp_to(self.parameters)

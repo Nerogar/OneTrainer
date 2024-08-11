@@ -76,7 +76,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 grid_info = widget.grid_info()
                 if int(grid_info["row"]) >= 1:
                     widget.destroy()
-        except TclError as e:
+        except TclError:
             pass
 
     def create_dynamic_ui(
@@ -144,7 +144,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'r': {'title': 'R', 'tooltip': 'EMA factor.', 'type': 'float'},
             'adanorm': {'title': 'AdaNorm', 'tooltip': 'Whether to use the AdaNorm variant', 'type': 'bool'},
             'adam_debias': {'title': 'Adam Debias', 'tooltip': 'Only correct the denominator to avoid inflating step sizes early in training.', 'type': 'bool'},
-            
+
         }
         # @formatter:on
 

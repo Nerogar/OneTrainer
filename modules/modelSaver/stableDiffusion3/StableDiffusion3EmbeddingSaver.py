@@ -86,7 +86,7 @@ class StableDiffusion3EmbeddingSaver:
             safetensors_embedding_name = os.path.join(
                 destination,
                 "embedding",
-                f"embedding.safetensors",
+                "embedding.safetensors",
             )
         else:
             safetensors_embedding_name = os.path.join(

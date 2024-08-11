@@ -1,6 +1,6 @@
 import tkinter as tk
 from enum import Enum
-from typing import Any, Callable, get_args, get_origin
+from typing import Any, Callable
 
 from modules.util.config.BaseConfig import BaseConfig
 
@@ -253,10 +253,7 @@ class UIState:
                 elif var_type == bool:
                     var = self.__vars[name]
                     var.set(obj_var or False)
-                elif var_type == int:
-                    var = self.__vars[name]
-                    var.set("" if obj_var is None else str(obj_var))
-                elif var_type == float:
+                elif var_type == int or var_type == float:
                     var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
         else:
@@ -270,9 +267,6 @@ class UIState:
                 elif isinstance(obj_var, bool):
                     var = self.__vars[name]
                     var.set(obj_var)
-                elif isinstance(obj_var, int):
-                    var = self.__vars[name]
-                    var.set(str(obj_var))
-                elif isinstance(obj_var, float):
+                elif isinstance(obj_var, int) or isinstance(obj_var, float):
                     var = self.__vars[name]
                     var.set(str(obj_var))
