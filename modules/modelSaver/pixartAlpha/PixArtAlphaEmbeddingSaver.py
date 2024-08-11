@@ -1,13 +1,14 @@
 import os.path
 from pathlib import Path
 
-import torch
-from safetensors.torch import save_file
-from torch import Tensor
-
-from modules.model.PixArtAlphaModel import PixArtAlphaModelEmbedding, PixArtAlphaModel
+from modules.model.PixArtAlphaModel import PixArtAlphaModel, PixArtAlphaModelEmbedding
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
+
+import torch
+from torch import Tensor
+
+from safetensors.torch import save_file
 
 
 class PixArtAlphaEmbeddingSaver:

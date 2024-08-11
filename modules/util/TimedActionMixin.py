@@ -1,7 +1,7 @@
 import time
 
-from modules.util.TrainProgress import TrainProgress
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.TrainProgress import TrainProgress
 
 
 class TimedActionMixin:

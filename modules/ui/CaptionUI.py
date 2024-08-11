@@ -4,13 +4,6 @@ import subprocess
 import traceback
 from tkinter import filedialog
 
-import customtkinter as ctk
-import cv2
-import numpy as np
-import torch
-from PIL import Image, ImageDraw
-from customtkinter import ThemeManager, ScalingTracker
-
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
@@ -21,9 +14,17 @@ from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
+from modules.util.torch_util import default_device
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
-from modules.util.torch_util import default_device
+
+import torch
+
+import customtkinter as ctk
+import cv2
+import numpy as np
+from customtkinter import ScalingTracker, ThemeManager
+from PIL import Image, ImageDraw
 
 
 class CaptionUI(ctk.CTkToplevel):

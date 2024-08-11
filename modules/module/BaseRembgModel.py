@@ -1,16 +1,17 @@
 import os
 from typing import Optional, Tuple
 
-import numpy as np
-import onnxruntime
-import pooch
+from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
+
 import torch
-from PIL import Image
-from numpy import ndarray
 from torch import Tensor, nn
 from torchvision.transforms import functional, transforms
 
-from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
+import numpy as np
+import onnxruntime
+import pooch
+from numpy import ndarray
+from PIL import Image
 
 
 class BaseRembgModel(BaseImageMaskModel):

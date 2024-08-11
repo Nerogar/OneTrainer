@@ -4,14 +4,15 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
-import safetensors.torch as safetensors
-import torch
-from torch import Tensor
-
 from modules.model.BaseModel import BaseModel
 from modules.util import git_util
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.modelSpec.ModelSpec import ModelSpec
+
+import torch
+from torch import Tensor
+
+import safetensors.torch as safetensors
 
 
 class DtypeModelSaverMixin:

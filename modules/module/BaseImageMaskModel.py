@@ -2,13 +2,14 @@ import os
 from abc import ABCMeta, abstractmethod
 from typing import Callable
 
+from modules.util import path_util
+
 import torch
-from PIL import Image
 from torch import Tensor
 from torchvision.transforms import transforms
-from tqdm import tqdm
 
-from modules.util import path_util
+from PIL import Image
+from tqdm import tqdm
 
 
 class MaskSample:

@@ -1,6 +1,6 @@
 import tkinter as tk
 from enum import Enum
-from typing import Any, get_origin, get_args, Callable
+from typing import Any, Callable, get_args, get_origin
 
 from modules.util.config.BaseConfig import BaseConfig
 

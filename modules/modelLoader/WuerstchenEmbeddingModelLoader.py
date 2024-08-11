@@ -4,9 +4,9 @@ from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoad
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.modelLoader.wuerstchen.WuerstchenEmbeddingLoader import WuerstchenEmbeddingLoader
 from modules.modelLoader.wuerstchen.WuerstchenModelLoader import WuerstchenModelLoader
+from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.enum.ModelType import ModelType
 
 
 class WuerstchenEmbeddingModelLoader(

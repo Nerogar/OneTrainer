@@ -6,14 +6,11 @@ from pathlib import Path
 from tkinter import filedialog
 from typing import Callable
 
-import customtkinter as ctk
-import torch
-
 from modules.trainer.GenericTrainer import GenericTrainer
+from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
-from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.LoraTab import LoraTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
@@ -21,7 +18,6 @@ from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
-from modules.util.TrainProgress import TrainProgress
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -30,9 +26,14 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 from modules.zluda import ZLUDA
+
+import torch
+
+import customtkinter as ctk
 
 
 class TrainUI(ctk.CTk):

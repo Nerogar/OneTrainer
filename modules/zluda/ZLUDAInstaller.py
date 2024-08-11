@@ -1,11 +1,10 @@
-import os
 import ctypes
-import shutil
-import zipfile
+import os
 import platform
+import shutil
 import urllib.request
+import zipfile
 from typing import Union
-
 
 RELEASE = f"rel.{os.environ.get('ZLUDA_HASH', '11cc5844514f93161e0e74387f04e2c537705a82')}"
 DLL_MAPPING = {

@@ -7,12 +7,12 @@
 import math
 from typing import Optional
 
+from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
+
 import torch
 from torch import Tensor
 from torch.optim import AdamW
 from torch.optim.optimizer import _use_grad_for_differentiable
-
-from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
 
 
 @torch.no_grad()

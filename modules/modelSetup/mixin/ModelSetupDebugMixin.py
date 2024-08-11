@@ -2,9 +2,10 @@ import os
 from abc import ABCMeta
 
 import torch
-from PIL import Image
 from torch import Tensor
 from torchvision import transforms
+
+from PIL import Image
 
 
 class ModelSetupDebugMixin(metaclass=ABCMeta):

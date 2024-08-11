@@ -1,10 +1,11 @@
 from functools import cached_property
 
-from torch.nn import Parameter
-from typing_extensions import Iterable
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.LearningRateScaler import LearningRateScaler
+
+from torch.nn import Parameter
+
+from typing_extensions import Iterable
 
 
 class NamedParameterGroup:

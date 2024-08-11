@@ -2,7 +2,8 @@ from abc import ABCMeta
 
 import torch
 import torch.nn.functional as F
-from torch import nn, Tensor
+from torch import Tensor, nn
+
 from transformers import CLIPTokenizer, T5Tokenizer
 
 

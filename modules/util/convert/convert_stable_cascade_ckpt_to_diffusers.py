@@ -1,6 +1,6 @@
-import torch
-
 import modules.util.convert.convert_diffusers_to_ckpt_util as util
+
+import torch
 
 
 def __map_unet_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:

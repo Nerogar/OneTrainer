@@ -1,7 +1,7 @@
 from typing import Any
 
-from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.config.BaseConfig import BaseConfig
+from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
 class SampleConfig(BaseConfig):

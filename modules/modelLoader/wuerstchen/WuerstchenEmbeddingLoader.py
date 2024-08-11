@@ -1,12 +1,13 @@
 import os
 import traceback
 
+from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util.ModelNames import EmbeddingName, ModelNames
+
 import torch
-from safetensors.torch import load_file
 from torch import Tensor
 
-from modules.model.WuerstchenModel import WuerstchenModel
-from modules.util.ModelNames import ModelNames, EmbeddingName
+from safetensors.torch import load_file
 
 
 class WuerstchenEmbeddingLoader:

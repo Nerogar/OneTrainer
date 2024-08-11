@@ -1,10 +1,12 @@
 import os
 
-import pooch
 import torch
 from torch import nn
 from torchvision.transforms import transforms
+
 from transformers import CLIPModel
+
+import pooch
 
 
 class MLPModel(nn.Module):

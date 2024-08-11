@@ -1,10 +1,10 @@
 from typing import Optional, Tuple
 
+from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
+
 import torch
 from torch import Tensor, nn
 from torchvision.transforms import functional, transforms
-
-from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
 
 class MaskByColor(BaseImageMaskModel):

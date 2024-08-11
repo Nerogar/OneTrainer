@@ -1,14 +1,14 @@
 from tkinter import filedialog
-from typing import Tuple, Any, Callable
-
-import customtkinter as ctk
-from PIL import Image
-from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
+from typing import Any, Callable, Tuple
 
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
+from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
+from PIL import Image
 
 PAD = 10
 

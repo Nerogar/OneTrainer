@@ -3,8 +3,6 @@ import uuid
 from copy import deepcopy
 from typing import Any
 
-from modules.util.ModelNames import ModelNames, EmbeddingName
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
@@ -21,9 +19,11 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TimestepDistribution import TimestepDistribution
+from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModelNames import EmbeddingName, ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
 
 

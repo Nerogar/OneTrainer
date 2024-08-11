@@ -3,8 +3,6 @@ import os
 import traceback
 from typing import Callable
 
-import customtkinter as ctk
-
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
@@ -12,6 +10,8 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
+
+import customtkinter as ctk
 
 
 class TopBar:

@@ -1,9 +1,9 @@
 from abc import ABCMeta
 from typing import Callable
 
-from torch import Tensor
-
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+
+from torch import Tensor
 
 
 class ModelSetupDiffusionMixin(metaclass=ABCMeta):

@@ -2,7 +2,8 @@ from abc import ABCMeta
 
 import torch
 from torch import Tensor
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
+
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 from transformers.tokenization_utils import Trie
 
 

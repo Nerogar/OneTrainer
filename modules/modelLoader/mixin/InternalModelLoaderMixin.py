@@ -2,10 +2,10 @@ import json
 import os
 from abc import ABCMeta
 
-import torch
-
 from modules.model.BaseModel import BaseModel
 from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class InternalModelLoaderMixin(metaclass=ABCMeta):

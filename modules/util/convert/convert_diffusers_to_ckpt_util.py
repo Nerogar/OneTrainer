@@ -1,8 +1,9 @@
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+
 import torch
-from diffusers import DDIMScheduler
 from torch import Tensor
 
-from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
+from diffusers import DDIMScheduler
 
 
 def combine(left: str, right: str) -> str:

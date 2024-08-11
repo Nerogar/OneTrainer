@@ -1,17 +1,18 @@
 import json
 import os
 
-import torch
-from tqdm import tqdm
-
 from modules.dataLoader import StableDiffusionFineTuneDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+
+from tqdm import tqdm
 
 
 class GenerateLossesModel:

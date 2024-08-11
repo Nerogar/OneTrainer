@@ -1,22 +1,31 @@
 from contextlib import nullcontext
 from uuid import uuid4
 
-import torch
-from diffusers import AutoencoderKL, UNet2DConditionModel, StableDiffusionDepth2ImgPipeline, \
-    StableDiffusionInpaintPipeline, StableDiffusionPipeline, DiffusionPipeline, DDIMScheduler
-from torch import Tensor
-from transformers import CLIPTextModel, CLIPTokenizer, DPTImageProcessor, DPTForDepthEstimation
-
 from modules.model.BaseModel import BaseModel
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import \
-    rescale_noise_scheduler_to_zero_terminal_snr
+from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
+    rescale_noise_scheduler_to_zero_terminal_snr,
+)
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch import Tensor
+
+from diffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    DiffusionPipeline,
+    StableDiffusionDepth2ImgPipeline,
+    StableDiffusionInpaintPipeline,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
+from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DPTImageProcessor
 
 
 class StableDiffusionModelEmbedding:

@@ -1,21 +1,27 @@
 from contextlib import nullcontext
 from uuid import uuid4
 
-import torch
-from diffusers import AutoencoderKL, DiffusionPipeline, DDIMScheduler, Transformer2DModel, \
-    PixArtAlphaPipeline, PixArtSigmaPipeline
-from torch import Tensor
-from transformers import T5Tokenizer, \
-    T5EncoderModel
-
 from modules.model.BaseModel import BaseModel
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch import Tensor
+
+from diffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    DiffusionPipeline,
+    PixArtAlphaPipeline,
+    PixArtSigmaPipeline,
+    Transformer2DModel,
+)
+from transformers import T5EncoderModel, T5Tokenizer
 
 
 class PixArtAlphaModelEmbedding:

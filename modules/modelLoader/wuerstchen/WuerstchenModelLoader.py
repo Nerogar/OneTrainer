@@ -2,18 +2,19 @@ import json
 import os.path
 import traceback
 
-from diffusers import DDPMWuerstchenScheduler
-from diffusers.models import StableCascadeUNet
-from diffusers.pipelines.wuerstchen import WuerstchenDiffNeXt, PaellaVQModel, WuerstchenPrior
-from safetensors import safe_open
-from safetensors.torch import load_file
-from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
-
-from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenEfficientNetEncoder
-from modules.util.ModelNames import ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder, WuerstchenModel
 from modules.util.convert.convert_stable_cascade_ckpt_to_diffusers import convert_stable_cascade_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
+from modules.util.ModelNames import ModelNames
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
+
+from diffusers import DDPMWuerstchenScheduler
+from diffusers.models import StableCascadeUNet
+from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+
+from safetensors import safe_open
+from safetensors.torch import load_file
 
 
 class WuerstchenModelLoader:

@@ -1,9 +1,9 @@
 import os
 from abc import ABCMeta
 
-import yaml
-
 from modules.util.enum.ModelType import ModelType
+
+import yaml
 
 
 class SDConfigModelLoaderMixin(metaclass=ABCMeta):

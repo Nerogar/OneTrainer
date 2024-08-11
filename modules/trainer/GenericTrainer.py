@@ -8,15 +8,6 @@ import traceback
 from pathlib import Path
 from typing import Callable
 
-import torch
-from PIL.Image import Image
-from torch import Tensor, nn
-from torch.nn import Parameter
-from torch.utils.hooks import RemovableHandle
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms.functional import pil_to_tensor
-from tqdm import tqdm
-
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -24,19 +15,29 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import path_util, create
-from modules.util.TrainProgress import TrainProgress
+from modules.util import create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import enable_grad_scaling, create_grad_scaler
+from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch import Tensor, nn
+from torch.nn import Parameter
+from torch.utils.hooks import RemovableHandle
+from torch.utils.tensorboard import SummaryWriter
+from torchvision.transforms.functional import pil_to_tensor
+
+from PIL.Image import Image
+from tqdm import tqdm
 
 
 class GenericTrainer(BaseTrainer):

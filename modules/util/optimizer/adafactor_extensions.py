@@ -6,10 +6,11 @@
 
 import math
 
-import torch
-from transformers import Adafactor
-
 from modules.util.bf16_stochastic_rounding import copy_stochastic_
+
+import torch
+
+from transformers import Adafactor
 
 
 @torch.no_grad()

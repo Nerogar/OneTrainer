@@ -1,19 +1,19 @@
 from abc import ABCMeta
 from typing import Callable
 
-import torch
-import torch.nn.functional as F
-from torch import Tensor
-
 from modules.module.AestheticScoreModel import AestheticScoreModel
 from modules.module.HPSv2ScoreModel import HPSv2ScoreModel
-from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.loss.masked_loss import masked_losses
 from modules.util.loss.vb_loss import vb_losses
+
+import torch
+import torch.nn.functional as F
+from torch import Tensor
 
 
 class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):

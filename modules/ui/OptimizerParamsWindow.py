@@ -1,12 +1,16 @@
 from tkinter import TclError
 
-import customtkinter as ctk
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.Optimizer import Optimizer
-from modules.util.optimizer_util import OPTIMIZER_DEFAULT_PARAMETERS, update_optimizer_config, load_optimizer_defaults, \
-    change_optimizer
+from modules.util.optimizer_util import (
+    OPTIMIZER_DEFAULT_PARAMETERS,
+    change_optimizer,
+    load_optimizer_defaults,
+    update_optimizer_config,
+)
 from modules.util.ui import components
+
+import customtkinter as ctk
 
 
 class OptimizerParamsWindow(ctk.CTkToplevel):
