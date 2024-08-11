@@ -176,11 +176,15 @@ class PixArtAlphaModel(BaseModel):
             attention_mask: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
+            max_token_length = 120
+            if self.model_type.is_pixart_sigma():
+                max_token_length = 300
+
             tokenizer_output = self.tokenizer(
                 text,
                 padding='max_length',
                 truncation=True,
-                max_length=120,
+                max_length=max_token_length,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)

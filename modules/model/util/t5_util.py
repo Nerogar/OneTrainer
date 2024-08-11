@@ -1,4 +1,5 @@
 from torch import Tensor
+
 from transformers import T5EncoderModel
 
 
@@ -11,7 +12,7 @@ def encode_t5(
         use_attention_mask: bool = True,
         attention_mask: Tensor | None = None,
         add_layer_norm: bool = True,
-) -> tuple[Tensor]:
+) -> Tensor:
     if text_encoder_output is None and text_encoder is not None:
         text_encoder_output = text_encoder(
             tokens,

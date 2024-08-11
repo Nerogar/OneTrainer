@@ -1,4 +1,5 @@
 from torch import Tensor
+
 from transformers import CLIPTextModel, CLIPTextModelWithProjection
 
 

@@ -125,9 +125,9 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return modules
 
-
     def __aspect_bucketing_in(self, config: TrainConfig):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
+
         aspect_bucketing = AspectBucketing(
             quantization=8,
             resolution_in_name='original_resolution',
@@ -149,16 +149,14 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             possible_resolutions_out_name='possible_resolutions'
         )
 
-        modules = []
+        modules = [calc_aspect]
 
-        modules.append(calc_aspect)
         if config.aspect_ratio_bucketing:
             modules.append(aspect_bucketing)
         else:
             modules.append(single_aspect_calculation)
 
         return modules
-
 
     def __crop_modules(self, config: TrainConfig):
         inputs = ['image']
