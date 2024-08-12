@@ -33,7 +33,6 @@ class StableDiffusionFineTuneSetup(
         if config.text_encoder.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="text_encoder",
-                display_name="text_encoder",
                 parameters=model.text_encoder.parameters(),
                 learning_rate=config.text_encoder.learning_rate,
             ))
@@ -46,7 +45,6 @@ class StableDiffusionFineTuneSetup(
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="unet",
-                display_name="unet",
                 parameters=model.unet.parameters(),
                 learning_rate=config.unet.learning_rate,
             ))

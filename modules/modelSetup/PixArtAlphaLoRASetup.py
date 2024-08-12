@@ -41,7 +41,6 @@ class PixArtAlphaLoRASetup(
         if config.text_encoder.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="text_encoder_lora",
-                display_name="text_encoder_lora",
                 parameters=model.text_encoder_lora.parameters(),
                 learning_rate=config.text_encoder.learning_rate,
             ))
@@ -54,7 +53,6 @@ class PixArtAlphaLoRASetup(
         if config.prior.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="transformer_lora",
-                display_name="transformer_lora",
                 parameters=model.transformer_lora.parameters(),
                 learning_rate=config.prior.learning_rate,
             ))

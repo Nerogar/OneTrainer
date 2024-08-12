@@ -46,7 +46,6 @@ class WuerstchenLoRASetup(
         if config.text_encoder.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="prior_text_encoder_lora",
-                display_name="prior_text_encoder_lora",
                 parameters=model.prior_text_encoder_lora.parameters(),
                 learning_rate=config.text_encoder.learning_rate,
             ))
@@ -60,7 +59,6 @@ class WuerstchenLoRASetup(
         if config.prior.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="prior_prior_lora",
-                display_name="prior_prior_lora",
                 parameters=model.prior_prior_lora.parameters(),
                 learning_rate=config.prior.learning_rate,
             ))

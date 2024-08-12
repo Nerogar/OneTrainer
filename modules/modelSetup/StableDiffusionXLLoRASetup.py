@@ -41,7 +41,6 @@ class StableDiffusionXLLoRASetup(
         if config.text_encoder.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="text_encoder_1_lora",
-                display_name="text_encoder_1_lora",
                 parameters=model.text_encoder_1_lora.parameters(),
                 learning_rate=config.text_encoder.learning_rate,
             ))
@@ -49,7 +48,6 @@ class StableDiffusionXLLoRASetup(
         if config.text_encoder_2.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="text_encoder_2_lora",
-                display_name="text_encoder_2_lora",
                 parameters=model.text_encoder_2_lora.parameters(),
                 learning_rate=config.text_encoder_2.learning_rate,
             ))
@@ -70,7 +68,6 @@ class StableDiffusionXLLoRASetup(
         if config.unet.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="unet_lora",
-                display_name="unet_lora",
                 parameters=model.unet_lora.parameters(),
                 learning_rate=config.unet.learning_rate,
             ))

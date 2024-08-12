@@ -33,7 +33,6 @@ class PixArtAlphaFineTuneSetup(
         if config.text_encoder.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="text_encoder",
-                display_name="text_encoder",
                 parameters=model.text_encoder.parameters(),
                 learning_rate=config.text_encoder.learning_rate,
             ))
@@ -46,7 +45,6 @@ class PixArtAlphaFineTuneSetup(
         if config.prior.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="transformer",
-                display_name="transformer",
                 parameters=model.transformer.parameters(),
                 learning_rate=config.prior.learning_rate,
             ))

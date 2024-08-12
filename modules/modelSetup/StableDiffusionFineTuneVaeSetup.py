@@ -32,7 +32,6 @@ class StableDiffusionFineTuneVaeSetup(
 
         parameter_group_collection.add_group(NamedParameterGroup(
             unique_name="vae",
-            display_name="vae",
             parameters=model.vae.decoder.parameters(),
             learning_rate=config.learning_rate,
         ))

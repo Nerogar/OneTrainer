@@ -33,7 +33,6 @@ class WuerstchenFineTuneSetup(
         if config.text_encoder.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="prior_text_encoder",
-                display_name="prior_text_encoder",
                 parameters=model.prior_text_encoder.parameters(),
                 learning_rate=config.text_encoder.learning_rate,
             ))
@@ -47,7 +46,6 @@ class WuerstchenFineTuneSetup(
         if config.prior.train:
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="prior_prior",
-                display_name="prior_prior",
                 parameters=model.prior_prior.parameters(),
                 learning_rate=config.prior.learning_rate,
             ))
