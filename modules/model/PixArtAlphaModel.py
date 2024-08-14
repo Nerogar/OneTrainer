@@ -177,8 +177,9 @@ class PixArtAlphaModel(BaseModel):
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             max_token_length = 120
-            if self.model_type.is_pixart_sigma():
-                max_token_length = 300
+            # deactivated for performance reasons. most people don't need 300 tokens
+            # if self.model_type.is_pixart_sigma():
+            #     max_token_length = 300
 
             tokenizer_output = self.tokenizer(
                 text,

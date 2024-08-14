@@ -56,8 +56,9 @@ class PixArtAlphaBaseDataLoader(
 
     def _preparation_modules(self, config: TrainConfig, model: PixArtAlphaModel):
         max_token_length = 120
-        if model.model_type.is_pixart_sigma():
-            max_token_length = 300
+        # deactivated for performance reasons. most people don't need 300 tokens
+        # if model.model_type.is_pixart_sigma():
+        #     max_token_length = 300
 
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
