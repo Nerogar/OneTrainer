@@ -5,6 +5,7 @@ from torch import nn
 from torch.utils.checkpoint import checkpoint
 
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
+from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
 from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
@@ -75,4 +76,11 @@ def enable_checkpointing_for_t5_encoder_layers(orig_module: nn.Module, device: t
 def enable_checkpointing_for_stable_diffusion_3_transformer(orig_module: nn.Module, device: torch.device):
     for name, child_module in orig_module.named_modules():
         if isinstance(child_module, JointTransformerBlock):
+            child_module.forward = create_checkpointed_forward(child_module, device)
+
+def enable_checkpointing_for_flux_transformer(orig_module: nn.Module, device: torch.device):
+    for name, child_module in orig_module.named_modules():
+        if isinstance(child_module, FluxTransformerBlock):
+            child_module.forward = create_checkpointed_forward(child_module, device)
+        if isinstance(child_module, FluxSingleTransformerBlock):
             child_module.forward = create_checkpointed_forward(child_module, device)

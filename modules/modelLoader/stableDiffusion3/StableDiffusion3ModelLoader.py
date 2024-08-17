@@ -72,11 +72,6 @@ class StableDiffusion3ModelLoader:
             base_model_name,
             subfolder="scheduler",
         )
-        # TODO: maybe use the loaded scheduler to create another scheduler for training
-        # noise_scheduler = create.create_noise_scheduler(
-        #     noise_scheduler=NoiseScheduler.DDIM,
-        #     original_noise_scheduler=noise_scheduler,
-        # )
 
         if include_text_encoder_1:
             text_encoder_1 = CLIPTextModelWithProjection.from_pretrained(

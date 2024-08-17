@@ -84,6 +84,7 @@ class TopBar:
                 ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
                 ("PixArt Sigma", ModelType.PIXART_SIGMA),
+                ("Flux Dev", ModelType.FLUX_DEV_1),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -106,7 +107,8 @@ class TopBar:
         elif self.train_config.model_type.is_stable_diffusion_3() \
                 or self.train_config.model_type.is_stable_diffusion_xl() \
                 or self.train_config.model_type.is_wuerstchen() \
-                or self.train_config.model_type.is_pixart():
+                or self.train_config.model_type.is_pixart() \
+                or self.train_config.model_type.is_flux():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

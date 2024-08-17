@@ -68,6 +68,8 @@ class TrainingTab:
             self.__setup_wuerstchen_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_flux():
+            self.__setup_flux_ui(column_0, column_1, column_2)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -135,6 +137,20 @@ class TrainingTab:
         self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2, supports_vb_loss=True)
+
+    def __setup_flux_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_1_frame(column_0, 1, supports_include=True)
+        self.__create_text_encoder_2_frame(column_0, 2, supports_include=True)
+        self.__create_embedding_frame(column_0, 4)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1)
+        self.__create_noise_frame(column_1, 2)
+
+        self.__create_align_prop_frame(column_2, 0)
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
 
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

@@ -10,6 +10,7 @@ class DataType(Enum):
     FLOAT_32 = 'FLOAT_32'
     BFLOAT_16 = 'BFLOAT_16'
     TFLOAT_32 = 'TFLOAT_32'
+    NFLOAT_4 = 'NFLOAT_4'
 
     def __str__(self):
         return self.value
@@ -37,3 +38,6 @@ class DataType(Enum):
 
     def enable_tf(self):
         return self == DataType.TFLOAT_32
+
+    def quantize_nf4(self):
+        return self == DataType.NFLOAT_4

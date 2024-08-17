@@ -50,6 +50,8 @@ class ModelTab:
             self.__setup_wuerstchen_ui()
         elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui()
+        elif self.train_config.model_type.is_flux():
+            self.__setup_flux_ui()
 
     def __setup_stable_diffusion_ui(self):
         row = 0
@@ -79,6 +81,26 @@ class ModelTab:
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_text_encoder_3=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method in [
+                TrainingMethod.FINE_TUNE,
+                TrainingMethod.FINE_TUNE_VAE,
+            ],
+            allow_checkpoint=True,
+        )
+
+    def __setup_flux_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            has_text_encoder_1=True,
+            has_text_encoder_2=True,
             has_vae=True,
         )
         row = self.__create_output_components(
@@ -160,6 +182,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
+            ("nfloat4", DataType.NFLOAT_4),
         ], self.ui_state, "weight_dtype")
 
         row += 1
@@ -188,6 +211,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "unet.weight_dtype")
 
             row += 1
@@ -211,6 +235,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "prior.weight_dtype")
 
             row += 1
@@ -225,6 +250,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
@@ -239,6 +265,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "text_encoder.weight_dtype")
 
             row += 1
@@ -253,6 +280,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "text_encoder_2.weight_dtype")
 
             row += 1
@@ -267,6 +295,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "text_encoder_3.weight_dtype")
 
             row += 1
@@ -289,6 +318,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "vae.weight_dtype")
 
             row += 1
@@ -313,6 +343,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
+            ("nfloat4", DataType.NFLOAT_4),
         ], self.ui_state, "effnet_encoder.weight_dtype")
 
         row += 1
@@ -341,6 +372,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
+            ("nfloat4", DataType.NFLOAT_4),
         ], self.ui_state, "decoder.weight_dtype")
 
         row += 1
@@ -355,6 +387,7 @@ class ModelTab:
                 ("bfloat16", DataType.BFLOAT_16),
                 ("float16", DataType.FLOAT_16),
                 ("float8", DataType.FLOAT_8),
+                ("nfloat4", DataType.NFLOAT_4),
             ], self.ui_state, "decoder_text_encoder.weight_dtype")
 
             row += 1
@@ -368,6 +401,7 @@ class ModelTab:
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8", DataType.FLOAT_8),
+            ("nfloat4", DataType.NFLOAT_4),
         ], self.ui_state, "decoder_vqgan.weight_dtype")
 
         row += 1
@@ -394,6 +428,7 @@ class ModelTab:
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float8", DataType.FLOAT_8),
+            ("nfloat4", DataType.NFLOAT_4),
         ], self.ui_state, "output_dtype")
 
         row += 1
