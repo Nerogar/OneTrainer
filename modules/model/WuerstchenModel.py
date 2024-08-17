@@ -265,5 +265,8 @@ class WuerstchenModel(BaseModel):
             if self.model_type.is_stable_cascade():
                 pooled_text_encoder_output = text_encoder_output.text_embeds.unsqueeze(1)
                 text_encoder_output = text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+        else:
+            if self.model_type.is_stable_cascade():
+                pooled_text_encoder_output = pooled_text_encoder_output.unsqueeze(1)
 
         return text_encoder_output, pooled_text_encoder_output
