@@ -38,8 +38,16 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
         image = Image.open(sample_config.prompt)
         image = image.convert("RGB")
-
-        t_in = transforms.ToTensor()
+        # TODO: figure out better set of transformations for resize and/or implement way to configure them as per-sample toggle
+        scale = sample_config.height
+        if sample_config.width > sample_config.height:
+            sample_config.width
+        
+        t_in = transforms.Compose([
+            transforms.Resize(scale),
+            transforms.CenterCrop([sample_config.height, sample_config.width]),
+            transforms.ToTensor()
+        ])
         image_tensor = t_in(image).to(device=self.train_device, dtype=self.model.vae.dtype)
         image_tensor = image_tensor * 2 - 1
 
@@ -47,15 +55,14 @@ class StableDiffusionVaeSampler(BaseModelSampler):
 
         with torch.no_grad():
             latent_image_tensor = self.model.vae.encode(image_tensor.unsqueeze(0)).latent_dist.mean
-            image_tensor = self.model.vae.decode(latent_image_tensor).sample.squeeze()
+            image_tensor = self.model.vae.decode(latent_image_tensor).sample.clamp(-1, 1).squeeze()
 
         self.model.vae_to(self.temp_device)
-
-        image_tensor = (image_tensor + 1) * 0.5
-        image_tensor = image_tensor.clamp(0, 1)
 
         t_out = transforms.ToPILImage()
         image = t_out(image_tensor)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         image.save(destination)
+        
+        on_sample(image)
