@@ -17,7 +17,7 @@ class StableDiffusionEmbeddingSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(StableDiffusionEmbeddingSetup, self).__init__(
+        super().__init__(
             train_device=train_device,
             temp_device=temp_device,
             debug_mode=debug_mode,

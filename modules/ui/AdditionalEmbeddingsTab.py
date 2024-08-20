@@ -11,7 +11,7 @@ import customtkinter as ctk
 class AdditionalEmbeddingsTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(AdditionalEmbeddingsTab, self).__init__(
+        super().__init__(
             master,
             train_config,
             ui_state,
@@ -36,7 +36,7 @@ class AdditionalEmbeddingsTab(ConfigList):
 
 class EmbeddingWidget(ctk.CTkFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super(EmbeddingWidget, self).__init__(
+        super().__init__(
             master=master, corner_radius=10, bg_color="transparent"
         )
 

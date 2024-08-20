@@ -59,7 +59,7 @@ class GenericTrainer(BaseTrainer):
     grad_hook_handles: list[RemovableHandle]
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
-        super(GenericTrainer, self).__init__(config, callbacks, commands)
+        super().__init__(config, callbacks, commands)
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
@@ -231,7 +231,7 @@ class GenericTrainer(BaseTrainer):
 
                     def on_sample_default(image: Image):
                         if self.config.samples_to_tensorboard:
-                            self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
+                            self.tensorboard.add_image(f"sample{i!s} - {safe_prompt}", pil_to_tensor(image),  # noqa: B023
                                                        train_progress.global_step)
                         self.callbacks.on_sample_default(image)
 
@@ -254,7 +254,7 @@ class GenericTrainer(BaseTrainer):
                         on_sample=on_sample,
                         on_update_progress=on_update_progress,
                     )
-                except:
+                except Exception:
                     traceback.print_exc()
                     print("Error during sampling, proceeding without sampling")
 
@@ -279,7 +279,7 @@ class GenericTrainer(BaseTrainer):
             if self.config.samples is not None:
                 sample_params_list = self.config.samples
             else:
-                with open(self.config.sample_definition_file_name, 'r') as f:
+                with open(self.config.sample_definition_file_name) as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
@@ -359,13 +359,13 @@ class GenericTrainer(BaseTrainer):
             )
 
             self.__save_backup_config(backup_path)
-        except:
+        except Exception:
             traceback.print_exc()
             print("Could not save backup. Check your disk space!")
             try:
                 if os.path.isdir(backup_path):
                     shutil.rmtree(backup_path)
-            except:
+            except Exception:
                 traceback.print_exc()
                 print("Could not delete partial backup")
         finally:
@@ -410,13 +410,13 @@ class GenericTrainer(BaseTrainer):
             if self.config.optimizer.optimizer.is_schedule_free:
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
-        except:
+        except Exception:
             traceback.print_exc()
             print("Could not save model. Check your disk space!")
             try:
                 if os.path.isfile(save_path):
                     shutil.rmtree(save_path)
-            except:
+            except Exception:
                 traceback.print_exc()
                 print("Could not delete partial save")
         finally:
@@ -488,14 +488,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.only_cache:
             self.callbacks.on_update_status("caching")
-            for epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
+            for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
                 self.data_loader.get_data_set().start_next_epoch()
             return
 
-        if enable_grad_scaling(self.config.train_dtype, self.parameters):
-            scaler = create_grad_scaler()
-        else:
-            scaler = None
+        scaler = create_grad_scaler() if enable_grad_scaling(self.config.train_dtype, self.parameters) else None
 
         self.__apply_fused_back_pass(scaler)
 
@@ -506,7 +503,7 @@ class GenericTrainer(BaseTrainer):
         lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
-        for epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
+        for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
             if self.config.latent_caching:
@@ -542,7 +539,7 @@ class GenericTrainer(BaseTrainer):
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
-            for epoch_step, batch in enumerate(step_tqdm):
+            for _epoch_step, batch in enumerate(step_tqdm):
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)

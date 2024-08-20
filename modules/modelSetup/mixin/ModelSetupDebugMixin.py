@@ -10,7 +10,7 @@ from PIL import Image
 
 class ModelSetupDebugMixin(metaclass=ABCMeta):
     def __init__(self):
-        super(ModelSetupDebugMixin, self).__init__()
+        super().__init__()
 
     def _save_image(self, image_tensor: Tensor, directory: str, name: str, step: int, fromarray: bool = False):
         path = os.path.join(directory, "step-" + str(step) + "-" + name + ".png")

@@ -11,7 +11,7 @@ from torch import Generator, Tensor
 class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
     def __init__(self):
-        super(ModelSetupNoiseMixin, self).__init__()
+        super().__init__()
 
         self.__weights = None
 
@@ -129,6 +129,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
                 return samples.to(dtype=torch.long, device=generator.device)
+            return None
 
     def _get_timestep_continuous(
             self,

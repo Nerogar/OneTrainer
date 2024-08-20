@@ -17,7 +17,7 @@ import customtkinter as ctk
 class LoraTab:
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(LoraTab, self).__init__()
+        super().__init__()
 
         self.master = master
         self.train_config = train_config

@@ -30,9 +30,9 @@ class CaptionSample:
     def get_caption(self) -> str:
         if self.captions is None and os.path.exists(self.caption_filename):
             try:
-                with open(self.caption_filename, "r") as f:
+                with open(self.caption_filename) as f:
                     self.captions = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
-            except:
+            except Exception:
                 self.captions = []
 
         return self.captions
@@ -48,7 +48,7 @@ class CaptionSample:
             try:
                 with open(self.caption_filename, "w", encoding='utf-8') as f:
                     f.write('\n'.join(self.captions))
-            except:
+            except Exception:
                 pass
 
 

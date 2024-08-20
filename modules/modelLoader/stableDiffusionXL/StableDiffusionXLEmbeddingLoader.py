@@ -12,7 +12,7 @@ from safetensors.torch import load_file
 
 class StableDiffusionXLEmbeddingLoader:
     def __init__(self):
-        super(StableDiffusionXLEmbeddingLoader, self).__init__()
+        super().__init__()
 
     def __load_embedding(
             self,
@@ -28,7 +28,7 @@ class StableDiffusionXLEmbeddingLoader:
             text_encoder_2_vector = embedding_state['clip_g']
 
             return text_encoder_1_vector, text_encoder_2_vector
-        except:
+        except Exception:
             pass
 
         try:
@@ -38,7 +38,7 @@ class StableDiffusionXLEmbeddingLoader:
             text_encoder_2_vector = embedding_state['clip_g']
 
             return text_encoder_1_vector, text_encoder_2_vector
-        except:
+        except Exception:
             pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
@@ -83,11 +83,11 @@ class StableDiffusionXLEmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except:
+            except Exception:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except:
+                except Exception:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
@@ -108,13 +108,13 @@ class StableDiffusionXLEmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except:
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

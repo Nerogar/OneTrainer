@@ -120,7 +120,7 @@ class WuerstchenModel(BaseModel):
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
-        super(WuerstchenModel, self).__init__(
+        super().__init__(
             model_type=model_type,
             optimizer_state_dict=optimizer_state_dict,
             ema_state_dict=ema_state_dict,
@@ -225,6 +225,7 @@ class WuerstchenModel(BaseModel):
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )
+        return None
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
         for embedding in self.additional_embeddings:

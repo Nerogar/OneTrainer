@@ -9,7 +9,7 @@ from transformers.tokenization_utils import Trie
 
 class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     def __init__(self):
-        super(ModelSetupEmbeddingMixin, self).__init__()
+        super().__init__()
 
     def _remove_added_embeddings_from_tokenizer(
             self,

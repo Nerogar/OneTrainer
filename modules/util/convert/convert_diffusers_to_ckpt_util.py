@@ -27,7 +27,7 @@ def map_wb(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dic
 def map_prefix(in_states: dict[str, Tensor], out_prefix: str, in_prefix: str) -> dict[str, Tensor]:
     out_states = {}
 
-    for key, tensor in in_states.items():
+    for key in in_states:
         if key.startswith(in_prefix):
             out_key = out_prefix + key.removeprefix(in_prefix)
             out_states[out_key] = in_states[key]

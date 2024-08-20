@@ -321,7 +321,7 @@ def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIS
     def update_var():
         if not deactivate_update_var:
             for key, value in values:
-                if var.get() == str(value):
+                if var.get() is str(value):
                     if component.winfo_exists():  # the component could already be destroyed
                         component.set(key)
                         if command:

@@ -62,10 +62,7 @@ class DtypeModelSaverMixin:
             model: BaseModel,
             state_dict: dict[str, Tensor] | None = None,
     ) -> dict[str, str]:
-        if model.model_spec is not None:
-            model_spec = copy.deepcopy(model.model_spec)
-        else:
-            model_spec = ModelSpec()
+        model_spec = copy.deepcopy(model.model_spec) if model.model_spec is not None else ModelSpec()
 
         if model.train_config is not None and model.train_config.include_train_config == ConfigPart.SETTINGS:
             config = json.dumps(model.train_config.to_dict())

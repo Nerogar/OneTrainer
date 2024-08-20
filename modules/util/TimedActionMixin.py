@@ -6,7 +6,7 @@ from modules.util.TrainProgress import TrainProgress
 
 class TimedActionMixin:
     def __init__(self):
-        super(TimedActionMixin, self).__init__()
+        super().__init__()
         self.__previous_action = {}
         self.__start_time = time.time()
 

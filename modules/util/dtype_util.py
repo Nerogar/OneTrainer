@@ -16,7 +16,7 @@ def allow_mixed_precision(train_config: TrainConfig):
 
 
 def enable_grad_scaling(train_dtype: DataType, parameters: list[Parameter]):
-    trainable_parameter_dtype = list(set([parameter.dtype for parameter in parameters]))
+    trainable_parameter_dtype = list({parameter.dtype for parameter in parameters})
     return train_dtype == DataType.FLOAT_16 and all(dtype == torch.float32 for dtype in trainable_parameter_dtype)
 
 

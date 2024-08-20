@@ -97,7 +97,7 @@ class StableDiffusionXLModel(BaseModel):
             model_spec: ModelSpec | None = None,
             train_config: TrainConfig | None = None,
     ):
-        super(StableDiffusionXLModel, self).__init__(
+        super().__init__(
             model_type=model_type,
             optimizer_state_dict=optimizer_state_dict,
             ema_state_dict=ema_state_dict,

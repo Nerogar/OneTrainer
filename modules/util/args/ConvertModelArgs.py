@@ -19,7 +19,7 @@ class ConvertModelArgs(BaseArgs):
     output_model_destination: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(ConvertModelArgs, self).__init__(data)
+        super().__init__(data)
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes.from_single_dtype(self.output_dtype)

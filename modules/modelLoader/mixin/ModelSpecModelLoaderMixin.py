@@ -23,7 +23,7 @@ class ModelSpecModelLoaderMixin(metaclass=ABCMeta):
 
         model_spec_name = self._default_model_spec_name(model_type)
         if model_spec_name:
-            with open(model_spec_name, "r", encoding="utf-8") as model_spec_file:
+            with open(model_spec_name, encoding="utf-8") as model_spec_file:
                 model_spec = ModelSpec.from_dict(json.load(model_spec_file))
         else:
             model_spec = ModelSpec()
@@ -33,7 +33,7 @@ class ModelSpecModelLoaderMixin(metaclass=ABCMeta):
                 with safe_open(safetensors_file_name, framework="pt") as f:
                     if "modelspec.sai_model_spec" in f.metadata():
                         model_spec = ModelSpec.from_dict(f.metadata())
-            except:
+            except Exception:
                 pass
 
         return model_spec

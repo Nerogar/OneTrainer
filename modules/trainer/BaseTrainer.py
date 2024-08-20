@@ -20,7 +20,7 @@ class BaseTrainer(
     metaclass=ABCMeta,
 ):
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
-        super(BaseTrainer, self).__init__()
+        super().__init__()
         self.config = config
         self.callbacks = callbacks
         self.commands = commands

@@ -11,7 +11,7 @@ class HPSv2ScoreModel(nn.Module):
             self,
             dtype: torch.dtype,
     ):
-        super(HPSv2ScoreModel, self).__init__()
+        super().__init__()
         self.dtype = dtype
 
         self.model = self.__load_open_clip_model()

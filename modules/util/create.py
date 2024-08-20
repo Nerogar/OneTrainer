@@ -73,7 +73,15 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.lr_scheduler_util import *
+from modules.util.lr_scheduler_util import (
+    lr_lambda_constant,
+    lr_lambda_cosine,
+    lr_lambda_cosine_with_hard_restarts,
+    lr_lambda_cosine_with_restarts,
+    lr_lambda_linear,
+    lr_lambda_rex,
+    lr_lambda_warmup,
+)
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
@@ -110,9 +118,11 @@ def create_model_loader(
                 return PixArtAlphaFineTuneModelLoader()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3FineTuneModelLoader()
+            return None
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
+            return None
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelLoader()
@@ -124,6 +134,7 @@ def create_model_loader(
                 return PixArtAlphaLoRAModelLoader()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3LoRAModelLoader()
+            return None
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -135,6 +146,7 @@ def create_model_loader(
                 return PixArtAlphaEmbeddingModelLoader()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingModelLoader()
+            return None
 
 
 def create_model_saver(
@@ -153,9 +165,11 @@ def create_model_saver(
                 return PixArtAlphaFineTuneModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3FineTuneModelSaver()
+            return None
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelSaver()
+            return None
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRAModelSaver()
@@ -167,6 +181,7 @@ def create_model_saver(
                 return PixArtAlphaLoRAModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3LoRAModelSaver()
+            return None
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -178,6 +193,7 @@ def create_model_saver(
                 return PixArtAlphaEmbeddingModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingModelSaver()
+            return None
 
 
 def create_model_setup(
@@ -199,9 +215,11 @@ def create_model_setup(
                 return PixArtAlphaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3FineTuneSetup(train_device, temp_device, debug_mode)
+            return None
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
+            return None
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionLoRASetup(train_device, temp_device, debug_mode)
@@ -213,6 +231,7 @@ def create_model_setup(
                 return PixArtAlphaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3LoRASetup(train_device, temp_device, debug_mode)
+            return None
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -224,6 +243,7 @@ def create_model_setup(
                 return PixArtAlphaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingSetup(train_device, temp_device, debug_mode)
+            return None
 
 
 def create_model_sampler(
@@ -245,9 +265,11 @@ def create_model_sampler(
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
+            return None
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
+            return None
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
@@ -259,6 +281,7 @@ def create_model_sampler(
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
+            return None
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
@@ -270,6 +293,7 @@ def create_model_sampler(
                 return PixArtAlphaSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
+            return None
 
 
 def create_data_loader(
@@ -279,8 +303,10 @@ def create_data_loader(
         model_type: ModelType,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
         config: TrainConfig = None,
-        train_progress: TrainProgress = TrainProgress(),
+        train_progress: TrainProgress | None = None,
 ):
+    if train_progress is None:
+        train_progress = TrainProgress()
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
@@ -293,9 +319,11 @@ def create_data_loader(
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
+            return None
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress)
+            return None
         case TrainingMethod.LORA:
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
@@ -307,6 +335,7 @@ def create_data_loader(
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
+            return None
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress)
@@ -318,6 +347,7 @@ def create_data_loader(
                 return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress)
+            return None
 
 
 def create_optimizer(
@@ -734,7 +764,7 @@ def create_optimizer(
 
             optimizer = Adafactor(
                 params=parameters,
-                lr=None if optimizer_config.relative_step == True else config.learning_rate,
+                lr=None if optimizer_config.relative_step is True else config.learning_rate,
                 eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
                      optimizer_config.eps2 if optimizer_config.eps2 is not None else 1e-3),
                 clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 1.0,
@@ -854,7 +884,7 @@ def create_optimizer(
                 else:
                     # the group state was not saved, initialize with an empty group state
                     new_group = new_param_groups[new_group_index]
-                    for i, old_state_index in enumerate(new_group['params']):
+                    for i in range(len(new_group['params'])):
                         new_group['params'][i] = state_index
                         state_index += 1
                     param_groups.append(new_group)

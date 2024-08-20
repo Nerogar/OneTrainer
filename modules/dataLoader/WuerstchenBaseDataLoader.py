@@ -1,16 +1,6 @@
 import os
 import re
 
-from modules.dataLoader.BaseDataLoader import BaseDataLoader
-from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
-from modules.model.WuerstchenModel import WuerstchenModel
-from modules.util import path_util
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.torch_util import torch_gc
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-
 from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
@@ -47,6 +37,15 @@ from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
 from mgds.pipelineModules.Tokenize import Tokenize
 from mgds.pipelineModules.VariationSorting import VariationSorting
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
+from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
+from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util import path_util
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class WuerstchenBaseDataLoader(BaseDataLoader):
@@ -58,7 +57,7 @@ class WuerstchenBaseDataLoader(BaseDataLoader):
             model: WuerstchenModel,
             train_progress: TrainProgress,
     ):
-        super(WuerstchenBaseDataLoader, self).__init__(
+        super().__init__(
             train_device,
             temp_device,
         )

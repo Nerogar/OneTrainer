@@ -53,8 +53,8 @@ class ModelSpec:
         for (key, value) in vars(model_spec).items():
             try:
                 if isinstance(value, str):
-                    setattr(model_spec, key, data["modelspec." + key])
-            except:
+                    setattr(model_spec, key, data[f"modelspec.{key}"])
+            except Exception:  # noqa: PERF203
                 pass
 
         return model_spec

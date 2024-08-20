@@ -12,7 +12,7 @@ from safetensors.torch import load_file
 
 class StableDiffusion3EmbeddingLoader:
     def __init__(self):
-        super(StableDiffusion3EmbeddingLoader, self).__init__()
+        super().__init__()
 
     def __load_embedding(
             self,
@@ -24,23 +24,23 @@ class StableDiffusion3EmbeddingLoader:
         try:
             embedding_state = torch.load(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
-            text_encoder_2_vector = embedding_state['clip_g'] if 'clip_g' in embedding_state else None
-            text_encoder_3_vector = embedding_state['t5'] if 't5' in embedding_state else None
+            text_encoder_1_vector = embedding_state.get("clip_l", None)
+            text_encoder_2_vector = embedding_state.get("clip_g", None)
+            text_encoder_3_vector = embedding_state.get("t5", None)
 
             return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
-        except:
+        except Exception:
             pass
 
         try:
             embedding_state = load_file(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
-            text_encoder_2_vector = embedding_state['clip_g'] if 'clip_g' in embedding_state else None
-            text_encoder_3_vector = embedding_state['t5'] if 't5' in embedding_state else None
+            text_encoder_1_vector = embedding_state.get("clip_l", None)
+            text_encoder_2_vector = embedding_state.get("clip_g", None)
+            text_encoder_3_vector = embedding_state.get("t5", None)
 
             return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
-        except:
+        except Exception:
             pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
@@ -85,11 +85,11 @@ class StableDiffusion3EmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except:
+            except Exception:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except:
+                except Exception:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
@@ -110,13 +110,13 @@ class StableDiffusion3EmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except:
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

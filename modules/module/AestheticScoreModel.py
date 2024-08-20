@@ -11,7 +11,7 @@ import pooch
 
 class MLPModel(nn.Module):
     def __init__(self, *args, **kwargs):
-        super(MLPModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.layers = nn.Sequential(
             nn.Linear(768, 1024),
             nn.Dropout(0.2),
@@ -31,7 +31,7 @@ class AestheticScoreModel(nn.Module):
     def __init__(
             self,
     ):
-        super(AestheticScoreModel, self).__init__()
+        super().__init__()
 
         self.clip = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
         self.mlp_model = self.__load_mlp_model()

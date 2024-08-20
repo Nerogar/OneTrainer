@@ -100,10 +100,7 @@ def step_adam_parameter(self, p, group, i):
 
         if group['amsgrad']:
             # Maintains the maximum of all 2nd moment running avg. till now
-            if group["differentiable"]:
-                max_exp_avg_sq = state["max_exp_avg_sq"].clone()
-            else:
-                max_exp_avg_sq = state["max_exp_avg_sq"]
+            max_exp_avg_sq = state["max_exp_avg_sq"].clone() if group["differentiable"] else state["max_exp_avg_sq"]
 
             state["max_exp_avg_sq"].copy_(torch.maximum(max_exp_avg_sq, exp_avg_sq))
 

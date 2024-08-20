@@ -27,7 +27,7 @@ class SampleConfig(BaseConfig):
     mask_image_path: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(SampleConfig, self).__init__(data)
+        super().__init__(data)
 
     def from_train_config(self, train_config):
         self.text_encoder_1_layer_skip = train_config.text_encoder_layer_skip

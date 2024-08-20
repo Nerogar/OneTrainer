@@ -29,22 +29,17 @@ class BaseConfig:
             '__version': self.config_version,
         }
 
-        for (name, _) in self.types.items():
+        for name in self.types:
             value = getattr(self, name)
             if issubclass(self.types[name], BaseConfig):
                 data[name] = value.to_dict()
-            elif self.types[name] == list or get_origin(self.types[name]) == list:
+            elif self.types[name] is list or get_origin(self.types[name]) is list:
                 if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
-                    if value is not None:
-                        list_data = []
-                        for list_entry in value:
-                            list_data.append(list_entry.to_dict())
-                    else:
-                        list_data = None
+                    list_data = [list_entry.to_dict() for list_entry in value] if value is not None else None
                     data[name] = list_data
                 else:
                     data[name] = value
-            elif self.types[name] == dict or get_origin(self.types[name]) == dict:
+            elif self.types[name] is dict or get_origin(self.types[name]) is dict:
                 if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[1], BaseConfig):
                     dict_data = {}
                     for dict_key, dict_value in value.items():
@@ -52,13 +47,13 @@ class BaseConfig:
                     data[name] = dict_data
                 else:
                     data[name] = value
-            elif self.types[name] == str:
+            elif self.types[name] is str:
                 data[name] = value
             elif issubclass(self.types[name], Enum):
                 data[name] = None if value is None else str(value)
-            elif self.types[name] == bool or self.types[name] == int:
+            elif self.types[name] is bool or self.types[name] is int:
                 data[name] = value
-            elif self.types[name] == float:
+            elif self.types[name] is float:
                 if value in [float('inf'), float('-inf')]:
                     data[name] = str(value)
                 else:
@@ -75,11 +70,11 @@ class BaseConfig:
             data = self.config_migrations[version](data)
             version += 1
 
-        for (name, _) in self.types.items():
+        for name in self.types:
             try:
                 if issubclass(self.types[name], BaseConfig):
                     getattr(self, name).from_dict(data[name])
-                elif self.types[name] == list or get_origin(self.types[name]) == list:
+                elif self.types[name] is list or get_origin(self.types[name]) is list:
                     if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
                         list_type = get_args(self.types[name])[0]
                         if data[name] is not None:
@@ -98,7 +93,7 @@ class BaseConfig:
                         setattr(self, name, value)
                     else:
                         setattr(self, name, data[name])
-                elif self.types[name] == dict or get_origin(self.types[name]) == dict:
+                elif self.types[name] is dict or get_origin(self.types[name]) is dict:
                     if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[1], BaseConfig):
                         dict_type = get_args(self.types[name])[1]
                         value = {}
@@ -107,7 +102,7 @@ class BaseConfig:
                         setattr(self, name, value)
                     else:
                         setattr(self, name, data[name])
-                elif self.types[name] == str:
+                elif self.types[name] is str:
                     if self.nullables[name]:
                         setattr(self, name, None if data[name] is None else str(data[name]))
                     else:
@@ -120,14 +115,14 @@ class BaseConfig:
                             setattr(self, name, self.types[name][data[name]])
                     else:
                         setattr(self, name, data[name])
-                elif self.types[name] == bool:
+                elif self.types[name] is bool:
                     setattr(self, name, data[name])
-                elif self.types[name] == int:
+                elif self.types[name] is int:
                     if self.nullables[name]:
                         setattr(self, name, None if data[name] is None else int(data[name]))
                     else:
                         setattr(self, name, int(data[name]))
-                elif self.types[name] == float:
+                elif self.types[name] is float:
                     # check for strings to support dicts loaded from json
                     if data[name] in [float('inf'), float('-inf'), 'inf', '-inf']:
                         setattr(self, name, float(data[name]))
@@ -135,7 +130,7 @@ class BaseConfig:
                         setattr(self, name, None if data[name] is None else float(data[name]))
                     else:
                         setattr(self, name, float(data[name]))
-            except Exception:
+            except Exception:  # noqa: PERF203
                 if name in data:
                     print(f"Could not set {name} as {str(data[name])}")
                 else:

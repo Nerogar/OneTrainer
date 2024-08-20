@@ -21,7 +21,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     __alphas_cumprod_fun: Callable[[Tensor, int], Tensor] | None
 
     def __init__(self):
-        super(ModelSetupDiffusionLossMixin, self).__init__()
+        super().__init__()
         self.__align_prop_loss_fn = None
         self.__coefficients = None
         self.__alphas_cumprod_fun = None

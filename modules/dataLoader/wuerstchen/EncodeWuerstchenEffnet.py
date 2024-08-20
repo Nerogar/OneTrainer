@@ -1,11 +1,10 @@
 from contextlib import nullcontext
 
+from mgds.MGDS import PipelineModule
+from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder
 
 import torch
-
-from mgds.MGDS import PipelineModule
-from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 
 
 class EncodeWuerstchenEffnet(
@@ -20,7 +19,7 @@ class EncodeWuerstchenEffnet(
             autocast_contexts: list[torch.autocast | None] = None,
             dtype: torch.dtype | None = None,
     ):
-        super(EncodeWuerstchenEffnet, self).__init__()
+        super().__init__()
         self.in_name = in_name
         self.out_name = out_name
         self.effnet_encoder = effnet_encoder

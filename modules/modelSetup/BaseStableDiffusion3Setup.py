@@ -483,12 +483,12 @@ class BaseStableDiffusion3Setup(
                 batch_size=batch['latent_image'].shape[0],
                 rand=rand,
                 config=config,
-                tokens_1=batch['tokens_1'] if 'tokens_1' in batch else None,
-                tokens_2=batch['tokens_2'] if 'tokens_2' in batch else None,
-                tokens_3=batch['tokens_3'] if 'tokens_3' in batch else None,
-                tokens_mask_1=batch['tokens_mask_1'] if 'tokens_mask_1' in batch else None,
-                tokens_mask_2=batch['tokens_mask_2'] if 'tokens_mask_2' in batch else None,
-                tokens_mask_3=batch['tokens_mask_3'] if 'tokens_mask_3' in batch else None,
+                tokens_1=batch.get("tokens_1"),
+                tokens_2=batch.get("tokens_2"),
+                tokens_3=batch.get("tokens_3"),
+                tokens_mask_1=batch.get("tokens_mask_1"),
+                tokens_mask_2=batch.get("tokens_mask_2"),
+                tokens_mask_3=batch.get("tokens_mask_3"),
                 text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
                     if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \

@@ -12,7 +12,7 @@ from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderMo
 
 class StableDiffusion3ModelLoader:
     def __init__(self):
-        super(StableDiffusion3ModelLoader, self).__init__()
+        super().__init__()
 
     def __load_internal(
             self,
@@ -237,7 +237,7 @@ class StableDiffusion3ModelLoader:
                 model_names.include_text_encoder_3,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
@@ -247,7 +247,7 @@ class StableDiffusion3ModelLoader:
                 model_names.include_text_encoder_3,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
@@ -257,7 +257,7 @@ class StableDiffusion3ModelLoader:
                 model_names.include_text_encoder_3,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         # try:
@@ -267,7 +267,7 @@ class StableDiffusion3ModelLoader:
         #         model_names.include_text_encoder_3,
         #     )
         #     return
-        # except:
+        # except Exception:
         #     stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

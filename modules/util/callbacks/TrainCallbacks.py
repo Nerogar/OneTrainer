@@ -33,7 +33,7 @@ class TrainCallbacks:
         try:
             if self.__on_update_train_progress:
                 self.__on_update_train_progress(train_progress, max_sample, max_epoch)
-        except:
+        except Exception:
             pass
 
     # on_update_status
@@ -47,7 +47,7 @@ class TrainCallbacks:
         try:
             if self.__on_update_status:
                 self.__on_update_status(status)
-        except:
+        except Exception:
             pass
 
     # on_sample_default
@@ -61,7 +61,7 @@ class TrainCallbacks:
         try:
             if self.__on_sample_default:
                 self.__on_sample_default(sample)
-        except:
+        except Exception:
             pass
 
     # on_update_sample_default_progress
@@ -75,7 +75,7 @@ class TrainCallbacks:
         try:
             if self.__on_update_sample_default_progress:
                 self.__on_update_sample_default_progress(step, max_step)
-        except:
+        except Exception:
             pass
 
     # on_sample_custom
@@ -89,7 +89,7 @@ class TrainCallbacks:
         try:
             if self.__on_sample_custom:
                 self.__on_sample_custom(sample)
-        except:
+        except Exception:
             pass
 
     # on_update_sample_custom_progress
@@ -103,5 +103,5 @@ class TrainCallbacks:
         try:
             if self.__on_update_sample_custom_progress:
                 self.__on_update_sample_custom_progress(progress, max_progress)
-        except:
+        except Exception:
             pass

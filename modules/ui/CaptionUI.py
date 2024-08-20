@@ -256,7 +256,7 @@ Mouse wheel: increase or decrease brush size"""
 
         try:
             return Image.open(image_name).convert('RGB')
-        except:
+        except Exception:
             print(f'Could not open image {image_name}')
 
     def load_mask(self):
@@ -267,7 +267,7 @@ Mouse wheel: increase or decrease brush size"""
 
             try:
                 return Image.open(mask_name).convert('RGB')
-            except:
+            except Exception:
                 return None
         else:
             return None
@@ -279,9 +279,9 @@ Mouse wheel: increase or decrease brush size"""
             prompt_name = os.path.join(self.dir, prompt_name)
 
             try:
-                with open(prompt_name, "r", encoding='utf-8') as f:
+                with open(prompt_name, encoding='utf-8') as f:
                     return f.readlines()[0].strip()
-            except:
+            except Exception:
                 return ""
         else:
             return ""
@@ -400,7 +400,7 @@ Mouse wheel: increase or decrease brush size"""
         if is_left:
             try:
                 alpha = float(self.mask_editing_alpha.get())
-            except:
+            except Exception:
                 alpha = 1.0
             rgb_value = int(max(0.0, min(alpha, 1.0)) * 255)  # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
@@ -435,7 +435,7 @@ Mouse wheel: increase or decrease brush size"""
         if is_left:
             try:
                 alpha = float(self.mask_editing_alpha.get())
-            except:
+            except Exception:
                 alpha = 1.0
             rgb_value = int(max(0.0, min(alpha, 1.0)) * 255)  # max/min stuff to clamp to 0 - 255 range
             color = (rgb_value, rgb_value, rgb_value)
@@ -470,11 +470,13 @@ Mouse wheel: increase or decrease brush size"""
             try:
                 with open(prompt_name, "w", encoding='utf-8') as f:
                     f.write(self.prompt_var.get())
-            except:
+            except Exception:
                 return ""
 
             if self.pil_mask:
                 self.pil_mask.save(mask_name)
+                return None
+            return None
 
         else:
             return ""
@@ -485,6 +487,7 @@ Mouse wheel: increase or decrease brush size"""
         if args:
             # disable default event
             return "break"
+        return None
 
     def fill_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'fill'
@@ -515,7 +518,7 @@ Mouse wheel: increase or decrease brush size"""
             image_name = self.image_rel_paths[self.current_image_index]
             image_name = os.path.realpath(os.path.join(self.dir, image_name))
             subprocess.Popen(f"explorer /select,{image_name}")
-        except:
+        except Exception:
             traceback.print_exc()
 
     def load_masking_model(self, model):

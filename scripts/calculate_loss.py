@@ -13,7 +13,7 @@ def main():
     args = CalculateLossArgs.parse_args()
 
     train_config = TrainConfig.default_values()
-    with open(args.config_path, "r") as f:
+    with open(args.config_path) as f:
         train_config.from_dict(json.load(f))
 
     trainer = GenerateLossesModel(train_config, args.output_path)

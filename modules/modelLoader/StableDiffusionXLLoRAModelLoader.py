@@ -16,7 +16,7 @@ class StableDiffusionXLLoRAModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super(StableDiffusionXLLoRAModelLoader, self).__init__()
+        super().__init__()
 
     def _default_model_spec_name(
             self,
