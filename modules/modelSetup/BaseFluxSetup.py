@@ -19,6 +19,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.quantization_util import set_nf4_compute_type
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -99,6 +100,10 @@ class BaseFluxSetup(
                 ],
                 config.enable_autocast_cache,
             )
+
+        set_nf4_compute_type(model.text_encoder_1, model.train_dtype)
+        set_nf4_compute_type(model.text_encoder_2, model.text_encoder_2_train_dtype)
+        set_nf4_compute_type(model.transformer, model.train_dtype)
 
     def _setup_additional_embeddings(
             self,
@@ -429,13 +434,50 @@ class BaseFluxSetup(
                 else:
                     latent_input = scaled_noisy_latent_image
 
-                predicted_flow = model.transformer(
-                    hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep=timestep,
-                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                if model.transformer.config.guidance_embeds:
+                    guidance = torch.tensor([3.0], device=self.train_device)
+                    guidance = guidance.expand(latent_input.shape[0])
+                else:
+                    guidance = None
+
+                text_ids = torch.zeros(
+                    size=(latent_image.shape[0], text_encoder_output.shape[1], 3),
+                    device=self.train_device,
+                )
+
+                image_ids = model.prepare_latent_image_ids(
+                    latent_image.shape[0],
+                    latent_input.shape[2],
+                    latent_input.shape[3],
+                    self.train_device,
+                    model.train_dtype.torch_dtype()
+                )
+
+                packed_latent_input = model.pack_latents(
+                    latent_input,
+                    latent_input.shape[0],
+                    latent_input.shape[1],
+                    latent_input.shape[2],
+                    latent_input.shape[3],
+                )
+
+                packed_predicted_flow = model.transformer(
+                    hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=timestep / 1000,
+                    guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                     pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
+                    img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
+                    joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
+
+                predicted_flow = model.unpack_latents(
+                    packed_predicted_flow,
+                    latent_input.shape[2],
+                    latent_input.shape[3],
+                )
 
                 flow = latent_noise - scaled_latent_image
                 model_output_data = {

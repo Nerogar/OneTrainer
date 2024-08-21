@@ -1,6 +1,35 @@
+from modules.util.enum.DataType import DataType
+
+import torch
 from torch import nn
 
 import bitsandbytes as bnb
+from bitsandbytes.nn import Linear4bit
+
+
+class LinearCompatibleNF4(Linear4bit):
+    """
+    Overwritten Linear4bit with torch.nn.Linear compatible parameters
+    """
+
+    def __init__(
+            self,
+            in_features,
+            out_features,
+            bias=True,
+            device=None,
+            dtype=None,
+    ):
+        super().__init__(
+            in_features,
+            out_features,
+            bias,
+            None,
+            True,
+            "nf4",
+            torch.uint8,
+            device,
+        )
 
 
 def __create_linear_with_nf4_layers(module: nn.Module):
@@ -60,3 +89,10 @@ def replace_linear_with_nf4_layers(
                     name_prefix=f"{name_prefix}.{attr_name}",
                     visited_modules=visited_modules,
                 )
+
+
+def set_nf4_compute_type(module: nn.Module, dtype: DataType):
+    for child_module in module.modules():
+        if isinstance(child_module, bnb.nn.LinearNF4):
+            child_module.compute_dtype = dtype.torch_dtype()
+            child_module.compute_type_is_set = True
