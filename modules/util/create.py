@@ -39,6 +39,9 @@ from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSam
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
 from modules.modelSampler.WuerstchenSampler import WuerstchenSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.FluxEmbeddingModelSaver import FluxEmbeddingModelSaver
+from modules.modelSaver.FluxFineTuneModelSaver import FluxFineTuneModelSaver
+from modules.modelSaver.FluxLoRAModelSaver import FluxLoRAModelSaver
 from modules.modelSaver.PixArtAlphaEmbeddingModelSaver import PixArtAlphaEmbeddingModelSaver
 from modules.modelSaver.PixArtAlphaFineTuneModelSaver import PixArtAlphaFineTuneModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
@@ -156,7 +159,7 @@ def create_model_loader(
 def create_model_saver(
         model_type: ModelType,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
-) -> BaseModelSaver:
+) -> BaseModelSaver | None:
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
@@ -169,6 +172,8 @@ def create_model_saver(
                 return PixArtAlphaFineTuneModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3FineTuneModelSaver()
+            if model_type.is_flux():
+                return FluxFineTuneModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelSaver()
@@ -183,6 +188,8 @@ def create_model_saver(
                 return PixArtAlphaLoRAModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3LoRAModelSaver()
+            if model_type.is_flux():
+                return FluxLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -194,7 +201,10 @@ def create_model_saver(
                 return PixArtAlphaEmbeddingModelSaver()
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingModelSaver()
+            if model_type.is_flux():
+                return FluxEmbeddingModelSaver()
 
+    return None
 
 def create_model_setup(
         model_type: ModelType,
