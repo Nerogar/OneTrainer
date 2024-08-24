@@ -153,6 +153,8 @@ class SampleWindow(ctk.CTkToplevel):
                 f"{get_string_timestamp()}-training-sample-{progress.filename_string()}{image_format.extension()}"
             )
 
+            self.model.eval()
+
             self.model_sampler.sample(
                 sample_config=sample,
                 destination=sample_path,

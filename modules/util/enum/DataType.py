@@ -10,6 +10,7 @@ class DataType(Enum):
     FLOAT_32 = 'FLOAT_32'
     BFLOAT_16 = 'BFLOAT_16'
     TFLOAT_32 = 'TFLOAT_32'
+    INT_8 = 'INT_8'
     NFLOAT_4 = 'NFLOAT_4'
 
     def __str__(self):
@@ -17,14 +18,14 @@ class DataType(Enum):
 
     def torch_dtype(
             self,
-            supports_fp8: bool = True,
+            supports_quantization: bool = True,
     ):
+        if self.is_quantized() and not supports_quantization:
+            return torch.float16
+
         match self:
             case DataType.FLOAT_8:
-                if supports_fp8:
-                    return torch.float8_e4m3fn
-                else:
-                    return torch.float16
+                return torch.float8_e4m3fn
             case DataType.FLOAT_16:
                 return torch.float16
             case DataType.FLOAT_32:
@@ -38,6 +39,14 @@ class DataType(Enum):
 
     def enable_tf(self):
         return self == DataType.TFLOAT_32
+
+    def is_quantized(self):
+        return self in [DataType.FLOAT_8,
+                        DataType.INT_8,
+                        DataType.NFLOAT_4]
+
+    def quantize_int8(self):
+        return self == DataType.INT_8
 
     def quantize_nf4(self):
         return self == DataType.NFLOAT_4

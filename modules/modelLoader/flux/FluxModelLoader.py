@@ -3,13 +3,13 @@ import os
 import traceback
 
 from modules.model.FluxModel import FluxModel
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.quantization_util import replace_linear_with_nf4_layers
+from modules.util.quantization_util import replace_linear_with_int8_layers, replace_linear_with_nf4_layers
 
 from torch import nn
-from torch.nn import Parameter
 
 from diffusers import (
     AutoencoderKL,
@@ -21,7 +21,6 @@ from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokeniz
 
 import accelerate
 import huggingface_hub
-from bitsandbytes.nn import Params4bit
 from huggingface_hub.utils import EntryNotFoundError
 from safetensors.torch import load_file
 
@@ -33,6 +32,7 @@ class FluxModelLoader:
     def __load_sub_module(
             self,
             sub_module: nn.Module,
+            dtype: DataType,
             keep_in_fp32_modules: list[str] | None,
             pretrained_model_name_or_path: str,
             subfolder: str,
@@ -40,7 +40,10 @@ class FluxModelLoader:
             shard_index_filename: str,
     ):
         with accelerate.init_empty_weights():
-            replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules)
+            if dtype.quantize_nf4():
+                replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules)
+            elif dtype.quantize_int8():
+                replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -92,10 +95,8 @@ class FluxModelLoader:
             is_buffer = tensor_name in module._buffers
             old_value = module._buffers[tensor_name] if is_buffer else module._parameters[tensor_name]
 
-            if isinstance(old_value, Params4bit):
-                new_value = Params4bit(value)
-            else:
-                new_value = Parameter(value)
+            old_type = type(old_value)
+            new_value = old_type(value)
 
             if is_buffer:
                 module._buffers[tensor_name] = new_value
@@ -109,6 +110,7 @@ class FluxModelLoader:
     def load_transformers_sub_module(
             self,
             module_type,
+            dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str,
     ):
@@ -129,6 +131,7 @@ class FluxModelLoader:
 
         return self.__load_sub_module(
             sub_module=sub_module,
+            dtype=dtype,
             keep_in_fp32_modules=module_type._keep_in_fp32_modules,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
@@ -139,6 +142,7 @@ class FluxModelLoader:
     def load_diffusers_sub_module(
             self,
             module_type,
+            dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str,
     ):
@@ -159,6 +163,7 @@ class FluxModelLoader:
 
         return self.__load_sub_module(
             sub_module=sub_module,
+            dtype=dtype,
             keep_in_fp32_modules=None,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
@@ -221,24 +226,20 @@ class FluxModelLoader:
                 subfolder="text_encoder",
                 torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
             )
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
+                supports_quantization=False))
         else:
             text_encoder_1 = None
 
         if include_text_encoder_2:
-            if weight_dtypes.text_encoder_2.quantize_nf4():
-                text_encoder_2 = self.load_transformers_sub_module(
-                    T5EncoderModel,
-                    base_model_name,
-                    "text_encoder_2",
-                )
-            else:
-                text_encoder_2 = T5EncoderModel.from_pretrained(
-                    base_model_name,
-                    subfolder="text_encoder_2",
-                    torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
-                )
-                text_encoder_2.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(supports_fp8=False))
+            text_encoder_2 = self.load_transformers_sub_module(
+                T5EncoderModel,
+                weight_dtypes.text_encoder_2,
+                base_model_name,
+                "text_encoder_2",
+            )
+            text_encoder_2.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
+                supports_quantization=False))
         else:
             text_encoder_2 = None
 
@@ -254,21 +255,12 @@ class FluxModelLoader:
                 torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
 
-        if weight_dtypes.vae.quantize_nf4():
-            replace_linear_with_nf4_layers(vae)
-
-        if weight_dtypes.prior.quantize_nf4():
-            transformer = self.load_diffusers_sub_module(
-                FluxTransformer2DModel,
-                base_model_name,
-                "transformer",
-            )
-        else:
-            transformer = FluxTransformer2DModel.from_pretrained(
-                base_model_name,
-                subfolder="transformer",
-                torch_dtype=weight_dtypes.prior.torch_dtype(),
-            )
+        transformer = self.load_diffusers_sub_module(
+            FluxTransformer2DModel,
+            weight_dtypes.prior,
+            base_model_name,
+            "transformer",
+        )
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
@@ -335,7 +327,8 @@ class FluxModelLoader:
 
         if pipeline.text_encoder_2 is not None and include_text_encoder_2:
             text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
-            text_encoder_2.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(supports_fp8=False))
+            text_encoder_2.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
+                supports_quantization=False))
             tokenizer_2 = pipeline.tokenizer_2
 
             if weight_dtypes.text_encoder_2.quantize_nf4():

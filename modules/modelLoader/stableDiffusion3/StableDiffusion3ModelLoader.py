@@ -79,7 +79,8 @@ class StableDiffusion3ModelLoader:
                 subfolder="text_encoder",
                 torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
             )
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
+                supports_quantization=False))
         else:
             text_encoder_1 = None
 
@@ -89,7 +90,8 @@ class StableDiffusion3ModelLoader:
                 subfolder="text_encoder_2",
                 torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
             )
-            text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(supports_fp8=False))
+            text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
+                supports_quantization=False))
         else:
             text_encoder_2 = None
 
@@ -99,7 +101,8 @@ class StableDiffusion3ModelLoader:
                 subfolder="text_encoder_3",
                 torch_dtype=weight_dtypes.text_encoder_3.torch_dtype(),
             )
-            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(supports_fp8=False))
+            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(
+                supports_quantization=False))
         else:
             text_encoder_3 = None
 
@@ -195,7 +198,8 @@ class StableDiffusion3ModelLoader:
 
         if pipeline.text_encoder_3 is not None and include_text_encoder_3:
             text_encoder_3 = pipeline.text_encoder_3.to(dtype=weight_dtypes.text_encoder_3.torch_dtype())
-            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(supports_fp8=False))
+            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(
+                supports_quantization=False))
             tokenizer_3 = pipeline.tokenizer_3
         else:
             text_encoder_3 = None
