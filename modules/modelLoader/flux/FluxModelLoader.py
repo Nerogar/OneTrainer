@@ -96,6 +96,7 @@ class FluxModelLoader:
             old_value = module._buffers[tensor_name] if is_buffer else module._parameters[tensor_name]
 
             old_type = type(old_value)
+            value = value.to(dtype=dtype.torch_dtype())
             new_value = old_type(value)
 
             if is_buffer:
