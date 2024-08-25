@@ -595,17 +595,19 @@ class TrainConfig(BaseConfig):
     def to_pack_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
 
-        with open(config.concept_file_name, 'r') as f:
-            concepts = json.load(f)
-            for i in range(len(concepts)):
-                concepts[i] = ConceptConfig.default_values().from_dict(concepts[i])
-            config.concepts = concepts
+        if config.concepts is None:
+            with open(config.concept_file_name, 'r') as f:
+                concepts = json.load(f)
+                for i in range(len(concepts)):
+                    concepts[i] = ConceptConfig.default_values().from_dict(concepts[i])
+                config.concepts = concepts
 
-        with open(config.sample_definition_file_name, 'r') as f:
-            samples = json.load(f)
-            for i in range(len(samples)):
-                samples[i] = SampleConfig.default_values().from_dict(samples[i])
-            config.samples = samples
+        if config.samples is None:
+            with open(config.sample_definition_file_name, 'r') as f:
+                samples = json.load(f)
+                for i in range(len(samples)):
+                    samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                config.samples = samples
 
         return config.to_dict()
 
