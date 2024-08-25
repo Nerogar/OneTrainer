@@ -58,6 +58,7 @@ from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbedding
 from modules.modelSaver.WuerstchenFineTuneModelSaver import WuerstchenFineTuneModelSaver
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.FluxEmbeddingSetup import FluxEmbeddingSetup
 from modules.modelSetup.FluxFineTuneSetup import FluxFineTuneSetup
 from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
@@ -254,6 +255,8 @@ def create_model_setup(
                 return PixArtAlphaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_stable_diffusion_3():
                 return StableDiffusion3EmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_flux():
+                return FluxEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
 
