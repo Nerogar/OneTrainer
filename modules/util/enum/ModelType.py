@@ -69,6 +69,10 @@ class ModelType(Enum):
     def has_depth_input(self):
         return self == ModelType.STABLE_DIFFUSION_20_DEPTH
 
+    def has_multiple_text_encoders(self):
+        return self.is_stable_diffusion_3() \
+            or self.is_stable_diffusion_xl()
+
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \
             or self == ModelType.STABLE_DIFFUSION_15_INPAINTING

@@ -574,15 +574,18 @@ class TrainConfig(BaseConfig):
 
     def train_text_encoder_or_embedding(self) -> bool:
         return (self.text_encoder.train and self.training_method != TrainingMethod.EMBEDDING) \
-            or (self.text_encoder.train_embedding and self.train_any_embedding())
+            or ((self.text_encoder.train_embedding or not self.model_type.has_multiple_text_encoders())
+                and self.train_any_embedding())
 
     def train_text_encoder_2_or_embedding(self) -> bool:
         return (self.text_encoder_2.train and self.training_method != TrainingMethod.EMBEDDING) \
-            or (self.text_encoder_2.train_embedding and self.train_any_embedding())
+            or ((self.text_encoder_2.train_embedding or not self.model_type.has_multiple_text_encoders())
+                and self.train_any_embedding())
 
     def train_text_encoder_3_or_embedding(self) -> bool:
         return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING) \
-            or (self.text_encoder_3.train_embedding and self.train_any_embedding())
+            or ((self.text_encoder_3.train_embedding or not self.model_type.has_multiple_text_encoders())
+                and self.train_any_embedding())
 
     def to_settings_dict(self) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())
