@@ -69,14 +69,18 @@ class BaseStableDiffusion3Setup(
                         f" correctly and a GPU is available: {e}"
                     )
 
-        if config.gradient_checkpointing:
-            enable_checkpointing_for_stable_diffusion_3_transformer(model.transformer, self.train_device)
+        if config.gradient_checkpointing.enabled():
+            enable_checkpointing_for_stable_diffusion_3_transformer(
+                model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
             if model.text_encoder_1 is not None:
-                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, self.train_device)
+                enable_checkpointing_for_clip_encoder_layers(
+                    model.text_encoder_1, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
             if model.text_encoder_2 is not None:
-                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, self.train_device)
+                enable_checkpointing_for_clip_encoder_layers(
+                    model.text_encoder_2, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
             if model.text_encoder_3 is not None and config.train_text_encoder_3_or_embedding():
-                enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, self.train_device)
+                enable_checkpointing_for_t5_encoder_layers(
+                    model.text_encoder_3, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

@@ -6,6 +6,7 @@ from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
+from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
@@ -244,7 +245,8 @@ class TrainingTab:
         # gradient checkpointing
         components.label(frame, 4, 0, "Gradient checkpointing",
                          tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        components.switch(frame, 4, 1, self.ui_state, "gradient_checkpointing")
+        components.options(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
+                           "gradient_checkpointing")
 
         # train dtype
         components.label(frame, 5, 0, "Train Data Type",
