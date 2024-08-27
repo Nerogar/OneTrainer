@@ -10,6 +10,7 @@ from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.loss.masked_loss import masked_losses
 from modules.util.loss.vb_loss import vb_losses
+from modules.util.dtype_util import autocast_device_context
 
 import torch
 import torch.nn.functional as F
@@ -50,7 +51,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         match config.align_prop_loss:
             case AlignPropLoss.HPS:
-                with torch.autocast(device_type=train_device.type, dtype=data['predicted'].dtype):
+                with autocast_device_context(device=train_device, dtype=data['predicted'].dtype):
                     losses = self.__align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
             case AlignPropLoss.AESTHETIC:
                 losses = self.__align_prop_loss_fn(data['predicted'])

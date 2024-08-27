@@ -11,6 +11,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.torch_util import torch_gc
+from modules.util.dtype_util import autocast_device_context
 
 import torch
 from torch import nn
@@ -142,7 +143,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
                 # predict the noise residual
-                with torch.autocast(self.train_device.type):
+                with autocast_device_context(self.train_device):
                     noise_pred = unet(
                         sample=latent_model_input,
                         timestep=timestep,
@@ -382,7 +383,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             latent_model_input = torch.cat([latent_model_input] * 2)
 
             # predict the noise residual
-            with torch.autocast(self.train_device.type):
+            with autocast_device_context(self.train_device):
                 noise_pred = unet(
                     sample=latent_model_input,
                     timestep=timestep,

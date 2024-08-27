@@ -1,4 +1,4 @@
-from contextlib import nullcontext
+from contextlib import nullcontext, contextmanager, ExitStack
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
@@ -24,6 +24,27 @@ def create_grad_scaler():
     from modules.util.CustomGradScaler import CustomGradScaler
     return CustomGradScaler()
 
+@contextmanager
+def autocast_device_context(
+        device: torch.device,
+        *,
+        dtype: torch.dtype,
+        enabled: bool = True,
+        enable_autocast_cache: bool | None = None
+):
+    stack = ExitStack()
+    with stack:
+        stack.enter_context(
+            torch.autocast(
+                device_type=device.type,
+                dtype=dtype,
+                enabled=enabled,
+                cache_enabled=enable_autocast_cache
+            )
+        )
+        stack.enter_context(torch.device(device))
+        yield
+
 
 def create_autocast_context(
         device: torch.device,
@@ -42,9 +63,9 @@ def create_autocast_context(
     weight_dtypes = list(set(weight_dtypes))
 
     if len(weight_dtypes) == 1 and train_dtype == weight_dtypes[0]:
-        return torch.autocast(device_type=device.type, enabled=False), train_dtype
+        return autocast_device_context(device=device, enabled=False), train_dtype
     else:
-        return torch.autocast(device_type=device.type, dtype=train_dtype.torch_dtype(),
+        return autocast_device_context(device=device, dtype=train_dtype.torch_dtype(),
                               cache_enabled=enable_autocast_cache), train_dtype
 
 
@@ -64,10 +85,10 @@ def disable_fp16_autocast_context(
 
     if len(weight_dtypes) == 1 and fallback_train_dtype == weight_dtypes[0]:
         # fallback_train_dtype is the same as all weights -> disable autocast
-        return torch.autocast(device_type=device.type, enabled=False), weight_dtypes[0]
+        return autocast_device_context(device=device, enabled=False), weight_dtypes[0]
 
-    return torch.autocast(device_type=device.type, dtype=fallback_train_dtype.torch_dtype(),
-                          cache_enabled=enable_autocast_cache), fallback_train_dtype
+    return autocast_device_context(device=device, dtype=fallback_train_dtype.torch_dtype(),
+                              cache_enabled=enable_autocast_cache), fallback_train_dtype
 
 
 def disable_bf16_on_fp16_autocast_context(
@@ -89,7 +110,7 @@ def disable_bf16_on_fp16_autocast_context(
 
     if len(weight_dtypes) == 1:
         # all weights use the same dtype -> disable autocast
-        return torch.autocast(device_type=device.type, enabled=False), weight_dtypes[0]
+        return autocast_device_context(device=device, enabled=False), weight_dtypes[0]
 
-    return torch.autocast(device_type=device.type, dtype=weight_dtypes[0],
-                          cache_enabled=enable_autocast_cache), weight_dtypes[0]
+    return autocast_device_context(device=device, dtype=weight_dtypes[0],
+                              cache_enabled=enable_autocast_cache), weight_dtypes[0]
