@@ -30,7 +30,7 @@ def autocast_device_context(
         *,
         dtype: torch.dtype,
         enabled: bool = True,
-        enable_autocast_cache: bool | None = None
+        cache_enabled: bool | None = None
 ):
     stack = ExitStack()
     with stack:
@@ -39,7 +39,7 @@ def autocast_device_context(
                 device_type=device.type,
                 dtype=dtype,
                 enabled=enabled,
-                cache_enabled=enable_autocast_cache
+                cache_enabled=cache_enabled,
             )
         )
         stack.enter_context(torch.device(device))
