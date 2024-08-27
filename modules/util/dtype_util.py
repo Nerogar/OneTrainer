@@ -56,7 +56,7 @@ def create_autocast_context(
         if any(train_dtype != dt for dt in weight_dtypes if dt is not None):
             raise RuntimeError("macOS needs all dtypes to be the same.")
 
-        return nullcontext(), train_dtype
+        return torch.device(device), train_dtype
 
     weight_dtypes = list(weight_dtypes)
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))
