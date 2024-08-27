@@ -34,7 +34,7 @@ def autocast_device_context(
 ):
     stack = ExitStack()
     with stack:
-        ac_ctx = stack.enter_context(
+        stack.enter_context(
             torch.autocast(
                 device_type=device.type,
                 dtype=dtype,
@@ -43,7 +43,7 @@ def autocast_device_context(
             )
         )
         stack.enter_context(torch.device(device))
-        yield ac_ctx
+        yield stack
 
 
 def create_autocast_context(
