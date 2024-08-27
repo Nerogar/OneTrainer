@@ -222,25 +222,64 @@ class StableDiffusionModel(BaseModel):
             text_encoder_layer_skip: int = 0,
             text_encoder_output: Tensor | None = None,
     ):
+        chunk_length = 75
+        max_embeddings_multiples = 3
+
+        def __process_tokens(tokens):
+            if tokens is None or tokens.numel() == 0:
+                return None
+
+            chunks = [tokens[:, i:i + chunk_length] for i in range(0, tokens.shape[1], chunk_length)]
+            chunk_embeddings = []
+
+            for chunk in chunks:
+                if chunk.numel() == 0:
+                    continue
+
+                if chunk.shape[1] < chunk_length:
+                    padding = torch.full((chunk.shape[0], chunk_length - chunk.shape[1]), self.tokenizer.eos_token_id, dtype=chunk.dtype, device=chunk.device)
+                    chunk = torch.cat([chunk, padding], dim=1)
+
+                bos_tokens = torch.full((chunk.shape[0], 1), self.tokenizer.bos_token_id, dtype=chunk.dtype, device=chunk.device)
+                eos_tokens = torch.full((chunk.shape[0], 1), self.tokenizer.eos_token_id, dtype=chunk.dtype, device=chunk.device)
+                chunk = torch.cat([bos_tokens, chunk, eos_tokens], dim=1)
+                
+                with self.autocast_context:
+                    embedding, _ = encode_clip(
+                        text_encoder=self.text_encoder,
+                        tokens=chunk,
+                        default_layer=-1,
+                        layer_skip=text_encoder_layer_skip,
+                        text_encoder_output=None,
+                        add_pooled_output=False,
+                        use_attention_mask=False,
+                        add_layer_norm=True,
+                    )
+
+                chunk_embeddings.append(embedding)
+
+            if not chunk_embeddings:
+                return None
+
+            if len(chunk_embeddings) > max_embeddings_multiples:
+                chunk_embeddings = chunk_embeddings[:max_embeddings_multiples]
+
+            combined_embedding = torch.cat(chunk_embeddings, dim=1)
+
+            return combined_embedding
+
         if tokens is None:
             tokenizer_output = self.tokenizer(
                 text,
                 padding='max_length',
-                truncation=True,
-                max_length=77,
+                truncation=False,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
 
-        text_encoder_output, _ = encode_clip(
-            text_encoder=self.text_encoder,
-            tokens=tokens,
-            default_layer=-1,
-            layer_skip=text_encoder_layer_skip,
-            text_encoder_output=text_encoder_output,
-            add_pooled_output=False,
-            use_attention_mask=False,
-            add_layer_norm=True,
-        )
+        text_encoder_output = __process_tokens(tokens)
+
+        if text_encoder_output is None:
+            print("Text encoder output is None. Check your input text or tokens.")
 
         return text_encoder_output

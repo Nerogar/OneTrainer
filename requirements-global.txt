@@ -11,11 +11,12 @@ matplotlib==3.9.0
 # pytorch
 accelerate==0.30.1
 safetensors==0.4.3
-tensorboard==2.17.0
+tensorboard==2.17.1
 pytorch-lightning==2.2.5
 
 # stable diffusion
--e git+https://github.com/huggingface/diffusers.git@dd4b731#egg=diffusers
+# -e git+https://github.com/huggingface/diffusers.git@dd4b731#egg=diffusers
+diffusers==0.30.0
 transformers==4.42.3
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline

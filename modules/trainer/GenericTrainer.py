@@ -29,6 +29,8 @@ from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
+from accelerate import Accelerator
+
 import torch
 from torch import Tensor, nn
 from torch.nn import Parameter
@@ -60,6 +62,8 @@ class GenericTrainer(BaseTrainer):
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super(GenericTrainer, self).__init__(config, callbacks, commands)
+
+        self.accelerator = Accelerator()
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
@@ -137,6 +141,11 @@ class GenericTrainer(BaseTrainer):
         self.data_loader = self.create_data_loader(
             self.model, self.model.train_progress
         )
+
+        self.model, self.data_loader = self.accelerator.prepare(
+            self.model, self.data_loader
+        )
+
         self.model_saver = self.create_model_saver()
 
         self.model_sampler = self.create_model_sampler(self.model)
@@ -578,9 +587,9 @@ class GenericTrainer(BaseTrainer):
 
                 loss = loss / self.config.gradient_accumulation_steps
                 if scaler:
-                    scaler.scale(loss).backward()
+                    self.accelerator.backward(scaler.scale(loss))
                 else:
-                    loss.backward()
+                    self.accelerator.backward(loss)
 
                 has_gradient = True
                 accumulated_loss += loss.item()

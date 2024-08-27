@@ -203,49 +203,79 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_output: Tensor = None,
             pooled_text_encoder_2_output: Tensor = None,
     ):
+        chunk_length = 75
+        max_embeddings_multiples = 3
+
+        def __process_tokens(tokens, tokenizer, text_encoder, layer_skip):
+            if tokens is None or tokens.numel() == 0:
+                return None, None
+
+            chunks = [tokens[:, i:i + chunk_length] for i in range(0, tokens.shape[1], chunk_length)]
+            chunk_embeddings = []
+            pooled_outputs = []
+
+            for chunk in chunks:
+                if chunk.numel() == 0:
+                    continue
+
+                if chunk.shape[1] < chunk_length:
+                    padding = torch.full((chunk.shape[0], chunk_length - chunk.shape[1]), tokenizer.eos_token_id, dtype=chunk.dtype, device=chunk.device)
+                    chunk = torch.cat([chunk, padding], dim=1)
+
+                bos_tokens = torch.full((chunk.shape[0], 1), tokenizer.bos_token_id, dtype=chunk.dtype, device=chunk.device)
+                eos_tokens = torch.full((chunk.shape[0], 1), tokenizer.eos_token_id, dtype=chunk.dtype, device=chunk.device)
+                chunk = torch.cat([bos_tokens, chunk, eos_tokens], dim=1)
+                
+                with self.autocast_context:
+                    outputs = text_encoder(
+                        chunk,
+                        output_hidden_states=True,
+                        return_dict=True,
+                    )
+                    embedding = outputs.hidden_states[-(2 + layer_skip)]
+                    if hasattr(outputs, 'text_embeds'):
+                        pooled_outputs.append(outputs.text_embeds)
+
+                chunk_embeddings.append(embedding)
+
+            if not chunk_embeddings:
+                return None, None
+
+            if len(chunk_embeddings) > max_embeddings_multiples:
+                chunk_embeddings = chunk_embeddings[:max_embeddings_multiples]
+                if pooled_outputs:
+                    pooled_outputs = pooled_outputs[:max_embeddings_multiples]
+
+            combined_embedding = torch.cat(chunk_embeddings, dim=1)
+            pooled_output = pooled_outputs[0] if pooled_outputs else None
+
+            return combined_embedding, pooled_output
+
         if tokens_1 is None and text is not None:
-            tokenizer_output = self.tokenizer_1(
+            tokens_1 = self.tokenizer_1(
                 text,
                 padding='max_length',
-                truncation=True,
-                max_length=77,
+                truncation=False,
                 return_tensors="pt",
-            )
-            tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
+            ).input_ids.to(self.text_encoder_1.device)
 
         if tokens_2 is None and text is not None:
-            tokenizer_output = self.tokenizer_2(
+            tokens_2 = self.tokenizer_2(
                 text,
                 padding='max_length',
-                truncation=True,
-                max_length=77,
+                truncation=False,
                 return_tensors="pt",
-            )
-            tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
+            ).input_ids.to(self.text_encoder_2.device)
 
-        text_encoder_1_output, _ = encode_clip(
-            text_encoder=self.text_encoder_1,
-            tokens=tokens_1,
-            default_layer=-2,
-            layer_skip=text_encoder_1_layer_skip,
-            text_encoder_output=text_encoder_1_output,
-            add_pooled_output=False,
-            use_attention_mask=False,
-            add_layer_norm=False,
-        )
+        if text_encoder_1_output is None:
+            text_encoder_1_output, _ = __process_tokens(tokens_1, self.tokenizer_1, self.text_encoder_1, text_encoder_1_layer_skip)
 
-        text_encoder_2_output, pooled_text_encoder_2_output = encode_clip(
-            text_encoder=self.text_encoder_2,
-            tokens=tokens_2,
-            default_layer=-2,
-            layer_skip=text_encoder_2_layer_skip,
-            text_encoder_output=text_encoder_2_output,
-            add_pooled_output=True,
-            pooled_text_encoder_output=pooled_text_encoder_2_output,
-            use_attention_mask=False,
-            add_layer_norm=False,
-        )
+        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
+            text_encoder_2_output, pooled_text_encoder_2_output = __process_tokens(tokens_2, self.tokenizer_2, self.text_encoder_2, text_encoder_2_layer_skip)
 
-        text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
+        if text_encoder_1_output is None or text_encoder_2_output is None:
+            print("Both text encoder outputs are None. Check your input text or tokens.")
+
+        text_encoder_output = torch.cat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 
         return text_encoder_output, pooled_text_encoder_2_output
