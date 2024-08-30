@@ -368,4 +368,14 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "adam_debias": False,
         "eps": 1e-8,
     },
+    Optimizer.ADAM_MINI: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "model_sharding": False,
+        # "dim": None,
+        # "n_heads": None,
+        # "n_kv_heads": None,
+    },
 }

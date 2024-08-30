@@ -34,6 +34,7 @@ lion-pytorch==0.1.4 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer
 schedulefree==1.2.5 # schedule-free optimizers
 pytorch_optimizer==3.0.2 # pytorch optimizers
+adam_mini
 
 # Profiling
 scalene==1.5.41
