@@ -144,7 +144,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'r': {'title': 'R', 'tooltip': 'EMA factor.', 'type': 'float'},
             'adanorm': {'title': 'AdaNorm', 'tooltip': 'Whether to use the AdaNorm variant', 'type': 'bool'},
             'adam_debias': {'title': 'Adam Debias', 'tooltip': 'Only correct the denominator to avoid inflating step sizes early in training.', 'type': 'bool'},
-
+            'model_sharding': {'title': 'Model Sharding', 'tooltip': 'Whether to use model sharding for distributed training.', 'type': 'bool'},
         }
         # @formatter:on
 
