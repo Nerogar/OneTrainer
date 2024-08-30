@@ -818,8 +818,11 @@ def create_optimizer(
         # Adam-mini Optimizer
         case Optimizer.ADAM_MINI:
             from adam_mini import Adam_mini
+            named_parameters = [(f'group_{i}.param_{j}', param)
+                                for i, group in enumerate(parameters)
+                                for j, param in enumerate(group['params'])]
             optimizer = Adam_mini(
-                named_parameters=parameters,
+                named_parameters=named_parameters,
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
