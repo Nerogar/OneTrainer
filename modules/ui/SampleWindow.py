@@ -10,6 +10,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -99,9 +100,25 @@ class SampleWindow(ctk.CTkToplevel):
             training_method=self.initial_train_config.training_method,
         )
 
+        model_names = self.initial_train_config.model_names()
+        if self.initial_train_config.continue_last_backup:
+            last_backup_path = self.initial_train_config.get_last_backup_path()
+
+            if last_backup_path:
+                if self.initial_train_config.training_method == TrainingMethod.LORA:
+                    model_names.lora = last_backup_path
+                elif self.initial_train_config.training_method == TrainingMethod.EMBEDDING:
+                    model_names.embedding.model_name = last_backup_path
+                else:  # fine-tunes
+                    model_names.base_model = last_backup_path
+
+                print(f"Loading from backup '{last_backup_path}'...")
+            else:
+                print("No backup found, loading without backup...")
+
         model = model_loader.load(
             model_type=self.initial_train_config.model_type,
-            model_names=self.initial_train_config.model_names(),
+            model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
         )
         model.train_config = self.initial_train_config

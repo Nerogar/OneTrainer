@@ -103,7 +103,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.continue_last_backup:
             self.callbacks.on_update_status("searching for previous backups")
-            last_backup_path = self.__get_last_backup_dirpath()
+            last_backup_path = self.config.get_last_backup_path()
 
             if last_backup_path:
                 if self.config.training_method == TrainingMethod.LORA:
@@ -156,21 +156,6 @@ class GenericTrainer(BaseTrainer):
                 path = os.path.join(self.config.cache_dir, filename)
                 if os.path.isdir(path) and (filename.startswith('epoch-') or filename in ['image', 'text']):
                     shutil.rmtree(path)
-
-    def __get_last_backup_dirpath(self):
-        backup_dirpath = os.path.join(self.config.workspace_dir, "backup")
-        if os.path.exists(backup_dirpath):
-            backup_directories = sorted(
-                [dirpath for dirpath in os.listdir(backup_dirpath) if
-                 os.path.isdir(os.path.join(backup_dirpath, dirpath))],
-                reverse=True,
-            )
-
-            if backup_directories:
-                last_backup_dirpath = backup_directories[0]
-                return os.path.join(backup_dirpath, last_backup_dirpath)
-
-        return None
 
     def __prune_backups(self, backups_to_keep: int):
         backup_dirpath = os.path.join(self.config.workspace_dir, "backup")
