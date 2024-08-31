@@ -347,7 +347,7 @@ class DoRAModule(LoRAModule):
         super().__init__(*args, **kwargs)
         self.register_load_state_dict_post_hook(self.__set_dora_scale_initialized)
 
-    def __set_dora_scale_initialized(self):
+    def __set_dora_scale_initialized(self, *args, **kwargs):
         self.dora_scale_initialized = True
 
     def initialize_weights(self):
