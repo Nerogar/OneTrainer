@@ -107,10 +107,14 @@ class TopBar:
         elif self.train_config.model_type.is_stable_diffusion_3() \
                 or self.train_config.model_type.is_stable_diffusion_xl() \
                 or self.train_config.model_type.is_wuerstchen() \
-                or self.train_config.model_type.is_pixart() \
-                or self.train_config.model_type.is_flux():
+                or self.train_config.model_type.is_pixart():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_config.model_type.is_flux():
+            values = [
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
