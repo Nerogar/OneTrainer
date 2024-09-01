@@ -56,6 +56,15 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 losses = self.__align_prop_loss_fn(data['predicted'])
 
         return losses * config.align_prop_weight
+    
+    def __log_cosh_loss(
+            self,
+            pred: torch.Tensor,
+            target: torch.Tensor,
+    ):
+        diff = pred - target
+        loss = diff + torch.nn.functional.softplus(-2.0*diff) - torch.log(torch.full(size=diff.size(), fill_value=2.0, dtype=torch.float32, device=diff.device))
+        return loss
 
     def __masked_losses(
             self,
@@ -90,6 +99,18 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
             ).mean([1, 2, 3]) * config.mae_strength
+
+        # log-cosh Loss
+        if config.log_cosh_strength != 0:
+            losses += masked_losses(
+                losses=self.__log_cosh_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['target'].to(dtype=torch.float32)
+                ),
+                mask=batch['latent_mask'].to(dtype=torch.float32),
+                unmasked_weight=config.unmasked_weight,
+                normalize_masked_area_loss=config.normalize_masked_area_loss,
+            ).mean([1, 2, 3]) * config.log_cosh_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data and self.__coefficients is not None:
@@ -132,6 +153,13 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 data['target'].to(dtype=torch.float32),
                 reduction='none'
             ).mean([1, 2, 3]) * config.mae_strength
+
+        # log-cosh Loss
+        if config.log_cosh_strength != 0:
+            losses += self.__log_cosh_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['target'].to(dtype=torch.float32)
+                ).mean([1, 2, 3]) * config.log_cosh_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data:
