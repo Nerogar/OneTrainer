@@ -1,3 +1,4 @@
+import copy
 import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -35,16 +36,22 @@ class PixArtAlphaBaseDataLoader(
             config: TrainConfig,
             model: PixArtAlphaModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         super(PixArtAlphaBaseDataLoader, self).__init__(
             train_device,
             temp_device,
         )
 
+        if is_validation:
+            config = copy.copy(config)
+            config.batch_size = 1
+
         self.__ds = self.create_dataset(
             config=config,
             model=model,
             train_progress=train_progress,
+            is_validation=is_validation,
         )
         self.__dl = TrainDataLoader(self.__ds, config.batch_size)
 
@@ -84,7 +91,6 @@ class PixArtAlphaBaseDataLoader(
             modules.append(encode_prompt)
 
         return modules
-
 
     def _cache_modules(self, config: TrainConfig, model: PixArtAlphaModel):
         image_split_names = ['latent_image']
@@ -141,7 +147,6 @@ class PixArtAlphaBaseDataLoader(
 
         return modules
 
-
     def _output_modules(self, config: TrainConfig, model: PixArtAlphaModel):
         output_names = ['latent_image', 'tokens', 'tokens_mask', 'image_path', 'prompt']
 
@@ -156,6 +161,11 @@ class PixArtAlphaBaseDataLoader(
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+
+        # add for calculating loss per concept
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.seed', 'concept_seed'))
 
         def before_cache_image_fun():
             model.to(self.temp_device)
@@ -212,12 +222,12 @@ class PixArtAlphaBaseDataLoader(
 
         return modules
 
-
     def create_dataset(
             self,
             config: TrainConfig,
             model: PixArtAlphaModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config)
         load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt)
@@ -249,5 +259,6 @@ class PixArtAlphaBaseDataLoader(
                 debug_modules if config.debug_mode else None,
                 # inserted before output_modules, which contains a sorting operation
             ],
-            train_progress
+            train_progress,
+            is_validation,
         )
