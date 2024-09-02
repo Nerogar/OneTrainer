@@ -64,7 +64,7 @@ class BaseWuerstchenSetup(
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor2_0())
 
-        if config.gradient_checkpointing:
+        if config.gradient_checkpointing.enabled():
             if model.model_type.is_wuerstchen_v2():
                 model.prior_prior.enable_gradient_checkpointing()
                 enable_checkpointing_for_clip_encoder_layers(
