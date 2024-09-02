@@ -18,14 +18,17 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             config: TrainConfig,
             definition: list,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         if config.concepts is not None:
             concepts = [concept.to_dict() for concept in config.concepts]
         else:
             with open(config.concept_file_name, 'r') as f:
-                concepts = json.load(f)
-                for i in range(len(concepts)):
-                    concepts[i] = ConceptConfig.default_values().from_dict(concepts[i]).to_dict()
+                concepts_source = json.load(f)
+            concepts = []
+            for concept in concepts_source:
+                if not config.validation or is_validation == concept['validation_concept']:
+                    concepts.append(ConceptConfig.default_values().from_dict(concept).to_dict())
 
         settings = {
             "target_resolution": config.resolution,
