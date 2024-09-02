@@ -100,15 +100,20 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Enable or disable this concept")
         components.switch(frame, 1, 1, self.ui_state, "enabled")
 
+        # validation_concept
+        components.label(frame, 2, 0, "Validation concept",
+                         tooltip="Enable concept as validation one")
+        components.switch(frame, 2, 1, self.ui_state, "validation_concept")
+
         # path
-        components.label(frame, 2, 0, "Path",
+        components.label(frame, 3, 0, "Path",
                          tooltip="Path where the training data is located")
-        components.dir_entry(frame, 2, 1, self.ui_state, "path")
+        components.dir_entry(frame, 3, 1, self.ui_state, "path")
 
         # prompt source
-        components.label(frame, 3, 0, "Prompt Source",
+        components.label(frame, 4, 0, "Prompt Source",
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
-        prompt_path_entry = components.file_entry(frame, 3, 2, self.text_ui_state, "prompt_path")
+        prompt_path_entry = components.file_entry(frame, 4, 2, self.text_ui_state, "prompt_path")
 
         def set_prompt_path_entry_enabled(option: str):
             if option == 'concept':
@@ -118,7 +123,7 @@ class ConceptWindow(ctk.CTkToplevel):
                 for child in prompt_path_entry.children.values():
                     child.configure(state="disabled")
 
-        components.options_kv(frame, 3, 1, [
+        components.options_kv(frame, 4, 1, [
             ("From text file per sample", 'sample'),
             ("From single text file", 'concept'),
             ("From image file name", 'filename'),
@@ -126,30 +131,30 @@ class ConceptWindow(ctk.CTkToplevel):
         set_prompt_path_entry_enabled(concept.text.prompt_source)
 
         # include subdirectories
-        components.label(frame, 4, 0, "Include Subdirectories",
+        components.label(frame, 5, 0, "Include Subdirectories",
                          tooltip="Includes images from subdirectories into the dataset")
-        components.switch(frame, 4, 1, self.ui_state, "include_subdirectories")
+        components.switch(frame, 5, 1, self.ui_state, "include_subdirectories")
 
         # image variations
-        components.label(frame, 5, 0, "Image Variations",
+        components.label(frame, 6, 0, "Image Variations",
                          tooltip="The number of different image versions to cache if latent caching is enabled.")
-        components.entry(frame, 5, 1, self.ui_state, "image_variations")
+        components.entry(frame, 6, 1, self.ui_state, "image_variations")
 
         # text variations
-        components.label(frame, 6, 0, "Text Variations",
+        components.label(frame, 7, 0, "Text Variations",
                          tooltip="The number of different text versions to cache if latent caching is enabled.")
-        components.entry(frame, 6, 1, self.ui_state, "text_variations")
+        components.entry(frame, 7, 1, self.ui_state, "text_variations")
 
         # balancing
-        components.label(frame, 7, 0, "Balancing",
+        components.label(frame, 8, 0, "Balancing",
                          tooltip="The number of samples used during training. Use repeats to multiply the concept, or samples to specify an exact number of samples used in each epoch.")
-        components.entry(frame, 7, 1, self.ui_state, "balancing")
-        components.options(frame, 7, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
+        components.entry(frame, 8, 1, self.ui_state, "balancing")
+        components.options(frame, 8, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
 
         # loss weight
-        components.label(frame, 8, 0, "Loss Weight",
+        components.label(frame, 9, 0, "Loss Weight",
                          tooltip="The loss multiplyer for this concept.")
-        components.entry(frame, 8, 1, self.ui_state, "loss_weight")
+        components.entry(frame, 9, 1, self.ui_state, "loss_weight")
 
         frame.pack(fill="both", expand=1)
         return frame
