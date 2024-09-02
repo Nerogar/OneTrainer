@@ -108,6 +108,7 @@ class ConceptConfig(BaseConfig):
     path: str
     seed: int
     enabled: bool
+    validation_concept: bool
     include_subdirectories: bool
     image_variations: int
     text_variations: int
@@ -153,6 +154,7 @@ class ConceptConfig(BaseConfig):
         data.append(("path", "", str, False))
         data.append(("seed", random.randint(-(1 << 30), 1 << 30), int, False))
         data.append(("enabled", True, bool, False))
+        data.append(("validation_concept", False, bool, False))
         data.append(("include_subdirectories", False, bool, False))
         data.append(("image_variations", 1, int, False))
         data.append(("text_variations", 1, int, False))
