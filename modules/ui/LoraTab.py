@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from modules.modelSetup.FluxLoRASetup import PRESETS as flux_presets
 from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
 from modules.modelSetup.StableDiffusion3LoRASetup import PRESETS as sd3_presets
 from modules.modelSetup.StableDiffusionLoRASetup import PRESETS as sd_presets
@@ -49,6 +50,8 @@ class LoraTab:
             self.presets = sc_presets
         elif self.train_config.model_type.is_pixart():
             self.presets = pixart_presets
+        elif self.train_config.model_type.is_flux():
+            self.presets = flux_presets
         else:
             self.presets = {"full": []}
         self.presets_list = list(self.presets.keys()) + ["custom"]

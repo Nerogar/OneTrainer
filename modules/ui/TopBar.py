@@ -84,6 +84,7 @@ class TopBar:
                 ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
                 ("PixArt Sigma", ModelType.PIXART_SIGMA),
+                ("Flux Dev", ModelType.FLUX_DEV_1),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -109,6 +110,11 @@ class TopBar:
                 or self.train_config.model_type.is_pixart():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
+                ("LoRA", TrainingMethod.LORA),
+                ("Embedding", TrainingMethod.EMBEDDING),
+            ]
+        elif self.train_config.model_type.is_flux():
+            values = [
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]

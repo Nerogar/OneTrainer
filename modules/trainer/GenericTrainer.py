@@ -25,6 +25,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.memory_util import TorchMemoryRecorder
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -106,7 +107,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.continue_last_backup:
             self.callbacks.on_update_status("searching for previous backups")
-            last_backup_path = self.__get_last_backup_dirpath()
+            last_backup_path = self.config.get_last_backup_path()
 
             if last_backup_path:
                 if self.config.training_method == TrainingMethod.LORA:
@@ -164,21 +165,6 @@ class GenericTrainer(BaseTrainer):
                 path = os.path.join(self.config.cache_dir, filename)
                 if os.path.isdir(path) and (filename.startswith('epoch-') or filename in ['image', 'text']):
                     shutil.rmtree(path)
-
-    def __get_last_backup_dirpath(self):
-        backup_dirpath = os.path.join(self.config.workspace_dir, "backup")
-        if os.path.exists(backup_dirpath):
-            backup_directories = sorted(
-                [dirpath for dirpath in os.listdir(backup_dirpath) if
-                 os.path.isdir(os.path.join(backup_dirpath, dirpath))],
-                reverse=True,
-            )
-
-            if backup_directories:
-                last_backup_dirpath = backup_directories[0]
-                return os.path.join(backup_dirpath, last_backup_dirpath)
-
-        return None
 
     def __prune_backups(self, backups_to_keep: int):
         backup_dirpath = os.path.join(self.config.workspace_dir, "backup")
@@ -581,64 +567,65 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("training")
 
-                model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                with TorchMemoryRecorder(enabled=False):
+                    model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
-                loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
+                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
-                loss = loss / self.config.gradient_accumulation_steps
-                if scaler:
-                    self.accelerator.backward(scaler.scale(loss))
-                else:
-                    self.accelerator.backward(loss)
-
-                has_gradient = True
-                accumulated_loss += loss.item()
-
-                if self.__is_update_step(train_progress):
-                    if scaler and self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
-                        scaler.step_after_unscale_parameter_(self.model.optimizer)
-                        scaler.update()
-                    elif scaler:
-                        scaler.unscale_(self.model.optimizer)
-                        nn.utils.clip_grad_norm_(self.parameters, 1)
-                        scaler.step(self.model.optimizer)
-                        scaler.update()
+                    loss = loss / self.config.gradient_accumulation_steps
+                    if scaler:
+                        self.accelerator.backward(scaler.scale(loss))
                     else:
-                        nn.utils.clip_grad_norm_(self.parameters, 1)
-                        self.model.optimizer.step()
+                        self.accelerator.backward(loss)
 
-                    lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
-                    self.model.optimizer.zero_grad(set_to_none=True)
-                    has_gradient = False
+                    has_gradient = True
+                    accumulated_loss += loss.item()
 
-                    self.model_setup.report_to_tensorboard(
-                        self.model, self.config, lr_scheduler, self.tensorboard
-                    )
+                    if self.__is_update_step(train_progress):
+                        if scaler and self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
+                            scaler.step_after_unscale_parameter_(self.model.optimizer)
+                            scaler.update()
+                        elif scaler:
+                            scaler.unscale_(self.model.optimizer)
+                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            scaler.step(self.model.optimizer)
+                            scaler.update()
+                        else:
+                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            self.model.optimizer.step()
 
-                    self.tensorboard.add_scalar("loss/loss", accumulated_loss, train_progress.global_step)
-                    ema_loss = ema_loss or accumulated_loss
-                    ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
-                    step_tqdm.set_postfix({
-                        'loss': accumulated_loss,
-                        'smooth loss': ema_loss,
-                    })
-                    self.tensorboard.add_scalar("loss/smooth loss", ema_loss, train_progress.global_step)
-                    accumulated_loss = 0.0
+                        lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
+                        self.model.optimizer.zero_grad(set_to_none=True)
+                        has_gradient = False
 
-                    self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
-                    if self.model.ema:
-                        update_step = train_progress.global_step // self.config.gradient_accumulation_steps
-                        self.tensorboard.add_scalar(
-                            "ema_decay",
-                            self.model.ema.get_current_decay(update_step),
-                            train_progress.global_step
-                        )
-                        self.model.ema.step(
-                            self.parameters,
-                            update_step
+                        self.model_setup.report_to_tensorboard(
+                            self.model, self.config, lr_scheduler, self.tensorboard
                         )
 
-                    self.one_step_trained = True
+                        self.tensorboard.add_scalar("loss/loss", accumulated_loss, train_progress.global_step)
+                        ema_loss = ema_loss or accumulated_loss
+                        ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
+                        step_tqdm.set_postfix({
+                            'loss': accumulated_loss,
+                            'smooth loss': ema_loss,
+                        })
+                        self.tensorboard.add_scalar("loss/smooth loss", ema_loss, train_progress.global_step)
+                        accumulated_loss = 0.0
+
+                        self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
+                        if self.model.ema:
+                            update_step = train_progress.global_step // self.config.gradient_accumulation_steps
+                            self.tensorboard.add_scalar(
+                                "ema_decay",
+                                self.model.ema.get_current_decay(update_step),
+                                train_progress.global_step
+                            )
+                            self.model.ema.step(
+                                self.parameters,
+                                update_step
+                            )
+
+                        self.one_step_trained = True
 
                 train_progress.next_step(self.config.batch_size)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)

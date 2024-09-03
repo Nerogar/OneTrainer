@@ -1,7 +1,7 @@
 import os
 import traceback
 
-from modules.model.StableDiffusion3Model import StableDiffusion3Model
+from modules.model.FluxModel import FluxModel
 from modules.util.ModelNames import EmbeddingName, ModelNames
 
 import torch
@@ -10,14 +10,14 @@ from torch import Tensor
 from safetensors.torch import load_file
 
 
-class StableDiffusion3EmbeddingLoader:
+class FluxEmbeddingLoader:
     def __init__(self):
-        super(StableDiffusion3EmbeddingLoader, self).__init__()
+        super(FluxEmbeddingLoader, self).__init__()
 
     def __load_embedding(
             self,
             embedding_name: str,
-    ) -> tuple[Tensor, Tensor, Tensor] | None:
+    ) -> tuple[Tensor, Tensor] | None:
         if embedding_name == "":
             return None
 
@@ -25,10 +25,9 @@ class StableDiffusion3EmbeddingLoader:
             embedding_state = torch.load(embedding_name)
 
             text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
-            text_encoder_2_vector = embedding_state['clip_g'] if 'clip_g' in embedding_state else None
-            text_encoder_3_vector = embedding_state['t5'] if 't5' in embedding_state else None
+            text_encoder_2_vector = embedding_state['t5'] if 't5' in embedding_state else None
 
-            return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
+            return text_encoder_1_vector, text_encoder_2_vector
         except:
             pass
 
@@ -36,10 +35,9 @@ class StableDiffusion3EmbeddingLoader:
             embedding_state = load_file(embedding_name)
 
             text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
-            text_encoder_2_vector = embedding_state['clip_g'] if 'clip_g' in embedding_state else None
-            text_encoder_3_vector = embedding_state['t5'] if 't5' in embedding_state else None
+            text_encoder_2_vector = embedding_state['t5'] if 't5' in embedding_state else None
 
-            return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
+            return text_encoder_1_vector, text_encoder_2_vector
         except:
             pass
 
@@ -50,7 +48,7 @@ class StableDiffusion3EmbeddingLoader:
             directory: str,
             embedding_name: EmbeddingName,
             load_single: bool,
-    ) -> tuple[Tensor, Tensor, Tensor] | None:
+    ) -> tuple[Tensor, Tensor] | None:
         if os.path.exists(os.path.join(directory, "meta.json")):
             if load_single:
                 safetensors_embedding_name = os.path.join(
@@ -74,7 +72,7 @@ class StableDiffusion3EmbeddingLoader:
 
     def load_multiple(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             model_names: ModelNames,
     ):
         model.additional_embedding_states = []
@@ -100,7 +98,7 @@ class StableDiffusion3EmbeddingLoader:
 
     def load_single(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             model_names: ModelNames,
     ):
         stacktraces = []

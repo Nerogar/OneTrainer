@@ -22,6 +22,8 @@ class ModelType(Enum):
     PIXART_ALPHA = 'PIXART_ALPHA'
     PIXART_SIGMA = 'PIXART_SIGMA'
 
+    FLUX_DEV_1 = 'FLUX_DEV_1'
+
     def __str__(self):
         return self.value
 
@@ -39,6 +41,9 @@ class ModelType(Enum):
         return self == ModelType.STABLE_DIFFUSION_XL_10_BASE \
             or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
 
+    def is_stable_diffusion_3(self):
+        return self == ModelType.STABLE_DIFFUSION_3
+
     def is_wuerstchen(self):
         return self == ModelType.WUERSTCHEN_2 \
             or self == ModelType.STABLE_CASCADE_1
@@ -47,14 +52,14 @@ class ModelType(Enum):
         return self == ModelType.PIXART_ALPHA \
             or self == ModelType.PIXART_SIGMA
 
-    def is_stable_diffusion_3(self):
-        return self == ModelType.STABLE_DIFFUSION_3
-
     def is_pixart_alpha(self):
         return self == ModelType.PIXART_ALPHA
 
     def is_pixart_sigma(self):
         return self == ModelType.PIXART_SIGMA
+
+    def is_flux(self):
+        return self == ModelType.FLUX_DEV_1
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
@@ -71,7 +76,8 @@ class ModelType(Enum):
 
     def has_multiple_text_encoders(self):
         return self.is_stable_diffusion_3() \
-            or self.is_stable_diffusion_xl()
+            or self.is_stable_diffusion_xl() \
+            or self.is_flux()
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \

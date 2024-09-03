@@ -5,6 +5,7 @@ from typing import Any, Mapping, Tuple
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
+from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
 import torch
 import torch.nn.functional as F
@@ -34,10 +35,10 @@ class PeftBase(nn.Module):
             match orig_module:
                 case nn.Linear():
                     self.op = F.linear
-                    self.shape = orig_module.weight.shape
+                    self.shape = get_weight_shape(orig_module)
                 case nn.Conv2d():
                     self.op = F.conv2d
-                    self.shape = orig_module.weight.shape
+                    self.shape = get_weight_shape(orig_module)
                     self.layer_kwargs.setdefault("stride", orig_module.stride)
                     self.layer_kwargs.setdefault("padding", orig_module.padding)
                     self.layer_kwargs.setdefault("dilation", orig_module.dilation)
@@ -341,25 +342,23 @@ class DoRAModule(LoRAModule):
 
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
+        self.dora_scale_initialized = False
         self.norm_epsilon = kwargs.pop('norm_epsilon', False)
         super().__init__(*args, **kwargs)
+        self.register_load_state_dict_post_hook(self.__set_dora_scale_initialized)
+
+    def __set_dora_scale_initialized(self, *args, **kwargs):
+        self.dora_scale_initialized = True
 
     def initialize_weights(self):
         super().initialize_weights()
 
-        # Thanks to KohakuBlueLeaf once again for figuring out the shape
-        # wrangling that works for both Linear and Convolutional layers. If you
-        # were just doing this for Linear, it would be substantially simpler.
-        orig_weight = self.orig_module.weight.detach().float()
-        self.dora_num_dims = orig_weight.dim() - 1
+        self.dora_num_dims = len(self.shape) - 1
         self.dora_scale = nn.Parameter(
-            torch.norm(
-                orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1),
-                dim=1, keepdim=True)
-            .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
+            torch.ones(size=(self.shape[1],))
+            .reshape(self.shape[1], *[1] * self.dora_num_dims)
             .transpose(1, 0)
-            .to(dtype=self.orig_module.weight.dtype,
-                device=self.orig_module.weight.device)
+            .to(device=self.orig_module.weight.device)
         )
 
     def check_initialized(self):
@@ -367,11 +366,32 @@ class DoRAModule(LoRAModule):
         assert self.dora_scale is not None
 
     def forward(self, x, *args, **kwargs):
-        self.check_initialized()
-
         A = self.lora_down.weight
         B = self.lora_up.weight
-        WP = self.orig_module.weight + (self.make_weight(A, B) * (self.alpha / self.rank))
+        orig_weight = get_unquantized_weight(self.orig_module, A.dtype)
+
+        if not self.dora_scale_initialized:
+            # Thanks to KohakuBlueLeaf once again for figuring out the shape
+            # wrangling that works for both Linear and Convolutional layers. If you
+            # were just doing this for Linear, it would be substantially simpler.
+
+            # dora_scale is not initialized in initialize_weights, because at that point, orig_weight
+            # could still be located on the wrong device, or not loaded at all. Instead,  we use lazy
+            # initialization during the first forward pass
+            self.dora_scale = nn.Parameter(
+                torch.norm(
+                    orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1),
+                    dim=1, keepdim=True)
+                .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
+                .transpose(1, 0)
+                .to(device=self.orig_module.weight.device)
+            )
+            self.dora_scale_initialized = True
+
+        self.check_initialized()
+
+        WP = orig_weight + (self.make_weight(A, B) * (self.alpha / self.rank))
+        del orig_weight
         # A norm should never really end up zero at any point, but epsilon just
         # to be safe if we underflow or something. Also, as per section 4.3 of
         # the paper, we treat the norm as a constant for the purposes of

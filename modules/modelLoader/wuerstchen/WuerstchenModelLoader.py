@@ -73,7 +73,7 @@ class WuerstchenModelLoader:
                 torch_dtype=weight_dtypes.decoder_text_encoder.torch_dtype(),
             )
             decoder_text_encoder.text_model.embeddings.to(
-                dtype=weight_dtypes.text_encoder.torch_dtype(supports_fp8=False))
+                dtype=weight_dtypes.text_encoder.torch_dtype(supports_quantization=False))
         if model_type.is_stable_cascade():
             decoder_text_encoder = None
 

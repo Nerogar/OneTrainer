@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from random import Random
 
-from modules.model.StableDiffusion3Model import StableDiffusion3Model, StableDiffusion3ModelEmbedding
+from modules.model.FluxModel import FluxModel, FluxModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
@@ -12,24 +12,21 @@ from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     create_checkpointed_forward,
     enable_checkpointing_for_clip_encoder_layers,
-    enable_checkpointing_for_stable_diffusion_3_transformer,
+    enable_checkpointing_for_flux_transformer,
     enable_checkpointing_for_t5_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.quantization_util import set_nf4_compute_type
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
 
-from diffusers.models.attention_processor import JointAttnProcessor2_0
-from diffusers.utils import is_xformers_available
 
-
-class BaseStableDiffusion3Setup(
+class BaseFluxSetup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
@@ -41,46 +38,43 @@ class BaseStableDiffusion3Setup(
 
     def _setup_optimizations(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             config: TrainConfig,
     ):
-        if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            pass
-            # model.transformer.set_attn_processor(AttnProcessor())
-        elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-            try:
-                # TODO: there is no xformers attention processor like JointAttnProcessor2_0 yet
-                # model.transformer.set_attn_processor(XFormersAttnProcessor())
-                model.vae.enable_xformers_memory_efficient_attention()
-            except Exception as e:
-                print(
-                    "Could not enable memory efficient attention. Make sure xformers is installed"
-                    f" correctly and a GPU is available: {e}"
-                )
-        elif config.attention_mechanism == AttentionMechanism.SDP:
-            model.transformer.set_attn_processor(JointAttnProcessor2_0())
-
-            if is_xformers_available():
-                try:
-                    model.vae.enable_xformers_memory_efficient_attention()
-                except Exception as e:
-                    print(
-                        "Could not enable memory efficient attention. Make sure xformers is installed"
-                        f" correctly and a GPU is available: {e}"
-                    )
+        # if config.attention_mechanism == AttentionMechanism.DEFAULT:
+        #     pass
+        #     # model.transformer.set_attn_processor(AttnProcessor())
+        # elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
+        #     try:
+        #         # TODO: there is no xformers attention processor like JointAttnProcessor2_0 yet
+        #         # model.transformer.set_attn_processor(XFormersAttnProcessor())
+        #         model.vae.enable_xformers_memory_efficient_attention()
+        #     except Exception as e:
+        #         print(
+        #             "Could not enable memory efficient attention. Make sure xformers is installed"
+        #             f" correctly and a GPU is available: {e}"
+        #         )
+        # elif config.attention_mechanism == AttentionMechanism.SDP:
+        #     model.transformer.set_attn_processor(JointAttnProcessor2_0())
+        #
+        #     if is_xformers_available():
+        #         try:
+        #             model.vae.enable_xformers_memory_efficient_attention()
+        #         except Exception as e:
+        #             print(
+        #                 "Could not enable memory efficient attention. Make sure xformers is installed"
+        #                 f" correctly and a GPU is available: {e}"
+        #             )
 
         if config.gradient_checkpointing.enabled():
-            enable_checkpointing_for_stable_diffusion_3_transformer(
+            enable_checkpointing_for_flux_transformer(
                 model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
             if model.text_encoder_1 is not None:
                 enable_checkpointing_for_clip_encoder_layers(
                     model.text_encoder_1, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-            if model.text_encoder_2 is not None:
-                enable_checkpointing_for_clip_encoder_layers(
-                    model.text_encoder_2, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-            if model.text_encoder_3 is not None and config.train_text_encoder_3_or_embedding():
+            if model.text_encoder_2 is not None and config.train_text_encoder_2_or_embedding():
                 enable_checkpointing_for_t5_encoder_layers(
-                    model.text_encoder_3, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                    model.text_encoder_2, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
@@ -92,28 +86,31 @@ class BaseStableDiffusion3Setup(
             config.weight_dtypes().prior,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().text_encoder_2,
-            config.weight_dtypes().text_encoder_3,
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
 
-        model.text_encoder_3_autocast_context, model.text_encoder_3_train_dtype = \
+        model.text_encoder_2_autocast_context, model.text_encoder_2_train_dtype = \
             disable_fp16_autocast_context(
                 self.train_device,
                 config.train_dtype,
                 config.fallback_train_dtype,
                 [
-                    config.weight_dtypes().text_encoder_3,
+                    config.weight_dtypes().text_encoder_2,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
                     config.weight_dtypes().embedding if config.train_any_embedding() else None,
                 ],
                 config.enable_autocast_cache,
             )
 
+        set_nf4_compute_type(model.text_encoder_1, model.train_dtype)
+        set_nf4_compute_type(model.text_encoder_2, model.text_encoder_2_train_dtype)
+        set_nf4_compute_type(model.transformer, model.train_dtype)
+
     def _setup_additional_embeddings(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             config: TrainConfig,
     ):
         model.additional_embeddings = []
@@ -139,18 +136,8 @@ class BaseStableDiffusion3Setup(
                     )
                 else:
                     embedding_state_2 = None
-
-                if model.tokenizer_3 is not None and model.text_encoder_3 is not None:
-                    embedding_state_3 = self._create_new_embedding(
-                        model.tokenizer_3,
-                        model.text_encoder_3,
-                        config.additional_embeddings[i].initial_embedding_text,
-                        config.additional_embeddings[i].token_count,
-                    )
-                else:
-                    embedding_state_3 = None
             else:
-                embedding_state_1, embedding_state_2, embedding_state_3 = embedding_state
+                embedding_state_1, embedding_state_2 = embedding_state
 
             if embedding_state_1 is not None:
                 embedding_state_1 = embedding_state_1.to(
@@ -164,17 +151,10 @@ class BaseStableDiffusion3Setup(
                     device=self.train_device,
                 ).detach()
 
-            if embedding_state_3 is not None:
-                embedding_state_3 = embedding_state_3.to(
-                    dtype=model.text_encoder_3.get_input_embeddings().weight.dtype,
-                    device=self.train_device,
-                ).detach()
-
-            embedding = StableDiffusion3ModelEmbedding(
+            embedding = FluxModelEmbedding(
                 embedding_config.uuid,
                 embedding_state_1,
                 embedding_state_2,
-                embedding_state_3,
                 embedding_config.placeholder,
             )
             model.additional_embeddings.append(embedding)
@@ -182,12 +162,10 @@ class BaseStableDiffusion3Setup(
                 self._add_embedding_to_tokenizer(model.tokenizer_1, embedding.text_tokens)
             if model.tokenizer_2 is not None:
                 self._add_embedding_to_tokenizer(model.tokenizer_2, embedding.text_tokens)
-            if model.tokenizer_3 is not None:
-                self._add_embedding_to_tokenizer(model.tokenizer_3, embedding.text_tokens)
 
     def _setup_embedding(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             config: TrainConfig,
     ):
         model.embedding = None
@@ -213,18 +191,8 @@ class BaseStableDiffusion3Setup(
                 )
             else:
                 embedding_state_2 = None
-
-            if model.tokenizer_3 is not None and model.text_encoder_3 is not None:
-                embedding_state_3 = self._create_new_embedding(
-                    model.tokenizer_3,
-                    model.text_encoder_3,
-                    config.embedding.initial_embedding_text,
-                    config.embedding.token_count,
-                )
-            else:
-                embedding_state_3 = None
         else:
-            embedding_state_1, embedding_state_2, embedding_state_3 = embedding_state
+            embedding_state_1, embedding_state_2 = embedding_state
 
         if embedding_state_1 is not None:
             embedding_state_1 = embedding_state_1.to(
@@ -238,29 +206,20 @@ class BaseStableDiffusion3Setup(
                 device=self.train_device,
             ).detach()
 
-        if embedding_state_3 is not None:
-            embedding_state_3 = embedding_state_3.to(
-                dtype=model.text_encoder_3.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
-
-        model.embedding = StableDiffusion3ModelEmbedding(
+        model.embedding = FluxModelEmbedding(
             config.embedding.uuid,
             embedding_state_1,
             embedding_state_2,
-            embedding_state_3,
             config.embedding.placeholder,
         )
         if model.tokenizer_1 is not None:
             self._add_embedding_to_tokenizer(model.tokenizer_1, model.embedding.text_tokens)
         if model.tokenizer_2 is not None:
             self._add_embedding_to_tokenizer(model.tokenizer_2, model.embedding.text_tokens)
-        if model.tokenizer_3 is not None:
-            self._add_embedding_to_tokenizer(model.tokenizer_3, model.embedding.text_tokens)
 
     def _setup_embedding_wrapper(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             config: TrainConfig,
     ):
         if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
@@ -277,20 +236,9 @@ class BaseStableDiffusion3Setup(
         if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
             model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer_2,
-                orig_module=model.text_encoder_2.text_model.embeddings.token_embedding,
+                orig_module=model.text_encoder_2.encoder.embed_tokens,
                 additional_embeddings=[embedding.text_encoder_2_vector for embedding in model.additional_embeddings]
                                       + ([] if model.embedding is None else [model.embedding.text_encoder_2_vector]),
-                additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
-                additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                           + ([] if model.embedding is None else [model.embedding.uuid]),
-            )
-        if model.tokenizer_3 is not None and model.text_encoder_3 is not None:
-            model.embedding_wrapper_3 = AdditionalEmbeddingWrapper(
-                tokenizer=model.tokenizer_3,
-                orig_module=model.text_encoder_3.encoder.embed_tokens,
-                additional_embeddings=[embedding.text_encoder_3_vector for embedding in model.additional_embeddings]
-                                      + ([] if model.embedding is None else [model.embedding.text_encoder_3_vector]),
                 additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
                                                   + ([] if model.embedding is None else [model.embedding.placeholder]),
                 additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
@@ -301,12 +249,10 @@ class BaseStableDiffusion3Setup(
             model.embedding_wrapper_1.hook_to_module()
         if model.embedding_wrapper_2 is not None:
             model.embedding_wrapper_2.hook_to_module()
-        if model.embedding_wrapper_3 is not None:
-            model.embedding_wrapper_3.hook_to_module()
 
     def predict(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
@@ -329,23 +275,13 @@ class BaseStableDiffusion3Setup(
                 rand=rand,
                 tokens_1=batch.get("tokens_1"),
                 tokens_2=batch.get("tokens_2"),
-                tokens_3=batch.get("tokens_3"),
-                tokens_mask_1=batch.get("tokens_mask_1"),
                 tokens_mask_2=batch.get("tokens_mask_2"),
-                tokens_mask_3=batch.get("tokens_mask_3"),
                 text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
-                text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
-                    if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
                     if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
                     if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
-                pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
-                    if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
-                text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
-                    if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
             )
 
             latent_image = batch['latent_image']
@@ -369,7 +305,6 @@ class BaseStableDiffusion3Setup(
                     text="",
                     text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                     text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                    text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
                 )
                 negative_text_encoder_output = negative_text_encoder_output \
                     .expand((scaled_latent_image.shape[0], -1, -1))
@@ -502,13 +437,50 @@ class BaseStableDiffusion3Setup(
                 else:
                     latent_input = scaled_noisy_latent_image
 
-                predicted_flow = model.transformer(
-                    hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep=timestep,
-                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                if model.transformer.config.guidance_embeds:
+                    guidance = torch.tensor([1.0], device=self.train_device)
+                    guidance = guidance.expand(latent_input.shape[0])
+                else:
+                    guidance = None
+
+                text_ids = torch.zeros(
+                    size=(latent_image.shape[0], text_encoder_output.shape[1], 3),
+                    device=self.train_device,
+                )
+
+                image_ids = model.prepare_latent_image_ids(
+                    latent_image.shape[0],
+                    latent_input.shape[2],
+                    latent_input.shape[3],
+                    self.train_device,
+                    model.train_dtype.torch_dtype()
+                )
+
+                packed_latent_input = model.pack_latents(
+                    latent_input,
+                    latent_input.shape[0],
+                    latent_input.shape[1],
+                    latent_input.shape[2],
+                    latent_input.shape[3],
+                )
+
+                packed_predicted_flow = model.transformer(
+                    hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=timestep / 1000,
+                    guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                     pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
+                    img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
+                    joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
+
+                predicted_flow = model.unpack_latents(
+                    packed_predicted_flow,
+                    latent_input.shape[2],
+                    latent_input.shape[3],
+                )
 
                 flow = latent_noise - scaled_latent_image
                 model_output_data = {
@@ -600,7 +572,7 @@ class BaseStableDiffusion3Setup(
 
     def calculate_loss(
             self,
-            model: StableDiffusion3Model,
+            model: FluxModel,
             batch: dict,
             data: dict,
             config: TrainConfig,
