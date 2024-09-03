@@ -15,7 +15,7 @@ from modules.util.torch_util import torch_gc
 import torch
 
 from PIL import Image
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 class StableDiffusion3Sampler(BaseModelSampler):
