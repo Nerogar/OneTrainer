@@ -219,10 +219,10 @@ class StableDiffusionXLModel(BaseModel):
                 if chunk.numel() == 0:
                     continue
 
-                # アテンションマスクの作成（1がマスクしない、0がマスクする）
+                # Create attention mask (1 for non-masked, 0 for masked)
                 attention_mask = torch.ones_like(chunk, dtype=torch.bool)
 
-                # まず、BOSとEOSを追加
+                # First, add BOS and EOS tokens
                 bos_tokens = torch.full((chunk.shape[0], 1), tokenizer.bos_token_id, dtype=chunk.dtype, device=chunk.device)
                 eos_tokens = torch.full((chunk.shape[0], 1), tokenizer.eos_token_id, dtype=chunk.dtype, device=chunk.device)
                 chunk = torch.cat([bos_tokens, chunk, eos_tokens], dim=1)
@@ -231,8 +231,8 @@ class StableDiffusionXLModel(BaseModel):
                                             torch.zeros_like(eos_tokens, dtype=torch.bool) if i < len(chunks) - 1 else torch.ones_like(eos_tokens, dtype=torch.bool)],
                                             dim=1)
 
-                # パディングで埋める
-                if chunk.shape[1] < chunk_length + 2:  # +2 はBOSとEOSのため
+                # Fill with padding
+                if chunk.shape[1] < chunk_length + 2:  # +2 is for BOS and EOS
                     padding = torch.full((chunk.shape[0], chunk_length + 2 - chunk.shape[1]), tokenizer.eos_token_id, dtype=chunk.dtype, device=chunk.device)
                     chunk = torch.cat([chunk, padding], dim=1)
                     attention_mask = torch.cat([attention_mask, torch.zeros_like(padding, dtype=torch.bool)], dim=1)
@@ -290,7 +290,7 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_output, pooled_text_encoder_2_output = __process_tokens(tokens_2, self.tokenizer_2, self.text_encoder_2, text_encoder_2_layer_skip)
 
         if text_encoder_1_output is None or text_encoder_2_output is None:
-            print("両方のテキストエンコーダーの出力がNoneです。入力テキストまたはトークンを確認してください。")
+            print("Both text encoder outputs are None. Check your input text or tokens.")
 
         text_encoder_output = torch.cat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 
