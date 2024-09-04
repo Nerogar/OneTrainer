@@ -1,4 +1,5 @@
 from torch import Tensor
+import torch
 
 from transformers import CLIPTextModel, CLIPTextModelWithProjection
 
@@ -16,28 +17,64 @@ def encode_clip(
         attention_mask: Tensor | None = None,
         add_layer_norm: bool = True,
 ) -> tuple[Tensor, Tensor]:
-    if (add_output and text_encoder_output is None) \
-            or (add_pooled_output and pooled_text_encoder_output is None) \
-            and text_encoder is not None:
+    chunk_length = 75
+    max_embeddings_multiples = 3
 
-        text_encoder_output = text_encoder(
-            tokens,
-            attention_mask=attention_mask if use_attention_mask else None,
+    if tokens is None or tokens.numel() == 0:
+        return None, None
+
+    chunks = [tokens[:, i:i + chunk_length] for i in range(0, tokens.shape[1], chunk_length)]
+    chunk_embeddings = [] if add_output else None
+    pooled_outputs = [] if add_pooled_output else None
+
+    for i, chunk in enumerate(chunks):
+        if chunk.numel() == 0:
+            continue
+
+        # Create attention mask (1 for non-masked, 0 for masked)
+        chunk_attention_mask = torch.ones_like(chunk, dtype=torch.bool)
+
+        # First, add BOS and EOS tokens
+        bos_tokens = torch.full((chunk.shape[0], 1), text_encoder.config.bos_token_id, dtype=chunk.dtype, device=chunk.device)
+        eos_tokens = torch.full((chunk.shape[0], 1), text_encoder.config.eos_token_id, dtype=chunk.dtype, device=chunk.device)
+        chunk = torch.cat([bos_tokens, chunk, eos_tokens], dim=1)
+        chunk_attention_mask = torch.cat([torch.zeros_like(bos_tokens, dtype=torch.bool) if i > 0 else torch.ones_like(bos_tokens, dtype=torch.bool),
+                                    chunk_attention_mask, 
+                                    torch.zeros_like(eos_tokens, dtype=torch.bool) if i < len(chunks) - 1 else torch.ones_like(eos_tokens, dtype=torch.bool)],
+                                    dim=1)
+
+        # Fill with padding
+        if chunk.shape[1] < chunk_length + 2:  # +2 is for BOS and EOS
+            padding = torch.full((chunk.shape[0], chunk_length + 2 - chunk.shape[1]), text_encoder.config.eos_token_id, dtype=chunk.dtype, device=chunk.device)
+            chunk = torch.cat([chunk, padding], dim=1)
+            chunk_attention_mask = torch.cat([chunk_attention_mask, torch.zeros_like(padding, dtype=torch.bool)], dim=1)
+        
+        outputs = text_encoder(
+            chunk,
+            attention_mask=chunk_attention_mask if use_attention_mask else None,
             return_dict=True,
             output_hidden_states=True,
         )
+        
+        if add_output:
+            embedding = outputs.hidden_states[default_layer - layer_skip]
+            chunk_embeddings.append(embedding)
 
-        pooled_text_encoder_output = None
         if add_pooled_output:
             if hasattr(text_encoder_output, "text_embeds"):
-                pooled_text_encoder_output = text_encoder_output.text_embeds
+                pooled_outputs.append(text_encoder_output.text_embeds)
             if hasattr(text_encoder_output, "pooler_output"):
-                pooled_text_encoder_output = text_encoder_output.pooler_output
+                pooled_outputs.append(text_encoder_output.pooler_output)
 
-        text_encoder_output = text_encoder_output.hidden_states[default_layer - layer_skip] if add_output else None
+    if chunk_embeddings is not None and len(chunk_embeddings) > max_embeddings_multiples:
+        chunk_embeddings = chunk_embeddings[:max_embeddings_multiples]
+    if pooled_outputs is not None and len(pooled_outputs) > max_embeddings_multiples:
+        pooled_outputs = pooled_outputs[:max_embeddings_multiples]
+    text_encoder_output = torch.cat(chunk_embeddings, dim=1) if chunk_embeddings is not None else None
+    pooled_text_encoder_output = pooled_outputs[0] if pooled_outputs else None
 
-        if add_layer_norm and text_encoder_output is not None:
-            final_layer_norm = text_encoder.text_model.final_layer_norm
-            text_encoder_output = final_layer_norm(text_encoder_output)
+    if add_layer_norm and text_encoder_output is not None:
+        final_layer_norm = text_encoder.text_model.final_layer_norm
+        text_encoder_output = final_layer_norm(text_encoder_output)
 
     return text_encoder_output, pooled_text_encoder_output
