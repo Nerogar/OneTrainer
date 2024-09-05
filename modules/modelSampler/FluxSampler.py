@@ -103,7 +103,6 @@ class FluxSampler(BaseModelSampler):
             )
 
             image_ids = self.model.prepare_latent_image_ids(
-                latent_image.shape[0],
                 height // vae_scale_factor,
                 width // vae_scale_factor,
                 self.train_device,

@@ -449,7 +449,6 @@ class BaseFluxSetup(
                 )
 
                 image_ids = model.prepare_latent_image_ids(
-                    latent_image.shape[0],
                     latent_input.shape[2],
                     latent_input.shape[3],
                     self.train_device,
