@@ -447,12 +447,11 @@ class BaseFluxSetup(
                     guidance = None
 
                 text_ids = torch.zeros(
-                    size=(latent_image.shape[0], text_encoder_output.shape[1], 3),
+                    size=(text_encoder_output.shape[1], 3),
                     device=self.train_device,
                 )
 
                 image_ids = model.prepare_latent_image_ids(
-                    latent_image.shape[0],
                     latent_input.shape[2],
                     latent_input.shape[3],
                     self.train_device,
