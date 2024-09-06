@@ -3,6 +3,7 @@ from random import Random
 
 from modules.model.FluxModel import FluxModel, FluxModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.flux.FluxXFormersAttnProcessor import FluxXFormersAttnProcessor
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
@@ -18,12 +19,16 @@ from modules.util.checkpointing_util import (
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import set_nf4_compute_type
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
+
+from diffusers.models.attention_processor import FluxAttnProcessor2_0
+from diffusers.utils import is_xformers_available
 
 
 class BaseFluxSetup(
@@ -41,30 +46,28 @@ class BaseFluxSetup(
             model: FluxModel,
             config: TrainConfig,
     ):
-        # if config.attention_mechanism == AttentionMechanism.DEFAULT:
-        #     pass
-        #     # model.transformer.set_attn_processor(AttnProcessor())
-        # elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-        #     try:
-        #         # TODO: there is no xformers attention processor like JointAttnProcessor2_0 yet
-        #         # model.transformer.set_attn_processor(XFormersAttnProcessor())
-        #         model.vae.enable_xformers_memory_efficient_attention()
-        #     except Exception as e:
-        #         print(
-        #             "Could not enable memory efficient attention. Make sure xformers is installed"
-        #             f" correctly and a GPU is available: {e}"
-        #         )
-        # elif config.attention_mechanism == AttentionMechanism.SDP:
-        #     model.transformer.set_attn_processor(JointAttnProcessor2_0())
-        #
-        #     if is_xformers_available():
-        #         try:
-        #             model.vae.enable_xformers_memory_efficient_attention()
-        #         except Exception as e:
-        #             print(
-        #                 "Could not enable memory efficient attention. Make sure xformers is installed"
-        #                 f" correctly and a GPU is available: {e}"
-        #             )
+        if config.attention_mechanism == AttentionMechanism.DEFAULT:
+            model.transformer.set_attn_processor(FluxAttnProcessor2_0())
+        elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
+            try:
+                model.transformer.set_attn_processor(FluxXFormersAttnProcessor(model.train_dtype.torch_dtype()))
+                model.vae.enable_xformers_memory_efficient_attention()
+            except Exception as e:
+                print(
+                    "Could not enable memory efficient attention. Make sure xformers is installed"
+                    f" correctly and a GPU is available: {e}"
+                )
+        elif config.attention_mechanism == AttentionMechanism.SDP:
+            model.transformer.set_attn_processor(FluxAttnProcessor2_0())
+
+            if is_xformers_available():
+                try:
+                    model.vae.enable_xformers_memory_efficient_attention()
+                except Exception as e:
+                    print(
+                        "Could not enable memory efficient attention. Make sure xformers is installed"
+                        f" correctly and a GPU is available: {e}"
+                    )
 
         if config.gradient_checkpointing.enabled():
             enable_checkpointing_for_flux_transformer(
