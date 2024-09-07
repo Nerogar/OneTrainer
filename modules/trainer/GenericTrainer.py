@@ -346,7 +346,7 @@ class GenericTrainer(BaseTrainer):
                 concept_seed = validation_batch["concept_seed"].item()
                 loss = loss_validation.item()
 
-                label = concept_name if concept_name else os.path.basename(os.path.dirname(concept_path))
+                label = concept_name if concept_name else os.path.basename(concept_path)
                 # check and fix collision to display both graphs in tensorboard
                 if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
                     suffix = 1

@@ -8,6 +8,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.stableDiffusion3.XFormersJointAttnProcessor import XFormersJointAttnProcessor
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     create_checkpointed_forward,
@@ -45,12 +46,10 @@ class BaseStableDiffusion3Setup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            pass
-            # model.transformer.set_attn_processor(AttnProcessor())
+            model.transformer.set_attn_processor(JointAttnProcessor2_0())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                # TODO: there is no xformers attention processor like JointAttnProcessor2_0 yet
-                # model.transformer.set_attn_processor(XFormersAttnProcessor())
+                model.transformer.set_attn_processor(XFormersJointAttnProcessor(model.train_dtype.torch_dtype()))
                 model.vae.enable_xformers_memory_efficient_attention()
             except Exception as e:
                 print(
