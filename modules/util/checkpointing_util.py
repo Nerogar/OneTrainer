@@ -133,14 +133,14 @@ def create_checkpointed_forward(
                 dummy.requires_grad_(True)
 
                 return checkpoint(
-                    offloaded_custom_forward,
+                    custom_forward,
                     dummy,
                     *args,
                     **kwargs,
                     use_reentrant=False
                 )
             else:
-                return offloaded_custom_forward(None, *args, **kwargs)
+                return custom_forward(None, *args, **kwargs)
 
     return forward
 
