@@ -242,6 +242,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         # add for calculating loss per concept
         if config.validation:
             output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
             output_names.append(('concept.seed', 'concept_seed'))
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')

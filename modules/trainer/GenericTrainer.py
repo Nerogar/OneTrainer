@@ -311,9 +311,13 @@ class GenericTrainer(BaseTrainer):
         torch_gc()
 
     def __validate(self, train_progress):
-        self.validation_data_loader.get_data_set().start_next_epoch()
-        current_epoch_length_validation = self.validation_data_loader.get_data_set().approximate_length()
-        if current_epoch_length_validation > 0 and self.__needs_validate(train_progress):
+        if self.__needs_validate(train_progress):
+            self.validation_data_loader.get_data_set().start_next_epoch()
+            current_epoch_length_validation = self.validation_data_loader.get_data_set().approximate_length()
+
+            if current_epoch_length_validation == 0:
+                return
+
             torch_gc()
 
             step_tqdm_validation = tqdm(
@@ -326,24 +330,23 @@ class GenericTrainer(BaseTrainer):
             mapping_seed_to_label = {}
             mapping_label_to_seed = {}
 
-            for epoch_step_validation, validation_batch in enumerate(step_tqdm_validation):
-
+            for validation_batch in step_tqdm_validation:
                 if self.__needs_gc(train_progress):
                     torch_gc()
 
                 with torch.no_grad():
-                    model_output_data = self.model_setup.predict(self.model, validation_batch, self.config,
-                                                                 train_progress)
-                    loss_validation = self.model_setup.calculate_loss(self.model, validation_batch, model_output_data,
-                                                                      self.config)
+                    model_output_data = self.model_setup.predict(
+                        self.model, validation_batch, self.config, train_progress)
+                    loss_validation = self.model_setup.calculate_loss(
+                        self.model, validation_batch, model_output_data, self.config)
 
                 # since validation batch size = 1
                 concept_name = validation_batch["concept_name"][0]
+                concept_path = validation_batch["concept_path"][0]
                 concept_seed = validation_batch["concept_seed"].item()
-                image_path = validation_batch["image_path"][0]
                 loss = loss_validation.item()
 
-                label = concept_name if concept_name else os.path.basename(os.path.dirname(image_path))
+                label = concept_name if concept_name else os.path.basename(os.path.dirname(concept_path))
                 # check and fix collision to display both graphs in tensorboard
                 if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
                     suffix = 1
@@ -372,7 +375,7 @@ class GenericTrainer(BaseTrainer):
                 total_count = sum(concept_counts[key] for key in concept_counts)
                 total_average_loss = total_loss / total_count
 
-                self.tensorboard.add_scalar(f"loss/validation_step/total_average",
+                self.tensorboard.add_scalar("loss/validation_step/total_average",
                                             total_average_loss,
                                             train_progress.global_step)
 

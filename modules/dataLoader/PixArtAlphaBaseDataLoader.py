@@ -165,6 +165,7 @@ class PixArtAlphaBaseDataLoader(
         # add for calculating loss per concept
         if config.validation:
             output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
             output_names.append(('concept.seed', 'concept_seed'))
 
         def before_cache_image_fun():

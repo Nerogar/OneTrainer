@@ -102,7 +102,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         # validation_concept
         components.label(frame, 2, 0, "Validation concept",
-                         tooltip="Enable concept as validation one")
+                         tooltip="Use concept as for validation instead of training")
         components.switch(frame, 2, 1, self.ui_state, "validation_concept")
 
         # path
