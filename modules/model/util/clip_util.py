@@ -32,7 +32,7 @@ def encode_clip(
             continue
 
         # Create attention mask (1 for non-masked, 0 for masked)
-        chunk_attention_mask = torch.ones_like(chunk, dtype=torch.bool)
+        chunk_attention_mask = torch.ones_like(chunk, dtype=torch.bool, device=chunk.device)
 
         # First, add BOS and EOS tokens
         bos_tokens = torch.full((chunk.shape[0], 1), text_encoder.config.bos_token_id, dtype=chunk.dtype, device=chunk.device)
