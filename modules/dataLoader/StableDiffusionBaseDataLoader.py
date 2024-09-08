@@ -1,3 +1,4 @@
+import copy
 import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -35,16 +36,22 @@ class StableDiffusionBaseDataLoader(
             config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         super(StableDiffusionBaseDataLoader, self).__init__(
             train_device,
             temp_device,
         )
 
+        if is_validation:
+            config = copy.copy(config)
+            config.batch_size = 1
+
         self.__ds = self.create_dataset(
             config=config,
             model=model,
             train_progress=train_progress,
+            is_validation=is_validation,
         )
         self.__dl = TrainDataLoader(self.__ds, config.batch_size)
 
@@ -83,7 +90,6 @@ class StableDiffusionBaseDataLoader(
             modules.append(encode_prompt)
 
         return modules
-
 
     def _cache_modules(self, config: TrainConfig, model: StableDiffusionModel):
         image_split_names = ['latent_image']
@@ -143,7 +149,6 @@ class StableDiffusionBaseDataLoader(
 
         return modules
 
-
     def _output_modules(self, config: TrainConfig, model: StableDiffusionModel):
         output_names = ['latent_image', 'tokens', 'image_path', 'prompt']
 
@@ -162,6 +167,12 @@ class StableDiffusionBaseDataLoader(
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
 
+        # add for calculating loss per concept
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
+            output_names.append(('concept.seed', 'concept_seed'))
+
         def before_cache_image_fun():
             model.to(self.temp_device)
             model.vae_to(self.train_device)
@@ -178,7 +189,6 @@ class StableDiffusionBaseDataLoader(
             autocast_context=model.autocast_context,
             train_dtype=model.train_dtype,
         )
-
 
     def _debug_modules(self, config: TrainConfig, model: StableDiffusionModel):
         debug_dir = os.path.join(config.debug_dir, "dataloader")
@@ -220,12 +230,12 @@ class StableDiffusionBaseDataLoader(
 
         return modules
 
-
     def create_dataset(
             self,
             config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config)
         load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt)
@@ -257,5 +267,6 @@ class StableDiffusionBaseDataLoader(
                 debug_modules if config.debug_mode else None,
                 # inserted before output_modules, which contains a sorting operation
             ],
-            train_progress
+            train_progress,
+            is_validation,
         )

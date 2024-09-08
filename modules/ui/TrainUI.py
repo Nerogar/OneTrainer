@@ -190,18 +190,27 @@ class TrainUI(ctk.CTk):
                          tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
         components.switch(frame, 7, 1, self.ui_state, "tensorboard_expose")
 
+        # validation
+        components.label(frame, 8, 0, "Validation",
+                         tooltip="Enable validation steps and add new graph in tensorboard")
+        components.switch(frame, 8, 1, self.ui_state, "validation")
+
+        components.label(frame, 9, 0, "Validate after",
+                         tooltip="The interval used when validate training")
+        components.time_entry(frame, 9, 1, self.ui_state, "validate_after", "validate_after_unit")
+
         # device
-        components.label(frame, 8, 0, "Dataloader Threads",
+        components.label(frame, 10, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 8, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
 
-        components.label(frame, 9, 0, "Train Device",
+        components.label(frame, 11, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
-        components.entry(frame, 9, 1, self.ui_state, "train_device")
+        components.entry(frame, 11, 1, self.ui_state, "train_device")
 
-        components.label(frame, 10, 0, "Temp Device",
+        components.label(frame, 12, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 10, 1, self.ui_state, "temp_device")
+        components.entry(frame, 12, 1, self.ui_state, "temp_device")
 
         frame.pack(fill="both", expand=1)
         return frame

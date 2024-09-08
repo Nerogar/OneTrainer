@@ -1,3 +1,4 @@
+import copy
 import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -35,16 +36,22 @@ class StableDiffusionXLBaseDataLoader(
             config: TrainConfig,
             model: StableDiffusionXLModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         super(StableDiffusionXLBaseDataLoader, self).__init__(
             train_device,
             temp_device,
         )
 
+        if is_validation:
+            config = copy.copy(config)
+            config.batch_size = 1
+
         self.__ds = self.create_dataset(
             config=config,
             model=model,
             train_progress=train_progress,
+            is_validation=is_validation,
         )
         self.__dl = TrainDataLoader(self.__ds, config.batch_size)
 
@@ -185,6 +192,12 @@ class StableDiffusionXLBaseDataLoader(
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
 
+        # add for calculating loss per concept
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
+            output_names.append(('concept.seed', 'concept_seed'))
+
         def before_cache_image_fun():
             model.to(self.temp_device)
             model.vae_to(self.train_device)
@@ -245,6 +258,7 @@ class StableDiffusionXLBaseDataLoader(
             config: TrainConfig,
             model: StableDiffusionXLModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config)
         load_input = self._load_input_modules(config, model.vae_train_dtype, model.add_embeddings_to_prompt)
@@ -276,5 +290,6 @@ class StableDiffusionXLBaseDataLoader(
                 debug_modules if config.debug_mode else None,
                 # inserted before output_modules, which contains a sorting operation
             ],
-            train_progress
+            train_progress,
+            is_validation,
         )

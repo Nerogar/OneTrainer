@@ -1,3 +1,4 @@
+import copy
 import os
 import re
 
@@ -45,16 +46,22 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         super(StableDiffusionFineTuneVaeDataLoader, self).__init__(
             train_device,
             temp_device,
         )
 
+        if is_validation:
+            config = copy.copy(config)
+            config.batch_size = 1
+
         self.__ds = self.create_dataset(
             config=config,
             model=model,
             train_progress=train_progress,
+            is_validation=is_validation,
         )
         self.__dl = TrainDataLoader(self.__ds, config.batch_size)
 
@@ -96,7 +103,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return modules
 
-
     def __load_input_modules(self, config: TrainConfig) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0)
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='latent_mask', range_min=0, range_max=1, channels=1)
@@ -107,7 +113,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             modules.append(load_mask)
 
         return modules
-
 
     def __mask_augmentation_modules(self, config: TrainConfig) -> list:
         inputs = ['image']
@@ -170,7 +175,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return modules
 
-
     def __augmentation_modules(self, config: TrainConfig):
         inputs = ['image']
 
@@ -184,7 +188,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
         random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
 
-
         modules = [
             random_flip,
             random_rotate,
@@ -196,14 +199,12 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return modules
 
-
     def __preparation_modules(self, config: TrainConfig, model: StableDiffusionModel):
         image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae)
 
         modules = [image]
 
         return modules
-
 
     def __cache_modules(self, config: TrainConfig, model: StableDiffusionModel):
         split_names = ['image', 'latent_image_distribution']
@@ -229,7 +230,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         return modules
 
-
     def __output_modules(self, config: TrainConfig):
         output_names = ['image', 'latent_image', 'image_path']
 
@@ -238,6 +238,12 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+
+        # add for calculating loss per concept
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
+            output_names.append(('concept.seed', 'concept_seed'))
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
 
@@ -284,6 +290,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             config: TrainConfig,
             model: StableDiffusionModel,
             train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         enumerate_input = self.__enumerate_input_modules(config)
         load_input = self.__load_input_modules(config)
@@ -312,5 +319,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
                 debug_modules if config.debug_mode else None,
             ],
-            train_progress
+            train_progress,
+            is_validation,
         )

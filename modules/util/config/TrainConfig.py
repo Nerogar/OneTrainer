@@ -233,6 +233,9 @@ class TrainConfig(BaseConfig):
     cache_dir: str
     tensorboard: bool
     tensorboard_expose: bool
+    validation: bool
+    validate_after: float
+    validate_after_unit: TimeUnit
     continue_last_backup: bool
     include_train_config: ConfigPart
 
@@ -666,6 +669,9 @@ class TrainConfig(BaseConfig):
         data.append(("cache_dir", "workspace-cache/run", str, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
+        data.append(("validation", False, bool, False))
+        data.append(("validate_after", 1, int, False))
+        data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
