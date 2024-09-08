@@ -103,7 +103,6 @@ class FluxSampler(BaseModelSampler):
             )
 
             image_ids = self.model.prepare_latent_image_ids(
-                latent_image.shape[0],
                 height // vae_scale_factor,
                 width // vae_scale_factor,
                 self.train_device,
@@ -143,7 +142,7 @@ class FluxSampler(BaseModelSampler):
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
-            text_ids = torch.zeros(latent_image.shape[0], prompt_embedding.shape[1], 3, device=self.train_device)
+            text_ids = torch.zeros(prompt_embedding.shape[1], 3, device=self.train_device)
 
             self.model.transformer_to(self.train_device)
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):

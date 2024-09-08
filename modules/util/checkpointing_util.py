@@ -1,12 +1,13 @@
 import inspect
-from typing import Callable, Any
+from typing import Any, Callable
 
 import torch
+from torch import nn
+from torch.utils.checkpoint import checkpoint
+
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
 from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
-from torch import nn
-from torch.utils.checkpoint import checkpoint
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
@@ -32,7 +33,7 @@ def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
     signature = dict(inspect.signature(fun).parameters)
     indices = []
 
-    for i, (key, value) in enumerate(signature.items()):
+    for i, key in enumerate(signature.keys()):
         if key in arg_names:
             indices.append(i)
 
@@ -42,31 +43,20 @@ def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
 def to_(
         data: torch.Tensor | list | tuple | dict,
         device: torch.device,
-        include_parameter_indices: list[int] = None,
+        include_parameter_indices: list[int] | None = None,
 ):
-    if include_parameter_indices is not None and len(include_parameter_indices) == 0:
-        include_parameter_indices = None
+    if include_parameter_indices is None:
+        include_parameter_indices = []
 
     if isinstance(data, torch.Tensor):
         data.data = data.data.to(device=device)
     elif isinstance(data, (list, tuple)):
         for i, elem in enumerate(data):
-            if include_parameter_indices is None or i in include_parameter_indices:
+            if i in include_parameter_indices:
                 to_(elem, device)
     elif isinstance(data, dict):
         for elem in data.values():
             to_(elem, device)
-
-
-def to(data: torch.Tensor | list | tuple | dict, device: torch.device) -> torch.Tensor | list | tuple | dict:
-    if isinstance(data, torch.Tensor):
-        return data.to(device=device)
-    elif isinstance(data, (list, tuple)):
-        for i in range(len(data)):
-            data[i] = to(data[i], device)
-    elif isinstance(data, dict):
-        for key, elem in data.items():
-            data[key] = to(elem, device)
 
 
 def create_checkpointed_forward(
@@ -82,7 +72,7 @@ def create_checkpointed_forward(
     include_from_offload_param_indices = __get_args_indices(orig_forward, include_from_offload_param_names)
 
     if offload_activations:
-        def custom_forward(
+        def offloaded_custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
                 dummy: torch.Tensor = None,
                 *args,
@@ -96,6 +86,13 @@ def create_checkpointed_forward(
 
             return output
 
+        def custom_forward(
+                # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
+                dummy: torch.Tensor = None,
+                *args,
+        ):
+            return orig_forward(*args)
+
         def forward(
                 *args,
                 **kwargs
@@ -107,7 +104,7 @@ def create_checkpointed_forward(
                 args = __kwargs_to_args(orig_forward, args, kwargs)
 
                 return checkpoint(
-                    custom_forward,
+                    offloaded_custom_forward,
                     dummy,
                     *args,
                     use_reentrant=True
