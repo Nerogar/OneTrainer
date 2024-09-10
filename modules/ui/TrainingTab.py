@@ -672,7 +672,7 @@ class TrainingTab:
 
         # log-cosh Strength
         components.label(frame, 2, 0, "log-cosh Strength",
-                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings. Should be used indepedently.")
+                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings.")
         components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength")
 
         if supports_vb_loss:
