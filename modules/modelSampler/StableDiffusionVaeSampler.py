@@ -39,10 +39,12 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         image = Image.open(sample_config.prompt)
         image = image.convert("RGB")
         # TODO: figure out better set of transformations for resize and/or implement way to configure them as per-sample toggle
-        scale = sample_config.height
-        if sample_config.width > sample_config.height:
-            sample_config.width
         
+        if sample_config.width > sample_config.height:
+            scale = sample_config.width
+        else:
+            scale = sample_config.height
+            
         t_in = transforms.Compose([
             transforms.Resize(scale),
             transforms.CenterCrop([sample_config.height, sample_config.width]),
@@ -55,9 +57,12 @@ class StableDiffusionVaeSampler(BaseModelSampler):
 
         with torch.no_grad():
             latent_image_tensor = self.model.vae.encode(image_tensor.unsqueeze(0)).latent_dist.mean
-            image_tensor = self.model.vae.decode(latent_image_tensor).sample.clamp(-1, 1).squeeze()
+            image_tensor = self.model.vae.decode(latent_image_tensor).sample.squeeze()
 
         self.model.vae_to(self.temp_device)
+
+        image_tensor = (image_tensor + 1) * 0.5
+        image_tensor = image_tensor.clamp(0, 1)
 
         t_out = transforms.ToPILImage()
         image = t_out(image_tensor)
