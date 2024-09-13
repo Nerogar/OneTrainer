@@ -66,6 +66,13 @@ class GenericTrainer(BaseTrainer):
         ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
         self.accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
+        if hasattr(self.accelerator, 'device') and self.accelerator.device:
+            print(f"Accelerator device: {self.accelerator.device.type}")
+        if hasattr(self.accelerator, 'distributed_type') and self.accelerator.distributed_type:
+            print(f"Distributed type: {self.accelerator.distributed_type}")
+
+        print(f"if accelerator is not activated, using {torch.device(self.config.train_device)}")
+
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
         self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, get_string_timestamp()))
@@ -477,7 +484,7 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
 
     def train(self):
-        train_device = torch.device(self.config.train_device)
+        train_device = self.accelerator.device if self.accelerator.device else torch.device(self.config.train_device)
 
         train_progress = self.model.train_progress
 
