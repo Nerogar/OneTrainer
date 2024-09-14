@@ -40,7 +40,7 @@ class BaseStableDiffusion3Setup(
     metaclass=ABCMeta
 ):
 
-    def _setup_optimizations(
+    def setup_optimizations(
             self,
             model: StableDiffusion3Model,
             config: TrainConfig,
@@ -70,7 +70,8 @@ class BaseStableDiffusion3Setup(
 
         if config.gradient_checkpointing.enabled():
             enable_checkpointing_for_stable_diffusion_3_transformer(
-                model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload(),
+                config.layer_offload_fraction)
             if model.text_encoder_1 is not None:
                 enable_checkpointing_for_clip_encoder_layers(
                     model.text_encoder_1, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
@@ -79,7 +80,8 @@ class BaseStableDiffusion3Setup(
                     model.text_encoder_2, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
             if model.text_encoder_3 is not None and config.train_text_encoder_3_or_embedding():
                 enable_checkpointing_for_t5_encoder_layers(
-                    model.text_encoder_3, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                    model.text_encoder_3, self.train_device, self.temp_device, config.gradient_checkpointing.offload(),
+                    config.layer_offload_fraction)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

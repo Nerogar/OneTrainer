@@ -79,10 +79,12 @@ class BasePixArtAlphaSetup(
         if config.gradient_checkpointing.enabled():
             model.vae.enable_gradient_checkpointing()
             enable_checkpointing_for_sdxl_transformer_blocks(
-                model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload(),
+                config.layer_offload_fraction)
             if config.text_encoder.train or config.train_any_embedding():
                 enable_checkpointing_for_t5_encoder_layers(
-                    model.text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                    model.text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload(),
+                    config.layer_offload_fraction)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

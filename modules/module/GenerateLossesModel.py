@@ -60,6 +60,7 @@ class GenerateLossesModel:
         )
         self.model.train_config = self.config
 
+        self.model_setup.setup_optimizations(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
         self.model.eval()
         self.model.train_progress = TrainProgress()

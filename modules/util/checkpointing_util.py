@@ -1,6 +1,8 @@
 import inspect
 from typing import Any, Callable
 
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
+
 import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
@@ -40,50 +42,34 @@ def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
     return indices
 
 
-def to_(
-        data: torch.Tensor | list | tuple | dict,
-        device: torch.device,
-        include_parameter_indices: list[int] | None = None,
-):
-    if include_parameter_indices is None:
-        include_parameter_indices = []
-
-    if isinstance(data, torch.Tensor):
-        data.data = data.data.to(device=device)
-    elif isinstance(data, (list, tuple)):
-        for i, elem in enumerate(data):
-            if i in include_parameter_indices:
-                to_(elem, device)
-    elif isinstance(data, dict):
-        for elem in data.values():
-            to_(elem, device)
-
-
 def create_checkpointed_forward(
         orig_module: nn.Module,
         train_device: torch.device,
-        temp_device: torch.device,
-        offload_activations: bool = False,
-        include_from_offload_param_names: list[str] = None
+        include_from_offload_param_names: list[str] = None,
+        conductor: LayerOffloadConductor | None = None,
+        layer_index: int = 0,
 ) -> Callable:
     orig_forward = orig_module.forward
     if include_from_offload_param_names is None:
         include_from_offload_param_names = []
-    include_from_offload_param_indices = __get_args_indices(orig_forward, include_from_offload_param_names)
+    included_offload_param_indices = __get_args_indices(orig_forward, include_from_offload_param_names)
 
-    if offload_activations:
+    bound_conductor = conductor
+    bound_layer_index = layer_index
+    conductor.add_layer(orig_module, included_offload_param_indices)
+
+    if conductor is not None and conductor.offload_activated():
         def offloaded_custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
                 dummy: torch.Tensor = None,
                 *args,
         ):
-            to_(args, train_device, include_from_offload_param_indices)
+            if bound_layer_index == 0 and not torch.is_grad_enabled():
+                bound_conductor.start_forward(True)
 
+            bound_conductor.before_layer(bound_layer_index)
             output = orig_forward(*args)
-
-            if not torch.is_grad_enabled():
-                to_(args, temp_device, include_from_offload_param_indices)
-
+            bound_conductor.after_layer(bound_layer_index, args)
             return output
 
         def custom_forward(
@@ -91,7 +77,13 @@ def create_checkpointed_forward(
                 dummy: torch.Tensor = None,
                 *args,
         ):
-            return orig_forward(*args)
+            if bound_layer_index == 0:
+                bound_conductor.start_forward(False)
+
+            bound_conductor.before_layer(bound_layer_index)
+            output = orig_forward(*args)
+            bound_conductor.after_layer(bound_layer_index, args)
+            return output
 
         def forward(
                 *args,
@@ -149,96 +141,176 @@ def enable_checkpointing_for_sdxl_transformer_blocks(
         orig_module: nn.Module,
         train_device: torch.device,
         temp_device: torch.device,
-        offload_activations: bool = True,
+        offload: bool = False,
+        layer_offload_fraction: float = 0.0,
 ):
-    for name, child_module in orig_module.named_modules():
+    conductor = LayerOffloadConductor(
+        train_device,
+        temp_device,
+        offload_activations=offload,
+        offload_layers=offload and layer_offload_fraction > 0,
+        layer_offload_fraction=layer_offload_fraction,
+    )
+
+    layer_index = 0
+    for child_module in orig_module.modules():
         if isinstance(child_module, BasicTransformerBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
 
 
 def enable_checkpointing_for_clip_encoder_layers(
         orig_module: nn.Module,
         train_device: torch.device,
         temp_device: torch.device,
-        offload_activations: bool = True,
+        offload: bool = False,
+        layer_offload_fraction: float = 0.0,
 ):
-    for name, child_module in orig_module.named_modules():
+    conductor = LayerOffloadConductor(
+        train_device,
+        temp_device,
+        offload_activations=offload,
+        offload_layers=offload and layer_offload_fraction > 0,
+        layer_offload_fraction=layer_offload_fraction,
+    )
+
+    layer_index = 0
+    for child_module in orig_module.modules():
         if isinstance(child_module, CLIPEncoderLayer):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
 
 
 def enable_checkpointing_for_stable_cascade_blocks(
         orig_module: nn.Module,
         train_device: torch.device,
         temp_device: torch.device,
-        offload_activations: bool = True,
+        offload: bool = False,
+        layer_offload_fraction: float = 0.0,
 ):
-    for name, child_module in orig_module.named_modules():
+    conductor = LayerOffloadConductor(
+        train_device,
+        temp_device,
+        offload_activations=offload,
+        offload_layers=offload and layer_offload_fraction > 0,
+        layer_offload_fraction=layer_offload_fraction,
+    )
+
+    layer_index = 0
+    for child_module in orig_module.modules():
         if isinstance(child_module, SDCascadeResBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
         if isinstance(child_module, SDCascadeAttnBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
         if isinstance(child_module, SDCascadeTimestepBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
 
 
 def enable_checkpointing_for_t5_encoder_layers(
         orig_module: nn.Module,
         train_device: torch.device,
         temp_device: torch.device,
-        offload_activations: bool = True,
+        offload: bool = False,
+        layer_offload_fraction: float = 0.0,
 ):
-    for name, child_module in orig_module.named_modules():
+    conductor = LayerOffloadConductor(
+        train_device,
+        temp_device,
+        offload_activations=offload,
+        offload_layers=offload and layer_offload_fraction > 0,
+        layer_offload_fraction=layer_offload_fraction,
+    )
+
+    layer_index = 0
+    for child_module in orig_module.modules():
         if isinstance(child_module, T5Block):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
 
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
         orig_module: nn.Module,
         train_device: torch.device,
         temp_device: torch.device,
-        offload_activations: bool = True,
+        offload: bool = False,
+        layer_offload_fraction: float = 0.0,
 ):
-    for name, child_module in orig_module.named_modules():
+    conductor = LayerOffloadConductor(
+        train_device,
+        temp_device,
+        offload_activations=offload,
+        offload_layers=offload and layer_offload_fraction > 0,
+        layer_offload_fraction=layer_offload_fraction,
+    )
+
+    layer_index = 0
+    for child_module in orig_module.modules():
         if isinstance(child_module, JointTransformerBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, [],
+                child_module, train_device,
+                [],
+                conductor, layer_index,
             )
+            layer_index += 1
 
 
 def enable_checkpointing_for_flux_transformer(
         orig_module: nn.Module,
         train_device: torch.device,
         temp_device: torch.device,
-        offload_activations: bool = True,
+        offload: bool = False,
+        layer_offload_fraction: float = 0.0,
 ):
-    for name, child_module in orig_module.named_modules():
+    conductor = LayerOffloadConductor(
+        train_device,
+        temp_device,
+        offload_activations=offload,
+        offload_layers=offload and layer_offload_fraction > 0,
+        layer_offload_fraction=layer_offload_fraction,
+    )
+
+    layer_index = 0
+    for child_module in orig_module.modules():
         if isinstance(child_module, FluxTransformerBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, ["hidden_states", "encoder_hidden_states"],
+                child_module, train_device,
+                ["hidden_states", "encoder_hidden_states"],
+                conductor, layer_index,
             )
+            layer_index += 1
+
+    for child_module in orig_module.modules():
         if isinstance(child_module, FluxSingleTransformerBlock):
             child_module.forward = create_checkpointed_forward(
-                child_module, train_device, temp_device,
-                offload_activations, ["hidden_states"],
+                child_module, train_device,
+                ["hidden_states"],
+                conductor, layer_index,
             )
+            layer_index += 1

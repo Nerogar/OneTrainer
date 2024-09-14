@@ -38,7 +38,7 @@ class BaseStableDiffusionXLSetup(
     metaclass=ABCMeta
 ):
 
-    def _setup_optimizations(
+    def setup_optimizations(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
