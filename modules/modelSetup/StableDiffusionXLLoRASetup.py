@@ -167,8 +167,6 @@ class StableDiffusionXLLoRASetup(
 
         init_model_parameters(model, self.create_parameters(model, config))
 
-        self._setup_optimizations(model, config)
-
     def setup_train_device(
             self,
             model: StableDiffusionXLModel,
