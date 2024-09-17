@@ -38,11 +38,11 @@ ask() {
     done
 }
 
-#clear linux-platform (used  to store the selected platform-requirements, so we don't have to confirm on every update)
+#clear linux-platform (used to store the selected platform-requirements, so we don't have to confirm on every update)
 > linux-platform
 
 echo ""
-echo "Platform requirements diverge slightly sepending on you GPU."Would you want to use the detected platform Requirements? (echo $PLATFORM_REQS)
+echo "Platform requirements diverge slightly depending on you GPU.Would you want to use the detected platform Requirements? (echo $PLATFORM_REQS)"
 if ask "Use $PLATFORM_REQS? default: Yes" Y; then
     echo "Using $PLATFORM_REQS"
     cat $PLATFORM_REQS > linux-platform
