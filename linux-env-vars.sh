@@ -15,10 +15,10 @@ if [[ -z "${conda_venv}" ]]; then
     export conda_env=ot
 fi
 
-if [ -e /dev/kfd ]; then
-	export PLATFORM_REQS=requirements-rocm.txt
-elif [ -x "$(command -v nvcc)" ]; then
+if [ -x "$(command -v nvcc)" ]; then
 	export PLATFORM_REQS=requirements-cuda.txt
+elif [ -e /dev/kfd ]; then
+	export PLATFORM_REQS=requirements-rocm.txt
 else
 	export PLATFORM_REQS=requirements-default.txt
 fi
