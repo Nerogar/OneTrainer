@@ -42,7 +42,7 @@ ask() {
 > linux-platform
 
 echo ""
-echo "Platform requirements diverge slightly depending on you GPU.Would you want to use the detected platform Requirements? (echo $PLATFORM_REQS)"
+echo "Platform requirements diverge slightly depending on you GPU.Would you want to use the detected platform Requirements? ($PLATFORM_REQS)"
 if ask "Use $PLATFORM_REQS? default: Yes" Y; then
     echo "Using $PLATFORM_REQS"
     cat $PLATFORM_REQS > linux-platform
@@ -53,7 +53,7 @@ fi
 
 stored_platform_reqs=$(<linux-platform)
 
-export linux_cmd_python_venv = '${python_cmd} -m pip install -r requirements-global.txt -r $stored_platform_reqs'
-export linux_cmd_conda_venv = '${python_cmd} -m pip install -r requirements-global.txt -r $stored_platform_reqs'
+export linux_cmd_python_venv='${python_cmd} -m pip install -r requirements-global.txt -r $stored_platform_reqs'
+export linux_cmd_conda_venv='${python_cmd} -m pip install -r requirements-global.txt -r $stored_platform_reqs'
 
 /bin/bash ./linux-python-env.sh
