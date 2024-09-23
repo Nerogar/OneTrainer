@@ -1,5 +1,5 @@
 # Inspiration for setup @ https://dev.to/ordigital/nvidia-525-cuda-118-python-310-pytorch-gpu-docker-image-1l4a
-FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 ENV PYTHONUNBUFFERED=1 
 
