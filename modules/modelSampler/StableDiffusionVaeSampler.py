@@ -39,12 +39,12 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         image = Image.open(sample_config.prompt)
         image = image.convert("RGB")
         # TODO: figure out better set of transformations for resize and/or implement way to configure them as per-sample toggle
-        
+
         if sample_config.width > sample_config.height:
             scale = sample_config.width
         else:
             scale = sample_config.height
-            
+
         t_in = transforms.Compose([
             transforms.Resize(scale),
             transforms.CenterCrop([sample_config.height, sample_config.width]),
@@ -65,9 +65,9 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         image_tensor = image_tensor.clamp(0, 1)
 
         t_out = transforms.ToPILImage()
-        image = t_out(image_tensor)
+        image = t_out(image_tensor.float())
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         image.save(destination)
-        
+
         on_sample(image)
