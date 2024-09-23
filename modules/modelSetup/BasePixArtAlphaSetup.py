@@ -11,8 +11,8 @@ from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     create_checkpointed_forward,
-    enable_checkpointing_for_t5_encoder_layers,
     enable_checkpointing_for_sdxl_transformer_blocks,
+    enable_checkpointing_for_t5_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
@@ -248,7 +248,7 @@ class BasePixArtAlphaSetup(
 
                 truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device)
+                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device, self.temp_device)
 
                 for step in range(config.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \
