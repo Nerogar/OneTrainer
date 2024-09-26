@@ -1,4 +1,6 @@
 .idea
+.python-version
+/.venv*
 /venv*
 /debug*
 /workspace*
