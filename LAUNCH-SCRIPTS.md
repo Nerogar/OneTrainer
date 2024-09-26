@@ -43,6 +43,7 @@
 - Always use `run-cmd.sh`, which automatically validates the chosen target script's name, configures the runtime environment correctly, and then runs the target script with your given command-line arguments.
 - For example, to run the training CLI script, you would use `./run-cmd.sh train --config-path <path to your config>`.
 - The names of all valid scripts can be seen in OneTrainer's `scripts/` directory.
+- To learn more about the available command-line arguments for each script, you can execute them with the `-h` (help) argument: `./run-cmd.sh <script name> -h`. For example, if you want to learn more about the "train" script, you would run `./run-cmd.sh train -h`.
 
 
 ### Creating your own launch scripts:
