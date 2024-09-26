@@ -17,7 +17,7 @@ from torch import nn
 from torchvision.transforms import transforms
 
 from PIL import Image
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 class StableDiffusionXLSampler(BaseModelSampler):

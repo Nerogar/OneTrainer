@@ -5,7 +5,7 @@ from typing import Callable
 from modules.util import path_util
 
 from PIL import Image
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 class CaptionSample:

@@ -115,6 +115,7 @@ class TopBar:
             ]
         elif self.train_config.model_type.is_flux():
             values = [
+                ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]

@@ -11,7 +11,7 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 class GenerateLossesModel:

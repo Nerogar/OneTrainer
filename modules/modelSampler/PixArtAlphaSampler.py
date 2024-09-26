@@ -15,7 +15,7 @@ from modules.util.torch_util import torch_gc
 import torch
 
 from PIL.Image import Image
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 class PixArtAlphaSampler(BaseModelSampler):

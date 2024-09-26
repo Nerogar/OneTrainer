@@ -37,16 +37,16 @@ elif [ -x "$(command -v python)" ]; then
 						if [[ -z "$VIRTUAL_ENV" ]]; then
     							echo "warning: No VIRTUAL_ENV set. exiting."
 						else
-							python scripts/train_ui.py
+							accelerate launch scripts/train_ui.py || python scripts/train_ui.py
 						fi
 					elif [ -x "$(command -v conda)" ]; then
 						#check for venv
 						if conda info --envs | grep -q ${conda_env}; 
 							then
-								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; python scripts/train_ui.py")
+								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; accelerate launch scripts/train_ui.py || python scripts/train_ui.py")
 							else 
 								conda create -y -n $conda_env python==3.10;
-								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; python scripts/train_ui.py")
+								bash --init-file <(echo ". \"$HOME/.bashrc\"; conda activate $conda_env; accelerate launch scripts/train_ui.py || python scripts/train_ui.py")
 						fi
 					fi
 				else

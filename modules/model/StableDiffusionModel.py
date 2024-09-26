@@ -225,9 +225,8 @@ class StableDiffusionModel(BaseModel):
         if tokens is None:
             tokenizer_output = self.tokenizer(
                 text,
-                padding='max_length',
-                truncation=True,
-                max_length=77,
+                padding="max_length",
+                truncation=False,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
@@ -239,7 +238,7 @@ class StableDiffusionModel(BaseModel):
             layer_skip=text_encoder_layer_skip,
             text_encoder_output=text_encoder_output,
             add_pooled_output=False,
-            use_attention_mask=False,
+            use_attention_mask=True,
             add_layer_norm=True,
         )
 

@@ -207,8 +207,7 @@ class StableDiffusionXLModel(BaseModel):
             tokenizer_output = self.tokenizer_1(
                 text,
                 padding='max_length',
-                truncation=True,
-                max_length=77,
+                truncation=False,
                 return_tensors="pt",
             )
             tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
@@ -217,8 +216,7 @@ class StableDiffusionXLModel(BaseModel):
             tokenizer_output = self.tokenizer_2(
                 text,
                 padding='max_length',
-                truncation=True,
-                max_length=77,
+                truncation=False,
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
@@ -230,7 +228,7 @@ class StableDiffusionXLModel(BaseModel):
             layer_skip=text_encoder_1_layer_skip,
             text_encoder_output=text_encoder_1_output,
             add_pooled_output=False,
-            use_attention_mask=False,
+            use_attention_mask=True,
             add_layer_norm=False,
         )
 
@@ -242,7 +240,7 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_output=text_encoder_2_output,
             add_pooled_output=True,
             pooled_text_encoder_output=pooled_text_encoder_2_output,
-            use_attention_mask=False,
+            use_attention_mask=True,
             add_layer_norm=False,
         )
 
