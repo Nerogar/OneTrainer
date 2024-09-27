@@ -223,12 +223,17 @@ function get_platform_requirements_path {
     # NOTE: The user can override our platform detection via the environment.
     local platform_reqs="${OT_PLATFORM_REQUIREMENTS}"
     if [[ "${platform_reqs}" == "detect" ]]; then
-        if [[ -e "/dev/kfd" ]]; then
-            platform_reqs="requirements-rocm.txt"
-        elif can_exec nvidia-smi || can_exec nvcc; then
-            # NOTE: Modern NVIDIA drivers don't have "nvcc" anymore.
+        # NOTE: We MUST prioritize NVIDIA first, since machines that contain
+        # *both* AMD and NVIDIA GPUs are usually running integrated AMD graphics
+        # that's built into their CPU, whereas their *dedicated* GPU is NVIDIA.
+        if can_exec nvidia-smi || can_exec nvcc; then
+            # NOTE: NVIDIA drivers don't contain "nvcc". That's a CUDA dev-tool.
             platform_reqs="requirements-cuda.txt"
+        elif [[ -e "/dev/kfd" ]]; then
+            # AMD graphics.
+            platform_reqs="requirements-rocm.txt"
         else
+            # No GPU acceleration.
             platform_reqs="requirements-default.txt"
         fi
     fi
