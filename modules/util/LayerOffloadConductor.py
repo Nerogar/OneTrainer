@@ -16,7 +16,7 @@ MESSAGES = []
 
 def log(msg: str = ''):
     pass
-    # print(msg)
+    print(msg)
     # MESSAGES.append(msg)
 
 
@@ -74,6 +74,8 @@ class SyncEvent:
 
 
 class LayerOffloadConductor:
+    __module: nn.Module
+
     __layers: list[nn.Module]
     __layer_device_map: list[torch.device | None]
     __num_offloaded_layers: int
@@ -101,6 +103,7 @@ class LayerOffloadConductor:
 
     def __init__(
             self,
+            module: nn.Module,
             train_device: torch.device,
             temp_device: torch.device,
             offload_activations: bool = False,
@@ -108,6 +111,8 @@ class LayerOffloadConductor:
             layer_offload_fraction: float = 0.5,
     ):
         super(LayerOffloadConductor, self).__init__()
+
+        self.__module = module
 
         self.__layers = []
         self.__layer_device_map = []
@@ -141,6 +146,32 @@ class LayerOffloadConductor:
 
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
+
+    def layer_offload_activated(self) -> bool:
+        return self.__offload_activations or self.__offload_layers
+
+    def to(self, device: torch.device):
+        self.__wait_all_layer_transfers()
+
+        if device_equals(device, self.__temp_device):
+            self.__module.to(self.__temp_device)
+        elif device_equals(device, self.__train_device):
+            # 1. calculate child modules that are not part of any layer
+            layer_modules = set()
+            for layer in self.__layers:
+                layer_modules.update(layer.modules())
+            all_modules = set(self.__module.modules())
+            non_layer_modules = all_modules.difference(layer_modules)
+
+            # 2. move non_layer_modules to the train device
+            for module in non_layer_modules:
+                module.to(self.__train_device)
+
+            # 3. move all layers to the train device, then move non-offloadable tensors back to the temp device
+            for layer in self.__layers:
+                layer.to(self.__train_device)
+                for module in layer.modules():
+                    offload_quantized(module, self.__temp_device)
 
     def add_layer(self, layer: nn.Module, included_offload_param_indices: list[int] = None):
         if included_offload_param_indices is None:
@@ -253,6 +284,10 @@ class LayerOffloadConductor:
     def __clear_activations(self):
         self.__activations_list = []
         self.__activations_event_list = []
+
+    def __wait_all_layer_train(self):
+        for layer_index in range(len(self.__layers)):
+            self.__wait_layer_train(layer_index)
 
     def __wait_all_layer_transfers(self):
         for layer_index in range(len(self.__layers)):
