@@ -17,7 +17,7 @@
 
 - `OT_CONDA_ENV`: Sets the name of the Conda environment. Defaults to `onetrainer`.
 
-- `OT_PYTHON_CMD`: Sets the Host's Python executable. It's used for creating the Python Venvs. Defaults to `python`.
+- `OT_PYTHON_CMD`: Sets the Host's Python executable. It's used for creating the Python Venvs. This can be used to force the usage of a specific Python version's binary (such as `python3.10`) whenever the host has multiple versions installed. However, it's *always* recommended to use Conda or Pyenv instead, rather than relying on the host's unreliable system-wide Python binaries (which might change or be removed with system updates), so we don't recommend changing this option unless you *really* know what you're doing. Defaults to `python`.
 
 - `OT_PYTHON_VENV`: Sets the name (or an absolute/relative path) of the Python Venv. If a name or relative path is used, it will be relative to the OneTrainer directory. Defaults to `.venv`.
 
@@ -38,15 +38,30 @@
 - If you're running OneTrainer inside a Docker/Podman container, you can instead use the [ENV](https://docs.docker.com/reference/dockerfile/#env) instruction in your `Dockerfile` / `Containerfile` to set the variables, such as `ENV OT_CUDA_LOWMEM_MODE="true"`.
 
 
+### Installing the required Python version for OneTrainer:
+
+- If you've received a warning that your system's Python version is incorrect, then your system doesn't have Conda installed, and has instead tried to create a Python Venv with your host's default Python version. If that version is incompatible with OneTrainer, then you'll have to resolve the problem by manually installing a compatible version.
+- Begin by deleting the `.venv` sub-directory inside the OneTrainer directory, to erase the invalid Python Venv (which was created with the wrong Python version). It's a hidden directory, so you will have to enable "show hidden files" if you're using a file manager.
+- Now you'll have to choose which solution you prefer.
+- The most beginner-friendly solution is to install [Miniconda](https://docs.anaconda.com/miniconda/) on your system. OneTrainer will then automatically install and manage the correct Python version for you. You can stop reading here if you're choosing this solution. Everything will work automatically after that.
+- Alternatively, if you prefer a more lightweight and advanced solution, then you can use [pyenv](https://github.com/pyenv/pyenv), which allows you to set the exact Python version to use for OneTrainer's directory. If you're on Linux, then read their "[automatic installer](https://github.com/pyenv/pyenv?tab=readme-ov-file#automatic-installer)" section and follow the instructions. If you're on a Mac instead, then read their "[Homebrew](https://github.com/pyenv/pyenv?tab=readme-ov-file#homebrew-in-macos)" section (which is an open-source package manager for Macs).
+- After installing pyenv, you will also need to install the [Python build dependencies](https://github.com/pyenv/pyenv/wiki#suggested-build-environment) on your system, since pyenv installs each Python version by compiling them directly from the official source code.
+- Restart your shell, and then try the `pyenv doctor` command, which ensures that pyenv is loaded and verifies that your system contains all required dependencies for installing Python.
+- Run `pyenv install <python version>` to install whichever Python version is currently required by OneTrainer. You can look at the `OT_CONDA_USE_PYTHON_VERSION` variable at the top of the `lib.include.sh` file in OneTrainer's project directory, to see which Python version is recommended by OneTrainer at the moment.
+- Lastly, you must navigate to the OneTrainer directory, and then run `pyenv local <python version>` to force OneTrainer to use that version of Python. Your choice will be stored persistently in the hidden `.python-version` file, and can be changed again in the future by running the command again.
+- You can now run `python --version` to verify that the `python` command in OneTrainer is being mapped to the correct Python version by pyenv.
+- Everything is now ready for running OneTrainer!
+
+
 ### Running custom script commands:
 
-- Always use `run-cmd.sh`, which automatically validates the chosen target script's name, configures the runtime environment correctly, and then runs the target script with your given command-line arguments.
+- Always use `run-cmd.sh` when you want to execute any of OneTrainer's CLI tasks. It automatically validates the chosen target script's name, configures the runtime environment correctly, and then runs the target script with your given command-line arguments.
 - For example, to run the training CLI script, you would use `./run-cmd.sh train --config-path <path to your config>`.
-- The names of all valid scripts can be seen in OneTrainer's `scripts/` directory.
+- The names of all valid scripts can be seen in OneTrainer's `scripts/` sub-directory.
 - To learn more about the available command-line arguments for each script, you can execute them with the `-h` (help) argument: `./run-cmd.sh <script name> -h`. For example, if you want to learn more about the "train" script, you would run `./run-cmd.sh train -h`.
 
 
-### Creating your own launch scripts:
+### Creating your own launch scripts and automating tasks:
 
 - If you want to automate various OneTrainer CLI tasks, then you should call `run-cmd.sh` from your own scripts (see previous guide section), since it's capable of running *any* OneTrainer command with your own command-line arguments.
 - To run multiple tasks in the same scripts, you should perform separate calls to `run-cmd.sh`. Run it as many times as required for all the custom scripts and command-line arguments that you want to perform in your own script.
