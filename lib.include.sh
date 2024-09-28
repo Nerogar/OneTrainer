@@ -158,7 +158,11 @@ function has_conda_env {
 
 function create_conda_env {
     print "Creating Conda environment with name \"${OT_CONDA_ENV}\"..."
-    run_conda create -y -n "${OT_CONDA_ENV}" "python==${OT_CONDA_USE_PYTHON_VERSION}"
+    # IMPORTANT: The ".*" suffix tells Conda to install the latest bugfix/patch
+    # release of the desired Python version. For example, if we specify "3.12",
+    # then it will pick the latest patch release, such as "3.12.5". It also works
+    # correctly if we specify an EXACT patch release ourselves, such as "3.10.5.*".
+    run_conda create -y -n "${OT_CONDA_ENV}" "python==${OT_CONDA_USE_PYTHON_VERSION}.*"
     export OT_MUST_INSTALL_REQUIREMENTS="true"
 }
 
