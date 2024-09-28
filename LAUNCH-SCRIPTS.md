@@ -19,7 +19,7 @@
 
 - `OT_PYTHON_CMD`: Sets the Host's Python executable. It's used for creating the Python Venvs. This can be used to force the usage of a specific Python version's binary (such as `python3.10`) whenever the host has multiple versions installed. However, it's *always* recommended to use Conda or Pyenv instead, rather than relying on the host's unreliable system-wide Python binaries (which might change or be removed with system updates), so we don't recommend changing this option unless you *really* know what you're doing. Defaults to `python`.
 
-- `OT_PYTHON_VENV`: Sets the name (or an absolute/relative path) of the Python Venv. If a name or relative path is used, it will be relative to the OneTrainer directory. Defaults to `.venv`.
+- `OT_PYTHON_VENV`: Sets the name (or an absolute/relative path) of the Python Venv. If a name or relative path is used, it will be relative to the OneTrainer directory. Defaults to `venv`.
 
 - `OT_PREFER_VENV`: If set to `true`, Conda will be ignored even if it exists on the system, and Python Venv will be used instead. This ensures that people who use `pyenv` (to choose which Python version to run on the host) can easily set up their desired Python Venv environments. Defaults to `false`.
 
@@ -41,7 +41,7 @@
 ### Installing the required Python version for OneTrainer:
 
 - If you've received a warning that your system's Python version is incorrect, then your system doesn't have Conda installed, and has instead tried to create a Python Venv with your host's default Python version. If that version is incompatible with OneTrainer, then you'll have to resolve the problem by manually installing a compatible version.
-- Begin by deleting the `.venv` sub-directory inside the OneTrainer directory, to erase the invalid Python Venv (which was created with the wrong Python version). It's a hidden directory, so you will have to enable "show hidden files" if you're using a file manager.
+- Begin by deleting the `venv` sub-directory inside the OneTrainer directory, to erase the invalid Python Venv (which was created with the wrong Python version).
 - Now you'll have to choose which solution you prefer.
 - The most beginner-friendly solution is to install [Miniconda](https://docs.anaconda.com/miniconda/) on your system. OneTrainer will then automatically install and manage the correct Python version for you. You can stop reading here if you're choosing this solution. Everything will work automatically after that.
 - Alternatively, if you prefer a more lightweight and advanced solution, then you can use [pyenv](https://github.com/pyenv/pyenv), which allows you to set the exact Python version to use for OneTrainer's directory. If you're on Linux, then read their "[automatic installer](https://github.com/pyenv/pyenv?tab=readme-ov-file#automatic-installer)" section and follow the instructions. If you're on a Mac instead, then read their "[Homebrew](https://github.com/pyenv/pyenv?tab=readme-ov-file#homebrew-in-macos)" section (which is an open-source package manager for Macs).
