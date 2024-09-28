@@ -2,17 +2,16 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
-
 import torch
-from torch import nn
-from torch.utils.checkpoint import checkpoint
-
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
 from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
+from torch import nn
+from torch.utils.checkpoint import checkpoint
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
+
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 
 def __kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
@@ -144,8 +143,9 @@ def enable_checkpointing_for_sdxl_transformer_blocks(
         temp_device: torch.device,
         offload: bool = False,
         layer_offload_fraction: float = 0.0,
-):
+) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(
+        orig_module,
         train_device,
         temp_device,
         offload_activations=offload,
@@ -163,6 +163,8 @@ def enable_checkpointing_for_sdxl_transformer_blocks(
             )
             layer_index += 1
 
+    return conductor
+
 
 def enable_checkpointing_for_clip_encoder_layers(
         orig_module: nn.Module,
@@ -170,8 +172,9 @@ def enable_checkpointing_for_clip_encoder_layers(
         temp_device: torch.device,
         offload: bool = False,
         layer_offload_fraction: float = 0.0,
-):
+) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(
+        orig_module,
         train_device,
         temp_device,
         offload_activations=offload,
@@ -189,6 +192,8 @@ def enable_checkpointing_for_clip_encoder_layers(
             )
             layer_index += 1
 
+    return conductor
+
 
 def enable_checkpointing_for_stable_cascade_blocks(
         orig_module: nn.Module,
@@ -196,8 +201,9 @@ def enable_checkpointing_for_stable_cascade_blocks(
         temp_device: torch.device,
         offload: bool = False,
         layer_offload_fraction: float = 0.0,
-):
+) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(
+        orig_module,
         train_device,
         temp_device,
         offload_activations=offload,
@@ -229,6 +235,8 @@ def enable_checkpointing_for_stable_cascade_blocks(
             )
             layer_index += 1
 
+    return conductor
+
 
 def enable_checkpointing_for_t5_encoder_layers(
         orig_module: nn.Module,
@@ -236,8 +244,9 @@ def enable_checkpointing_for_t5_encoder_layers(
         temp_device: torch.device,
         offload: bool = False,
         layer_offload_fraction: float = 0.0,
-):
+) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(
+        orig_module,
         train_device,
         temp_device,
         offload_activations=offload,
@@ -255,6 +264,8 @@ def enable_checkpointing_for_t5_encoder_layers(
             )
             layer_index += 1
 
+    return conductor
+
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
         orig_module: nn.Module,
@@ -262,8 +273,9 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
         temp_device: torch.device,
         offload: bool = False,
         layer_offload_fraction: float = 0.0,
-):
+) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(
+        orig_module,
         train_device,
         temp_device,
         offload_activations=offload,
@@ -281,6 +293,8 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
             )
             layer_index += 1
 
+    return conductor
+
 
 def enable_checkpointing_for_flux_transformer(
         orig_module: nn.Module,
@@ -288,8 +302,9 @@ def enable_checkpointing_for_flux_transformer(
         temp_device: torch.device,
         offload: bool = False,
         layer_offload_fraction: float = 0.0,
-):
+) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(
+        orig_module,
         train_device,
         temp_device,
         offload_activations=offload,
@@ -315,3 +330,5 @@ def enable_checkpointing_for_flux_transformer(
                 conductor, layer_index,
             )
             layer_index += 1
+
+    return conductor

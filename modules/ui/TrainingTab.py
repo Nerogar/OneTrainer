@@ -248,11 +248,10 @@ class TrainingTab:
         components.options(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
                            "gradient_checkpointing")
 
-        # gradient checkpointing
+        # gradient checkpointing layer offloading
         components.label(frame, 5, 0, "Layer offload fraction",
                          tooltip="Enables offloading of individual layers during training to reduce VRAM usage. Increases training time and uses more RAM. Only available if checkpointing is set to CPU_OFFLOADED. values between 0 and 1, 0=disabled")
-        components.options(frame, 5, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
-                           "layer_offload_fraction")
+        components.entry(frame, 5, 1, self.ui_state, "layer_offload_fraction")
 
         # train dtype
         components.label(frame, 6, 0, "Train Data Type",
