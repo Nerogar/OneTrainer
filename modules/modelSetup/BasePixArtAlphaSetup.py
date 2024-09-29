@@ -82,9 +82,8 @@ class BasePixArtAlphaSetup(
             model.vae.enable_gradient_checkpointing()
             model.transformer_offload_conductor = \
                 enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, offload_enabled=True)
-            if config.text_encoder.train or config.train_any_embedding():
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+            model.text_encoder_offload_conductor = \
+                enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

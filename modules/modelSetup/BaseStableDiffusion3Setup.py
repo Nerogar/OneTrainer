@@ -78,7 +78,7 @@ class BaseStableDiffusion3Setup(
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
             if model.text_encoder_2 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
-            if model.text_encoder_3 is not None and config.train_text_encoder_3_or_embedding():
+            if model.text_encoder_3 is not None:
                 model.text_encoder_3_offload_conductor = \
                     enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, config)
 

@@ -9,7 +9,7 @@ from modules.util.quantization_util import offload_quantized, get_offload_tensor
 from modules.util.torch_util import (
     create_stream_context,
     device_equals,
-    to_device_,
+    tensor_to_device_, module_to_device_except_sub_module,
 )
 
 MESSAGES = []
@@ -151,21 +151,15 @@ class LayerOffloadConductor:
         self.__wait_all_layer_transfers()
 
         if device_equals(device, self.__temp_device):
+            log("to temp device")
             self.__module.to(self.__temp_device)
         elif device_equals(device, self.__train_device):
-            # 1. calculate child modules that are not part of any layer
-            layer_modules = set()
-            for layer in self.__layers:
-                layer_modules.update(layer.modules())
-            all_modules = set(self.__module.modules())
-            non_layer_modules = all_modules.difference(layer_modules)
+            log("to train device")
+            module_to_device_except_sub_module(self.__module, device, self.__layers)
 
-            # 2. move non_layer_modules to the train device
-            for module in non_layer_modules:
-                module.to(self.__train_device)
-
-            # 3. move all layers to the train device, then move non-offloadable tensors back to the temp device
-            for layer in self.__layers:
+            # move all layers to the train device, then move offloadable tensors back to the temp device
+            for layer_index, layer in enumerate(self.__layers):
+                log(f"layer {layer_index} to train device")
                 layer.to(self.__train_device)
                 for module in layer.modules():
                     offload_quantized(module, self.__temp_device)
@@ -340,5 +334,5 @@ class LayerOffloadConductor:
         log(f"schedule activations to {str(device)}")
 
         with torch.cuda.stream(self.__transfer_stream):
-            to_device_(activations, device, non_blocking=True)
+            tensor_to_device_(activations, device, non_blocking=True)
             return SyncEvent(self.__transfer_stream.record_event(), f"transfer to {device}")

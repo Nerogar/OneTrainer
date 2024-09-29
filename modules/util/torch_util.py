@@ -14,7 +14,7 @@ def state_dict_has_prefix(state_dict: dict | None, prefix: str):
     return any(k.startswith(prefix) for k in state_dict)
 
 
-def to_device_(
+def tensor_to_device_(
         data: torch.Tensor | list | tuple | dict,
         device: torch.device,
         include_parameter_indices: list[int] | None = None,
@@ -28,10 +28,39 @@ def to_device_(
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
             if i in include_parameter_indices:
-                to_device_(elem, device, non_blocking=non_blocking)
+                tensor_to_device_(elem, device, non_blocking=non_blocking)
     elif isinstance(data, dict):
         for elem in data.values():
-            to_device_(elem, device, non_blocking=non_blocking)
+            tensor_to_device_(elem, device, non_blocking=non_blocking)
+
+def module_to_device_except_sub_module(
+        module: torch.nn.Module,
+        device: torch.device,
+        sub_modules: list[torch.nn.Module],
+        non_blocking: bool = False,
+):
+    sub_module_parameters = set(sum([list(x.parameters()) for x in sub_modules], []))
+
+    def convert(t):
+        if t in sub_module_parameters:
+            return t
+
+        try:
+            return t.to(
+                device,
+                None,
+                non_blocking,
+            )
+        except NotImplementedError as e:
+            if str(e) == "Cannot copy out of meta tensor; no data!":
+                raise NotImplementedError(
+                    f"{e} Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() "
+                    f"when moving module from meta to a different device."
+                ) from None
+            else:
+                raise
+
+    return module._apply(convert)
 
 
 def device_equals(device1: torch.device, device2: torch.device) -> bool:
