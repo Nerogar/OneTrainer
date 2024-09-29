@@ -2,6 +2,7 @@
 .python-version
 /.venv*
 /venv*
+/conda_env*
 /debug*
 /workspace*
 /models*
