@@ -56,7 +56,8 @@ def create_checkpointed_forward(
 
     bound_conductor = conductor
     bound_layer_index = layer_index
-    conductor.add_layer(orig_module, included_offload_param_indices)
+    if conductor is not None:
+        conductor.add_layer(orig_module, included_offload_param_indices)
 
     if conductor is not None and conductor.offload_activated():
         def offloaded_custom_forward(
