@@ -35,9 +35,10 @@ export OT_PYTHON_VERSION_MINIMUM="3"
 export OT_PYTHON_VERSION_TOO_HIGH="3.11"
 export OT_CONDA_USE_PYTHON_VERSION="3.10"
 export OT_MUST_INSTALL_REQUIREMENTS="false"
+export OT_HOST_OS="$(uname -s)"
 
 # Force PyTorch to use fallbacks on Mac systems.
-if [[ "$(uname)" == "Darwin" ]]; then
+if [[ "${OT_HOST_OS}" == "Darwin" ]]; then
     export PYTORCH_ENABLE_MPS_FALLBACK="1"
 fi
 
@@ -88,7 +89,7 @@ function absolute_path {
     fi
 
     if [[ ! -d "$1" ]]; then
-        print_error "absolute_path argument is not a directory: \"$1\""
+        print_error "absolute_path argument is not a directory: \"$1\"."
         return 1
     fi
 
@@ -203,12 +204,29 @@ function has_conda_global_env {
 
 function create_conda_env {
     print "Creating Conda environment in \"${OT_CONDA_ENV}\"..."
+
     # IMPORTANT: The ".*" suffix tells Conda to install the latest bugfix/patch
     # release of the desired Python version. For example, if we specify "3.12.*",
     # then it will pick the latest patch release, such as "3.12.5". It also works
     # correctly if we specify an EXACT patch release ourselves, such as "3.10.14.*",
     # or if we only specify a major version, such as "3.*" (gets the latest release).
-    run_conda create -y --prefix "${OT_CONDA_ENV}" "python==${OT_CONDA_USE_PYTHON_VERSION}.*"
+    declare -a install_args=()
+    install_args+=("python==${OT_CONDA_USE_PYTHON_VERSION}.*")
+
+    # IMPORTANT: We MUST use "conda-forge" and EXPLICITLY switch to the version
+    # of Tk that has libXft support on Linux, otherwise the GUI will have broken
+    # fonts, inability to render Unicode, and no antialiasing! Doesn't affect Macs.
+    # SEE: https://github.com/conda-forge/tk-feedstock/pull/40#issuecomment-2381409555
+    # SEE: https://anaconda.org/conda-forge/tk/files (only Linux has "xft" variant).
+    if [[ "${OT_HOST_OS}" == "Linux" ]]; then
+        install_args+=("tk[build=xft_*]")
+    fi
+
+    # NOTE: We install with strict channel priority, which ensures that package
+    # names which exist in "conda-forge" will never fall back to the "defaults"
+    # channel if "conda-forge" doesn't have the required version. This protects
+    # against mismatched packages built with different settings.
+    run_conda create -y --prefix "${OT_CONDA_ENV}" --channel "conda-forge" --strict-channel-priority "${install_args[@]}"
     export OT_MUST_INSTALL_REQUIREMENTS="true"
 
     # Show a warning if the user has the legacy "ot" environment on their system.
