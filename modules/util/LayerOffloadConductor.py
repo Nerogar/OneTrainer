@@ -148,7 +148,7 @@ class LayerOffloadConductor:
         return self.__offload_activations or self.__offload_layers
 
     def layer_offload_activated(self) -> bool:
-        return self.__offload_activations or self.__offload_layers
+        return self.__offload_layers
 
     def to(self, device: torch.device):
         self.__wait_all_layer_transfers()
