@@ -12,7 +12,7 @@ from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     create_checkpointed_forward,
     enable_checkpointing_for_clip_encoder_layers,
-    enable_checkpointing_for_sdxl_transformer_blocks,
+    enable_checkpointing_for_basic_transformer_blocks,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
@@ -73,10 +73,8 @@ class BaseStableDiffusionSetup(
         if config.gradient_checkpointing.enabled():
             model.vae.enable_gradient_checkpointing()
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_sdxl_transformer_blocks(
-                model.unet, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-            enable_checkpointing_for_clip_encoder_layers(
-                model.text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
