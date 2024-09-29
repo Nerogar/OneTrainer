@@ -42,7 +42,6 @@ class FluxModelEmbedding(BaseModelEmbedding):
 
 class FluxModel(BaseModel):
     # base model data
-    model_type: ModelType
     tokenizer_1: CLIPTokenizer | None
     tokenizer_2: T5Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None

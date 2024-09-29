@@ -4,6 +4,7 @@ from typing import Any
 import torch
 from torch import nn
 
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.quantization_util import offload_quantized, get_offload_tensors
 from modules.util.torch_util import (
     create_stream_context,
@@ -104,11 +105,7 @@ class LayerOffloadConductor:
     def __init__(
             self,
             module: nn.Module,
-            train_device: torch.device,
-            temp_device: torch.device,
-            offload_activations: bool = False,
-            offload_layers: bool = False,
-            layer_offload_fraction: float = 0.5,
+            config: TrainConfig,
     ):
         super(LayerOffloadConductor, self).__init__()
 
@@ -118,14 +115,14 @@ class LayerOffloadConductor:
         self.__layer_device_map = []
         self.__num_offloaded_layers = 0
         self.__num_loaded_layers = 0
-        self.__offload_activations = offload_activations
-        self.__offload_layers = offload_layers
-        self.__layer_offload_fraction = layer_offload_fraction
+        self.__offload_activations = config.gradient_checkpointing.offload()
+        self.__offload_layers = config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0
+        self.__layer_offload_fraction = config.layer_offload_fraction
 
         self.__layer_activations_included_offload_param_indices_map = []
 
-        self.__train_device = train_device
-        self.__temp_device = temp_device
+        self.__train_device = torch.device(config.train_device)
+        self.__temp_device = torch.device(config.temp_device)
 
         self.__layer_train_event_map = []
         self.__layer_transfer_event_map = []
@@ -135,8 +132,8 @@ class LayerOffloadConductor:
 
         self.__async_transfer = self.__train_device.type == "cuda"
         if self.__async_transfer:
-            self.__train_stream = torch.cuda.default_stream(train_device)
-            self.__transfer_stream = torch.cuda.Stream(train_device)
+            self.__train_stream = torch.cuda.default_stream(self.__train_device)
+            self.__transfer_stream = torch.cuda.Stream(self.__train_device)
         else:
             self.__train_stream = None
             self.__transfer_stream = None

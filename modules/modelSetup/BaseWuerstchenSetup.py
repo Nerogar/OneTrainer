@@ -67,13 +67,10 @@ class BaseWuerstchenSetup(
         if config.gradient_checkpointing.enabled():
             if model.model_type.is_wuerstchen_v2():
                 model.prior_prior.enable_gradient_checkpointing()
-                enable_checkpointing_for_clip_encoder_layers(
-                    model.prior_text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
             elif model.model_type.is_stable_cascade():
-                enable_checkpointing_for_stable_cascade_blocks(
-                    model.prior_prior, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-                enable_checkpointing_for_clip_encoder_layers(
-                    model.prior_text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, config)
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.decoder_vqgan)
