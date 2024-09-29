@@ -95,7 +95,9 @@ All functionality is split into different scrips located in the `scripts` direct
 - `generate_masks.py` A utility to automatically create masks for your dataset
 - `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
 
-To learn more about the different parameters, execute `<scipt-name> -h`. For example `python scripts\train.py -h`
+To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`
+
+If you are on Mac or Linux, read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system.
 
 ## Contributing
 
