@@ -496,7 +496,9 @@ class GenericTrainer(BaseTrainer):
         )
 
     def __needs_save(self, train_progress: TrainProgress):
-        return self.repeating_action_needed(
+        return self.single_action_elapsed(
+            "skip_save", self.config.skip_save, self.config.skip_save_unit, train_progress
+        ) and self.repeating_action_needed(
             "save", self.config.save_after, self.config.save_after_unit, train_progress, start_at_zero=False
         )
 
