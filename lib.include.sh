@@ -13,15 +13,15 @@ cd -- "${SCRIPT_DIR}"
 
 # User-configurable environment variables.
 # IMPORTANT: Don't modify the code below! Pass these variables via the environment!
-# NOTE: The "OT_PYTHON_VENV" is always created relative to "SCRIPT_DIR" unless
-# an absolute ("/home/foo/venv") or relative-traversal ("../venv") path is given.
+# NOTE: The "OT_CONDA_ENV" and "OT_PYTHON_VENV" are always relative to "SCRIPT_DIR"
+# unless an absolute ("/home/foo/venv") or relative-traversal ("../venv") path is given.
 # NOTE: The Conda detection prioritizes the user-provided value, otherwise the
 # value of "$CONDA_EXE" (the env variable set by Conda's shell startup script),
 # or lastly the "conda" binary (from PATH) as final fallback. We MUST use this
 # order, otherwise we will fail to detect Conda if its startup script has executed,
 # since their script shadows "conda" as a shell-function instead of a binary!
 export OT_CONDA_CMD="${OT_CONDA_CMD:-${CONDA_EXE:-conda}}"
-export OT_CONDA_ENV="${OT_CONDA_ENV:-onetrainer}"
+export OT_CONDA_ENV="${OT_CONDA_ENV:-conda_env}"
 export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python}"
 export OT_PYTHON_VENV="${OT_PYTHON_VENV:-venv}"
 export OT_PREFER_VENV="${OT_PREFER_VENV:-false}"
@@ -47,12 +47,22 @@ if [[ "${OT_CUDA_LOWMEM_MODE}" == "true" ]]; then
 fi
 
 # Utility functions.
+function escape_shell_command {
+    # NOTE: "%q" ensures shell-compatible argument escaping.
+    printf " %q" "$@" | sed 's/^ //'
+}
+
 function print {
+    # NOTE: "%b" parses escape-sequences, allowing us to output "\n" newlines.
     printf "[OneTrainer] %b\n" "$*"
 }
 
+function print_warning {
+    printf "[OneTrainer] Warning: %b\n" "$*" >&2
+}
+
 function print_error {
-    printf "Error: %b\n" "$*" >&2
+    printf "[OneTrainer] Error: %b\n" "$*" >&2
 }
 
 function print_debug {
@@ -61,8 +71,28 @@ function print_debug {
     fi
 }
 
+function print_command {
+    # NOTE: "%s" prints the escaped command as-is without parsing escape-seqs.
+    printf "[OneTrainer] + %s\n" "$(escape_shell_command "$@")"
+}
+
 function regex_escape {
     sed 's/[][\.|$(){}?+*^]/\\&/g' <<<"$*"
+}
+
+# Resolves the absolute path for an absolute or relative input path.
+function absolute_path {
+    if [[ -z "$1" ]]; then
+        print_error "absolute_path requires 1 argument."
+        return 1
+    fi
+
+    if [[ ! -d "$1" ]]; then
+        print_error "absolute_path argument is not a directory: \"$1\""
+        return 1
+    fi
+
+    echo "$(cd -- "$1" &>/dev/null && pwd)"
 }
 
 # Checks if a command exists and is executable.
@@ -81,10 +111,15 @@ function can_exec {
     return 1
 }
 
+# Executes a shell command and displays the exact command for logging purposes.
+function run_cmd {
+    print_command "$@"
+    "$@"
+}
+
 # Python command wrappers.
 function run_python {
-    print "+ ${OT_PYTHON_CMD} $*"
-    "${OT_PYTHON_CMD}" "$@"
+    run_cmd "${OT_PYTHON_CMD}" "$@"
 }
 
 function run_pip {
@@ -133,8 +168,7 @@ function activate_python_venv {
 
 # Conda command wrappers.
 function run_conda {
-    print "+ ${OT_CONDA_CMD} $*"
-    "${OT_CONDA_CMD}" "$@"
+    run_cmd "${OT_CONDA_CMD}" "$@"
 }
 
 __HAS_CONDA__CACHE=""
@@ -152,18 +186,36 @@ function has_conda {
 }
 
 function has_conda_env {
+    # Look for Conda's metadata to ensure it's a valid local Conda environment.
+    [[ -d "${OT_CONDA_ENV}/conda-meta" ]]
+}
+
+function has_conda_global_env {
+    if [[ -z "$1" ]]; then
+        print_error "has_conda_global_env requires 1 argument."
+        return 1
+    fi
+
+    # Checks for a globally installed (non-local) Conda environment by name.
     # NOTE: We perform a strict, case-sensitive check for the exact env name.
-    run_conda info --envs | grep -q -- "^$(regex_escape "${OT_CONDA_ENV}")\b"
+    run_conda info --envs | grep -q -- "^$(regex_escape "$1")\b"
 }
 
 function create_conda_env {
-    print "Creating Conda environment with name \"${OT_CONDA_ENV}\"..."
+    print "Creating Conda environment in \"${OT_CONDA_ENV}\"..."
     # IMPORTANT: The ".*" suffix tells Conda to install the latest bugfix/patch
-    # release of the desired Python version. For example, if we specify "3.12",
+    # release of the desired Python version. For example, if we specify "3.12.*",
     # then it will pick the latest patch release, such as "3.12.5". It also works
-    # correctly if we specify an EXACT patch release ourselves, such as "3.10.5.*".
-    run_conda create -y -n "${OT_CONDA_ENV}" "python==${OT_CONDA_USE_PYTHON_VERSION}.*"
+    # correctly if we specify an EXACT patch release ourselves, such as "3.10.14.*",
+    # or if we only specify a major version, such as "3.*" (gets the latest release).
+    run_conda create -y --prefix "${OT_CONDA_ENV}" "python==${OT_CONDA_USE_PYTHON_VERSION}.*"
     export OT_MUST_INSTALL_REQUIREMENTS="true"
+
+    # Show a warning if the user has the legacy "ot" environment on their system.
+    if has_conda_global_env "ot"; then
+        # NOTE: We tell the user what to do, since automated removal is risky.
+        print_warning "The deprecated \"ot\" Conda environment has been detected on your system. It is occupying several gigabytes of disk space, and can be deleted manually to reclaim the storage space.\n\nTo delete the outdated Conda environment, execute the following command:\n\"${OT_CONDA_CMD}\" remove -y --name \"ot\" --all"
+    fi
 }
 
 function ensure_conda_env_exists {
@@ -174,7 +226,7 @@ function ensure_conda_env_exists {
 
 function run_in_conda_env {
     # NOTE: The "--no-capture-output" flag is necessary to print live to stdout/stderr.
-    run_conda run -n "${OT_CONDA_ENV}" --no-capture-output "$@"
+    run_conda run --prefix "${OT_CONDA_ENV}" --no-capture-output "$@"
 }
 
 function run_python_in_conda_env {
@@ -197,7 +249,7 @@ function should_use_conda {
 # depending on what's available on the system or user-preference overrides.
 function activate_chosen_env {
     if should_use_conda; then
-        print "Using Conda environment with name \"${OT_CONDA_ENV}\"..."
+        print "Using Conda environment in \"${OT_CONDA_ENV}\"..."
         ensure_conda_env_exists
     else
         print "Using Python Venv environment in \"${OT_PYTHON_VENV}\"..."
@@ -271,10 +323,16 @@ function install_requirements_in_active_env_if_necessary {
 # Educates the user about the correct methods for installing Python or Conda.
 function show_runtime_solutions {
     if should_use_conda; then
+        # Resolve the absolute path to ensure user doesn't delete anything else.
+        local conda_env_path="${OT_CONDA_ENV}"
+        if has_conda_env; then
+            conda_env_path="$(absolute_path "${conda_env_path}")"
+        fi
+
         # NOTE: We tell the user what to do, since automated removal is risky.
-        print "Solution: Switch your Conda environment to the required Python version by deleting your old environment, and then run OneTrainer again.\n\nTo delete the outdated Conda environment, execute the following command:\n\"${OT_CONDA_CMD}\" remove -y -n \"${OT_CONDA_ENV}\" --all"
+        print "Solution: Switch your Conda environment to the required Python version by deleting your old environment, and then run OneTrainer again.\n\nTo delete the outdated Conda environment, execute the following command:\n\"${OT_CONDA_CMD}\" remove -y --prefix \"${conda_env_path}\" --all"
     else
-        print "Solutions: Either install the required Python version via pyenv (https://github.com/pyenv/pyenv) and set the project directory's Python version with \"pyenv install <version>\" followed by \"pyenv local <version>\", or install Miniconda if you prefer that we automatically manage everything for you (https://docs.anaconda.com/miniconda/). Remember to manually delete any previous Venv or Conda environment which was created with a different Python version. Read \"LAUNCH-SCRIPTS.md\" for more detailed instructions."
+        print "Solution: Either install the required Python version via pyenv (https://github.com/pyenv/pyenv) and set the project directory's Python version with \"pyenv install <version>\" followed by \"pyenv local <version>\", or install Miniconda if you prefer that we automatically manage everything for you (https://docs.anaconda.com/miniconda/). Remember to manually delete any previous Venv or Conda environment which was created with a different Python version. Read \"LAUNCH-SCRIPTS.md\" for more detailed instructions."
     fi
 }
 

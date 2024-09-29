@@ -15,11 +15,11 @@
 
 - `OT_CONDA_CMD`: Sets a custom Conda command or an absolute path to the binary (useful when it isn't in the user's `PATH`). If nothing is provided, we detect and use `CONDA_EXE` if available, which is a variable that's set by Conda itself and always points at the user's installed Conda binary.
 
-- `OT_CONDA_ENV`: Sets the name of the Conda environment. Defaults to `onetrainer`.
+- `OT_CONDA_ENV`: Sets the directory name (or an absolute/relative path) of the Conda environment. If a name or relative path is used, it will be relative to the OneTrainer directory. Defaults to `conda_env`.
 
 - `OT_PYTHON_CMD`: Sets the Host's Python executable. It's used for creating the Python Venvs. This can be used to force the usage of a specific Python version's binary (such as `python3.10`) whenever the host has multiple versions installed. However, it's *always* recommended to use Conda or Pyenv instead, rather than relying on the host's unreliable system-wide Python binaries (which might change or be removed with system updates), so we don't recommend changing this option unless you *really* know what you're doing. Defaults to `python`.
 
-- `OT_PYTHON_VENV`: Sets the name (or an absolute/relative path) of the Python Venv. If a name or relative path is used, it will be relative to the OneTrainer directory. Defaults to `venv`.
+- `OT_PYTHON_VENV`: Sets the directory name (or an absolute/relative path) of the Python Venv. If a name or relative path is used, it will be relative to the OneTrainer directory. Defaults to `venv`.
 
 - `OT_PREFER_VENV`: If set to `true`, Conda will be ignored even if it exists on the system, and Python Venv will be used instead. This ensures that people who use `pyenv` (to choose which Python version to run on the host) can easily set up their desired Python Venv environments. Defaults to `false`.
 
