@@ -495,6 +495,22 @@ def create_optimizer(
                 is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
             )
 
+        # AdEMAMix_8BIT Optimizer
+        case Optimizer.AdEMAMix_8BIT:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.AdEMAMix8bit(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
+                       optimizer_config.beta3 if optimizer_config.beta1 is not None else 0.9999,),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.05,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                alpha=optimizer_config.eps if optimizer_config.eps is not None else 5,
+                min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
+                is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
+            )
+
         # ADAGRAD Optimizer
         case Optimizer.ADAGRAD:
             import bitsandbytes as bnb
