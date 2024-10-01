@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable
 from tkinter import EventType
-from typing import Any, Optional
+from typing import Any
 
 
 def bind_mousewheel(
