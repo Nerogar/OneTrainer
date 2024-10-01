@@ -1,13 +1,14 @@
+import sys
 from collections.abc import Callable
 from tkinter import EventType
 from typing import Any, Optional
-import customtkinter as ctk
-import sys
 
 
 def bind_mousewheel(
-    widget: Any, whitelist: Optional[set[Any]], callback: Callable[[int, Any], None]
-) -> None:
+        widget: Any,
+        whitelist: set[Any] | None,
+        callback: Callable[[int, Any], None],
+):
     assert whitelist is None or isinstance(whitelist, set)
 
     is_mac = sys.platform == "darwin"
