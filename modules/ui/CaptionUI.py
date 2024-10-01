@@ -355,7 +355,7 @@ Mouse wheel: increase or decrease brush size"""
     def draw_mask_radius(self, delta, raw_event):
         # Wheel up = Increase radius. Wheel down = Decrease radius.
         multiplier = 1.0 + (delta * 0.05)
-        self.mask_draw_radius = max(0.01, self.mask_draw_radius * multiplier)
+        self.mask_draw_radius = max(0.0025, self.mask_draw_radius * multiplier)
 
     def edit_mask(self, event):
         if not self.enable_mask_editing_var.get():
