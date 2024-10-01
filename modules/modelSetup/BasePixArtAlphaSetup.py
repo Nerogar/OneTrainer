@@ -11,9 +11,7 @@ from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     create_checkpointed_forward,
-    enable_checkpointing_for_t5_encoder_layers,
     enable_checkpointing_for_basic_transformer_blocks,
-    enable_checkpointing_for_sdxl_transformer_blocks,
     enable_checkpointing_for_t5_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig

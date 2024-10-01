@@ -43,6 +43,15 @@ def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
     return indices
 
 
+__current_call_index = 0
+
+
+def __generate_call_index() -> int:
+    global __current_call_index
+    __current_call_index += 1
+    return __current_call_index
+
+
 def create_checkpointed_forward(
         orig_module: nn.Module,
         train_device: torch.device,
@@ -63,34 +72,38 @@ def create_checkpointed_forward(
     if conductor is not None and conductor.offload_activated():
         def offloaded_custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-                dummy: torch.Tensor = None,
+                dummy: torch.Tensor,
+                call_id: int,
                 *args,
         ):
             if bound_layer_index == 0 and not torch.is_grad_enabled():
                 bound_conductor.start_forward(True)
 
-            bound_conductor.before_layer(bound_layer_index)
+            args = bound_conductor.before_layer(bound_layer_index, call_id, args)
             output = orig_forward(*args)
-            bound_conductor.after_layer(bound_layer_index, args)
+            bound_conductor.after_layer(bound_layer_index, call_id, args)
             return output
 
         def custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-                dummy: torch.Tensor = None,
+                dummy: torch.Tensor,
+                call_index: int,
                 *args,
         ):
             if bound_layer_index == 0:
                 bound_conductor.start_forward(False)
 
-            bound_conductor.before_layer(bound_layer_index)
+            args = bound_conductor.before_layer(bound_layer_index, call_index, args)
             output = orig_forward(*args)
-            bound_conductor.after_layer(bound_layer_index, args)
+            bound_conductor.after_layer(bound_layer_index, call_index, args)
             return output
 
         def forward(
                 *args,
                 **kwargs
         ):
+            call_id = __generate_call_index()
+
             if torch.is_grad_enabled():
                 dummy = torch.zeros((1,), device=train_device)
                 dummy.requires_grad_(True)
@@ -100,12 +113,13 @@ def create_checkpointed_forward(
                 return checkpoint(
                     offloaded_custom_forward,
                     dummy,
+                    call_id,
                     *args,
                     use_reentrant=True
                 )
             else:
                 args = __kwargs_to_args(orig_forward, args, kwargs)
-                return custom_forward(None, *args)
+                return custom_forward(None, call_id, *args)
     else:
         def custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA

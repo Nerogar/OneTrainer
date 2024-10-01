@@ -331,8 +331,12 @@ def create_data_loader(
         train_progress: TrainProgress | None = None,
         is_validation: bool = False
 ) -> BaseDataLoader | None:
+    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0 and config.dataloader_threads > 1:
+        raise RuntimeError('layer offloading can not be activated if "dataloader_threads" > 1')
+
     if train_progress is None:
         train_progress = TrainProgress()
+
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
