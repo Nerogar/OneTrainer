@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import torch
 from torch import nn
@@ -50,7 +51,7 @@ def to_(
 
     if isinstance(data, torch.Tensor):
         data.data = data.data.to(device=device)
-    elif isinstance(data, (list, tuple)):
+    elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
             if i in include_parameter_indices:
                 to_(elem, device)

@@ -1,4 +1,3 @@
-from typing import Optional
 
 import torch
 
@@ -33,7 +32,7 @@ class FluxXFormersAttnProcessor:
         attn: Attention,
         hidden_states: torch.FloatTensor,
         encoder_hidden_states: torch.FloatTensor = None,
-        attention_mask: Optional[torch.FloatTensor] = None,
+        attention_mask: torch.FloatTensor | None = None,
         image_rotary_emb: tuple[torch.Tensor, torch.Tensor] = None,
     ) -> torch.FloatTensor:
         batch_size, _, _ = hidden_states.shape if encoder_hidden_states is None else encoder_hidden_states.shape

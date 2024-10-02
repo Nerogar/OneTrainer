@@ -5,7 +5,6 @@
 #
 
 import math
-from typing import Optional
 
 from modules.util.bf16_stochastic_rounding import addcdiv_stochastic_
 
@@ -159,8 +158,8 @@ def _get_scalar_dtype(is_fused=None):
 def _single_tensor_adamw(
         self,
         group,
-        grad_scale: Optional[Tensor],
-        found_inf: Optional[Tensor],
+        grad_scale: Tensor | None,
+        found_inf: Tensor | None,
 ):
 
     assert grad_scale is None and found_inf is None

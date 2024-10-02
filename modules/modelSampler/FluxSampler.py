@@ -1,8 +1,8 @@
 import copy
 import inspect
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler

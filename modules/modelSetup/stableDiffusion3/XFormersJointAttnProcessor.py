@@ -1,4 +1,3 @@
-from typing import Optional
 
 import torch
 
@@ -16,7 +15,7 @@ class XFormersJointAttnProcessor:
         attn: Attention,
         hidden_states: torch.FloatTensor,
         encoder_hidden_states: torch.FloatTensor = None,
-        attention_mask: Optional[torch.FloatTensor] = None,
+        attention_mask: torch.FloatTensor | None = None,
         *args,
         **kwargs,
     ) -> tuple[torch.FloatTensor, torch.FloatTensor]:

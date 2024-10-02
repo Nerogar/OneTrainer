@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.ImageFormat import ImageFormat

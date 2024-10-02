@@ -94,7 +94,7 @@ class BaseModelSetup(
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
-        for lr, parameter in zip(lrs, parameters):
+        for lr, parameter in zip(lrs, parameters, strict=True):
             # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
             name = parameter.split('/')[0]
 

@@ -2,9 +2,9 @@ import json
 import threading
 import traceback
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog
-from typing import Callable
 
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab

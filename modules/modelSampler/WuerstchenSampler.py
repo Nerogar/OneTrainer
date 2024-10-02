@@ -1,7 +1,7 @@
 import inspect
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler

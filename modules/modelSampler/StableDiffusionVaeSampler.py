@@ -1,6 +1,6 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler

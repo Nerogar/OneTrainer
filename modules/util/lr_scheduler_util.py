@@ -1,5 +1,5 @@
 import math
-from typing import Callable
+from collections.abc import Callable
 
 
 def lr_lambda_warmup(warmup_steps: int, lr_lambda: Callable[[int], float]):

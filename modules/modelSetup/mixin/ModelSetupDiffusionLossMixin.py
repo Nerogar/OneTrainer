@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from typing import Callable
+from collections.abc import Callable
 
 from modules.module.AestheticScoreModel import AestheticScoreModel
 from modules.module.HPSv2ScoreModel import HPSv2ScoreModel

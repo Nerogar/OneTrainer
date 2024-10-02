@@ -1,5 +1,5 @@
 import re
-from typing import Callable
+from collections.abc import Callable
 
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting

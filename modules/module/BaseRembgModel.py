@@ -1,5 +1,4 @@
 import os
-from typing import Optional, Tuple
 
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
@@ -58,7 +57,7 @@ class BaseRembgModel(BaseImageMaskModel):
             provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in onnxruntime.get_available_providers() else "CPUExecutionProvider"
         return onnxruntime.InferenceSession(os.path.join(path, self.model_filename), providers=[provider])
 
-    def __create_average_kernel(self, kernel_radius: Optional[int]):
+    def __create_average_kernel(self, kernel_radius: int | None):
         if kernel_radius is None:
             return None
 
@@ -91,9 +90,9 @@ class BaseRembgModel(BaseImageMaskModel):
     def __normalize(
             self,
             img: Image.Image,
-            mean: Tuple[float, float, float],
-            std: Tuple[float, float, float],
-            size: Tuple[int, int],
+            mean: tuple[float, float, float],
+            std: tuple[float, float, float],
+            size: tuple[int, int],
     ) -> ndarray:
         im = img.resize(size, Image.LANCZOS)
 

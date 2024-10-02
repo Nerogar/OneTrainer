@@ -5,8 +5,8 @@ import shutil
 import subprocess
 import sys
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel

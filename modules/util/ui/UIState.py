@@ -1,7 +1,8 @@
 import contextlib
 import tkinter as tk
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
 
@@ -260,6 +261,6 @@ class UIState:
                 elif isinstance(obj_var, bool):
                     var = self.__vars[name]
                     var.set(obj_var)
-                elif isinstance(obj_var, (int, float)):
+                elif isinstance(obj_var, int | float):
                     var = self.__vars[name]
                     var.set(str(obj_var))

@@ -66,7 +66,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     ):
         for parameter, placeholder, name in zip(embedding_wrapper.additional_embeddings,
                                                 embedding_wrapper.additional_embedding_placeholders,
-                                                embedding_wrapper.additional_embedding_names):
+                                                embedding_wrapper.additional_embedding_names, strict=True):
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name=f"{prefix}/{name}",
                 display_name=f"{prefix}/{placeholder}",

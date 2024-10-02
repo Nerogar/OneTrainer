@@ -1,7 +1,8 @@
 import copy
 import math
 from abc import abstractmethod
-from typing import Any, Mapping, Tuple
+from collections.abc import Mapping
+from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
@@ -121,7 +122,7 @@ class PeftBase(nn.Module):
     def extract_from_module(self, base_module: nn.Module):
         pass
 
-    def create_layer(self) -> Tuple[nn.Module, nn.Module]:
+    def create_layer(self) -> tuple[nn.Module, nn.Module]:
         """Generic helper function for creating a PEFT layer, like LoRA.
 
         Creates down/up layer modules for the given layer type in the
@@ -449,7 +450,7 @@ class LoRAModuleWrapper:
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
-                    if isinstance(child_module, (Linear, Conv2d)):
+                    if isinstance(child_module, Linear | Conv2d):
                         lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
 
         return lora_modules

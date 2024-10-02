@@ -1,7 +1,7 @@
 import json
 import os
 import traceback
-from typing import Callable
+from collections.abc import Callable
 
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig

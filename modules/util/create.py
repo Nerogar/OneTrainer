@@ -1,6 +1,6 @@
 import ast
 import importlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
