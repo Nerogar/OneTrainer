@@ -40,7 +40,7 @@ class BaseStableDiffusionSetup(
 ):
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
-        super(BaseStableDiffusionSetup, self).__init__(train_device, temp_device, debug_mode)
+        super().__init__(train_device, temp_device, debug_mode)
 
     def _setup_optimizations(
             self,

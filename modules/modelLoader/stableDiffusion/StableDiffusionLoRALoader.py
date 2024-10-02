@@ -11,7 +11,7 @@ from safetensors.torch import load_file
 
 class StableDiffusionLoRALoader:
     def __init__(self):
-        super(StableDiffusionLoRALoader, self).__init__()
+        super().__init__()
 
     def __load_safetensors(
             self,

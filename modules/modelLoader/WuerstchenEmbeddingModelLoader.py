@@ -15,7 +15,7 @@ class WuerstchenEmbeddingModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super(WuerstchenEmbeddingModelLoader, self).__init__()
+        super().__init__()
 
     def _default_model_spec_name(
             self,

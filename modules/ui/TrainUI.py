@@ -46,7 +46,7 @@ class TrainUI(ctk.CTk):
     training_commands: TrainCommands | None
 
     def __init__(self):
-        super(TrainUI, self).__init__()
+        super().__init__()
 
         self.title("OneTrainer")
         self.geometry("1100x740")

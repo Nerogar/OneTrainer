@@ -92,7 +92,7 @@ class PeftBase(nn.Module):
     def check_initialized(self):
         """Checks, and raises an exception, if the module is not initialized."""
         if not self._initialized:
-            raise RuntimeError("Module %s is not initialized." % self.prefix)
+            raise RuntimeError(f"Module {self.prefix} is not initialized.")
 
         # Perform assertions to make pytype happy.
         assert self.orig_forward is not None
@@ -291,7 +291,7 @@ class LoRAModule(PeftBase):
     # construction, but definitely exist by the time those methods are called.
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
-        super(LoRAModule, self).__init__(prefix, orig_module)
+        super().__init__(prefix, orig_module)
 
         self.rank = rank
         self.dropout = Dropout(0)
@@ -448,25 +448,24 @@ class LoRAModuleWrapper:
 
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
-                if len(self.module_filter) == 0 or any([x in name for x in self.module_filter]):
-                    if isinstance(child_module, Linear) or \
-                       isinstance(child_module, Conv2d):
+                if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
+                    if isinstance(child_module, (Linear, Conv2d)):
                         lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
 
         return lora_modules
 
     def requires_grad_(self, requires_grad: bool):
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             module.requires_grad_(requires_grad)
 
     def parameters(self) -> list[Parameter]:
         parameters = []
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             parameters += module.parameters()
         return parameters
 
     def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModuleWrapper':
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             module.to(device, dtype)
         return self
 
@@ -504,7 +503,7 @@ class LoRAModuleWrapper:
         """
         state_dict = {}
 
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             state_dict |= module.state_dict(prefix=module.prefix)
 
         return state_dict
@@ -523,28 +522,28 @@ class LoRAModuleWrapper:
         """
         Hooks the LoRA into the module without changing its weights
         """
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             module.hook_to_module()
 
     def remove_hook_from_module(self):
         """
         Removes the LoRA hook from the module without changing its weights
         """
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             module.remove_hook_from_module()
 
     def apply_to_module(self):
         """
         Applys the LoRA to the module, changing its weights
         """
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             module.apply_to_module()
 
     def extract_from_module(self, base_module: nn.Module):
         """
         Creates a LoRA from the difference between the base_module and the orig_module
         """
-        for name, module in self.lora_modules.items():
+        for module in self.lora_modules.values():
             module.extract_from_module(base_module)
 
     def prune(self):

@@ -1,18 +1,18 @@
 from abc import ABCMeta
 
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+
 import torch
 from torch import Tensor
 
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 from transformers.tokenization_utils import Trie
 
-from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
-
 
 class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     def __init__(self):
-        super(ModelSetupEmbeddingMixin, self).__init__()
+        super().__init__()
 
     def _remove_added_embeddings_from_tokenizer(
             self,
@@ -73,4 +73,3 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
                 parameters=[parameter],
                 learning_rate=embedding_learning_rate,
             ))
-            

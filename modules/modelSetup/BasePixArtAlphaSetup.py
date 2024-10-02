@@ -40,7 +40,7 @@ class BasePixArtAlphaSetup(
 ):
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
-        super(BasePixArtAlphaSetup, self).__init__(train_device, temp_device, debug_mode)
+        super().__init__(train_device, temp_device, debug_mode)
 
     def setup_optimizations(
             self,
@@ -48,12 +48,12 @@ class BasePixArtAlphaSetup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            for name, child_module in model.transformer.named_modules():
+            for _name, child_module in model.transformer.named_modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                for name, child_module in model.transformer.named_modules():
+                for _name, child_module in model.transformer.named_modules():
                     if isinstance(child_module, Attention):
                         child_module.set_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
@@ -63,7 +63,7 @@ class BasePixArtAlphaSetup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            for name, child_module in model.transformer.named_modules():
+            for _name, child_module in model.transformer.named_modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor2_0())
 

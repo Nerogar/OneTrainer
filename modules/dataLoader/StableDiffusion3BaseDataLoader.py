@@ -1,15 +1,6 @@
 import copy
 import os
 
-from modules.dataLoader.BaseDataLoader import BaseDataLoader
-from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
-from modules.model.StableDiffusion3Model import StableDiffusion3Model
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.torch_util import torch_gc
-from modules.util.TrainProgress import TrainProgress
-
-import torch
-
 from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
@@ -24,6 +15,14 @@ from mgds.pipelineModules.SaveText import SaveText
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 from mgds.pipelineModules.VariationSorting import VariationSorting
+from modules.dataLoader.BaseDataLoader import BaseDataLoader
+from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.model.StableDiffusion3Model import StableDiffusion3Model
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
+
+import torch
 
 
 class StableDiffusion3BaseDataLoader(
@@ -39,7 +38,7 @@ class StableDiffusion3BaseDataLoader(
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
-        super(StableDiffusion3BaseDataLoader, self).__init__(
+        super().__init__(
             train_device,
             temp_device,
         )

@@ -29,7 +29,7 @@ class BaseConfig:
             '__version': self.config_version,
         }
 
-        for (name, _) in self.types.items():
+        for name in self.types:
             value = getattr(self, name)
             if issubclass(self.types[name], BaseConfig):
                 data[name] = value.to_dict()
@@ -75,7 +75,7 @@ class BaseConfig:
             data = self.config_migrations[version](data)
             version += 1
 
-        for (name, _) in self.types.items():
+        for name in self.types:
             try:
                 if issubclass(self.types[name], BaseConfig):
                     getattr(self, name).from_dict(data[name])

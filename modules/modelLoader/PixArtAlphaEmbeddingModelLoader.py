@@ -15,7 +15,7 @@ class PixArtAlphaEmbeddingModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super(PixArtAlphaEmbeddingModelLoader, self).__init__()
+        super().__init__()
 
     def _default_model_spec_name(
             self,

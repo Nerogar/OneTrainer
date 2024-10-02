@@ -1,3 +1,4 @@
+import contextlib
 import tkinter as tk
 from enum import Enum
 from typing import Any, Callable
@@ -14,7 +15,7 @@ class UIState:
         self.master = master
         self.obj = obj
         self.__vars = self.__create_vars(obj)
-        self.__var_traces = {name: {} for name in self.__vars.keys()}
+        self.__var_traces = {name: {} for name in self.__vars}
         self.__latest_var_trace_id = 0
 
     def update(self, obj):
@@ -41,7 +42,7 @@ class UIState:
         self.__var_traces[name].pop(trace_id)
 
     def __call_var_traces(self, name):
-        for trace_id, trace in self.__var_traces[name].items():
+        for trace in self.__var_traces[name].values():
             trace()
 
     def __set_str_var(self, obj, is_dict, name, var, nullable):
@@ -107,10 +108,8 @@ class UIState:
                 elif string_var == "-inf":
                     obj[name] = int("-inf")
                 else:
-                    try:
+                    with contextlib.suppress(ValueError):
                         obj[name] = int(string_var)
-                    except ValueError:
-                        pass
                 self.__call_var_traces(name)
         else:
             def update(_0, _1, _2):
@@ -122,10 +121,8 @@ class UIState:
                 elif string_var == "-inf":
                     setattr(obj, name, int("-inf"))
                 else:
-                    try:
+                    with contextlib.suppress(ValueError):
                         setattr(obj, name, int(string_var))
-                    except ValueError:
-                        pass
                 self.__call_var_traces(name)
 
         return update
@@ -141,10 +138,8 @@ class UIState:
                 elif string_var == "-inf":
                     obj[name] = float("-inf")
                 else:
-                    try:
+                    with contextlib.suppress(ValueError):
                         obj[name] = float(string_var)
-                    except ValueError:
-                        pass
                 self.__call_var_traces(name)
         else:
             def update(_0, _1, _2):
@@ -156,10 +151,8 @@ class UIState:
                 elif string_var == "-inf":
                     setattr(obj, name, float("-inf"))
                 else:
-                    try:
+                    with contextlib.suppress(ValueError):
                         setattr(obj, name, float(string_var))
-                    except ValueError:
-                        pass
                 self.__call_var_traces(name)
 
         return update
@@ -253,7 +246,7 @@ class UIState:
                 elif var_type == bool:
                     var = self.__vars[name]
                     var.set(obj_var or False)
-                elif var_type == int or var_type == float:
+                elif var_type in (int, float):
                     var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
         else:
@@ -267,6 +260,6 @@ class UIState:
                 elif isinstance(obj_var, bool):
                     var = self.__vars[name]
                     var.set(obj_var)
-                elif isinstance(obj_var, int) or isinstance(obj_var, float):
+                elif isinstance(obj_var, (int, float)):
                     var = self.__vars[name]
                     var.set(str(obj_var))

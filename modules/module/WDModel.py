@@ -64,7 +64,7 @@ class WDModel(BaseImageCaptionModel):
         probs = probs[0].astype(float)
 
         general_labels = [(self.tag_names[i], probs[i]) for i in self.general_indexes if probs[i] > 0.35]
-        character_labels = [(self.tag_names[i], probs[i]) for i in self.character_indexes if probs[i] > 0.8]
+        [(self.tag_names[i], probs[i]) for i in self.character_indexes if probs[i] > 0.8]
 
         sorted_general_labels = sorted(general_labels, key=lambda label: label[1], reverse=True)
         predicted_caption = ", ".join([

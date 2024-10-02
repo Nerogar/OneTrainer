@@ -1,14 +1,13 @@
 import json
 from abc import ABCMeta
 
+from mgds.MGDS import MGDS
+from mgds.PipelineModule import PipelineState
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.TrainProgress import TrainProgress
 
 import torch
-
-from mgds.MGDS import MGDS
-from mgds.PipelineModule import PipelineState
 
 
 class DataLoaderMgdsMixin(metaclass=ABCMeta):

@@ -22,7 +22,7 @@ class BaseModelSetup(
             temp_device: torch.device,
             debug_mode: bool,
     ):
-        super(BaseModelSetup, self).__init__()
+        super().__init__()
 
         self.train_device = train_device
         self.temp_device = temp_device

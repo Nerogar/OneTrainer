@@ -91,7 +91,7 @@ class TrainOptimizerConfig(BaseConfig):
     adam_debias: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(TrainOptimizerConfig, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def default_values():
@@ -173,7 +173,7 @@ class TrainModelPartConfig(BaseConfig):
     attention_mask: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(TrainModelPartConfig, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def default_values():
@@ -205,7 +205,7 @@ class TrainEmbeddingConfig(BaseConfig):
     initial_embedding_text: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(TrainEmbeddingConfig, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def default_values():
@@ -391,7 +391,7 @@ class TrainConfig(BaseConfig):
     save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(TrainConfig, self).__init__(
+        super().__init__(
             data,
             config_version=5,
             config_migrations={

@@ -151,7 +151,7 @@ def enable_checkpointing_for_sdxl_transformer_blocks(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for _name, child_module in orig_module.named_modules():
         if isinstance(child_module, BasicTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -165,7 +165,7 @@ def enable_checkpointing_for_clip_encoder_layers(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for _name, child_module in orig_module.named_modules():
         if isinstance(child_module, CLIPEncoderLayer):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -179,7 +179,7 @@ def enable_checkpointing_for_stable_cascade_blocks(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for _name, child_module in orig_module.named_modules():
         if isinstance(child_module, SDCascadeResBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -203,7 +203,7 @@ def enable_checkpointing_for_t5_encoder_layers(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for _name, child_module in orig_module.named_modules():
         if isinstance(child_module, T5Block):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -217,7 +217,7 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for _name, child_module in orig_module.named_modules():
         if isinstance(child_module, JointTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -231,7 +231,7 @@ def enable_checkpointing_for_flux_transformer(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for _name, child_module in orig_module.named_modules():
         if isinstance(child_module, FluxTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,

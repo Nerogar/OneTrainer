@@ -1,14 +1,6 @@
 import re
 from typing import Callable
 
-from modules.util import path_util
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.DataType import DataType
-
-import torch
-
-from diffusers import AutoencoderKL
-
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
@@ -36,6 +28,13 @@ from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
+from modules.util import path_util
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.DataType import DataType
+
+import torch
+
+from diffusers import AutoencoderKL
 
 
 class DataLoaderText2ImageMixin:

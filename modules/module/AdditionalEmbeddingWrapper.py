@@ -23,7 +23,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
             additional_embedding_placeholders: list[str],
             additional_embedding_names: list[str],
     ):
-        super(AdditionalEmbeddingWrapper, self).__init__()
+        super().__init__()
 
         self.orig_module = orig_module
         self.additional_embeddings = additional_embeddings

@@ -475,6 +475,8 @@ Mouse wheel: increase or decrease brush size"""
 
             if self.pil_mask:
                 self.pil_mask.save(mask_name)
+                return None
+            return None
 
         else:
             return ""
@@ -485,6 +487,7 @@ Mouse wheel: increase or decrease brush size"""
         if args:
             # disable default event
             return "break"
+        return None
 
     def fill_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'fill'

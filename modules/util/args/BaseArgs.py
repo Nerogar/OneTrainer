@@ -6,7 +6,7 @@ from modules.util.config.BaseConfig import BaseConfig
 
 class BaseArgs(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(BaseArgs, self).__init__(data)
+        super().__init__(data)
 
     def __to_arg_name(self, var_name: str) -> str:
         return "--" + var_name.replace('_', '-')
@@ -16,7 +16,7 @@ class BaseArgs(BaseConfig):
 
     def to_args(self) -> str:
         data = []
-        for (name, _) in self.types.items():
+        for name in self.types:
             value = getattr(self, name)
             if value is not None:
                 if self.types[name] == str:

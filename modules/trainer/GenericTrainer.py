@@ -61,7 +61,7 @@ class GenericTrainer(BaseTrainer):
     grad_hook_handles: list[RemovableHandle]
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
-        super(GenericTrainer, self).__init__(config, callbacks, commands)
+        super().__init__(config, callbacks, commands)
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
@@ -553,14 +553,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.only_cache:
             self.callbacks.on_update_status("caching")
-            for epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
+            for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
                 self.data_loader.get_data_set().start_next_epoch()
             return
 
-        if enable_grad_scaling(self.config.train_dtype, self.parameters):
-            scaler = create_grad_scaler()
-        else:
-            scaler = None
+        scaler = create_grad_scaler() if enable_grad_scaling(self.config.train_dtype, self.parameters) else None
 
         self.__apply_fused_back_pass(scaler)
 
@@ -571,7 +568,7 @@ class GenericTrainer(BaseTrainer):
         lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
-        for epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
+        for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
             if self.config.latent_caching:
@@ -607,7 +604,7 @@ class GenericTrainer(BaseTrainer):
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
-            for epoch_step, batch in enumerate(step_tqdm):
+            for _epoch_step, batch in enumerate(step_tqdm):
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)

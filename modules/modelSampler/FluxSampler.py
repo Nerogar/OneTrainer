@@ -26,7 +26,7 @@ class FluxSampler(BaseModelSampler):
             model: FluxModel,
             model_type: ModelType,
     ):
-        super(FluxSampler, self).__init__(train_device, temp_device)
+        super().__init__(train_device, temp_device)
 
         self.model = model
         self.model_type = model_type
