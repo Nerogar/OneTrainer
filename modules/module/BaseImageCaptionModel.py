@@ -62,9 +62,9 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         if include_subdirectories:
             filenames = []
             for root, _, files in os.walk(sample_dir):
-                filenames.extend(os.path.join(root, fn) for fn in files if __is_supported_image_extension(fn))
+                filenames.extend(os.path.join(root, file) for file in files if __is_supported_image_extension(file))
         else:
-            filenames = [os.path.join(sample_dir, fn) for fn in os.listdir(sample_dir) if __is_supported_image_extension(fn)]
+            filenames = [os.path.join(sample_dir, file) for file in os.listdir(sample_dir) if __is_supported_image_extension(file)]
 
         return filenames
 
