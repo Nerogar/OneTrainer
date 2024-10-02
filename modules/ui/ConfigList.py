@@ -195,7 +195,7 @@ class ConfigList(metaclass=ABCMeta):
                 for element_json in loaded_config_json:
                     element = self.create_new_element().from_dict(element_json)
                     self.current_config.append(element)
-        except:
+        except Exception:
             self.current_config = []
 
         self._create_element_list()
@@ -211,7 +211,7 @@ class ConfigList(metaclass=ABCMeta):
                         [element.to_dict() for element in self.current_config],
                         f, indent=4
                     )
-            except:
+            except Exception:
                 pass
 
     def __open_element_window(self, i, ui_state):

@@ -551,7 +551,7 @@ class TrainUI(ctk.CTk):
         try:
             trainer.start()
             trainer.train()
-        except:
+        except Exception:
             error_caught = True
             traceback.print_exc()
 

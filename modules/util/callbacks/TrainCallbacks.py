@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Callable
 
 from modules.util.TrainProgress import TrainProgress
@@ -30,11 +31,9 @@ class TrainCallbacks:
         self.__on_update_train_progress = on_update_train_progress
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
-        try:
-            if self.__on_update_train_progress:
+        if self.__on_update_train_progress:
+            with contextlib.suppress(Exception):
                 self.__on_update_train_progress(train_progress, max_sample, max_epoch)
-        except:
-            pass
 
     # on_update_status
     def set_on_update_status(
@@ -44,11 +43,9 @@ class TrainCallbacks:
         self.__on_update_status = on_update_status
 
     def on_update_status(self, status: str):
-        try:
-            if self.__on_update_status:
+        if self.__on_update_status:
+            with contextlib.suppress(Exception):
                 self.__on_update_status(status)
-        except:
-            pass
 
     # on_sample_default
     def set_on_sample_default(
@@ -58,11 +55,9 @@ class TrainCallbacks:
         self.__on_sample_default = on_sample_default
 
     def on_sample_default(self, sample: Image):
-        try:
-            if self.__on_sample_default:
+        if self.__on_sample_default:
+            with contextlib.suppress(Exception):
                 self.__on_sample_default(sample)
-        except:
-            pass
 
     # on_update_sample_default_progress
     def set_on_update_sample_default_progress(
@@ -72,11 +67,9 @@ class TrainCallbacks:
         self.__on_update_sample_default_progress = on_update_sample_default_progress
 
     def on_update_sample_default_progress(self, step: int, max_step: int):
-        try:
-            if self.__on_update_sample_default_progress:
+        if self.__on_update_sample_default_progress:
+            with contextlib.suppress(Exception):
                 self.__on_update_sample_default_progress(step, max_step)
-        except:
-            pass
 
     # on_sample_custom
     def set_on_sample_custom(
@@ -86,11 +79,9 @@ class TrainCallbacks:
         self.__on_sample_custom = on_sample_custom
 
     def on_sample_custom(self, sample: Image):
-        try:
-            if self.__on_sample_custom:
+        if self.__on_sample_custom:
+            with contextlib.suppress(Exception):
                 self.__on_sample_custom(sample)
-        except:
-            pass
 
     # on_update_sample_custom_progress
     def set_on_update_sample_custom_progress(
@@ -100,8 +91,6 @@ class TrainCallbacks:
         self.__on_update_sample_custom_progress = on_update_sample_custom_progress
 
     def on_update_sample_custom_progress(self, progress: int, max_progress: int):
-        try:
-            if self.__on_update_sample_custom_progress:
+        if self.__on_update_sample_custom_progress:
+            with contextlib.suppress(Exception):
                 self.__on_update_sample_custom_progress(progress, max_progress)
-        except:
-            pass

@@ -32,7 +32,7 @@ class CaptionSample:
             try:
                 with open(self.caption_filename, "r") as f:
                     self.captions = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
-            except:
+            except Exception:
                 self.captions = []
 
         return self.captions
@@ -48,7 +48,7 @@ class CaptionSample:
             try:
                 with open(self.caption_filename, "w", encoding='utf-8') as f:
                     f.write('\n'.join(self.captions))
-            except:
+            except Exception:
                 pass
 
 
@@ -59,16 +59,12 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             ext = os.path.splitext(filename)[1]
             return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
 
-        filenames = []
         if include_subdirectories:
+            filenames = []
             for root, _, files in os.walk(sample_dir):
-                for filename in files:
-                    if __is_supported_image_extension(filename):
-                        filenames.append(os.path.join(root, filename))
+                filenames.extend(os.path.join(root, fn) for fn in files if __is_supported_image_extension(fn))
         else:
-            for filename in os.listdir(sample_dir):
-                if __is_supported_image_extension(filename):
-                    filenames.append(os.path.join(sample_dir, filename))
+            filenames = [os.path.join(sample_dir, fn) for fn in os.listdir(sample_dir) if __is_supported_image_extension(fn)]
 
         return filenames
 

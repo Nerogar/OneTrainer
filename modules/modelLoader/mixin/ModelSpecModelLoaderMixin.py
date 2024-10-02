@@ -33,7 +33,7 @@ class ModelSpecModelLoaderMixin(metaclass=ABCMeta):
                 with safe_open(safetensors_file_name, framework="pt") as f:
                     if "modelspec.sai_model_spec" in f.metadata():
                         model_spec = ModelSpec.from_dict(f.metadata())
-            except:
+            except Exception:
                 pass
 
         return model_spec

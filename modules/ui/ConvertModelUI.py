@@ -143,7 +143,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                 dtype=self.convert_model_args.output_dtype.torch_dtype(),
             )
             print("Model converted")
-        except:
+        except Exception:
             traceback.print_exc()
 
         torch_gc()

@@ -222,8 +222,10 @@ class GenericTrainer(BaseTrainer):
 
                     def on_sample_default(image: Image):
                         if self.config.samples_to_tensorboard:
-                            self.tensorboard.add_image(f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),
-                                                       train_progress.global_step)
+                            self.tensorboard.add_image(
+                                f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),  # noqa: B023
+                                train_progress.global_step
+                            )
                         self.callbacks.on_sample_default(image)
 
                     def on_sample_custom(image: Image):
@@ -245,7 +247,7 @@ class GenericTrainer(BaseTrainer):
                         on_sample=on_sample,
                         on_update_progress=on_update_progress,
                     )
-                except:
+                except Exception:
                     traceback.print_exc()
                     print("Error during sampling, proceeding without sampling")
 
@@ -419,13 +421,13 @@ class GenericTrainer(BaseTrainer):
             )
 
             self.__save_backup_config(backup_path)
-        except:
+        except Exception:
             traceback.print_exc()
             print("Could not save backup. Check your disk space!")
             try:
                 if os.path.isdir(backup_path):
                     shutil.rmtree(backup_path)
-            except:
+            except Exception:
                 traceback.print_exc()
                 print("Could not delete partial backup")
         finally:
@@ -470,13 +472,13 @@ class GenericTrainer(BaseTrainer):
             if self.config.optimizer.optimizer.is_schedule_free:
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
-        except:
+        except Exception:
             traceback.print_exc()
             print("Could not save model. Check your disk space!")
             try:
                 if os.path.isfile(save_path):
                     shutil.rmtree(save_path)
-            except:
+            except Exception:
                 traceback.print_exc()
                 print("Could not delete partial save")
         finally:

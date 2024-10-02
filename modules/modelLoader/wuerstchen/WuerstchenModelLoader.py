@@ -193,7 +193,7 @@ class WuerstchenModelLoader:
                 decoder_model_name,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
@@ -207,7 +207,7 @@ class WuerstchenModelLoader:
                 decoder_model_name,
             )
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

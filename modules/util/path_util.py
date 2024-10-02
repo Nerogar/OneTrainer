@@ -26,9 +26,11 @@ def canonical_join(base_path: str, *paths: str):
     return joined.replace('\\', '/')
 
 
-def supported_image_extensions() -> list[str]:
-    return ['.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp']
+SUPPORTED_IMAGE_EXTENSIONS = {'.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp'}
+
+def supported_image_extensions() -> set[str]:
+    return SUPPORTED_IMAGE_EXTENSIONS
 
 
 def is_supported_image_extension(extension: str) -> bool:
-    return extension.lower() in supported_image_extensions()
+    return extension.lower() in SUPPORTED_IMAGE_EXTENSIONS

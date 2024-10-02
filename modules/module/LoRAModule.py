@@ -484,7 +484,7 @@ class LoRAModuleWrapper:
         for name, module in self.lora_modules.items():
             try:
                 module.load_state_dict(state_dict)
-            except RuntimeError:
+            except RuntimeError:  # noqa: PERF203
                 print(f"Missing key for {name}; initializing it to zero.")
 
         # Temporarily re-create the state dict, so we can see what keys were left.
