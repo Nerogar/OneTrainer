@@ -116,7 +116,7 @@ class WuerstchenModelLoader:
         elif model_type.is_stable_cascade():
             if prior_prior_model_name:
                 with safe_open(prior_prior_model_name, framework="pt") as f:
-                    if any(key.startswith("down_blocks.0.23") for key in f):
+                    if any(key.startswith("down_blocks.0.23") for key in f.keys()):  # noqa: SIM118
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_3.6b.json"
                     else:
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_1.0b.json"
