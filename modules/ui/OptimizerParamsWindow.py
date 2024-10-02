@@ -123,7 +123,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'no_prox': {'title': 'No Prox', 'tooltip': 'Whether to use proximity updates or not.', 'type': 'bool'},
             'optim_bits': {'title': 'Optim Bits', 'tooltip': 'Number of bits used for optimization.', 'type': 'int'},
             'percentile_clipping': {'title': 'Percentile Clipping', 'tooltip': 'Gradient clipping based on percentile values.', 'type': 'float'},
-            'r': {'title': 'r', 'tooltip': 'Use polynomial weighting in the average with power r', 'type': 'float'},
+            # Repeated key in `dict`
+            # 'r': {'title': 'r', 'tooltip': 'Use polynomial weighting in the average with power r', 'type': 'float'},
             'relative_step': {'title': 'Relative Step', 'tooltip': 'Whether to use a relative step size.', 'type': 'bool'},
             'safeguard_warmup': {'title': 'Safeguard Warmup', 'tooltip': 'Avoid issues during warm-up stage.', 'type': 'bool'},
             'scale_parameter': {'title': 'Scale Parameter', 'tooltip': 'Whether to scale the parameter or not.', 'type': 'bool'},
@@ -141,8 +142,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'xi': {'title': 'Xi', 'tooltip': 'Term used in vector projections to avoid division by zero.', 'type': 'float'},
             'n_sma_threshold': {'title': 'N SMA Threshold', 'tooltip': 'Number of SMA threshold.', 'type': 'int'},
             'ams_bound': {'title': 'AMS Bound', 'tooltip': 'Whether to use the AMSBound variant.', 'type': 'bool'},
-            # Repeated key in `dict`
-            # 'r': {'title': 'R', 'tooltip': 'EMA factor.', 'type': 'float'},
+            'r': {'title': 'R', 'tooltip': 'EMA factor.', 'type': 'float'},
             'adanorm': {'title': 'AdaNorm', 'tooltip': 'Whether to use the AdaNorm variant', 'type': 'bool'},
             'adam_debias': {'title': 'Adam Debias', 'tooltip': 'Only correct the denominator to avoid inflating step sizes early in training.', 'type': 'bool'},
 
