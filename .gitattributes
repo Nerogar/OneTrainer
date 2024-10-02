@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.bat text eol=crlf
+# GitHub syntax highlighting
+pixi.lock linguist-language=YAML linguist-generated=true

@@ -17,3 +17,6 @@ config.json
 *.pyc
 *.bak
 /src
+# pixi environments
+.pixi
+*.egg-info
