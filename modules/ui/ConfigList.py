@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import os
@@ -202,7 +203,7 @@ class ConfigList(metaclass=ABCMeta):
 
     def __save_current_config(self):
         if self.from_external_file:
-            try:
+            with contextlib.suppress(Exception):
                 if not os.path.exists(self.config_dir):
                     os.mkdir(self.config_dir)
 
@@ -211,8 +212,6 @@ class ConfigList(metaclass=ABCMeta):
                         [element.to_dict() for element in self.current_config],
                         f, indent=4
                     )
-            except Exception:
-                pass
 
     def __open_element_window(self, i, ui_state):
         window = self.open_element_window(i, ui_state)

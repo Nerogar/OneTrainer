@@ -1,3 +1,4 @@
+import contextlib
 import os
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
@@ -46,11 +47,8 @@ class CaptionSample:
 
     def save_caption(self):
         if self.captions is not None:
-            try:
-                with open(self.caption_filename, "w", encoding='utf-8') as f:
-                    f.write('\n'.join(self.captions))
-            except Exception:
-                pass
+            with contextlib.suppress(Exception), open(self.caption_filename, "w", encoding='utf-8') as f:
+                f.write('\n'.join(self.captions))
 
 
 class BaseImageCaptionModel(metaclass=ABCMeta):

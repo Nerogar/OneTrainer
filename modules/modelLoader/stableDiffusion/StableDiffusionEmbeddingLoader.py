@@ -1,3 +1,4 @@
+import contextlib
 import os
 import traceback
 
@@ -21,15 +22,11 @@ class StableDiffusionEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        try:
+        with contextlib.suppress(Exception):
             return torch.load(embedding_name)['string_to_param']['*']
-        except Exception:
-            pass
 
-        try:
+        with contextlib.suppress(Exception):
             return load_file(embedding_name)["emp_params"]
-        except Exception:
-            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 

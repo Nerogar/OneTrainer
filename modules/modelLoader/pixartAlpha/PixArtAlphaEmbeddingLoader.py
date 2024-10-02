@@ -1,3 +1,4 @@
+import contextlib
 import os
 import traceback
 
@@ -21,23 +22,19 @@ class PixArtAlphaEmbeddingLoader:
         if embedding_name == "":
             return None
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = torch.load(embedding_name)
 
             prior_text_encoder_vector = embedding_state['t5']
 
             return prior_text_encoder_vector
-        except Exception:
-            pass
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = load_file(embedding_name)
 
             prior_text_encoder_vector = embedding_state['t5']
 
             return prior_text_encoder_vector
-        except Exception:
-            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 

@@ -1,3 +1,4 @@
+import contextlib
 from tkinter import TclError
 
 from modules.util.config.TrainConfig import TrainConfig
@@ -71,13 +72,11 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.create_dynamic_ui(master)
 
     def clear_dynamic_ui(self, master):
-        try:
+        with contextlib.suppress(TclError):
             for widget in master.winfo_children():
                 grid_info = widget.grid_info()
                 if int(grid_info["row"]) >= 1:
                     widget.destroy()
-        except TclError:
-            pass
 
     def create_dynamic_ui(
             self,
