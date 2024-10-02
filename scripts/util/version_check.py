@@ -1,5 +1,6 @@
 import sys
 
+
 # Python Version Check.
 # IMPORTANT: All code below must be backwards-compatible with Python 2+.
 
@@ -10,7 +11,7 @@ def exit_err(msg):
 
 
 def str_to_tuple(data):
-    return tuple(int(x, 10) for x in data.split("."))
+    return tuple(map(lambda x: int(x, 10), data.split(".")))
 
 
 def tuple_to_str(data):
@@ -19,7 +20,9 @@ def tuple_to_str(data):
 
 def exit_wrong_version(msg, min_ver, too_high_ver):
     exit_err(
-        f"Your Python version is {msg}: {sys.version}. Must be >= {tuple_to_str(min_ver)} and < {tuple_to_str(too_high_ver)}."
+        "Your Python version is {}: {}. Must be >= {} and < {}.".format(
+            msg, sys.version, tuple_to_str(min_ver), tuple_to_str(too_high_ver)
+        )
     )
 
 
