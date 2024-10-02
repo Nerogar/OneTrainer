@@ -119,6 +119,16 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "block_wise": True,
         "is_paged": False,
     },
+    Optimizer.AdEMAMix_8BIT: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "beta3": 0.9999,
+        "eps": 1e-8,
+        "alpha": 5,
+        "weight_decay": 0.05,
+        "min_8bit_size": 4096,
+        "is_paged": False,
+    },
     Optimizer.LAMB: {
         "bias_correction": True,
         "beta1": 0.9,

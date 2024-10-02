@@ -16,6 +16,7 @@ from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.torch_util import default_device
 from modules.util.ui import components
+from modules.util.ui.ui_utils import bind_mousewheel
 from modules.util.ui.UIState import UIState
 
 import torch
@@ -195,7 +196,7 @@ Mouse wheel: increase or decrease brush size"""
         self.image_label.bind("<Motion>", self.edit_mask)
         self.image_label.bind("<Button-1>", self.edit_mask)
         self.image_label.bind("<Button-3>", self.edit_mask)
-        self.image_label.bind("<MouseWheel>", self.draw_mask_radius)
+        bind_mousewheel(self.image_label, {self.image_label.children["!label"]}, self.draw_mask_radius)
 
         # prompt
         self.prompt_var = ctk.StringVar()
@@ -351,12 +352,10 @@ Mouse wheel: increase or decrease brush size"""
         else:
             self.image.configure(light_image=self.pil_image, size=self.pil_image.size)
 
-    def draw_mask_radius(self, event):
-        if event.widget != self.image_label.children["!label"]:
-            return
-
-        delta = 1.0 + (-np.sign(event.delta) * 0.05)
-        self.mask_draw_radius *= delta
+    def draw_mask_radius(self, delta, raw_event):
+        # Wheel up = Increase radius. Wheel down = Decrease radius.
+        multiplier = 1.0 + (delta * 0.05)
+        self.mask_draw_radius = max(0.0025, self.mask_draw_radius * multiplier)
 
     def edit_mask(self, event):
         if not self.enable_mask_editing_var.get():
