@@ -225,7 +225,7 @@ class WuerstchenModel(BaseModel):
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )
-        return None
+        raise NotImplementedError
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
         return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)

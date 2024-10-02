@@ -474,7 +474,6 @@ Mouse wheel: increase or decrease brush size"""
 
             if self.pil_mask:
                 self.pil_mask.save(mask_name)
-                return None
             return None
 
         else:
