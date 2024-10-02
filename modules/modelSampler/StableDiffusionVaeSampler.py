@@ -1,6 +1,6 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -22,7 +22,7 @@ class StableDiffusionVaeSampler(BaseModelSampler):
             model: StableDiffusionModel,
             model_type: ModelType,
     ):
-        super(StableDiffusionVaeSampler, self).__init__(train_device, temp_device)
+        super().__init__(train_device, temp_device)
 
         self.model = model
         self.model_type = model_type
@@ -40,10 +40,7 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         image = image.convert("RGB")
         # TODO: figure out better set of transformations for resize and/or implement way to configure them as per-sample toggle
 
-        if sample_config.width > sample_config.height:
-            scale = sample_config.width
-        else:
-            scale = sample_config.height
+        scale = sample_config.width if sample_config.width > sample_config.height else sample_config.height
 
         t_in = transforms.Compose([
             transforms.Resize(scale),

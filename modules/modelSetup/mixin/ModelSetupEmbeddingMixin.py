@@ -1,18 +1,18 @@
 from abc import ABCMeta
 
+from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+
 import torch
 from torch import Tensor
 
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 from transformers.tokenization_utils import Trie
 
-from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
-
 
 class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     def __init__(self):
-        super(ModelSetupEmbeddingMixin, self).__init__()
+        super().__init__()
 
     def _remove_added_embeddings_from_tokenizer(
             self,
@@ -66,11 +66,10 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     ):
         for parameter, placeholder, name in zip(embedding_wrapper.additional_embeddings,
                                                 embedding_wrapper.additional_embedding_placeholders,
-                                                embedding_wrapper.additional_embedding_names):
+                                                embedding_wrapper.additional_embedding_names, strict=True):
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name=f"{prefix}/{name}",
                 display_name=f"{prefix}/{placeholder}",
                 parameters=[parameter],
                 learning_rate=embedding_learning_rate,
             ))
-            

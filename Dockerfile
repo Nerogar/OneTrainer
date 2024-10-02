@@ -1,7 +1,7 @@
 # Inspiration for setup @ https://dev.to/ordigital/nvidia-525-cuda-118-python-310-pytorch-gpu-docker-image-1l4a
 FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
 
-ENV PYTHONUNBUFFERED=1 
+ENV PYTHONUNBUFFERED=1
 
 # SYSTEM
 RUN apt-get update --yes --quiet && DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet --no-install-recommends \
@@ -41,4 +41,3 @@ RUN python3 -m pip install -r requirements.txt
 
 # Run the training UI
 CMD ["python3", "scripts/train_ui.py"]
-

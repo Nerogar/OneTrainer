@@ -15,7 +15,7 @@ class WuerstchenFineTuneModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super(WuerstchenFineTuneModelLoader, self).__init__()
+        super().__init__()
 
     def _default_model_spec_name(
             self,

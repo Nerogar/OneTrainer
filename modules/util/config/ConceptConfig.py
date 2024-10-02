@@ -39,7 +39,7 @@ class ConceptImageConfig(BaseConfig):
     enable_random_mask_rotate_crop: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(ConceptImageConfig, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def default_values():
@@ -88,7 +88,7 @@ class ConceptTextConfig(BaseConfig):
     keep_tags_count: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(ConceptTextConfig, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def default_values():
@@ -119,7 +119,7 @@ class ConceptConfig(BaseConfig):
     text: ConceptTextConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(ConceptConfig, self).__init__(
+        super().__init__(
             data,
             config_version=1,
             config_migrations={
@@ -138,7 +138,7 @@ class ConceptConfig(BaseConfig):
         return migrated_data
 
     def to_dict(self):
-        as_dict = super(ConceptConfig, self).to_dict()
+        as_dict = super().to_dict()
         as_dict['image'] = self.image.to_dict()
         as_dict['text'] = self.text.to_dict()
         return as_dict

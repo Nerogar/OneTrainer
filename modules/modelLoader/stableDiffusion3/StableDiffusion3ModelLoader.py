@@ -12,7 +12,7 @@ from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderMo
 
 class StableDiffusion3ModelLoader:
     def __init__(self):
-        super(StableDiffusion3ModelLoader, self).__init__()
+        super().__init__()
 
     def __load_internal(
             self,

@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import torch
 
@@ -41,7 +41,7 @@ class EMAModuleWrapper:
         one_minus_decay = 1 - self.get_current_decay(optimization_step)
 
         if (optimization_step + 1) % self.update_step_interval == 0:
-            for ema_parameter, parameter in zip(self.ema_parameters, parameters):
+            for ema_parameter, parameter in zip(self.ema_parameters, parameters, strict=True):
                 if parameter.requires_grad:
                     if ema_parameter.device == parameter.device:
                         ema_parameter.add_(one_minus_decay * (parameter - ema_parameter))
@@ -65,11 +65,11 @@ class EMAModuleWrapper:
             self.temp_stored_parameters = [parameter.detach().cpu() for parameter in parameters]
 
         parameters = list(parameters)
-        for ema_parameter, parameter in zip(self.ema_parameters, parameters):
+        for ema_parameter, parameter in zip(self.ema_parameters, parameters, strict=True):
             parameter.data.copy_(ema_parameter.to(parameter.device).data)
 
     def copy_temp_to(self, parameters: Iterable[torch.nn.Parameter]) -> None:
-        for temp_parameter, parameter in zip(self.temp_stored_parameters, parameters):
+        for temp_parameter, parameter in zip(self.temp_stored_parameters, parameters, strict=True):
             parameter.data.copy_(temp_parameter.data)
 
         self.temp_stored_parameters = None

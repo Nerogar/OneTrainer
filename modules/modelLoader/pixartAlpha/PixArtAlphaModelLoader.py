@@ -12,7 +12,7 @@ from transformers import T5EncoderModel, T5Tokenizer
 
 class PixArtAlphaModelLoader:
     def __init__(self):
-        super(PixArtAlphaModelLoader, self).__init__()
+        super().__init__()
 
     def __load_internal(
             self,

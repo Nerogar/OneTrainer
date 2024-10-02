@@ -20,7 +20,7 @@ class StableDiffusionModelLoader(
     SDConfigModelLoaderMixin,
 ):
     def __init__(self):
-        super(StableDiffusionModelLoader, self).__init__()
+        super().__init__()
 
     def _default_sd_config_name(
             self,

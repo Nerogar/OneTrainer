@@ -12,7 +12,7 @@ from safetensors.torch import load_file
 
 class WuerstchenEmbeddingLoader:
     def __init__(self):
-        super(WuerstchenEmbeddingLoader, self).__init__()
+        super().__init__()
 
     def __load_embedding(
             self,

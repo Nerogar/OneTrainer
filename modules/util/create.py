@@ -1,6 +1,6 @@
 import ast
 import importlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
@@ -799,7 +799,7 @@ def create_optimizer(
 
             optimizer = Adafactor(
                 params=parameters,
-                lr=None if optimizer_config.relative_step == True else config.learning_rate,
+                lr=None if optimizer_config.relative_step is True else config.learning_rate,
                 eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
                      optimizer_config.eps2 if optimizer_config.eps2 is not None else 1e-3),
                 clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 1.0,

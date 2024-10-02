@@ -15,7 +15,7 @@ from PIL import Image
 class ConceptTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(ConceptTab, self).__init__(
+        super().__init__(
             master,
             train_config,
             ui_state,
@@ -39,7 +39,7 @@ class ConceptTab(ConfigList):
 
 class ConceptWidget(ctk.CTkFrame):
     def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command):
-        super(ConceptWidget, self).__init__(
+        super().__init__(
             master=master, width=150, height=170, corner_radius=10, bg_color="transparent"
         )
 

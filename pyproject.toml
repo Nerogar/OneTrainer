@@ -1,4 +1,8 @@
+[project]
+requires-python = ">=3.10"
+
 [tool.ruff]
+extend-exclude = ["scripts/util/version_check.py"]
 line-length = 120
 
 [tool.ruff.lint]

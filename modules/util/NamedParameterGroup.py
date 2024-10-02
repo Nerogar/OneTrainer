@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from functools import cached_property
-from typing import Iterable
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.LearningRateScaler import LearningRateScaler

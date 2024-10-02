@@ -469,14 +469,11 @@ Mouse wheel: increase or decrease brush size"""
             try:
                 with open(prompt_name, "w", encoding='utf-8') as f:
                     f.write(self.prompt_var.get())
-            except:
-                return ""
+            except Exception:
+                return
 
             if self.pil_mask:
                 self.pil_mask.save(mask_name)
-
-        else:
-            return ""
 
     def draw_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'draw'
@@ -484,6 +481,7 @@ Mouse wheel: increase or decrease brush size"""
         if args:
             # disable default event
             return "break"
+        return None
 
     def fill_mask_editing_mode(self, *args):
         self.mask_editing_mode = 'fill'

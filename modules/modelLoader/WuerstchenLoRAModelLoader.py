@@ -16,7 +16,7 @@ class WuerstchenLoRAModelLoader(
     InternalModelLoaderMixin,
 ):
     def __init__(self):
-        super(WuerstchenLoRAModelLoader, self).__init__()
+        super().__init__()
 
     def _default_model_spec_name(
             self,

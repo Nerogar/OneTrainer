@@ -23,7 +23,7 @@ class StableDiffusionXLModelLoader(
     SDConfigModelLoaderMixin,
 ):
     def __init__(self):
-        super(StableDiffusionXLModelLoader, self).__init__()
+        super().__init__()
 
     def _default_sd_config_name(
             self,

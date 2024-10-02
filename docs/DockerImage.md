@@ -14,7 +14,7 @@ docker build -t myuser/onetrainer:latest -f Dockerfile .
 
 ## Running Image
 
-This is an example 
+This is an example
 
 ```
 docker run \

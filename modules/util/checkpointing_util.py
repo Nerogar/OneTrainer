@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import torch
 from torch import nn
@@ -50,7 +51,7 @@ def to_(
 
     if isinstance(data, torch.Tensor):
         data.data = data.data.to(device=device)
-    elif isinstance(data, (list, tuple)):
+    elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
             if i in include_parameter_indices:
                 to_(elem, device)
@@ -151,7 +152,7 @@ def enable_checkpointing_for_sdxl_transformer_blocks(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for child_module in orig_module.modules():
         if isinstance(child_module, BasicTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -165,7 +166,7 @@ def enable_checkpointing_for_clip_encoder_layers(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for child_module in orig_module.modules():
         if isinstance(child_module, CLIPEncoderLayer):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -179,7 +180,7 @@ def enable_checkpointing_for_stable_cascade_blocks(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for child_module in orig_module.modules():
         if isinstance(child_module, SDCascadeResBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -203,7 +204,7 @@ def enable_checkpointing_for_t5_encoder_layers(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for child_module in orig_module.modules():
         if isinstance(child_module, T5Block):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -217,7 +218,7 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for child_module in orig_module.modules():
         if isinstance(child_module, JointTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,
@@ -231,7 +232,7 @@ def enable_checkpointing_for_flux_transformer(
         temp_device: torch.device,
         offload_activations: bool = True,
 ):
-    for name, child_module in orig_module.named_modules():
+    for child_module in orig_module.modules():
         if isinstance(child_module, FluxTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, train_device, temp_device,

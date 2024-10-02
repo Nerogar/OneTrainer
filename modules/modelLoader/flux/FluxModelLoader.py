@@ -21,7 +21,7 @@ class FluxModelLoader(
     HFModelLoaderMixin,
 ):
     def __init__(self):
-        super(FluxModelLoader, self).__init__()
+        super().__init__()
 
     def __load_internal(
             self,

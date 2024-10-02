@@ -1,4 +1,3 @@
-from typing import Optional, Tuple
 
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
@@ -24,7 +23,7 @@ class MaskByColor(BaseImageMaskModel):
             transforms.ToTensor(),
         ])
 
-    def __create_average_kernel(self, kernel_radius: Optional[int]):
+    def __create_average_kernel(self, kernel_radius: int | None):
         if kernel_radius is None:
             return None
 
@@ -39,7 +38,7 @@ class MaskByColor(BaseImageMaskModel):
         kernel.to(self.device)
         return kernel
 
-    def __create_dot_kernel(self, color: Tuple[float, float, float]):
+    def __create_dot_kernel(self, color: tuple[float, float, float]):
         kernel_weights = torch.tensor(color).view(1, 3, 1, 1)
         kernel = nn.Conv2d(
             in_channels=1, out_channels=1, kernel_size=1, bias=False, padding_mode='replicate',
@@ -65,7 +64,7 @@ class MaskByColor(BaseImageMaskModel):
 
         return mask
 
-    def __parse_color(self, color: str) -> Tuple[float, float, float]:
+    def __parse_color(self, color: str) -> tuple[float, float, float]:
         if len(color) == 7 and color.startswith('#'):
             color = color[1:]
         if len(color) == 8 and color.startswith('0x'):

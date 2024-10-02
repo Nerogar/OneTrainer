@@ -23,7 +23,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             noising_weight: float,
             noising_bias: float,
     ):
-        super(TimestepGenerator, self).__init__()
+        super().__init__()
 
         self.timestep_distribution = timestep_distribution
         self.min_noising_strength = min_noising_strength

@@ -1,8 +1,8 @@
 import copy
 import inspect
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -26,7 +26,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             model: StableDiffusion3Model,
             model_type: ModelType,
     ):
-        super(StableDiffusion3Sampler, self).__init__(train_device, temp_device)
+        super().__init__(train_device, temp_device)
 
         self.model = model
         self.model_type = model_type

@@ -1,6 +1,6 @@
 import os
 from abc import ABCMeta, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 from modules.util import path_util
 

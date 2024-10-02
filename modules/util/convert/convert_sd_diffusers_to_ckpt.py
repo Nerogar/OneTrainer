@@ -159,5 +159,3 @@ def convert_sd_diffusers_to_ckpt(
     state_dict |= util.map_noise_scheduler(noise_scheduler)
 
     return state_dict
-
-

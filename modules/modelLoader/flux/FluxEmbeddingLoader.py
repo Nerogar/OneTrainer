@@ -12,7 +12,7 @@ from safetensors.torch import load_file
 
 class FluxEmbeddingLoader:
     def __init__(self):
-        super(FluxEmbeddingLoader, self).__init__()
+        super().__init__()
 
     def __load_embedding(
             self,
@@ -24,8 +24,8 @@ class FluxEmbeddingLoader:
         try:
             embedding_state = torch.load(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
-            text_encoder_2_vector = embedding_state['t5'] if 't5' in embedding_state else None
+            text_encoder_1_vector = embedding_state.get("clip_l", None)
+            text_encoder_2_vector = embedding_state.get("t5", None)
 
             return text_encoder_1_vector, text_encoder_2_vector
         except:
@@ -34,8 +34,8 @@ class FluxEmbeddingLoader:
         try:
             embedding_state = load_file(embedding_name)
 
-            text_encoder_1_vector = embedding_state['clip_l'] if 'clip_l' in embedding_state else None
-            text_encoder_2_vector = embedding_state['t5'] if 't5' in embedding_state else None
+            text_encoder_1_vector = embedding_state.get("clip_l", None)
+            text_encoder_2_vector = embedding_state.get("t5", None)
 
             return text_encoder_1_vector, text_encoder_2_vector
         except:

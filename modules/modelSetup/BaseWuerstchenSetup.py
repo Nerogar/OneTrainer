@@ -46,12 +46,12 @@ class BaseWuerstchenSetup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            for name, child_module in model.prior_prior.named_modules():
+            for child_module in model.prior_prior.modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                for name, child_module in model.prior_prior.named_modules():
+                for child_module in model.prior_prior.modules():
                     if isinstance(child_module, Attention):
                         child_module.set_processor(XFormersAttnProcessor())
             except Exception as e:
@@ -60,7 +60,7 @@ class BaseWuerstchenSetup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            for name, child_module in model.prior_prior.named_modules():
+            for child_module in model.prior_prior.modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor2_0())
 

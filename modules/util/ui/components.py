@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from tkinter import filedialog
-from typing import Any, Callable, Tuple
+from typing import Any
 
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
@@ -293,7 +294,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
     return frame, {'component': component, 'button_component': button_component}
 
 
-def options_kv(master, row, column, values: list[Tuple[str, Any]], ui_state: UIState, var_name: str,
+def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
                command: Callable[[Any], None] = None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]

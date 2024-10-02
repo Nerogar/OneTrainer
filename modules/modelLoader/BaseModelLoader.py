@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 from abc import ABCMeta, abstractmethod
@@ -28,16 +29,12 @@ class BaseModelLoader(metaclass=ABCMeta):
             )
 
         # optimizer
-        try:
+        with contextlib.suppress(FileNotFoundError):
             model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
-        except FileNotFoundError:
-            pass
 
         # ema
-        try:
+        with contextlib.suppress(FileNotFoundError):
             model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
-        except FileNotFoundError:
-            pass
 
         # meta
         model.train_progress = train_progress

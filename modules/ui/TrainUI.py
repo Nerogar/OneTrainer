@@ -2,9 +2,9 @@ import json
 import threading
 import traceback
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog
-from typing import Callable
 
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
@@ -46,7 +46,7 @@ class TrainUI(ctk.CTk):
     training_commands: TrainCommands | None
 
     def __init__(self):
-        super(TrainUI, self).__init__()
+        super().__init__()
 
         self.title("OneTrainer")
         self.geometry("1100x740")

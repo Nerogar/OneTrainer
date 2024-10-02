@@ -1,7 +1,7 @@
 import inspect
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -26,7 +26,7 @@ class PixArtAlphaSampler(BaseModelSampler):
             model: PixArtAlphaModel,
             model_type: ModelType,
     ):
-        super(PixArtAlphaSampler, self).__init__(train_device, temp_device)
+        super().__init__(train_device, temp_device)
 
         self.model = model
         self.model_type = model_type

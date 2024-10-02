@@ -23,7 +23,7 @@ import customtkinter as ctk
 class TrainingTab:
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super(TrainingTab, self).__init__()
+        super().__init__()
 
         self.master = master
         self.train_config = train_config

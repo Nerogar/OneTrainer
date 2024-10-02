@@ -25,7 +25,7 @@ class SampleArgs(BaseArgs):
     mask_image_path:str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(SampleArgs, self).__init__(data)
+        super().__init__(data)
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes.from_single_dtype(self.weight_dtype)

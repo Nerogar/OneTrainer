@@ -39,17 +39,17 @@ class CAME(torch.optim.Optimizer):
         stochastic_rounding=False
     ):
         assert lr > 0.
-        assert all([0. <= beta <= 1. for beta in betas])
+        assert all(0. <= beta <= 1. for beta in betas)
 
-        defaults = dict(
-            lr=lr,
-            eps=eps,
-            clip_threshold=clip_threshold,
-            betas=betas,
-            weight_decay=weight_decay,
-        )
+        defaults = {
+            "lr": lr,
+            "eps": eps,
+            "clip_threshold": clip_threshold,
+            "betas": betas,
+            "weight_decay": weight_decay,
+        }
         self.stochastic_rounding = stochastic_rounding
-        super(CAME, self).__init__(params, defaults)
+        super().__init__(params, defaults)
 
     @property
     def supports_memory_efficient_fp16(self):
