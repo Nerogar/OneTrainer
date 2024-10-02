@@ -929,9 +929,8 @@ def create_optimizer(
                 else:
                     # the group state was not saved, initialize with an empty group state
                     new_group = new_param_groups[new_group_index]
-                    for i in range(len(new_group['params'])):
-                        new_group['params'][i] = state_index
-                        state_index += 1
+                    new_group['params'] = list(range(state_index, state_index + len(new_group['params'])))
+                    state_index += len(new_group['params'])
                     param_groups.append(new_group)
 
             state_dict['state'] = state
