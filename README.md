@@ -8,7 +8,7 @@ Hardware for development sponsored by https://shakker.ai
 
 ## Features
 
-- **Supported models**: Stable Diffusion 1.5, 2.0, 2.1, 3.0, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha,
+- **Supported models**: FLUX.1, Stable Diffusion 1.5, 2.0, 2.1, 3.0, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha,
   PixArt-Sigma and inpainting models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
