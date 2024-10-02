@@ -59,7 +59,7 @@ class ClipSegModel(BaseImageMaskModel):
     def mask_image(
             self,
             filename: str,
-            prompts: [str],
+            prompts: list[str],
             mode: str = 'fill',
             alpha: float = 1.0,
             threshold: float = 0.3,
