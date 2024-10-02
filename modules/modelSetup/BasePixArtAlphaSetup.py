@@ -48,12 +48,12 @@ class BasePixArtAlphaSetup(
             config: TrainConfig,
     ):
         if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            for _name, child_module in model.transformer.named_modules():
+            for child_module in model.transformer.modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                for _name, child_module in model.transformer.named_modules():
+                for child_module in model.transformer.modules():
                     if isinstance(child_module, Attention):
                         child_module.set_processor(XFormersAttnProcessor())
                 model.vae.enable_xformers_memory_efficient_attention()
@@ -63,7 +63,7 @@ class BasePixArtAlphaSetup(
                     f" correctly and a GPU is available: {e}"
                 )
         elif config.attention_mechanism == AttentionMechanism.SDP:
-            for _name, child_module in model.transformer.named_modules():
+            for child_module in model.transformer.modules():
                 if isinstance(child_module, Attention):
                     child_module.set_processor(AttnProcessor2_0())
 
