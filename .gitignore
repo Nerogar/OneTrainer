@@ -19,4 +19,6 @@ config.json
 /src
 # pixi environments
 .pixi
+pixi.lock
+pixi.toml
 *.egg-info
