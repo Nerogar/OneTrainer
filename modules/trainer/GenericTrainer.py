@@ -604,7 +604,7 @@ class GenericTrainer(BaseTrainer):
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
-            for _epoch_step, batch in enumerate(step_tqdm):
+            for batch in step_tqdm:
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
