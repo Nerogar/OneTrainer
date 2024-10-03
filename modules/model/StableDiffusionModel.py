@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.clip_util import encode_clip
@@ -217,9 +218,13 @@ class StableDiffusionModel(BaseModel):
 
     def encode_text(
             self,
+            train_device: torch.device,
+            batch_size: int,
+            rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
             text_encoder_layer_skip: int = 0,
+            text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor | None = None,
     ):
         if tokens is None:
@@ -242,5 +247,12 @@ class StableDiffusionModel(BaseModel):
             use_attention_mask=False,
             add_layer_norm=True,
         )
+
+        # apply dropout
+        if text_encoder_dropout_probability is not None:
+            dropout_text_encoder_mask = (torch.tensor(
+                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
 
         return text_encoder_output
