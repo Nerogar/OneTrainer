@@ -19,26 +19,25 @@ class BaseArgs(BaseConfig):
         for name in self.types:
             value = getattr(self, name)
             if value is not None:
-                if self.types[name] == str:
+                if self.types[name] is str:
                     data.append(f"{self.__to_arg_name(name)}=\"{value}\"")
                 elif issubclass(self.types[name], Enum):
                     data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
-                elif self.types[name] == bool:
+                elif self.types[name] is bool:
                     if self.nullables[name]:
                         data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                     else:
                         if value:
                             data.append(self.__to_arg_name(name))
-                elif self.types[name] == int:
+                elif self.types[name] is int:
                     data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
-                elif self.types[name] == float:
+                elif self.types[name] is float:
                     if value in [float('inf'), float('-inf')]:
                         data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                     else:
                         data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                 elif self.types[name] == list[str]:
-                    for val in value:
-                        data.append(f"{self.__to_arg_name(name)}=\"{val}\"")
+                    data.extend(f"{self.__to_arg_name(name)}=\"{val}\"" for val in value)
                 else:
                     data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
 

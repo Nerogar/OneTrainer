@@ -1,3 +1,4 @@
+import contextlib
 import os
 import traceback
 
@@ -21,7 +22,7 @@ class StableDiffusion3EmbeddingLoader:
         if embedding_name == "":
             return None
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = torch.load(embedding_name)
 
             text_encoder_1_vector = embedding_state.get("clip_l", None)
@@ -29,10 +30,8 @@ class StableDiffusion3EmbeddingLoader:
             text_encoder_3_vector = embedding_state.get("t5", None)
 
             return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
-        except:
-            pass
 
-        try:
+        with contextlib.suppress(Exception):
             embedding_state = load_file(embedding_name)
 
             text_encoder_1_vector = embedding_state.get("clip_l", None)
@@ -40,8 +39,6 @@ class StableDiffusion3EmbeddingLoader:
             text_encoder_3_vector = embedding_state.get("t5", None)
 
             return text_encoder_1_vector, text_encoder_2_vector, text_encoder_3_vector
-        except:
-            pass
 
         raise Exception(f"could not load embedding: {embedding_name}")
 
@@ -85,11 +82,11 @@ class StableDiffusion3EmbeddingLoader:
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
                 continue
-            except:
+            except Exception:
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
                     continue
-                except:
+                except Exception:
                     stacktraces.append(traceback.format_exc())
 
                 stacktraces.append(traceback.format_exc())
@@ -110,13 +107,13 @@ class StableDiffusion3EmbeddingLoader:
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
                 return
-            except:
+            except Exception:
                 stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

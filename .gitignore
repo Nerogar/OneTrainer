@@ -17,3 +17,8 @@ config.json
 *.pyc
 *.bak
 /src
+# pixi environments
+.pixi
+pixi.lock
+pixi.toml
+*.egg-info

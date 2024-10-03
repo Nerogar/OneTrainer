@@ -1,6 +1,8 @@
+import contextlib
 import os
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
+from pathlib import Path
 
 from modules.util import path_util
 
@@ -32,7 +34,7 @@ class CaptionSample:
             try:
                 with open(self.caption_filename, "r") as f:
                     self.captions = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
-            except:
+            except Exception:
                 self.captions = []
 
         return self.captions
@@ -45,32 +47,21 @@ class CaptionSample:
 
     def save_caption(self):
         if self.captions is not None:
-            try:
-                with open(self.caption_filename, "w", encoding='utf-8') as f:
-                    f.write('\n'.join(self.captions))
-            except:
-                pass
+            with contextlib.suppress(Exception), open(self.caption_filename, "w", encoding='utf-8') as f:
+                f.write('\n'.join(self.captions))
 
 
 class BaseImageCaptionModel(metaclass=ABCMeta):
     @staticmethod
-    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> [str]:
-        def __is_supported_image_extension(filename: str) -> bool:
-            ext = os.path.splitext(filename)[1]
-            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
+    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> list[str]:
+        sample_dir = Path(sample_dir)
 
-        filenames = []
-        if include_subdirectories:
-            for root, _, files in os.walk(sample_dir):
-                for filename in files:
-                    if __is_supported_image_extension(filename):
-                        filenames.append(os.path.join(root, filename))
-        else:
-            for filename in os.listdir(sample_dir):
-                if __is_supported_image_extension(filename):
-                    filenames.append(os.path.join(sample_dir, filename))
+        def __is_supported_image_extension(path: Path) -> bool:
+            ext = path.suffix
+            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
 
-        return filenames
+        recursive_prefix = "" if not include_subdirectories else "**/"
+        return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
 
     @abstractmethod
     def generate_caption(
@@ -127,7 +118,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
 
     def caption_images(
             self,
-            filenames: [str],
+            filenames: list[str],
             initial_caption: str = "",
             caption_prefix: str = "",
             caption_postfix: str = "",

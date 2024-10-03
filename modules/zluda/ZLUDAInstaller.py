@@ -20,7 +20,7 @@ def get_path() -> str:
 
 
 def find_hip_sdk() -> str | None:
-    program_files = os.environ.get('ProgramFiles', r'C:\Program Files')
+    program_files = os.environ.get('ProgramFiles', r'C:\Program Files')  # noqa: SIM112
     hip_path_default = rf'{program_files}\AMD\ROCm\5.7'
     if not os.path.exists(hip_path_default):
         hip_path_default = None

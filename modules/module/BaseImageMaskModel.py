@@ -1,6 +1,7 @@
 import os
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
+from pathlib import Path
 
 from modules.util import path_util
 
@@ -115,29 +116,21 @@ class MaskSample:
 
 class BaseImageMaskModel(metaclass=ABCMeta):
     @staticmethod
-    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> [str]:
-        def __is_supported_image_extension(filename: str) -> bool:
-            ext = os.path.splitext(filename)[1]
-            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in filename
+    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> list[str]:
+        sample_dir = Path(sample_dir)
 
-        filenames = []
-        if include_subdirectories:
-            for root, _, files in os.walk(sample_dir):
-                for filename in files:
-                    if __is_supported_image_extension(filename):
-                        filenames.append(os.path.join(root, filename))
-        else:
-            for filename in os.listdir(sample_dir):
-                if __is_supported_image_extension(filename):
-                    filenames.append(os.path.join(sample_dir, filename))
+        def __is_supported_image_extension(path: Path) -> bool:
+            ext = path.suffix
+            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
 
-        return filenames
+        recursive_prefix = "" if not include_subdirectories else "**/"
+        return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
 
     @abstractmethod
     def mask_image(
             self,
             filename: str,
-            prompts: [str],
+            prompts: list[str],
             mode: str = 'fill',
             alpha: float = 1.0,
             threshold: float = 0.3,

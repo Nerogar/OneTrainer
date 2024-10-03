@@ -91,13 +91,13 @@ class PixArtAlphaModelLoader:
         try:
             self.__load_internal(model, model_type, weight_dtypes, base_model_name, model_names.vae_model)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, model_names.vae_model)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:

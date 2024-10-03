@@ -52,19 +52,19 @@ class StableDiffusionXLLoRALoader:
         try:
             self.__load_internal(model, model_names.lora)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_ckpt(model, model_names.lora)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_safetensors(model, model_names.lora)
             return
-        except:
+        except Exception:
             stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
