@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "flux-dev",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "FluxDev 1.0"
+}

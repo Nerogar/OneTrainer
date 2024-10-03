@@ -2,5 +2,5 @@
     "modelspec.sai_model_spec": "1.0.0",
     "modelspec.architecture": "pixart-alpha/lora",
     "modelspec.implementation": "https://github.com/PixArt-alpha/PixArt-alpha",
-    "modelspec.title": "PixArt Alpha 1.0"
+    "modelspec.title": "PixArt Alpha 1.0 LoRA"
 }
