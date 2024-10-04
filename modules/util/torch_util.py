@@ -1,11 +1,16 @@
 import gc
 from contextlib import nullcontext
 
-import accelerate
 import torch
+
+import accelerate
+import packaging
+from packaging.version import Version
 
 accelerator = accelerate.Accelerator()
 default_device = accelerator.device
+
+torch_version = packaging.version.parse(torch.__version__)
 
 
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
@@ -94,32 +99,14 @@ def tensors_record_stream(
             tensors_record_stream(stream, elem)
 
 
-def module_to_device_except_sub_module(
+
+def unpin_module(
         module: torch.nn.Module,
-        device: torch.device,
-        sub_modules: list[torch.nn.Module],
-        non_blocking: bool = False,
 ):
-    sub_module_parameters = set(sum([list(x.parameters()) for x in sub_modules], []))
-
     def convert(t):
-        if t in sub_module_parameters:
-            return t
-
-        try:
-            return t.to(
-                device,
-                None,
-                non_blocking,
-            )
-        except NotImplementedError as e:
-            if str(e) == "Cannot copy out of meta tensor; no data!":
-                raise NotImplementedError(
-                    f"{e} Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() "
-                    f"when moving module from meta to a different device."
-                ) from None
-            else:
-                raise
+        if t.is_pinned():
+            return t.clone()
+        return t
 
     return module._apply(convert)
 
@@ -140,6 +127,10 @@ def torch_gc():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
+        if torch_version > Version("2.6.0"):
+            # TODO: replace with a torch.cuda binding once that's available
+            torch._C._host_emptyCache()
+
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
 
@@ -149,9 +140,34 @@ def torch_sync():
         torch.cuda.synchronize()
     if torch.backends.mps.is_available():
         torch.mps.synchronize()
+        packaging.version.parse(torch.__version__)
 
 
 def create_stream_context(stream: torch.cuda.Stream) -> torch.cuda.StreamContext | nullcontext:
     if isinstance(stream, torch.cuda.Stream):
         return torch.cuda.StreamContext(stream)
     return nullcontext()
+
+
+def pin_tensor_(x):
+    # not implemented for other device types
+    if torch.cuda.is_available():
+        cudart = torch.cuda.cudart()
+        err = cudart.cudaHostRegister(
+            x.data_ptr(),
+            x.numel() * x.element_size(),
+            0,
+        )
+
+        if err.value != 0:
+            raise RuntimeError("CUDA Error while trying to pin memory")
+
+
+def unpin_tensor_(x):
+    # not implemented for other device types
+    if torch.cuda.is_available():
+        cudart = torch.cuda.cudart()
+        err = cudart.cudaHostUnregister(x.data_ptr())
+
+        if err.value != 0:
+            raise RuntimeError("CUDA Error while trying to unpin memory")

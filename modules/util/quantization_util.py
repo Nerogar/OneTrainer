@@ -1,4 +1,6 @@
+import math
 from collections.abc import Callable
+
 import bitsandbytes as bnb
 import torch
 from torch import Tensor, nn
@@ -152,19 +154,33 @@ def get_weight_shape(module: nn.Module) -> torch.Size:
 
 
 def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
-    if isinstance(module, bnb.nn.Linear4bit):
-        return [module.weight.data]
-    if isinstance(module, nn.Linear):
-        return [module.weight.data]
-    if isinstance(module, nn.Conv2d):
+    if isinstance(module, bnb.nn.Linear4bit | nn.Linear | nn.Conv2d):
         return [module.weight.data]
     return []
 
 
-def offload_quantized(module: nn.Module, device: torch.device, non_blocking: bool = False):
-    if isinstance(module, bnb.nn.LinearNF4):
-        module.weight.data = module.weight.data.to(device=device, non_blocking=non_blocking)
-    elif isinstance(module, nn.Linear):
-        module.to(device=device, non_blocking=non_blocking)
-    elif isinstance(module, nn.Conv2d):
-        module.to(device=device, non_blocking=non_blocking)
+def get_offload_tensor_bytes(module: nn.Module) -> int:
+    if isinstance(module, bnb.nn.Linear4bit):
+        if module.weight.quant_state is None:
+            return math.ceil(module.weight.numel() / 2)
+        else:
+            return module.weight.numel()
+    if isinstance(module, nn.Linear | nn.Conv2d):
+        return module.weight.element_size() * module.weight.numel()
+    return 0
+
+
+def offload_quantized(
+        module: nn.Module,
+        device: torch.device,
+        non_blocking: bool = False,
+        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+):
+    if allocator is None:
+        if isinstance(module, bnb.nn.LinearNF4 | nn.Linear | nn.Conv2d):
+            module.weight.data = module.weight.data.to(device=device, non_blocking=non_blocking)
+    else:
+        if isinstance(module, bnb.nn.LinearNF4 | nn.Linear | nn.Conv2d):
+            tensor = allocator(module.weight)
+            tensor.copy_(module.weight.data, non_blocking=non_blocking)
+            module.weight.data = tensor
