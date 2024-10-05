@@ -1,6 +1,5 @@
 import contextlib
 import os
-import traceback
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.util.ModelNames import EmbeddingName, ModelNames
@@ -73,45 +72,27 @@ class WuerstchenEmbeddingLoader:
         model.additional_embedding_states = []
 
         for embedding_name in model_names.additional_embeddings:
-            stacktraces = []
-
             try:
                 model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
-                continue
-            except Exception:
+            except Exception as e1:  # noqa: PERF203
                 try:
                     model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
-                    continue
-                except Exception:
-                    stacktraces.append(traceback.format_exc())
-
-                stacktraces.append(traceback.format_exc())
-
-                for stacktrace in stacktraces:
-                    print(stacktrace)
-                raise Exception("could not load embedding: " + str(model_names.embedding))
+                except Exception as e2:
+                    e2.__cause__ = e1
+                    raise Exception(f"could not load embedding: {embedding_name}") from e2
 
     def load_single(
             self,
             model: WuerstchenModel,
             model_names: ModelNames,
     ):
-        stacktraces = []
-
         embedding_name = model_names.embedding
 
         try:
             model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
-            return
-        except Exception:
-            stacktraces.append(traceback.format_exc())
-
+        except Exception as e1:
             try:
                 model.embedding_state = self.__load_embedding(embedding_name.model_name)
-                return
-            except Exception:
-                stacktraces.append(traceback.format_exc())
-
-        for stacktrace in stacktraces:
-            print(stacktrace)
-        raise Exception("could not load embedding: " + str(model_names.embedding))
+            except Exception as e2:
+                e2.__cause__ = e1
+                raise Exception(f"could not load embedding: {embedding_name}") from e2
