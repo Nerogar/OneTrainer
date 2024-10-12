@@ -112,7 +112,8 @@ def unpin_module(
 
 
 def device_equals(device1: torch.device, device2: torch.device) -> bool:
-    return device1.type == device2.type \
+    return device1 is not None and device2 is not None \
+        and device1.type == device2.type \
         and (0 if device1.index is None else device1.index) == (0 if device2.index is None else device2.index)
 
 
@@ -160,6 +161,8 @@ def pin_tensor_(x):
         )
 
         if err.value != 0:
+            if err.value == 712:  # cudaErrorHostMemoryAlreadyRegistered
+                raise RuntimeError("CUDA Error while trying to pin memory. cudaErrorHostMemoryAlreadyRegistered, ")
             raise RuntimeError("CUDA Error while trying to pin memory")
 
 

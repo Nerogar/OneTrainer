@@ -1,3 +1,4 @@
+import math
 import random
 from typing import Any
 
@@ -14,7 +15,7 @@ from modules.util.torch_util import (
     tensors_record_stream,
     tensors_to_device_,
     torch_gc,
-    pin_tensor_, unpin_tensor_,
+    unpin_tensor_, pin_tensor_,
 )
 
 MESSAGES = []
@@ -24,6 +25,19 @@ def log(msg: str = ''):
     pass
     # print(msg)
     # MESSAGES.append(msg)
+
+
+def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
+    # clones a tensor into a new memory location to remove all memory dependencies between tensors
+    return tensor.clone()
+
+
+def ceil_4(number: int) -> int:
+    return number + (4 - (number % 4)) % 4
+
+
+def floor_4(number: int) -> int:
+    return number - (number % 4)
 
 
 class StaticTensorAllocator:
@@ -38,40 +52,67 @@ class StaticTensorAllocator:
         self.__layer_index = layer_index
 
         if allocate_forward:
-            self.__allocation_start = layer_allocator._allocation_end
-            self.__allocation_end = layer_allocator._allocation_end
+            self.__allocation_start = layer_allocator.allocation_end
+            self.__allocation_end = layer_allocator.allocation_end
         else:
-            self.__allocation_start = layer_allocator._allocation_start
-            self.__allocation_end = layer_allocator._allocation_start
+            self.__allocation_start = layer_allocator.allocation_start
+            self.__allocation_end = layer_allocator.allocation_start
 
     def allocate_like(self, source_tensor: torch.Tensor) -> torch.Tensor:
         num_bytes = source_tensor.numel() * source_tensor.element_size()
 
-        total_cache_bytes = self.__layer_allocator._cache_tensor.shape[0]
+        cache_tensor_size = self.__layer_allocator.cache_tensor_size
+        total_cache_bytes = cache_tensor_size * len(self.__layer_allocator.cache_tensors)
         if self.__allocate_forward:
-            if self.__allocation_end + num_bytes > total_cache_bytes:
-                self.__allocation_end = 0
-            allocated_tensor = \
-                self.__layer_allocator._cache_tensor[self.__allocation_end:self.__allocation_end + num_bytes]
-            print(f"--allocated: {self.__layer_allocator._cache_tensor.device}/{num_bytes}, between {self.__allocation_end} - {self.__allocation_end + num_bytes} for layer {self.__layer_index}")
-            self.__allocation_end += num_bytes
-            self.__layer_allocator._allocation_end = self.__allocation_end
-        else:
-            if self.__allocation_start - num_bytes < 0:
-                self.__allocation_start = total_cache_bytes
-            allocated_tensor = \
-                self.__layer_allocator._cache_tensor[self.__allocation_start - num_bytes:self.__allocation_start]
-            self.__allocation_start -= num_bytes
-            self.__layer_allocator._allocation_start = self.__allocation_start
+            cache_tensor_index = self.__allocation_end // cache_tensor_size
+            cache_tensor_allocation_end = ceil_4(self.__allocation_end % cache_tensor_size)
 
+            if cache_tensor_allocation_end + num_bytes > cache_tensor_size:
+                # move to the start of the next cache tensor
+                cache_tensor_index += 1
+                cache_tensor_allocation_end = 0
+            if cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end + num_bytes > total_cache_bytes:
+                # move to the first cache tensor
+                cache_tensor_index = 0
+                cache_tensor_allocation_end = 0
+
+            self.__allocation_end = cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end
+            self.__layer_allocator.ensure_allocation(cache_tensor_index)
+            cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
+            allocated_tensor = cache_tensor[cache_tensor_allocation_end:cache_tensor_allocation_end + num_bytes]
+            log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_end} - {self.__allocation_end + num_bytes}/[{cache_tensor_index}] {cache_tensor_allocation_end} for layer {self.__layer_index}")
+            self.__allocation_end += num_bytes
+            self.__layer_allocator.allocation_end = self.__allocation_end
+        else:
+            cache_tensor_index = self.__allocation_start // cache_tensor_size
+            cache_tensor_allocation_start = self.__allocation_start % cache_tensor_size
+
+            if cache_tensor_allocation_start - num_bytes < 0:
+                # move to the end of the previous cache tensor
+                cache_tensor_index -= 1
+                cache_tensor_allocation_start = cache_tensor_size
+            if cache_tensor_index < 0:
+                # move to the first cache tensor
+                cache_tensor_index = len(self.__layer_allocator.cache_tensors) - 1
+                cache_tensor_allocation_start = cache_tensor_size
+
+            new_allocation_start = floor_4(cache_tensor_allocation_start - num_bytes)
+            self.__layer_allocator.ensure_allocation(cache_tensor_index)
+            cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
+            allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
+            self.__allocation_start = cache_tensor_index * cache_tensor_size + new_allocation_start
+            log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_start - num_bytes} - {self.__allocation_start}/[{cache_tensor_index}] {cache_tensor_allocation_start - num_bytes} for layer {self.__layer_index}")
+            self.__layer_allocator.allocation_start = self.__allocation_start
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
 
     def deallocate(self, deallocate_forward):
         if deallocate_forward:
-            self.__layer_allocator._allocation_start = self.__allocation_end
+            log(f"{self.__layer_allocator.cache_tensors[0].device}/deallocating layer {self.__layer_index}, allocation_start {self.__allocation_end}")
+            self.__layer_allocator.allocation_start = self.__allocation_end
         else:
-            self.__layer_allocator._allocation_end = self.__allocation_start
+            log(f"{self.__layer_allocator.cache_tensors[0].device}/deallocating layer {self.__layer_index}, allocation_end {self.__allocation_start}")
+            self.__layer_allocator.allocation_end = self.__allocation_start
 
 
 class StaticLayerTensorAllocator:
@@ -81,10 +122,11 @@ class StaticLayerTensorAllocator:
     __num_layers: int
     __max_tensor_bytes: int
     __layer_bytes: list[int]
-    _cache_tensor: torch.Tensor | None
+    cache_tensors: list[torch.Tensor | None]
+    cache_tensor_size: int
 
-    _allocation_start: int  # index of the first allocated byte
-    _allocation_end: int  # index of the first unallocated byte
+    allocation_start: int  # index of the first allocated byte
+    allocation_end: int  # index of the first unallocated byte
 
     __tensor_allocators: list[StaticTensorAllocator | None]
 
@@ -99,16 +141,19 @@ class StaticLayerTensorAllocator:
         self.__num_layers = 0
         self.__max_tensor_bytes = 0
         self.__layer_bytes = []
-        self._cache_tensor = None
+        self.cache_tensors = []
+        self.cache_tensor_size = 0
 
-        self._allocation_start = 0
-        self._allocation_end = 0
+        self.allocation_start = 0
+        self.allocation_end = 0
 
         self.__tensor_allocators = []
 
     def allocate_cache(self, layers: list[nn.Module], num_layers: int):
-        if not self.__allocate_statically or self._cache_tensor is not None:
+        if not self.__allocate_statically or any(x is not None for x in self.cache_tensors):
             return
+
+        log(f"allocating cache on device {self.__device}")
 
         self.__num_layers = num_layers
 
@@ -122,20 +167,43 @@ class StaticLayerTensorAllocator:
             self.__layer_bytes.append(sum(layer_tensor_bytes))
 
         cache_bytes = sum(sorted(self.__layer_bytes, reverse=True)[:num_layers]) + self.__max_tensor_bytes
-        self._cache_tensor = torch.zeros((cache_bytes,), dtype=torch.int8, device=self.__device)
-
-        if self.__is_pinned:
-            pin_tensor_(self._cache_tensor)
+        num_cache_tensors = min(
+            # no more than 10% overhead
+            math.ceil(int(cache_bytes * 0.10) / self.__max_tensor_bytes),
+            # at least twice self.__max_tensor_bytes for each tensor
+            math.ceil(cache_bytes / (self.__max_tensor_bytes * 2)),
+            # no more than 10 cache tensors
+            10
+        )
+        # add self.__max_tensor_bytes to ensure even the largest tensors can be allocated in the remaining space
+        # add 1kb for the alignment overhead
+        self.cache_tensor_size = math.ceil(cache_bytes / num_cache_tensors) + self.__max_tensor_bytes + 1024
 
         self.__tensor_allocators = [None] * len(layers)
+        self.cache_tensors = [None] * num_cache_tensors
+        self.allocation_start = 0
+        self.allocation_end = 0
+
+    def ensure_allocation(self, cache_tensor_index: int):
+        if self.cache_tensors[cache_tensor_index] is None:
+            self.cache_tensors[cache_tensor_index] = \
+                torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.__device)
+
+            log(f"tensor {cache_tensor_index} not allocated, allocating {self.cache_tensor_size} bytes")
+
+            if self.__is_pinned:
+                pin_tensor_(self.cache_tensors[cache_tensor_index])
 
     def deallocate_cache(self):
-        if not self.__allocate_statically or self._cache_tensor is None:
+        if not self.__allocate_statically:
             return
 
-        if self._cache_tensor is not None and self.__is_pinned:
-            unpin_tensor_(self._cache_tensor)
-        self._cache_tensor = None
+        for cache_tensor in self.cache_tensors:
+            if cache_tensor is not None and self.__is_pinned:
+                unpin_tensor_(cache_tensor)
+
+        self.cache_tensors = [None] * len(self.cache_tensors)
+        self.__tensor_allocators = [None] * len(self.__tensor_allocators)
 
     def get_allocator(self, layer_index: int, allocate_forward: bool) -> StaticTensorAllocator | None:
         if self.__allocate_statically:
@@ -148,7 +216,7 @@ class StaticLayerTensorAllocator:
     def deallocate_layer(self, layer_index: int, deallocate_forward: bool):
         if self.__tensor_allocators[layer_index] is not None:
             self.__tensor_allocators[layer_index].deallocate(deallocate_forward)
-        self.__tensor_allocators[layer_index] = None
+            self.__tensor_allocators[layer_index] = None
 
 
 class SyncEvent:
@@ -288,19 +356,22 @@ class LayerOffloadConductor:
     def to(self, device: torch.device):
         torch_gc()
 
-        self.__init_layer_device_map()
         self.__wait_all_layer_transfers()
 
         if device_equals(device, self.__temp_device):
             log("to temp device")
 
+            # deallocate the cache before to take advantage of the gc
+            self.__train_device_allocator.deallocate_cache()
+            self.__temp_device_allocator.deallocate_cache()
+
             self.__module_to_device_except_layers(self.__temp_device)
             for layer_index, layer in enumerate(self.__layers):
                 self.__layers[layer_index].to(self.__temp_device)
-                self.__layer_device_map[layer_index] = self.__temp_device
+                for module in layer.modules():
+                    offload_quantized(module, self.__temp_device, allocator=clone_tensor_allocator)
+                self.__layer_device_map[layer_index] = None
 
-            self.__train_device_allocator.deallocate_cache()
-            self.__temp_device_allocator.deallocate_cache()
         elif device_equals(device, self.__train_device):
             log("to train device")
 
@@ -314,15 +385,17 @@ class LayerOffloadConductor:
                 layer.to(self.__train_device)
 
                 if layer_index < self.__num_loaded_layers:
-                    allocator = self.__train_device_allocator.get_allocator(layer_index, allocate_forward=True)
-                    for module in layer.modules():
-                        offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
-                    self.__layer_device_map[layer_index] = self.__train_device
+                    if not device_equals(self.__layer_device_map[layer_index], self.__train_device):
+                        allocator = self.__train_device_allocator.get_allocator(layer_index, allocate_forward=True)
+                        for module in layer.modules():
+                            offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
+                        self.__layer_device_map[layer_index] = self.__train_device
                 else:
-                    allocator = self.__temp_device_allocator.get_allocator(layer_index, allocate_forward=True)
-                    for module in layer.modules():
-                        offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
-                    self.__layer_device_map[layer_index] = self.__temp_device
+                    if not device_equals(self.__layer_device_map[layer_index], self.__temp_device):
+                        allocator = self.__temp_device_allocator.get_allocator(layer_index, allocate_forward=True)
+                        for module in layer.modules():
+                            offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
+                        self.__layer_device_map[layer_index] = self.__temp_device
 
                 event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
                 self.__layer_train_event_map[layer_index] = event
@@ -352,7 +425,6 @@ class LayerOffloadConductor:
         log("starting forward")
         self.__transfer_stream.wait_stream(self.__train_stream)
         self.__wait_all_layer_transfers()
-        self.__init_layer_device_map()
         self.__clear_activations()
 
         self.__is_forward_pass = True
@@ -431,7 +503,7 @@ class LayerOffloadConductor:
                     self.__schedule_layer_to(
                         layer_index - self.__num_loaded_layers, self.__train_device, is_forward=False)
 
-            return activations
+        return activations
 
     def after_layer(self, layer_index: int, call_index: int, activations: Any):
         log(f"after layer {layer_index}, {call_index}")
@@ -469,14 +541,6 @@ class LayerOffloadConductor:
     @staticmethod
     def __get_all_tensors(layer: nn.Module):
         return sum([get_offload_tensors(x) for x in layer.modules()], [])
-
-    def __init_layer_device_map(self):
-        if self.__layer_device_map[0] is not None:
-            return
-
-        for layer_index, layer in enumerate(self.__layers):
-            first_parameter_device = self.__get_all_tensors(layer)[0].device
-            self.__layer_device_map[layer_index] = first_parameter_device
 
     def __clear_activations(self):
         self.__activations_map.clear()
@@ -520,7 +584,7 @@ class LayerOffloadConductor:
 
         layer_deallocator = self.__temp_device_allocator \
             if device_equals(device, self.__train_device) \
-            else self.__temp_device_allocator
+            else self.__train_device_allocator
 
         layer_allocator = self.__train_device_allocator \
             if device_equals(device, self.__train_device) \
