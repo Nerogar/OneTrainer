@@ -381,24 +381,23 @@ class LayerOffloadConductor:
 
             # move all layers to the train device, then move offloadable tensors back to the temp device
             for layer_index, layer in enumerate(self.__layers):
-                log(f"layer {layer_index} to train device")
-                layer.to(self.__train_device)
+                if self.__layer_device_map[layer_index] is None:
+                    log(f"layer {layer_index} to train device")
+                    layer.to(self.__train_device)
 
-                if layer_index < self.__num_loaded_layers:
-                    if not device_equals(self.__layer_device_map[layer_index], self.__train_device):
+                    if layer_index < self.__num_loaded_layers:
                         allocator = self.__train_device_allocator.get_allocator(layer_index, allocate_forward=True)
                         for module in layer.modules():
                             offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
                         self.__layer_device_map[layer_index] = self.__train_device
-                else:
-                    if not device_equals(self.__layer_device_map[layer_index], self.__temp_device):
+                    else:
                         allocator = self.__temp_device_allocator.get_allocator(layer_index, allocate_forward=True)
                         for module in layer.modules():
                             offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
                         self.__layer_device_map[layer_index] = self.__temp_device
 
-                event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
-                self.__layer_train_event_map[layer_index] = event
+                    event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
+                    self.__layer_train_event_map[layer_index] = event
 
         torch_gc()
 
