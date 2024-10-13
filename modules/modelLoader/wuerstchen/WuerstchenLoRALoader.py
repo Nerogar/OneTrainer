@@ -30,7 +30,7 @@ class WuerstchenLoRALoader:
             model: WuerstchenModel,
             lora_name: str,
     ):
-        model.lora_state_dict = torch.load(lora_name)
+        model.lora_state_dict = torch.load(lora_name, weights_only=True)
         if model.model_type.is_stable_cascade():
             model.lora_state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(model.lora_state_dict)
 

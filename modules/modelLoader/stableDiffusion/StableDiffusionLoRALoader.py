@@ -25,7 +25,7 @@ class StableDiffusionLoRALoader:
             model: StableDiffusionModel,
             lora_name: str,
     ):
-        model.lora_state_dict = torch.load(lora_name)
+        model.lora_state_dict = torch.load(lora_name, weights_only=True)
 
     def __load_internal(
             self,

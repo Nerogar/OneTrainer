@@ -22,7 +22,7 @@ class StableDiffusionEmbeddingLoader:
             return None
 
         with contextlib.suppress(Exception):
-            return torch.load(embedding_name)['string_to_param']['*']
+            return torch.load(embedding_name, weights_only=True)['string_to_param']['*']
 
         with contextlib.suppress(Exception):
             return load_file(embedding_name)["emp_params"]

@@ -52,7 +52,7 @@ class HPSv2ScoreModel(nn.Module):
         model_path = huggingface_hub.hf_hub_download(
             "xswu/HPSv2", "HPS_v2_compressed.pt"
         )
-        checkpoint = torch.load(model_path)
+        checkpoint = torch.load(model_path, weights_only=True)
         open_clip_model.load_state_dict(checkpoint['state_dict'])
 
         return open_clip_model
