@@ -7,11 +7,13 @@ from pathlib import Path
 from tkinter import filedialog
 
 from modules.trainer.GenericTrainer import GenericTrainer
+from modules.trainer.CloudTrainer import CloudTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.LoraTab import LoraTab
+from modules.ui.CloudTab import CloudTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
@@ -70,6 +72,7 @@ class TrainUI(ctk.CTk):
         self.model_tab = None
         self.training_tab = None
         self.lora_tab = None
+        self.cloud_tab = None
         self.additional_embeddings_tab = None
 
         self.top_bar_component = self.top_bar(self)
@@ -140,6 +143,7 @@ class TrainUI(ctk.CTk):
         self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
         self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
         self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
+        self.cloud_tab = self.create_cloud_tab(self.tabview.add("cloud"))
 
         self.change_training_method(self.train_config.training_method)
 
@@ -249,6 +253,9 @@ class TrainUI(ctk.CTk):
 
     def create_training_tab(self, master) -> TrainingTab:
         return TrainingTab(master, self.train_config, self.ui_state)
+        
+    def create_cloud_tab(self, master) -> CloudTab:
+        return CloudTab(master, self.train_config, self.ui_state)
 
     def create_sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
@@ -544,12 +551,15 @@ class TrainUI(ctk.CTk):
             on_update_status=self.on_update_status,
         )
 
-        ZLUDA.initialize_devices(self.train_config)
-
-        trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
+        if self.train_config.cloud.enabled:
+            trainer = CloudTrainer(self.train_config, self.training_callbacks, self.training_commands)
+        else:
+            ZLUDA.initialize_devices(self.train_config)
+            trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
 
         try:
             trainer.start()
+            self.ui_state.update(self.train_config) #TODO only update cloud tab
             trainer.train()
         except Exception:
             error_caught = True
@@ -559,6 +569,7 @@ class TrainUI(ctk.CTk):
 
         # clear gpu memory
         del trainer
+                
         self.training_thread = None
         self.training_commands = None
         torch.clear_autocast_cache()

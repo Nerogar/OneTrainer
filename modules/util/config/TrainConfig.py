@@ -7,6 +7,7 @@ from typing import Any
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.CloudConfig import CloudConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.ConfigPart import ConfigPart
@@ -379,6 +380,9 @@ class TrainConfig(BaseConfig):
     sample_image_format: ImageFormat
     samples_to_tensorboard: bool
     non_ema_sampling: bool
+    
+    # cloud settings
+    cloud: CloudConfig
 
     # backup settings
     backup_after: float
@@ -829,6 +833,9 @@ class TrainConfig(BaseConfig):
         data.append(("embedding", TrainEmbeddingConfig.default_values(), TrainEmbeddingConfig, False))
         data.append(("additional_embeddings", [], list[TrainEmbeddingConfig], False))
         data.append(("embedding_weight_dtype", DataType.FLOAT_32, DataType, False))
+        
+        # cloud
+        data.append(("cloud", CloudConfig.default_values(), CloudConfig, False))
 
         # lora
         data.append(("peft_type", PeftType.LORA, PeftType, False))
