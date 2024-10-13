@@ -199,11 +199,15 @@ class BasePixArtAlphaSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, text_encoder_attention_mask = model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
                 tokens=batch['tokens'],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_output=batch[
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
                 attention_mask=batch['tokens_mask'],
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
 
             latent_image = batch['latent_image']
@@ -220,6 +224,9 @@ class BasePixArtAlphaSetup(
                 dummy.requires_grad_(True)
 
                 negative_text_encoder_output, negative_text_encoder_attention_mask = model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch['latent_image'].shape[0],
+                    rand=rand,
                     text="",
                     text_encoder_layer_skip=config.text_encoder_layer_skip,
                 )
