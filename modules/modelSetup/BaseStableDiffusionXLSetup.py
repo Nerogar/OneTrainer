@@ -232,6 +232,9 @@ class BaseStableDiffusionXLSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, pooled_text_encoder_2_output = model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
                 tokens_1=batch['tokens_1'],
                 tokens_2=batch['tokens_2'],
                 text_encoder_1_layer_skip=config.text_encoder_layer_skip,
@@ -242,6 +245,8 @@ class BaseStableDiffusionXLSetup(
                     'text_encoder_2_hidden_state'] if not config.train_text_encoder_2_or_embedding() else None,
                 pooled_text_encoder_2_output=batch[
                     'text_encoder_2_pooled_state'] if not config.train_text_encoder_2_or_embedding() else None,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
             )
 
             latent_image = batch['latent_image']
@@ -258,6 +263,9 @@ class BaseStableDiffusionXLSetup(
                 dummy.requires_grad_(True)
 
                 negative_text_encoder_output, negative_pooled_text_encoder_2_output = model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch['latent_image'].shape[0],
+                    rand=rand,
                     text="",
                     text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                     text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,

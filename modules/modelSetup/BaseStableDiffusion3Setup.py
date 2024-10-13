@@ -344,6 +344,10 @@ class BaseStableDiffusion3Setup(
                     if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
                 text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
                     if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
+                text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability,
+                apply_attention_mask=config.prior.attention_mask,
             )
 
             latent_image = batch['latent_image']
@@ -369,6 +373,7 @@ class BaseStableDiffusion3Setup(
                 #     text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                 #     text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
                 #     text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
+                #     apply_attention_mask=config.prior.attention_mask,
                 # )
                 # negative_text_encoder_output = negative_text_encoder_output \
                 #     .expand((scaled_latent_image.shape[0], -1, -1))

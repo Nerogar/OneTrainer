@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
@@ -232,10 +233,14 @@ class WuerstchenModel(BaseModel):
 
     def encode_text(
             self,
+            train_device: torch.device,
+            batch_size: int,
+            rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
             tokens_mask: Tensor = None,
             text_encoder_layer_skip: int = 0,
+            text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor | None = None,
             pooled_text_encoder_output: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
@@ -269,5 +274,17 @@ class WuerstchenModel(BaseModel):
         else:
             if self.model_type.is_stable_cascade():
                 pooled_text_encoder_output = pooled_text_encoder_output.unsqueeze(1)
+
+        # apply dropout
+        if text_encoder_dropout_probability is not None:
+            dropout_text_encoder_mask = (torch.tensor(
+                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+
+            if self.model_type.is_wuerstchen_v2():
+                text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
+            if self.model_type.is_stable_cascade():
+                pooled_text_encoder_output = pooled_text_encoder_output * dropout_text_encoder_mask[:, None, None]
+                text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
 
         return text_encoder_output, pooled_text_encoder_output

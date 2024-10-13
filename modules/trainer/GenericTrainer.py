@@ -312,13 +312,16 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
-    def __validate(self, train_progress):
+    def __validate(self, train_progress: TrainProgress):
         if self.__needs_validate(train_progress):
             self.validation_data_loader.get_data_set().start_next_epoch()
             current_epoch_length_validation = self.validation_data_loader.get_data_set().approximate_length()
 
             if current_epoch_length_validation == 0:
                 return
+
+            self.callbacks.on_update_status("calculating validation loss")
+            self.model_setup.setup_train_device(self.model, self.config)
 
             torch_gc()
 

@@ -51,11 +51,15 @@ class WuerstchenSampler(BaseModelSampler):
 
         prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
             text=prompt,
+            train_device=self.train_device,
+            batch_size=1,
             text_encoder_layer_skip=text_encoder_layer_skip,
         )
 
         negative_prompt_embedding, pooled_negative_prompt_embedding = self.model.encode_text(
             text=negative_prompt,
+            train_device=self.train_device,
+            batch_size=1,
             text_encoder_layer_skip=text_encoder_layer_skip,
         )
 

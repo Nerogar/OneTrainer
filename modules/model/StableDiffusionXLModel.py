@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.clip_util import encode_clip
@@ -194,6 +195,9 @@ class StableDiffusionXLModel(BaseModel):
 
     def encode_text(
             self,
+            train_device: torch.device,
+            batch_size: int,
+            rand: Random | None = None,
             text: str = None,
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
@@ -201,6 +205,8 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_layer_skip: int = 0,
             text_encoder_1_output: Tensor = None,
             text_encoder_2_output: Tensor = None,
+            text_encoder_1_dropout_probability: float | None = None,
+            text_encoder_2_dropout_probability: float | None = None,
             pooled_text_encoder_2_output: Tensor = None,
     ):
         if tokens_1 is None and text is not None:
@@ -245,6 +251,20 @@ class StableDiffusionXLModel(BaseModel):
             use_attention_mask=False,
             add_layer_norm=False,
         )
+
+        # apply dropout
+        if text_encoder_1_dropout_probability is not None:
+            dropout_text_encoder_1_mask = (torch.tensor(
+                [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
+
+        if text_encoder_2_dropout_probability is not None:
+            dropout_text_encoder_2_mask = (torch.tensor(
+                [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
+            text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
 
         text_encoder_output = torch.concat([text_encoder_1_output, text_encoder_2_output], dim=-1)
 
