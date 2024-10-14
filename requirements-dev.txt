@@ -1,0 +1,4 @@
+# Git commit hook handler.
+# NOTE: It's a user-wide tool installed outside venv. Don't pin exact versions.
+# SEE: https://pre-commit.com/
+pre-commit>=4.0.1
