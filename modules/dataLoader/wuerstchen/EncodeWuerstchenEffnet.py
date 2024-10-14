@@ -1,8 +1,9 @@
 from contextlib import nullcontext
 
+from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder
+
 from mgds.MGDS import PipelineModule
 from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
-from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder
 
 import torch
 
