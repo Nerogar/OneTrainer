@@ -36,7 +36,7 @@ Hardware for development sponsored by https://shakker.ai
 
 ## Installation
 
-Installing OneTrainer requires Python 3.10 and the x64 version of the [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170). You can download Python here https://www.python.org/downloads/windows/.
+Installing OneTrainer requires Python 3.10 and the x64 version of the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe). You can download Python here https://www.python.org/downloads/windows/.
 Then follow these steps:
 
 Automatic installation
