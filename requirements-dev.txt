@@ -1,0 +1,3 @@
+# Git commit hook handler.
+# SEE: https://pre-commit.com/
+pre-commit
