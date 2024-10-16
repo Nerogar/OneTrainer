@@ -501,8 +501,10 @@ class GenericTrainer(BaseTrainer):
         )
 
     def __needs_save(self, train_progress: TrainProgress):
-        return self.repeating_action_needed(
-            "save", self.config.save_after, self.config.save_after_unit, train_progress, start_at_zero=False
+        return self.single_action_elapsed(
+            "save_skip_first", self.config.save_skip_first, self.config.save_every_unit, train_progress
+        ) and self.repeating_action_needed(
+            "save", self.config.save_every, self.config.save_every_unit, train_progress, start_at_zero=False
         )
 
     def __needs_gc(self, train_progress: TrainProgress):

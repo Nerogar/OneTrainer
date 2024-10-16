@@ -321,17 +321,22 @@ class TrainUI(ctk.CTk):
         components.switch(frame, 2, 1, self.ui_state, "backup_before_save")
 
         # save after
-        components.label(frame, 3, 0, "Save After",
+        components.label(frame, 3, 0, "Save Every",
                          tooltip="The interval used when automatically saving the model during training")
-        components.time_entry(frame, 3, 1, self.ui_state, "save_after", "save_after_unit")
+        components.time_entry(frame, 3, 1, self.ui_state, "save_every", "save_every_unit")
 
         # save now
         components.button(frame, 3, 3, "save now", self.save_now)
 
+        # skip save
+        components.label(frame, 4, 0, "Skip First",
+                         tooltip="Start saving automatically after this interval has elapsed")
+        components.entry(frame, 4, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
+
         # save filename prefix
-        components.label(frame, 4, 0, "Save Filename Prefix",
+        components.label(frame, 5, 0, "Save Filename Prefix",
                          tooltip="The prefix for filenames used when saving the model during training")
-        components.entry(frame, 4, 1, self.ui_state, "save_filename_prefix")
+        components.entry(frame, 5, 1, self.ui_state, "save_filename_prefix")
 
         frame.pack(fill="both", expand=1)
         return frame
