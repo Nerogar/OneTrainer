@@ -386,22 +386,22 @@ class TrainConfig(BaseConfig):
     rolling_backup: bool
     rolling_backup_count: int
     backup_before_save: bool
-    save_after: float
-    save_after_unit: TimeUnit
-    skip_save: float
-    skip_save_unit: TimeUnit
+    save_every: float
+    save_every_unit: TimeUnit
+    save_skip_first: float
     save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainConfig, self).__init__(
             data,
-            config_version=5,
+            config_version=6,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
                 2: self.__migration_2,
                 3: self.__migration_3,
                 4: self.__migration_4,
+                5: self.__migration_5,
             }
         )
 
@@ -554,6 +554,14 @@ class TrainConfig(BaseConfig):
             migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.ON
         else:
             migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.OFF
+
+        return migrated_data
+
+    def __migration_5(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        migrated_data["save_every"] = migrated_data.pop("save_after")
+        migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
 
         return migrated_data
 
@@ -863,10 +871,9 @@ class TrainConfig(BaseConfig):
         data.append(("rolling_backup", False, bool, False))
         data.append(("rolling_backup_count", 3, int, False))
         data.append(("backup_before_save", True, bool, False))
-        data.append(("save_after", 0, int, False))
-        data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
-        data.append(("skip_save", 0, int, False))
-        data.append(("skip_save_unit", TimeUnit.ALWAYS, TimeUnit, False))
+        data.append(("save_every", 0, int, False))
+        data.append(("save_every_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("save_skip_first", 0, int, False))
         data.append(("save_filename_prefix", "", str, False))
 
         return TrainConfig(data)

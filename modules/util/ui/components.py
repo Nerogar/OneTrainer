@@ -44,14 +44,16 @@ def entry(
         var_name: str,
         command: Callable[[], None] = None,
         tooltip: str = "",
-        wide_tooltip: bool = False
+        wide_tooltip: bool = False,
+        width: int = 140,
+        sticky: str = "new",
 ):
     var = ui_state.get_var(var_name)
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
-    component = ctk.CTkEntry(master, textvariable=var)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    component = ctk.CTkEntry(master, textvariable=var,width=width)
+    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
     def create_destroy(component):
         orig_destroy = component.destroy
@@ -91,8 +93,7 @@ def file_entry(
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name))
-    entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
+    entry_component = entry(frame,row=0, column=0, ui_state=ui_state, var_name=var_name)
 
     def __open_dialog():
         filetypes = [
@@ -124,22 +125,6 @@ def file_entry(
             if command:
                 command(file_path)
 
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
-    def create_destroy(component):
-        orig_destroy = component.destroy
-
-        def destroy(self):
-            if self._textvariable_callback_name:
-                self._textvariable.trace_remove("write", self._textvariable_callback_name)
-                self._textvariable_callback_name = ""
-
-            orig_destroy()
-
-        return destroy
-
-    destroy = create_destroy(entry_component)
-    entry_component.destroy = lambda: destroy(entry_component)
-
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
@@ -152,8 +137,7 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name))
-    entry_component.grid(row=0, column=0, padx=(PAD, PAD), pady=PAD, sticky="new")
+    entry_component = entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
 
     def __open_dialog():
         dir_path = filedialog.askdirectory()
@@ -163,22 +147,6 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
             if command:
                 command(dir_path)
-
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
-    def create_destroy(component):
-        orig_destroy = component.destroy
-
-        def destroy(self):
-            if self._textvariable_callback_name:
-                self._textvariable.trace_remove("write", self._textvariable_callback_name)
-                self._textvariable_callback_name = ""
-
-            orig_destroy()
-
-        return destroy
-
-    destroy = create_destroy(entry_component)
-    entry_component.destroy = lambda: destroy(entry_component)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
@@ -193,24 +161,7 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
     frame.grid_columnconfigure(0, weight=0)
     frame.grid_columnconfigure(1, weight=1)
 
-    entry_component = ctk.CTkEntry(frame, textvariable=ui_state.get_var(var_name), width=50)
-    entry_component.grid(row=0, column=0, padx=PAD, pady=PAD, sticky="new")
-
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
-    def create_destroy(component):
-        orig_destroy = component.destroy
-
-        def destroy(self):
-            if self._textvariable_callback_name:
-                self._textvariable.trace_remove("write", self._textvariable_callback_name)
-                self._textvariable_callback_name = ""
-
-            orig_destroy()
-
-        return destroy
-
-    destroy = create_destroy(entry_component)
-    entry_component.destroy = lambda: destroy(entry_component)
+    entry_component = entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name, width=50)
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
