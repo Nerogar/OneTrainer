@@ -29,6 +29,8 @@ from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util import path_util
+from modules.util.time_util import get_string_timestamp
 from modules.zluda import ZLUDA
 
 import torch
@@ -574,6 +576,7 @@ class TrainUI(ctk.CTk):
     def start_training(self):
         if self.training_thread is None:
             self.top_bar_component.save_default()
+            self.save_workspace_config()
 
             self.training_button.configure(text="Stop Training", state="normal")
 
@@ -595,6 +598,13 @@ class TrainUI(ctk.CTk):
         if file_path:
             with open(file_path, "w") as f:
                 json.dump(self.train_config.to_pack_dict(), f, indent=4)
+
+    def save_workspace_config(self):
+        filename = f"config-{get_string_timestamp()}.json"
+        path = path_util.canonical_join(self.train_config.workspace_dir,filename)
+        with open(path, "w") as f:
+            json.dump(self.train_config.to_pack_dict(), f, indent=4)
+
 
     def sample_now(self):
         train_commands = self.training_commands
