@@ -33,7 +33,7 @@ class BaseCloud(metaclass=ABCMeta):
             json.dump(self.config.to_pack_dict(), f, indent=4)
         self._upload_config_file(local_config_path)
 
-        if hasattr(self.config,"local_base_model_name"): self._upload(local=self.config.local_base_model_name,remote=self.config.base_model_name)
+        if hasattr(self.config,"local_base_model_name"): self._upload(local=Path(self.config.local_base_model_name),remote=Path(self.config.base_model_name))
         #TODO upload lora base, upload embeddings base
         for concept in self.config.concepts:
             print(f"uploading concept {concept.name}...")
