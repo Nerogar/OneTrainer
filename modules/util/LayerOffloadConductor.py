@@ -15,7 +15,7 @@ from modules.util.torch_util import (
     tensors_record_stream,
     tensors_to_device_,
     torch_gc,
-    unpin_tensor_, pin_tensor_,
+    unpin_tensor_, pin_tensor_, get_tensors,
 )
 
 MESSAGES = []
@@ -40,10 +40,10 @@ def floor_4(number: int) -> int:
     return number - (number % 4)
 
 
-class StaticTensorAllocator:
+class StaticLayerTensorAllocator:
     def __init__(
             self,
-            layer_allocator: 'StaticLayerTensorAllocator',
+            layer_allocator: 'StaticLayerAllocator',
             allocate_forward: bool,
             layer_index: int,
     ):
@@ -115,7 +115,7 @@ class StaticTensorAllocator:
             self.__layer_allocator.allocation_end = self.__allocation_start
 
 
-class StaticLayerTensorAllocator:
+class StaticLayerAllocator:
     __device: torch.device
     __is_pinned: bool
 
@@ -128,7 +128,7 @@ class StaticLayerTensorAllocator:
     allocation_start: int  # index of the first allocated byte
     allocation_end: int  # index of the first unallocated byte
 
-    __tensor_allocators: list[StaticTensorAllocator | None]
+    __tensor_allocators: list[StaticLayerTensorAllocator | None]
 
     def __init__(
             self,
@@ -176,8 +176,8 @@ class StaticLayerTensorAllocator:
             10
         )
         # add self.__max_tensor_bytes to ensure even the largest tensors can be allocated in the remaining space
-        # add 1kb for the alignment overhead
-        self.cache_tensor_size = math.ceil(cache_bytes / num_cache_tensors) + self.__max_tensor_bytes + 1024
+        # add 4kb for the alignment overhead
+        self.cache_tensor_size = math.ceil(cache_bytes / num_cache_tensors) + self.__max_tensor_bytes + 4096
 
         self.__tensor_allocators = [None] * len(layers)
         self.cache_tensors = [None] * num_cache_tensors
@@ -205,9 +205,9 @@ class StaticLayerTensorAllocator:
         self.cache_tensors = [None] * len(self.cache_tensors)
         self.__tensor_allocators = [None] * len(self.__tensor_allocators)
 
-    def get_allocator(self, layer_index: int, allocate_forward: bool) -> StaticTensorAllocator | None:
+    def get_allocator(self, layer_index: int, allocate_forward: bool) -> StaticLayerTensorAllocator | None:
         if self.__allocate_statically:
-            allocator = StaticTensorAllocator(self, allocate_forward, layer_index)
+            allocator = StaticLayerTensorAllocator(self, allocate_forward, layer_index)
             self.__tensor_allocators[layer_index] = allocator
             return allocator
         else:
@@ -217,6 +217,92 @@ class StaticLayerTensorAllocator:
         if self.__tensor_allocators[layer_index] is not None:
             self.__tensor_allocators[layer_index].deallocate(deallocate_forward)
             self.__tensor_allocators[layer_index] = None
+
+
+class StaticActivationAllocator:
+    __device: torch.device
+    __allocate_statically: bool
+    __is_pinned: bool
+
+    __cache_tensors: list[torch.Tensor]
+    __current_cache_tensor: int
+    __current_cache_tensor_offset: int
+    __allocated_bytes: int
+
+    def __init__(
+            self,
+            device: torch.device,
+    ):
+        self.__device = device
+        self.__allocate_statically = True
+        self.__is_pinned = device.type == "cpu"
+
+        self.__cache_tensors = []
+        self.__current_cache_tensor = 0
+        self.__current_cache_tensor_offset = 0
+        self.__allocated_bytes = 0
+
+    def reserve_cache(self, tensors: list[torch.Tensor]):
+        num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
+                    + len(tensors) * 4  # add enough padding for alignment
+
+        cache_found = False
+        while self.__current_cache_tensor < len(self.__cache_tensors):
+            if self.__cache_tensors[self.__current_cache_tensor].shape[0] - self.__current_cache_tensor_offset \
+                    >= num_bytes:
+                cache_found = True
+                break
+
+            self.__current_cache_tensor += 1
+            self.__current_cache_tensor_offset = 0
+
+        if not cache_found:
+            cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
+
+            if self.__is_pinned:
+                pin_tensor_(cache_tensor)
+
+            self.__cache_tensors.append(cache_tensor)
+
+        self.__allocated_bytes += num_bytes
+
+    def allocate_like(self, source_tensor: torch.Tensor) -> torch.Tensor:
+        num_bytes = source_tensor.element_size() * source_tensor.numel()
+        cache_tensor = self.__cache_tensors[self.__current_cache_tensor]
+        allocated_tensor = \
+            cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
+        self.__current_cache_tensor_offset += ceil_4(num_bytes)
+
+        return allocated_tensor
+
+    def deallocate(self):
+        if len(self.__cache_tensors) > 1:
+            # more than one tensor was allocated. this can be condensed into a single tensor to reduce fragmentation
+            if self.__is_pinned:
+                for cache_tensor in self.__cache_tensors:
+                    unpin_tensor_(cache_tensor)
+
+            # add 4kb for the alignment overhead
+            num_bytes = self.__allocated_bytes + 4096
+            cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
+
+            if self.__is_pinned:
+                pin_tensor_(cache_tensor)
+
+            self.__cache_tensors = [cache_tensor]
+
+            torch_gc()
+
+        self.__current_cache_tensor = 0
+        self.__current_cache_tensor_offset = 0
+        self.__allocated_bytes = 0
+
+    def deallocate_cache(self):
+        if self.__is_pinned:
+            for cache_tensor in self.__cache_tensors:
+                unpin_tensor_(cache_tensor)
+
+        self.__cache_tensors = []
 
 
 class SyncEvent:
@@ -289,17 +375,18 @@ class LayerOffloadConductor:
     __temp_device: torch.device
 
     __train_stream: torch.Stream | None
-    __transfer_stream: torch.Stream | None
+    __layer_transfer_stream: torch.Stream | None
 
-    __train_device_allocator: StaticLayerTensorAllocator
-    __temp_device_allocator: StaticLayerTensorAllocator
+    __train_device_layer_allocator: StaticLayerAllocator
+    __temp_device_layer_allocator: StaticLayerAllocator
+    __temp_device_activations_allocator: StaticActivationAllocator
 
     __layer_train_event_map: list[SyncEvent]
     __layer_transfer_event_map: list[SyncEvent]
 
     __activations_map: dict[int, Any]
-    __activations_layer_index_map: dict[int, int]
-    __activations_event_map: dict[int, SyncEvent]
+    __call_index_layer_index_map: dict[int, int]
+    __activations_transfer_event_map: dict[int, SyncEvent]
 
     __is_forward_pass: bool
     __keep_graph: bool
@@ -329,20 +416,23 @@ class LayerOffloadConductor:
         self.__async_transfer = self.__train_device.type == "cuda"
         if self.__async_transfer:
             self.__train_stream = torch.cuda.default_stream(self.__train_device)
-            self.__transfer_stream = torch.cuda.Stream(self.__train_device)
+            self.__layer_transfer_stream = torch.cuda.Stream(self.__train_device)
+            self.__activations_transfer_stream = torch.cuda.Stream(self.__train_device)
         else:
             self.__train_stream = None
-            self.__transfer_stream = None
+            self.__layer_transfer_stream = None
+            self.__activations_transfer_stream = None
 
-        self.__train_device_allocator = StaticLayerTensorAllocator(self.__train_device)
-        self.__temp_device_allocator = StaticLayerTensorAllocator(self.__temp_device)
+        self.__train_device_layer_allocator = StaticLayerAllocator(self.__train_device)
+        self.__temp_device_layer_allocator = StaticLayerAllocator(self.__temp_device)
+        self.__temp_device_activations_allocator = StaticActivationAllocator(self.__temp_device)
 
         self.__layer_train_event_map = []
         self.__layer_transfer_event_map = []
 
         self.__activations_map = {}
-        self.__activations_layer_index_map = {}
-        self.__activations_event_map = {}
+        self.__call_index_layer_index_map = {}
+        self.__activations_transfer_event_map = {}
 
         self.__is_forward_pass = False
         self.__keep_graph = False
@@ -357,13 +447,15 @@ class LayerOffloadConductor:
         torch_gc()
 
         self.__wait_all_layer_transfers()
+        self.__wait_all_activation_transfers()
 
         if device_equals(device, self.__temp_device):
             log("to temp device")
 
             # deallocate the cache before to take advantage of the gc
-            self.__train_device_allocator.deallocate_cache()
-            self.__temp_device_allocator.deallocate_cache()
+            self.__train_device_layer_allocator.deallocate_cache()
+            self.__temp_device_layer_allocator.deallocate_cache()
+            self.__temp_device_activations_allocator.deallocate_cache()
 
             self.__module_to_device_except_layers(self.__temp_device)
             for layer_index, layer in enumerate(self.__layers):
@@ -375,8 +467,8 @@ class LayerOffloadConductor:
         elif device_equals(device, self.__train_device):
             log("to train device")
 
-            self.__train_device_allocator.allocate_cache(self.__layers, self.__num_loaded_layers + 1)
-            self.__temp_device_allocator.allocate_cache(self.__layers, self.__num_offloaded_layers + 1)
+            self.__train_device_layer_allocator.allocate_cache(self.__layers, self.__num_loaded_layers + 1)
+            self.__temp_device_layer_allocator.allocate_cache(self.__layers, self.__num_offloaded_layers + 1)
             self.__module_to_device_except_layers(self.__train_device)
 
             # move all layers to the train device, then move offloadable tensors back to the temp device
@@ -386,12 +478,13 @@ class LayerOffloadConductor:
                     layer.to(self.__train_device)
 
                     if layer_index < self.__num_loaded_layers:
-                        allocator = self.__train_device_allocator.get_allocator(layer_index, allocate_forward=True)
+                        allocator = self.__train_device_layer_allocator.get_allocator(layer_index,
+                                                                                      allocate_forward=True)
                         for module in layer.modules():
                             offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
                         self.__layer_device_map[layer_index] = self.__train_device
                     else:
-                        allocator = self.__temp_device_allocator.get_allocator(layer_index, allocate_forward=True)
+                        allocator = self.__temp_device_layer_allocator.get_allocator(layer_index, allocate_forward=True)
                         for module in layer.modules():
                             offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
                         self.__layer_device_map[layer_index] = self.__temp_device
@@ -422,7 +515,7 @@ class LayerOffloadConductor:
         log()
         log()
         log("starting forward")
-        self.__transfer_stream.wait_stream(self.__train_stream)
+        self.__layer_transfer_stream.wait_stream(self.__train_stream)
         self.__wait_all_layer_transfers()
         self.__clear_activations()
 
@@ -444,38 +537,42 @@ class LayerOffloadConductor:
         log()
         log(f"before layer {layer_index}, {call_index}")
 
+        self.__call_index_layer_index_map[call_index] = layer_index
+
         if torch.is_grad_enabled() and self.__is_forward_pass:
             # Offloading can only be used with the use_reentrant=True checkpointing variant.
             # Gradients are only enabled during the back pass.
             log("starting backward")
             self.__is_forward_pass = False
 
-        if call_index in self.__activations_map:
-            replace_tensors_(
-                activations, self.__activations_map.pop(call_index),
-                self.__layer_activations_included_offload_param_indices_map[layer_index])
-
-        self.__wait_layer_transfer(layer_index)
-
         if self.__offload_activations and not self.__is_forward_pass:
-            # during the back pass, make sure activations are loaded before continuing
-            self.__wait_all_activations_transfer()
+            self.__wait_activations_transfer(call_index)
+
+            tensor_indices = self.__layer_activations_included_offload_param_indices_map[layer_index]
+
+            if call_index in self.__activations_map:
+                # during the back pass, replace activations with saved acitvations
+                replace_tensors_(activations, self.__activations_map.pop(call_index), tensor_indices)
 
             # if current activations are not on train_device, move them now
             if not tensors_match_device(
                     activations, self.__train_device,
-                    self.__layer_activations_included_offload_param_indices_map[layer_index]):
+                    tensor_indices):
                 log(f"activations for layer {layer_index} not loaded to train device, transferring now")
-                self.__schedule_activations_to_train_device(activations, self.__train_device, call_index)
-                self.__wait_all_activations_transfer()
+                self.__schedule_activations_to_device(
+                    activations, self.__train_device, call_index, wait_train_stream=False)
+                self.__wait_activations_transfer(call_index)
 
             # schedule previous activations to the train device
             if call_index - 1 in self.__activations_map:
-                self.__schedule_activations_to_train_device(
-                    self.__activations_map[call_index - 1], self.__train_device, call_index - 1)
+                self.__schedule_activations_to_device(
+                    self.__activations_map[call_index - 1], self.__train_device, call_index - 1,
+                    wait_train_stream=False)
 
         # schedule loading of the next layer and offloading of the previous layer
         if self.__offload_layers:  # TODO: implement a second offloading strategy: ring/toggle
+            self.__wait_layer_transfer(layer_index)
+
             if self.__is_forward_pass and self.__keep_graph:
                 # next pass will be a back pass.
                 # do not offload the last layers, they will be needed immediately
@@ -517,8 +614,7 @@ class LayerOffloadConductor:
         if self.__offload_activations and self.__keep_graph and self.__is_forward_pass:
             log(f"saving layer {call_index} activations for back pass")
             self.__activations_map[call_index] = activations
-            self.__activations_layer_index_map[call_index] = layer_index
-            self.__schedule_activations_to_temp_device(activations, self.__temp_device, layer_index, call_index)
+            self.__schedule_activations_to_device(activations, self.__temp_device, call_index, wait_train_stream=True)
 
         event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
         self.__layer_train_event_map[layer_index] = event
@@ -543,8 +639,9 @@ class LayerOffloadConductor:
 
     def __clear_activations(self):
         self.__activations_map.clear()
-        self.__activations_layer_index_map.clear()
-        self.__activations_event_map.clear()
+        self.__call_index_layer_index_map.clear()
+        self.__activations_transfer_event_map.clear()
+        self.__temp_device_activations_allocator.deallocate()
 
     def __wait_all_layer_train(self):
         for layer_index in range(len(self.__layers)):
@@ -554,9 +651,14 @@ class LayerOffloadConductor:
         for layer_index in range(len(self.__layers)):
             self.__wait_layer_transfer(layer_index)
 
+    def __wait_all_activation_transfers(self):
+        call_indices = list(self.__activations_transfer_event_map.keys())
+        for call_index in call_indices:
+            self.__wait_activations_transfer(call_index)
+
     def __wait_layer_train(self, layer_index: int):
         self.__layer_train_event_map[layer_index] \
-            .wait(self.__transfer_stream, f"wait layer train {layer_index}")
+            .wait(self.__layer_transfer_stream, f"wait layer train {layer_index}")
         self.__layer_train_event_map[layer_index] = SyncEvent()
 
     def __wait_layer_transfer(self, layer_index: int):
@@ -564,11 +666,11 @@ class LayerOffloadConductor:
             .wait(self.__train_stream, f"wait layer transfer {layer_index}")
         self.__layer_transfer_event_map[layer_index] = SyncEvent()
 
-    def __wait_all_activations_transfer(self):
-        for call_index, event in self.__activations_event_map.items():
-            event.wait(self.__train_stream,
-                       f"wait {call_index} activations layer {self.__activations_layer_index_map[call_index]}")
-        self.__activations_event_map.clear()
+    def __wait_activations_transfer(self, call_index: int):
+        event = self.__activations_transfer_event_map.pop(call_index, None)
+
+        if event is not None:
+            event.wait(self.__train_stream, f"wait activations transfer {call_index}")
 
     def __schedule_layer_to(
             self,
@@ -581,18 +683,18 @@ class LayerOffloadConductor:
             log(f"schedule layer {layer_index} to {str(device)}, skipping")
             return
 
-        layer_deallocator = self.__temp_device_allocator \
+        layer_deallocator = self.__temp_device_layer_allocator \
             if device_equals(device, self.__train_device) \
-            else self.__train_device_allocator
+            else self.__train_device_layer_allocator
 
-        layer_allocator = self.__train_device_allocator \
+        layer_allocator = self.__train_device_layer_allocator \
             if device_equals(device, self.__train_device) \
-            else self.__temp_device_allocator
+            else self.__temp_device_layer_allocator
         allocator = layer_allocator.get_allocator(layer_index, is_forward)
 
         allocator_fn = allocator.allocate_like if allocator is not None else None
 
-        with create_stream_context(self.__transfer_stream):
+        with create_stream_context(self.__layer_transfer_stream):
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
             if self.__async_transfer:
@@ -603,11 +705,11 @@ class LayerOffloadConductor:
                     offload_quantized(module, device, non_blocking=True, allocator=allocator_fn)
                 for x in parameters:
                     if x.device.type == "cuda":
-                        x.record_stream(self.__transfer_stream)
+                        x.record_stream(self.__layer_transfer_stream)
 
                 layer_deallocator.deallocate_layer(layer_index, deallocate_forward=is_forward)
 
-                event = SyncEvent(self.__transfer_stream.record_event(), f"transfer to {device}")
+                event = SyncEvent(self.__layer_transfer_stream.record_event(), f"transfer to {device}")
                 self.__layer_transfer_event_map[layer_index] = event
                 log(f"schedule layer {layer_index} to {str(device)}, {event}")
             else:
@@ -616,45 +718,39 @@ class LayerOffloadConductor:
 
             self.__layer_device_map[layer_index] = device
 
-    def __schedule_activations_to_temp_device(
-            self,
-            activations: Any,
-            device: torch.device,
-            layer_index: int,
-            call_index: int,
-    ):
-        log(f"schedule {call_index} activations to {str(device)}")
-
-        with torch.cuda.stream(self.__transfer_stream):
-            transferred = tensors_to_device_(
-                activations, device,
-                self.__layer_activations_included_offload_param_indices_map[layer_index], non_blocking=True)
-
-            if transferred:
-                tensors_record_stream(
-                    self.__transfer_stream, activations,
-                    self.__layer_activations_included_offload_param_indices_map[layer_index])
-                self.__activations_event_map[call_index] = \
-                    SyncEvent(self.__transfer_stream.record_event(), f"transfer to {device}")
-
-    def __schedule_activations_to_train_device(
+    def __schedule_activations_to_device(
             self,
             activations: Any,
             device: torch.device,
             call_index: int,
+            wait_train_stream: bool,
     ):
         log(f"schedule {call_index} activations to {str(device)}")
+        layer_index = self.__call_index_layer_index_map[call_index]
 
-        layer_index = self.__activations_layer_index_map[call_index]
+        activations_allocator = self.__temp_device_activations_allocator \
+            if device_equals(device, self.__temp_device) \
+            else None
 
-        with torch.cuda.stream(self.__transfer_stream):
-            transferred = tensors_to_device_(
-                activations, device,
-                self.__layer_activations_included_offload_param_indices_map[layer_index], non_blocking=True)
+        allocator_fn = activations_allocator.allocate_like if activations_allocator is not None else None
 
-            if transferred:
-                tensors_record_stream(
-                    self.__transfer_stream, activations,
-                    self.__layer_activations_included_offload_param_indices_map[layer_index])
-                self.__activations_event_map[call_index] = \
-                    SyncEvent(self.__transfer_stream.record_event(), f"transfer to {device}")
+        event = None
+        if wait_train_stream:
+            event = SyncEvent(self.__train_stream.record_event(), f"train before activations transfer {call_index}")
+
+        with torch.cuda.stream(self.__activations_transfer_stream):
+            tensor_indices = self.__layer_activations_included_offload_param_indices_map[layer_index]
+
+            if event is not None:
+                event.wait(self.__activations_transfer_stream)
+
+            tensors = get_tensors(activations, tensor_indices)
+            if activations_allocator is not None:
+                activations_allocator.reserve_cache(tensors)
+            tensors_to_device_(activations, device, tensor_indices, non_blocking=True, allocator=allocator_fn)
+            tensors_record_stream(self.__activations_transfer_stream, tensors)
+
+            self.__activations_transfer_event_map[call_index] = \
+                SyncEvent(self.__activations_transfer_stream.record_event(), f"transfer to {device}")
+
+            del tensors

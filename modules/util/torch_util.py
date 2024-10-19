@@ -1,10 +1,10 @@
 import gc
 from contextlib import nullcontext
-
-import torch
+from typing import Callable
 
 import accelerate
 import packaging
+import torch
 from packaging.version import Version
 
 accelerator = accelerate.Accelerator()
@@ -19,18 +19,42 @@ def state_dict_has_prefix(state_dict: dict | None, prefix: str):
     return any(k.startswith(prefix) for k in state_dict)
 
 
+def get_tensors(
+        data: torch.Tensor | list | tuple | dict,
+        include_parameter_indices: list[int] | None = None,
+) -> list[torch.Tensor]:
+    tensors = []
+
+    if isinstance(data, torch.Tensor) and include_parameter_indices is None:
+        return [data.data]
+    elif isinstance(data, list | tuple):
+        for i, elem in enumerate(data):
+            if i in include_parameter_indices or include_parameter_indices is None:
+                tensors.extend(get_tensors(elem))
+    elif isinstance(data, dict) and include_parameter_indices is None:
+        for elem in data.values():
+            tensors.extend(get_tensors(elem))
+
+    return tensors
+
+
 def tensors_to_device_(
         data: torch.Tensor | list | tuple | dict,
         device: torch.device,
         include_parameter_indices: list[int] | None = None,
         non_blocking: bool = False,
+        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
 ) -> bool:
     tensor_transferred = False
 
     if isinstance(data, torch.Tensor) and include_parameter_indices is None:
-        if not device_equals(data.device, device):
+        if allocator is None:
             data.data = data.data.to(device=device, non_blocking=non_blocking)
-            tensor_transferred = True
+        else:
+            tensor = allocator(data)
+            tensor.copy_(data, non_blocking=non_blocking)
+            data.data = tensor
+        tensor_transferred = True
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
             if i in include_parameter_indices or include_parameter_indices is None:
@@ -68,7 +92,7 @@ def tensors_match_device(
             return False
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
-            if i in include_parameter_indices or include_parameter_indices is None:
+            if include_parameter_indices is None or i in include_parameter_indices:
                 if not tensors_match_device(elem, device):
                     return False
     elif isinstance(data, dict) and include_parameter_indices is None:
@@ -84,20 +108,16 @@ def tensors_record_stream(
         data: torch.Tensor | list | tuple | dict,
         include_parameter_indices: list[int] | None = None,
 ):
-    if include_parameter_indices is None:
-        include_parameter_indices = []
-
     if isinstance(data, torch.Tensor):
         if data.device.type == "cuda":
             data.record_stream(stream)
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
-            if i in include_parameter_indices:
-                tensors_record_stream(stream, elem)
+            if include_parameter_indices is None or i in include_parameter_indices:
+                tensors_record_stream(stream, elem, [])
     elif isinstance(data, dict):
         for elem in data.values():
             tensors_record_stream(stream, elem)
-
 
 
 def unpin_module(
