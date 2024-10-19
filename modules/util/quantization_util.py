@@ -5,7 +5,10 @@ from modules.util.enum.DataType import DataType
 import torch
 from torch import Tensor, nn
 
-import bitsandbytes as bnb
+try:
+    import bitsandbytes as bnb
+except ImportError:
+    bnb = None
 
 
 def __create_nf4_linear_layer(module: nn.Module):
@@ -16,6 +19,7 @@ def __create_nf4_linear_layer(module: nn.Module):
     )
 
     return quant_linear
+
 
 def __create_int8_linear_layer(module: nn.Module):
     quant_linear = bnb.nn.Linear8bitLt(
@@ -90,6 +94,7 @@ def replace_linear_with_nf4_layers(
         keep_in_fp32_modules=keep_in_fp32_modules,
     )
 
+
 def replace_linear_with_int8_layers(
         parent_module: nn.Module,
         keep_in_fp32_modules: list[str] | None = None,
@@ -100,42 +105,48 @@ def replace_linear_with_int8_layers(
         keep_in_fp32_modules=keep_in_fp32_modules,
     )
 
+
 def set_nf4_compute_type(module: nn.Module, dtype: DataType):
     for child_module in module.modules():
-        if isinstance(child_module, bnb.nn.LinearNF4):
-            child_module.compute_dtype = dtype.torch_dtype()
-            child_module.compute_type_is_set = True
+        if bnb is not None:
+            if isinstance(child_module, bnb.nn.LinearNF4):
+                child_module.compute_dtype = dtype.torch_dtype()
+                child_module.compute_type_is_set = True
+
 
 def get_unquantized_weight(module: nn.Module, dtype: torch.dtype) -> Tensor:
     param = module.weight
 
-    if isinstance(param, bnb.nn.Params4bit):
-        if param.quant_state is not None:
-            return bnb.functional.dequantize_4bit(
-                A=param.data,
-                quant_state=param.quant_state,
-                quant_type=param.quant_type,
-            ).detach().to(dtype=dtype)
-        else:
-            return param.detach().to(dtype=dtype)
-    if isinstance(param, bnb.nn.Int8Params):
-        if param.dtype == torch.int8: # already quantized
-            if param.SCB is not None:
-                return (param.SCB.unsqueeze(1) * param.detach()) / 127
-            else: # SCB is saved in the module
-                return (module.state.SCB.unsqueeze(1) * param.detach()) / 127
-        else:
-            return param.detach().to(dtype=dtype)
+    if bnb is not None:
+        if isinstance(param, bnb.nn.Params4bit):
+            if param.quant_state is not None:
+                return bnb.functional.dequantize_4bit(
+                    A=param.data,
+                    quant_state=param.quant_state,
+                    quant_type=param.quant_type,
+                ).detach().to(dtype=dtype)
+            else:
+                return param.detach().to(dtype=dtype)
+        if isinstance(param, bnb.nn.Int8Params):
+            if param.dtype == torch.int8:  # already quantized
+                if param.SCB is not None:
+                    return (param.SCB.unsqueeze(1) * param.detach()) / 127
+                else:  # SCB is saved in the module
+                    return (module.state.SCB.unsqueeze(1) * param.detach()) / 127
+            else:
+                return param.detach().to(dtype=dtype)
 
     return param.detach().to(dtype=dtype)
+
 
 def get_weight_shape(module: nn.Module) -> torch.Size:
     param = module.weight
 
-    if isinstance(param, bnb.nn.Params4bit):
-        if param.quant_state is not None:
-            return param.quant_state.shape
-        else:
-            return param.shape
+    if bnb is not None:
+        if isinstance(param, bnb.nn.Params4bit):
+            if param.quant_state is not None:
+                return param.quant_state.shape
+            else:
+                return param.shape
 
     return param.shape
