@@ -1,10 +1,11 @@
 import gc
+from collections.abc import Callable
 from contextlib import nullcontext
-from typing import Callable
+
+import torch
 
 import accelerate
 import packaging
-import torch
 from packaging.version import Version
 
 accelerator = accelerate.Accelerator()
@@ -58,10 +59,10 @@ def tensors_to_device_(
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
             if i in include_parameter_indices or include_parameter_indices is None:
-                tensor_transferred |= tensors_to_device_(elem, device, non_blocking=non_blocking)
+                tensor_transferred |= tensors_to_device_(elem, device, non_blocking=non_blocking, allocator=allocator)
     elif isinstance(data, dict) and include_parameter_indices is None:
         for elem in data.values():
-            tensor_transferred |= tensors_to_device_(elem, device, non_blocking=non_blocking)
+            tensor_transferred |= tensors_to_device_(elem, device, non_blocking=non_blocking, allocator=allocator)
 
     return tensor_transferred
 

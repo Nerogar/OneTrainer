@@ -742,6 +742,8 @@ class GenericTrainer(BaseTrainer):
 
             print("Saving " + self.config.output_model_destination)
 
+            self.model.to(self.temp_device)
+
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,

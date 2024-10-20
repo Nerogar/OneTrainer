@@ -284,7 +284,7 @@ class StaticActivationAllocator:
             cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
         self.__current_cache_tensor_offset += ceil_4(num_bytes)
 
-        return allocated_tensor
+        return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
 
     def deallocate(self):
         if len(self.__cache_tensors) > 1:
