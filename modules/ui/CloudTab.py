@@ -78,28 +78,32 @@ class CloudTab:
         components.label(self.frame, 4, 2, "Install OneTrainer",
                          tooltip="Automatically install OneTrainer from GitHub if the directory doesn't already exist.")
         components.switch(self.frame, 4, 3, self.ui_state, "cloud.install_onetrainer")
-        components.label(self.frame, 5, 2, "Detach remote trainer",
-                         tooltip="Allows the trainer to keep running even if your connection to the cloud is lost.")
-        components.switch(self.frame, 5, 3, self.ui_state, "cloud.detach_trainer")
-        components.label(self.frame, 6, 2, "Reattach run id",
-                         tooltip=f"An id identifying the remotely running trainer. In case you have lost connection or closed OneTrainer, it will try to reattach to this id instead of starting a new remote trainer.")
-        components.entry(self.frame, 6, 3, self.ui_state, "cloud.run_id")
+        components.label(self.frame, 5, 2, "Install command",
+                         tooltip=f"The command for installing OneTrainer. Leave the default, unless you want to use a development branch of OneTrainer.")
+        components.entry(self.frame, 5, 3, self.ui_state, "cloud.install_cmd")
         
-        components.label(self.frame, 8, 2, "Download samples",
+        components.label(self.frame, 7, 2, "Detach remote trainer",
+                         tooltip="Allows the trainer to keep running even if your connection to the cloud is lost.")
+        components.switch(self.frame, 7, 3, self.ui_state, "cloud.detach_trainer")
+        components.label(self.frame, 8, 2, "Reattach run id",
+                         tooltip=f"An id identifying the remotely running trainer. In case you have lost connection or closed OneTrainer, it will try to reattach to this id instead of starting a new remote trainer.")
+        components.entry(self.frame, 8, 3, self.ui_state, "cloud.run_id")
+        
+        components.label(self.frame, 10, 2, "Download samples",
                          tooltip="Download samples from the remote workspace directory to your local machine.")
-        components.switch(self.frame, 8, 3, self.ui_state, "cloud.download_samples")
-        components.label(self.frame, 9, 2, "Download output model",
+        components.switch(self.frame, 10, 3, self.ui_state, "cloud.download_samples")
+        components.label(self.frame, 11, 2, "Download output model",
                          tooltip="Download the final model after training. You can disable this if you plan to use an automatically saved checkpoint instead.")
-        components.switch(self.frame, 9, 3, self.ui_state, "cloud.download_output_model")
-        components.label(self.frame, 10, 2, "Download saved checkpoints",
+        components.switch(self.frame, 11, 3, self.ui_state, "cloud.download_output_model")
+        components.label(self.frame, 12, 2, "Download saved checkpoints",
                          tooltip="Download the automatically saved training checkpoints from the remote workspace directory to your local machine.")
-        components.switch(self.frame, 10, 3, self.ui_state, "cloud.download_saves")
-        components.label(self.frame, 11, 2, "Download backups",
+        components.switch(self.frame, 12, 3, self.ui_state, "cloud.download_saves")
+        components.label(self.frame, 13, 2, "Download backups",
                          tooltip="Download backups from the remote workspace directory to your local machine. It's usually not necessary to download them, because as long as the backups are still available on the cloud, the training can be restarted using one of the cloud's backups.")
-        components.switch(self.frame, 11, 3, self.ui_state, "cloud.download_backups")
-        components.label(self.frame, 12, 2, "Download tensorboard logs",
+        components.switch(self.frame, 13, 3, self.ui_state, "cloud.download_backups")
+        components.label(self.frame, 14, 2, "Download tensorboard logs",
                          tooltip="Download TensorBoard event logs from the remote workspace directory to your local machine. They can then be viewed locally in TensorBoard. It is recommended to disable \"Sample to TensorBoard\" to reduce the event log size.")
-        components.switch(self.frame, 12, 3, self.ui_state, "cloud.download_tensorboard")
+        components.switch(self.frame, 14, 3, self.ui_state, "cloud.download_tensorboard")
 
         components.label(self.frame, 0, 4, "Create cloud",
                          tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty, or if the connection to your existing Cloud ID fails. Currently supported for RUNPOD.")
@@ -127,7 +131,7 @@ class CloudTab:
         components.entry(self.frame, 4, 5, self.ui_state, "cloud.volume_size")
 
         components.label(self.frame, 5, 4, "Min download",
-                         tooltip=f"Set the minimum download speed of the cloud in Mbps. NOT IMPLEMENTED")
+                         tooltip=f"Set the minimum download speed of the cloud in Mbps. WARNING: requires PR #360 if runpod-python!")
         components.entry(self.frame, 5, 5, self.ui_state, "cloud.min_download")
         
         components.label(self.frame, 6, 4, "Action on finish",

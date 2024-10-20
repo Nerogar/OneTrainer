@@ -25,6 +25,7 @@ class CloudConfig(BaseConfig):
     huggingface_cache_dir: str
     onetrainer_dir: str
     install_onetrainer: bool
+    install_cmd: str
     detach_trainer: bool
     run_id: str
     download_sampels : bool
@@ -63,6 +64,7 @@ class CloudConfig(BaseConfig):
         data.append(("workspace_dir", "/workspace", str, False))
         data.append(("huggingface_cache_dir", "/workspace/huggingface_cache", str, False))
         data.append(("onetrainer_dir", "/workspace/OneTrainer", str, False))
+        data.append(("install_cmd", "git clone https://github.com/Nerogar/OneTrainer", str, False))
         data.append(("install_onetrainer", True, bool, False))
         data.append(("detach_trainer", False, bool, False))
         data.append(("run_id", "job1", str, False))

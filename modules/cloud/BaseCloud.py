@@ -39,7 +39,8 @@ class BaseCloud(metaclass=ABCMeta):
             print(f"uploading concept {concept.name}...")
             if commands and commands.get_stop_command(): return
             self._upload(local=Path(concept.local_path),remote=Path(concept.path),commands=commands)
-            self._upload(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))
+            if len(concept.text.local_prompt_path) > 0:
+                self._upload(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))
 
     @staticmethod
     def _filter_download(config : CloudConfig,path : Path):

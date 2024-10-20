@@ -96,8 +96,9 @@ class CloudTrainer(BaseTrainer):
             print('warning: backups are not uploaded, but expected to be on the cloud already!')
 
     def train(self):
-        if self.commands.get_stop_command(): return
         try:
+            if self.commands.get_stop_command(): return
+
             self.callbacks.on_update_status("starting trainer on cloud")
             self.cloud.run_trainer()
 
@@ -110,6 +111,7 @@ class CloudTrainer(BaseTrainer):
         finally:
             self.stop_event.set()
             self.callback_thread.join()
+            self.callbacks.on_update_status("waiting for downloads")
             self.sync_thread.join()
 
     def end(self):

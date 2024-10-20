@@ -51,7 +51,7 @@ class LinuxCloud(BaseCloud):
         self.connection.run(f'test -d {shlex.quote(config.onetrainer_dir)} \
                               || (mkdir -p {shlex.quote(parent)} \
                                   && cd {shlex.quote(parent)} \
-                                  && git clone https://github.com/Nerogar/OneTrainer)',in_stream=False) 
+                                  && {config.install_cmd})',in_stream=False)
 
         #OT requires cuda in PATH, but runpod only sets that up in bashprofile, which is not used by fabric
         #TODO test with other clouds
@@ -122,21 +122,31 @@ class LinuxCloud(BaseCloud):
            && cat "{file}.read" \
            && rm "{file}.read"'
 
-        _,b,_=self.callback_connection.client.exec_command(cmd)
+        in_file,out_file,err_file=self.callback_connection.client.exec_command(cmd)
         
-        while True:
-            try: name=pickle.load(b)
-            except EOFError: return
-            params=pickle.load(b)
+        try:
+            while True:
+                try: name=pickle.load(out_file)
+                except EOFError: return
+                params=pickle.load(out_file)
 
-            fun=getattr(callbacks,name)
-            fun(*params)
+                fun=getattr(callbacks,name)
+                fun(*params)
+        finally:
+            in_file.close()
+            out_file.close()
+            err_file.close()
         
     def send_commands(self,commands : TrainCommands):
-        b,_,_=self.command_connection.client.exec_command(f'test -e {self.command_pipe} && cat > {self.command_pipe}')
-        pickle.dump(commands,b)
-        b.flush()
-        b.close()
+        in_file,out_file,err_file=self.command_connection.client.exec_command(f'test -e {self.command_pipe} && cat > {self.command_pipe}')
+        try:
+            pickle.dump(commands,in_file)
+            in_file.flush()
+            in_file.channel.shutdown_write()
+        finally:
+            in_file.close()
+            out_file.close()
+            err_file.close()
 
         commands.reset()
         
