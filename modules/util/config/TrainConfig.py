@@ -386,9 +386,9 @@ class TrainConfig(BaseConfig):
     rolling_backup: bool
     rolling_backup_count: int
     backup_before_save: bool
-    save_every: float
+    save_every: int
     save_every_unit: TimeUnit
-    save_skip_first: float
+    save_skip_first: int
     save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
