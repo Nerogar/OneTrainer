@@ -2,21 +2,23 @@ import math
 import random
 from typing import Any
 
-import torch
-from torch import nn
-
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.quantization_util import get_offload_tensors, offload_quantized, get_offload_tensor_bytes
+from modules.util.quantization_util import get_offload_tensor_bytes, get_offload_tensors, offload_quantized
 from modules.util.torch_util import (
     create_stream_context,
     device_equals,
+    get_tensors,
+    pin_tensor_,
     replace_tensors_,
     tensors_match_device,
     tensors_record_stream,
     tensors_to_device_,
     torch_gc,
-    unpin_tensor_, pin_tensor_, get_tensors,
+    unpin_tensor_,
 )
+
+import torch
+from torch import nn
 
 MESSAGES = []
 
@@ -186,6 +188,8 @@ class StaticLayerAllocator:
 
     def ensure_allocation(self, cache_tensor_index: int):
         if self.cache_tensors[cache_tensor_index] is None:
+            torch_gc()
+
             self.cache_tensors[cache_tensor_index] = \
                 torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.__device)
 
@@ -228,6 +232,7 @@ class StaticActivationAllocator:
     __current_cache_tensor: int
     __current_cache_tensor_offset: int
     __allocated_bytes: int
+    __max_allocated_bytes: int
 
     def __init__(
             self,
@@ -241,10 +246,14 @@ class StaticActivationAllocator:
         self.__current_cache_tensor = 0
         self.__current_cache_tensor_offset = 0
         self.__allocated_bytes = 0
+        self.__max_allocated_bytes = 0
 
     def reserve_cache(self, tensors: list[torch.Tensor]):
         num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
                     + len(tensors) * 4  # add enough padding for alignment
+
+        if len(self.__cache_tensors) == 0:
+            num_bytes = max(num_bytes, self.__max_allocated_bytes)
 
         cache_found = False
         while self.__current_cache_tensor < len(self.__cache_tensors):
@@ -257,6 +266,7 @@ class StaticActivationAllocator:
             self.__current_cache_tensor_offset = 0
 
         if not cache_found:
+            torch_gc()
             cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
 
             if self.__is_pinned:
@@ -265,6 +275,7 @@ class StaticActivationAllocator:
             self.__cache_tensors.append(cache_tensor)
 
         self.__allocated_bytes += num_bytes
+        self.__max_allocated_bytes = max(self.__max_allocated_bytes, self.__allocated_bytes)
 
     def allocate_like(self, source_tensor: torch.Tensor) -> torch.Tensor:
         num_bytes = source_tensor.element_size() * source_tensor.numel()
@@ -282,6 +293,9 @@ class StaticActivationAllocator:
                 for cache_tensor in self.__cache_tensors:
                     unpin_tensor_(cache_tensor)
 
+            self.__cache_tensors = []
+            torch_gc()
+
             # add 4kb for the alignment overhead
             num_bytes = self.__allocated_bytes + 4096
             cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
@@ -290,8 +304,6 @@ class StaticActivationAllocator:
                 pin_tensor_(cache_tensor)
 
             self.__cache_tensors = [cache_tensor]
-
-            torch_gc()
 
         self.__current_cache_tensor = 0
         self.__current_cache_tensor_offset = 0
