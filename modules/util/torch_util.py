@@ -182,9 +182,7 @@ def pin_tensor_(x):
         )
 
         if err.value != 0:
-            if err.value == 712:  # cudaErrorHostMemoryAlreadyRegistered
-                raise RuntimeError("CUDA Error while trying to pin memory. cudaErrorHostMemoryAlreadyRegistered, ")
-            raise RuntimeError("CUDA Error while trying to pin memory")
+            raise RuntimeError(f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {x.numel() * x.element_size()}")
 
 
 def unpin_tensor_(x):
@@ -194,4 +192,4 @@ def unpin_tensor_(x):
         err = cudart.cudaHostUnregister(x.data_ptr())
 
         if err.value != 0:
-            raise RuntimeError("CUDA Error while trying to unpin memory")
+            raise RuntimeError(f"CUDA Error while trying to unpin memory. error {err.value}, ptr: {x.data_ptr()}")
