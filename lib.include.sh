@@ -31,7 +31,7 @@ export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
 
 # Internal environment variables.
 # NOTE: Version check supports "3", "3.1" and "3.1.5" specifier formats.
-export OT_PYTHON_VERSION_MINIMUM="3"
+export OT_PYTHON_VERSION_MINIMUM="3.10"
 export OT_PYTHON_VERSION_TOO_HIGH="3.11"
 export OT_CONDA_USE_PYTHON_VERSION="3.10"
 export OT_MUST_INSTALL_REQUIREMENTS="false"
@@ -222,11 +222,11 @@ function create_conda_env {
         install_args+=("tk[build=xft_*]")
     fi
 
-    # NOTE: We install with strict channel priority, which ensures that package
-    # names which exist in "conda-forge" will never fall back to the "defaults"
-    # channel if "conda-forge" doesn't have the required version. This protects
-    # against mismatched packages built with different settings.
-    run_conda create -y --prefix "${OT_CONDA_ENV}" --channel "conda-forge" --strict-channel-priority "${install_args[@]}"
+    # NOTE: We install with strict channel priority and an explicit channel list,
+    # which ensures that package names which exist in "conda-forge" will never
+    # fall back to the "defaults" channel if "conda-forge" lacks the required
+    # version. Protects against mismatched packages built with different settings.
+    run_conda create -y --prefix "${OT_CONDA_ENV}" --override-channels --strict-channel-priority --channel "conda-forge" "${install_args[@]}"
     export OT_MUST_INSTALL_REQUIREMENTS="true"
 
     # Show a warning if the user has the legacy "ot" environment on their system.
