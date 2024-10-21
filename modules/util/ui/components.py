@@ -94,7 +94,7 @@ def file_entry(
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry_component = entry(frame,row=0, column=0, ui_state=ui_state, var_name=var_name)
+    entry(frame,row=0, column=0, ui_state=ui_state, var_name=var_name)
 
     def __open_dialog():
         filetypes = [
@@ -138,7 +138,7 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry_component = entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
+    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
 
     def __open_dialog():
         dir_path = filedialog.askdirectory()
@@ -162,7 +162,7 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
     frame.grid_columnconfigure(0, weight=0)
     frame.grid_columnconfigure(1, weight=1)
 
-    entry_component = entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name, width=50)
+    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name, width=50)
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
