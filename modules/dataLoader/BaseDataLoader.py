@@ -1,7 +1,8 @@
 from abc import ABCMeta, abstractmethod
 
-from mgds.MGDS import MGDS, TrainDataLoader
 from modules.dataLoader.mixin.DataLoaderMgdsMixin import DataLoaderMgdsMixin
+
+from mgds.MGDS import MGDS, TrainDataLoader
 
 import torch
 
