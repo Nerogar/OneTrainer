@@ -86,6 +86,17 @@ class ConceptTextConfig(BaseConfig):
     enable_tag_shuffling: bool
     tag_delimiter: str
     keep_tags_count: int
+    tag_dropout_enable: bool
+    tag_dropout_mode: str
+    tag_dropout_probability: float
+    tag_dropout_special_tags_mode: str
+    tag_dropout_special_tags: str
+    tag_dropout_special_tags_regex: bool
+    caps_randomize_enable: bool
+    caps_randomize_probability: float
+    caps_randomize_mode: str
+    caps_randomize_lowercase: bool
+
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -99,6 +110,16 @@ class ConceptTextConfig(BaseConfig):
         data.append(("enable_tag_shuffling", False, bool, False))
         data.append(("tag_delimiter", ",", str, False))
         data.append(("keep_tags_count", 1, int, False))
+        data.append(("tag_dropout_enable", False, bool, False))
+        data.append(("tag_dropout_mode", "NONE", str, False))
+        data.append(("tag_dropout_probability", 0.0, float, False))
+        data.append(("tag_dropout_special_tags_mode", "NONE", str, False))
+        data.append(("tag_dropout_special_tags", "", str, False))
+        data.append(("tag_dropout_special_tags_regex", False, bool, False))
+        data.append(("caps_randomize_enable", False, bool, False))
+        data.append(("caps_randomize_mode", "capslock, title, first, random", str, False))
+        data.append(("caps_randomize_probability", 0.0, float, False))
+        data.append(("caps_randomize_lowercase", False, bool, False))
 
         return ConceptTextConfig(data)
 

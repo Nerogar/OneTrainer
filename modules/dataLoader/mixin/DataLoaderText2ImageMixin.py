@@ -1,11 +1,21 @@
 import re
 from collections.abc import Callable
 
+from modules.util import path_util
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.DataType import DataType
+
+import torch
+
+from diffusers import AutoencoderKL
+
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
+from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
+from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
 from mgds.pipelineModules.GetFilename import GetFilename
@@ -28,13 +38,6 @@ from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
-from modules.util import path_util
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.DataType import DataType
-
-import torch
-
-from diffusers import AutoencoderKL
 
 
 class DataLoaderText2ImageMixin:
@@ -159,6 +162,8 @@ class DataLoaderText2ImageMixin:
         random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
         random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
         random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
+        drop_tags = DropTags(text_in_name='prompt', enabled_in_name='concept.text.tag_dropout_enable', probability_in_name='concept.text.tag_dropout_probability', dropout_mode_in_name='concept.text.tag_dropout_mode', special_tags_in_name='concept.text.tag_dropout_special_tags', special_tag_mode_in_name='concept.text.tag_dropout_special_tags_mode', delimiter_in_name='concept.text.tag_delimiter', keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt', regex_enabled_in_name='concept.text.tag_dropout_special_tags_regex')
+        caps_randomize = CapitalizeTags(text_in_name='prompt', enabled_in_name='concept.text.caps_randomize_enable', probability_in_name='concept.text.caps_randomize_probability', capitalize_mode_in_name='concept.text.caps_randomize_mode', delimiter_in_name='concept.text.tag_delimiter', convert_lowercase_in_name='concept.text.caps_randomize_lowercase', text_out_name='prompt')
         shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.text.enable_tag_shuffling', delimiter_in_name='concept.text.tag_delimiter', keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt')
 
         modules = [
@@ -168,6 +173,8 @@ class DataLoaderText2ImageMixin:
             random_contrast,
             random_saturation,
             random_hue,
+            drop_tags,
+            caps_randomize,
             shuffle_tags,
         ]
 
