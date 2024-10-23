@@ -3,12 +3,14 @@ import modules.util.convert.convert_diffusers_to_ckpt_util as util
 import torch
 from torch import Tensor
 
+from modules.util.enum.ModelType import ModelType
+
 
 def __swap_chunks(tensor:Tensor) -> Tensor:
     chunk_0, chunk_1 = tensor.chunk(2, dim=0)
     return torch.cat([chunk_1, chunk_0], dim=0)
 
-def __map_transformer_block(in_states: dict, out_prefix: str, in_prefix: str, is_last:bool) -> dict:
+def __map_transformer_block(model_type: ModelType, in_states: dict, out_prefix: str, in_prefix: str, is_last:bool) -> dict:
     out_states = {}
 
     out_states[util.combine(out_prefix, "x_block.attn.qkv.weight")] = torch.cat([
@@ -48,8 +50,16 @@ def __map_transformer_block(in_states: dict, out_prefix: str, in_prefix: str, is
         out_states[util.combine(out_prefix, "context_block.adaLN_modulation.1.weight")] = __swap_chunks(in_states[util.combine(in_prefix, "norm1_context.linear.weight")])
         out_states[util.combine(out_prefix, "context_block.adaLN_modulation.1.bias")] = __swap_chunks(in_states[util.combine(in_prefix, "norm1_context.linear.bias")])
 
+    if model_type.is_stable_diffusion_3_5():
+        out_states[util.combine(out_prefix, "context_block.attn.ln_k.weight")] = in_states[util.combine(in_prefix, "attn.norm_added_k.weight")]
+        out_states[util.combine(out_prefix, "context_block.attn.ln_q.weight")] = in_states[util.combine(in_prefix, "attn.norm_added_q.weight")]
+
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "x_block.mlp.fc1"), util.combine(in_prefix, "ff.net.0.proj"))
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "x_block.mlp.fc2"), util.combine(in_prefix, "ff.net.2"))
+
+    if model_type.is_stable_diffusion_3_5():
+        out_states[util.combine(out_prefix, "x_block.attn.ln_k.weight")] = in_states[util.combine(in_prefix, "attn.norm_k.weight")]
+        out_states[util.combine(out_prefix, "x_block.attn.ln_k.weight")] = in_states[util.combine(in_prefix, "attn.norm_q.weight")]
 
     if not is_last:
         out_states |= util.map_wb(in_states, util.combine(out_prefix, "context_block.mlp.fc1"), util.combine(in_prefix, "ff_context.net.0.proj"))
@@ -58,7 +68,7 @@ def __map_transformer_block(in_states: dict, out_prefix: str, in_prefix: str, is
     return out_states
 
 
-def __map_transformer(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
+def __map_transformer(model_type: ModelType, in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
     out_states[util.combine(out_prefix, "pos_embed")] = in_states[util.combine(in_prefix, "pos_embed.pos_embed")]
@@ -73,10 +83,10 @@ def __map_transformer(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "y_embedder.mlp.0"), util.combine(in_prefix, "time_text_embed.text_embedder.linear_1"))
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "y_embedder.mlp.2"), util.combine(in_prefix, "time_text_embed.text_embedder.linear_2"))
 
-    num_layers = 24
+    num_layers = 38 if model_type.is_stable_diffusion_3_5() else 24
     for i in range(num_layers):
         is_last = i == (num_layers - 1)
-        out_states |= __map_transformer_block(in_states, util.combine(out_prefix, f"joint_blocks.{i}"), util.combine(in_prefix, f"transformer_blocks.{i}"), is_last)
+        out_states |= __map_transformer_block(model_type, in_states, util.combine(out_prefix, f"joint_blocks.{i}"), util.combine(in_prefix, f"transformer_blocks.{i}"), is_last)
 
     return out_states
 
@@ -130,6 +140,7 @@ def __map_t5_text_encoder(in_states: dict, out_prefix: str, in_prefix: str) -> d
 
 
 def convert_sd3_diffusers_to_ckpt(
+        model_type: ModelType,
         vae_state_dict: dict,
         transformer_state_dict: dict,
         text_encoder_1_state_dict: dict,
@@ -139,7 +150,7 @@ def convert_sd3_diffusers_to_ckpt(
     state_dict = {}
 
     state_dict |= util.map_vae(vae_state_dict, "first_stage_model", "")
-    state_dict |= __map_transformer(transformer_state_dict, "model.diffusion_model", "")
+    state_dict |= __map_transformer(model_type, transformer_state_dict, "model.diffusion_model", "")
     if text_encoder_1_state_dict is not None:
         state_dict |= __map_clip_text_encoder(text_encoder_1_state_dict, "text_encoders.clip_l.transformer", "")
     if text_encoder_2_state_dict is not None:

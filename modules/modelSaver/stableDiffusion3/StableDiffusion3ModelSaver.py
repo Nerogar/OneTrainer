@@ -81,6 +81,7 @@ class StableDiffusion3ModelSaver(
             dtype: torch.dtype | None,
     ):
         state_dict = convert_sd3_diffusers_to_ckpt(
+            model.model_type,
             model.vae.state_dict(),
             model.transformer.state_dict(),
             model.text_encoder_1.state_dict() if model.text_encoder_1 is not None else None,
