@@ -6,12 +6,9 @@ from modules.model.util.clip_util import encode_clip
 from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.modelSpec.ModelSpec import ModelSpec
-from modules.util.TrainProgress import TrainProgress
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor

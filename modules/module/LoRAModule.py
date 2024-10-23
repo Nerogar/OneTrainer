@@ -7,13 +7,12 @@ from typing import Any
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
+from modules.util.torch_util import device_equals
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Conv2d, Dropout, Linear, Parameter
-
-from modules.util.torch_util import device_equals
 
 
 class PeftBase(nn.Module):

@@ -1,10 +1,10 @@
 import math
 from collections.abc import Callable
 
-import bitsandbytes as bnb
+from modules.util.enum.DataType import DataType
+
 import torch
 from torch import Tensor, nn
-from modules.util.enum.DataType import DataType
 
 try:
     import bitsandbytes as bnb

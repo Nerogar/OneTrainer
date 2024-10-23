@@ -1,15 +1,15 @@
 from abc import ABCMeta, abstractmethod
 from uuid import uuid4
 
-import torch
-from torch.optim import Optimizer
-
 from modules.module.EMAModule import EMAModuleWrapper
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.TrainProgress import TrainProgress
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch.optim import Optimizer
 
 
 class BaseModelEmbedding:

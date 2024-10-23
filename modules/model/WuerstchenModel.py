@@ -4,11 +4,8 @@ from random import Random
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.modelSpec.ModelSpec import ModelSpec
-from modules.util.TrainProgress import TrainProgress
 
 import torch
 import torchvision
@@ -19,7 +16,7 @@ from diffusers.configuration_utils import register_to_config
 from diffusers.models import StableCascadeUNet
 from diffusers.pipelines.stable_cascade import StableCascadeCombinedPipeline
 from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer
 
 
 class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):

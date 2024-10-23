@@ -408,7 +408,7 @@ class LayerOffloadConductor:
             module: nn.Module,
             config: TrainConfig,
     ):
-        super(LayerOffloadConductor, self).__init__()
+        super().__init__()
 
         self.__module = module
 
@@ -534,16 +534,15 @@ class LayerOffloadConductor:
         self.__is_forward_pass = True
         self.__keep_graph = keep_graph
 
-        if self.__offload_layers:
-            for layer_index in range(len(self.__layers)):
-                pass
-                # TODO: implement a better cache miss behavior.
-                #       it's not possible to move layers in order, because that could cause too many layers to be
-                #       loaded at the same time
-                # if layer_index < self.__num_loaded_layers:
-                #     self.__schedule_layer_to(layer_index, self.__train_device)
-                # else:
-                #     self.__schedule_layer_to(layer_index, self.__temp_device)
+        # TODO: implement a better cache miss behavior.
+        #       it's not possible to move layers in order, because that could cause too many layers to be
+        #       loaded at the same time
+        # if self.__offload_layers:
+        #     for layer_index in range(len(self.__layers)):
+        #         if layer_index < self.__num_loaded_layers:
+        #             self.__schedule_layer_to(layer_index, self.__train_device)
+        #         else:
+        #             self.__schedule_layer_to(layer_index, self.__temp_device)
 
     def before_layer(self, layer_index: int, call_index: int, activations: Any) -> Any:
         log()

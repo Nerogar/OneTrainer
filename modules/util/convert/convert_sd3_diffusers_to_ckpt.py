@@ -1,9 +1,8 @@
 import modules.util.convert.convert_diffusers_to_ckpt_util as util
+from modules.util.enum.ModelType import ModelType
 
 import torch
 from torch import Tensor
-
-from modules.util.enum.ModelType import ModelType
 
 
 def __swap_chunks(tensor:Tensor) -> Tensor:
