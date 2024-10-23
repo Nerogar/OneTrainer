@@ -48,7 +48,11 @@ class BaseStableDiffusion3Setup(
             model.transformer.set_attn_processor(JointAttnProcessor2_0())
         elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
             try:
-                model.transformer.set_attn_processor(XFormersJointAttnProcessor(model.train_dtype.torch_dtype()))
+                # TODO: add support for SD3.5 xformers
+                if model.model_type.is_stable_diffusion_3_5():
+                    model.transformer.set_attn_processor(JointAttnProcessor2_0())
+                else:
+                    model.transformer.set_attn_processor(XFormersJointAttnProcessor(model.train_dtype.torch_dtype()))
                 model.vae.enable_xformers_memory_efficient_attention()
             except Exception as e:
                 print(

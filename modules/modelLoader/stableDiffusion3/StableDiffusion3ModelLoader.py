@@ -2,6 +2,7 @@ import os
 import traceback
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
+from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -10,7 +11,9 @@ from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transfo
 from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 
-class StableDiffusion3ModelLoader:
+class StableDiffusion3ModelLoader(
+    HFModelLoaderMixin,
+):
     def __init__(self):
         super().__init__()
 
@@ -96,10 +99,11 @@ class StableDiffusion3ModelLoader:
             text_encoder_2 = None
 
         if include_text_encoder_3:
-            text_encoder_3 = T5EncoderModel.from_pretrained(
+            text_encoder_3 = self._load_transformers_sub_module(
+                T5EncoderModel,
+                weight_dtypes.text_encoder_3,
                 base_model_name,
-                subfolder="text_encoder_3",
-                torch_dtype=weight_dtypes.text_encoder_3.torch_dtype(),
+                "text_encoder_3",
             )
             text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(
                 supports_quantization=False))
@@ -118,10 +122,11 @@ class StableDiffusion3ModelLoader:
                 torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
 
-        transformer = SD3Transformer2DModel.from_pretrained(
+        transformer = self._load_diffusers_sub_module(
+            SD3Transformer2DModel,
+            weight_dtypes.prior,
             base_model_name,
-            subfolder="transformer",
-            torch_dtype=weight_dtypes.prior.torch_dtype(),
+            "transformer",
         )
 
         model.model_type = model_type
