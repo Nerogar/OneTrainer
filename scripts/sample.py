@@ -1,5 +1,3 @@
-from modules.util.ModelNames import ModelNames
-
 from util.import_util import script_imports
 
 script_imports()
@@ -9,6 +7,7 @@ from modules.util.args.SampleArgs import SampleArgs
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModelNames import ModelNames
 from modules.util.torch_util import default_device
 
 
