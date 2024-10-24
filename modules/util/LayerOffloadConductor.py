@@ -273,8 +273,8 @@ class StaticActivationAllocator:
                 pin_tensor_(cache_tensor)
 
             self.__cache_tensors.append(cache_tensor)
+            self.__allocated_bytes += num_bytes
 
-        self.__allocated_bytes += num_bytes
         self.__max_allocated_bytes = max(self.__max_allocated_bytes, self.__allocated_bytes)
 
     def allocate_like(self, source_tensor: torch.Tensor) -> torch.Tensor:
