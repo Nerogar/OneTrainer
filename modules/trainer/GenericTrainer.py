@@ -751,6 +751,8 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=self.config.output_model_destination,
                 dtype=self.config.output_dtype.torch_dtype()
             )
+        else:
+            self.model.to(self.temp_device)
 
         self.tensorboard.close()
 
