@@ -67,6 +67,11 @@ def tensors_to_device_(
     return tensor_transferred
 
 
+def optimizer_to_device_(optimizer: torch.optim.Optimizer, device: torch.device):
+    for state in optimizer.state_dict()['state'].values():
+        tensors_to_device_(state, device)
+
+
 def replace_tensors_(
         target_data: torch.Tensor | list | tuple | dict,
         source_data: torch.Tensor | list | tuple | dict,

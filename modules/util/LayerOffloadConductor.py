@@ -82,7 +82,7 @@ class StaticLayerTensorAllocator:
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
             allocated_tensor = cache_tensor[cache_tensor_allocation_end:cache_tensor_allocation_end + num_bytes]
-            log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_end} - {self.__allocation_end + num_bytes}/[{cache_tensor_index}] {cache_tensor_allocation_end} for layer {self.__layer_index}")
+            # log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_end} - {self.__allocation_end + num_bytes}/[{cache_tensor_index}] {cache_tensor_allocation_end} for layer {self.__layer_index}")
             self.__allocation_end += num_bytes
             self.__layer_allocator.allocation_end = self.__allocation_end
         else:
@@ -103,7 +103,7 @@ class StaticLayerTensorAllocator:
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
             allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
             self.__allocation_start = cache_tensor_index * cache_tensor_size + new_allocation_start
-            log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_start - num_bytes} - {self.__allocation_start}/[{cache_tensor_index}] {cache_tensor_allocation_start - num_bytes} for layer {self.__layer_index}")
+            # log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_start - num_bytes} - {self.__allocation_start}/[{cache_tensor_index}] {cache_tensor_allocation_start - num_bytes} for layer {self.__layer_index}")
             self.__layer_allocator.allocation_start = self.__allocation_start
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)

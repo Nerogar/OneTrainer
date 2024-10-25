@@ -3,6 +3,9 @@ from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.torch_util import optimizer_to_device_
+
+import torch
 
 
 def change_optimizer(train_config: TrainConfig) -> TrainOptimizerConfig:
@@ -47,10 +50,12 @@ def update_optimizer_config(train_config: TrainConfig):
 def init_model_parameters(
         model: BaseModel,
         parameters: NamedParameterGroupCollection,
+        train_device: torch.device,
 ):
     model.parameters = parameters
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
     model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
