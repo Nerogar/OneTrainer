@@ -252,6 +252,9 @@ class StaticActivationAllocator:
         num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
                     + len(tensors) * 4  # add enough padding for alignment
 
+        if num_bytes == 0:
+            return
+
         if len(self.__cache_tensors) == 0:
             num_bytes = max(num_bytes, self.__max_allocated_bytes)
 
