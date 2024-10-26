@@ -55,7 +55,8 @@ def init_model_parameters(
     model.parameters = parameters
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
-    optimizer_to_device_(model.optimizer, train_device)
+    if model.optimizer is not None:
+        optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
     model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)

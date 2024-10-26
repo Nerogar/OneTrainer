@@ -215,6 +215,7 @@ def create_model_saver(
 
     return None
 
+
 def create_model_setup(
         model_type: ModelType,
         train_device: torch.device,
@@ -268,6 +269,7 @@ def create_model_setup(
 
     return None
 
+
 def create_model_sampler(
         train_device: torch.device,
         temp_device: torch.device,
@@ -320,6 +322,7 @@ def create_model_sampler(
                 return FluxSampler(train_device, temp_device, model, model_type)
 
     return None
+
 
 def create_data_loader(
         train_device: torch.device,
@@ -383,13 +386,17 @@ def create_data_loader(
 
     return None
 
+
 def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
-) -> torch.optim.Optimizer:
+) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
+
+    if optimizer_config.optimizer is None:
+        return None
 
     if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0:
         if optimizer_config.optimizer.supports_fused_back_pass() and not optimizer_config.fused_back_pass \
