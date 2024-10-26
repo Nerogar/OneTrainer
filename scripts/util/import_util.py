@@ -11,6 +11,7 @@ def script_imports(allow_zluda: bool = True):
 
     # Insert ourselves as the highest-priority library path, so our modules are
     # always found without any risk of being shadowed by another import path.
+    # 3 .parent calls to navigate from /scripts/util/import_util.py to the main directory
     onetrainer_lib_path = Path(__file__).absolute().parent.parent.parent
     sys.path.insert(0, str(onetrainer_lib_path))
 
