@@ -88,6 +88,8 @@ class GenericTrainer(BaseTrainer):
         self.grad_hook_handles = []
 
     def start(self):
+        self.__save_config_to_workspace()
+
         if self.config.clear_cache_before_training and self.config.latent_caching:
             self.__clear_cache()
 
@@ -150,6 +152,13 @@ class GenericTrainer(BaseTrainer):
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model.train_progress, is_validation=True
             )
+
+    def __save_config_to_workspace(self):
+        path = path_util.canonical_join(self.config.workspace_dir, "config")
+        os.makedirs(Path(path).absolute(), exist_ok=True)
+        path = path_util.canonical_join(path, f"{get_string_timestamp()}.json")
+        with open(path, "w") as f:
+            json.dump(self.config.to_pack_dict(), f, indent=4)
 
     def __clear_cache(self):
         print(
