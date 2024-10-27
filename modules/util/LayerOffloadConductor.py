@@ -273,6 +273,7 @@ class StaticActivationAllocator:
         if not cache_found:
             torch_gc()
             cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
+            log(f"{self.__device}/allocating activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}")
 
             if self.__is_pinned:
                 pin_tensor_(cache_tensor)
@@ -304,6 +305,7 @@ class StaticActivationAllocator:
             # add 4kb for the alignment overhead
             num_bytes = self.__allocated_bytes + 4096
             cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
+            log(f"{self.__device}/condensing activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}")
 
             if self.__is_pinned:
                 pin_tensor_(cache_tensor)
