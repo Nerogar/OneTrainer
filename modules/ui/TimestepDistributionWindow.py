@@ -66,7 +66,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
 
         self.image_preview_file_index = 0
 
-        self.title("Timestep Distribution")
+        self.title("时间步长分布")
         self.geometry("900x600")
         self.resizable(True, True)
         self.wait_visibility()

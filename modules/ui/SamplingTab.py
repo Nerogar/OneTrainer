@@ -19,7 +19,7 @@ class SamplingTab(ConfigList):
             attr_name="sample_definition_file_name",
             config_dir="training_samples",
             default_config_name="samples.json",
-            add_button_text="add sample",
+            add_button_text="添加采样",
             is_full_width=True,
         )
 

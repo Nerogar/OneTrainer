@@ -21,7 +21,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
-        self.title("Convert models")
+        self.title("转换模型")
         self.geometry("550x350")
         self.resizable(True, True)
         self.wait_visibility()
@@ -43,8 +43,8 @@ class ConvertModelUI(ctk.CTkToplevel):
 
     def main_frame(self, master):
         # model type
-        components.label(master, 0, 0, "Model Type",
-                         tooltip="Type of the model")
+        components.label(master, 0, 0, "模型类型",
+                         tooltip="模型类型")
         components.options_kv(master, 0, 1, [
             ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
             ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
@@ -62,8 +62,8 @@ class ConvertModelUI(ctk.CTkToplevel):
         ], self.ui_state, "model_type")
 
         # training method
-        components.label(master, 1, 0, "Model Type",
-                         tooltip="The type of model to convert")
+        components.label(master, 1, 0, "转换模式",
+                         tooltip="要转换的模型类型")
         components.options_kv(master, 1, 1, [
             ("Base Model", TrainingMethod.FINE_TUNE),
             ("LoRA", TrainingMethod.LORA),
@@ -71,16 +71,16 @@ class ConvertModelUI(ctk.CTkToplevel):
         ], self.ui_state, "training_method")
 
         # input name
-        components.label(master, 2, 0, "Input name",
-                         tooltip="Filename, directory or hugging face repository of the base model")
+        components.label(master, 2, 0, "输入名称",
+                         tooltip="基础模型的文件名、目录或 hugging face 仓库")
         components.file_entry(
             master, 2, 1, self.ui_state, "input_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # output data type
-        components.label(master, 3, 0, "Output Data Type",
-                         tooltip="Precision to use when saving the output model")
+        components.label(master, 3, 0, "保存数据类型",
+                         tooltip="保存输出模型时使用的精度")
         components.options_kv(master, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
@@ -88,8 +88,8 @@ class ConvertModelUI(ctk.CTkToplevel):
         ], self.ui_state, "output_dtype")
 
         # output format
-        components.label(master, 4, 0, "Output Format",
-                         tooltip="Format to use when saving the output model")
+        components.label(master, 4, 0, "保存格式",
+                         tooltip="保存输出模型时使用的格式")
         components.options_kv(master, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
@@ -97,11 +97,11 @@ class ConvertModelUI(ctk.CTkToplevel):
         ], self.ui_state, "output_model_format")
 
         # output model destination
-        components.label(master, 5, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
+        components.label(master, 5, 0, "保存位置",
+                         tooltip="保存输出模型的文件名或目录")
         components.file_entry(master, 5, 1, self.ui_state, "output_model_destination", is_output=True)
 
-        self.button = components.button(master, 6, 1, "Convert", self.convert_model)
+        self.button = components.button(master, 6, 1, "转换", self.convert_model)
 
     def convert_model(self):
         try:
@@ -115,7 +115,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                 training_method=self.convert_model_args.training_method
             )
 
-            print("Loading model " + self.convert_model_args.input_name)
+            print("正在加载模型：" + self.convert_model_args.input_name)
             if self.convert_model_args.training_method in [TrainingMethod.FINE_TUNE]:
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
@@ -134,9 +134,9 @@ class ConvertModelUI(ctk.CTkToplevel):
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
                 )
             else:
-                raise Exception("could not load model: " + self.convert_model_args.input_name)
+                raise Exception("无法加载模型：" + self.convert_model_args.input_name)
 
-            print("Saving model " + self.convert_model_args.output_model_destination)
+            print("正在保存模型：" + self.convert_model_args.output_model_destination)
             model_saver.save(
                 model=model,
                 model_type=self.convert_model_args.model_type,
@@ -144,7 +144,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                 output_model_destination=self.convert_model_args.output_model_destination,
                 dtype=self.convert_model_args.output_dtype.torch_dtype(),
             )
-            print("Model converted")
+            print("模型已转换")
         except Exception:
             traceback.print_exc()
 

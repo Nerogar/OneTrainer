@@ -55,14 +55,14 @@ class KvWidget(ctk.CTkFrame):
         close_button.grid(row=0, column=0)
 
         # Key
-        tooltip_key = "Key name for an argument in your scheduler"
+        tooltip_key = "调度程序中参数的键名"
         self.key = components.entry(self, 0, 1, self.ui_state, "key",
                                     tooltip=tooltip_key, wide_tooltip=True)
         self.key.bind("<FocusOut>", lambda _: save_command())
         self.key.configure(width=50)
 
         # Value
-        tooltip_val = "Value for an argument in your scheduler. Some special values can be used, wrapped in percent signs: LR, EPOCHS, STEPS_PER_EPOCH, TOTAL_STEPS, SCHEDULER_STEPS. Note that OneTrainer calls step() after every individual learning step, not every epoch, so what Torch calls 'epoch' you should treat as 'step'."
+        tooltip_val = "调度程序中参数的值。可以使用一些特殊值，用百分号包裹：LR、EPOCHS、STEPS_PER_EPOCH、TOTAL_STEPS、SCHEDUER_STEPS。请注意，OneTrainer在每个单独的学习步骤之后调用step（），而不是在每个纪元之后，所以Torch所称的“纪元”应该被视为“步骤”。"
         self.value = components.entry(self, 0, 2, self.ui_state, "value",
                                       tooltip=tooltip_val, wide_tooltip=True)
         self.value.bind("<FocusOut>", lambda _: save_command())
@@ -80,7 +80,7 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.train_config = train_config
         self.ui_state = ui_state
 
-        self.title("Learning Rate Scheduler Settings")
+        self.title("学习率调度器设置")
         self.geometry("800x400")
         self.resizable(True, True)
         self.wait_visibility()
@@ -103,8 +103,8 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
 
     def main_frame(self, master):
         if self.train_config.learning_rate_scheduler is LearningRateScheduler.CUSTOM:
-            components.label(master, 0, 0, "Class Name",
-                             tooltip="Python class module and name for the custom scheduler class, in the form of <module>.<class_name>.")
+            components.label(master, 0, 0, "自定义类名",
+                             tooltip="自定义调度器类的 Python 类模块和名称，格式为 <模块>.<类名>。")
             components.entry(master, 0, 1, self.ui_state, "custom_learning_rate_scheduler")
 
         # Any additional parameters, in key-value form.

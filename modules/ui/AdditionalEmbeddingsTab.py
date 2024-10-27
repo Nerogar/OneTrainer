@@ -17,7 +17,7 @@ class AdditionalEmbeddingsTab(ConfigList):
             ui_state,
             attr_name="additional_embeddings",
             from_external_file=False,
-            add_button_text="add embedding",
+            add_button_text="新增嵌入",
             is_full_width=True,
         )
 

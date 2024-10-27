@@ -60,8 +60,8 @@ class TopBar:
         # components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
         # save button
-        components.button(self.frame, 0, 3, "save current config", self.__save_config,
-                          tooltip="Save the current configuration in a custom preset")
+        components.button(self.frame, 0, 3, "保存当前配置", self.__save_config,
+                          tooltip="将当前配置保存在自定义预设中")
 
         # padding
         self.frame.grid_columnconfigure(4, weight=1)

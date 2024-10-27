@@ -31,7 +31,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.optimizer_ui_state = ui_state.get_var("optimizer")
         self.protocol("WM_DELETE_WINDOW", self.on_window_close)
 
-        self.title("Optimizer Settings")
+        self.title("优化器设置")
         self.geometry("800x400")
         self.resizable(True, True)
         self.wait_visibility()
@@ -51,23 +51,23 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.frame.grid_columnconfigure(3, weight=0)
         self.frame.grid_columnconfigure(4, weight=1)
 
-        components.button(self, 1, 0, "ok", command=self.on_window_close)
+        components.button(self, 1, 0, "确认", command=self.on_window_close)
         self.main_frame(self.frame)
 
     def main_frame(self, master):
         # Optimizer
-        components.label(master, 0, 0, "Optimizer",
-                         tooltip="The type of optimizer")
+        components.label(master, 0, 0, "优化器",
+                         tooltip="优化器类型")
 
         # Create the optimizer dropdown menu and set the command
         components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.optimizer_ui_state, "optimizer",
                            command=self.on_optimizer_change)
 
         # Defaults Button
-        components.label(master, 0, 3, "Optimizer Defaults",
-                         tooltip="Load default settings for the selected optimizer")
-        components.button(self.frame, 0, 4, "Load Defaults", self.load_defaults,
-                          tooltip="Load default settings for the selected optimizer")
+        components.label(master, 0, 3, "优化器默认值",
+                         tooltip="加载所选优化器的默认设置")
+        components.button(self.frame, 0, 4, "加载默认值", self.load_defaults,
+                          tooltip="加载所选优化器的默认设置")
 
         self.create_dynamic_ui(master)
 

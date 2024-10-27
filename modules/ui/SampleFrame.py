@@ -43,36 +43,36 @@ class SampleFrame(ctk.CTkFrame):
 
         if include_prompt:
             # prompt
-            components.label(top_frame, 0, 0, "prompt:")
+            components.label(top_frame, 0, 0, "提示词:")
             components.entry(top_frame, 0, 1, self.ui_state, "prompt")
 
             # negative prompt
-            components.label(top_frame, 1, 0, "negative prompt:")
+            components.label(top_frame, 1, 0, "负面词:")
             components.entry(top_frame, 1, 1, self.ui_state, "negative_prompt")
 
         if include_settings:
             # width
-            components.label(bottom_frame, 0, 0, "width:")
+            components.label(bottom_frame, 0, 0, "宽度:")
             components.entry(bottom_frame, 0, 1, self.ui_state, "width")
 
             # height
-            components.label(bottom_frame, 0, 2, "height:")
+            components.label(bottom_frame, 0, 2, "高度:")
             components.entry(bottom_frame, 0, 3, self.ui_state, "height")
 
             # seed
-            components.label(bottom_frame, 1, 0, "seed:")
+            components.label(bottom_frame, 1, 0, "种子:")
             components.entry(bottom_frame, 1, 1, self.ui_state, "seed")
 
             # random seed
-            components.label(bottom_frame, 1, 2, "random seed:")
+            components.label(bottom_frame, 1, 2, "随机种子:")
             components.switch(bottom_frame, 1, 3, self.ui_state, "random_seed")
 
             # cfg scale
-            components.label(bottom_frame, 2, 0, "cfg scale:")
+            components.label(bottom_frame, 2, 0, "CFG:")
             components.entry(bottom_frame, 2, 1, self.ui_state, "cfg_scale")
 
             # sampler
-            components.label(bottom_frame, 2, 2, "sampler:")
+            components.label(bottom_frame, 2, 2, "采样器:")
             components.options_kv(bottom_frame, 2, 3, [
                 ("DDIM", NoiseScheduler.DDIM),
                 ("Euler", NoiseScheduler.EULER),
@@ -87,25 +87,25 @@ class SampleFrame(ctk.CTkFrame):
             ], self.ui_state, "noise_scheduler")
 
             # steps
-            components.label(bottom_frame, 3, 0, "steps:")
+            components.label(bottom_frame, 3, 0, "步数:")
             components.entry(bottom_frame, 3, 1, self.ui_state, "diffusion_steps")
 
             # inpainting
-            components.label(bottom_frame, 4, 0, "inpainting:",
-                             tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
+            components.label(bottom_frame, 4, 0, "图像修复:",
+                             tooltip="启用修复采样。仅在从修复模型中采样时可用。")
             components.switch(bottom_frame, 4, 1, self.ui_state, "sample_inpainting")
 
             # base image path
-            components.label(bottom_frame, 5, 0, "base image path:",
-                             tooltip="The base image used when inpainting.")
+            components.label(bottom_frame, 5, 0, "基础图像路径:",
+                             tooltip="修复时使用的基础图像。")
             components.file_entry(bottom_frame, 5, 1, self.ui_state, "base_image_path",
                                   allow_model_files=False,
                                   allow_image_files=True,
                                   )
 
             # mask image path
-            components.label(bottom_frame, 5, 2, "mask image path:",
-                             tooltip="The mask used when inpainting.")
+            components.label(bottom_frame, 5, 2, "蒙版图像路径:",
+                             tooltip="修复时使用的蒙版。")
             components.file_entry(bottom_frame, 5, 3, self.ui_state, "mask_image_path",
                                   allow_model_files=False,
                                   allow_image_files=True,

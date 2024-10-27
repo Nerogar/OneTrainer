@@ -57,7 +57,7 @@ class ConfigList(metaclass=ABCMeta):
             self.__load_current_config(getattr(self.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
-            components.icon_button(self.top_frame, 0, 2, "add config", self.__add_config)
+            components.icon_button(self.top_frame, 0, 2, "添加配置", self.__add_config)
             components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
         else:
             self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")

@@ -67,7 +67,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         self.image_preview_file_index = 0
 
-        self.title("Concept")
+        self.title("概念")
         self.geometry("800x630")
         self.resizable(True, True)
         self.wait_visibility()

@@ -23,7 +23,7 @@ class ConceptTab(ConfigList):
             attr_name="concept_file_name",
             config_dir="training_concepts",
             default_config_name="concepts.json",
-            add_button_text="add concept",
+            add_button_text="添加概念",
             is_full_width=False,
         )
 

@@ -56,7 +56,7 @@ class SampleWindow(ctk.CTkToplevel):
         self.sample = SampleConfig.default_values()
         self.ui_state = UIState(self, self.sample)
 
-        self.title("Sample")
+        self.title("采样")
         self.geometry("1200x800")
         self.resizable(True, True)
         self.wait_visibility()
@@ -112,9 +112,9 @@ class SampleWindow(ctk.CTkToplevel):
                 else:  # fine-tunes
                     model_names.base_model = last_backup_path
 
-                print(f"Loading from backup '{last_backup_path}'...")
+                print(f"正在从备份 '{last_backup_path}' 加载...")
             else:
-                print("No backup found, loading without backup...")
+                print("未找到备份，正在不使用备份的情况下加载...")
 
         model = model_loader.load(
             model_type=self.initial_train_config.model_type,
