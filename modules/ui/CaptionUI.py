@@ -53,18 +53,18 @@ class CaptionUI(ctk.CTkToplevel):
         self.focus_set()
 
         self.help_text = """
-Keyboard shortcuts when focusing on the prompt input field:
-Up arrow: previous image
-Down arrow: next image
-Return: save
-Ctrl+M: only show the mask
-Ctrl+D: draw mask editing mode
-Ctrl+F: fill mask editing mode
-
-When editing masks:
-Left click: add mask
-Right click: remove mask
-Mouse wheel: increase or decrease brush size"""
+键盘快捷键：\n
+焦点在提示输入框时：\n
+上箭头： 前一张图像\n
+下箭头： 下一张图像\n
+回车键： 保存\n
+Ctrl+M： 只显示遮罩\n
+Ctrl+D： 进入遮罩编辑模式 - 绘制\n
+Ctrl+F： 进入遮罩编辑模式 - 填充\n
+编辑遮罩时：\n
+左键点击： 添加遮罩\n
+右键点击： 删除遮罩\n
+鼠标滚轮： 增减画笔大小"""
 
         self.masking_model = None
         self.captioning_model = None
@@ -113,23 +113,23 @@ Mouse wheel: increase or decrease brush size"""
         top_frame = ctk.CTkFrame(master)
         top_frame.grid(row=0, column=0, sticky="nsew")
 
-        components.button(top_frame, 0, 0, "Open", self.open_directory,
-                          tooltip="open a new directory")
-        components.button(top_frame, 0, 1, "Generate Masks", self.open_mask_window,
-                          tooltip="open a dialog to automatically generate masks")
-        components.button(top_frame, 0, 2, "Generate Captions", self.open_caption_window,
-                          tooltip="open a dialog to automatically generate captions")
+        components.button(top_frame, 0, 0, "打开", self.open_directory,
+                          tooltip="打开一个新目录")
+        components.button(top_frame, 0, 1, "生成遮罩", self.open_mask_window,
+                          tooltip="打开一个对话框以自动生成遮罩")
+        components.button(top_frame, 0, 2, "生成标题", self.open_caption_window,
+                          tooltip="打开一个对话框以自动生成标题")
 
         if platform.system() == "Windows":
-            components.button(top_frame, 0, 3, "Open in Explorer", self.open_in_explorer,
-                              tooltip="open the current image in Explorer")
+            components.button(top_frame, 0, 3, "在资源管理器中打开", self.open_in_explorer,
+                              tooltip="在资源管理器中打开当前图像")
 
         components.switch(top_frame, 0, 4, self.config_ui_state, "include_subdirectories",
-                          text="include subdirectories")
+                          text="包含子目录")
 
         top_frame.grid_columnconfigure(5, weight=1)
 
-        components.button(top_frame, 0, 6, "Help", self.print_help,
+        components.button(top_frame, 0, 6, "帮助", self.print_help,
                           tooltip=self.help_text)
 
     def file_list_column(self, master):
@@ -162,16 +162,16 @@ Mouse wheel: increase or decrease brush size"""
         right_frame.grid_columnconfigure(4, weight=1)
         right_frame.grid_rowconfigure(1, weight=1)
 
-        components.button(right_frame, 0, 0, "Draw", self.draw_mask_editing_mode,
-                          tooltip="draw a mask using a brush")
-        components.button(right_frame, 0, 1, "Fill", self.fill_mask_editing_mode,
-                          tooltip="draw a mask using a fill tool")
+        components.button(right_frame, 0, 0, "绘制", self.draw_mask_editing_mode,
+                          tooltip="使用画笔绘制遮罩")
+        components.button(right_frame, 0, 1, "填充", self.fill_mask_editing_mode,
+                          tooltip="使用填充工具绘制遮罩")
 
         # checkbox to enable mask editing
         self.enable_mask_editing_var = ctk.BooleanVar()
         self.enable_mask_editing_var.set(False)
         enable_mask_editing_checkbox = ctk.CTkCheckBox(
-            right_frame, text="Enable Mask Editing", variable=self.enable_mask_editing_var, width=50)
+            right_frame, text="启用遮罩编辑", variable=self.enable_mask_editing_var, width=50)
         enable_mask_editing_checkbox.grid(row=0, column=2, padx=25, pady=5, sticky="w")
 
         # mask alpha textbox
@@ -180,7 +180,7 @@ Mouse wheel: increase or decrease brush size"""
         self.mask_editing_alpha.grid(row=0, column=3, sticky="e", padx=5, pady=5)
         self.bind_key_events(self.mask_editing_alpha)
 
-        mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="Brush Alpha", width=75)
+        mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="画笔透明度", width=75)
         mask_editing_alpha_label.grid(row=0, column=4, padx=0, pady=5, sticky="w")
 
         # image
@@ -520,15 +520,15 @@ Mouse wheel: increase or decrease brush size"""
 
         if model == "ClipSeg":
             if self.masking_model is None or not isinstance(self.masking_model, ClipSegModel):
-                print("loading ClipSeg model, this may take a while")
+                print("正在加载 ClipSeg 模型，这可能需要一些时间")
                 self.masking_model = ClipSegModel(default_device, torch.float32)
         elif model == "Rembg":
             if self.masking_model is None or not isinstance(self.masking_model, RembgModel):
-                print("loading Rembg model, this may take a while")
+                print("正在加载 Rembg 模型，这可能需要一些时间")
                 self.masking_model = RembgModel(default_device, torch.float32)
         elif model == "Rembg-Human":
             if self.masking_model is None or not isinstance(self.masking_model, RembgHumanModel):
-                print("loading Rembg-Human model, this may take a while")
+                print("正在加载 Rembg-Human 模型，这可能需要一些时间")
                 self.masking_model = RembgHumanModel(default_device, torch.float32)
         elif model == "Hex Color":
             if self.masking_model is None or not isinstance(self.masking_model, MaskByColor):
@@ -539,15 +539,15 @@ Mouse wheel: increase or decrease brush size"""
 
         if model == "Blip":
             if self.captioning_model is None or not isinstance(self.captioning_model, BlipModel):
-                print("loading Blip model, this may take a while")
+                print("正在加载 Blip 模型，这可能需要一些时间")
                 self.captioning_model = BlipModel(default_device, torch.float16)
         elif model == "Blip2":
             if self.captioning_model is None or not isinstance(self.captioning_model, Blip2Model):
-                print("loading Blip2 model, this may take a while")
+                print("正在加载 Blip2 模型，这可能需要一些时间")
                 self.captioning_model = Blip2Model(default_device, torch.float16)
         elif model == "WD14 VIT v2":
             if self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
-                print("loading WD14_VIT_v2 model, this may take a while")
+                print("正在加载 WD14_VIT_v2 模型，这可能需要一些时间")
                 self.captioning_model = WDModel(default_device, torch.float16)
 
     def print_help(self):

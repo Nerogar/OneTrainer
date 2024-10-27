@@ -80,9 +80,9 @@ class ConceptWindow(ctk.CTkToplevel):
         tabview = ctk.CTkTabview(self)
         tabview.grid(row=0, column=0, sticky="nsew")
 
-        self.general_tab = self.__general_tab(tabview.add("general"), concept)
-        self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
-        self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
+        self.general_tab = self.__general_tab(tabview.add("基础设置"), concept)
+        self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("图像增强"))
+        self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("文本增强"))
 
         components.button(self, 1, 0, "ok", self.__ok)
 
@@ -92,28 +92,28 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(2, weight=1)
 
         # name
-        components.label(frame, 0, 0, "Name",
-                         tooltip="Name of the concept")
+        components.label(frame, 0, 0, "名称",
+                         tooltip="概念的名称")
         components.entry(frame, 0, 1, self.ui_state, "name")
 
         # enabled
-        components.label(frame, 1, 0, "Enabled",
-                         tooltip="Enable or disable this concept")
+        components.label(frame, 1, 0, "启用",
+                         tooltip="启用或禁用此概念")
         components.switch(frame, 1, 1, self.ui_state, "enabled")
 
         # validation_concept
-        components.label(frame, 2, 0, "Validation concept",
-                         tooltip="Use concept as for validation instead of training")
+        components.label(frame, 2, 0, "验证概念",
+                         tooltip="使用概念作为验证而不是训练")
         components.switch(frame, 2, 1, self.ui_state, "validation_concept")
 
         # path
-        components.label(frame, 3, 0, "Path",
-                         tooltip="Path where the training data is located")
+        components.label(frame, 3, 0, "路径",
+                         tooltip="训练数据所在的路径")
         components.dir_entry(frame, 3, 1, self.ui_state, "path")
 
         # prompt source
-        components.label(frame, 4, 0, "Prompt Source",
-                         tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
+        components.label(frame, 4, 0, "提示来源",
+                         tooltip="训练期间使用的提示的来源。选择“从单个文本文件”时，请选择包含提示列表的文本文件")
         prompt_path_entry = components.file_entry(frame, 4, 2, self.text_ui_state, "prompt_path")
 
         def set_prompt_path_entry_enabled(option: str):
@@ -125,36 +125,36 @@ class ConceptWindow(ctk.CTkToplevel):
                     child.configure(state="disabled")
 
         components.options_kv(frame, 4, 1, [
-            ("From text file per sample", 'sample'),
-            ("From single text file", 'concept'),
-            ("From image file name", 'filename'),
+            ("从每个样本的文本文件获取", 'sample'),
+            ("从单个文本文件获取", 'concept'),
+            ("从图像文件名获取", 'filename'),
         ], self.text_ui_state, "prompt_source", command=set_prompt_path_entry_enabled)
         set_prompt_path_entry_enabled(concept.text.prompt_source)
 
         # include subdirectories
-        components.label(frame, 5, 0, "Include Subdirectories",
-                         tooltip="Includes images from subdirectories into the dataset")
+        components.label(frame, 5, 0, "包含子目录",
+                         tooltip="将子目录中的图像包含到数据集中")
         components.switch(frame, 5, 1, self.ui_state, "include_subdirectories")
 
         # image variations
-        components.label(frame, 6, 0, "Image Variations",
-                         tooltip="The number of different image versions to cache if latent caching is enabled.")
+        components.label(frame, 6, 0, "图像变体",
+                         tooltip="如果启用了潜在缓存，要缓存的不同图像版本的数量。")
         components.entry(frame, 6, 1, self.ui_state, "image_variations")
 
         # text variations
-        components.label(frame, 7, 0, "Text Variations",
-                         tooltip="The number of different text versions to cache if latent caching is enabled.")
+        components.label(frame, 7, 0, "文本变体",
+                         tooltip="如果启用了潜在缓存，要缓存的不同文本版本的数量。")
         components.entry(frame, 7, 1, self.ui_state, "text_variations")
 
         # balancing
-        components.label(frame, 8, 0, "Balancing",
-                         tooltip="The number of samples used during training. Use repeats to multiply the concept, or samples to specify an exact number of samples used in each epoch.")
+        components.label(frame, 8, 0, "平衡",
+                         tooltip="训练期间使用的样本数量。使用重复来乘以概念，或者使用样本在每个时期中指定使用的确切样本数量。")
         components.entry(frame, 8, 1, self.ui_state, "balancing")
         components.options(frame, 8, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
 
         # loss weight
-        components.label(frame, 9, 0, "Loss Weight",
-                         tooltip="The loss multiplyer for this concept.")
+        components.label(frame, 9, 0, "损失权重",
+                         tooltip="此概念的损失乘数。")
         components.entry(frame, 9, 1, self.ui_state, "loss_weight")
 
         frame.pack(fill="both", expand=1)
@@ -168,70 +168,70 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(3, weight=1)
 
         # header
-        components.label(frame, 0, 1, "Random",
-                         tooltip="Enable this augmentation with random values")
-        components.label(frame, 0, 2, "Fixed",
-                         tooltip="Enable this augmentation with fixed values")
+        components.label(frame, 0, 1, "随机",
+                         tooltip="使用随机值启用此增强")
+        components.label(frame, 0, 2, "固定",
+                         tooltip="使用固定值启用此增强")
 
         # crop jitter
-        components.label(frame, 1, 0, "Crop Jitter",
-                         tooltip="Enables random cropping of samples")
+        components.label(frame, 1, 0, "裁剪抖动",
+                         tooltip="启用样本的随机裁剪")
         components.switch(frame, 1, 1, self.image_ui_state, "enable_crop_jitter")
 
         # random flip
-        components.label(frame, 2, 0, "Random Flip",
-                         tooltip="Randomly flip the sample during training")
+        components.label(frame, 2, 0, "随机翻转",
+                         tooltip="在训练期间随机翻转样本")
         components.switch(frame, 2, 1, self.image_ui_state, "enable_random_flip")
         components.switch(frame, 2, 2, self.image_ui_state, "enable_fixed_flip")
 
         # random rotation
-        components.label(frame, 3, 0, "Random Rotation",
-                         tooltip="Randomly rotates the sample during training")
+        components.label(frame, 3, 0, "随机旋转",
+                         tooltip="在训练期间随机旋转样本")
         components.switch(frame, 3, 1, self.image_ui_state, "enable_random_rotate")
         components.switch(frame, 3, 2, self.image_ui_state, "enable_fixed_rotate")
         components.entry(frame, 3, 3, self.image_ui_state, "random_rotate_max_angle")
 
         # random brightness
-        components.label(frame, 4, 0, "Random Brightness",
-                         tooltip="Randomly adjusts the brightness of the sample during training")
+        components.label(frame, 4, 0, "随机亮度",
+                         tooltip="在训练期间随机调整样本的亮度")
         components.switch(frame, 4, 1, self.image_ui_state, "enable_random_brightness")
         components.switch(frame, 4, 2, self.image_ui_state, "enable_fixed_brightness")
         components.entry(frame, 4, 3, self.image_ui_state, "random_brightness_max_strength")
 
         # random contrast
-        components.label(frame, 5, 0, "Random Contrast",
-                         tooltip="Randomly adjusts the contrast of the sample during training")
+        components.label(frame, 5, 0, "随机对比度",
+                         tooltip="在训练期间随机调整样本的对比度")
         components.switch(frame, 5, 1, self.image_ui_state, "enable_random_contrast")
         components.switch(frame, 5, 2, self.image_ui_state, "enable_fixed_contrast")
         components.entry(frame, 5, 3, self.image_ui_state, "random_contrast_max_strength")
 
         # random saturation
-        components.label(frame, 6, 0, "Random Saturation",
-                         tooltip="Randomly adjusts the saturation of the sample during training")
+        components.label(frame, 6, 0, "随机饱和度",
+                         tooltip="在训练期间随机调整样本的饱和度")
         components.switch(frame, 6, 1, self.image_ui_state, "enable_random_saturation")
         components.switch(frame, 6, 2, self.image_ui_state, "enable_fixed_saturation")
         components.entry(frame, 6, 3, self.image_ui_state, "random_saturation_max_strength")
 
         # random hue
-        components.label(frame, 7, 0, "Random Hue",
-                         tooltip="Randomly adjusts the hue of the sample during training")
+        components.label(frame, 7, 0, "随机色调",
+                         tooltip="在训练期间随机调整样本的色调")
         components.switch(frame, 7, 1, self.image_ui_state, "enable_random_hue")
         components.switch(frame, 7, 2, self.image_ui_state, "enable_fixed_hue")
         components.entry(frame, 7, 3, self.image_ui_state, "random_hue_max_strength")
 
         # random circular mask shrink
-        components.label(frame, 8, 0, "Circular Mask Generation",
-                         tooltip="Automatically create circular masks for masked training")
+        components.label(frame, 8, 0, "圆形掩码生成",
+                         tooltip="自动为掩码训练创建圆形掩码")
         components.switch(frame, 8, 1, self.image_ui_state, "enable_random_circular_mask_shrink")
 
         # random rotate and crop
-        components.label(frame, 9, 0, "Random Rotate and Crop",
-                         tooltip="Randomly rotate the training samples and crop to the masked region")
+        components.label(frame, 9, 0, "随机旋转和裁剪",
+                         tooltip="随机旋转训练样本并裁剪到掩码区域")
         components.switch(frame, 9, 1, self.image_ui_state, "enable_random_mask_rotate_crop")
 
         # circular mask generation
-        components.label(frame, 10, 0, "Resolution Override",
-                         tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
+        components.label(frame, 10, 0, "分辨率覆盖",
+                         tooltip="覆盖此概念的分辨率。可以选择指定多个分辨率（用逗号分隔），或以 <宽度>x<高度> 的格式指定单个精确分辨率")
         components.switch(frame, 10, 2, self.image_ui_state, "enable_resolution_override")
         components.entry(frame, 10, 3, self.image_ui_state, "resolution_override")
 
@@ -250,7 +250,7 @@ class ConceptWindow(ctk.CTkToplevel):
         update_button_frame.grid_columnconfigure(1, weight=1)
 
         prev_preview_button = components.button(update_button_frame, 0, 0, "<", command=self.__prev_image_preview)
-        components.button(update_button_frame, 0, 1, "Update Preview", command=self.__update_image_preview)
+        components.button(update_button_frame, 0, 1, "更新预览", command=self.__update_image_preview)
         next_preview_button = components.button(update_button_frame, 0, 2, ">", command=self.__next_image_preview)
 
         prev_preview_button.configure(width=40)
@@ -267,18 +267,18 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(3, weight=1)
 
         # tag shuffling
-        components.label(frame, 0, 0, "Tag Shuffling",
-                         tooltip="Enables tag shuffling")
+        components.label(frame, 0, 0, "随机打乱",
+                         tooltip="启用随机打乱")
         components.switch(frame, 0, 1, self.text_ui_state, "enable_tag_shuffling")
 
         # keep tag count
-        components.label(frame, 1, 0, "Tag Delimiter",
-                         tooltip="The delimiter between tags")
+        components.label(frame, 1, 0, "标签分隔符",
+                         tooltip="标签之间的分隔符")
         components.entry(frame, 1, 1, self.text_ui_state, "tag_delimiter")
 
         # keep tag count
-        components.label(frame, 2, 0, "Keep Tag Count",
-                         tooltip="The number of tags at the start of the caption that are not shuffled")
+        components.label(frame, 2, 0, "固定标签",
+                         tooltip="在随机打乱 tokens 时，保留前 N 个不变。")
         components.entry(frame, 2, 1, self.text_ui_state, "keep_tags_count")
 
         frame.pack(fill="both", expand=1)

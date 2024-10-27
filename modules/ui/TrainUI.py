@@ -100,23 +100,23 @@ class TrainUI(ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=2, column=0, sticky="nsew")
 
-        self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
+        self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "步数", "轮次")
 
         self.status_label = components.label(frame, 0, 1, "",
-                                             tooltip="Current status of the training run")
+                                             tooltip="训练运行的当前状态")
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
 
         # tensorboard button
-        components.button(frame, 0, 3, "Tensorboard", self.open_tensorboard)
+        components.button(frame, 0, 3, "Tensorboard日志", self.open_tensorboard)
 
         # training button
-        self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training)
+        self.training_button = components.button(frame, 0, 4, "开始训练", self.start_training)
 
         # export button
-        self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
-                                               tooltip="Export the current configuration as a script to run without a UI")
+        self.export_button = components.button(frame, 0, 5, "导出", self.export_training,
+                                               tooltip="将当前配置导出为脚本，以便在没有 UI 的情况下运行。")
 
 
         return frame
@@ -131,15 +131,15 @@ class TrainUI(ctk.CTk):
         self.tabview = ctk.CTkTabview(frame)
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
-        self.general_tab = self.create_general_tab(self.tabview.add("general"))
-        self.model_tab = self.create_model_tab(self.tabview.add("model"))
-        self.data_tab = self.create_data_tab(self.tabview.add("data"))
-        self.create_concepts_tab(self.tabview.add("concepts"))
-        self.training_tab = self.create_training_tab(self.tabview.add("training"))
-        self.create_sampling_tab(self.tabview.add("sampling"))
-        self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
-        self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
-        self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
+        self.general_tab = self.create_general_tab(self.tabview.add("基础设置"))
+        self.model_tab = self.create_model_tab(self.tabview.add("模型"))
+        self.data_tab = self.create_data_tab(self.tabview.add("数据"))
+        self.create_concepts_tab(self.tabview.add("概念"))
+        self.training_tab = self.create_training_tab(self.tabview.add("训练参数"))
+        self.create_sampling_tab(self.tabview.add("采样图"))
+        self.backup_tab = self.create_backup_tab(self.tabview.add("备份"))
+        self.tools_tab = self.create_tools_tab(self.tabview.add("工具"))
+        self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("附加嵌入"))
 
         self.change_training_method(self.train_config.training_method)
 
@@ -153,63 +153,63 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(3, weight=1)
 
         # workspace dir
-        components.label(frame, 0, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run are saved")
+        components.label(frame, 0, 0, "工作区目录",
+                         tooltip="保存此次训练运行的所有文件的目录。")
         components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
-        components.label(frame, 1, 0, "Cache Directory",
-                         tooltip="The directory where cached data is saved")
+        components.label(frame, 1, 0, "缓存目录",
+                         tooltip="保存缓存数据的目录。")
         components.dir_entry(frame, 1, 1, self.ui_state, "cache_dir")
 
         # continue from previous backup
-        components.label(frame, 2, 0, "Continue from last backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
+        components.label(frame, 2, 0, "从上次备份继续",
+                         tooltip="自动从<workspace>/backup中保存的上次备份继续训练。")
         components.switch(frame, 2, 1, self.ui_state, "continue_last_backup")
 
         # only cache
-        components.label(frame, 3, 0, "Only Cache",
-                         tooltip="Only populate the cache, without any training")
+        components.label(frame, 3, 0, "仅缓存",
+                         tooltip="仅填充缓存，不进行任何训练。")
         components.switch(frame, 3, 1, self.ui_state, "only_cache")
 
         # debug
-        components.label(frame, 4, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
+        components.label(frame, 4, 0, "调试模式",
+                         tooltip="在训练过程中将调试信息保存到调试目录。")
         components.switch(frame, 4, 1, self.ui_state, "debug_mode")
 
-        components.label(frame, 5, 0, "Debug Directory",
-                         tooltip="The directory where debug data is saved")
+        components.label(frame, 5, 0, "调试目录",
+                         tooltip="保存调试数据的目录。")
         components.dir_entry(frame, 5, 1, self.ui_state, "debug_dir")
 
         # tensorboard
-        components.label(frame, 6, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
+        components.label(frame, 6, 0, "Tensorboard日志",
+                         tooltip="在训练过程中启动 Tensorboard Web UI。")
         components.switch(frame, 6, 1, self.ui_state, "tensorboard")
 
-        components.label(frame, 7, 0, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
+        components.label(frame, 7, 0, "公开 Tensorboard",
+                         tooltip="将 Tensorboard Web UI 公开给所有网络接口（使其可从网络访问）。")
         components.switch(frame, 7, 1, self.ui_state, "tensorboard_expose")
 
         # validation
-        components.label(frame, 8, 0, "Validation",
-                         tooltip="Enable validation steps and add new graph in tensorboard")
+        components.label(frame, 8, 0, "验证",
+                         tooltip="启用验证步骤并在 Tensorboard 中添加新的图形。")
         components.switch(frame, 8, 1, self.ui_state, "validation")
 
-        components.label(frame, 9, 0, "Validate after",
-                         tooltip="The interval used when validate training")
+        components.label(frame, 9, 0, "验证间隔",
+                         tooltip="验证训练时使用的间隔。")
         components.time_entry(frame, 9, 1, self.ui_state, "validate_after", "validate_after_unit")
 
         # device
-        components.label(frame, 10, 0, "Dataloader Threads",
-                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
+        components.label(frame, 10, 0, "数据加载器线程",
+                         tooltip="数据加载器使用的线程数。如果 GPU 在缓存期间有空间，则增加线程数；如果 GPU 在缓存期间内存不足，则减少线程数。")
         components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
 
-        components.label(frame, 11, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
+        components.label(frame, 11, 0, "训练设备",
+                         tooltip="用于训练的设备。可以是“cuda”、“cuda:0”、“cuda:1”等。默认值为“cuda”。")
         components.entry(frame, 11, 1, self.ui_state, "train_device")
 
-        components.label(frame, 12, 0, "Temp Device",
-                         tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
+        components.label(frame, 12, 0, "临时设备",
+                         tooltip="用于在模型未使用时暂时卸载模型的设备。默认值为“cpu”。")
         components.entry(frame, 12, 1, self.ui_state, "temp_device")
 
         frame.pack(fill="both", expand=1)
@@ -227,18 +227,18 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(4, weight=1)
 
         # aspect ratio bucketing
-        components.label(frame, 0, 0, "Aspect Ratio Bucketing",
-                         tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
+        components.label(frame, 0, 0, "长宽比分桶",
+                         tooltip="长宽比分桶允许对不同长宽比的图像进行训练。")
         components.switch(frame, 0, 1, self.ui_state, "aspect_ratio_bucketing")
 
         # latent caching
-        components.label(frame, 1, 0, "Latent Caching",
-                         tooltip="Caching of intermediate training data that can be re-used between epochs")
+        components.label(frame, 1, 0, "潜在缓存",
+                         tooltip="缓存中间训练数据，这些数据可以在不同轮次之间重复使用。")
         components.switch(frame, 1, 1, self.ui_state, "latent_caching")
 
         # clear cache before training
-        components.label(frame, 2, 0, "Clear cache before training",
-                         tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
+        components.label(frame, 2, 0, "训练前清除缓存",
+                         tooltip="在开始训练之前清除缓存目录。只有在您想继续使用相同的缓存数据时才禁用此功能。如果在重启期间更改了其他设置，禁用此功能可能会导致错误。")
         components.switch(frame, 2, 1, self.ui_state, "clear_cache_before_training")
 
         frame.pack(fill="both", expand=1)
@@ -260,27 +260,27 @@ class TrainUI(ctk.CTk):
         top_frame.grid(row=0, column=0, sticky="nsew")
         sub_frame = ctk.CTkFrame(master=top_frame, corner_radius=0, fg_color="transparent")
         sub_frame.grid(row=1, column=0, sticky="nsew", columnspan=6)
-        components.label(top_frame, 0, 0, "Sample After",
-                         tooltip="The interval used when automatically sampling from the model during training")
+        components.label(top_frame, 0, 0, "采样间隔",
+                         tooltip="在训练期间从模型自动采样时使用的间隔。")
         components.time_entry(top_frame, 0, 1, self.ui_state, "sample_after", "sample_after_unit")
 
-        components.label(top_frame, 0, 2, "Format",
-                         tooltip="File Format used when saving samples")
+        components.label(top_frame, 0, 2, "格式",
+                         tooltip="保存样本时使用的文件格式。")
         components.options_kv(top_frame, 0, 3, [
             ("PNG", ImageFormat.PNG),
             ("JPG", ImageFormat.JPG),
         ], self.ui_state, "sample_image_format")
 
-        components.button(top_frame, 0, 4, "sample now", self.sample_now)
+        components.button(top_frame, 0, 4, "立即采样", self.sample_now)
 
-        components.button(top_frame, 0, 5, "manual sample", self.open_sample_ui)
+        components.button(top_frame, 0, 5, "手动采样", self.open_sample_ui)
 
-        components.label(sub_frame, 0, 0, "Non-EMA Sampling",
-                         tooltip="Whether to include non-ema sampling when using ema.")
+        components.label(sub_frame, 0, 0, "非 EMA 采样",
+                         tooltip="在使用 EMA 时是否包含非 EMA 采样。")
         components.switch(sub_frame, 0, 1, self.ui_state, "non_ema_sampling")
 
-        components.label(sub_frame, 0, 2, "Samples to Tensorboard",
-                         tooltip="Whether to include sample images in the Tensorboard output.")
+        components.label(sub_frame, 0, 2, "Tensorboard 采样",
+                         tooltip="是否将样本图像包含在 Tensorboard 输出中。")
         components.switch(sub_frame, 0, 3, self.ui_state, "samples_to_tensorboard")
 
         # table
@@ -298,44 +298,44 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(4, weight=1)
 
         # backup after
-        components.label(frame, 0, 0, "Backup After",
-                         tooltip="The interval used when automatically creating model backups during training")
+        components.label(frame, 0, 0, "备份间隔",
+                         tooltip="在训练期间自动创建模型备份时使用的间隔。")
         components.time_entry(frame, 0, 1, self.ui_state, "backup_after", "backup_after_unit")
 
         # backup now
-        components.button(frame, 0, 3, "backup now", self.backup_now)
+        components.button(frame, 0, 3, "立即备份", self.backup_now)
 
         # rolling backup
-        components.label(frame, 1, 0, "Rolling Backup",
-                         tooltip="If rolling backups are enabled, older backups are deleted automatically")
+        components.label(frame, 1, 0, "滚动备份",
+                         tooltip="如果启用了滚动备份，则会自动删除旧的备份。")
         components.switch(frame, 1, 1, self.ui_state, "rolling_backup")
 
         # rolling backup count
-        components.label(frame, 1, 3, "Rolling Backup Count",
-                         tooltip="Defines the number of backups to keep if rolling backups are enabled")
+        components.label(frame, 1, 3, "滚动备份数量",
+                         tooltip="如果启用了滚动备份，则定义要保留的备份数量。")
         components.entry(frame, 1, 4, self.ui_state, "rolling_backup_count")
 
         # backup before save
-        components.label(frame, 2, 0, "Backup Before Save",
-                         tooltip="Create a full backup before saving the final model")
+        components.label(frame, 2, 0, "保存前备份",
+                         tooltip="在保存最终模型之前创建完整备份。")
         components.switch(frame, 2, 1, self.ui_state, "backup_before_save")
 
         # save after
-        components.label(frame, 3, 0, "Save Every",
-                         tooltip="The interval used when automatically saving the model during training")
+        components.label(frame, 3, 0, "保存间隔",
+                         tooltip="在训练期间自动保存模型时使用的间隔。")
         components.time_entry(frame, 3, 1, self.ui_state, "save_every", "save_every_unit")
 
         # save now
-        components.button(frame, 3, 3, "save now", self.save_now)
+        components.button(frame, 3, 3, "立即保存", self.save_now)
 
         # skip save
-        components.label(frame, 4, 0, "Skip First",
-                         tooltip="Start saving automatically after this interval has elapsed")
+        components.label(frame, 4, 0, "跳过第一个",
+                         tooltip="在该间隔过去后开始自动保存。")
         components.entry(frame, 4, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
 
         # save filename prefix
-        components.label(frame, 5, 0, "Save Filename Prefix",
-                         tooltip="The prefix for filenames used when saving the model during training")
+        components.label(frame, 5, 0, "保存文件名前缀",
+                         tooltip="在训练期间保存模型时使用的文件名前缀。")
         components.entry(frame, 5, 1, self.ui_state, "save_filename_prefix")
 
         frame.pack(fill="both", expand=1)
@@ -350,39 +350,39 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(4, weight=1)
 
         # lora model name
-        components.label(frame, 0, 0, "LoRA base model",
-                         tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
+        components.label(frame, 0, 0, "LoRA 基础模型",
+                         tooltip="要训练的 LoRA 基础模型。留空以创建新的 LoRA。")
         components.file_entry(
             frame, 0, 1, self.ui_state, "lora_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # lora rank
-        components.label(frame, 1, 0, "LoRA rank",
-                         tooltip="The rank parameter used when creating a new LoRA")
+        components.label(frame, 1, 0, "LoRA 秩",
+                         tooltip="创建新的 LoRA 时使用的秩参数。")
         components.entry(frame, 1, 1, self.ui_state, "lora_rank")
 
         # lora rank
         components.label(frame, 2, 0, "LoRA alpha",
-                         tooltip="The alpha parameter used when creating a new LoRA")
+                         tooltip="创建新的 LoRA 时使用的 alpha 参数。")
         components.entry(frame, 2, 1, self.ui_state, "lora_alpha")
 
         # Dropout Percentage
-        components.label(frame, 3, 0, "Dropout Probability",
-                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+        components.label(frame, 3, 0, "丢弃概率",
+                         tooltip="丢弃概率。此百分比的模型节点将在每个训练步骤中被随机忽略。有助于防止过拟合。范围0-1，为0则不启用")
         components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
 
         # lora weight dtype
-        components.label(frame, 4, 0, "LoRA Weight Data Type",
-                         tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.label(frame, 4, 0, "LoRA 权重数据类型",
+                         tooltip="用于训练的 LoRA 权重数据类型。这可以减少内存消耗，但会降低精度。")
         components.options_kv(frame, 4, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "lora_weight_dtype")
 
         # For use with additional embeddings.
-        components.label(frame, 5, 0, "Bundle Embeddings",
-                         tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
+        components.label(frame, 5, 0, "捆绑嵌入",
+                         tooltip="将任何额外的嵌入捆绑到 LoRA 输出文件中，而不是作为单独的文件。")
         components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
         frame.pack(fill="both", expand=1)
@@ -397,34 +397,34 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(4, weight=1)
 
         # embedding model name
-        components.label(frame, 0, 0, "Base embedding",
-                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
+        components.label(frame, 0, 0, "基础嵌入",
+                         tooltip="要训练的基础嵌入。留空以创建新的嵌入。")
         components.file_entry(
             frame, 0, 1, self.ui_state, "embedding.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
-        components.label(frame, 1, 0, "Token count",
-                         tooltip="The token count used when creating a new embedding")
+        components.label(frame, 1, 0, "令牌数量",
+                         tooltip="创建新的嵌入时使用的令牌数量。")
         components.entry(frame, 1, 1, self.ui_state, "embedding.token_count")
 
         # initial embedding text
-        components.label(frame, 2, 0, "Initial embedding text",
-                         tooltip="The initial embedding text used when creating a new embedding")
+        components.label(frame, 2, 0, "初始嵌入文本",
+                         tooltip="创建新的嵌入时使用的初始嵌入文本。")
         components.entry(frame, 2, 1, self.ui_state, "embedding.initial_embedding_text")
 
         # embedding weight dtype
-        components.label(frame, 3, 0, "Embedding Weight Data Type",
-                         tooltip="The Embedding weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.label(frame, 3, 0, "嵌入权重数据类型",
+                         tooltip="用于训练的嵌入权重数据类型。这可以减少内存消耗，但会降低精度。")
         components.options_kv(frame, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "embedding_weight_dtype")
 
         # placeholder
-        components.label(frame, 4, 0, "Placeholder",
-                         tooltip="The placeholder used when using the embedding in a prompt")
+        components.label(frame, 4, 0, "触发词",
+                         tooltip="在提示中使用嵌入时使用的触发词。")
         components.entry(frame, 4, 1, self.ui_state, "embedding.placeholder")
 
         frame.pack(fill="both", expand=1)
@@ -442,23 +442,23 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(4, weight=1)
 
         # dataset
-        components.label(frame, 0, 0, "Dataset Tools",
-                         tooltip="Open the captioning tool")
-        components.button(frame, 0, 1, "Open", self.open_dataset_tool)
+        components.label(frame, 0, 0, "数据集工具",
+                         tooltip="打开标注工具")
+        components.button(frame, 0, 1, "打开", self.open_dataset_tool)
 
         # convert model
-        components.label(frame, 1, 0, "Convert Model Tools",
-                         tooltip="Open the model conversion tool")
-        components.button(frame, 1, 1, "Open", self.open_convert_model_tool)
+        components.label(frame, 1, 0, "模型转换工具",
+                         tooltip="打开模型转换工具")
+        components.button(frame, 1, 1, "打开", self.open_convert_model_tool)
 
         # sample
-        components.label(frame, 2, 0, "Sampling Tool",
-                         tooltip="Open the model sampling tool")
-        components.button(frame, 2, 1, "Open", self.open_sampling_tool)
+        components.label(frame, 2, 0, "采样工具",
+                         tooltip="打开模型采样工具")
+        components.button(frame, 2, 1, "打开", self.open_sampling_tool)
 
-        components.label(frame, 3, 0, "Profiling Tool",
-                         tooltip="Open the profiling tools.")
-        components.button(frame, 3, 1, "Open", self.open_profiling_tool)
+        components.label(frame, 3, 0, "性能分析工具",
+                         tooltip="打开性能分析工具。")
+        components.button(frame, 3, 1, "打开", self.open_profiling_tool)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -570,17 +570,17 @@ class TrainUI(ctk.CTk):
         torch_gc()
 
         if error_caught:
-            self.on_update_status("error: check the console for more information")
+            self.on_update_status("错误：查看控制台获取更多信息")
         else:
-            self.on_update_status("stopped")
+            self.on_update_status("已停止")
 
-        self.training_button.configure(text="Start Training", state="normal")
+        self.training_button.configure(text="开始训练", state="normal")
 
     def start_training(self):
         if self.training_thread is None:
             self.top_bar_component.save_default()
 
-            self.training_button.configure(text="Stop Training", state="normal")
+            self.training_button.configure(text="停止训练", state="normal")
 
             self.training_commands = TrainCommands()
 
@@ -588,12 +588,12 @@ class TrainUI(ctk.CTk):
             self.training_thread.start()
         else:
             self.training_button.configure(state="disabled")
-            self.on_update_status("stopping")
+            self.on_update_status("正在停止")
             self.training_commands.stop()
 
     def export_training(self):
         file_path = filedialog.asksaveasfilename(filetypes=[
-            ("All Files", "*.*"),
+            ("所有文件", "*.*"),
             ("json", "*.json"),
         ], initialdir=".", initialfile="config.json")
 

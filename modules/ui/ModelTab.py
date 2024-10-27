@@ -183,16 +183,16 @@ class ModelTab:
 
     def __create_base_dtype_components(self, row: int) -> int:
         # base model
-        components.label(self.scroll_frame, row, 0, "Base Model",
-                         tooltip="Filename, directory or Hugging Face repository of the base model")
+        components.label(self.scroll_frame, row, 0, "基础模型",
+                         tooltip="基础模型的文件名、目录或 Hugging Face 仓库")
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "base_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # weight dtype
-        components.label(self.scroll_frame, row, 3, "Weight Data Type",
-                         tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
+        components.label(self.scroll_frame, row, 3, "权重数据类型",
+                         tooltip="用于训练的基础模型权重数据类型。这可以减少内存消耗，但会降低精度")
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(False),
                               self.ui_state, "weight_dtype")
 
@@ -214,8 +214,8 @@ class ModelTab:
     ) -> int:
         if has_unet:
             # unet weight dtype
-            components.label(self.scroll_frame, row, 3, "Override UNet Data Type",
-                             tooltip="Overrides the unet weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖 UNet 数据类型",
+                             tooltip="覆盖 UNet 权重数据类型")
             components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(),
                                   self.ui_state, "unet.weight_dtype")
 
@@ -224,16 +224,16 @@ class ModelTab:
         if has_prior:
             if allow_override_prior:
                 # prior model
-                components.label(self.scroll_frame, row, 0, "Prior Model",
-                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                components.label(self.scroll_frame, row, 0, "先验模型",
+                                 tooltip="先验模型的文件名、目录或 Hugging Face 仓库")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
                 )
 
             # prior weight dtype
-            components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
-                             tooltip="Overrides the prior weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖先验数据类型",
+                             tooltip="覆盖先验权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "prior.weight_dtype")
 
@@ -241,8 +241,8 @@ class ModelTab:
 
         if has_text_encoder:
             # text encoder weight dtype
-            components.label(self.scroll_frame, row, 3, "Override Text Encoder Data Type",
-                             tooltip="Overrides the text encoder weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖文本编码器数据类型",
+                             tooltip="覆盖文本编码器权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder.weight_dtype")
 
@@ -250,8 +250,8 @@ class ModelTab:
 
         if has_text_encoder_1:
             # text encoder 1 weight dtype
-            components.label(self.scroll_frame, row, 3, "Override Text Encoder 1 Data Type",
-                             tooltip="Overrides the text encoder 1 weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖文本编码器 1 数据类型",
+                             tooltip="覆盖文本编码器 1 权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder.weight_dtype")
 
@@ -259,8 +259,8 @@ class ModelTab:
 
         if has_text_encoder_2:
             # text encoder 2 weight dtype
-            components.label(self.scroll_frame, row, 3, "Override Text Encoder 2 Data Type",
-                             tooltip="Overrides the text encoder 2 weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖文本编码器 2 数据类型",
+                             tooltip="覆盖文本编码器 2 权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder_2.weight_dtype")
 
@@ -268,8 +268,8 @@ class ModelTab:
 
         if has_text_encoder_3:
             # text encoder 3 weight dtype
-            components.label(self.scroll_frame, row, 3, "Override Text Encoder 3 Data Type",
-                             tooltip="Overrides the text encoder 3 weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖文本编码器 2 数据类型",
+                             tooltip="覆盖文本编码器 3 权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder_3.weight_dtype")
 
@@ -277,16 +277,16 @@ class ModelTab:
 
         if has_vae:
             # base model
-            components.label(self.scroll_frame, row, 0, "VAE Override",
-                             tooltip="Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. Using a safetensor VAE file will cause an error that the model cannot be loaded.")
+            components.label(self.scroll_frame, row, 0, "VAE 覆盖",
+                             tooltip="diffusers 格式的 VAE 模型的目录或 Hugging Face 仓库。可用于覆盖基础模型中包含的 VAE。使用 safetensor VAE 文件会导致错误，即模型无法加载。")
             components.file_entry(
                 self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
             )
 
             # vae weight dtype
-            components.label(self.scroll_frame, row, 3, "Override VAE Data Type",
-                             tooltip="Overrides the vae weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖 VAE 数据类型",
+                             tooltip="覆盖 vae 权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "vae.weight_dtype")
 
@@ -296,16 +296,16 @@ class ModelTab:
 
     def __create_effnet_encoder_components(self, row: int):
         # effnet encoder model
-        components.label(self.scroll_frame, row, 0, "Effnet Encoder Model",
-                         tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
+        components.label(self.scroll_frame, row, 0, "Effnet 编码器模型",
+                         tooltip="Effnet 编码器模型的文件名、目录或 Hugging Face 仓库")
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "effnet_encoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # effnet encoder weight dtype
-        components.label(self.scroll_frame, row, 3, "Override Effnet Encoder Data Type",
-                         tooltip="Overrides the effnet encoder weight data type")
+        components.label(self.scroll_frame, row, 3, "覆盖 Effnet 编码器数据类型",
+                         tooltip="覆盖 Effnet 编码器权重数据类型")
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(),
                               self.ui_state, "effnet_encoder.weight_dtype")
 
@@ -319,16 +319,16 @@ class ModelTab:
             has_text_encoder: bool,
     ) -> int:
         # decoder model
-        components.label(self.scroll_frame, row, 0, "Decoder Model",
-                         tooltip="Filename, directory or Hugging Face repository of the decoder model")
+        components.label(self.scroll_frame, row, 0, "解码器模型",
+                         tooltip="解码器模型的文件名、目录或 Hugging Face 仓库")
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "decoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # decoder weight dtype
-        components.label(self.scroll_frame, row, 3, "Override Decoder Data Type",
-                         tooltip="Overrides the decoder weight data type")
+        components.label(self.scroll_frame, row, 3, "覆盖解码器数据类型",
+                         tooltip="覆盖解码器权重数据类型")
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(),
                               self.ui_state, "decoder.weight_dtype")
 
@@ -336,16 +336,16 @@ class ModelTab:
 
         if has_text_encoder:
             # decoder text encoder weight dtype
-            components.label(self.scroll_frame, row, 3, "Override Decoder Text Encoder Data Type",
-                             tooltip="Overrides the decoder text encoder weight data type")
+            components.label(self.scroll_frame, row, 3, "覆盖解码器文本编码器数据类型",
+                             tooltip="覆盖解码器文本编码器权重数据类型")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "decoder_text_encoder.weight_dtype")
 
             row += 1
 
         # decoder vqgan weight dtype
-        components.label(self.scroll_frame, row, 3, "Override Decoder VQGAN Data Type",
-                         tooltip="Overrides the decoder vqgan weight data type")
+        components.label(self.scroll_frame, row, 3, "覆盖解码器 VQGAN 数据类型",
+                         tooltip="覆盖解码器 VQGAN 权重数据类型")
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(),
                               self.ui_state, "decoder_vqgan.weight_dtype")
 
@@ -361,13 +361,13 @@ class ModelTab:
             allow_checkpoint: bool = False,
     ) -> int:
         # output model destination
-        components.label(self.scroll_frame, row, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
+        components.label(self.scroll_frame, row, 0, "模型输出目标",
+                         tooltip="保存输出模型的文件名或目录")
         components.file_entry(self.scroll_frame, row, 1, self.ui_state, "output_model_destination", is_output=True)
 
         # output data type
-        components.label(self.scroll_frame, row, 3, "Output Data Type",
-                         tooltip="Precision to use when saving the output model")
+        components.label(self.scroll_frame, row, 3, "输出数据类型",
+                         tooltip="保存输出模型时使用的精度")
         components.options_kv(self.scroll_frame, row, 4, [
             ("float16", DataType.FLOAT_16),
             ("float32", DataType.FLOAT_32),
@@ -387,16 +387,16 @@ class ModelTab:
         if allow_checkpoint:
             formats.append(("Checkpoint", ModelFormat.CKPT))
 
-        components.label(self.scroll_frame, row, 0, "Output Format",
-                         tooltip="Format to use when saving the output model")
+        components.label(self.scroll_frame, row, 0, "输出格式",
+                         tooltip="保存输出模型时使用的格式")
         components.options_kv(self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format")
 
         # include config
-        components.label(self.scroll_frame, row, 3, "Include Config",
-                         tooltip="Include the training configuration in the final model. Only supported for safetensors files. "
-                                 "None: No config is included. "
-                                 "Settings: All training settings are included. "
-                                 "All: All settings, including the samples and concepts are included.")
+        components.label(self.scroll_frame, row, 3, "包含配置",
+                         tooltip="在最终模型中包含训练配置。仅支持 safetensors 文件。\n"
+                                 "None: 不包含任何配置。\n"
+                                 "Settings: 包含所有训练设置。\n"
+                                 "All: 包含所有设置，包括样本和概念。")
         components.options_kv(self.scroll_frame, row, 4, [
             ("None", ConfigPart.NONE),
             ("Settings", ConfigPart.SETTINGS),

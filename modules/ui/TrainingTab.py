@@ -159,8 +159,8 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # optimizer
-        components.label(frame, 0, 0, "Optimizer",
-                         tooltip="The type of optimizer")
+        components.label(frame, 0, 0, "优化器",
+                         tooltip="优化器类型")
         components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer.optimizer",
                                command=self.__restore_optimizer_config, adv_command=self.__open_optimizer_params_window)
 
@@ -169,8 +169,8 @@ class TrainingTab:
         if hasattr(self, "lr_scheduler_comp"):
             delattr(self, "lr_scheduler_comp")
             delattr(self, "lr_scheduler_adv_comp")
-        components.label(frame, 1, 0, "Learning Rate Scheduler",
-                         tooltip="Learning rate scheduler that automatically changes the learning rate during training")
+        components.label(frame, 1, 0, "学习率调度器",
+                         tooltip="学习率调度器，在训练期间自动更改学习率")
         _, d = components.options_adv(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], self.ui_state,
                                       "learning_rate_scheduler", command=self.__restore_scheduler_config,
                                       adv_command=self.__open_scheduler_params_window)
@@ -180,38 +180,38 @@ class TrainingTab:
         self.__restore_scheduler_config(self.ui_state.get_var("learning_rate_scheduler").get())
 
         # learning rate
-        components.label(frame, 2, 0, "Learning Rate",
-                         tooltip="The base learning rate")
+        components.label(frame, 2, 0, "学习率",
+                         tooltip="基础学习率")
         components.entry(frame, 2, 1, self.ui_state, "learning_rate")
 
         # learning rate warmup steps
-        components.label(frame, 3, 0, "Learning Rate Warmup Steps",
-                         tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate")
+        components.label(frame, 3, 0, "学习率预热步数",
+                         tooltip="将学习率从 0 逐渐增加到指定学习率所需的步数")
         components.entry(frame, 3, 1, self.ui_state, "learning_rate_warmup_steps")
 
         # learning rate cycles
-        components.label(frame, 4, 0, "Learning Rate Cycles",
-                         tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
+        components.label(frame, 4, 0, "学习率周期",
+                         tooltip="学习率周期的数量。这仅适用于学习率调度器支持周期的情况")
         components.entry(frame, 4, 1, self.ui_state, "learning_rate_cycles")
 
         # epochs
-        components.label(frame, 5, 0, "Epochs",
-                         tooltip="The number of epochs for a full training run")
+        components.label(frame, 5, 0, "轮次",
+                         tooltip="完整训练运行的轮次数量")
         components.entry(frame, 5, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(frame, 6, 0, "Batch Size",
-                         tooltip="The batch size of one training step")
+        components.label(frame, 6, 0, "批次大小",
+                         tooltip="一个训练步骤的批次大小")
         components.entry(frame, 6, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(frame, 7, 0, "Accumulation Steps",
-                         tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
+        components.label(frame, 7, 0, "累积步数",
+                         tooltip="累积步数。增加此数字可以以训练速度为代价换取批次大小")
         components.entry(frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
 
         # Learning Rate Scaler
-        components.label(frame, 8, 0, "Learning Rate Scaler",
-                         tooltip="Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)")
+        components.label(frame, 8, 0, "学习率缩放器",
+                         tooltip="选择在训练期间使用的学习率缩放类型。功能上等同于：LR * SQRT(选择)")
         components.options(frame, 8, 1, [str(x) for x in list(LearningRateScaler)], self.ui_state,
                            "learning_rate_scaler")
 
@@ -221,36 +221,36 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # attention mechanism
-        components.label(frame, 0, 0, "Attention",
-                         tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
+        components.label(frame, 0, 0, "注意力",
+                         tooltip="训练期间使用的注意力机制。这会对速度和内存消耗产生重大影响")
         components.options(frame, 0, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
                            "attention_mechanism")
 
         # ema
         components.label(frame, 1, 0, "EMA",
-                         tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
+                         tooltip="EMA 对许多步骤的训练进度进行平均，更好地保留大型数据集中的不同概念")
         components.options(frame, 1, 1, [str(x) for x in list(EMAMode)], self.ui_state,
                            "ema")
 
         # ema decay
-        components.label(frame, 2, 0, "EMA Decay",
-                         tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
+        components.label(frame, 2, 0, "EMA 衰减",
+                         tooltip="EMA 模型的衰减参数。较高的数字将平均更多步骤。对于数百或数千张图像的数据集，将其设置为 0.9999。对于较小的数据集，将其设置为 0.999 或 0.998")
         components.entry(frame, 2, 1, self.ui_state, "ema_decay")
 
         # ema update step interval
-        components.label(frame, 3, 0, "EMA Update Step Interval",
-                         tooltip="Number of steps between EMA update steps")
+        components.label(frame, 3, 0, "EMA 更新步长间隔",
+                         tooltip="EMA 更新步长之间的步长数")
         components.entry(frame, 3, 1, self.ui_state, "ema_update_step_interval")
 
         # gradient checkpointing
-        components.label(frame, 4, 0, "Gradient checkpointing",
-                         tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
+        components.label(frame, 4, 0, "梯度检查点",
+                         tooltip="启用梯度检查点。这会减少内存使用量，但会增加训练时间")
         components.options(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
                            "gradient_checkpointing")
 
         # train dtype
-        components.label(frame, 5, 0, "Train Data Type",
-                         tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
+        components.label(frame, 5, 0, "训练数据类型",
+                         tooltip="用于训练的混合精度数据类型。这可以提高训练速度，但会降低精度")
         components.options_kv(frame, 5, 1, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
@@ -259,26 +259,26 @@ class TrainingTab:
         ], self.ui_state, "train_dtype")
 
         # fallback train dtype
-        components.label(frame, 6, 0, "Fallback Train Data Type",
-                         tooltip="The mixed precision data type used for training stages that don't support float16 data types. This can increase training speed, but reduces precision")
+        components.label(frame, 6, 0, "回退训练数据类型",
+                         tooltip="用于不支持 float16 数据类型的训练阶段的混合精度数据类型。这可以提高训练速度，但会降低精度")
         components.options_kv(frame, 6, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "fallback_train_dtype")
 
         # autocast cache
-        components.label(frame, 7, 0, "Autocast Cache",
-                         tooltip="Enables the autocast cache. Disabling this reduces memory usage, but increases training time")
+        components.label(frame, 7, 0, "自动广播缓存",
+                         tooltip="启用自动广播缓存。禁用此选项会减少内存使用量，但会增加训练时间")
         components.switch(frame, 7, 1, self.ui_state, "enable_autocast_cache")
 
         # resolution
-        components.label(frame, 8, 0, "Resolution",
-                         tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
+        components.label(frame, 8, 0, "分辨率",
+                         tooltip="用于训练的分辨率。可以选择指定多个分辨率（用逗号分隔），或以 <宽度>x<高度> 的格式指定单个精确分辨率")
         components.entry(frame, 8, 1, self.ui_state, "resolution")
 
         # force circular padding
-        components.label(frame, 9, 0, "Force Circular Padding",
-                         tooltip="Enables circular padding for all conv layers to better train seamless images")
+        components.label(frame, 9, 0, "强制循环填充",
+                         tooltip="为所有卷积层启用循环填充，以便更好地训练无缝图像")
         components.switch(frame, 9, 1, self.ui_state, "force_circular_padding")
 
     def __create_align_prop_frame(self, master, row):
@@ -288,37 +288,37 @@ class TrainingTab:
 
         # align prop
         components.label(frame, 0, 0, "AlignProp",
-                         tooltip="Enables AlignProp training")
+                         tooltip="启用 AlignProp 训练\n以奖励反向传播对齐文本到图像扩散模型")
         components.switch(frame, 0, 1, self.ui_state, "align_prop")
 
         # align prop probability
-        components.label(frame, 1, 0, "AlignProp Probability",
-                         tooltip="When AlignProp is enabled, specifies the number of training steps done using AlignProp calculations")
+        components.label(frame, 1, 0, "AlignProp 概率",
+                         tooltip="当启用 AlignProp 时，指定使用 AlignProp 计算进行的训练步骤数量")
         components.entry(frame, 1, 1, self.ui_state, "align_prop_probability")
 
         # align prop loss
-        components.label(frame, 2, 0, "AlignProp Loss",
-                         tooltip="Specifies the loss function used for AlignProp calculations")
+        components.label(frame, 2, 0, "AlignProp 损失",
+                         tooltip="指定用于 AlignProp 计算的损失函数")
         components.options(frame, 2, 1, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
 
         # align prop weight
-        components.label(frame, 3, 0, "AlignProp Weight",
-                         tooltip="A weight multiplier for the AlignProp loss")
+        components.label(frame, 3, 0, "AlignProp 权重",
+                         tooltip="AlignProp 损失的权重乘数")
         components.entry(frame, 3, 1, self.ui_state, "align_prop_weight")
 
         # align prop steps
-        components.label(frame, 4, 0, "AlignProp Steps",
-                         tooltip="Number of inference steps for each AlignProp step")
+        components.label(frame, 4, 0, "AlignProp 步长",
+                         tooltip="每个 AlignProp 步长的推理步长数")
         components.entry(frame, 4, 1, self.ui_state, "align_prop_steps")
 
         # align prop truncate steps
-        components.label(frame, 5, 0, "AlignProp Truncate Steps",
-                         tooltip="Fraction of steps to randomly truncate when using AlignProp. This is needed to increase model diversity.")
+        components.label(frame, 5, 0, "AlignProp 截断步长",
+                         tooltip="使用 AlignProp 时随机截断的步长比例。这需要增加模型的多样性。")
         components.entry(frame, 5, 1, self.ui_state, "align_prop_truncate_steps")
 
         # align prop truncate steps
-        components.label(frame, 6, 0, "AlignProp CFG Scale",
-                         tooltip="CFG Scale for inference steps of AlignProp calculations")
+        components.label(frame, 6, 0, "AlignProp CFG 缩放",
+                         tooltip="AlignProp 计算推理步长的 CFG 缩放")
         components.entry(frame, 6, 1, self.ui_state, "align_prop_cfg_scale")
 
     def __create_text_encoder_frame(self, master, row):
@@ -327,30 +327,30 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # train text encoder
-        components.label(frame, 0, 0, "Train Text Encoder",
-                         tooltip="Enables training the text encoder model")
+        components.label(frame, 0, 0, "训练文本编码器",
+                         tooltip="启用训练文本编码器模型")
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
         # dropout
-        components.label(frame, row, 0, "Dropout Probability",
-                         tooltip="The Probability for dropping the text encoder conditioning")
+        components.label(frame, row, 0, "丢弃概率",
+                         tooltip="文本编码器条件丢弃的概率")
         components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
         row += 1
 
         # train text encoder epochs
-        components.label(frame, 2, 0, "Stop Training After",
-                         tooltip="When to stop training the text encoder")
+        components.label(frame, 2, 0, "停止训练时间",
+                         tooltip="何时停止训练文本编码器")
         components.time_entry(frame, 2, 1, self.ui_state, "text_encoder.stop_training_after",
                               "text_encoder.stop_training_after_unit", supports_time_units=False)
 
         # text encoder learning rate
-        components.label(frame, 3, 0, "Text Encoder Learning Rate",
-                         tooltip="The learning rate of the text encoder. Overrides the base learning rate")
+        components.label(frame, 3, 0, "文本编码器学习率",
+                         tooltip="文本编码器的学习率。覆盖基础学习率")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate")
 
         # text encoder layer skip (clip skip)
-        components.label(frame, 4, 0, "Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
+        components.label(frame, 4, 0, "剪辑跳过",
+                         tooltip="要跳过的额外剪辑层数。0 = 模型默认值")
         components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
 
     def __create_text_encoder_1_frame(self, master, row, supports_include: bool = False):
@@ -361,45 +361,45 @@ class TrainingTab:
 
         if supports_include:
             # include text encoder
-            components.label(frame, row, 0, "Include Text Encoder 1",
-                             tooltip="Includes text encoder 1 in the training run")
+            components.label(frame, row, 0, "包含文本编码器 1",
+                             tooltip="在训练运行中包含文本编码器 1")
             components.switch(frame, row, 1, self.ui_state, "text_encoder.include")
             row += 1
 
         # train text encoder
-        components.label(frame, row, 0, "Train Text Encoder 1",
-                         tooltip="Enables training the text encoder 1 model")
+        components.label(frame, row, 0, "训练文本编码器 1",
+                         tooltip="启用训练文本编码器 1 模型")
         components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
         row += 1
 
         # train text encoder embedding
-        components.label(frame, row, 0, "Train Text Encoder 1 Embedding",
-                         tooltip="Enables training embeddings for the text encoder 1 model")
+        components.label(frame, row, 0, "训练文本编码器 1 嵌入",
+                         tooltip="启用训练文本编码器 1 模型的嵌入")
         components.switch(frame, row, 1, self.ui_state, "text_encoder.train_embedding")
         row += 1
 
         # dropout
-        components.label(frame, row, 0, "Dropout Probability",
-                         tooltip="The Probability for dropping the text encoder 1 conditioning")
+        components.label(frame, row, 0, "丢弃概率",
+                         tooltip="文本编码器 1 条件丢弃的概率")
         components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
         row += 1
 
         # train text encoder epochs
-        components.label(frame, row, 0, "Stop Training After",
-                         tooltip="When to stop training the text encoder 1")
+        components.label(frame, row, 0, "停止训练时间",
+                         tooltip="何时停止训练文本编码器 1")
         components.time_entry(frame, row, 1, self.ui_state, "text_encoder.stop_training_after",
                               "text_encoder.stop_training_after_unit", supports_time_units=False)
         row += 1
 
         # text encoder learning rate
-        components.label(frame, row, 0, "Text Encoder 1 Learning Rate",
-                         tooltip="The learning rate of the text encoder 1. Overrides the base learning rate")
+        components.label(frame, row, 0, "文本编码器 1 学习率",
+                         tooltip="文本编码器 1 的学习率。覆盖基础学习率")
         components.entry(frame, row, 1, self.ui_state, "text_encoder.learning_rate")
         row += 1
 
         # text encoder layer skip (clip skip)
-        components.label(frame, row, 0, "Text Encoder 1 Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
+        components.label(frame, row, 0, "文本编码器 1 剪辑跳过",
+                         tooltip="要跳过的额外剪辑层数。0 = 模型默认值")
         components.entry(frame, row, 1, self.ui_state, "text_encoder_layer_skip")
         row += 1
 
@@ -508,13 +508,13 @@ class TrainingTab:
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
 
         # embedding learning rate
-        components.label(frame, 0, 0, "Embeddings Learning Rate",
-                         tooltip="The learning rate of embeddings. Overrides the base learning rate")
+        components.label(frame, 0, 0, "嵌入学习率",
+                         tooltip="嵌入的学习率。覆盖基础学习率")
         components.entry(frame, 0, 1, self.ui_state, "embedding_learning_rate")
 
         # preserve embedding norm
-        components.label(frame, 1, 0, "Preserve Embedding Norm",
-                         tooltip="Rescales each trained embedding to the median embedding norm")
+        components.label(frame, 1, 0, "保留嵌入范数",
+                         tooltip="将每个训练后的嵌入重新缩放到中位嵌入范数")
         components.switch(frame, 1, 1, self.ui_state, "preserve_embedding_norm")
 
     def __create_unet_frame(self, master, row):
@@ -523,24 +523,24 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # train unet
-        components.label(frame, 0, 0, "Train UNet",
-                         tooltip="Enables training the UNet model")
+        components.label(frame, 0, 0, "训练 UNet",
+                         tooltip="启用训练 UNet 模型")
         components.switch(frame, 0, 1, self.ui_state, "unet.train")
 
         # train unet epochs
-        components.label(frame, 1, 0, "Stop Training After",
-                         tooltip="When to stop training the UNet")
+        components.label(frame, 1, 0, "停止训练时间",
+                         tooltip="何时停止训练 UNet")
         components.time_entry(frame, 1, 1, self.ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
                               supports_time_units=False)
 
         # unet learning rate
-        components.label(frame, 2, 0, "UNet Learning Rate",
-                         tooltip="The learning rate of the UNet. Overrides the base learning rate")
+        components.label(frame, 2, 0, "UNet 学习率",
+                         tooltip="UNet 的学习率。覆盖基础学习率")
         components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate")
 
         # rescale noise scheduler to zero terminal SNR
-        components.label(frame, 3, 0, "Rescale Noise Scheduler",
-                         tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
+        components.label(frame, 3, 0, "重新缩放到零终端信噪比",
+                         tooltip="将噪声调度器重新缩放到零终端信噪比，并将模型切换到 v 预测目标")
         components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
     def __create_prior_frame(self, master, row):
@@ -549,19 +549,19 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # train prior
-        components.label(frame, 0, 0, "Train Prior",
-                         tooltip="Enables training the Prior model")
+        components.label(frame, 0, 0, "训练先验",
+                         tooltip="启用训练先验模型")
         components.switch(frame, 0, 1, self.ui_state, "prior.train")
 
         # train prior epochs
-        components.label(frame, 1, 0, "Stop Training After",
-                         tooltip="When to stop training the Prior")
+        components.label(frame, 1, 0, "停止训练时间",
+                         tooltip="何时停止训练先验")
         components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
                               supports_time_units=False)
 
         # prior learning rate
-        components.label(frame, 2, 0, "Prior Learning Rate",
-                         tooltip="The learning rate of the Prior. Overrides the base learning rate")
+        components.label(frame, 2, 0, "先验学习率",
+                         tooltip="先验的学习率。覆盖基础学习率")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
     def __create_transformer_frame(self, master, row):
@@ -570,24 +570,24 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # train transformer
-        components.label(frame, 0, 0, "Train Transformer",
-                         tooltip="Enables training the Transformer model")
+        components.label(frame, 0, 0, "训练 Transformer",
+                         tooltip="启用训练 Transformer 模型")
         components.switch(frame, 0, 1, self.ui_state, "prior.train")
 
         # train transformer epochs
-        components.label(frame, 1, 0, "Stop Training After",
-                         tooltip="When to stop training the Transformer")
+        components.label(frame, 1, 0, "停止训练时间",
+                         tooltip="何时停止训练 Transformer")
         components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
                               supports_time_units=False)
 
         # transformer learning rate
-        components.label(frame, 2, 0, "Transformer Learning Rate",
-                         tooltip="The learning rate of the Transformer. Overrides the base learning rate")
+        components.label(frame, 2, 0, "Transformer 学习率",
+                         tooltip="Transformer 的学习率。覆盖基础学习率")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
         # transformer learning rate
-        components.label(frame, 3, 0, "Force Attention Mask",
-                         tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
+        components.label(frame, 3, 0, "强制注意力掩码",
+                         tooltip="强制启用将文本嵌入注意力掩码传递到 Transformer。这可以改善对较短标题的训练。")
         components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
 
     def __create_noise_frame(self, master, row):
@@ -596,40 +596,40 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # offset noise weight
-        components.label(frame, 0, 0, "Offset Noise Weight",
-                         tooltip="The weight of offset noise added to each training step")
+        components.label(frame, 0, 0, "Offset噪声权重",
+                         tooltip="添加到每个训练步骤的offset噪声的权重")
         components.entry(frame, 0, 1, self.ui_state, "offset_noise_weight")
 
         # perturbation noise weight
-        components.label(frame, 1, 0, "Perturbation Noise Weight",
-                         tooltip="The weight of perturbation noise added to each training step")
+        components.label(frame, 1, 0, "Perturbation噪声权重",
+                         tooltip="添加到每个训练步骤的Perturbation噪声的权重")
         components.entry(frame, 1, 1, self.ui_state, "perturbation_noise_weight")
 
         # timestep distribution
-        components.label(frame, 2, 0, "Timestep Distribution",
-                         tooltip="Selects the function to sample timesteps during training",
+        components.label(frame, 2, 0, "时间步长分布",
+                         tooltip="选择在训练期间采样时间步长的函数",
                          wide_tooltip=True)
         components.options_adv(frame, 2, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution",
                                adv_command=self.__open_timestep_distribution_window)
 
         # min noising strength
-        components.label(frame, 3, 0, "Min Noising Strength",
-                         tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
+        components.label(frame, 3, 0, "最小噪声强度",
+                         tooltip="指定训练期间使用的最小噪声强度。这可以帮助改进构图，但会阻止训练更精细的细节")
         components.entry(frame, 3, 1, self.ui_state, "min_noising_strength")
 
         # max noising strength
-        components.label(frame, 4, 0, "Max Noising Strength",
-                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
+        components.label(frame, 4, 0, "最大噪声强度",
+                         tooltip="指定训练期间使用的最大噪声强度。这可以用来减少过拟合，但也减少了训练样本对整体图像构图的影响")
         components.entry(frame, 4, 1, self.ui_state, "max_noising_strength")
 
         # noising weight
-        components.label(frame, 5, 0, "Noising Weight",
-                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
+        components.label(frame, 5, 0, "噪声权重",
+                         tooltip="控制时间步长分布函数的权重参数。使用预览查看更多详细信息。")
         components.entry(frame, 5, 1, self.ui_state, "noising_weight")
 
         # noising bias
-        components.label(frame, 6, 0, "Noising Bias",
-                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
+        components.label(frame, 6, 0, "噪声偏差",
+                         tooltip="控制时间步长分布函数的偏差参数。使用预览查看更多详细信息。")
         components.entry(frame, 6, 1, self.ui_state, "noising_bias")
 
 
@@ -639,23 +639,23 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # Masked Training
-        components.label(frame, 0, 0, "Masked Training",
-                         tooltip="Masks the training samples to let the model focus on certain parts of the image. When enabled, one mask image is loaded for each training sample.")
+        components.label(frame, 0, 0, "掩码训练",
+                         tooltip="掩盖训练样本，让模型专注于图像的特定部分。启用后，将为每个训练样本加载一个掩码图像。")
         components.switch(frame, 0, 1, self.ui_state, "masked_training")
 
         # unmasked probability
-        components.label(frame, 1, 0, "Unmasked Probability",
-                         tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
+        components.label(frame, 1, 0, "未掩盖概率",
+                         tooltip="启用掩码训练时，指定在未掩盖样本上进行的训练步骤数量")
         components.entry(frame, 1, 1, self.ui_state, "unmasked_probability")
 
         # unmasked weight
-        components.label(frame, 2, 0, "Unmasked Weight",
-                         tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
+        components.label(frame, 2, 0, "未掩盖权重",
+                         tooltip="启用掩码训练时，指定掩盖区域外部区域的损失权重")
         components.entry(frame, 2, 1, self.ui_state, "unmasked_weight")
 
         # normalize masked area loss
-        components.label(frame, 3, 0, "Normalize Masked Area Loss",
-                         tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
+        components.label(frame, 3, 0, "归一化掩盖区域损失",
+                         tooltip="启用掩码训练时，根据掩盖区域的大小对每个样本的损失进行归一化")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
@@ -664,39 +664,39 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         # MSE Strength
-        components.label(frame, 0, 0, "MSE Strength",
-                         tooltip="Mean Squared Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+        components.label(frame, 0, 0, "MSE 强度",
+                         tooltip="自定义损失设置的均方误差强度。MAE + MSE 强度通常应加起来为 1。")
         components.entry(frame, 0, 1, self.ui_state, "mse_strength")
 
         # MAE Strength
-        components.label(frame, 1, 0, "MAE Strength",
-                         tooltip="Mean Absolute Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+        components.label(frame, 1, 0, "MAE 强度",
+                         tooltip="自定义损失设置的平均绝对误差强度。MAE + MSE 强度通常应加起来为 1。")
         components.entry(frame, 1, 1, self.ui_state, "mae_strength")
 
         # log-cosh Strength
-        components.label(frame, 2, 0, "log-cosh Strength",
-                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings.")
+        components.label(frame, 2, 0, "log-cosh 强度",
+                         tooltip="自定义损失设置的对数 - 双曲余弦误差强度。")
         components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength")
 
         if supports_vb_loss:
             # VB Strength
-            components.label(frame, 3, 0, "VB Strength",
-                             tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
+            components.label(frame, 3, 0, "VB 强度",
+                             tooltip="自定义损失设置的变分下界强度。对于变分扩散模型，应设置为 1")
             components.entry(frame, 3, 1, self.ui_state, "vb_loss_strength")
 
         # Loss Weight function
-        components.label(frame, 4, 0, "Loss Weight Function",
-                         tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
+        components.label(frame, 4, 0, "损失权重函数",
+                         tooltip="损失权重函数的选择。可以帮助模型更准确地学习细节。")
         components.options(frame, 4, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
 
         # Loss weight strength
         components.label(frame, 5, 0, "Gamma",
-                         tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
+                         tooltip="损失加权的逆强度。范围：1-20，仅适用于最小 SNR 和 P2。")
         components.entry(frame, 5, 1, self.ui_state, "loss_weight_strength")
 
         # Loss Scaler
-        components.label(frame, 6, 0, "Loss Scaler",
-                         tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
+        components.label(frame, 6, 0, "损失缩放器",
+                         tooltip="选择在训练期间使用的损失缩放类型。功能上等同于：损失 * 选择")
         components.options(frame, 6, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __open_optimizer_params_window(self):

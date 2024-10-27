@@ -93,30 +93,30 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         frame.grid_rowconfigure(5, weight=1)
 
         # timestep distribution
-        components.label(frame, 0, 0, "Timestep Distribution",
-                         tooltip="Selects the function to sample timesteps during training",
+        components.label(frame, 0, 0, "时间步长分布",
+                         tooltip="选择在训练期间采样时间步长的函数",
                          wide_tooltip=True)
         components.options(frame, 0, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state,
                            "timestep_distribution")
 
         # min noising strength
-        components.label(frame, 1, 0, "Min Noising Strength",
-                         tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
+        components.label(frame, 1, 0, "最小噪声强度",
+                         tooltip="指定训练期间使用的最小噪声强度。这可以帮助改进构图，但会阻止训练更精细的细节")
         components.entry(frame, 1, 1, self.ui_state, "min_noising_strength")
 
         # max noising strength
-        components.label(frame, 2, 0, "Max Noising Strength",
-                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
+        components.label(frame, 2, 0, "最大噪声强度",
+                         tooltip="指定训练期间使用的最大噪声强度。这可以用来减少过拟合，但也减少了训练样本对整体图像构图的影响")
         components.entry(frame, 2, 1, self.ui_state, "max_noising_strength")
 
         # noising weight
-        components.label(frame, 3, 0, "Noising Weight",
-                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
+        components.label(frame, 3, 0, "噪声权重",
+                         tooltip="控制时间步长分布函数的权重参数。使用预览查看更多详细信息。")
         components.entry(frame, 3, 1, self.ui_state, "noising_weight")
 
         # noising bias
-        components.label(frame, 4, 0, "Noising Bias",
-                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
+        components.label(frame, 4, 0, "噪声偏差",
+                         tooltip="控制时间步长分布函数的偏差参数。使用预览查看更多详细信息。")
         components.entry(frame, 4, 1, self.ui_state, "noising_bias")
 
         # plot
