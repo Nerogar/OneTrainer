@@ -314,7 +314,7 @@ class StaticActivationAllocator:
 
         self.__current_cache_tensor = 0
         self.__current_cache_tensor_offset = 0
-        self.__allocated_bytes = 0
+        self.__allocated_bytes = sum(cache_tensor.shape[0] for cache_tensor in self.__cache_tensors)
 
     def deallocate_cache(self):
         if self.__is_pinned:
