@@ -17,6 +17,7 @@ class Optimizer(Enum):
     # 32 bit is torch and not bnb
     ADAMW = 'ADAMW'
     ADAMW_8BIT = 'ADAMW_8BIT'
+    PAGEDADAMW_8BIT = 'PAGEDADAMW_8BIT'
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"

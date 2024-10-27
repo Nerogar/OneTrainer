@@ -119,6 +119,18 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "block_wise": True,
         "is_paged": False,
     },
+    Optimizer.PAGEDADAMW_8BIT: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-8,
+        "weight_decay": 1e-2,
+        "amsgrad": False,
+        "optim_bits": 32,
+        "min_8bit_size": 4096,
+        "percentile_clipping": 100,
+        "block_wise": True,
+        "is_paged": False,
+    },
     Optimizer.AdEMAMix_8BIT: {
         "beta1": 0.9,
         "beta2": 0.999,

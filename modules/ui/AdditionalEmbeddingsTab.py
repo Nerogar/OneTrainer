@@ -81,37 +81,37 @@ class EmbeddingWidget(ctk.CTkFrame):
         clone_button.grid(row=0, column=1, padx=5)
 
         # embedding model names
-        components.label(top_frame, 0, 2, "base embedding:",
-                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
+        components.label(top_frame, 0, 2, "基础嵌入：",
+                         tooltip="要训练的基础嵌入。留空以创建新的嵌入")
         components.file_entry(
             top_frame, 0, 3, self.ui_state, "model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # placeholder
-        components.label(top_frame, 0, 4, "placeholder:",
-                         tooltip="The placeholder used when using the embedding in a prompt")
+        components.label(top_frame, 0, 4, "触发词：",
+                         tooltip="在提示中使用嵌入时使用的触发词")
         components.entry(top_frame, 0, 5, self.ui_state, "placeholder")
 
         # token count
-        components.label(top_frame, 0, 6, "token count:",
-                         tooltip="The token count used when creating a new embedding")
+        components.label(top_frame, 0, 6, "令牌计数：",
+                         tooltip="创建新嵌入时使用的令牌计数")
         token_count_entry = components.entry(top_frame, 0, 7, self.ui_state, "token_count")
         token_count_entry.configure(width=40)
 
         # trainable
-        components.label(bottom_frame, 0, 0, "train:")
+        components.label(bottom_frame, 0, 0, "训练:")
         trainable_switch = components.switch(bottom_frame, 0, 1, self.ui_state, "train")
         trainable_switch.configure(width=40)
 
         # stop training after
-        components.label(bottom_frame, 0, 2, "stop training after:",
-                         tooltip="When to stop training the embedding")
+        components.label(bottom_frame, 0, 2, "在以下情况下停止训练：",
+                         tooltip="何时停止训练嵌入")
         components.time_entry(bottom_frame, 0, 3, self.ui_state, "stop_training_after", "stop_training_after_unit")
 
         # initial embedding text
-        components.label(bottom_frame, 0, 4, "initial embedding text:",
-                         tooltip="The initial embedding text used when creating a new embedding")
+        components.label(bottom_frame, 0, 4, "初始嵌入文本：",
+                         tooltip="创建新嵌入时使用的初始嵌入文本")
         components.entry(bottom_frame, 0, 5, self.ui_state, "initial_embedding_text")
 
     def __randomize_uuid(self, embedding_config: TrainEmbeddingConfig):
