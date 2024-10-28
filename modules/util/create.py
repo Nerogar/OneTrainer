@@ -399,7 +399,7 @@ def create_optimizer(
         return None
 
     if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0:
-        if optimizer_config.optimizer.supports_fused_back_pass() and not optimizer_config.fused_back_pass \
+        if (not optimizer_config.optimizer.supports_fused_back_pass() or not optimizer_config.fused_back_pass) \
                 and config.training_method == TrainingMethod.FINE_TUNE:
             raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')
 
