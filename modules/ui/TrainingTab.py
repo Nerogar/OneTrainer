@@ -215,6 +215,11 @@ class TrainingTab:
         components.options(frame, 8, 1, [str(x) for x in list(LearningRateScaler)], self.ui_state,
                            "learning_rate_scaler")
 
+        # clip grad norm
+        components.label(frame, 9, 0, "Clip Grad Norm",
+                         tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
+        components.entry(frame, 9, 1, self.ui_state, "clip_grad_norm")
+
     def __create_base2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")

@@ -542,12 +542,14 @@ class GenericTrainer(BaseTrainer):
                         if scaler:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
                                 scaler.unscale_parameter_(tensor, self.model.optimizer)
-                                nn.utils.clip_grad_norm_(tensor, 1)
+                                if self.config.clip_grad_norm is not None:
+                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                                 scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
                                 tensor.grad = None
                         else:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                                nn.utils.clip_grad_norm_(tensor, 1)
+                                if self.config.clip_grad_norm is not None:
+                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                                 self.model.optimizer.step_parameter(tensor, param_group, i)
                                 tensor.grad = None
 
@@ -670,11 +672,13 @@ class GenericTrainer(BaseTrainer):
                             scaler.update()
                         elif scaler:
                             scaler.unscale_(self.model.optimizer)
-                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            if self.config.clip_grad_norm is not None:
+                                nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             scaler.step(self.model.optimizer)
                             scaler.update()
                         else:
-                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            if self.config.clip_grad_norm is not None:
+                                nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             self.model.optimizer.step()
 
                         lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients

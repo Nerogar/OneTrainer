@@ -295,6 +295,7 @@ class TrainConfig(BaseConfig):
     dropout_probability: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
+    clip_grad_norm: float
 
     # noise
     offset_noise_weight: float
@@ -739,6 +740,7 @@ class TrainConfig(BaseConfig):
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
+        data.append(("clip_grad_norm", 1.0, float, True))
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))
