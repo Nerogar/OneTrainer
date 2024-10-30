@@ -1,11 +1,11 @@
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.5.0+cu124
-torchvision==0.20.0+cu124
+torch==2.5.1+cu124
+torchvision==0.20.1+cu124
 onnxruntime-gpu==1.19.2
 
 # xformers
-xformers==0.0.28.post2
+xformers==0.0.28.post3
 
 # optimizers
 bitsandbytes==0.44.1 # bitsandbytes for 8-bit optimizers
