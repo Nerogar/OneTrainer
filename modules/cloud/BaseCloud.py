@@ -13,13 +13,7 @@ class BaseCloud(metaclass=ABCMeta):
         
 
     def setup(self):
-        try: self._connect()
-        except:
-            if self.config.cloud.create:
-                self._create()
-                self._connect()
-            else: raise
-            
+        self._connect()
         if self.config.cloud.install_onetrainer: self._install_onetrainer()
 
     def download_output_model(self):

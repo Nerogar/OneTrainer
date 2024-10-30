@@ -35,11 +35,20 @@ class RunpodCloud(LinuxCloud):
     
         
     def _connect(self):
-        if self.config.cloud.id != "": self.__get_host_port()
+        config=self.config.cloud
+
+        pod=None
+        if config.id != "":
+            pod=runpod.get_pod(config.id)
+            if pod is None: raise ValueError(f"Runpod {config.id} does not exist")
+        elif config.create:
+            self._create()
+            pod=runpod.get_pod(config.id)
+            if pod is None: raise ValueError(f"Could not create cloud")
+
+        if pod is not None: self.__get_host_port()
         super()._connect()
       
-        
-        
     def _create(self):
         config=self.config.cloud
         if config.min_download == 0:

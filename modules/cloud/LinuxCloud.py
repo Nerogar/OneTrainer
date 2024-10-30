@@ -23,7 +23,7 @@ class LinuxCloud(BaseCloud):
     def _connect(self):
         if self.connection: return
         config=self.config.cloud
-        if config.host != '' and config.port > 0:
+        if config.host != '' and config.port != '':
             self.connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.connection.open()
             
@@ -196,6 +196,12 @@ class LinuxCloud(BaseCloud):
 
     @staticmethod
     def __upload_dir(connection,local : Path,remote : Path,update_info,commands : TrainCommands=None):
+        n=sum(1 for entry in local.iterdir())
+        if n > 50:
+            print(f"WARNING: Uploading {n} files. Uploading many individual files can be slow via SSH.")
+            print( "         If you prefer, you can interrupt the upload by pressing 'Stop Training',")
+            print(f"         upload your files in {str(local)} manually to the cloud at {remote.as_posix()},")
+            print( "         and start training again.")
         for local_entry in local.iterdir():
             LinuxCloud.__upload(connection,local_entry,remote/local_entry.name,update_info=update_info,commands=commands)
             if commands and commands.get_stop_command(): return
