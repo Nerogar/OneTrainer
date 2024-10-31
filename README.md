@@ -21,7 +21,7 @@ Hardware for development sponsored by https://shakker.ai
 - **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
 - **Noise Scheduler Rescaling**: From the paper
   [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
-- **EMA**: Train you own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
+- **EMA**: Train your own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
 - **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
   resolutions, buckets are created automatically.
 - **Multi Resolution Training**: Train multiple resolutions at the same time.
