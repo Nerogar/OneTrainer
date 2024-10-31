@@ -359,9 +359,9 @@ class StableDiffusion3Model(BaseModel):
                 )
 
         if apply_attention_mask:
-            text_encoder_1_output *= tokens_mask_1[:, :, None]
-            text_encoder_2_output *= tokens_mask_2[:, :, None]
-            text_encoder_3_output *= tokens_mask_3[:, :, None]
+            text_encoder_1_output = text_encoder_1_output * tokens_mask_1[:, :, None]
+            text_encoder_2_output = text_encoder_2_output * tokens_mask_2[:, :, None]
+            text_encoder_3_output = text_encoder_3_output * tokens_mask_3[:, :, None]
 
         # apply dropout
         if text_encoder_1_dropout_probability is not None:

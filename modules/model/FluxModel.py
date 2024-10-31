@@ -273,7 +273,7 @@ class FluxModel(BaseModel):
                 )
 
         if apply_attention_mask:
-            text_encoder_2_output *= tokens_mask_2[:, :, None]
+            text_encoder_2_output = text_encoder_2_output * tokens_mask_2[:, :, None]
 
         # apply dropout
         if text_encoder_1_dropout_probability is not None:
