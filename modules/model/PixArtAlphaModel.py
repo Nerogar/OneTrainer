@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.t5_util import encode_t5
@@ -169,9 +170,13 @@ class PixArtAlphaModel(BaseModel):
 
     def encode_text(
             self,
+            train_device: torch.device,
+            batch_size: int,
+            rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
             text_encoder_layer_skip: int = 0,
+            text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
             attention_mask: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
@@ -202,5 +207,13 @@ class PixArtAlphaModel(BaseModel):
                 text_encoder_output=text_encoder_output,
                 attention_mask=attention_mask,
             )
+
+        # apply dropout
+        if text_encoder_dropout_probability is not None:
+            dropout_text_encoder_mask = (torch.tensor(
+                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            attention_mask = attention_mask * dropout_text_encoder_mask[:, None]
+            text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
 
         return text_encoder_output, attention_mask

@@ -181,10 +181,14 @@ class BaseStableDiffusionSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output = model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
                 tokens=batch['tokens'],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_output=batch[
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
 
             latent_image = batch['latent_image']
@@ -198,6 +202,9 @@ class BaseStableDiffusionSetup(
 
             if is_align_prop_step and not deterministic:
                 negative_text_encoder_output = model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch['latent_image'].shape[0],
+                    rand=rand,
                     text="",
                     text_encoder_layer_skip=config.text_encoder_layer_skip,
                 ).expand((scaled_latent_image.shape[0], -1, -1))

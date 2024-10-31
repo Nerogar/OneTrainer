@@ -331,6 +331,12 @@ class TrainingTab:
                          tooltip="Enables training the text encoder model")
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
+        # dropout
+        components.label(frame, row, 0, "Dropout Probability",
+                         tooltip="The Probability for dropping the text encoder conditioning")
+        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+        row += 1
+
         # train text encoder epochs
         components.label(frame, 2, 0, "Stop Training After",
                          tooltip="When to stop training the text encoder")
@@ -372,12 +378,11 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "text_encoder.train_embedding")
         row += 1
 
-        if supports_include: # TODO: enable this for all models
-            # dropout
-            components.label(frame, row, 0, "Dropout Probability",
-                             tooltip="The Probability for dropping the text encoder 1 conditioning")
-            components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
-            row += 1
+        # dropout
+        components.label(frame, row, 0, "Dropout Probability",
+                         tooltip="The Probability for dropping the text encoder 1 conditioning")
+        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+        row += 1
 
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
@@ -423,12 +428,11 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "text_encoder_2.train_embedding")
         row += 1
 
-        if supports_include: # TODO: enable this for all models
-            # dropout
-            components.label(frame, row, 0, "Dropout Probability",
-                             tooltip="The Probability for dropping the text encoder 2 conditioning")
-            components.entry(frame, row, 1, self.ui_state, "text_encoder_2.dropout_probability")
-            row += 1
+        # dropout
+        components.label(frame, row, 0, "Dropout Probability",
+                         tooltip="The Probability for dropping the text encoder 2 conditioning")
+        components.entry(frame, row, 1, self.ui_state, "text_encoder_2.dropout_probability")
+        row += 1
 
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
@@ -474,12 +478,11 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "text_encoder_3.train_embedding")
         row += 1
 
-        if supports_include: # TODO: enable this for all models
-            # dropout
-            components.label(frame, row, 0, "Dropout Probability",
-                             tooltip="The Probability for dropping the text encoder 3 conditioning")
-            components.entry(frame, row, 1, self.ui_state, "text_encoder_3.dropout_probability")
-            row += 1
+        # dropout
+        components.label(frame, row, 0, "Dropout Probability",
+                         tooltip="The Probability for dropping the text encoder 3 conditioning")
+        components.entry(frame, row, 1, self.ui_state, "text_encoder_3.dropout_probability")
+        row += 1
 
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
