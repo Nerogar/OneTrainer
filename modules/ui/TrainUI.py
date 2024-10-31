@@ -497,7 +497,7 @@ class TrainUI(ctk.CTk):
             self.additional_embeddings_tab.refresh_ui()
 
     def open_tensorboard(self):
-        webbrowser.open("http://localhost:" + self.train_config.tensorboard_port, new=0, autoraise=False)
+        webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
         self.set_step_progress(train_progress.epoch_step, max_sample)

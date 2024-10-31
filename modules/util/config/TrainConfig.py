@@ -671,6 +671,7 @@ class TrainConfig(BaseConfig):
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_port", "6006", str, False))
+        data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
