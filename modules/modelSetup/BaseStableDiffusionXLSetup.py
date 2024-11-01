@@ -327,16 +327,16 @@ class BaseStableDiffusionXLSetup(
                         latent_input = scaled_noisy_latent_image
 
                     predicted_latent_noise = checkpointed_unet(
-                        sample=latent_input,
+                        sample=latent_input.to(dtype=model.train_dtype.torch_dtype()),
                         timestep=timestep,
-                        encoder_hidden_states=text_encoder_output,
+                        encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                         added_cond_kwargs=added_cond_kwargs,
                     ).sample
 
                     negative_predicted_latent_noise = checkpointed_unet(
-                        sample=latent_input,
+                        sample=latent_input.to(dtype=model.train_dtype.torch_dtype()),
                         timestep=timestep,
-                        encoder_hidden_states=negative_text_encoder_output,
+                        encoder_hidden_states=negative_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                         added_cond_kwargs=negative_added_cond_kwargs,
                     ).sample
 
@@ -425,9 +425,9 @@ class BaseStableDiffusionXLSetup(
 
                 added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
                 predicted_latent_noise = model.unet(
-                    sample=latent_input,
+                    sample=latent_input.to(dtype=model.train_dtype.torch_dtype()),
                     timestep=timestep,
-                    encoder_hidden_states=text_encoder_output,
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     added_cond_kwargs=added_cond_kwargs,
                 ).sample
 
