@@ -25,7 +25,7 @@ class StableDiffusion3EmbeddingModelLoader(
             case ModelType.STABLE_DIFFUSION_3:
                 return "resources/sd_model_spec/sd_3_2b_1.0-embedding.json"
             case ModelType.STABLE_DIFFUSION_35:
-                return "resources/sd_model_spec/sd_3.5_8b_1.0-embedding.json"
+                return "resources/sd_model_spec/sd_3.5_1.0-embedding.json"
             case _:
                 return None
 
