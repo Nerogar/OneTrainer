@@ -300,8 +300,13 @@ function get_platform_requirements_path {
         # NOTE: We MUST prioritize NVIDIA first, since machines that contain
         # *both* AMD and NVIDIA GPUs are usually running integrated AMD graphics
         # that's built into their CPU, whereas their *dedicated* GPU is NVIDIA.
-        if can_exec nvidia-smi || can_exec nvcc; then
-            # NOTE: NVIDIA drivers don't contain "nvcc". That's a CUDA dev-tool.
+        if [[ -e "/dev/nvidia0" ]] || can_exec nvidia-smi || can_exec "/usr/lib/wsl/lib/nvidia-smi"; then
+            # NVIDIA graphics.
+            #  "/dev/nvidia0": The "first" detected NVIDIA GPU in the system.
+            #  "nvidia-smi": Driver tool for all NVIDIA GPUs made after 2010.
+            #  "nvcc": CUDA SDK compiler. Not included in the drivers.
+            #  "/usr/lib/wsl/lib/nvidia-smi": WSL's NVIDIA path (isn't in $PATH).
+            # SEE: https://docs.nvidia.com/cuda/wsl-user-guide/
             platform_reqs="requirements-cuda.txt"
         elif [[ -e "/dev/kfd" ]]; then
             # AMD graphics.
