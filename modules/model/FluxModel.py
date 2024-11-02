@@ -6,11 +6,9 @@ from modules.model.util.clip_util import encode_clip
 from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.modelSpec.ModelSpec import ModelSpec
-from modules.util.TrainProgress import TrainProgress
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -45,14 +43,13 @@ class FluxModelEmbedding(BaseModelEmbedding):
 
 class FluxModel(BaseModel):
     # base model data
-    model_type: ModelType
-    tokenizer_1: CLIPTokenizer
-    tokenizer_2: T5Tokenizer
-    noise_scheduler: FlowMatchEulerDiscreteScheduler
-    text_encoder_1: CLIPTextModel
-    text_encoder_2: T5EncoderModel
-    vae: AutoencoderKL
-    transformer: FluxTransformer2DModel
+    tokenizer_1: CLIPTokenizer | None
+    tokenizer_2: T5Tokenizer | None
+    noise_scheduler: FlowMatchEulerDiscreteScheduler | None
+    text_encoder_1: CLIPTextModel | None
+    text_encoder_2: T5EncoderModel | None
+    vae: AutoencoderKL | None
+    transformer: FluxTransformer2DModel | None
 
     # autocast context
     autocast_context: torch.autocast | nullcontext
@@ -61,13 +58,16 @@ class FluxModel(BaseModel):
     train_dtype: DataType
     text_encoder_2_train_dtype: DataType
 
+    text_encoder_2_offload_conductor: LayerOffloadConductor | None
+    transformer_offload_conductor: LayerOffloadConductor | None
+
     # persistent embedding training data
     embedding: FluxModelEmbedding | None
     embedding_state: tuple[Tensor, Tensor, Tensor] | None
     additional_embeddings: list[FluxModelEmbedding] | None
     additional_embedding_states: list[tuple[Tensor, Tensor, Tensor] | None]
-    embedding_wrapper_1: AdditionalEmbeddingWrapper
-    embedding_wrapper_2: AdditionalEmbeddingWrapper
+    embedding_wrapper_1: AdditionalEmbeddingWrapper | None
+    embedding_wrapper_2: AdditionalEmbeddingWrapper | None
 
     # persistent lora training data
     text_encoder_1_lora: LoRAModuleWrapper | None
@@ -81,45 +81,18 @@ class FluxModel(BaseModel):
     def __init__(
             self,
             model_type: ModelType,
-            tokenizer_1: CLIPTokenizer | None = None,
-            tokenizer_2: T5Tokenizer | None = None,
-            noise_scheduler: FlowMatchEulerDiscreteScheduler | None = None,
-            text_encoder_1: CLIPTextModel | None = None,
-            text_encoder_2: T5EncoderModel | None = None,
-            vae: AutoencoderKL | None = None,
-            transformer: FluxTransformer2DModel | None = None,
-            optimizer_state_dict: dict | None = None,
-            ema_state_dict: dict | None = None,
-            train_progress: TrainProgress = None,
-            embedding: FluxModelEmbedding | None = None,
-            embedding_state: tuple[Tensor, Tensor, Tensor] | None = None,
-            additional_embeddings: list[FluxModelEmbedding] | None = None,
-            additional_embedding_states: list[tuple[Tensor, Tensor, Tensor] | None] = None,
-            embedding_wrapper_1: AdditionalEmbeddingWrapper | None = None,
-            embedding_wrapper_2: AdditionalEmbeddingWrapper | None = None,
-            text_encoder_1_lora: LoRAModuleWrapper | None = None,
-            text_encoder_2_lora: LoRAModuleWrapper | None = None,
-            transformer_lora: LoRAModuleWrapper | None = None,
-            lora_state_dict: dict | None = None,
-            model_spec: ModelSpec | None = None,
-            train_config: TrainConfig | None = None,
     ):
         super().__init__(
             model_type=model_type,
-            optimizer_state_dict=optimizer_state_dict,
-            ema_state_dict=ema_state_dict,
-            train_progress=train_progress,
-            model_spec=model_spec,
-            train_config=train_config,
         )
 
-        self.tokenizer_1 = tokenizer_1
-        self.tokenizer_2 = tokenizer_2
-        self.noise_scheduler = noise_scheduler
-        self.text_encoder_1 = text_encoder_1
-        self.text_encoder_2 = text_encoder_2
-        self.vae = vae
-        self.transformer = transformer
+        self.tokenizer_1 = None
+        self.tokenizer_2 = None
+        self.noise_scheduler = None
+        self.text_encoder_1 = None
+        self.text_encoder_2 = None
+        self.vae = None
+        self.transformer = None
 
         self.autocast_context = nullcontext()
         self.text_encoder_2_autocast_context = nullcontext()
@@ -127,17 +100,20 @@ class FluxModel(BaseModel):
         self.train_dtype = DataType.FLOAT_32
         self.text_encoder_2_train_dtype = DataType.FLOAT_32
 
-        self.embedding = embedding
-        self.embedding_state = embedding_state
-        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
-        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
-        self.embedding_wrapper_1 = embedding_wrapper_1
-        self.embedding_wrapper_2 = embedding_wrapper_2
+        self.text_encoder_2_offload_conductor = None
+        self.transformer_offload_conductor = None
 
-        self.text_encoder_1_lora = text_encoder_1_lora
-        self.text_encoder_2_lora = text_encoder_2_lora
-        self.transformer_lora = transformer_lora
-        self.lora_state_dict = lora_state_dict
+        self.embedding = None
+        self.embedding_state = None
+        self.additional_embeddings = []
+        self.additional_embedding_states = []
+        self.embedding_wrapper_1 = None
+        self.embedding_wrapper_2 = None
+
+        self.text_encoder_1_lora = None
+        self.text_encoder_2_lora = None
+        self.transformer_lora = None
+        self.lora_state_dict = None
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -155,13 +131,21 @@ class FluxModel(BaseModel):
 
     def text_encoder_2_to(self, device: torch.device):
         if self.text_encoder_2 is not None:
-            self.text_encoder_2.to(device=device)
+            if self.text_encoder_2_offload_conductor is not None and \
+                    self.text_encoder_2_offload_conductor.layer_offload_activated():
+                self.text_encoder_2_offload_conductor.to(device)
+            else:
+                self.text_encoder_2.to(device=device)
 
         if self.text_encoder_2_lora is not None:
             self.text_encoder_2_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        self.transformer.to(device=device)
+        if self.transformer_offload_conductor is not None and \
+                self.transformer_offload_conductor.layer_offload_activated():
+            self.transformer_offload_conductor.to(device)
+        else:
+            self.transformer.to(device=device)
 
         if self.transformer_lora is not None:
             self.transformer_lora.to(device)

@@ -246,6 +246,7 @@ class TrainConfig(BaseConfig):
     output_model_format: ModelFormat
     output_model_destination: str
     gradient_checkpointing: GradientCheckpointingMethod
+    layer_offload_fraction: float
     force_circular_padding: bool
 
     # data settings
@@ -693,6 +694,7 @@ class TrainConfig(BaseConfig):
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
+        data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
 
         # data settings

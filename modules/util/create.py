@@ -215,6 +215,7 @@ def create_model_saver(
 
     return None
 
+
 def create_model_setup(
         model_type: ModelType,
         train_device: torch.device,
@@ -267,6 +268,7 @@ def create_model_setup(
                 return FluxEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
+
 
 def create_model_sampler(
         train_device: torch.device,
@@ -321,6 +323,7 @@ def create_model_sampler(
 
     return None
 
+
 def create_data_loader(
         train_device: torch.device,
         temp_device: torch.device,
@@ -331,8 +334,12 @@ def create_data_loader(
         train_progress: TrainProgress | None = None,
         is_validation: bool = False
 ) -> BaseDataLoader | None:
+    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0 and config.dataloader_threads > 1:
+        raise RuntimeError('layer offloading can not be activated if "dataloader_threads" > 1')
+
     if train_progress is None:
         train_progress = TrainProgress()
+
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
@@ -379,13 +386,22 @@ def create_data_loader(
 
     return None
 
+
 def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
-) -> torch.optim.Optimizer:
+) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
+
+    if optimizer_config.optimizer is None:
+        return None
+
+    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0:
+        if (not optimizer_config.optimizer.supports_fused_back_pass() or not optimizer_config.fused_back_pass) \
+                and config.training_method == TrainingMethod.FINE_TUNE:
+            raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
 

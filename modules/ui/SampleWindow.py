@@ -50,8 +50,8 @@ class SampleWindow(ctk.CTkToplevel):
             self.callbacks.set_on_sample_custom(self.__update_preview)
             self.callbacks.set_on_update_sample_custom_progress(self.__update_progress)
         else:
-            self.model = self.__load_model()
-            self.model_sampler = self.__create_sampler(self.model)
+            self.model = None
+            self.model_sampler = None
 
         self.sample = SampleConfig.default_values()
         self.ui_state = UIState(self, self.sample)
@@ -123,8 +123,10 @@ class SampleWindow(ctk.CTkToplevel):
         )
         model.train_config = self.initial_train_config
 
+        model_setup.setup_optimizations(model, self.initial_train_config)
         model_setup.setup_train_device(model, self.initial_train_config)
         model_setup.setup_model(model, self.initial_train_config)
+        model.to(torch.device(self.initial_train_config.temp_device))
 
         return model
 
@@ -156,6 +158,11 @@ class SampleWindow(ctk.CTkToplevel):
         if self.commands:
             self.commands.sample_custom(sample)
         else:
+            if self.model is None:
+                # lazy initialization
+                self.model = self.__load_model()
+                self.model_sampler = self.__create_sampler(self.model)
+
             sample.from_train_config(self.current_train_config)
 
             sample_dir = os.path.join(

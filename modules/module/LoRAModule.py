@@ -7,6 +7,7 @@ from typing import Any
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
+from modules.util.torch_util import device_equals
 
 import torch
 import torch.nn.functional as F
@@ -344,15 +345,24 @@ class DoRAModule(LoRAModule):
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
         self.norm_epsilon = kwargs.pop('norm_epsilon', False)
+        self.train_device = kwargs.pop('train_device')
         super().__init__(*args, **kwargs)
 
     def initialize_weights(self):
         super().initialize_weights()
 
+        # Temporarily move the module to the train_device if it's located on the temp_device
+        orig_device = self.orig_module.weight.device
+        if not device_equals(orig_device, self.train_device):
+            self.orig_module.to(self.train_device)
+            orig_weight = get_unquantized_weight(self.orig_module, torch.float)
+            self.orig_module.to(orig_device)
+        else:
+            orig_weight = get_unquantized_weight(self.orig_module, torch.float)
+
         # Thanks to KohakuBlueLeaf once again for figuring out the shape
         # wrangling that works for both Linear and Convolutional layers. If you
         # were just doing this for Linear, it would be substantially simpler.
-        orig_weight = get_unquantized_weight(self.orig_module, torch.float)
         self.dora_num_dims = orig_weight.dim() - 1
         self.dora_scale = nn.Parameter(
             torch.norm(
@@ -430,7 +440,10 @@ class LoRAModuleWrapper:
                 self.klass = DoRAModule
                 self.dummy_klass = DummyDoRAModule
                 self.additional_args = [self.rank, self.alpha]
-                self.additional_kwargs = {'norm_epsilon': config.lora_decompose_norm_epsilon}
+                self.additional_kwargs = {
+                    'norm_epsilon': config.lora_decompose_norm_epsilon,
+                    'train_device': torch.device(config.train_device),
+                }
             else:
                 self.klass = LoRAModule
                 self.dummy_klass = DummyLoRAModule

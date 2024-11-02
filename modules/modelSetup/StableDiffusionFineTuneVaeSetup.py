@@ -48,9 +48,7 @@ class StableDiffusionFineTuneVaeSetup(
         model.vae.decoder.requires_grad_(True)
         model.unet.requires_grad_(False)
 
-        init_model_parameters(model, self.create_parameters(model, config))
-
-        self._setup_optimizations(model, config)
+        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
 
     def setup_train_device(
             self,

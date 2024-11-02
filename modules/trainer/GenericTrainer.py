@@ -130,6 +130,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("running model setup")
 
+        self.model_setup.setup_optimizations(self.model, self.config)
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
         self.model.to(self.temp_device)
@@ -628,6 +629,12 @@ class GenericTrainer(BaseTrainer):
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )
 
+                if self.__needs_backup(train_progress):
+                    self.commands.backup()
+
+                if self.__needs_save(train_progress):
+                    self.commands.save()
+
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
                 if sample_commands:
                     def create_sample_commands_fun(sample_commands):
@@ -643,12 +650,20 @@ class GenericTrainer(BaseTrainer):
 
                 if not has_gradient:
                     self.__execute_sample_during_training()
+                    transferred_to_temp_device = False
 
-                if self.__needs_backup(train_progress) or self.commands.get_and_reset_backup_command():
-                    self.backup(train_progress)
+                    if self.commands.get_and_reset_backup_command():
+                        self.model.to(self.temp_device)
+                        self.backup(train_progress)
+                        transferred_to_temp_device = True
 
-                if self.__needs_save(train_progress) or self.commands.get_and_reset_save_command():
-                    self.save(train_progress)
+                    if self.commands.get_and_reset_save_command():
+                        self.model.to(self.temp_device)
+                        self.save(train_progress)
+                        transferred_to_temp_device = True
+
+                    if transferred_to_temp_device:
+                        self.model_setup.setup_train_device(self.model, self.config)
 
                 self.callbacks.on_update_status("training")
 
@@ -731,6 +746,8 @@ class GenericTrainer(BaseTrainer):
 
     def end(self):
         if self.one_step_trained:
+            self.model.to(self.temp_device)
+
             if self.config.backup_before_save:
                 self.backup(self.model.train_progress)
             # Special case for schedule-free optimizers.
@@ -752,6 +769,8 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=self.config.output_model_destination,
                 dtype=self.config.output_dtype.torch_dtype()
             )
+        else:
+            self.model.to(self.temp_device)
 
         self.tensorboard.close()
 
