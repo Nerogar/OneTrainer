@@ -42,7 +42,7 @@ Select a base model to train on. This can be a model in many different formats:
 
 1. A filename of a checkpoint either in ckpt or safetensors format
 2. A directory name of a model in diffusers format
-3. A Huggingface repository name
+3. A Hugging Face repository name
 4. A backup directory from a previous training run
 
 You also need to specify the type of the input model.
