@@ -2,7 +2,16 @@
 requires-python = ">=3.10"
 
 [tool.ruff]
-extend-exclude = ["scripts/util/version_check.py"]
+extend-exclude = [
+    # Exclude all third-party dependencies and environments.
+    # NOTE: Conda installs mgds+diffusers into "src/" in the project directory.
+    ".venv*",
+    "venv*",
+    "conda_env*",
+    "src",
+    # Do not lint the universal Python 2/3 version checker.
+    "scripts/util/version_check.py",
+]
 line-length = 120
 
 [tool.ruff.lint]
@@ -10,18 +19,21 @@ select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN"
 ignore = ["BLE001", "E402", "E501", "B024", "PGH003", "RET504", "RET505", "SIM102", "UP015"]
 
 [tool.ruff.lint.isort.sections]
-torch = ["torch*"]
 hf = ["diffusers*", "transformers*"]
+mgds = ["mgds"]
+torch = ["torch*"]
 
 [tool.ruff.format]
 quote-style = "double"
 docstring-code-format = true
 
 [tool.ruff.lint.isort]
+known-first-party = ["modules"]
 section-order = [
     "future",
     "standard-library",
     "first-party",
+    "mgds",
     "torch",
     "hf",
     "third-party",

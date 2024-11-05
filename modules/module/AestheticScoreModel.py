@@ -57,7 +57,7 @@ class AestheticScoreModel(nn.Module):
         )
 
         mlp_model = MLPModel()
-        mlp_model.load_state_dict(torch.load(os.path.join(path, filename)))
+        mlp_model.load_state_dict(torch.load(os.path.join(path, filename), weights_only=True))
 
         return mlp_model
 

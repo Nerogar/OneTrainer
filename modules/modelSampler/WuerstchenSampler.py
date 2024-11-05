@@ -359,8 +359,8 @@ class WuerstchenSampler(BaseModelSampler):
         image = self.__sample_base(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            height=sample_config.height,
-            width=sample_config.width,
+            height=self.quantize_resolution(sample_config.height, 128),
+            width=self.quantize_resolution(sample_config.width, 128),
             seed=sample_config.seed,
             random_seed=sample_config.random_seed,
             diffusion_steps=sample_config.diffusion_steps,

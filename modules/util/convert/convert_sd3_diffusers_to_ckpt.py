@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 
 
-def __swap_chunks(tensor:Tensor) -> Tensor:
+def __swap_chunks(tensor: Tensor) -> Tensor:
     chunk_0, chunk_1 = tensor.chunk(2, dim=0)
     return torch.cat([chunk_1, chunk_0], dim=0)
 
@@ -48,8 +48,34 @@ def __map_transformer_block(in_states: dict, out_prefix: str, in_prefix: str, is
         out_states[util.combine(out_prefix, "context_block.adaLN_modulation.1.weight")] = __swap_chunks(in_states[util.combine(in_prefix, "norm1_context.linear.weight")])
         out_states[util.combine(out_prefix, "context_block.adaLN_modulation.1.bias")] = __swap_chunks(in_states[util.combine(in_prefix, "norm1_context.linear.bias")])
 
+    if util.combine(in_prefix, "attn.norm_added_k.weight") in in_states:
+        out_states[util.combine(out_prefix, "context_block.attn.ln_k.weight")] = in_states[util.combine(in_prefix, "attn.norm_added_k.weight")]
+        out_states[util.combine(out_prefix, "context_block.attn.ln_q.weight")] = in_states[util.combine(in_prefix, "attn.norm_added_q.weight")]
+
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "x_block.mlp.fc1"), util.combine(in_prefix, "ff.net.0.proj"))
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "x_block.mlp.fc2"), util.combine(in_prefix, "ff.net.2"))
+
+    if util.combine(in_prefix, "attn.norm_k.weight") in in_states:
+        out_states[util.combine(out_prefix, "x_block.attn.ln_k.weight")] = in_states[util.combine(in_prefix, "attn.norm_k.weight")]
+        out_states[util.combine(out_prefix, "x_block.attn.ln_q.weight")] = in_states[util.combine(in_prefix, "attn.norm_q.weight")]
+
+    if util.combine(in_prefix, "attn2.norm_k.weight") in in_states:
+        out_states[util.combine(out_prefix, "x_block.attn2.ln_k.weight")] = in_states[util.combine(in_prefix, "attn2.norm_k.weight")]
+        out_states[util.combine(out_prefix, "x_block.attn2.ln_q.weight")] = in_states[util.combine(in_prefix, "attn2.norm_q.weight")]
+
+        out_states[util.combine(out_prefix, "x_block.attn2.qkv.weight")] = torch.cat([
+            in_states[util.combine(in_prefix, "attn2.to_q.weight")],
+            in_states[util.combine(in_prefix, "attn2.to_k.weight")],
+            in_states[util.combine(in_prefix, "attn2.to_v.weight")],
+        ], 0)
+
+        out_states[util.combine(out_prefix, "x_block.attn2.qkv.bias")] = torch.cat([
+            in_states[util.combine(in_prefix, "attn2.to_q.bias")],
+            in_states[util.combine(in_prefix, "attn2.to_k.bias")],
+            in_states[util.combine(in_prefix, "attn2.to_v.bias")],
+        ], 0)
+
+        out_states |= util.map_wb(in_states, util.combine(out_prefix, "x_block.attn2.proj"), util.combine(in_prefix, "attn2.to_out.0"))
 
     if not is_last:
         out_states |= util.map_wb(in_states, util.combine(out_prefix, "context_block.mlp.fc1"), util.combine(in_prefix, "ff_context.net.0.proj"))
@@ -73,10 +99,11 @@ def __map_transformer(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "y_embedder.mlp.0"), util.combine(in_prefix, "time_text_embed.text_embedder.linear_1"))
     out_states |= util.map_wb(in_states, util.combine(out_prefix, "y_embedder.mlp.2"), util.combine(in_prefix, "time_text_embed.text_embedder.linear_2"))
 
-    num_layers = 24
-    for i in range(num_layers):
-        is_last = i == (num_layers - 1)
+    i = 0
+    while any(key.startswith(util.combine(in_prefix, f"transformer_blocks.{i}")) for key in in_states):
+        is_last = not any(key.startswith(util.combine(in_prefix, f"transformer_blocks.{i+1}")) for key in in_states)
         out_states |= __map_transformer_block(in_states, util.combine(out_prefix, f"joint_blocks.{i}"), util.combine(in_prefix, f"transformer_blocks.{i}"), is_last)
+        i += 1
 
     return out_states
 

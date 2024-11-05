@@ -39,21 +39,16 @@ class BaseModel(metaclass=ABCMeta):
     def __init__(
             self,
             model_type: ModelType,
-            optimizer_state_dict: dict | None,
-            ema_state_dict: dict | None,
-            train_progress: TrainProgress,
-            model_spec: ModelSpec | None,
-            train_config: TrainConfig | None,
     ):
         self.model_type = model_type
         self.parameters = None
         self.optimizer = None
-        self.optimizer_state_dict = optimizer_state_dict
+        self.optimizer_state_dict = None
         self.param_group_mapping = None
-        self.ema_state_dict = ema_state_dict
-        self.train_progress = train_progress if train_progress is not None else TrainProgress()
-        self.model_spec = model_spec
-        self.train_config = train_config
+        self.ema_state_dict = None
+        self.train_progress = TrainProgress()
+        self.model_spec = None
+        self.train_config = None
 
     @abstractmethod
     def to(self, device: torch.device):

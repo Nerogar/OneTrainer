@@ -3,6 +3,9 @@ from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.torch_util import optimizer_to_device_
+
+import torch
 
 
 def change_optimizer(train_config: TrainConfig) -> TrainOptimizerConfig:
@@ -47,10 +50,13 @@ def update_optimizer_config(train_config: TrainConfig):
 def init_model_parameters(
         model: BaseModel,
         parameters: NamedParameterGroupCollection,
+        train_device: torch.device,
 ):
     model.parameters = parameters
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    if model.optimizer is not None:
+        optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
     model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
@@ -125,7 +131,18 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta3": 0.9999,
         "eps": 1e-8,
         "alpha": 5,
-        "weight_decay": 0.05,
+        "weight_decay": 1e-2,
+        "min_8bit_size": 4096,
+        "is_paged": False,
+    },
+    Optimizer.AdEMAMix: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "beta3": 0.9999,
+        "eps": 1e-8,
+        "alpha": 5,
+        "weight_decay": 1e-2,
+        "optim_bits": 32,
         "min_8bit_size": 4096,
         "is_paged": False,
     },

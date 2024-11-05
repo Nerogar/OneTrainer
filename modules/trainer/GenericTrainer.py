@@ -89,6 +89,8 @@ class GenericTrainer(BaseTrainer):
         self.grad_hook_handles = []
 
     def start(self):
+        self.__save_config_to_workspace()
+
         if self.config.clear_cache_before_training and self.config.latent_caching:
             self.__clear_cache()
 
@@ -129,6 +131,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("running model setup")
 
+        self.model_setup.setup_optimizations(self.model, self.config)
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
         self.model.to(self.temp_device)
@@ -151,6 +154,13 @@ class GenericTrainer(BaseTrainer):
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model.train_progress, is_validation=True
             )
+
+    def __save_config_to_workspace(self):
+        path = path_util.canonical_join(self.config.workspace_dir, "config")
+        os.makedirs(Path(path).absolute(), exist_ok=True)
+        path = path_util.canonical_join(path, f"{get_string_timestamp()}.json")
+        with open(path, "w") as f:
+            json.dump(self.config.to_pack_dict(), f, indent=4)
 
     def __clear_cache(self):
         print(
@@ -534,12 +544,14 @@ class GenericTrainer(BaseTrainer):
                         if scaler:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
                                 scaler.unscale_parameter_(tensor, self.model.optimizer)
-                                nn.utils.clip_grad_norm_(tensor, 1)
+                                if self.config.clip_grad_norm is not None:
+                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                                 scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
                                 tensor.grad = None
                         else:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                                nn.utils.clip_grad_norm_(tensor, 1)
+                                if self.config.clip_grad_norm is not None:
+                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                                 self.model.optimizer.step_parameter(tensor, param_group, i)
                                 tensor.grad = None
 
@@ -618,6 +630,12 @@ class GenericTrainer(BaseTrainer):
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )
 
+                if self.__needs_backup(train_progress):
+                    self.commands.backup()
+
+                if self.__needs_save(train_progress):
+                    self.commands.save()
+
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
                 if sample_commands:
                     def create_sample_commands_fun(sample_commands):
@@ -633,12 +651,20 @@ class GenericTrainer(BaseTrainer):
 
                 if not has_gradient:
                     self.__execute_sample_during_training()
+                    transferred_to_temp_device = False
 
-                if self.__needs_backup(train_progress) or self.commands.get_and_reset_backup_command():
-                    self.backup(train_progress)
+                    if self.commands.get_and_reset_backup_command():
+                        self.model.to(self.temp_device)
+                        self.backup(train_progress)
+                        transferred_to_temp_device = True
 
-                if self.__needs_save(train_progress) or self.commands.get_and_reset_save_command():
-                    self.save(train_progress)
+                    if self.commands.get_and_reset_save_command():
+                        self.model.to(self.temp_device)
+                        self.save(train_progress)
+                        transferred_to_temp_device = True
+
+                    if transferred_to_temp_device:
+                        self.model_setup.setup_train_device(self.model, self.config)
 
                 self.callbacks.on_update_status("training")
 
@@ -662,11 +688,13 @@ class GenericTrainer(BaseTrainer):
                             scaler.update()
                         elif scaler:
                             scaler.unscale_(self.model.optimizer)
-                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            if self.config.clip_grad_norm is not None:
+                                nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             scaler.step(self.model.optimizer)
                             scaler.update()
                         else:
-                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            if self.config.clip_grad_norm is not None:
+                                nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             self.model.optimizer.step()
 
                         lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
@@ -719,6 +747,8 @@ class GenericTrainer(BaseTrainer):
 
     def end(self):
         if self.one_step_trained:
+            self.model.to(self.temp_device)
+
             if self.config.backup_before_save:
                 self.backup(self.model.train_progress)
             # Special case for schedule-free optimizers.
@@ -740,6 +770,8 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=self.config.output_model_destination,
                 dtype=self.config.output_dtype.torch_dtype()
             )
+        else:
+            self.model.to(self.temp_device)
 
         self.tensorboard.close()
 

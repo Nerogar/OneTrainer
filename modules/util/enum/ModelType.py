@@ -12,6 +12,7 @@ class ModelType(Enum):
     STABLE_DIFFUSION_21_BASE = 'STABLE_DIFFUSION_21_BASE'
 
     STABLE_DIFFUSION_3 = 'STABLE_DIFFUSION_3'
+    STABLE_DIFFUSION_35 = 'STABLE_DIFFUSION_35'
 
     STABLE_DIFFUSION_XL_10_BASE = 'STABLE_DIFFUSION_XL_10_BASE'
     STABLE_DIFFUSION_XL_10_BASE_INPAINTING = 'STABLE_DIFFUSION_XL_10_BASE_INPAINTING'
@@ -42,7 +43,11 @@ class ModelType(Enum):
             or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
 
     def is_stable_diffusion_3(self):
-        return self == ModelType.STABLE_DIFFUSION_3
+        return self == ModelType.STABLE_DIFFUSION_3 \
+            or self == ModelType.STABLE_DIFFUSION_35
+
+    def is_stable_diffusion_3_5(self):
+        return self == ModelType.STABLE_DIFFUSION_35
 
     def is_wuerstchen(self):
         return self == ModelType.WUERSTCHEN_2 \

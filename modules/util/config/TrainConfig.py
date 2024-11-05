@@ -247,6 +247,7 @@ class TrainConfig(BaseConfig):
     output_model_format: ModelFormat
     output_model_destination: str
     gradient_checkpointing: GradientCheckpointingMethod
+    layer_offload_fraction: float
     force_circular_padding: bool
 
     # data settings
@@ -296,6 +297,7 @@ class TrainConfig(BaseConfig):
     dropout_probability: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
+    clip_grad_norm: float
 
     # noise
     offset_noise_weight: float
@@ -695,6 +697,7 @@ class TrainConfig(BaseConfig):
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
+        data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
 
         # data settings
@@ -742,6 +745,7 @@ class TrainConfig(BaseConfig):
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
+        data.append(("clip_grad_norm", 1.0, float, True))
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))

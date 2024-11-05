@@ -31,3 +31,7 @@ class BaseModelSampler(metaclass=ABCMeta):
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         pass
+
+    @staticmethod
+    def quantize_resolution(resolution: int, quantization: int) -> int:
+        return round(resolution / quantization) * quantization

@@ -22,7 +22,7 @@ class StableDiffusionXLEmbeddingLoader:
             return None
 
         with contextlib.suppress(Exception):
-            embedding_state = torch.load(embedding_name)
+            embedding_state = torch.load(embedding_name, weights_only=True)
 
             text_encoder_1_vector = embedding_state['clip_l']
             text_encoder_2_vector = embedding_state['clip_g']

@@ -22,7 +22,7 @@ class WuerstchenEmbeddingLoader:
             return None
 
         with contextlib.suppress(Exception):
-            embedding_state = torch.load(embedding_name)
+            embedding_state = torch.load(embedding_name, weights_only=True)
 
             prior_text_encoder_vector = embedding_state['clip_g']
 
