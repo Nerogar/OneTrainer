@@ -20,7 +20,7 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.quantization_util import set_nf4_compute_type
+from modules.util.quantization_util import quantize_layers, set_nf4_compute_type
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -108,6 +108,10 @@ class BaseFluxSetup(
         set_nf4_compute_type(model.text_encoder_1, model.train_dtype)
         set_nf4_compute_type(model.text_encoder_2, model.text_encoder_2_train_dtype)
         set_nf4_compute_type(model.transformer, model.train_dtype)
+
+        quantize_layers(model.text_encoder_1, self.train_device)
+        quantize_layers(model.text_encoder_2, self.train_device)
+        quantize_layers(model.transformer, self.train_device)
 
     def _setup_additional_embeddings(
             self,

@@ -1,6 +1,8 @@
 import math
 from collections.abc import Callable
 
+from modules.module.quantized.LinearFp8 import LinearFp8
+from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.enum.DataType import DataType
 
 import torch
@@ -28,6 +30,16 @@ def __create_int8_linear_layer(module: nn.Linear) -> nn.Module:
         output_features=module.out_features,
         bias=module.bias is not None,
         has_fp16_weights=False,
+    )
+
+    return quant_linear
+
+
+def __create_fp8_linear_layer(module: nn.Linear) -> nn.Module:
+    quant_linear = LinearFp8(
+        in_features=module.in_features,
+        out_features=module.out_features,
+        bias=module.bias is not None,
     )
 
     return quant_linear
@@ -105,6 +117,23 @@ def replace_linear_with_int8_layers(
         convert_fn=__create_int8_linear_layer,
         keep_in_fp32_modules=keep_in_fp32_modules,
     )
+
+
+def replace_linear_with_fp8_layers(
+        parent_module: nn.Linear,
+        keep_in_fp32_modules: list[str] | None = None,
+):
+    __replace_linear_layers(
+        parent_module=parent_module,
+        convert_fn=__create_fp8_linear_layer,
+        keep_in_fp32_modules=keep_in_fp32_modules,
+    )
+
+
+def quantize_layers(module: nn.Module, device: torch.device | None = None):
+    for child_module in module.modules():
+        if isinstance(child_module, QuantizedModuleMixin):
+            child_module.quantize(device)
 
 
 def set_nf4_compute_type(module: nn.Module, dtype: DataType):

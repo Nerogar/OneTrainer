@@ -3,7 +3,11 @@ import os
 from abc import ABCMeta
 
 from modules.util.enum.DataType import DataType
-from modules.util.quantization_util import replace_linear_with_int8_layers, replace_linear_with_nf4_layers
+from modules.util.quantization_util import (
+    replace_linear_with_fp8_layers,
+    replace_linear_with_int8_layers,
+    replace_linear_with_nf4_layers,
+)
 
 from torch import nn
 
@@ -30,6 +34,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules)
             elif dtype.quantize_int8():
                 replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules)
+            elif dtype.quantize_fp8():
+                replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
