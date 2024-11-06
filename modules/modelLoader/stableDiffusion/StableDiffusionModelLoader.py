@@ -150,7 +150,7 @@ class StableDiffusionModelLoader(
             base_model_name: str,
             vae_model_name: str,
     ):
-        state_dict = torch.load(base_model_name)
+        state_dict = torch.load(base_model_name, weights_only=True)
         state_dict = self.__fix_nai_model(state_dict)
 
         num_in_channels = 4

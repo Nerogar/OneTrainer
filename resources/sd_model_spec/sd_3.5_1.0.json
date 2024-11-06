@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "stable-diffusion-v3.5",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "Stable Diffusion 3.5"
+}

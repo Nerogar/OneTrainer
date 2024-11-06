@@ -11,8 +11,8 @@ from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     create_checkpointed_forward,
+    enable_checkpointing_for_basic_transformer_blocks,
     enable_checkpointing_for_clip_encoder_layers,
-    enable_checkpointing_for_sdxl_transformer_blocks,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
@@ -38,7 +38,7 @@ class BaseStableDiffusionXLSetup(
     metaclass=ABCMeta
 ):
 
-    def _setup_optimizations(
+    def setup_optimizations(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
@@ -68,12 +68,9 @@ class BaseStableDiffusionXLSetup(
 
         if config.gradient_checkpointing.enabled():
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_sdxl_transformer_blocks(
-                model.unet, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-            enable_checkpointing_for_clip_encoder_layers(
-                model.text_encoder_1, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-            enable_checkpointing_for_clip_encoder_layers(
-                model.text_encoder_2, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
@@ -232,6 +229,9 @@ class BaseStableDiffusionXLSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, pooled_text_encoder_2_output = model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
                 tokens_1=batch['tokens_1'],
                 tokens_2=batch['tokens_2'],
                 text_encoder_1_layer_skip=config.text_encoder_layer_skip,
@@ -242,6 +242,8 @@ class BaseStableDiffusionXLSetup(
                     'text_encoder_2_hidden_state'] if not config.train_text_encoder_2_or_embedding() else None,
                 pooled_text_encoder_2_output=batch[
                     'text_encoder_2_pooled_state'] if not config.train_text_encoder_2_or_embedding() else None,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
             )
 
             latent_image = batch['latent_image']
@@ -258,6 +260,9 @@ class BaseStableDiffusionXLSetup(
                 dummy.requires_grad_(True)
 
                 negative_text_encoder_output, negative_pooled_text_encoder_2_output = model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch['latent_image'].shape[0],
+                    rand=rand,
                     text="",
                     text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                     text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,

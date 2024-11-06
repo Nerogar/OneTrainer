@@ -247,6 +247,7 @@ class TrainConfig(BaseConfig):
     output_model_format: ModelFormat
     output_model_destination: str
     gradient_checkpointing: GradientCheckpointingMethod
+    layer_offload_fraction: float
     force_circular_padding: bool
 
     # data settings
@@ -296,6 +297,7 @@ class TrainConfig(BaseConfig):
     dropout_probability: float
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
+    clip_grad_norm: float
 
     # noise
     offset_noise_weight: float
@@ -390,20 +392,22 @@ class TrainConfig(BaseConfig):
     rolling_backup: bool
     rolling_backup_count: int
     backup_before_save: bool
-    save_after: float
-    save_after_unit: TimeUnit
+    save_every: int
+    save_every_unit: TimeUnit
+    save_skip_first: int
     save_filename_prefix: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=5,
+            config_version=6,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
                 2: self.__migration_2,
                 3: self.__migration_3,
                 4: self.__migration_4,
+                5: self.__migration_5,
             }
         )
 
@@ -559,6 +563,14 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_5(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        migrated_data["save_every"] = migrated_data.pop("save_after")
+        migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
@@ -686,6 +698,7 @@ class TrainConfig(BaseConfig):
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
+        data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
 
         # data settings
@@ -733,6 +746,7 @@ class TrainConfig(BaseConfig):
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
+        data.append(("clip_grad_norm", 1.0, float, True))
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))
@@ -868,8 +882,9 @@ class TrainConfig(BaseConfig):
         data.append(("rolling_backup", False, bool, False))
         data.append(("rolling_backup_count", 3, int, False))
         data.append(("backup_before_save", True, bool, False))
-        data.append(("save_after", 0, int, False))
-        data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("save_every", 0, int, False))
+        data.append(("save_every_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("save_skip_first", 0, int, False))
         data.append(("save_filename_prefix", "", str, False))
 
         return TrainConfig(data)

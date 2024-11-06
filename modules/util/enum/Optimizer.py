@@ -18,6 +18,7 @@ class Optimizer(Enum):
     ADAMW = 'ADAMW'
     ADAMW_8BIT = 'ADAMW_8BIT'
 
+    AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
 
     LAMB = 'LAMB'

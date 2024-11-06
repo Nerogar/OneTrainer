@@ -69,13 +69,13 @@ class StableDiffusion3Sampler(BaseModelSampler):
             self.model.text_encoder_to(self.train_device)
 
             prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
-                text = prompt,
-                train_device = self.train_device,
+                text=prompt,
+                train_device=self.train_device,
                 batch_size=1,
-                text_encoder_1_layer_skip = text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip = text_encoder_2_layer_skip,
-                text_encoder_3_layer_skip = text_encoder_3_layer_skip,
-                apply_attention_mask = prior_attention_mask,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                text_encoder_3_layer_skip=text_encoder_3_layer_skip,
+                apply_attention_mask=prior_attention_mask,
             )
 
             negative_prompt_embedding, negative_pooled_prompt_embedding = self.model.encode_text(
@@ -186,8 +186,8 @@ class StableDiffusion3Sampler(BaseModelSampler):
         image = self.__sample_base(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            height=sample_config.height,
-            width=sample_config.width,
+            height=self.quantize_resolution(sample_config.height, 16),
+            width=self.quantize_resolution(sample_config.width, 16),
             seed=sample_config.seed,
             random_seed=sample_config.random_seed,
             diffusion_steps=sample_config.diffusion_steps,

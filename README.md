@@ -8,8 +8,8 @@ Hardware for development sponsored by https://shakker.ai
 
 ## Features
 
-- **Supported models**: FLUX.1, Stable Diffusion 1.5, 2.0, 2.1, 3.0, SDXL, Würstchen-v2, Stable Cascade, PixArt-Alpha,
-  PixArt-Sigma and inpainting models
+- **Supported models**: FLUX.1, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
+  PixArt-Alpha, PixArt-Sigma and inpainting models
 - **Model formats**: diffusers and ckpt models
 - **Training methods**: Full fine-tuning, LoRA, embeddings
 - **Masked Training**: Let the training focus on just certain parts of the samples.
@@ -21,7 +21,7 @@ Hardware for development sponsored by https://shakker.ai
 - **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
 - **Noise Scheduler Rescaling**: From the paper
   [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
-- **EMA**: Train you own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
+- **EMA**: Train your own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
 - **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
   resolutions, buckets are created automatically.
 - **Multi Resolution Training**: Train multiple resolutions at the same time.
@@ -102,10 +102,24 @@ If you are on Mac or Linux, read [the launch script documentation](LAUNCH-SCRIPT
 ## Contributing
 
 Contributions are always welcome in any form. You can open issues, participate in discussions, or even open pull
-requests for new or improved functionality. You can find more information [here](docs/Contributing.md)
+requests for new or improved functionality. You can find more information [here](docs/Contributing.md).
 
 Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
 For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.
+
+You also **NEED** to **install the required developer dependencies** for your current user and enable the Git commit
+hooks, via the following commands (works on all platforms; Windows, Linux and Mac):
+
+```sh
+pip install -r requirements-dev.txt
+pre-commit install
+```
+
+(Be sure to run those commands *without activating your venv or Conda environment,* since [pre-commit](https://pre-commit.com/) is supposed to be installed outside any environment.)
+
+Now all of your commits will automatically be verified for common errors and code style issues, so that code
+reviewers can focus on the architecture of your changes without wasting time on style/formatting issues, thus
+greatly improving the chances that your pull request will be accepted quickly and effortlessly.
 
 ## Related Projects
 

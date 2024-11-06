@@ -1,17 +1,15 @@
 from contextlib import nullcontext
+from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.clip_util import encode_clip
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
     rescale_noise_scheduler_to_zero_terminal_snr,
 )
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.modelSpec.ModelSpec import ModelSpec
-from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
@@ -46,14 +44,13 @@ class StableDiffusionModelEmbedding(BaseModelEmbedding):
 
 class StableDiffusionModel(BaseModel):
     # base model data
-    model_type: ModelType
-    tokenizer: CLIPTokenizer
-    noise_scheduler: DDIMScheduler
-    text_encoder: CLIPTextModel
-    vae: AutoencoderKL
-    unet: UNet2DConditionModel
-    image_depth_processor: DPTImageProcessor
-    depth_estimator: DPTForDepthEstimation
+    tokenizer: CLIPTokenizer | None
+    noise_scheduler: DDIMScheduler | None
+    text_encoder: CLIPTextModel | None
+    vae: AutoencoderKL | None
+    unet: UNet2DConditionModel | None
+    image_depth_processor: DPTImageProcessor | None
+    depth_estimator: DPTForDepthEstimation | None
 
     # autocast context
     autocast_context: torch.autocast | nullcontext
@@ -65,7 +62,7 @@ class StableDiffusionModel(BaseModel):
     embedding_state: Tensor | None
     additional_embeddings: list[StableDiffusionModelEmbedding] | None
     additional_embedding_states: list[Tensor | None]
-    embedding_wrapper: AdditionalEmbeddingWrapper
+    embedding_wrapper: AdditionalEmbeddingWrapper | None
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -78,62 +75,35 @@ class StableDiffusionModel(BaseModel):
     def __init__(
             self,
             model_type: ModelType,
-            tokenizer: CLIPTokenizer | None = None,
-            noise_scheduler: DDIMScheduler | None = None,
-            text_encoder: CLIPTextModel | None = None,
-            vae: AutoencoderKL | None = None,
-            unet: UNet2DConditionModel | None = None,
-            image_depth_processor: DPTImageProcessor | None = None,
-            depth_estimator: DPTForDepthEstimation | None = None,
-            optimizer_state_dict: dict | None = None,
-            ema_state_dict: dict | None = None,
-            train_progress: TrainProgress = None,
-            embedding: StableDiffusionModelEmbedding | None = None,
-            embedding_state: Tensor | None = None,
-            additional_embeddings: list[StableDiffusionModelEmbedding] | None = None,
-            additional_embedding_states: list[Tensor | None] = None,
-            embedding_wrapper: AdditionalEmbeddingWrapper | None = None,
-            text_encoder_lora: LoRAModuleWrapper | None = None,
-            unet_lora: LoRAModuleWrapper | None = None,
-            lora_state_dict: dict | None = None,
-            sd_config: dict | None = None,
-            sd_config_filename: str | None = None,
-            model_spec: ModelSpec | None = None,
-            train_config: TrainConfig | None = None,
     ):
         super().__init__(
             model_type=model_type,
-            optimizer_state_dict=optimizer_state_dict,
-            ema_state_dict=ema_state_dict,
-            train_progress=train_progress,
-            model_spec=model_spec,
-            train_config=train_config,
         )
 
-        self.tokenizer = tokenizer
-        self.noise_scheduler = noise_scheduler
-        self.text_encoder = text_encoder
-        self.vae = vae
-        self.unet = unet
-        self.image_depth_processor = image_depth_processor
-        self.depth_estimator = depth_estimator
+        self.tokenizer = None
+        self.noise_scheduler = None
+        self.text_encoder = None
+        self.vae = None
+        self.unet = None
+        self.image_depth_processor = None
+        self.depth_estimator = None
 
         self.autocast_context = nullcontext()
 
         self.train_dtype = DataType.FLOAT_32
 
-        self.embedding = embedding
-        self.embedding_state = embedding_state
-        self.additional_embeddings = additional_embeddings if additional_embeddings is not None else []
-        self.additional_embedding_states = additional_embedding_states if additional_embedding_states is not None else []
-        self.embedding_wrapper = embedding_wrapper
+        self.embedding = None
+        self.embedding_state = None
+        self.additional_embeddings = []
+        self.additional_embedding_states = []
+        self.embedding_wrapper = None
 
-        self.text_encoder_lora = text_encoder_lora
-        self.unet_lora = unet_lora
-        self.lora_state_dict = lora_state_dict
+        self.text_encoder_lora = None
+        self.unet_lora = None
+        self.lora_state_dict = None
 
-        self.sd_config = sd_config
-        self.sd_config_filename = sd_config_filename
+        self.sd_config = None
+        self.sd_config_filename = None
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -217,9 +187,13 @@ class StableDiffusionModel(BaseModel):
 
     def encode_text(
             self,
+            train_device: torch.device,
+            batch_size: int,
+            rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
             text_encoder_layer_skip: int = 0,
+            text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor | None = None,
     ):
         if tokens is None:
@@ -242,5 +216,12 @@ class StableDiffusionModel(BaseModel):
             use_attention_mask=False,
             add_layer_norm=True,
         )
+
+        # apply dropout
+        if text_encoder_dropout_probability is not None:
+            dropout_text_encoder_mask = (torch.tensor(
+                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
 
         return text_encoder_output

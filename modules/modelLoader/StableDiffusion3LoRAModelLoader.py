@@ -25,6 +25,8 @@ class StableDiffusion3LoRAModelLoader(
         match model_type:
             case ModelType.STABLE_DIFFUSION_3:
                 return "resources/sd_model_spec/sd_3_2b_1.0-lora.json"
+            case ModelType.STABLE_DIFFUSION_35:
+                return "resources/sd_model_spec/sd_3.5_1.0-lora.json"
             case _:
                 return None
 
