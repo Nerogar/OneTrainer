@@ -80,7 +80,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
-            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
+                .to(dtype=self.model.train_dtype.torch_dtype())
 
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
@@ -282,7 +283,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
-            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
+                .to(dtype=self.model.train_dtype.torch_dtype())
 
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
