@@ -240,16 +240,16 @@ class BaseStableDiffusionSetup(
                         ).sample
 
                         negative_predicted_latent_noise = checkpointed_unet(
-                            latent_input,
+                            latent_input.to(dtype=model.train_dtype.torch_dtype()),
                             timestep,
-                            negative_text_encoder_output,
+                            negative_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                             batch['latent_depth'],
                         ).sample
                     else:
                         predicted_latent_noise = checkpointed_unet(
-                            latent_input,
+                            latent_input.to(dtype=model.train_dtype.torch_dtype()),
                             timestep,
-                            text_encoder_output,
+                            text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                         ).sample
 
                         negative_predicted_latent_noise = checkpointed_unet(
@@ -322,11 +322,16 @@ class BaseStableDiffusionSetup(
 
                 if config.model_type.has_depth_input():
                     predicted_latent_noise = model.unet(
-                        latent_input, timestep, text_encoder_output, batch['latent_depth']
+                        latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                        timestep,
+                        text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                        batch['latent_depth'].to(dtype=model.train_dtype.torch_dtype()),
                     ).sample
                 else:
                     predicted_latent_noise = model.unet(
-                        latent_input, timestep, text_encoder_output
+                        latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                        timestep,
+                        text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     ).sample
 
                 model_output_data = {}
