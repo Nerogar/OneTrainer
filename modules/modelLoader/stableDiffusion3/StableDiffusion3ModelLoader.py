@@ -77,24 +77,24 @@ class StableDiffusion3ModelLoader(
         )
 
         if include_text_encoder_1:
-            text_encoder_1 = CLIPTextModelWithProjection.from_pretrained(
+            text_encoder_1 = self._load_transformers_sub_module(
+                CLIPTextModelWithProjection,
+                weight_dtypes.text_encoder,
+                weight_dtypes.train_dtype,
                 base_model_name,
-                subfolder="text_encoder",
-                torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+                "text_encoder",
             )
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_1 = None
 
         if include_text_encoder_2:
-            text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
+            text_encoder_2 = self._load_transformers_sub_module(
+                CLIPTextModelWithProjection,
+                weight_dtypes.text_encoder_2,
+                weight_dtypes.train_dtype,
                 base_model_name,
-                subfolder="text_encoder_2",
-                torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
+                "text_encoder_2",
             )
-            text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_2 = None
 
@@ -102,29 +102,33 @@ class StableDiffusion3ModelLoader(
             text_encoder_3 = self._load_transformers_sub_module(
                 T5EncoderModel,
                 weight_dtypes.text_encoder_3,
+                weight_dtypes.fallback_train_dtype,
                 base_model_name,
                 "text_encoder_3",
             )
-            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_3 = None
 
         if vae_model_name:
-            vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 vae_model_name,
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
         else:
-            vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 base_model_name,
-                subfolder="vae",
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
+                "vae",
             )
 
         transformer = self._load_diffusers_sub_module(
             SD3Transformer2DModel,
             weight_dtypes.prior,
+            weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
         )
@@ -263,16 +267,6 @@ class StableDiffusion3ModelLoader(
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
-
-        # try:
-        #     self.__load_ckpt(
-        #         model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-        #         model_names.include_text_encoder, model_names.include_text_encoder_2,
-        #         model_names.include_text_encoder_3,
-        #     )
-        #     return
-        # except Exception:
-        #     stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)

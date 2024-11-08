@@ -570,6 +570,8 @@ class TrainConfig(BaseConfig):
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
+            self.train_dtype,
+            self.fallback_train_dtype,
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
             self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,

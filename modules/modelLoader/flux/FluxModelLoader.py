@@ -76,11 +76,10 @@ class FluxModelLoader(
             text_encoder_1 = self._load_transformers_sub_module(
                 CLIPTextModel,
                 weight_dtypes.text_encoder,
+                weight_dtypes.train_dtype,
                 base_model_name,
                 "text_encoder",
             )
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_1 = None
 
@@ -88,11 +87,10 @@ class FluxModelLoader(
             text_encoder_2 = self._load_transformers_sub_module(
                 T5EncoderModel,
                 weight_dtypes.text_encoder_2,
+                weight_dtypes.fallback_train_dtype,
                 base_model_name,
                 "text_encoder_2",
             )
-            text_encoder_2.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_2 = None
 
@@ -100,12 +98,14 @@ class FluxModelLoader(
             vae = self._load_diffusers_sub_module(
                 AutoencoderKL,
                 weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 vae_model_name,
             )
         else:
             vae = self._load_diffusers_sub_module(
                 AutoencoderKL,
                 weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 base_model_name,
                 "vae",
             )
@@ -113,6 +113,7 @@ class FluxModelLoader(
         transformer = self._load_diffusers_sub_module(
             FluxTransformer2DModel,
             weight_dtypes.prior,
+            weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
         )
@@ -245,16 +246,6 @@ class FluxModelLoader(
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
-
-        # try:
-        #     self.__load_ckpt(
-        #         model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-        #         model_names.include_text_encoder, model_names.include_text_encoder_2,
-        #         model_names.include_text_encoder_3,
-        #     )
-        #     return
-        # except Exception:
-        #     stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)

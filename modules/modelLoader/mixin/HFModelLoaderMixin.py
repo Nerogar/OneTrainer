@@ -4,6 +4,7 @@ from abc import ABCMeta
 
 from modules.util.enum.DataType import DataType
 from modules.util.quantization_util import (
+    is_quantized_parameter,
     replace_linear_with_fp8_layers,
     replace_linear_with_int8_layers,
     replace_linear_with_nf4_layers,
@@ -23,12 +24,16 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             self,
             sub_module: nn.Module,
             dtype: DataType,
+            train_dtype: DataType,
             keep_in_fp32_modules: list[str] | None,
             pretrained_model_name_or_path: str,
             subfolder: str | None,
             model_filename: str,
             shard_index_filename: str,
     ):
+        if keep_in_fp32_modules is None:
+            keep_in_fp32_modules = []
+
         with accelerate.init_empty_weights():
             if dtype.quantize_nf4():
                 replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules)
@@ -36,6 +41,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules)
             elif dtype.quantize_fp8():
                 replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules)
+
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -85,16 +91,22 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         for key, value in state_dict.items():
             module = sub_module
             tensor_name = key
+            module_name = None
             key_splits = tensor_name.split(".")
             for split in key_splits[:-1]:
                 module = getattr(module, split)
+                module_name = split
             tensor_name = key_splits[-1]
 
             is_buffer = tensor_name in module._buffers
             old_value = module._buffers[tensor_name] if is_buffer else module._parameters[tensor_name]
 
             old_type = type(old_value)
-            value = value.to(dtype=dtype.torch_dtype())
+            if not is_quantized_parameter(module, tensor_name):
+                if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                    value = value.to(dtype=train_dtype.torch_dtype())
+                else:
+                    value = value.to(dtype=dtype.torch_dtype())
             new_value = old_type(value)
 
             if is_buffer:
@@ -111,6 +123,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             self,
             module_type,
             dtype: DataType,
+            train_dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str | None = None,
     ):
@@ -132,6 +145,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         return self.__load_sub_module(
             sub_module=sub_module,
             dtype=dtype,
+            train_dtype=train_dtype,
             keep_in_fp32_modules=module_type._keep_in_fp32_modules,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
@@ -144,6 +158,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             self,
             module_type,
             dtype: DataType,
+            train_dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str | None = None,
     ):
@@ -165,6 +180,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         return self.__load_sub_module(
             sub_module=sub_module,
             dtype=dtype,
+            train_dtype=train_dtype,
             keep_in_fp32_modules=None,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,

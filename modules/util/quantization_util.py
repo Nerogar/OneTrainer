@@ -130,6 +130,20 @@ def replace_linear_with_fp8_layers(
     )
 
 
+def is_quantized_parameter(
+        module: nn.Module,
+        parameter_name: str,
+) -> bool:
+    if bnb is not None:
+        if isinstance(module, bnb.nn.LinearNF4 | bnb.nn.Linear8bitLt):
+            return parameter_name == "weight"
+
+    if isinstance(module, LinearFp8):
+        return parameter_name == "weight"
+
+    return False
+
+
 def quantize_layers(module: nn.Module, device: torch.device | None = None):
     for child_module in module.modules():
         if isinstance(child_module, QuantizedModuleMixin):
@@ -142,6 +156,9 @@ def set_nf4_compute_type(module: nn.Module, dtype: DataType):
             if isinstance(child_module, bnb.nn.LinearNF4):
                 child_module.compute_dtype = dtype.torch_dtype()
                 child_module.compute_type_is_set = True
+        if isinstance(child_module, LinearFp8):
+            child_module.compute_dtype = dtype.torch_dtype()
+            child_module.compute_type_is_set = True
 
 
 def get_unquantized_weight(module: nn.Module, dtype: torch.dtype) -> Tensor:
