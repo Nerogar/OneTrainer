@@ -36,7 +36,8 @@ Hardware for development sponsored by https://shakker.ai
 
 ## Installation
 
-Installing OneTrainer requires Python 3.10. You can download Python here https://www.python.org/downloads/windows/.
+Installing OneTrainer requires Python >=3.10 and <3.13. You can download Python
+here https://www.python.org/downloads/windows/.
 Then follow these steps:
 
 Automatic installation
@@ -97,7 +98,8 @@ All functionality is split into different scrips located in the `scripts` direct
 
 To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`
 
-If you are on Mac or Linux, read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system.
+If you are on Mac or Linux, read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how
+to run OneTrainer and its various scripts on your system.
 
 ## Contributing
 
@@ -115,7 +117,8 @@ pip install -r requirements-dev.txt
 pre-commit install
 ```
 
-(Be sure to run those commands *without activating your venv or Conda environment,* since [pre-commit](https://pre-commit.com/) is supposed to be installed outside any environment.)
+(Be sure to run those commands *without activating your venv or Conda environment,*
+since [pre-commit](https://pre-commit.com/) is supposed to be installed outside any environment.)
 
 Now all of your commits will automatically be verified for common errors and code style issues, so that code
 reviewers can focus on the architecture of your changes without wasting time on style/formatting issues, thus
