@@ -690,7 +690,7 @@ class TrainConfig(BaseConfig):
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         # model settings
-        data.append(("base_model_name", "runwayml/stable-diffusion-v1-5", str, False))
+        data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
         data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
