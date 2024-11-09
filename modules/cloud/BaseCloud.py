@@ -2,6 +2,8 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.CloudConfig import CloudConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.time_util import get_string_timestamp
+
 from abc import ABCMeta, abstractmethod
 import json
 from pathlib import Path
@@ -22,7 +24,7 @@ class BaseCloud(metaclass=ABCMeta):
         #TODO additional embeddings
 
     def upload_config(self,commands : TrainCommands=None):
-        local_config_path=Path(self.config.local_workspace_dir,"remote_config.json")
+        local_config_path=Path(self.config.local_workspace_dir,f"remote_config-{get_string_timestamp()}.json")
         with local_config_path.open(mode="w") as f:
             json.dump(self.config.to_pack_dict(), f, indent=4)
         self._upload_config_file(local_config_path)

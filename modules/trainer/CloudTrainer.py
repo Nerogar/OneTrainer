@@ -174,13 +174,14 @@ class CloudTrainer(BaseTrainer):
 
     @staticmethod
     def __load_concepts(config): #TODO is there not a function in OT that can do that?
-        if config.concepts is None:
-            with open(config.concept_file_name, 'r') as f:
-                config.concepts=[]
-                json_concepts = json.load(f)
-                for json_concept in json_concepts:
-                    concept=ConceptConfig.default_values().from_dict(json_concept)
-                    config.concepts.append(concept)
+        #overwrite config.concepts in any case, even if it is not None
+        #the file can be more up to date
+        with open(config.concept_file_name, 'r') as f:
+            config.concepts=[]
+            json_concepts = json.load(f)
+            for json_concept in json_concepts:
+                concept=ConceptConfig.default_values().from_dict(json_concept)
+                config.concepts.append(concept)
 
     def backup(self, train_progress: TrainProgress):
         pass

@@ -564,7 +564,8 @@ class TrainUI(ctk.CTk):
 
         try:
             trainer.start()
-            self.ui_state.update(self.train_config) #TODO only update cloud tab
+            if self.train_config.cloud.enabled:
+                self.ui_state.get_var("cloud").update(self.train_config.cloud)
             trainer.train()
         except Exception:
             error_caught = True
