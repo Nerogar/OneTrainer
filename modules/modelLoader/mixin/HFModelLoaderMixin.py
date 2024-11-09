@@ -1,6 +1,7 @@
 import json
 import os
 from abc import ABCMeta
+from itertools import repeat
 
 from modules.util.enum.DataType import DataType
 from modules.util.quantization_util import (
@@ -10,6 +11,7 @@ from modules.util.quantization_util import (
     replace_linear_with_nf4_layers,
 )
 
+import torch
 from torch import nn
 
 import accelerate
@@ -36,12 +38,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         with accelerate.init_empty_weights():
             if dtype.quantize_nf4():
-                replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules)
+                replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
             elif dtype.quantize_int8():
-                replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules)
+                replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
             elif dtype.quantize_fp8():
-                replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules)
-
+                replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -101,23 +102,23 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             is_buffer = tensor_name in module._buffers
             old_value = module._buffers[tensor_name] if is_buffer else module._parameters[tensor_name]
 
-            old_type = type(old_value)
-            if not is_quantized_parameter(module, tensor_name):
-                if dtype.is_quantized() or module_name in keep_in_fp32_modules:
-                    value = value.to(dtype=train_dtype.torch_dtype())
-                else:
-                    value = value.to(dtype=dtype.torch_dtype())
-            new_value = old_type(value)
+            if torch.is_floating_point(old_value):
+                old_type = type(old_value)
+                if not is_quantized_parameter(module, tensor_name):
+                    if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                        value = value.to(dtype=train_dtype.torch_dtype())
+                    else:
+                        value = value.to(dtype=dtype.torch_dtype())
+                    new_value = old_type(value)
 
-            if is_buffer:
-                module._buffers[tensor_name] = new_value
-            else:
-                module._parameters[tensor_name] = new_value
+                    if is_buffer:
+                        module._buffers[tensor_name] = new_value
+                    else:
+                        module._parameters[tensor_name] = new_value
 
         del state_dict
 
         return sub_module
-
 
     def _load_transformers_sub_module(
             self,
@@ -153,7 +154,6 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             shard_index_filename="model.safetensors.index.json",
         )
 
-
     def _load_diffusers_sub_module(
             self,
             module_type,
@@ -186,4 +186,71 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             subfolder=subfolder,
             model_filename="diffusion_pytorch_model.safetensors",
             shard_index_filename="diffusion_pytorch_model.safetensors.index.json",
+        )
+
+    def __convert_sub_module_to_dtype(
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+            keep_in_fp32_modules: list[str] | None,
+    ):
+        if keep_in_fp32_modules is None:
+            keep_in_fp32_modules = []
+
+        if dtype.quantize_nf4():
+            replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
+        elif dtype.quantize_int8():
+            replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
+        elif dtype.quantize_fp8():
+            replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
+
+        for module_name, module in sub_module.named_modules():
+            param_iter = [(x, y[0], y[1]) for x, y in zip(repeat(False), module._parameters.items(), strict=False)]
+            buffer_iter = [(x, y[0], y[1]) for x, y in zip(repeat(True), module._buffers.items(), strict=False)]
+
+            for is_buffer, tensor_name, value in param_iter + buffer_iter:
+                if value is not None and torch.is_floating_point(value):
+                    old_type = type(value)
+                    if not is_quantized_parameter(module, tensor_name):
+                        if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                            value = value.to(dtype=train_dtype.torch_dtype())
+                        else:
+                            value = value.to(dtype=dtype.torch_dtype())
+
+                        value = old_type(value)
+
+                        if is_buffer:
+                            module._buffers[tensor_name] = value
+                        else:
+                            module._parameters[tensor_name] = value
+
+        return sub_module
+
+    def _convert_transformers_sub_module_to_dtype(
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+    ):
+        module_type = type(sub_module)
+
+        return self.__convert_sub_module_to_dtype(
+            sub_module,
+            dtype,
+            train_dtype,
+            module_type._keep_in_fp32_modules,
+        )
+
+    def _convert_diffusers_sub_module_to_dtype(
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+    ):
+        return self.__convert_sub_module_to_dtype(
+            sub_module,
+            dtype,
+            train_dtype,
+            None,
         )

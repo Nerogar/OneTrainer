@@ -14,41 +14,63 @@ except ImportError:
     bnb = None
 
 
-def __create_nf4_linear_layer(module: nn.Linear) -> nn.Module:
+def __create_nf4_linear_layer(module: nn.Linear, copy_parameters: bool) -> nn.Module:
+    bias = module.bias is not None
+
     quant_linear = bnb.nn.LinearNF4(
         input_features=module.in_features,
         output_features=module.out_features,
-        bias=module.bias is not None,
+        bias=bias,
     )
+
+    if copy_parameters:
+        quant_linear.weight.data = module.weight.data
+        if bias:
+            quant_linear.bias.data = module.bias.data
 
     return quant_linear
 
 
-def __create_int8_linear_layer(module: nn.Linear) -> nn.Module:
+def __create_int8_linear_layer(module: nn.Linear, copy_parameters: bool) -> nn.Module:
+    bias = module.bias is not None
+
     quant_linear = bnb.nn.Linear8bitLt(
         input_features=module.in_features,
         output_features=module.out_features,
-        bias=module.bias is not None,
+        bias=bias,
         has_fp16_weights=False,
     )
+
+    if copy_parameters:
+        quant_linear.weight = type(quant_linear.weight)(module.weight)
+        if bias:
+            quant_linear.bias = type(quant_linear.bias)(module.bias)
 
     return quant_linear
 
 
-def __create_fp8_linear_layer(module: nn.Linear) -> nn.Module:
+def __create_fp8_linear_layer(module: nn.Linear, copy_parameters: bool) -> nn.Module:
+    bias = module.bias is not None
+
     quant_linear = LinearFp8(
         in_features=module.in_features,
         out_features=module.out_features,
-        bias=module.bias is not None,
+        bias=bias,
     )
+
+    if copy_parameters:
+        quant_linear.weight = type(quant_linear.weight)(module.weight)
+        if bias:
+            quant_linear.bias = type(quant_linear.bias)(module.bias)
 
     return quant_linear
 
 
 def __replace_linear_layers(
         parent_module: nn.Module,
-        convert_fn: Callable[[nn.Linear], nn.Module],
+        convert_fn: Callable[[nn.Linear, bool], nn.Module],
         keep_in_fp32_modules: list[str] | None = None,
+        copy_parameters: bool = False,
         name_prefix: str = "",
         visited_modules: set[int] | None = None,
 ):
@@ -64,8 +86,7 @@ def __replace_linear_layers(
     if isinstance(parent_module, nn.ModuleList):
         for i, module in enumerate(parent_module):
             if isinstance(module, nn.Linear):
-                # print('replaced: ', f"{name_prefix}[{i}]")
-                quant_linear = convert_fn(module)
+                quant_linear = convert_fn(module, copy_parameters)
                 parent_module[i] = quant_linear
                 del module
             elif id(module) not in visited_modules:
@@ -73,6 +94,7 @@ def __replace_linear_layers(
                     parent_module=module,
                     convert_fn=convert_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
+                    copy_parameters=copy_parameters,
                     name_prefix=f"{name_prefix}[{i}]",
                     visited_modules=visited_modules,
                 )
@@ -83,8 +105,7 @@ def __replace_linear_layers(
 
             module = getattr(parent_module, attr_name)
             if isinstance(module, nn.Linear):
-                # print('replaced: ', f"{name_prefix}.{attr_name}")
-                quant_linear = convert_fn(module)
+                quant_linear = convert_fn(module, copy_parameters)
                 setattr(parent_module, attr_name, quant_linear)
                 del module
             elif isinstance(module, nn.Module) and id(module) not in visited_modules:
@@ -92,41 +113,48 @@ def __replace_linear_layers(
                     parent_module=module,
                     convert_fn=convert_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
+                    copy_parameters=copy_parameters,
                     name_prefix=f"{name_prefix}.{attr_name}",
                     visited_modules=visited_modules,
                 )
 
 
 def replace_linear_with_nf4_layers(
-        parent_module: nn.Linear,
+        parent_module: nn.Module,
         keep_in_fp32_modules: list[str] | None = None,
+        copy_parameters: bool = False,
 ):
     __replace_linear_layers(
         parent_module=parent_module,
         convert_fn=__create_nf4_linear_layer,
         keep_in_fp32_modules=keep_in_fp32_modules,
+        copy_parameters=copy_parameters,
     )
 
 
 def replace_linear_with_int8_layers(
-        parent_module: nn.Linear,
+        parent_module: nn.Module,
         keep_in_fp32_modules: list[str] | None = None,
+        copy_parameters: bool = False,
 ):
     __replace_linear_layers(
         parent_module=parent_module,
         convert_fn=__create_int8_linear_layer,
         keep_in_fp32_modules=keep_in_fp32_modules,
+        copy_parameters=copy_parameters,
     )
 
 
 def replace_linear_with_fp8_layers(
-        parent_module: nn.Linear,
+        parent_module: nn.Module,
         keep_in_fp32_modules: list[str] | None = None,
+        copy_parameters: bool = False,
 ):
     __replace_linear_layers(
         parent_module=parent_module,
         convert_fn=__create_fp8_linear_layer,
         keep_in_fp32_modules=keep_in_fp32_modules,
+        copy_parameters=copy_parameters,
     )
 
 
@@ -144,20 +172,20 @@ def is_quantized_parameter(
     return False
 
 
-def quantize_layers(module: nn.Module, device: torch.device | None = None):
-    for child_module in module.modules():
-        if isinstance(child_module, QuantizedModuleMixin):
-            child_module.quantize(device)
-
-
-def set_nf4_compute_type(module: nn.Module, dtype: DataType):
+def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType):
     for child_module in module.modules():
         if bnb is not None:
             if isinstance(child_module, bnb.nn.LinearNF4):
-                child_module.compute_dtype = dtype.torch_dtype()
+                child_module.compute_dtype = train_dtype.torch_dtype()
                 child_module.compute_type_is_set = True
-        if isinstance(child_module, LinearFp8):
-            child_module.compute_dtype = dtype.torch_dtype()
+                if not child_module.weight.bnb_quantized:
+                    orig_device = child_module.weight.device
+                    child_module.to(device=device)
+                    child_module.to(device=orig_device)
+
+        if isinstance(child_module, QuantizedModuleMixin):
+            child_module.quantize(device)
+            child_module.compute_dtype = train_dtype.torch_dtype()
             child_module.compute_type_is_set = True
 
 
