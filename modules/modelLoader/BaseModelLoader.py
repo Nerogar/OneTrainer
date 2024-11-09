@@ -30,11 +30,12 @@ class BaseModelLoader(metaclass=ABCMeta):
 
         # optimizer
         with contextlib.suppress(FileNotFoundError):
-            model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"))
+            model.optimizer_state_dict = torch.load(os.path.join(base_model_name, "optimizer", "optimizer.pt"),
+                                                    weights_only=True)
 
         # ema
         with contextlib.suppress(FileNotFoundError):
-            model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"))
+            model.ema_state_dict = torch.load(os.path.join(base_model_name, "ema", "ema.pt"), weights_only=True)
 
         # meta
         model.train_progress = train_progress

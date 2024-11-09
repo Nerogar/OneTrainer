@@ -215,6 +215,7 @@ def create_model_saver(
 
     return None
 
+
 def create_model_setup(
         model_type: ModelType,
         train_device: torch.device,
@@ -267,6 +268,7 @@ def create_model_setup(
                 return FluxEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
+
 
 def create_model_sampler(
         train_device: torch.device,
@@ -321,6 +323,7 @@ def create_model_sampler(
 
     return None
 
+
 def create_data_loader(
         train_device: torch.device,
         temp_device: torch.device,
@@ -331,8 +334,12 @@ def create_data_loader(
         train_progress: TrainProgress | None = None,
         is_validation: bool = False
 ) -> BaseDataLoader | None:
+    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0 and config.dataloader_threads > 1:
+        raise RuntimeError('layer offloading can not be activated if "dataloader_threads" > 1')
+
     if train_progress is None:
         train_progress = TrainProgress()
+
     match training_method:
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
@@ -379,13 +386,22 @@ def create_data_loader(
 
     return None
 
+
 def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
-) -> torch.optim.Optimizer:
+) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
+
+    if optimizer_config.optimizer is None:
+        return None
+
+    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0:
+        if (not optimizer_config.optimizer.supports_fused_back_pass() or not optimizer_config.fused_back_pass) \
+                and config.training_method == TrainingMethod.FINE_TUNE:
+            raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
 
@@ -514,9 +530,26 @@ def create_optimizer(
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
                        optimizer_config.beta3 if optimizer_config.beta1 is not None else 0.9999,),
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.05,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 1e-2,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                alpha=optimizer_config.eps if optimizer_config.eps is not None else 5,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
+                is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
+            )
+
+        # AdEMAMix Optimizer
+        case Optimizer.AdEMAMix:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.AdEMAMix(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
+                       optimizer_config.beta3 if optimizer_config.beta1 is not None else 0.9999,),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 1e-2,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                optim_bits=optimizer_config.optim_bits if optimizer_config.optim_bits is not None else 32,
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
                 is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
             )

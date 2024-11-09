@@ -1,4 +1,5 @@
 from abc import ABCMeta
+from random import Random
 
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
@@ -67,13 +68,10 @@ class BaseWuerstchenSetup(
         if config.gradient_checkpointing.enabled():
             if model.model_type.is_wuerstchen_v2():
                 model.prior_prior.enable_gradient_checkpointing()
-                enable_checkpointing_for_clip_encoder_layers(
-                    model.prior_text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
             elif model.model_type.is_stable_cascade():
-                enable_checkpointing_for_stable_cascade_blocks(
-                    model.prior_prior, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-                enable_checkpointing_for_clip_encoder_layers(
-                    model.prior_text_encoder, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, config)
+                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.decoder_vqgan)
@@ -219,6 +217,7 @@ class BaseWuerstchenSetup(
 
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(train_progress.global_step)
+            rand = Random(train_progress.global_step)
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
@@ -242,6 +241,9 @@ class BaseWuerstchenSetup(
             )
 
             text_embedding, pooled_text_text_embedding = model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
                 tokens=batch['tokens'],
                 tokens_mask=batch['tokens_mask'],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
@@ -249,6 +251,7 @@ class BaseWuerstchenSetup(
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_output=batch[
                     'pooled_text_encoder_output'] if not config.train_text_encoder_or_embedding() else None,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
 
             latent_input = scaled_noisy_latent_image

@@ -1,41 +1,42 @@
 # base requirements
 numpy==1.26.4
-opencv-python==4.9.0.80
-pillow==10.3.0
-tqdm==4.66.4
-PyYAML==6.0.1
-huggingface-hub==0.23.3
-scipy==1.13.1; sys_platform != 'win32'
-matplotlib==3.9.0
+opencv-python==4.10.0.84
+pillow==11.0.0
+tqdm==4.66.6
+PyYAML==6.0.2
+huggingface-hub==0.26.2
+scipy==1.14.1; sys_platform != 'win32'
+matplotlib==3.9.2
 
 # pytorch
-accelerate==0.30.1
-safetensors==0.4.3
-tensorboard==2.17.0
-pytorch-lightning==2.2.5
+accelerate==1.0.1
+safetensors==0.4.5
+tensorboard==2.18.0
+pytorch-lightning==2.4.0
 
 # stable diffusion
--e git+https://github.com/huggingface/diffusers.git@2ee3215#egg=diffusers
-transformers==4.42.3
+-e git+https://github.com/huggingface/diffusers.git@e45c25d#egg=diffusers
+transformers==4.46.0
+sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # other models
-pooch==1.8.1
-open-clip-torch==2.24.0
+pooch==1.8.2
+open-clip-torch==2.28.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@85bf187#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@fa78a18#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
-lion-pytorch==0.1.4 # lion optimizer
+lion-pytorch==0.2.2 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer
-schedulefree==1.2.5 # schedule-free optimizers
-pytorch_optimizer==3.0.2 # pytorch optimizers
+schedulefree==1.2.7 # schedule-free optimizers
+pytorch_optimizer==3.1.2 # pytorch optimizers
 
 # Profiling
-scalene==1.5.41
+scalene==1.5.45
 
 # ui
 customtkinter==5.2.2

@@ -37,6 +37,14 @@ class BaseModelSetup(
         pass
 
     @abstractmethod
+    def setup_optimizations(
+            self,
+            model: BaseModel,
+            config: TrainConfig,
+    ):
+        pass
+
+    @abstractmethod
     def setup_model(
             self,
             model: BaseModel,

@@ -1,6 +1,12 @@
 import os
 import random
 
+from modules.util import path_util
+from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.ui import components
+from modules.util.ui.UIState import UIState
+
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.PipelineModule import PipelineModule
@@ -13,11 +19,6 @@ from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
 from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
-from modules.util import path_util
-from modules.util.config.ConceptConfig import ConceptConfig
-from modules.util.enum.BalancingStrategy import BalancingStrategy
-from modules.util.ui import components
-from modules.util.ui.UIState import UIState
 
 import torch
 from torchvision.transforms import functional
@@ -102,7 +103,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         # validation_concept
         components.label(frame, 2, 0, "Validation concept",
-                         tooltip="Use concept as for validation instead of training")
+                         tooltip="Use concept for validation instead of training")
         components.switch(frame, 2, 1, self.ui_state, "validation_concept")
 
         # path

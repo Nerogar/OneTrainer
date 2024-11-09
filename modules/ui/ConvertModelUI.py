@@ -51,6 +51,8 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
             ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
             ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
+            ("Stable Diffusion 3", ModelType.STABLE_DIFFUSION_3),
+            ("Stable Diffusion 3.5", ModelType.STABLE_DIFFUSION_35),
             ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
             ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
             ("Wuerstchen v2", ModelType.WUERSTCHEN_2),

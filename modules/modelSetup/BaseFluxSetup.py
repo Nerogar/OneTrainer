@@ -11,7 +11,6 @@ from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowM
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
-    create_checkpointed_forward,
     enable_checkpointing_for_clip_encoder_layers,
     enable_checkpointing_for_flux_transformer,
     enable_checkpointing_for_t5_encoder_layers,
@@ -41,7 +40,7 @@ class BaseFluxSetup(
     metaclass=ABCMeta
 ):
 
-    def _setup_optimizations(
+    def setup_optimizations(
             self,
             model: FluxModel,
             config: TrainConfig,
@@ -70,14 +69,13 @@ class BaseFluxSetup(
                     )
 
         if config.gradient_checkpointing.enabled():
-            enable_checkpointing_for_flux_transformer(
-                model.transformer, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+            model.transformer_offload_conductor = \
+                enable_checkpointing_for_flux_transformer(model.transformer, config)
             if model.text_encoder_1 is not None:
-                enable_checkpointing_for_clip_encoder_layers(
-                    model.text_encoder_1, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
-            if model.text_encoder_2 is not None and config.train_text_encoder_2_or_embedding():
-                enable_checkpointing_for_t5_encoder_layers(
-                    model.text_encoder_2, self.train_device, self.temp_device, config.gradient_checkpointing.offload())
+                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
+            if model.text_encoder_2 is not None:
+                model.text_encoder_2_offload_conductor = \
+                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder_2, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
@@ -285,6 +283,9 @@ class BaseFluxSetup(
                     if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
                     if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
+                apply_attention_mask=config.prior.attention_mask,
             )
 
             latent_image = batch['latent_image']
@@ -298,199 +299,200 @@ class BaseFluxSetup(
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             if is_align_prop_step and not deterministic:
-                dummy = torch.zeros((1,), device=self.train_device)
-                dummy.requires_grad_(True)
+                raise NotImplementedError
+                # dummy = torch.zeros((1,), device=self.train_device)
+                # dummy.requires_grad_(True)
 
-                negative_text_encoder_output, negative_pooled_text_encoder_2_output = model.encode_text(
-                    train_device=self.train_device,
-                    batch_size=batch['latent_image'].shape[0],
-                    rand=rand,
-                    text="",
-                    text_encoder_1_layer_skip=config.text_encoder_layer_skip,
-                    text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                # negative_text_encoder_output, negative_pooled_text_encoder_2_output = model.encode_text(
+                #     train_device=self.train_device,
+                #     batch_size=batch['latent_image'].shape[0],
+                #     rand=rand,
+                #     text="",
+                #     text_encoder_1_layer_skip=config.text_encoder_layer_skip,
+                #     text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                #     apply_attention_mask=config.prior.attention_mask,
+                # )
+                # negative_text_encoder_output = negative_text_encoder_output \
+                #     .expand((scaled_latent_image.shape[0], -1, -1))
+                # negative_pooled_text_encoder_2_output = negative_pooled_text_encoder_2_output \
+                #     .expand((scaled_latent_image.shape[0], -1))
+
+                # model.noise_scheduler.set_timesteps(config.align_prop_steps)
+
+                # scaled_noisy_latent_image = latent_noise
+
+                # timestep_high = int(config.align_prop_steps * config.max_noising_strength)
+                # timestep_low = \
+                #     int(config.align_prop_steps * config.max_noising_strength * (
+                #             1.0 - config.align_prop_truncate_steps))
+
+                # truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
+
+                # # original size of the image
+                # original_height = scaled_noisy_latent_image.shape[2] * 8
+                # original_width = scaled_noisy_latent_image.shape[3] * 8
+                # crops_coords_top = 0
+                # crops_coords_left = 0
+                # target_height = scaled_noisy_latent_image.shape[2] * 8
+                # target_width = scaled_noisy_latent_image.shape[3] * 8
+
+                # add_time_ids = torch.tensor([
+                #     original_height,
+                #     original_width,
+                #     crops_coords_top,
+                #     crops_coords_left,
+                #     target_height,
+                #     target_width
+                # ]).unsqueeze(0).expand((scaled_latent_image.shape[0], -1))
+
+                # add_time_ids = add_time_ids.to(
+                #     dtype=scaled_noisy_latent_image.dtype,
+                #     device=scaled_noisy_latent_image.device,
+                # )
+
+                # added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
+                # negative_added_cond_kwargs = {"text_embeds": negative_pooled_text_encoder_2_output,
+                #                               "time_ids": add_time_ids}
+
+                # checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device, self.temp_device)
+
+                # for step in range(config.align_prop_steps):
+                #     timestep = model.noise_scheduler.timesteps[step] \
+                #         .expand((scaled_latent_image.shape[0],)) \
+                #         .to(device=model.unet.device)
+
+                #     if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
+                #         latent_input = torch.concat(
+                #             [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
+                #         )
+                #     else:
+                #         latent_input = scaled_noisy_latent_image
+
+                #     predicted_latent_noise = checkpointed_unet(
+                #         sample=latent_input,
+                #         timestep=timestep,
+                #         encoder_hidden_states=text_encoder_output,
+                #         added_cond_kwargs=added_cond_kwargs,
+                #     ).sample
+
+                #     negative_predicted_latent_noise = checkpointed_unet(
+                #         sample=latent_input,
+                #         timestep=timestep,
+                #         encoder_hidden_states=negative_text_encoder_output,
+                #         added_cond_kwargs=negative_added_cond_kwargs,
+                #     ).sample
+
+                #     cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
+                #     cfg_predicted_latent_noise = negative_predicted_latent_noise + config.align_prop_cfg_scale * cfg_grad
+
+                #     scaled_noisy_latent_image = model.noise_scheduler \
+                #         .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
+                #         .prev_sample
+
+                #     if step < truncate_timestep_index:
+                #         scaled_noisy_latent_image = scaled_noisy_latent_image.detach()
+
+                #     if self.debug_mode:
+                #         with torch.no_grad():
+                #             # predicted image
+                #             predicted_image = self._project_latent_to_image(scaled_noisy_latent_image)
+                #             self._save_image(
+                #                 predicted_image,
+                #                 config.debug_dir + "/training_batches",
+                #                 "2-predicted_image_" + str(step),
+                #                 train_progress.global_step,
+                #                 True
+                #             )
+
+                # predicted_latent_image = scaled_noisy_latent_image / vae_scaling_factor
+                # predicted_latent_image = predicted_latent_image.to(dtype=model.vae.dtype)
+
+                # predicted_image = []
+                # for x in predicted_latent_image.split(1):
+                #     predicted_image.append(torch.utils.checkpoint.checkpoint(
+                #         model.vae.decode,
+                #         x,
+                #         use_reentrant=False
+                #     ).sample)
+                # predicted_image = torch.cat(predicted_image)
+
+                # model_output_data = {
+                #     'loss_type': 'align_prop',
+                #     'predicted': predicted_image,
+                # }
+            timestep_index = self._get_timestep_discrete(
+                model.noise_scheduler.config['num_train_timesteps'],
+                deterministic,
+                generator,
+                scaled_latent_image.shape[0],
+                config,
+            )
+
+            scaled_noisy_latent_image, timestep, sigma = self._add_noise_discrete(
+                scaled_latent_image,
+                latent_noise,
+                timestep_index,
+                model.noise_scheduler.timesteps,
+            )
+
+            if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
+                latent_input = torch.concat(
+                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
                 )
-                negative_text_encoder_output = negative_text_encoder_output \
-                    .expand((scaled_latent_image.shape[0], -1, -1))
-                negative_pooled_text_encoder_2_output = negative_pooled_text_encoder_2_output \
-                    .expand((scaled_latent_image.shape[0], -1))
-
-                model.noise_scheduler.set_timesteps(config.align_prop_steps)
-
-                scaled_noisy_latent_image = latent_noise
-
-                timestep_high = int(config.align_prop_steps * config.max_noising_strength)
-                timestep_low = \
-                    int(config.align_prop_steps * config.max_noising_strength * (
-                            1.0 - config.align_prop_truncate_steps))
-
-                truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
-
-                # original size of the image
-                original_height = scaled_noisy_latent_image.shape[2] * 8
-                original_width = scaled_noisy_latent_image.shape[3] * 8
-                crops_coords_top = 0
-                crops_coords_left = 0
-                target_height = scaled_noisy_latent_image.shape[2] * 8
-                target_width = scaled_noisy_latent_image.shape[3] * 8
-
-                add_time_ids = torch.tensor([
-                    original_height,
-                    original_width,
-                    crops_coords_top,
-                    crops_coords_left,
-                    target_height,
-                    target_width
-                ]).unsqueeze(0).expand((scaled_latent_image.shape[0], -1))
-
-                add_time_ids = add_time_ids.to(
-                    dtype=scaled_noisy_latent_image.dtype,
-                    device=scaled_noisy_latent_image.device,
-                )
-
-                added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
-                negative_added_cond_kwargs = {"text_embeds": negative_pooled_text_encoder_2_output,
-                                              "time_ids": add_time_ids}
-
-                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device, self.temp_device)
-
-                for step in range(config.align_prop_steps):
-                    timestep = model.noise_scheduler.timesteps[step] \
-                        .expand((scaled_latent_image.shape[0],)) \
-                        .to(device=model.unet.device)
-
-                    if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                        latent_input = torch.concat(
-                            [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
-                        )
-                    else:
-                        latent_input = scaled_noisy_latent_image
-
-                    predicted_latent_noise = checkpointed_unet(
-                        sample=latent_input,
-                        timestep=timestep,
-                        encoder_hidden_states=text_encoder_output,
-                        added_cond_kwargs=added_cond_kwargs,
-                    ).sample
-
-                    negative_predicted_latent_noise = checkpointed_unet(
-                        sample=latent_input,
-                        timestep=timestep,
-                        encoder_hidden_states=negative_text_encoder_output,
-                        added_cond_kwargs=negative_added_cond_kwargs,
-                    ).sample
-
-                    cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
-                    cfg_predicted_latent_noise = negative_predicted_latent_noise + config.align_prop_cfg_scale * cfg_grad
-
-                    scaled_noisy_latent_image = model.noise_scheduler \
-                        .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
-                        .prev_sample
-
-                    if step < truncate_timestep_index:
-                        scaled_noisy_latent_image = scaled_noisy_latent_image.detach()
-
-                    if self.debug_mode:
-                        with torch.no_grad():
-                            # predicted image
-                            predicted_image = self._project_latent_to_image(scaled_noisy_latent_image)
-                            self._save_image(
-                                predicted_image,
-                                config.debug_dir + "/training_batches",
-                                "2-predicted_image_" + str(step),
-                                train_progress.global_step,
-                                True
-                            )
-
-                predicted_latent_image = scaled_noisy_latent_image / vae_scaling_factor
-                predicted_latent_image = predicted_latent_image.to(dtype=model.vae.dtype)
-
-                predicted_image = []
-                for x in predicted_latent_image.split(1):
-                    predicted_image.append(torch.utils.checkpoint.checkpoint(
-                        model.vae.decode,
-                        x,
-                        use_reentrant=False
-                    ).sample)
-                predicted_image = torch.cat(predicted_image)
-
-                model_output_data = {
-                    'loss_type': 'align_prop',
-                    'predicted': predicted_image,
-                }
             else:
-                timestep_index = self._get_timestep_discrete(
-                    model.noise_scheduler.config['num_train_timesteps'],
-                    deterministic,
-                    generator,
-                    scaled_latent_image.shape[0],
-                    config,
-                )
+                latent_input = scaled_noisy_latent_image
 
-                scaled_noisy_latent_image, timestep, sigma = self._add_noise_discrete(
-                    scaled_latent_image,
-                    latent_noise,
-                    timestep_index,
-                    model.noise_scheduler.timesteps,
-                )
+            if model.transformer.config.guidance_embeds:
+                guidance = torch.tensor([1.0], device=self.train_device)
+                guidance = guidance.expand(latent_input.shape[0])
+            else:
+                guidance = None
 
-                if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                    latent_input = torch.concat(
-                        [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
-                    )
-                else:
-                    latent_input = scaled_noisy_latent_image
+            text_ids = torch.zeros(
+                size=(text_encoder_output.shape[1], 3),
+                device=self.train_device,
+            )
 
-                if model.transformer.config.guidance_embeds:
-                    guidance = torch.tensor([1.0], device=self.train_device)
-                    guidance = guidance.expand(latent_input.shape[0])
-                else:
-                    guidance = None
+            image_ids = model.prepare_latent_image_ids(
+                latent_input.shape[2],
+                latent_input.shape[3],
+                self.train_device,
+                model.train_dtype.torch_dtype()
+            )
 
-                text_ids = torch.zeros(
-                    size=(text_encoder_output.shape[1], 3),
-                    device=self.train_device,
-                )
+            packed_latent_input = model.pack_latents(
+                latent_input,
+                latent_input.shape[0],
+                latent_input.shape[1],
+                latent_input.shape[2],
+                latent_input.shape[3],
+            )
 
-                image_ids = model.prepare_latent_image_ids(
-                    latent_input.shape[2],
-                    latent_input.shape[3],
-                    self.train_device,
-                    model.train_dtype.torch_dtype()
-                )
+            packed_predicted_flow = model.transformer(
+                hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                timestep=timestep / 1000,
+                guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
+                pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
+                img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
+                joint_attention_kwargs=None,
+                return_dict=True
+            ).sample
 
-                packed_latent_input = model.pack_latents(
-                    latent_input,
-                    latent_input.shape[0],
-                    latent_input.shape[1],
-                    latent_input.shape[2],
-                    latent_input.shape[3],
-                )
+            predicted_flow = model.unpack_latents(
+                packed_predicted_flow,
+                latent_input.shape[2],
+                latent_input.shape[3],
+            )
 
-                packed_predicted_flow = model.transformer(
-                    hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep=timestep / 1000,
-                    guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
-                    pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
-                    img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
-                    joint_attention_kwargs=None,
-                    return_dict=True
-                ).sample
-
-                predicted_flow = model.unpack_latents(
-                    packed_predicted_flow,
-                    latent_input.shape[2],
-                    latent_input.shape[3],
-                )
-
-                flow = latent_noise - scaled_latent_image
-                model_output_data = {
-                    'loss_type': 'target',
-                    'timestep': timestep,
-                    'predicted': predicted_flow,
-                    'target': flow,
-                }
+            flow = latent_noise - scaled_latent_image
+            model_output_data = {
+                'loss_type': 'target',
+                'timestep': timestep,
+                'predicted': predicted_flow,
+                'target': flow,
+            }
 
             if config.debug_mode:
                 with torch.no_grad():

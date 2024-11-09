@@ -70,17 +70,22 @@ class StableDiffusionXLSampler(BaseModelSampler):
 
             prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
                 text=prompt,
+                train_device=self.train_device,
+                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )
 
             negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
                 text=negative_prompt,
+                train_device=self.train_device,
+                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )
 
-            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
+                .to(dtype=self.model.train_dtype.torch_dtype())
 
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
@@ -122,7 +127,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
                 generator=generator,
                 device=self.train_device,
-                dtype=torch.float32,
+                dtype=self.model.train_dtype.torch_dtype(),
             ) * noise_scheduler.init_noise_sigma
 
             added_cond_kwargs = {
@@ -142,13 +147,12 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
                 # predict the noise residual
-                with torch.autocast(self.train_device.type):
-                    noise_pred = unet(
-                        sample=latent_model_input,
-                        timestep=timestep,
-                        encoder_hidden_states=combined_prompt_embedding,
-                        added_cond_kwargs=added_cond_kwargs,
-                    )[0]
+                noise_pred = unet(
+                    sample=latent_model_input,
+                    timestep=timestep,
+                    encoder_hidden_states=combined_prompt_embedding,
+                    added_cond_kwargs=added_cond_kwargs,
+                )[0]
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -222,167 +226,172 @@ class StableDiffusionXLSampler(BaseModelSampler):
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> Image.Image:
-        generator = torch.Generator(device=self.train_device)
-        if random_seed:
-            generator.seed()
-        else:
-            generator.manual_seed(seed)
-
-        noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.model.noise_scheduler, diffusion_steps)
-        image_processor = self.pipeline.image_processor
-        unet = self.pipeline.unet
-        vae = self.pipeline.vae
-        vae_scale_factor = self.pipeline.vae_scale_factor
-
-        # prepare conditioning image
-        self.model.vae_to(self.train_device)
-
-        with self.model.vae_autocast_context:
-            if sample_inpainting:
-                t = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Resize(
-                        (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
-                    ),
-                ])
-
-                image = Image.open(base_image_path).convert("RGB")
-                image = t(image).to(
-                    dtype=self.model.vae_train_dtype.torch_dtype(),
-                    device=self.train_device,
-                )
-
-                mask = Image.open(mask_image_path).convert("L")
-                mask = t(mask).to(
-                    dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device,
-                )
-
-                erode_kernel = self.__create_erode_kernel(self.train_device)
-                eroded_mask = erode_kernel(mask)
-                eroded_mask = (eroded_mask > 0.5).float()
-
-                image = (image * 2.0) - 1.0
-                conditioning_image = (image * (1 - eroded_mask))
-                conditioning_image = conditioning_image.unsqueeze(0)
-
-                latent_conditioning_image = vae.encode(
-                    conditioning_image).latent_dist.mode() * vae.config.scaling_factor
-
-                rescale_mask = transforms.Resize(
-                    (round(mask.shape[1] // 8), round(mask.shape[2] // 8)),
-                    interpolation=transforms.InterpolationMode.BILINEAR,
-                    antialias=True
-                )
-                latent_mask = rescale_mask(mask)
-                latent_mask = (latent_mask > 0).float()
-                latent_mask = latent_mask.unsqueeze(0)
+        with self.model.autocast_context:
+            generator = torch.Generator(device=self.train_device)
+            if random_seed:
+                generator.seed()
             else:
-                conditioning_image = torch.zeros(
-                    (1, 3, height, width),
-                    dtype=self.model.vae_train_dtype.torch_dtype(),
-                    device=self.train_device,
-                )
-                conditioning_image = conditioning_image
-                latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
-                latent_mask = torch.ones(
-                    size=(1, 1, latent_conditioning_image.shape[2], latent_conditioning_image.shape[3]),
-                    dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device
-                )
+                generator.manual_seed(seed)
 
-        self.model.vae_to(self.temp_device)
-        torch_gc()
+            noise_scheduler = create.create_noise_scheduler(noise_scheduler, self.model.noise_scheduler, diffusion_steps)
+            image_processor = self.pipeline.image_processor
+            unet = self.pipeline.unet
+            vae = self.pipeline.vae
+            vae_scale_factor = self.pipeline.vae_scale_factor
 
-        # prepare prompt
-        self.model.text_encoder_to(self.train_device)
+            # prepare conditioning image
+            self.model.vae_to(self.train_device)
 
-        prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
-            text=prompt,
-            text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-            text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-        )
+            with self.model.vae_autocast_context:
+                if sample_inpainting:
+                    t = transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Resize(
+                            (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
+                        ),
+                    ])
 
-        negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
-            text=negative_prompt,
-            text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-            text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-        )
+                    image = Image.open(base_image_path).convert("RGB")
+                    image = t(image).to(
+                        dtype=self.model.vae_train_dtype.torch_dtype(),
+                        device=self.train_device,
+                    )
 
-        combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding])
+                    mask = Image.open(mask_image_path).convert("L")
+                    mask = t(mask).to(
+                        dtype=self.model.train_dtype.torch_dtype(),
+                        device=self.train_device,
+                    )
 
-        self.model.text_encoder_to(self.temp_device)
-        torch_gc()
+                    erode_kernel = self.__create_erode_kernel(self.train_device)
+                    eroded_mask = erode_kernel(mask)
+                    eroded_mask = (eroded_mask > 0.5).float()
 
-        # prepare timesteps
-        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
-        timesteps = noise_scheduler.timesteps
+                    image = (image * 2.0) - 1.0
+                    conditioning_image = (image * (1 - eroded_mask))
+                    conditioning_image = conditioning_image.unsqueeze(0)
 
-        if force_last_timestep:
-            last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                            * (noise_scheduler.config.num_train_timesteps - 1)
+                    latent_conditioning_image = vae.encode(
+                        conditioning_image).latent_dist.mode() * vae.config.scaling_factor
 
-            # add the final timestep to force predicting with zero snr
-            timesteps = torch.cat([last_timestep, timesteps])
+                    rescale_mask = transforms.Resize(
+                        (round(mask.shape[1] // 8), round(mask.shape[2] // 8)),
+                        interpolation=transforms.InterpolationMode.BILINEAR,
+                        antialias=True
+                    )
+                    latent_mask = rescale_mask(mask)
+                    latent_mask = (latent_mask > 0).float()
+                    latent_mask = latent_mask.unsqueeze(0)
+                else:
+                    conditioning_image = torch.zeros(
+                        (1, 3, height, width),
+                        dtype=self.model.vae_train_dtype.torch_dtype(),
+                        device=self.train_device,
+                    )
+                    conditioning_image = conditioning_image
+                    latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+                    latent_mask = torch.ones(
+                        size=(1, 1, latent_conditioning_image.shape[2], latent_conditioning_image.shape[3]),
+                        dtype=self.model.train_dtype.torch_dtype(),
+                        device=self.train_device
+                    )
 
-        original_height = height
-        original_width = width
-        crops_coords_top = 0
-        crops_coords_left = 0
-        target_height = height
-        target_width = width
+            self.model.vae_to(self.temp_device)
+            torch_gc()
 
-        add_time_ids = torch.tensor([
-            original_height,
-            original_width,
-            crops_coords_top,
-            crops_coords_left,
-            target_height,
-            target_width
-        ]).unsqueeze(dim=0)
+            # prepare prompt
+            self.model.text_encoder_to(self.train_device)
 
-        add_time_ids = add_time_ids.to(
-            device=self.train_device,
-        )
-
-        # prepare latent image
-        num_channels_latents = latent_conditioning_image.shape[1]
-        latent_image = torch.randn(
-            size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
-            generator=generator,
-            device=self.train_device,
-            dtype=torch.float32,
-        )
-
-        if sample_inpainting:
-            # SDXL inpainting is terrible at reconstructing from pure noise.
-            # This removes the last timestep to let the model know about the general image composition and brightness
-            timesteps = timesteps[1:]
-            latent_image = noise_scheduler.add_noise(latent_conditioning_image, latent_image, timesteps[:1])
-        else:
-            latent_image = latent_image * noise_scheduler.init_noise_sigma
-
-        added_cond_kwargs = {
-            "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
-            "time_ids": torch.concat([add_time_ids] * 2, dim=0),
-        }
-
-        # denoising loop
-        extra_step_kwargs = {}
-        if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
-            extra_step_kwargs["generator"] = generator
-
-        # denoising loop
-        self.model.unet_to(self.train_device)
-        for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
-            latent_model_input = noise_scheduler.scale_model_input(latent_image, timestep)
-            latent_model_input = torch.concat(
-                [latent_model_input, latent_mask, latent_conditioning_image], 1
+            prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
+                text=prompt,
+                train_device=self.train_device,
+                batch_size=1,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )
-            latent_model_input = torch.cat([latent_model_input] * 2)
 
-            # predict the noise residual
-            with torch.autocast(self.train_device.type):
+            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
+                text=negative_prompt,
+                train_device=self.train_device,
+                batch_size=1,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+            )
+
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
+                .to(dtype=self.model.train_dtype.torch_dtype())
+
+            self.model.text_encoder_to(self.temp_device)
+            torch_gc()
+
+            # prepare timesteps
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
+            timesteps = noise_scheduler.timesteps
+
+            if force_last_timestep:
+                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
+                                * (noise_scheduler.config.num_train_timesteps - 1)
+
+                # add the final timestep to force predicting with zero snr
+                timesteps = torch.cat([last_timestep, timesteps])
+
+            original_height = height
+            original_width = width
+            crops_coords_top = 0
+            crops_coords_left = 0
+            target_height = height
+            target_width = width
+
+            add_time_ids = torch.tensor([
+                original_height,
+                original_width,
+                crops_coords_top,
+                crops_coords_left,
+                target_height,
+                target_width
+            ]).unsqueeze(dim=0)
+
+            add_time_ids = add_time_ids.to(
+                device=self.train_device,
+            )
+
+            # prepare latent image
+            num_channels_latents = latent_conditioning_image.shape[1]
+            latent_image = torch.randn(
+                size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
+                generator=generator,
+                device=self.train_device,
+                dtype=self.model.train_dtype.torch_dtype(),
+            )
+
+            if sample_inpainting:
+                # SDXL inpainting is terrible at reconstructing from pure noise.
+                # This removes the last timestep to let the model know about the general image composition and brightness
+                timesteps = timesteps[1:]
+                latent_image = noise_scheduler.add_noise(latent_conditioning_image, latent_image, timesteps[:1])
+            else:
+                latent_image = latent_image * noise_scheduler.init_noise_sigma
+
+            added_cond_kwargs = {
+                "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
+                "time_ids": torch.concat([add_time_ids] * 2, dim=0),
+            }
+
+            # denoising loop
+            extra_step_kwargs = {}
+            if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
+                extra_step_kwargs["generator"] = generator
+
+            # denoising loop
+            self.model.unet_to(self.train_device)
+            for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
+                latent_model_input = noise_scheduler.scale_model_input(latent_image, timestep)
+                latent_model_input = torch.concat(
+                    [latent_model_input, latent_mask, latent_conditioning_image], 1
+                )
+                latent_model_input = torch.cat([latent_model_input] * 2)
+
+                # predict the noise residual
                 noise_pred = unet(
                     sample=latent_model_input,
                     timestep=timestep,
@@ -390,42 +399,42 @@ class StableDiffusionXLSampler(BaseModelSampler):
                     added_cond_kwargs=added_cond_kwargs,
                 )[0]
 
-            # cfg
-            noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
-            noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
+                # cfg
+                noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
+                noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
 
-            if cfg_rescale > 0.0:
-                # From: Common Diffusion Noise Schedules and Sample Steps are Flawed (https://arxiv.org/abs/2305.08891)
-                std_positive = noise_pred_positive.std(dim=list(range(1, noise_pred_positive.ndim)), keepdim=True)
-                std_pred = noise_pred.std(dim=list(range(1, noise_pred.ndim)), keepdim=True)
-                noise_pred_rescaled = noise_pred * (std_positive / std_pred)
-                noise_pred = (
-                        cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
-                )
+                if cfg_rescale > 0.0:
+                    # From: Common Diffusion Noise Schedules and Sample Steps are Flawed (https://arxiv.org/abs/2305.08891)
+                    std_positive = noise_pred_positive.std(dim=list(range(1, noise_pred_positive.ndim)), keepdim=True)
+                    std_pred = noise_pred.std(dim=list(range(1, noise_pred.ndim)), keepdim=True)
+                    noise_pred_rescaled = noise_pred * (std_positive / std_pred)
+                    noise_pred = (
+                            cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
+                    )
 
-            # compute the previous noisy sample x_t -> x_t-1
-            latent_image = noise_scheduler.step(
-                noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
-            )[0]
+                # compute the previous noisy sample x_t -> x_t-1
+                latent_image = noise_scheduler.step(
+                    noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
+                )[0]
 
-            on_update_progress(i + 1, len(timesteps))
+                on_update_progress(i + 1, len(timesteps))
 
-        self.model.unet_to(self.temp_device)
-        torch_gc()
+            self.model.unet_to(self.temp_device)
+            torch_gc()
 
-        # decode
-        self.model.vae_to(self.train_device)
+            # decode
+            self.model.vae_to(self.train_device)
 
-        latent_image = latent_image.to(dtype=self.model.vae_train_dtype.torch_dtype())
-        with self.model.vae_autocast_context:
-            image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
+            latent_image = latent_image.to(dtype=self.model.vae_train_dtype.torch_dtype())
+            with self.model.vae_autocast_context:
+                image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
-        do_denormalize = [True] * image.shape[0]
-        image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+            do_denormalize = [True] * image.shape[0]
+            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-        self.model.vae_to(self.temp_device)
+            self.model.vae_to(self.temp_device)
 
-        return image[0]
+            return image[0]
 
     def sample(
             self,
@@ -442,8 +451,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
             image = self.__sample_inpainting(
                 prompt=prompt,
                 negative_prompt=negative_prompt,
-                height=sample_config.height,
-                width=sample_config.width,
+                height=self.quantize_resolution(sample_config.height, 64),
+                width=self.quantize_resolution(sample_config.width, 64),
                 seed=sample_config.seed,
                 random_seed=sample_config.random_seed,
                 diffusion_steps=sample_config.diffusion_steps,
@@ -462,8 +471,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
             image = self.__sample_base(
                 prompt=prompt,
                 negative_prompt=negative_prompt,
-                height=sample_config.height,
-                width=sample_config.width,
+                height=self.quantize_resolution(sample_config.height, 64),
+                width=self.quantize_resolution(sample_config.width, 64),
                 seed=sample_config.seed,
                 random_seed=sample_config.random_seed,
                 diffusion_steps=sample_config.diffusion_steps,

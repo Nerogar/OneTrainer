@@ -1,3 +1,4 @@
+import math
 from collections.abc import Callable
 
 from modules.util.enum.DataType import DataType
@@ -5,10 +6,13 @@ from modules.util.enum.DataType import DataType
 import torch
 from torch import Tensor, nn
 
-import bitsandbytes as bnb
+try:
+    import bitsandbytes as bnb
+except ImportError:
+    bnb = None
 
 
-def __create_nf4_linear_layer(module: nn.Module):
+def __create_nf4_linear_layer(module: nn.Linear) -> nn.Module:
     quant_linear = bnb.nn.LinearNF4(
         input_features=module.in_features,
         output_features=module.out_features,
@@ -17,7 +21,8 @@ def __create_nf4_linear_layer(module: nn.Module):
 
     return quant_linear
 
-def __create_int8_linear_layer(module: nn.Module):
+
+def __create_int8_linear_layer(module: nn.Linear) -> nn.Module:
     quant_linear = bnb.nn.Linear8bitLt(
         input_features=module.in_features,
         output_features=module.out_features,
@@ -28,9 +33,9 @@ def __create_int8_linear_layer(module: nn.Module):
     return quant_linear
 
 
-def replace_linear_layers(
+def __replace_linear_layers(
         parent_module: nn.Module,
-        convert_fn: Callable[[nn.Module], nn.Module],
+        convert_fn: Callable[[nn.Linear], nn.Module],
         keep_in_fp32_modules: list[str] | None = None,
         name_prefix: str = "",
         visited_modules: set[int] | None = None,
@@ -52,7 +57,7 @@ def replace_linear_layers(
                 parent_module[i] = quant_linear
                 del module
             elif id(module) not in visited_modules:
-                replace_linear_layers(
+                __replace_linear_layers(
                     parent_module=module,
                     convert_fn=convert_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
@@ -71,7 +76,7 @@ def replace_linear_layers(
                 setattr(parent_module, attr_name, quant_linear)
                 del module
             elif isinstance(module, nn.Module) and id(module) not in visited_modules:
-                replace_linear_layers(
+                __replace_linear_layers(
                     parent_module=module,
                     convert_fn=convert_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
@@ -81,61 +86,101 @@ def replace_linear_layers(
 
 
 def replace_linear_with_nf4_layers(
-        parent_module: nn.Module,
+        parent_module: nn.Linear,
         keep_in_fp32_modules: list[str] | None = None,
 ):
-    replace_linear_layers(
+    __replace_linear_layers(
         parent_module=parent_module,
         convert_fn=__create_nf4_linear_layer,
         keep_in_fp32_modules=keep_in_fp32_modules,
     )
 
+
 def replace_linear_with_int8_layers(
-        parent_module: nn.Module,
+        parent_module: nn.Linear,
         keep_in_fp32_modules: list[str] | None = None,
 ):
-    replace_linear_layers(
+    __replace_linear_layers(
         parent_module=parent_module,
         convert_fn=__create_int8_linear_layer,
         keep_in_fp32_modules=keep_in_fp32_modules,
     )
 
+
 def set_nf4_compute_type(module: nn.Module, dtype: DataType):
     for child_module in module.modules():
-        if isinstance(child_module, bnb.nn.LinearNF4):
-            child_module.compute_dtype = dtype.torch_dtype()
-            child_module.compute_type_is_set = True
+        if bnb is not None:
+            if isinstance(child_module, bnb.nn.LinearNF4):
+                child_module.compute_dtype = dtype.torch_dtype()
+                child_module.compute_type_is_set = True
+
 
 def get_unquantized_weight(module: nn.Module, dtype: torch.dtype) -> Tensor:
     param = module.weight
 
-    if isinstance(param, bnb.nn.Params4bit):
-        if param.quant_state is not None:
-            return bnb.functional.dequantize_4bit(
-                A=param.data,
-                quant_state=param.quant_state,
-                quant_type=param.quant_type,
-            ).detach().to(dtype=dtype)
-        else:
-            return param.detach().to(dtype=dtype)
-    if isinstance(param, bnb.nn.Int8Params):
-        if param.dtype == torch.int8: # already quantized
-            if param.SCB is not None:
-                return (param.SCB.unsqueeze(1) * param.detach()) / 127
-            else: # SCB is saved in the module
-                return (module.state.SCB.unsqueeze(1) * param.detach()) / 127
-        else:
-            return param.detach().to(dtype=dtype)
+    if bnb is not None:
+        if isinstance(param, bnb.nn.Params4bit):
+            if param.quant_state is not None:
+                return bnb.functional.dequantize_4bit(
+                    A=param.data,
+                    quant_state=param.quant_state,
+                    quant_type=param.quant_type,
+                ).detach().to(dtype=dtype)
+            else:
+                return param.detach().to(dtype=dtype)
+        if isinstance(param, bnb.nn.Int8Params):
+            if param.dtype == torch.int8:  # already quantized
+                if param.SCB is not None:
+                    return (param.SCB.unsqueeze(1) * param.detach()) / 127
+                else:  # SCB is saved in the module
+                    return (module.state.SCB.unsqueeze(1) * param.detach()) / 127
+            else:
+                return param.detach().to(dtype=dtype)
 
     return param.detach().to(dtype=dtype)
+
 
 def get_weight_shape(module: nn.Module) -> torch.Size:
     param = module.weight
 
-    if isinstance(param, bnb.nn.Params4bit):
-        if param.quant_state is not None:
-            return param.quant_state.shape
-        else:
-            return param.shape
+    if bnb is not None:
+        if isinstance(param, bnb.nn.Params4bit):
+            if param.quant_state is not None:
+                return param.quant_state.shape
+            else:
+                return param.shape
 
     return param.shape
+
+
+def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
+    if isinstance(module, bnb.nn.Linear4bit | nn.Linear | nn.Conv2d):
+        return [module.weight.data]
+    return []
+
+
+def get_offload_tensor_bytes(module: nn.Module) -> int:
+    if isinstance(module, bnb.nn.Linear4bit):
+        if module.weight.quant_state is None:
+            return math.ceil(module.weight.numel() / 2)
+        else:
+            return module.weight.numel()
+    if isinstance(module, nn.Linear | nn.Conv2d):
+        return module.weight.element_size() * module.weight.numel()
+    return 0
+
+
+def offload_quantized(
+        module: nn.Module,
+        device: torch.device,
+        non_blocking: bool = False,
+        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+):
+    if allocator is None:
+        if isinstance(module, bnb.nn.LinearNF4 | nn.Linear | nn.Conv2d):
+            module.weight.data = module.weight.data.to(device=device, non_blocking=non_blocking)
+    else:
+        if isinstance(module, bnb.nn.LinearNF4 | nn.Linear | nn.Conv2d):
+            tensor = allocator(module.weight)
+            tensor.copy_(module.weight.data, non_blocking=non_blocking)
+            module.weight.data = tensor
