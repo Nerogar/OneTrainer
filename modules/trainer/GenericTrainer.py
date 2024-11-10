@@ -74,7 +74,7 @@ class GenericTrainer(BaseTrainer):
                 "--logdir",
                 tensorboard_log_dir,
                 "--port",
-                "6006",
+                str(config.tensorboard_port),
                 "--samples_per_plugin=images=100,scalars=10000",
             ]
 
