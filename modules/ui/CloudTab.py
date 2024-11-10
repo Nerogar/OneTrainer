@@ -106,7 +106,7 @@ class CloudTab:
         components.switch(self.frame, 14, 3, self.ui_state, "cloud.download_tensorboard")
 
         components.label(self.frame, 0, 4, "Create cloud",
-                         tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty, or if the connection to your existing Cloud ID fails. Currently supported for RUNPOD.")
+                         tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty. Currently supported for RUNPOD.")
         components.switch(self.frame, 0, 5, self.ui_state, "cloud.create")
         components.label(self.frame, 1, 4, "Cloud name",
                          tooltip=f"The name of the new cloud instance.")
@@ -131,7 +131,7 @@ class CloudTab:
         components.entry(self.frame, 4, 5, self.ui_state, "cloud.volume_size")
 
         components.label(self.frame, 5, 4, "Min download",
-                         tooltip=f"Set the minimum download speed of the cloud in Mbps. WARNING: requires PR #360 if runpod-python!")
+                         tooltip=f"Set the minimum download speed of the cloud in Mbps.")
         components.entry(self.frame, 5, 5, self.ui_state, "cloud.min_download")
         
         components.label(self.frame, 6, 4, "Action on finish",

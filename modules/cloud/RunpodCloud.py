@@ -51,32 +51,18 @@ class RunpodCloud(LinuxCloud):
       
     def _create(self):
         config=self.config.cloud
-        if config.min_download == 0:
-            pod=runpod.create_pod(
-                name=config.name,
-                image_name="runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04",
-                gpu_type_id=config.gpu_type,
-                cloud_type=config.sub_type,
-                support_public_ip=True,
-                volume_in_gb=config.volume_size,
-                container_disk_in_gb=10,
-                ports="22/tcp",
-                volume_mount_path="/workspace",
-            )
-        else:
-            print("WARNING: passing min_download parameter to RunPod API. This requires PR #360 of runpod-python!")
-            pod=runpod.create_pod(
-                name=config.name,
-                image_name="runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04",
-                gpu_type_id=config.gpu_type,
-                cloud_type=config.sub_type,
-                support_public_ip=True,
-                volume_in_gb=config.volume_size,
-                container_disk_in_gb=10,
-                ports="22/tcp",
-                volume_mount_path="/workspace",
-                min_download=config.min_download,
-            )
+        pod=runpod.create_pod(
+            name=config.name,
+            image_name="runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04",
+            gpu_type_id=config.gpu_type,
+            cloud_type=config.sub_type,
+            support_public_ip=True,
+            volume_in_gb=config.volume_size,
+            container_disk_in_gb=10,
+            ports="22/tcp",
+            volume_mount_path="/workspace",
+            min_download=config.min_download,
+        )
         config.id=pod['id']
 
     def delete(self):
