@@ -186,7 +186,7 @@ class TrainingTab:
 
         # learning rate warmup steps
         components.label(frame, 3, 0, "Learning Rate Warmup Steps",
-                         tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate")
+                         tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate. Values >1 are interpeted as a fixed number of steps, values <=1 are intepreted as a percentage of the total training steps (ex. 0.2 = 20% of the total step count)")
         components.entry(frame, 3, 1, self.ui_state, "learning_rate_warmup_steps")
 
         # learning rate cycles
