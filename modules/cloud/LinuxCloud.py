@@ -117,7 +117,7 @@ class LinuxCloud(BaseCloud):
         if config.detach_trainer:
             self.connection.run(f'rm -f {self.config.cloud.workspace_dir}/{self.config.cloud.run_id}.finished')
 
-            #if the callback file still exists 30 seconds after the trainer has exited, the client must be detached, because the clients reads and deletes this file:
+            #if the callback file still exists 10 seconds after the trainer has exited, the client must be detached, because the clients reads and deletes this file:
             action_cmd=f"&& (sleep 10 && test -f {self.callback_file} && {self._get_action_cmd(self.config.cloud.on_detached_finish)}) \
                          || (sleep 10 && test -f {self.callback_file} && {self._get_action_cmd(self.config.cloud.on_detached_error)})"
 

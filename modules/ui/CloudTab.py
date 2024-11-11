@@ -61,7 +61,7 @@ class CloudTab:
         components.entry(self.frame, 7, 1, self.ui_state, "cloud.id")
 
         components.label(self.frame, 8, 0, "Make tensorboard TCP tunnel",
-                         tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud (NOT IMPLEMENTED)")
+                         tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud")
         components.switch(self.frame, 8, 1, self.ui_state, "cloud.tensorboard_tunnel")
         
         
@@ -151,7 +151,7 @@ class CloudTab:
         ], self.ui_state, "cloud.on_error")
 
         components.label(self.frame, 8, 4, "Action on detached finish",
-                         tooltip="What to do when training finishes, but the client has been detached and cannot download data. Data may be lost. (NOT IMPLEMENTED)")
+                         tooltip="What to do when training finishes, but the client has been detached and cannot download data. Data may be lost.")
         components.options_kv(self.frame, 8, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
@@ -159,7 +159,7 @@ class CloudTab:
         ], self.ui_state, "cloud.on_detached_finish")
         
         components.label(self.frame, 9, 4, "Action on detached error",
-                         tooltip="What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost. (NOT IMPLEMENTED)")
+                         tooltip="What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost.")
         components.options_kv(self.frame, 9, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
