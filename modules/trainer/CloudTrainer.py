@@ -33,25 +33,8 @@ class CloudTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        if config.tensorboard:
-            if config.cloud.tensorboard_tunnel:
-                pass #TODO
-            else:
-                tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
-
-                tensorboard_args = [
-                    tensorboard_executable,
-                    "--logdir",
-                    tensorboard_log_dir,
-                    "--port",
-                    "6006",
-                    "--samples_per_plugin=images=100,scalars=10000",
-                ]
-
-                if self.config.tensorboard_expose:
-                    tensorboard_args.append("--bind_all")
-
-                self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+        if config.tensorboard and not config.cloud.tensorboard_tunnel:
+            super()._start_tensorboard()
 
         match config.cloud.type:
             case CloudType.RUNPOD: self.cloud=RunpodCloud(self.remote_config)

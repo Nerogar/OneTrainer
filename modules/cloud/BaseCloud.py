@@ -17,6 +17,7 @@ class BaseCloud(metaclass=ABCMeta):
     def setup(self):
         self._connect()
         if self.config.cloud.install_onetrainer: self._install_onetrainer()
+        if self.config.cloud.tensorboard_tunnel: self._make_tensorboard_tunnel()
 
     def download_output_model(self):
         self._download_file(local=Path(self.config.local_output_model_destination),
@@ -58,11 +59,11 @@ class BaseCloud(metaclass=ABCMeta):
     @abstractmethod
     def exec_callback(self,callbacks : TrainCallbacks):
         pass
-        
+
     @abstractmethod
     def send_commands(self,commands : TrainCommands):
         pass
-        
+
     @abstractmethod
     def sync_workspace(self):
         pass
@@ -83,6 +84,10 @@ class BaseCloud(metaclass=ABCMeta):
     @abstractmethod
     def _install_onetrainer(self):
         pass
+
+    @abstractmethod
+    def _make_tensorboard_tunnel(self):
+        raise NotImplementedError("Tensorboard tunnel not supported on this cloud type")
 
     @abstractmethod
     def _upload(self,local : Path,remote : Path,commands : TrainCommands = None):

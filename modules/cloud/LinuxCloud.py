@@ -1,12 +1,14 @@
 import fabric
 import shlex
 import pickle
+import threading
 
 from modules.cloud.BaseCloud import BaseCloud
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.CloudConfig import CloudConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.enum.CloudAction import CloudAction
 from pathlib import Path
 
 
@@ -19,6 +21,10 @@ class LinuxCloud(BaseCloud):
         self.command_connection=None
         self.command_pipe=None
         self.sync_connection=None
+        self.tensorboard_tunnel_stop=None
+        self.callback_file=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.callback'
+        self.command_pipe=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.command'
+        self.config_file=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.json'
 
     def _connect(self):
         if self.connection: return
@@ -40,9 +46,6 @@ class LinuxCloud(BaseCloud):
         
     def setup(self):
         super().setup()
-        self.callback_file=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.callback'
-        self.command_pipe=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.command'
-        self.config_file=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.json'
         self.connection.run(f'mkfifo {self.command_pipe}',warn=True,hide=True,in_stream=False)
 
     def _install_onetrainer(self):
@@ -60,7 +63,22 @@ class LinuxCloud(BaseCloud):
                                   && export PATH=$PATH:/usr/local/cuda/bin \
                                   && ./install.sh)',in_stream=False)
 
+    def _make_tensorboard_tunnel(self):
+        self.tensorboard_tunnel_stop=threading.Event()
+        self.tensorboard_tunnel=fabric.tunnels.TunnelManager(
+            local_host='localhost',
+            local_port=self.config.tensorboard_port,
+            remote_host='localhost',
+            remote_port=self.config.tensorboard_port,
+            transport=self.connection.client.get_transport(),
+            finished=self.tensorboard_tunnel_stop
+        )
+        self.tensorboard_tunnel.start()
+
+
     def close(self):
+        if self.tensorboard_tunnel_stop is not None:
+            self.tensorboard_tunnel_stop.set()
         if self.callback_connection: self.callback_connection.close()
         if self.command_connection: self.command_connection.close()
         if self.sync_connection: self.sync_connection.close()
@@ -71,6 +89,10 @@ class LinuxCloud(BaseCloud):
         result=self.connection.run(f"test -f {config.workspace_dir}/{config.run_id}.pid && test ! -f {config.workspace_dir}/{config.run_id}.finished",warn=True,in_stream=False)
         return result.exited == 0
 
+    def _get_action_cmd(self,action : CloudAction):
+        if action != CloudAction.NONE:
+            raise NotImplementedError("Action on detached not supported for this cloud type")
+        return ":"
 
     def run_trainer(self):
         config=self.config.cloud
@@ -81,7 +103,7 @@ class LinuxCloud(BaseCloud):
             print(f"Reattaching to run id {config.run_id}\n\n")
             self.__trail_detached_trainer()
             return
-        
+
 
         cmd="export PYTHONUNBUFFERED=1"
         if config.huggingface_token != "": cmd+=f" && export HF_TOKEN={config.huggingface_token}"
@@ -93,7 +115,13 @@ class LinuxCloud(BaseCloud):
 
 
         if config.detach_trainer:
-            cmd+=f' && nohup {script_cmd} >{config.workspace_dir}/{config.run_id}.out 2>&1 & echo $! > {config.workspace_dir}/{config.run_id}.pid'
+            self.connection.run(f'rm -f {self.config.cloud.workspace_dir}/{self.config.cloud.run_id}.finished')
+
+            #if the callback file still exists 30 seconds after the trainer has exited, the client must be detached, because the clients reads and deletes this file:
+            action_cmd=f"&& (sleep 10 && test -f {self.callback_file} && {self._get_action_cmd(self.config.cloud.on_detached_finish)}) \
+                         || (sleep 10 && test -f {self.callback_file} && {self._get_action_cmd(self.config.cloud.on_detached_error)})"
+
+            cmd+=f' && (nohup {script_cmd} {action_cmd}) >{config.workspace_dir}/{config.run_id}.out 2>&1 & echo $! > {config.workspace_dir}/{config.run_id}.pid'
             self.connection.run(cmd,disown=True)
             self.__trail_detached_trainer()
         else:

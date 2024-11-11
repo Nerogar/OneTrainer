@@ -3,7 +3,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import traceback
 from collections.abc import Callable
 from pathlib import Path
@@ -55,7 +54,6 @@ class GenericTrainer(BaseTrainer):
 
     parameters: list[Parameter]
 
-    tensorboard_subprocess: subprocess.Popen
     tensorboard: SummaryWriter
 
     grad_hook_handles: list[RemovableHandle]
@@ -67,21 +65,7 @@ class GenericTrainer(BaseTrainer):
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
         self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, get_string_timestamp()))
         if config.tensorboard:
-            tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
-
-            tensorboard_args = [
-                tensorboard_executable,
-                "--logdir",
-                tensorboard_log_dir,
-                "--port",
-                str(config.tensorboard_port),
-                "--samples_per_plugin=images=100,scalars=10000",
-            ]
-
-            if self.config.tensorboard_expose:
-                tensorboard_args.append("--bind_all")
-
-            self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            super()._start_tensorboard()
 
         self.one_step_trained = False
 
@@ -775,7 +759,7 @@ class GenericTrainer(BaseTrainer):
         self.tensorboard.close()
 
         if self.config.tensorboard:
-            self.tensorboard_subprocess.kill()
+            super()._stop_tensorboard()
 
         for handle in self.grad_hook_handles:
             handle.remove()

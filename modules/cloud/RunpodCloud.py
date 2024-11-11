@@ -1,5 +1,7 @@
 from modules.cloud.LinuxCloud import LinuxCloud
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.CloudAction import CloudAction
+
 
 import runpod
 import time
@@ -73,3 +75,11 @@ class RunpodCloud(LinuxCloud):
         
     def _start(self):
         runpod.resume_pod(self.config.cloud.id,gpu_count=1)
+
+    def _get_action_cmd(self,action : CloudAction):
+        if action == CloudAction.STOP:
+            return "source /etc/rp_environment && runpodctl stop pod $RUNPOD_POD_ID"
+        elif action == CloudAction.DELETE:
+            return "source /etc/rp_environment && runpodctl remove pod $RUNPOD_POD_ID"
+        else:
+            return ":"
