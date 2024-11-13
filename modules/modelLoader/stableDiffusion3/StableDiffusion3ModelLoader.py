@@ -182,7 +182,24 @@ class StableDiffusion3ModelLoader(
             )
 
         if vae_model_name:
-            pipeline.vae = AutoencoderKL.from_pretrained(vae_model_name)
+            pipeline.vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                vae_model_name,
+            )
+
+        if vae_model_name:
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                vae_model_name,
+            )
+        else:
+            vae = self._convert_diffusers_sub_module_to_dtype(
+                pipeline.vae, weight_dtypes.vae, weight_dtypes.train_dtype
+            )
 
         if pipeline.text_encoder is not None and include_text_encoder_1:
             text_encoder_1 = self._convert_transformers_sub_module_to_dtype(
@@ -214,9 +231,6 @@ class StableDiffusion3ModelLoader(
             tokenizer_3 = None
             print("text encoder 3 (t5) not loaded, continuing without it")
 
-        vae = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.vae, weight_dtypes.vae, weight_dtypes.train_dtype
-        )
         transformer = self._convert_diffusers_sub_module_to_dtype(
             pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
         )

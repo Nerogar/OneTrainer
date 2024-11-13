@@ -6,7 +6,6 @@ from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.quantization_util import replace_linear_with_nf4_layers
 
 from diffusers import (
     AutoencoderKL,
@@ -164,43 +163,40 @@ class FluxModelLoader(
             )
 
         if vae_model_name:
-            pipeline.vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 vae_model_name,
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
+        else:
+            vae = self._convert_diffusers_sub_module_to_dtype(
+                pipeline.vae, weight_dtypes.vae, weight_dtypes.train_dtype
             )
 
         if pipeline.text_encoder is not None and include_text_encoder_1:
-            text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+            text_encoder_1 = self._convert_transformers_sub_module_to_dtype(
+                pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
+            )
             tokenizer_1 = pipeline.tokenizer
-
-            if weight_dtypes.text_encoder.quantize_nf4():
-                replace_linear_with_nf4_layers(text_encoder_1)
         else:
             text_encoder_1 = None
             tokenizer_1 = None
             print("text encoder 1 (clip l) not loaded, continuing without it")
 
         if pipeline.text_encoder_2 is not None and include_text_encoder_2:
-            text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
-            text_encoder_2.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
-                supports_quantization=False))
+            text_encoder_2 = self._convert_transformers_sub_module_to_dtype(
+                pipeline.text_encoder_2, weight_dtypes.text_encoder_2, weight_dtypes.fallback_train_dtype
+            )
             tokenizer_2 = pipeline.tokenizer_2
-
-            if weight_dtypes.text_encoder_2.quantize_nf4():
-                replace_linear_with_nf4_layers(text_encoder_2)
         else:
             text_encoder_2 = None
             tokenizer_2 = None
             print("text encoder 2 (t5) not loaded, continuing without it")
 
-        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
-        if weight_dtypes.vae.quantize_nf4():
-            replace_linear_with_nf4_layers(pipeline.vae)
-
-        transformer = pipeline.transformer.to(dtype=weight_dtypes.prior.torch_dtype())
-        if weight_dtypes.prior.quantize_nf4():
-            replace_linear_with_nf4_layers(pipeline.transformer)
+        transformer = self._convert_diffusers_sub_module_to_dtype(
+            pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+        )
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
