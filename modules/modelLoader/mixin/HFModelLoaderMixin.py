@@ -31,6 +31,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             pretrained_model_name_or_path: str,
             subfolder: str | None,
             model_filename: str,
+            pytorch_model_filename: str | None,
             shard_index_filename: str,
     ):
         if keep_in_fp32_modules is None:
@@ -65,29 +66,43 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         is_sharded = full_shard_index_filename is not None
 
+        safetensors_filenames = []
+
         if is_sharded:
             with open(full_shard_index_filename, "r") as f:
                 index_file = json.loads(f.read())
-                filenames = sorted(set(index_file["weight_map"].values()))
-        else:
-            filenames = [model_filename]
-
-        if is_local:
-            if subfolder:
-                full_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in filenames]
-            else:
-                full_filenames = [os.path.join(pretrained_model_name_or_path, f) for f in filenames]
-        else:
-            full_filenames = [huggingface_hub.hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                subfolder=subfolder,
-                filename=f,
-            ) for f in filenames]
+                safetensors_filenames = sorted(set(index_file["weight_map"].values()))
+        elif os.path.isfile(
+                os.path.join(pretrained_model_name_or_path, subfolder, model_filename)
+        ):
+            safetensors_filenames = [model_filename]
 
         state_dict = {}
+        if len(safetensors_filenames) > 0:
+            if is_local:
+                if subfolder:
+                    full_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in
+                                      safetensors_filenames]
+                else:
+                    full_filenames = [os.path.join(pretrained_model_name_or_path, f) for f in safetensors_filenames]
+            else:
+                full_filenames = [huggingface_hub.hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    subfolder=subfolder,
+                    filename=f,
+                ) for f in safetensors_filenames]
 
-        for f in full_filenames:
-            state_dict |= load_file(f)
+            for f in full_filenames:
+                state_dict |= load_file(f)
+        else:
+            # fall back to the pytorch_model_filename
+            state_dict = torch.load(os.path.join(pretrained_model_name_or_path, subfolder, pytorch_model_filename),
+                                    weights_only=True)
+            while 'state_dict' in state_dict:
+                state_dict = state_dict['state_dict']
+
+        if hasattr(sub_module, '_convert_deprecated_attention_blocks'):
+            sub_module._convert_deprecated_attention_blocks(state_dict)
 
         for key, value in state_dict.items():
             module = sub_module
@@ -109,12 +124,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                         value = value.to(dtype=train_dtype.torch_dtype())
                     else:
                         value = value.to(dtype=dtype.torch_dtype())
-                    new_value = old_type(value)
 
-                    if is_buffer:
-                        module._buffers[tensor_name] = new_value
-                    else:
-                        module._parameters[tensor_name] = new_value
+                new_value = old_type(value)
+
+                if is_buffer:
+                    module._buffers[tensor_name] = new_value
+                else:
+                    module._parameters[tensor_name] = new_value
 
         del state_dict
 
@@ -151,6 +167,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
             model_filename="model.safetensors",
+            pytorch_model_filename="pytorch_model.bin",
             shard_index_filename="model.safetensors.index.json",
         )
 
@@ -185,6 +202,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
             model_filename="diffusion_pytorch_model.safetensors",
+            pytorch_model_filename="diffusion_pytorch_model.bin",
             shard_index_filename="diffusion_pytorch_model.safetensors.index.json",
         )
 
