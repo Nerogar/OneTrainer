@@ -128,7 +128,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 new_value = old_type(value)
 
                 if is_buffer:
-                    module._buffers[tensor_name] = new_value
+                    module._buffers[tensor_name].data = new_value
                 else:
                     module._parameters[tensor_name] = new_value
 
@@ -239,7 +239,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                         value = old_type(value)
 
                         if is_buffer:
-                            module._buffers[tensor_name] = value
+                            module._buffers[tensor_name].data = value
                         else:
                             module._parameters[tensor_name] = value
 

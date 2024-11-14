@@ -111,6 +111,7 @@ class BaseStableDiffusion3Setup(
         quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype)
         quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
         quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype)
+        quantize_layers(model.vae, self.train_device, model.train_dtype)
         quantize_layers(model.transformer, self.train_device, model.train_dtype)
 
     def _setup_additional_embeddings(

@@ -35,7 +35,7 @@ class LinearFp8(
 
         if weight.dtype != self.fp8_dtype:
             abs_max = weight.abs().max()
-            self._scale = torch.clamp(abs_max, min=1e-12) / torch.finfo(self.fp8_dtype).max
+            self._scale.copy_(torch.clamp(abs_max, min=1e-12) / torch.finfo(self.fp8_dtype).max)
             weight = weight.div_(self._scale).to(dtype=self.fp8_dtype)
 
         if device is not None:
