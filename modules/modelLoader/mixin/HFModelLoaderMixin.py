@@ -66,40 +66,52 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         is_sharded = full_shard_index_filename is not None
 
-        safetensors_filenames = []
-
         if is_sharded:
             with open(full_shard_index_filename, "r") as f:
                 index_file = json.loads(f.read())
                 safetensors_filenames = sorted(set(index_file["weight_map"].values()))
-        elif os.path.isfile(
-                os.path.join(pretrained_model_name_or_path, subfolder, model_filename)
-        ):
+        else:
             safetensors_filenames = [model_filename]
 
         state_dict = {}
-        if len(safetensors_filenames) > 0:
-            if is_local:
-                if subfolder:
-                    full_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in
-                                      safetensors_filenames]
-                else:
-                    full_filenames = [os.path.join(pretrained_model_name_or_path, f) for f in safetensors_filenames]
+        is_torch_pickle = False
+
+        if is_local:
+            if subfolder:
+                full_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in
+                                  safetensors_filenames]
             else:
+                full_filenames = [os.path.join(pretrained_model_name_or_path, f) for f in safetensors_filenames]
+
+            if any(not os.path.isfile(f) for f in full_filenames):
+                # fall back to the pytorch_model_filename
+                full_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, pytorch_model_filename)]
+                is_torch_pickle = True
+        else:
+            try:
                 full_filenames = [huggingface_hub.hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     subfolder=subfolder,
                     filename=f,
                 ) for f in safetensors_filenames]
+            except EntryNotFoundError as _:
+                # fall back to the pytorch_model_filename
+                full_filenames = [huggingface_hub.hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    subfolder=subfolder,
+                    filename=pytorch_model_filename,
+                )]
+                is_torch_pickle = True
 
+        if is_torch_pickle:
+            for f in full_filenames:
+                file_state_dict = torch.load(f, weights_only=True)
+                while 'state_dict' in file_state_dict:
+                    file_state_dict = file_state_dict['state_dict']
+                state_dict |= file_state_dict
+        else:
             for f in full_filenames:
                 state_dict |= load_file(f)
-        else:
-            # fall back to the pytorch_model_filename
-            state_dict = torch.load(os.path.join(pretrained_model_name_or_path, subfolder, pytorch_model_filename),
-                                    weights_only=True)
-            while 'state_dict' in state_dict:
-                state_dict = state_dict['state_dict']
 
         if hasattr(sub_module, '_convert_deprecated_attention_blocks'):
             sub_module._convert_deprecated_attention_blocks(state_dict)
