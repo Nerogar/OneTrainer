@@ -265,7 +265,7 @@ class TrainConfig(BaseConfig):
     # of restrictions with ConfigList.
     scheduler_params: list[dict[str, str]]
     learning_rate: float
-    learning_rate_warmup_steps: int
+    learning_rate_warmup_steps: float
     learning_rate_cycles: float
     epochs: int
     batch_size: int
@@ -715,7 +715,7 @@ class TrainConfig(BaseConfig):
         data.append(("custom_learning_rate_scheduler", None, str, True))
         data.append(("scheduler_params", [], list[dict[str, str]], True))
         data.append(("learning_rate", 3e-6, float, False))
-        data.append(("learning_rate_warmup_steps", 200, int, False))
+        data.append(("learning_rate_warmup_steps", 200, float, False))
         data.append(("learning_rate_cycles", 1, int, False))
         data.append(("epochs", 100, int, False))
         data.append(("batch_size", 1, int, False))
