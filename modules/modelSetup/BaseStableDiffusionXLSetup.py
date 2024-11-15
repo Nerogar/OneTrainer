@@ -309,7 +309,7 @@ class BaseStableDiffusionXLSetup(
                 negative_added_cond_kwargs = {"text_embeds": negative_pooled_text_encoder_2_output,
                                               "time_ids": add_time_ids}
 
-                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device, self.temp_device)
+                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device, ["temp_device"])
 
                 for step in range(config.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \

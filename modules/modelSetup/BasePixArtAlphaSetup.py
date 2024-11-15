@@ -254,7 +254,7 @@ class BasePixArtAlphaSetup(
 
                 truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device, self.temp_device)
+                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device, ["temp_device"])
 
                 for step in range(config.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \
