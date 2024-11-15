@@ -1004,7 +1004,7 @@ def create_lr_scheduler(
         config: TrainConfig,
         optimizer: torch.optim.Optimizer,
         learning_rate_scheduler: LearningRateScheduler,
-        warmup_steps: int,
+        warmup_steps: float,
         num_cycles: float,
         num_epochs: int,
         batch_size: int,
@@ -1014,7 +1014,14 @@ def create_lr_scheduler(
 ) -> LRScheduler:
     steps_per_epoch = approximate_epoch_length
     total_steps = int(steps_per_epoch * num_epochs / gradient_accumulation_steps)
-    warmup_steps = int(warmup_steps / gradient_accumulation_steps)
+
+    if warmup_steps > 1:   #values > 1 are literal step count
+        warmup_steps = int(warmup_steps / gradient_accumulation_steps)
+    elif 0 < warmup_steps <= 1:  #values between 0-1 are treated as percentage
+        warmup_steps = int(warmup_steps * total_steps)
+    else:   #catch any invalid inputs or negative values
+        warmup_steps = 0
+
     scheduler_steps = total_steps - warmup_steps
 
     # Force schedule-free algorithms to constant schedule.

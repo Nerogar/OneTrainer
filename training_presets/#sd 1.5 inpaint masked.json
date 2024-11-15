@@ -1,5 +1,5 @@
 {
-    "base_model_name": "runwayml/stable-diffusion-inpainting",
+    "base_model_name": "stable-diffusion-v1-5/stable-diffusion-inpainting",
     "batch_size": 4,
     "masked_training": true,
     "model_type": "STABLE_DIFFUSION_15_INPAINTING",

@@ -1,6 +1,6 @@
 {
     "backup_after": 10,
-    "base_model_name": "runwayml/stable-diffusion-v1-5",
+    "base_model_name": "stable-diffusion-v1-5/stable-diffusion-v1-5",
     "batch_size": 4,
     "learning_rate": 0.0003,
     "model_type": "STABLE_DIFFUSION_15",

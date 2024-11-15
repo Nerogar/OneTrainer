@@ -235,6 +235,7 @@ class TrainConfig(BaseConfig):
     cache_dir: str
     tensorboard: bool
     tensorboard_expose: bool
+    tensorboard_port: str
     validation: bool
     validate_after: float
     validate_after_unit: TimeUnit
@@ -265,7 +266,7 @@ class TrainConfig(BaseConfig):
     # of restrictions with ConfigList.
     scheduler_params: list[dict[str, str]]
     learning_rate: float
-    learning_rate_warmup_steps: int
+    learning_rate_warmup_steps: float
     learning_rate_cycles: float
     epochs: int
     batch_size: int
@@ -683,6 +684,7 @@ class TrainConfig(BaseConfig):
         data.append(("cache_dir", "workspace-cache/run", str, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
+        data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
@@ -690,7 +692,7 @@ class TrainConfig(BaseConfig):
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         # model settings
-        data.append(("base_model_name", "runwayml/stable-diffusion-v1-5", str, False))
+        data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
         data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
@@ -711,7 +713,7 @@ class TrainConfig(BaseConfig):
         data.append(("custom_learning_rate_scheduler", None, str, True))
         data.append(("scheduler_params", [], list[dict[str, str]], True))
         data.append(("learning_rate", 3e-6, float, False))
-        data.append(("learning_rate_warmup_steps", 200, int, False))
+        data.append(("learning_rate_warmup_steps", 200, float, False))
         data.append(("learning_rate_cycles", 1, int, False))
         data.append(("epochs", 100, int, False))
         data.append(("batch_size", 1, int, False))

@@ -47,7 +47,7 @@ class GenericTrainer(BaseTrainer):
     data_loader: BaseDataLoader
     model_saver: BaseModelSaver
     model_sampler: BaseModelSampler
-    model: BaseModel
+    model: BaseModel | None
     validation_data_loader: BaseDataLoader
 
     previous_sample_time: float
@@ -74,7 +74,7 @@ class GenericTrainer(BaseTrainer):
                 "--logdir",
                 tensorboard_log_dir,
                 "--port",
-                "6006",
+                str(config.tensorboard_port),
                 "--samples_per_plugin=images=100,scalars=10000",
             ]
 
@@ -83,6 +83,7 @@ class GenericTrainer(BaseTrainer):
 
             self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
 
+        self.model = None
         self.one_step_trained = False
 
         self.grad_hook_handles = []
@@ -769,7 +770,7 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=self.config.output_model_destination,
                 dtype=self.config.output_dtype.torch_dtype()
             )
-        else:
+        elif self.model is not None:
             self.model.to(self.temp_device)
 
         self.tensorboard.close()
