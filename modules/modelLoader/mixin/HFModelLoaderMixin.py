@@ -115,6 +115,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             tensor_name = key_splits[-1]
 
             is_buffer = tensor_name in module._buffers
+            if not is_buffer and tensor_name not in module._parameters:
+                continue
             old_value = module._buffers[tensor_name] if is_buffer else module._parameters[tensor_name]
 
             if torch.is_floating_point(old_value):
