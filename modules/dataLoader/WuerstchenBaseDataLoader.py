@@ -176,7 +176,7 @@ class WuerstchenBaseDataLoader(
             sort_names=sort_names,
             config=config,
             before_cache_image_fun=before_cache_image_fun,
-            autocast_context=model.autocast_context,
+            autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
 

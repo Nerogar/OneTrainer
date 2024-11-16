@@ -211,7 +211,7 @@ class StableDiffusionXLBaseDataLoader(
             before_cache_image_fun=before_cache_image_fun,
             use_conditioning_image=True,
             vae=model.vae,
-            autocast_context=model.vae_autocast_context,
+            autocast_context=[model.autocast_context, model.vae_autocast_context],
             train_dtype=model.vae_train_dtype,
         )
 
