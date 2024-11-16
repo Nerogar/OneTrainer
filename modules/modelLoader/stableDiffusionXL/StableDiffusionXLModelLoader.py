@@ -130,7 +130,7 @@ class StableDiffusionXLModelLoader(
     ):
         pipeline = StableDiffusionXLPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
-            original_config_file=model.sd_config_filename,
+            original_config=model.sd_config_filename,
             safety_checker=None,
         )
 
@@ -172,14 +172,14 @@ class StableDiffusionXLModelLoader(
         if model_type.has_conditioning_image_input():
             pipeline = StableDiffusionXLInpaintPipeline.from_single_file(
                 pretrained_model_link_or_path=base_model_name,
-                original_config_file=model.sd_config_filename,
+                original_config=model.sd_config_filename,
                 safety_checker=None,
                 use_safetensors=True,
             )
         else:
             pipeline = StableDiffusionXLPipeline.from_single_file(
                 pretrained_model_link_or_path=base_model_name,
-                original_config_file=model.sd_config_filename,
+                original_config=model.sd_config_filename,
                 safety_checker=None,
                 use_safetensors=True,
             )
