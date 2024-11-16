@@ -20,6 +20,8 @@ class LinearFp8(
         self._scale = torch.tensor(1.0, dtype=torch.float)
         self.register_buffer("scale", self._scale)
 
+        self.compute_dtype = None
+
     def original_weight_shape(self) -> tuple[int, ...]:
         return self.weight.shape
 
@@ -43,7 +45,9 @@ class LinearFp8(
         self.weight.data = weight
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        weight = self.weight.detach().to(x.dtype)
+        weight = self.weight.detach()
+        weight = weight.to(dtype=self.compute_dtype if self.compute_dtype is not None else x.dtype)
+
         if self._scale is not None:
             weight = weight.mul_(self._scale)
         x = nn.functional.linear(x, weight, self.bias)
