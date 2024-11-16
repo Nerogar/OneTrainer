@@ -205,6 +205,8 @@ class TopBar:
             self.ui_state.get_var("optimizer").update(optimizer_config)
 
             self.load_preset_callback()
+        except FileNotFoundError:
+            pass
         except Exception:
             print(traceback.format_exc())
 
