@@ -17,7 +17,7 @@ from diffusers import (
     StableDiffusionXLPipeline,
     UNet2DConditionModel,
 )
-from transformers import CLIPTextModel, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 
 class StableDiffusionXLModelLoader(
@@ -88,7 +88,7 @@ class StableDiffusionXLModelLoader(
         )
 
         text_encoder_2 = self._load_transformers_sub_module(
-            CLIPTextModel,
+            CLIPTextModelWithProjection,
             weight_dtypes.text_encoder_2,
             weight_dtypes.train_dtype,
             base_model_name,
