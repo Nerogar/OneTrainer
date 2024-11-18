@@ -551,7 +551,7 @@ class TrainConfig(BaseConfig):
     def __migration_4(self, data: dict) -> dict:
         migrated_data = data.copy()
 
-        gradient_checkpointing = migrated_data.pop("gradient_checkpointing")
+        gradient_checkpointing = migrated_data.pop("gradient_checkpointing", True)
 
         if gradient_checkpointing:
             migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.ON
@@ -563,8 +563,10 @@ class TrainConfig(BaseConfig):
     def __migration_5(self, data: dict) -> dict:
         migrated_data = data.copy()
 
-        migrated_data["save_every"] = migrated_data.pop("save_after")
-        migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
+        if "save_after" in migrated_data:
+            migrated_data["save_every"] = migrated_data.pop("save_after")
+        if "save_after_unit" in migrated_data:
+            migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
 
         return migrated_data
 
