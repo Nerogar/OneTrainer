@@ -210,6 +210,12 @@ def get_unquantized_weight(module: nn.Module, dtype: torch.dtype) -> Tensor:
             else:
                 return param.detach().to(dtype=dtype)
 
+    if isinstance(module, LinearFp8):
+        if module._scale is not None:
+            return module.weight.detach().to(dtype) * module._scale
+        else:
+            return module.weight.detach().to(dtype)
+
     return param.detach().to(dtype=dtype)
 
 
