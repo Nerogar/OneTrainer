@@ -533,7 +533,8 @@ class GenericTrainer(BaseTrainer):
 
     def __apply_fused_back_pass(self, scaler):
         if self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
-            print("Warning: activating fused_back_pass with gradient_accumulation_steps > 1 does not reduce VRAM usage.")
+            if self.config.gradient_accumulation_steps > 1:
+                print("Warning: activating fused_back_pass with gradient_accumulation_steps > 1 does not reduce VRAM usage.")
 
             for param_group in self.model.optimizer.param_groups:
                 for i, parameter in enumerate(param_group["params"]):
