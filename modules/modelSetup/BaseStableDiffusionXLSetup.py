@@ -19,6 +19,7 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -96,6 +97,11 @@ class BaseStableDiffusionXLSetup(
             ],
             config.enable_autocast_cache,
         )
+
+        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
+        quantize_layers(model.vae, self.train_device, model.vae_train_dtype)
+        quantize_layers(model.unet, self.train_device, model.train_dtype)
 
     def _setup_additional_embeddings(
             self,
