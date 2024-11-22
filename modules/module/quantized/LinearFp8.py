@@ -32,16 +32,16 @@ class LinearFp8(
 
         weight = self.weight.data
         orig_device = weight.device
-        if device is not None:
-            weight = weight.to(device=device)
-
         if weight.dtype != self.fp8_dtype:
+            if device is not None:
+                weight = weight.to(device=device)
+
             abs_max = weight.abs().max()
             self._scale.copy_(torch.clamp(abs_max, min=1e-12) / torch.finfo(self.fp8_dtype).max)
             weight = weight.div_(self._scale).to(dtype=self.fp8_dtype)
 
-        if device is not None:
-            weight = weight.to(device=orig_device)
+            if device is not None:
+                weight = weight.to(device=orig_device)
         self.weight.data = weight
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
