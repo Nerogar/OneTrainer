@@ -5,6 +5,7 @@ from modules.util.enum.CloudAction import CloudAction
 
 import runpod
 import time
+import secrets
 
 class RunpodCloud(LinuxCloud):
     def __init__(self, config: TrainConfig):
@@ -61,9 +62,10 @@ class RunpodCloud(LinuxCloud):
             support_public_ip=True,
             volume_in_gb=config.volume_size,
             container_disk_in_gb=10,
-            ports="22/tcp",
+            ports="22/tcp,8888/http",
             volume_mount_path="/workspace",
             min_download=config.min_download,
+            env={"JUPYTER_PASSWORD": secrets.token_urlsafe(12)},
         )
         config.id=pod['id']
 

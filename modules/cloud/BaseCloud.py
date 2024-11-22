@@ -103,4 +103,8 @@ class BaseCloud(metaclass=ABCMeta):
         #only call with main thread!
         pass
 
+    @abstractmethod
+    def delete_workspace(self):
+        pass
+
 

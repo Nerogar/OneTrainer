@@ -66,9 +66,9 @@ class CloudTab:
         
         
         
-        components.label(self.frame, 1, 2, "Remote Workspace Directory",
+        components.label(self.frame, 1, 2, "Remote Directory",
                          tooltip=f"The directory on the cloud where files will be uploaded and downloaded.")
-        components.entry(self.frame, 1, 3, self.ui_state, "cloud.workspace_dir")
+        components.entry(self.frame, 1, 3, self.ui_state, "cloud.remote_dir")
         components.label(self.frame, 2, 2, "OneTrainer Directory",
                          tooltip=f"The directory for OneTrainer on the cloud.")
         components.entry(self.frame, 2, 3, self.ui_state, "cloud.onetrainer_dir")
@@ -104,6 +104,9 @@ class CloudTab:
         components.label(self.frame, 14, 2, "Download tensorboard logs",
                          tooltip="Download TensorBoard event logs from the remote workspace directory to your local machine. They can then be viewed locally in TensorBoard. It is recommended to disable \"Sample to TensorBoard\" to reduce the event log size.")
         components.switch(self.frame, 14, 3, self.ui_state, "cloud.download_tensorboard")
+        components.label(self.frame, 15, 2, "Delete workspace",
+                         tooltip="Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
+        components.switch(self.frame, 15, 3, self.ui_state, "cloud.delete_workspace")
 
         components.label(self.frame, 0, 4, "Create cloud",
                          tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty. Currently supported for RUNPOD.")

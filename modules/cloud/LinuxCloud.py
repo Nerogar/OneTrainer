@@ -9,6 +9,7 @@ from modules.util.config.CloudConfig import CloudConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.CloudAction import CloudAction
+from modules.util.time_util import get_string_timestamp
 from pathlib import Path
 
 
@@ -17,14 +18,14 @@ class LinuxCloud(BaseCloud):
         super(LinuxCloud, self).__init__(config)
         self.connection=None
         self.callback_connection=None
-        self.callback_file=None
         self.command_connection=None
-        self.command_pipe=None
         self.sync_connection=None
         self.tensorboard_tunnel_stop=None
-        self.callback_file=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.callback'
-        self.command_pipe=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.command'
-        self.config_file=f'{shlex.quote(self.config.cloud.workspace_dir)}/{self.config.cloud.run_id}.json'
+        
+        name=config.cloud.run_id if config.cloud.detach_trainer else get_string_timestamp()
+        self.callback_file=f'{config.cloud.remote_dir}/{name}.callback'
+        self.command_pipe=f'{config.cloud.remote_dir}/{name}.command'
+        self.config_file=f'{config.cloud.remote_dir}/{name}.json'
 
     def _connect(self):
         if self.connection: return
@@ -38,6 +39,8 @@ class LinuxCloud(BaseCloud):
             
             self.command_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.command_connection.open()
+            #the command connection isn't used for long periods of time; prevent remote from closing it:
+            self.command_connection.transport.set_keepalive(30)
             
             self.sync_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.sync_connection.open()
@@ -46,7 +49,7 @@ class LinuxCloud(BaseCloud):
         
     def setup(self):
         super().setup()
-        self.connection.run(f'mkfifo {self.command_pipe}',warn=True,hide=True,in_stream=False)
+        self.connection.run(f'mkfifo {shlex.quote(self.command_pipe)}',warn=True,hide=True,in_stream=False)
 
     def _install_onetrainer(self):
         config=self.config.cloud
@@ -86,7 +89,7 @@ class LinuxCloud(BaseCloud):
 
     def can_reattach(self):
         config=self.config.cloud
-        result=self.connection.run(f"test -f {config.workspace_dir}/{config.run_id}.pid && test ! -f {config.workspace_dir}/{config.run_id}.finished",warn=True,in_stream=False)
+        result=self.connection.run(f"test -f {config.remote_dir}/{config.run_id}.pid && test ! -f {config.remote_dir}/{config.run_id}.finished",warn=True,in_stream=False)
         return result.exited == 0
 
     def _get_action_cmd(self,action : CloudAction):
@@ -110,18 +113,18 @@ class LinuxCloud(BaseCloud):
         if config.huggingface_cache_dir != "": cmd+=f" && export HF_HOME={config.huggingface_cache_dir}"
         
         script_cmd=f'{config.onetrainer_dir}/run-cmd.sh train_remote --config-path={shlex.quote(self.config_file)} \
-                                                                    --callback-path={self.callback_file} \
-                                                                    --command-path={self.command_pipe}'
+                                                                    --callback-path={shlex.quote(self.callback_file)} \
+                                                                    --command-path={shlex.quote(self.command_pipe)}'
 
 
         if config.detach_trainer:
-            self.connection.run(f'rm -f {self.config.cloud.workspace_dir}/{self.config.cloud.run_id}.finished')
+            self.connection.run(f'rm -f {config.remote_dir}/{config.run_id}.finished')
 
             #if the callback file still exists 10 seconds after the trainer has exited, the client must be detached, because the clients reads and deletes this file:
-            action_cmd=f"&& (sleep 10 && test -f {self.callback_file} && {self._get_action_cmd(self.config.cloud.on_detached_finish)}) \
-                         || (sleep 10 && test -f {self.callback_file} && {self._get_action_cmd(self.config.cloud.on_detached_error)})"
+            action_cmd=f"&& (sleep 10 && test -f {shlex.quote(self.callback_file)} && {self._get_action_cmd(config.on_detached_finish)}) \
+                         || (sleep 10 && test -f {shlex.quote(self.callback_file)} && {self._get_action_cmd(config.on_detached_error)})"
 
-            cmd+=f' && (nohup {script_cmd} {action_cmd}) >{config.workspace_dir}/{config.run_id}.out 2>&1 & echo $! > {config.workspace_dir}/{config.run_id}.pid'
+            cmd+=f' && (nohup {script_cmd} {action_cmd}) >{config.remote_dir}/{config.run_id}.out 2>&1 & echo $! > {config.remote_dir}/{config.run_id}.pid'
             self.connection.run(cmd,disown=True)
             self.__trail_detached_trainer()
         else:
@@ -130,10 +133,10 @@ class LinuxCloud(BaseCloud):
 
     def __trail_detached_trainer(self):
         config=self.config.cloud
-        cmd=f'tail -f {config.workspace_dir}/{config.run_id}.out --pid $(<{config.workspace_dir}/{config.run_id}.pid)'
+        cmd=f'tail -f {config.remote_dir}/{config.run_id}.out --pid $(<{config.remote_dir}/{config.run_id}.pid)'
         self.connection.run(cmd,in_stream=False)
         #trainer has exited, don't reattach:
-        self.connection.run(f'echo 1 > {self.config.cloud.workspace_dir}/{self.config.cloud.run_id}.finished')
+        self.connection.run(f'echo 1 > {config.remote_dir}/{config.run_id}.finished')
 
 
 
@@ -166,7 +169,10 @@ class LinuxCloud(BaseCloud):
             err_file.close()
         
     def send_commands(self,commands : TrainCommands):
-        in_file,out_file,err_file=self.command_connection.client.exec_command(f'test -e {self.command_pipe} && cat > {self.command_pipe}')
+        in_file,out_file,err_file=self.command_connection.client.exec_command(
+            f'test -e {shlex.quote(self.command_pipe)} \
+            && cat > {shlex.quote(self.command_pipe)}'
+        )
         try:
             pickle.dump(commands,in_file)
             in_file.flush()
@@ -260,3 +266,7 @@ class LinuxCloud(BaseCloud):
         
         print(f'\n\ndownloading {local}...')
         connection.get(remote=remote.as_posix(),local=str(local))
+
+    def delete_workspace(self):
+        self.connection.run(f"rm -r {shlex.quote(self.config.workspace_dir)}")
+

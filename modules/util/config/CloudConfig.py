@@ -21,7 +21,7 @@ class CloudConfig(BaseConfig):
     port: int
     user: str
     huggingface_token: str
-    workspace_dir: str
+    remote_dir: str
     huggingface_cache_dir: str
     onetrainer_dir: str
     install_onetrainer: bool
@@ -61,7 +61,7 @@ class CloudConfig(BaseConfig):
         data.append(("host", "", str, False))
         data.append(("port", 0, str, False))
         data.append(("user", "root", str, False))
-        data.append(("workspace_dir", "/workspace", str, False))
+        data.append(("remote_dir", "/workspace", str, False))
         data.append(("huggingface_cache_dir", "/workspace/huggingface_cache", str, False))
         data.append(("onetrainer_dir", "/workspace/OneTrainer", str, False))
         data.append(("install_cmd", "git clone https://github.com/Nerogar/OneTrainer", str, False))
@@ -73,6 +73,7 @@ class CloudConfig(BaseConfig):
         data.append(("download_saves", True, bool, False))
         data.append(("download_backups", False, bool, False))
         data.append(("download_tensorboard", False, bool, False))
+        data.append(("delete_workspace", False, bool, False))
         data.append(("on_finish", CloudAction.NONE, CloudAction, False))
         data.append(("on_error", CloudAction.NONE, CloudAction, False))
         data.append(("on_detached_finish", CloudAction.NONE, CloudAction, False))

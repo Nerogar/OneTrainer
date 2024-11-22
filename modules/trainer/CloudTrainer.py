@@ -27,6 +27,7 @@ class CloudTrainer(BaseTrainer):
         self.error_caught=False
         self.callback_thread=None
         self.sync_thread=None
+        self.sync_exception=None
         self.stop_event=None
         self.cloud=None
         self.remote_config=CloudTrainer.__make_remote_config(config)
@@ -68,10 +69,15 @@ class CloudTrainer(BaseTrainer):
         self.callback_thread.start()
         
         def sync():
-            while not self.stop_event.is_set():
+            try:
+                while not self.stop_event.is_set():
+                    self.cloud.sync_workspace()
+                    time.sleep(5)
                 self.cloud.sync_workspace()
-                time.sleep(5)
-            self.cloud.sync_workspace()
+            except Exception as e:
+                self.sync_exception=e
+                raise
+
         self.sync_thread = threading.Thread(target=sync)
         self.sync_thread.start()
                 
@@ -96,10 +102,18 @@ class CloudTrainer(BaseTrainer):
             self.callback_thread.join()
             self.callbacks.on_update_status("waiting for downloads")
             self.sync_thread.join()
+        
+        if self.sync_exception:
+            self.error_caught=True
+            raise self.sync_exception
 
     def end(self):
         try:
             if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel: self.tensorboard_subprocess.kill()
+            if self.config.cloud.delete_workspace and not self.error_caught and not self.commands.get_stop_command():
+                self.callbacks.on_update_status("Deleting remote workspace")
+                self.cloud.delete_workspace()
+
             self.cloud.close()
         except Exception:
             self.error_caught=True
@@ -123,7 +137,7 @@ class CloudTrainer(BaseTrainer):
         def adjust(config,attribute : str):
             path=getattr(config,attribute)
             setattr(config,"local_"+attribute,path)
-            path=CloudTrainer.__adjust_path(path,remote.cloud.workspace_dir)
+            path=CloudTrainer.__adjust_path(path,remote.cloud.remote_dir)
             setattr(config,attribute,path)
 
         adjust(remote,"debug_dir")
@@ -148,11 +162,11 @@ class CloudTrainer(BaseTrainer):
         return remote
 
     @staticmethod
-    def __adjust_path(pathstr : str,remote_workspace_dir : str):
+    def __adjust_path(pathstr : str,remote_dir : str):
         if len(pathstr.strip()) > 0:
             path=Path(pathstr)
             if path.is_absolute(): path=path.relative_to(path.anchor)  #remove windows drive name C:
-            return (Path(remote_workspace_dir,"remote") / path).as_posix()
+            return (Path(remote_dir,"remote") / path).as_posix()
         else: return ""
 
     @staticmethod
