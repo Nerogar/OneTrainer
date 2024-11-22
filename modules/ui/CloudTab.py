@@ -104,7 +104,7 @@ class CloudTab:
         components.label(self.frame, 14, 2, "Download tensorboard logs",
                          tooltip="Download TensorBoard event logs from the remote workspace directory to your local machine. They can then be viewed locally in TensorBoard. It is recommended to disable \"Sample to TensorBoard\" to reduce the event log size.")
         components.switch(self.frame, 14, 3, self.ui_state, "cloud.download_tensorboard")
-        components.label(self.frame, 15, 2, "Delete workspace",
+        components.label(self.frame, 15, 2, "Delete remote workspace",
                          tooltip="Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
         components.switch(self.frame, 15, 3, self.ui_state, "cloud.delete_workspace")
 

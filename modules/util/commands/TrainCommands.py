@@ -7,10 +7,11 @@ class TrainCommands:
             on_command=None# Callable[[TrainCommands], None] = lambda _: None
     ):
         self.reset()
+        self.__stop_command = False
         self.__on_command = on_command
 
     def reset(self):
-        self.__stop_command = False
+        #don't reset stop
         self.__sample_custom_commands = []
         self.__sample_default_command = False
         self.__backup_command = False
