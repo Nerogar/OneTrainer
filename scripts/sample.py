@@ -29,6 +29,7 @@ def main():
 
     model.to(device)
     model.eval()
+    model.train_dtype = args.weight_dtype
 
     model_sampler = create.create_model_sampler(
         train_device=device,
@@ -39,7 +40,7 @@ def main():
 
     print("Sampling " + args.destination)
     model_sampler.sample(
-        sample_params=SampleConfig.default_values().from_dict(
+        sample_config=SampleConfig.default_values().from_dict(
             {
                 "prompt": args.prompt,
                 "negative_prompt": args.negative_prompt,
