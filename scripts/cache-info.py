@@ -12,7 +12,7 @@ This is useful if you have multiple datadirs cached, and want to remove
 ONE of them, instead of your entire data cache
 
 Example:  
-    python cache-info.py /OneTrainer/workdir-cache/abcdefreallylongnamehere
+    python cache-info.py /OneTrainer/workdir-cache/run/image/abcdefreallylongnamehere
 
 """
 
