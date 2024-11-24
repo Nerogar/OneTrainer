@@ -3,7 +3,7 @@ import random
 from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.quantization_util import get_offload_tensor_bytes, get_offload_tensors, offload_quantized
+from modules.util.quantization_util import get_offload_tensor_bytes, offload_quantized
 from modules.util.torch_util import (
     create_stream_context,
     device_equals,
@@ -627,6 +627,8 @@ class LayerOffloadConductor:
         elif device_equals(device, self.__train_device):
             log("to train device")
 
+            self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
+
             self.__train_device_layer_allocator.allocate_cache(
                 self.__layers, self.__offload_strategy.max_loaded_bytes)
             self.__temp_device_layer_allocator.allocate_cache(
@@ -666,8 +668,6 @@ class LayerOffloadConductor:
         self.__layer_transfer_event_map.append(SyncEvent())
 
         self.__layer_activations_included_offload_param_indices_map.append(included_offload_param_indices)
-
-        self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
 
     def start_forward(self, keep_graph: bool):
         log()
@@ -743,9 +743,6 @@ class LayerOffloadConductor:
         log(f"after layer {layer_index}, {call_index}")
 
         # record stream
-        if self.__async_transfer:
-            for x in self.__get_all_tensors(self.__layers[layer_index]):
-                x.record_stream(self.__train_stream)
         tensors_record_stream(self.__train_stream, activations)
 
         # save activations during the forward pass to make them accessible during the backward pass
@@ -773,10 +770,6 @@ class LayerOffloadConductor:
             return t.to(device=device)
 
         self.__module._apply(convert)
-
-    @staticmethod
-    def __get_all_tensors(layer: nn.Module):
-        return sum([get_offload_tensors(x) for x in layer.modules()], [])
 
     def __clear_activations(self):
         self.__activations_map.clear()
@@ -839,12 +832,8 @@ class LayerOffloadConductor:
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
             if self.__async_transfer:
-                parameters = self.__get_all_tensors(layer)
                 for module in layer.modules():
                     offload_quantized(module, device, non_blocking=True, allocator=allocator_fn)
-                for x in parameters:
-                    if x.device.type == "cuda":
-                        x.record_stream(self.__layer_transfer_stream)
 
                 layer_deallocator.deallocate_layer(layer_index, deallocate_forward=is_forward)
 

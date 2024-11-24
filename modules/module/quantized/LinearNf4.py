@@ -40,6 +40,28 @@ class LinearNf4(
     def original_weight_shape(self) -> tuple[int, ...]:
         return self.weight.shape
 
+    def unquantized_weight(self,  dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+        if self.is_quantized:
+            device_weight = self.weight.to(device=device)
+            device_absmax = self._absmax.to(device=device)
+
+            return bnb.functional.dequantize_4bit(
+                A=device_weight,
+                quant_state=bnb.functional.QuantState(
+                    absmax=device_absmax,
+                    shape=self.shape,
+                    code=self._code,
+                    blocksize=self.block_size,
+                    quant_type='nf4',
+                    dtype=self.compute_dtype,
+                    offset=self._offset,
+                    state2=self.quant_state.state2,
+                ),
+                quant_type='nf4',
+            ).detach().to(dtype=dtype)
+        else:
+            return self.weight.detach().to(dtype=dtype)
+
     def quantize(self, device: torch.device | None = None):
         if self.is_quantized:
             return
