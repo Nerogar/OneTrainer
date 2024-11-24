@@ -148,6 +148,7 @@ class TopBar:
                         name = os.path.basename(path)
                         name = os.path.splitext(name)[0]
                         self.configs.append((name, path))
+            self.configs.sort()
 
     def __save_to_file(self, name) -> str:
         name = path_util.safe_filename(name)
@@ -164,6 +165,7 @@ class TopBar:
 
         if is_new_config:
             self.configs.append((name, path))
+            self.configs.sort()
 
         if self.config_ui_data["config_name"] != path_util.canonical_join(self.dir, f"{name}.json"):
             self.config_ui_state.get_var("config_name").set(path_util.canonical_join(self.dir, f"{name}.json"))
