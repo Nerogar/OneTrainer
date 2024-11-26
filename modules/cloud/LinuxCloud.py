@@ -2,6 +2,8 @@ import fabric
 import shlex
 import pickle
 import threading
+import time
+import socket
 
 from modules.cloud.BaseCloud import BaseCloud
 from modules.util.config.TrainConfig import TrainConfig
@@ -153,36 +155,58 @@ class LinuxCloud(BaseCloud):
            && cat "{file}.read" \
            && rm "{file}.read"'
 
-        in_file,out_file,err_file=self.callback_connection.client.exec_command(cmd)
-        
         try:
-            while True:
-                try: name=pickle.load(out_file)
-                except EOFError: return
-                params=pickle.load(out_file)
+            in_file,out_file,err_file=self.callback_connection.client.exec_command(cmd)
+            
+            try:
+                while True:
+                    try:
+                        while not out_file.channel.recv_ready() and not out_file.channel.exit_status_ready():
+                            #even though reading from out_file is blocking, it doesn't block if there
+                            #is *no* data available yet, which results in an unpickling error.
+                            #wait until there is at least some data before reading:
+                            time.sleep(0.1)
+                        name=pickle.load(out_file)
+                    except EOFError: return
+                    params=pickle.load(out_file)
 
-                fun=getattr(callbacks,name)
-                fun(*params)
-        finally:
-            in_file.close()
-            out_file.close()
-            err_file.close()
+                    fun=getattr(callbacks,name)
+                    fun(*params)
+            finally:
+                in_file.close()
+                out_file.close()
+                err_file.close()
+        except Exception:
+            if not self.callback_connection.is_connected:
+                print("\n\nCallback SSH connection lost. Attempting to reconnect...")
+                self.callback_connection.open()
+                self.exec_callback(callbacks)
+            else: raise
+            
         
     def send_commands(self,commands : TrainCommands):
-        in_file,out_file,err_file=self.command_connection.client.exec_command(
-            f'test -e {shlex.quote(self.command_pipe)} \
-            && cat > {shlex.quote(self.command_pipe)}'
-        )
         try:
-            pickle.dump(commands,in_file)
-            in_file.flush()
-            in_file.channel.shutdown_write()
-        finally:
-            in_file.close()
-            out_file.close()
-            err_file.close()
+            in_file,out_file,err_file=self.command_connection.client.exec_command(
+                f'test -e {shlex.quote(self.command_pipe)} \
+                && cat > {shlex.quote(self.command_pipe)}'
+            )
+            try:
+                pickle.dump(commands,in_file)
+                in_file.flush()
+                in_file.channel.shutdown_write()
+            finally:
+                in_file.close()
+                out_file.close()
+                err_file.close()
 
-        commands.reset()
+            commands.reset()
+        except Exception:
+            if not self.command_connection.is_connected:
+                print("\n\nCommand SSH connection lost. Attempting to reconnect...")
+                self.command_connection.open()
+                self.send_commands(commands)
+            else: raise
+
         
     def _upload(self,local : Path,remote : Path,commands : TrainCommands = None):
         update_info=LinuxCloud.__get_update_info(self.connection,remote)
@@ -197,12 +221,23 @@ class LinuxCloud(BaseCloud):
         LinuxCloud.__download_file(self.connection,local,remote,update_info)
 
     def sync_workspace(self):
-        update_info=LinuxCloud.__get_update_info(self.sync_connection,Path(self.config.workspace_dir))
-        LinuxCloud.__download_dir(self.sync_connection,
-                                  local=Path(self.config.local_workspace_dir),
-                                  remote=Path(self.config.workspace_dir),
-                                  update_info=update_info,
-                                  config=self.config.cloud)
+        try:
+            update_info=LinuxCloud.__get_update_info(self.sync_connection,Path(self.config.workspace_dir))
+            LinuxCloud.__download_dir(self.sync_connection,
+                                      local=Path(self.config.local_workspace_dir),
+                                      remote=Path(self.config.workspace_dir),
+                                      update_info=update_info,
+                                      config=self.config.cloud)
+        except Exception as e:
+            if isinstance(e,socket.error):
+                #Connection.is_connected is True even if SFTP socket is closed. Close and re-open:
+                self.sync_connection.close()
+
+            if not self.sync_connection.is_connected:
+                print("\n\nSync SSH connection lost. Attempting to reconnect...")
+                self.sync_connection.open()
+                self.sync_workspace()
+            else: raise
 
     @staticmethod
     def __get_update_info(connection,remote : Path):
