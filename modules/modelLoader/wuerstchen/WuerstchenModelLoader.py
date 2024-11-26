@@ -3,6 +3,7 @@ import os.path
 import traceback
 
 from modules.model.WuerstchenModel import WuerstchenEfficientNetEncoder, WuerstchenModel
+from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.convert.convert_stable_cascade_ckpt_to_diffusers import convert_stable_cascade_ckpt_to_diffusers
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
@@ -17,7 +18,9 @@ from safetensors import safe_open
 from safetensors.torch import load_file
 
 
-class WuerstchenModelLoader:
+class WuerstchenModelLoader(
+    HFModelLoaderMixin,
+):
     def __init__(self):
         super().__init__()
 
@@ -67,51 +70,63 @@ class WuerstchenModelLoader:
         )
 
         if model_type.is_wuerstchen_v2():
-            decoder_text_encoder = CLIPTextModel.from_pretrained(
+            decoder_text_encoder = self._load_transformers_sub_module(
+                CLIPTextModel,
+                weight_dtypes.decoder_text_encoder,
+                weight_dtypes.train_dtype,
                 decoder_model_name,
-                subfolder="text_encoder",
-                torch_dtype=weight_dtypes.decoder_text_encoder.torch_dtype(),
+                "text_encoder",
             )
-            decoder_text_encoder.text_model.embeddings.to(
-                dtype=weight_dtypes.text_encoder.torch_dtype(supports_quantization=False))
         if model_type.is_stable_cascade():
             decoder_text_encoder = None
 
         if model_type.is_wuerstchen_v2():
-            decoder_decoder = WuerstchenDiffNeXt.from_pretrained(
+            decoder_decoder = self._load_diffusers_sub_module(
+                WuerstchenDiffNeXt,
+                weight_dtypes.decoder,
+                weight_dtypes.train_dtype,
                 decoder_model_name,
-                subfolder="decoder",
-                torch_dtype=weight_dtypes.decoder.torch_dtype(),
+                "decoder",
             )
         elif model_type.is_stable_cascade():
-            decoder_decoder = StableCascadeUNet.from_pretrained(
+            decoder_decoder = self._load_diffusers_sub_module(
+                StableCascadeUNet,
+                weight_dtypes.decoder,
+                weight_dtypes.train_dtype,
                 decoder_model_name,
-                subfolder="decoder",
-                torch_dtype=weight_dtypes.decoder.torch_dtype(),
+                "decoder",
             )
 
-        decoder_vqgan = PaellaVQModel.from_pretrained(
+        decoder_vqgan = self._load_diffusers_sub_module(
+            PaellaVQModel,
+            weight_dtypes.decoder_vqgan,
+            weight_dtypes.train_dtype,
             decoder_model_name,
-            subfolder="vqgan",
-            torch_dtype=weight_dtypes.decoder_vqgan.torch_dtype(),
+            "vqgan",
         )
 
         if model_type.is_wuerstchen_v2():
-            effnet_encoder = WuerstchenEfficientNetEncoder.from_pretrained(
+            effnet_encoder = self._load_diffusers_sub_module(
+                WuerstchenEfficientNetEncoder,
+                weight_dtypes.effnet_encoder,
+                weight_dtypes.fallback_train_dtype,
                 effnet_encoder_model_name,
-                torch_dtype=weight_dtypes.effnet_encoder.torch_dtype(),
             )
         elif model_type.is_stable_cascade():
             # TODO: this is a temporary workaround until the effnet weights are available in diffusers format
             effnet_encoder = WuerstchenEfficientNetEncoder(affine_batch_norm=False)
             effnet_encoder.load_state_dict(load_file(effnet_encoder_model_name))
-            effnet_encoder.to(dtype=weight_dtypes.effnet_encoder.torch_dtype())
+            effnet_encoder = self._convert_diffusers_sub_module_to_dtype(
+                effnet_encoder, weight_dtypes.effnet_encoder, weight_dtypes.fallback_train_dtype
+            )
 
         if model_type.is_wuerstchen_v2():
-            prior_prior = WuerstchenPrior.from_pretrained(
+            prior_prior = self._load_diffusers_sub_module(
+                WuerstchenPrior,
+                weight_dtypes.prior,
+                weight_dtypes.train_dtype,
                 prior_model_name,
-                subfolder="prior",
-                torch_dtype=weight_dtypes.prior.torch_dtype(),
+                "prior",
             )
         elif model_type.is_stable_cascade():
             if prior_prior_model_name:
@@ -124,12 +139,16 @@ class WuerstchenModelLoader:
                         prior_config = json.load(config_file)
                 prior_prior = StableCascadeUNet(**prior_config)
                 prior_prior.load_state_dict(convert_stable_cascade_ckpt_to_diffusers(load_file(prior_prior_model_name)))
-                prior_prior.to(dtype=weight_dtypes.prior.torch_dtype())
+                prior_prior = self._convert_diffusers_sub_module_to_dtype(
+                    prior_prior, weight_dtypes.prior, weight_dtypes.fallback_train_dtype
+                )
             else:
-                prior_prior = StableCascadeUNet.from_pretrained(
+                prior_prior = self._load_diffusers_sub_module(
+                    StableCascadeUNet,
+                    weight_dtypes.prior,
+                    weight_dtypes.fallback_train_dtype,
                     prior_model_name,
-                    subfolder="prior",
-                    torch_dtype=weight_dtypes.prior.torch_dtype(),
+                    "prior",
                 )
 
         prior_tokenizer = CLIPTokenizer.from_pretrained(
@@ -138,19 +157,21 @@ class WuerstchenModelLoader:
         )
 
         if model_type.is_wuerstchen_v2():
-            prior_text_encoder = CLIPTextModel.from_pretrained(
+            prior_text_encoder = self._load_transformers_sub_module(
+                CLIPTextModel,
+                weight_dtypes.text_encoder,
+                weight_dtypes.train_dtype,
                 prior_model_name,
-                subfolder="text_encoder",
-                torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+                "text_encoder",
             )
-            prior_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
         elif model_type.is_stable_cascade():
-            prior_text_encoder = CLIPTextModelWithProjection.from_pretrained(
+            prior_text_encoder = self._load_transformers_sub_module(
+                CLIPTextModelWithProjection,
+                weight_dtypes.text_encoder,
+                weight_dtypes.train_dtype,
                 prior_model_name,
-                subfolder="text_encoder",
-                torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+                "text_encoder",
             )
-            prior_text_encoder.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
 
         prior_noise_scheduler = DDPMWuerstchenScheduler.from_pretrained(
             prior_model_name,

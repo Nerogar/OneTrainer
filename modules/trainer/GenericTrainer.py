@@ -518,7 +518,7 @@ class GenericTrainer(BaseTrainer):
     def __apply_fused_back_pass(self, scaler):
         if self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
             if self.config.gradient_accumulation_steps > 1:
-                raise RuntimeError("fused_back_step can not be used if gradient_accumulation_steps > 1")
+                print("Warning: activating fused_back_pass with gradient_accumulation_steps > 1 does not reduce VRAM usage.")
 
             for param_group in self.model.optimizer.param_groups:
                 for i, parameter in enumerate(param_group["params"]):
@@ -527,17 +527,19 @@ class GenericTrainer(BaseTrainer):
                     if parameter.requires_grad:
                         if scaler:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                                scaler.unscale_parameter_(tensor, self.model.optimizer)
-                                if self.config.clip_grad_norm is not None:
-                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
-                                scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
-                                tensor.grad = None
+                                if self.__is_update_step(self.model.train_progress):
+                                    scaler.unscale_parameter_(tensor, self.model.optimizer)
+                                    if self.config.clip_grad_norm is not None:
+                                        nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
+                                    scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
+                                    tensor.grad = None
                         else:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                                if self.config.clip_grad_norm is not None:
-                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
-                                self.model.optimizer.step_parameter(tensor, param_group, i)
-                                tensor.grad = None
+                                if self.__is_update_step(self.model.train_progress):
+                                    if self.config.clip_grad_norm is not None:
+                                        nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
+                                    self.model.optimizer.step_parameter(tensor, param_group, i)
+                                    tensor.grad = None
 
                         handle = parameter.register_post_accumulate_grad_hook(__grad_hook)
                         self.grad_hook_handles.append(handle)

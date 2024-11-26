@@ -216,7 +216,7 @@ class FluxBaseDataLoader(
             before_cache_image_fun=before_cache_image_fun,
             use_conditioning_image=True,
             vae=model.vae,
-            autocast_context=model.autocast_context,
+            autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
 
