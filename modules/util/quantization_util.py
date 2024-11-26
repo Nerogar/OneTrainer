@@ -1,7 +1,7 @@
-import math
 from collections.abc import Callable
 
 from modules.module.quantized.LinearFp8 import LinearFp8
+from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.enum.DataType import DataType
 
@@ -9,17 +9,20 @@ import torch
 from torch import Tensor, nn
 
 try:
+    from modules.module.quantized.LinearNf4 import LinearNf4
+
     import bitsandbytes as bnb
 except ImportError:
     bnb = None
+    LinearNf4 = None
 
 
 def __create_nf4_linear_layer(module: nn.Linear, copy_parameters: bool) -> nn.Module:
     bias = module.bias is not None
 
-    quant_linear = bnb.nn.LinearNF4(
-        input_features=module.in_features,
-        output_features=module.out_features,
+    quant_linear = LinearNf4(
+        in_features=module.in_features,
+        out_features=module.out_features,
         bias=bias,
     )
 
@@ -163,7 +166,16 @@ def is_quantized_parameter(
         parameter_name: str,
 ) -> bool:
     if bnb is not None:
-        if isinstance(module, bnb.nn.LinearNF4 | bnb.nn.Linear8bitLt):
+        if isinstance(module, LinearNf4):
+            return parameter_name in [
+                "weight",
+                "absmax",
+                "offset",
+                "code",
+                "nested_absmax",
+                "nested_code",
+            ]
+        elif isinstance(module, bnb.nn.Linear8bitLt):
             return parameter_name == "weight"
 
     if isinstance(module, LinearFp8):
@@ -174,79 +186,46 @@ def is_quantized_parameter(
 
 def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType):
     for child_module in module.modules():
-        if bnb is not None:
-            if isinstance(child_module, bnb.nn.LinearNF4):
-                child_module.compute_dtype = train_dtype.torch_dtype()
-                child_module.compute_type_is_set = True
-                if not child_module.weight.bnb_quantized:
-                    orig_device = child_module.weight.device
-                    child_module.to(device=device)
-                    child_module.to(device=orig_device)
-
         if isinstance(child_module, QuantizedModuleMixin):
-            child_module.quantize(device)
             child_module.compute_dtype = train_dtype.torch_dtype()
+            child_module.quantize(device)
 
 
-def get_unquantized_weight(module: nn.Module, dtype: torch.dtype) -> Tensor:
-    param = module.weight
+def get_unquantized_weight(module: nn.Module, dtype: torch.dtype, device: torch.device) -> Tensor:
+    if isinstance(module, QuantizedLinearMixin):
+        return module.unquantized_weight(dtype, device)
 
-    if bnb is not None:
-        if isinstance(param, bnb.nn.Params4bit):
-            if param.quant_state is not None:
-                return bnb.functional.dequantize_4bit(
-                    A=param.data,
-                    quant_state=param.quant_state,
-                    quant_type=param.quant_type,
-                ).detach().to(dtype=dtype)
-            else:
-                return param.detach().to(dtype=dtype)
-        if isinstance(param, bnb.nn.Int8Params):
-            if param.dtype == torch.int8:  # already quantized
-                if param.SCB is not None:
-                    return (param.SCB.unsqueeze(1) * param.detach()) / 127
-                else:  # SCB is saved in the module
-                    return (module.state.SCB.unsqueeze(1) * param.detach()) / 127
-            else:
-                return param.detach().to(dtype=dtype)
-
-    if isinstance(module, LinearFp8):
-        if module._scale is not None:
-            return module.weight.detach().to(dtype) * module._scale
-        else:
-            return module.weight.detach().to(dtype)
-
-    return param.detach().to(dtype=dtype)
+    return module.weight.detach().to(dtype=dtype)
 
 
 def get_weight_shape(module: nn.Module) -> torch.Size:
     param = module.weight
 
     if bnb is not None:
-        if isinstance(param, bnb.nn.Params4bit):
-            if param.quant_state is not None:
-                return param.quant_state.shape
-            else:
-                return param.shape
+        if isinstance(module, LinearNf4):
+            return module.shape
 
     return param.shape
 
 
 def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
-    if isinstance(module, bnb.nn.Linear4bit | nn.Linear | nn.Conv2d):
-        return [module.weight.data]
-    return []
+    tensors = []
+
+    if bnb is not None:
+        if isinstance(module, LinearNf4):
+            tensors += [module.quant_state.absmax]
+    if isinstance(module, nn.Linear | nn.Conv2d):
+        tensors += [module.weight]
+    if isinstance(module, nn.Linear) and module.bias is not None:
+        tensors += [module.bias]
+
+    return tensors
 
 
 def get_offload_tensor_bytes(module: nn.Module) -> int:
-    if isinstance(module, bnb.nn.Linear4bit):
-        if module.weight.quant_state is None:
-            return math.ceil(module.weight.numel() / 2)
-        else:
-            return module.weight.numel()
-    if isinstance(module, nn.Linear | nn.Conv2d):
-        return module.weight.element_size() * module.weight.numel()
-    return 0
+    tensors = get_offload_tensors(module)
+
+    return sum(t.element_size() * t.numel() for t in tensors)
 
 
 def offload_quantized(
@@ -255,11 +234,13 @@ def offload_quantized(
         non_blocking: bool = False,
         allocator: Callable[[torch.tensor], torch.tensor] | None = None,
 ):
+    tensors = get_offload_tensors(module)
+
     if allocator is None:
-        if isinstance(module, bnb.nn.LinearNF4 | nn.Linear | nn.Conv2d):
-            module.weight.data = module.weight.data.to(device=device, non_blocking=non_blocking)
+        for tensor in tensors:
+            tensor.data = tensor.data.to(device=device, non_blocking=non_blocking)
     else:
-        if isinstance(module, bnb.nn.LinearNF4 | nn.Linear | nn.Conv2d):
-            tensor = allocator(module.weight)
-            tensor.copy_(module.weight.data, non_blocking=non_blocking)
-            module.weight.data = tensor
+        for tensor in tensors:
+            new_tensor = allocator(tensor)
+            new_tensor.copy_(tensor.data, non_blocking=non_blocking)
+            tensor.data = new_tensor

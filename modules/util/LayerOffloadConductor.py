@@ -3,7 +3,7 @@ import random
 from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.quantization_util import get_offload_tensor_bytes, get_offload_tensors, offload_quantized
+from modules.util.quantization_util import get_offload_tensor_bytes, offload_quantized
 from modules.util.torch_util import (
     create_stream_context,
     device_equals,
@@ -153,16 +153,12 @@ class StaticLayerAllocator:
 
         self.__tensor_allocators = []
 
-    def allocate_cache(self, layers: list[nn.Module], num_layers: int):
+    def allocate_cache(self, layers: list[nn.Module], target_bytes: int):
         if not self.__allocate_statically or any(x is not None for x in self.cache_tensors):
             return
 
         log(f"allocating cache on device {self.device}")
 
-        self.__num_layers = num_layers
-
-        # This assumes that most layers are close in size.
-        # Find a better allocation strategy once there are models with different architectures
         self.__max_tensor_bytes = 0
         self.__layer_bytes = []
         for layer in layers:
@@ -170,7 +166,7 @@ class StaticLayerAllocator:
             self.__max_tensor_bytes = max(self.__max_tensor_bytes, *layer_tensor_bytes)
             self.__layer_bytes.append(sum(layer_tensor_bytes))
 
-        cache_bytes = sum(sorted(self.__layer_bytes, reverse=True)[:num_layers]) + self.__max_tensor_bytes
+        cache_bytes = target_bytes
         num_cache_tensors = min(
             # no more than 10% overhead
             math.ceil(int(cache_bytes * 0.10) / self.__max_tensor_bytes),
@@ -377,13 +373,158 @@ class SyncEvent:
             return f"event({self.__log_msg}, done={self.__torch_event.query()})"
 
 
+class LayerOffloadStrategy:
+    def __init__(
+            self,
+            layers: list[nn.Module],
+            layer_offload_fraction: float,
+    ):
+        layer_bytes = [sum([get_offload_tensor_bytes(x) for x in layer.modules()]) for layer in layers]
+        total_bytes = sum(layer_bytes)
+        target_loaded_bytes = int(total_bytes * (1.0 - layer_offload_fraction))
+
+        # calculate min number of loaded layers at the start
+        self.initial_loaded_layers = self.__get_layers_below(
+            layer_bytes=layer_bytes,
+            start_layer=0,
+            max_bytes=target_loaded_bytes,
+            is_forward=True,
+            is_cyclic=False,
+        )
+
+        # the offloading strategy has 3 cases:
+        # case 1, forward pass, followed by a backward pass:
+        #     do not offload the last layers, they will be needed immediately
+        # case 2, forward pass,  followed by another forward pass:
+        #     start loading the first layers when executing the last layers
+        # case 3, backward pass:
+        #     same as case 1, but in reversed order
+
+        # calculate a list of loaded layers before execution of each layer
+        self.forward_backward_loaded_layers = [self.__get_layers_below(
+            layer_bytes=layer_bytes,
+            start_layer=i,
+            max_bytes=target_loaded_bytes,
+            is_forward=True,
+            is_cyclic=False,
+        ) for i in range(len(layers))]
+
+        self.forward_forward_loaded_layers = [self.__get_layers_below(
+            layer_bytes=layer_bytes,
+            start_layer=i,
+            max_bytes=target_loaded_bytes,
+            is_forward=True,
+            is_cyclic=True,
+        ) for i in range(len(layers))]
+
+        self.backward_forward_loaded_layers = [self.__get_layers_below(
+            layer_bytes=layer_bytes,
+            start_layer=i,
+            max_bytes=target_loaded_bytes,
+            is_forward=False,
+            is_cyclic=False,
+        ) for i in range(len(layers))]
+
+        all_loaded_layers = self.forward_backward_loaded_layers \
+                            + self.forward_forward_loaded_layers \
+                            + self.backward_forward_loaded_layers
+
+        self.max_loaded_bytes = max(sum([layer_bytes[i] for i in loaded_layers]) for loaded_layers in all_loaded_layers)
+        self.max_offloaded_bytes = total_bytes - self.max_loaded_bytes + max(layer_bytes)
+
+    @staticmethod
+    def __get_layers_below(
+            layer_bytes: list[int],
+            start_layer: int,
+            max_bytes: int,
+            is_forward: bool,
+            is_cyclic: bool,
+    ) -> list[int]:
+        accumulator = 0
+        layers = []
+        if is_forward and is_cyclic:
+            for i in range(start_layer, len(layer_bytes)):
+                accumulator += layer_bytes[i]
+                if accumulator > max_bytes and len(layers) >= 2:
+                    break
+                layers.append(i)
+            for i in range(start_layer):
+                accumulator += layer_bytes[i]
+                if accumulator > max_bytes and len(layers) >= 2:
+                    break
+                layers.append(i)
+        elif is_forward and not is_cyclic:
+            for i in range(start_layer, len(layer_bytes)):
+                accumulator += layer_bytes[i]
+                if accumulator > max_bytes and len(layers) >= 2:
+                    break
+                layers.append(i)
+            for i in range(start_layer - 1, -1, -1):
+                accumulator += layer_bytes[i]
+                if accumulator > max_bytes and len(layers) >= 2:
+                    break
+                layers.append(i)
+        else:
+            for i in range(start_layer, -1, -1):
+                accumulator += layer_bytes[i]
+                if accumulator > max_bytes and len(layers) >= 2:
+                    break
+                layers.append(i)
+            for i in range(start_layer + 1, len(layer_bytes)):
+                accumulator += layer_bytes[i]
+                if accumulator > max_bytes and len(layers) >= 2:
+                    break
+                layers.append(i)
+        return sorted(layers)
+
+    def get_layers_to_offload(
+            self,
+            layer_index: int,
+            is_forward: bool,
+            is_next_forward: bool,
+            loaded_layers: list[int],
+    ) -> list[int]:
+        layers = []
+        if is_forward and is_next_forward:
+            layers = sorted([i for i in loaded_layers if i not in self.forward_forward_loaded_layers[layer_index]])
+        if is_forward and not is_next_forward:
+            layers = sorted([i for i in loaded_layers if i not in self.forward_backward_loaded_layers[layer_index]])
+        if not is_forward:
+            layers = sorted([i for i in loaded_layers if i not in self.backward_forward_loaded_layers[layer_index]],
+                            reverse=True)
+
+        if is_forward:
+            return [x for x in layers if x >= layer_index] + [x for x in layers if x < layer_index]
+        else:
+            return [x for x in layers if x < layer_index] + [x for x in layers if x >= layer_index]
+
+    def get_layers_to_load(
+            self,
+            layer_index: int,
+            is_forward: bool,
+            is_next_forward: bool,
+            loaded_layers: list[int],
+    ) -> list[int]:
+        layers = []
+        if is_forward and is_next_forward:
+            layers = sorted([i for i in self.forward_forward_loaded_layers[layer_index] if i not in loaded_layers])
+        if is_forward and not is_next_forward:
+            layers = sorted([i for i in self.forward_backward_loaded_layers[layer_index] if i not in loaded_layers])
+        if not is_forward:
+            layers = sorted([i for i in self.backward_forward_loaded_layers[layer_index] if i not in loaded_layers],
+                            reverse=True)
+
+        if is_forward:
+            return [x for x in layers if x >= layer_index] + [x for x in layers if x < layer_index]
+        else:
+            return [x for x in layers if x < layer_index] + [x for x in layers if x >= layer_index]
+
+
 class LayerOffloadConductor:
     __module: nn.Module
 
     __layers: list[nn.Module]
     __layer_device_map: list[torch.device | None]
-    __num_offloaded_layers: int
-    __num_loaded_layers: int
     __offload_activations: bool
     __offload_layers: bool
     __layer_offload_fraction: float
@@ -407,6 +548,7 @@ class LayerOffloadConductor:
     __call_index_layer_index_map: dict[int, int]
     __activations_transfer_event_map: dict[int, SyncEvent]
 
+    __offload_strategy = LayerOffloadStrategy | None
     __is_forward_pass: bool
     __keep_graph: bool
 
@@ -421,9 +563,7 @@ class LayerOffloadConductor:
 
         self.__layers = []
         self.__layer_device_map = []
-        self.__num_offloaded_layers = 0
-        self.__num_loaded_layers = 0
-        self.__offload_activations = config.gradient_checkpointing.offload()
+        self.__offload_activations = config.gradient_checkpointing.offload() and config.enable_activation_offloading
         self.__offload_layers = config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0
         self.__layer_offload_fraction = config.layer_offload_fraction
 
@@ -453,6 +593,7 @@ class LayerOffloadConductor:
         self.__call_index_layer_index_map = {}
         self.__activations_transfer_event_map = {}
 
+        self.__offload_strategy = None
         self.__is_forward_pass = False
         self.__keep_graph = False
 
@@ -486,8 +627,12 @@ class LayerOffloadConductor:
         elif device_equals(device, self.__train_device):
             log("to train device")
 
-            self.__train_device_layer_allocator.allocate_cache(self.__layers, self.__num_loaded_layers)
-            self.__temp_device_layer_allocator.allocate_cache(self.__layers, self.__num_offloaded_layers + 1)
+            self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
+
+            self.__train_device_layer_allocator.allocate_cache(
+                self.__layers, self.__offload_strategy.max_loaded_bytes)
+            self.__temp_device_layer_allocator.allocate_cache(
+                self.__layers, self.__offload_strategy.max_offloaded_bytes)
             self.__module_to_device_except_layers(self.__train_device)
 
             # move all layers to the train device, then move offloadable tensors back to the temp device
@@ -496,7 +641,7 @@ class LayerOffloadConductor:
                     log(f"layer {layer_index} to train device")
                     layer.to(self.__train_device)
 
-                    if layer_index < self.__num_loaded_layers:
+                    if layer_index in self.__offload_strategy.initial_loaded_layers:
                         allocator = self.__train_device_layer_allocator.get_allocator(
                             layer_index, allocate_forward=True)
                         for module in layer.modules():
@@ -521,11 +666,6 @@ class LayerOffloadConductor:
         self.__layer_device_map.append(None)
         self.__layer_train_event_map.append(SyncEvent())
         self.__layer_transfer_event_map.append(SyncEvent())
-        self.__num_offloaded_layers = min(
-            len(self.__layers) - 2,  # 2 layers need to be loaded for async offloading to work efficiently
-            int(len(self.__layers) * self.__layer_offload_fraction)
-        )
-        self.__num_loaded_layers = len(self.__layers) - self.__num_offloaded_layers
 
         self.__layer_activations_included_offload_param_indices_map.append(included_offload_param_indices)
 
@@ -540,16 +680,6 @@ class LayerOffloadConductor:
 
         self.__is_forward_pass = True
         self.__keep_graph = keep_graph
-
-        # TODO: implement a better cache miss behavior.
-        #       it's not possible to move layers in order, because that could cause too many layers to be
-        #       loaded at the same time
-        # if self.__offload_layers:
-        #     for layer_index in range(len(self.__layers)):
-        #         if layer_index < self.__num_loaded_layers:
-        #             self.__schedule_layer_to(layer_index, self.__train_device)
-        #         else:
-        #             self.__schedule_layer_to(layer_index, self.__temp_device)
 
     def before_layer(self, layer_index: int, call_index: int, activations: Any) -> Any:
         log()
@@ -591,33 +721,21 @@ class LayerOffloadConductor:
         if self.__offload_layers:
             self.__wait_layer_transfer(layer_index)
 
-            if self.__is_forward_pass and self.__keep_graph:
-                previous_layer_index = layer_index - 1
-                # next pass will be a back pass.
-                # do not offload the last layers, they will be needed immediately
-                if previous_layer_index < self.__num_offloaded_layers:
-                    self.__schedule_layer_to(
-                        previous_layer_index, self.__temp_device, is_forward=True)
-                    self.__schedule_layer_to(
-                        self.__num_loaded_layers + previous_layer_index, self.__train_device, is_forward=True)
-            elif self.__is_forward_pass and not self.__keep_graph:
-                previous_layer_index = layer_index - 1
-                # next pass will be another forward pass.
-                # start loading the first layers when executing the last layers,
-                # while trying to keep as many middle layers as possible
-                self.__schedule_layer_to(
-                    previous_layer_index, self.__temp_device, is_forward=True)
-                self.__schedule_layer_to(
-                    (self.__num_loaded_layers + previous_layer_index) % len(self.__layers), self.__train_device,
-                    is_forward=True)
-            elif not self.__is_forward_pass:
-                previous_layer_index = layer_index + 1
-                # next pass will be a forward pass
-                if self.__num_loaded_layers <= previous_layer_index < len(self.__layers):
-                    self.__schedule_layer_to(
-                        previous_layer_index, self.__temp_device, is_forward=False)
-                    self.__schedule_layer_to(
-                        previous_layer_index - self.__num_loaded_layers, self.__train_device, is_forward=False)
+            for i in self.__offload_strategy.get_layers_to_offload(
+                    layer_index=layer_index,
+                    is_forward=self.__is_forward_pass,
+                    is_next_forward=not self.__keep_graph,
+                    loaded_layers=self.__get_loaded_layers(),
+            ):
+                self.__schedule_layer_to(i, self.__temp_device, is_forward=self.__is_forward_pass)
+
+            for i in self.__offload_strategy.get_layers_to_load(
+                    layer_index=layer_index,
+                    is_forward=self.__is_forward_pass,
+                    is_next_forward=not self.__keep_graph,
+                    loaded_layers=self.__get_loaded_layers(),
+            ):
+                self.__schedule_layer_to(i, self.__train_device, is_forward=self.__is_forward_pass)
 
         return activations
 
@@ -625,9 +743,6 @@ class LayerOffloadConductor:
         log(f"after layer {layer_index}, {call_index}")
 
         # record stream
-        if self.__async_transfer:
-            for x in self.__get_all_tensors(self.__layers[layer_index]):
-                x.record_stream(self.__train_stream)
         tensors_record_stream(self.__train_stream, activations)
 
         # save activations during the forward pass to make them accessible during the backward pass
@@ -638,6 +753,9 @@ class LayerOffloadConductor:
 
         event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
         self.__layer_train_event_map[layer_index] = event
+
+    def __get_loaded_layers(self) -> list[int]:
+        return [i for i in range(len(self.__layers)) if device_equals(self.__layer_device_map[i], self.__train_device)]
 
     def __module_to_device_except_layers(
             self,
@@ -652,10 +770,6 @@ class LayerOffloadConductor:
             return t.to(device=device)
 
         self.__module._apply(convert)
-
-    @staticmethod
-    def __get_all_tensors(layer: nn.Module):
-        return sum([get_offload_tensors(x) for x in layer.modules()], [])
 
     def __clear_activations(self):
         self.__activations_map.clear()
@@ -718,12 +832,8 @@ class LayerOffloadConductor:
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
             if self.__async_transfer:
-                parameters = self.__get_all_tensors(layer)
                 for module in layer.modules():
                     offload_quantized(module, device, non_blocking=True, allocator=allocator_fn)
-                for x in parameters:
-                    if x.device.type == "cuda":
-                        x.record_stream(self.__layer_transfer_stream)
 
                 layer_deallocator.deallocate_layer(layer_index, deallocate_forward=is_forward)
 

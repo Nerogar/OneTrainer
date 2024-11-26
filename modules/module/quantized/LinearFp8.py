@@ -25,6 +25,12 @@ class LinearFp8(
     def original_weight_shape(self) -> tuple[int, ...]:
         return self.weight.shape
 
+    def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+        if self._scale is not None:
+            return self.weight.detach().to(dtype) * self._scale.to(dtype=dtype)
+        else:
+            return self.weight.detach().to(dtype=dtype)
+
     def quantize(self, device: torch.device | None = None):
         if self.is_quantized:
             return
@@ -32,16 +38,16 @@ class LinearFp8(
 
         weight = self.weight.data
         orig_device = weight.device
-        if device is not None:
-            weight = weight.to(device=device)
-
         if weight.dtype != self.fp8_dtype:
+            if device is not None:
+                weight = weight.to(device=device)
+
             abs_max = weight.abs().max()
             self._scale.copy_(torch.clamp(abs_max, min=1e-12) / torch.finfo(self.fp8_dtype).max)
             weight = weight.div_(self._scale).to(dtype=self.fp8_dtype)
 
-        if device is not None:
-            weight = weight.to(device=orig_device)
+            if device is not None:
+                weight = weight.to(device=orig_device)
         self.weight.data = weight
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
