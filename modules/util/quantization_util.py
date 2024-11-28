@@ -185,10 +185,11 @@ def is_quantized_parameter(
 
 
 def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType):
-    for child_module in module.modules():
-        if isinstance(child_module, QuantizedModuleMixin):
-            child_module.compute_dtype = train_dtype.torch_dtype()
-            child_module.quantize(device)
+    if module is not None:
+        for child_module in module.modules():
+            if isinstance(child_module, QuantizedModuleMixin):
+                child_module.compute_dtype = train_dtype.torch_dtype()
+                child_module.quantize(device)
 
 
 def get_unquantized_weight(module: nn.Module, dtype: torch.dtype, device: torch.device) -> Tensor:
