@@ -430,7 +430,8 @@ class LayerOffloadStrategy:
                             + self.backward_forward_loaded_layers
 
         self.max_loaded_bytes = max(sum([layer_bytes[i] for i in loaded_layers]) for loaded_layers in all_loaded_layers)
-        self.max_offloaded_bytes = total_bytes - self.max_loaded_bytes + max(layer_bytes)
+        min_loaded_bytes = min(sum([layer_bytes[i] for i in loaded_layers]) for loaded_layers in all_loaded_layers)
+        self.max_offloaded_bytes = total_bytes - min_loaded_bytes + max(layer_bytes)
 
     @staticmethod
     def __get_layers_below(
