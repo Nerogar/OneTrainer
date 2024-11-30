@@ -526,8 +526,6 @@ class LayerOffloadConductor:
 
     __layers: list[nn.Module]
     __layer_device_map: list[torch.device | None]
-    __offload_activations: bool
-    __offload_layers: bool
     __layer_offload_fraction: float
 
     __layer_activations_included_offload_param_indices_map: list[list[int]]
@@ -535,8 +533,13 @@ class LayerOffloadConductor:
     __train_device: torch.device
     __temp_device: torch.device
 
+    __offload_activations: bool
+    __offload_layers: bool
+    __async_transfer: bool
+
     __train_stream: torch.Stream | None
     __layer_transfer_stream: torch.Stream | None
+    __activations_transfer_stream: torch.Stream | None
 
     __train_device_layer_allocator: StaticLayerAllocator
     __temp_device_layer_allocator: StaticLayerAllocator
@@ -564,8 +567,6 @@ class LayerOffloadConductor:
 
         self.__layers = []
         self.__layer_device_map = []
-        self.__offload_activations = config.gradient_checkpointing.offload() and config.enable_activation_offloading
-        self.__offload_layers = config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0
         self.__layer_offload_fraction = config.layer_offload_fraction
 
         self.__layer_activations_included_offload_param_indices_map = []
@@ -573,7 +574,10 @@ class LayerOffloadConductor:
         self.__train_device = torch.device(config.train_device)
         self.__temp_device = torch.device(config.temp_device)
 
-        self.__async_transfer = self.__train_device.type == "cuda"
+        self.__offload_activations = config.gradient_checkpointing.offload() and config.enable_activation_offloading
+        self.__offload_layers = config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0
+        self.__async_transfer = self.__train_device.type == "cuda" and config.enable_async_offloading
+
         if self.__async_transfer:
             self.__train_stream = torch.cuda.default_stream(self.__train_device)
             self.__layer_transfer_stream = torch.cuda.Stream(self.__train_device)
@@ -654,8 +658,9 @@ class LayerOffloadConductor:
                             offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
                         self.__layer_device_map[layer_index] = self.__temp_device
 
-                    event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
-                    self.__layer_train_event_map[layer_index] = event
+                    if self.__async_transfer:
+                        event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
+                        self.__layer_train_event_map[layer_index] = event
 
         torch_gc()
 
@@ -675,7 +680,8 @@ class LayerOffloadConductor:
         log()
         log()
         log("starting forward")
-        self.__layer_transfer_stream.wait_stream(self.__train_stream)
+        if self.__async_transfer:
+            self.__layer_transfer_stream.wait_stream(self.__train_stream)
         self.__wait_all_layer_transfers()
         self.__clear_activations()
 
@@ -744,7 +750,8 @@ class LayerOffloadConductor:
         log(f"after layer {layer_index}, {call_index}")
 
         # record stream
-        tensors_record_stream(self.__train_stream, activations)
+        if self.__async_transfer:
+            tensors_record_stream(self.__train_stream, activations)
 
         # save activations during the forward pass to make them accessible during the backward pass
         if self.__offload_activations and self.__keep_graph and self.__is_forward_pass:
@@ -752,8 +759,9 @@ class LayerOffloadConductor:
             self.__activations_map[call_index] = activations
             self.__schedule_activations_to_device(activations, self.__temp_device, call_index, wait_train_stream=True)
 
-        event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
-        self.__layer_train_event_map[layer_index] = event
+        if self.__async_transfer:
+            event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
+            self.__layer_train_event_map[layer_index] = event
 
     def __get_loaded_layers(self) -> list[int]:
         return [i for i in range(len(self.__layers)) if device_equals(self.__layer_device_map[i], self.__train_device)]
@@ -797,9 +805,10 @@ class LayerOffloadConductor:
         self.__layer_train_event_map[layer_index] = SyncEvent()
 
     def __wait_layer_transfer(self, layer_index: int):
-        self.__layer_transfer_event_map[layer_index] \
-            .wait(self.__train_stream, f"wait layer transfer {layer_index}")
-        self.__layer_transfer_event_map[layer_index] = SyncEvent()
+        if self.__async_transfer:
+            self.__layer_transfer_event_map[layer_index] \
+                .wait(self.__train_stream, f"wait layer transfer {layer_index}")
+            self.__layer_transfer_event_map[layer_index] = SyncEvent()
 
     def __wait_activations_transfer(self, call_index: int):
         event = self.__activations_transfer_event_map.pop(call_index, None)
@@ -832,18 +841,17 @@ class LayerOffloadConductor:
         with create_stream_context(self.__layer_transfer_stream):
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
+            for module in layer.modules():
+                offload_quantized(module, device, non_blocking=self.__async_transfer, allocator=allocator_fn)
+
+            layer_deallocator.deallocate_layer(layer_index, deallocate_forward=is_forward)
+
             if self.__async_transfer:
-                for module in layer.modules():
-                    offload_quantized(module, device, non_blocking=True, allocator=allocator_fn)
-
-                layer_deallocator.deallocate_layer(layer_index, deallocate_forward=is_forward)
-
                 event = SyncEvent(self.__layer_transfer_stream.record_event(), f"transfer to {device}")
                 self.__layer_transfer_event_map[layer_index] = event
                 log(f"schedule layer {layer_index} to {str(device)}, {event}")
             else:
-                layer.to(device)
-                log(f"schedule layer {layer_index} to {str(device)}, blocking")
+                log(f"schedule layer {layer_index} to {str(device)}")
 
             self.__layer_device_map[layer_index] = device
 
@@ -864,10 +872,10 @@ class LayerOffloadConductor:
         allocator_fn = activations_allocator.allocate_like if activations_allocator is not None else None
 
         event = None
-        if wait_train_stream:
+        if wait_train_stream and self.__async_transfer:
             event = SyncEvent(self.__train_stream.record_event(), f"train before activations transfer {call_index}")
 
-        with torch.cuda.stream(self.__activations_transfer_stream):
+        with create_stream_context(self.__activations_transfer_stream):
             tensor_indices = self.__layer_activations_included_offload_param_indices_map[layer_index]
 
             if event is not None:
@@ -876,10 +884,11 @@ class LayerOffloadConductor:
             tensors = get_tensors(activations, tensor_indices)
             if activations_allocator is not None:
                 activations_allocator.reserve_cache(tensors)
-            tensors_to_device_(activations, device, tensor_indices, non_blocking=True, allocator=allocator_fn)
-            tensors_record_stream(self.__activations_transfer_stream, tensors)
+            tensors_to_device_(activations, device, tensor_indices, non_blocking=self.__async_transfer, allocator=allocator_fn)
 
-            self.__activations_transfer_event_map[call_index] = \
-                SyncEvent(self.__activations_transfer_stream.record_event(), f"transfer to {device}")
+            if self.__async_transfer:
+                tensors_record_stream(self.__activations_transfer_stream, tensors)
+                self.__activations_transfer_event_map[call_index] = \
+                    SyncEvent(self.__activations_transfer_stream.record_event(), f"transfer to {device}")
 
             del tensors
