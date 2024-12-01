@@ -1,3 +1,4 @@
+from modules.ui.OffloadingWindow import OffloadingWindow
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
@@ -250,8 +251,8 @@ class TrainingTab:
         # gradient checkpointing
         components.label(frame, 4, 0, "Gradient checkpointing",
                          tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        components.options(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
-                           "gradient_checkpointing")
+        components.options_adv(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
+                           "gradient_checkpointing", adv_command=self.__open_offloading_window)
 
         # gradient checkpointing layer offloading
         components.label(frame, 5, 0, "Layer offload fraction",
@@ -719,6 +720,10 @@ class TrainingTab:
 
     def __open_timestep_distribution_window(self):
         window = TimestepDistributionWindow(self.master, self.train_config, self.ui_state)
+        self.master.wait_window(window)
+
+    def __open_offloading_window(self):
+        window = OffloadingWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
     def __restore_optimizer_config(self, *args):
