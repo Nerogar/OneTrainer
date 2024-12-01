@@ -111,7 +111,7 @@ class ConceptTextConfig(BaseConfig):
         data.append(("tag_delimiter", ",", str, False))
         data.append(("keep_tags_count", 1, int, False))
         data.append(("tag_dropout_enable", False, bool, False))
-        data.append(("tag_dropout_mode", "NONE", str, False))
+        data.append(("tag_dropout_mode", "FULL", str, False))
         data.append(("tag_dropout_probability", 0.0, float, False))
         data.append(("tag_dropout_special_tags_mode", "NONE", str, False))
         data.append(("tag_dropout_special_tags", "", str, False))
