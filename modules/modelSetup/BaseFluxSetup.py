@@ -445,7 +445,7 @@ class BaseFluxSetup(
                 latent_input = scaled_noisy_latent_image
 
             if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([1.0], device=self.train_device)
+                guidance = torch.tensor([config.prior.guidance_scale], device=self.train_device)
                 guidance = guidance.expand(latent_input.shape[0])
             else:
                 guidance = None
