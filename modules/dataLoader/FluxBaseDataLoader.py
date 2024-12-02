@@ -68,6 +68,7 @@ class FluxBaseDataLoader(
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
+        downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         shuffle_mask_channels = ShuffleFluxFillMaskChannels(in_name='mask', out_name='latent_mask')
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
@@ -83,8 +84,10 @@ class FluxBaseDataLoader(
         if model.tokenizer_2:
             modules.append(tokenize_prompt_2)
 
-        if config.masked_training or config.model_type.has_mask_input():
+        if config.model_type.has_mask_input():
             modules.append(shuffle_mask_channels)
+        elif config.masked_training:
+            modules.append(downscale_mask)
 
         if config.model_type.has_conditioning_image_input():
             modules.append(rescale_conditioning_image)
