@@ -437,9 +437,8 @@ class BaseFluxSetup(
             )
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                latent_mask = batch['latent_mask']
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, latent_mask, scaled_latent_conditioning_image], 1
+                    [scaled_noisy_latent_image, scaled_latent_conditioning_image, batch['latent_mask']], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
@@ -469,13 +468,6 @@ class BaseFluxSetup(
                 latent_input.shape[2],
                 latent_input.shape[3],
             )
-
-            if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
-                )
-            else:
-                latent_input = scaled_noisy_latent_image
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
