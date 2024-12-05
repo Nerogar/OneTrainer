@@ -2,6 +2,7 @@ import os
 import traceback
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
 from modules.util.enum.ModelType import ModelType
@@ -21,6 +22,7 @@ from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokeniz
 
 class StableDiffusionXLModelLoader(
     SDConfigModelLoaderMixin,
+    HFModelLoaderMixin,
 ):
     def __init__(self):
         super().__init__()
@@ -77,38 +79,44 @@ class StableDiffusionXLModelLoader(
             original_noise_scheduler=noise_scheduler,
         )
 
-        text_encoder_1 = CLIPTextModel.from_pretrained(
+        text_encoder_1 = self._load_transformers_sub_module(
+            CLIPTextModel,
+            weight_dtypes.text_encoder,
+            weight_dtypes.train_dtype,
             base_model_name,
-            subfolder="text_encoder",
-            torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+            "text_encoder",
         )
-        text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
-            supports_quantization=False))
 
-        text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
+        text_encoder_2 = self._load_transformers_sub_module(
+            CLIPTextModelWithProjection,
+            weight_dtypes.text_encoder_2,
+            weight_dtypes.train_dtype,
             base_model_name,
-            subfolder="text_encoder_2",
-            torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
+            "text_encoder_2",
         )
-        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
-            supports_quantization=False))
 
         if vae_model_name:
-            vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.fallback_train_dtype,
                 vae_model_name,
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
         else:
-            vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.fallback_train_dtype,
                 base_model_name,
-                subfolder="vae",
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
+                "vae",
             )
 
-        unet = UNet2DConditionModel.from_pretrained(
+        unet = self._load_diffusers_sub_module(
+            UNet2DConditionModel,
+            weight_dtypes.unet,
+            weight_dtypes.train_dtype,
             base_model_name,
-            subfolder="unet",
-            torch_dtype=weight_dtypes.unet.torch_dtype(),
+            "unet",
         )
 
         model.model_type = model_type
@@ -130,7 +138,7 @@ class StableDiffusionXLModelLoader(
     ):
         pipeline = StableDiffusionXLPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
-            original_config_file=model.sd_config_filename,
+            original_config=model.sd_config_filename,
             safety_checker=None,
         )
 
@@ -172,14 +180,14 @@ class StableDiffusionXLModelLoader(
         if model_type.has_conditioning_image_input():
             pipeline = StableDiffusionXLInpaintPipeline.from_single_file(
                 pretrained_model_link_or_path=base_model_name,
-                original_config_file=model.sd_config_filename,
+                original_config=model.sd_config_filename,
                 safety_checker=None,
                 use_safetensors=True,
             )
         else:
             pipeline = StableDiffusionXLPipeline.from_single_file(
                 pretrained_model_link_or_path=base_model_name,
-                original_config_file=model.sd_config_filename,
+                original_config=model.sd_config_filename,
                 safety_checker=None,
                 use_safetensors=True,
             )
@@ -190,17 +198,26 @@ class StableDiffusionXLModelLoader(
         )
 
         if vae_model_name:
-            pipeline.vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.fallback_train_dtype,
                 vae_model_name,
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
+        else:
+            vae = self._convert_diffusers_sub_module_to_dtype(
+                pipeline.vae, weight_dtypes.vae, weight_dtypes.fallback_train_dtype
             )
 
-        text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
-        text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
-        text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
-        text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(False))
-        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
-        unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
+        text_encoder_1 = self._convert_transformers_sub_module_to_dtype(
+            pipeline.text_encoder_1, weight_dtypes.text_encoder, weight_dtypes.train_dtype
+        )
+        text_encoder_2 = self._convert_transformers_sub_module_to_dtype(
+            pipeline.text_encoder_2, weight_dtypes.text_encoder_2, weight_dtypes.train_dtype
+        )
+        unet = self._convert_diffusers_sub_module_to_dtype(
+            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype
+        )
 
         model.model_type = model_type
         model.tokenizer_1 = pipeline.tokenizer

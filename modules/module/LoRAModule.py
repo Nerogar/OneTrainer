@@ -7,7 +7,6 @@ from typing import Any
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
-from modules.util.torch_util import device_equals
 
 import torch
 import torch.nn.functional as F
@@ -351,14 +350,7 @@ class DoRAModule(LoRAModule):
     def initialize_weights(self):
         super().initialize_weights()
 
-        # Temporarily move the module to the train_device if it's located on the temp_device
-        orig_device = self.orig_module.weight.device
-        if not device_equals(orig_device, self.train_device):
-            self.orig_module.to(self.train_device)
-            orig_weight = get_unquantized_weight(self.orig_module, torch.float)
-            self.orig_module.to(orig_device)
-        else:
-            orig_weight = get_unquantized_weight(self.orig_module, torch.float)
+        orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
 
         # Thanks to KohakuBlueLeaf once again for figuring out the shape
         # wrangling that works for both Linear and Convolutional layers. If you
@@ -384,7 +376,7 @@ class DoRAModule(LoRAModule):
 
         A = self.lora_down.weight
         B = self.lora_up.weight
-        orig_weight = get_unquantized_weight(self.orig_module, A.dtype)
+        orig_weight = get_unquantized_weight(self.orig_module, A.dtype, self.train_device)
         WP = orig_weight + (self.make_weight(A, B) * (self.alpha / self.rank))
         del orig_weight
         # A norm should never really end up zero at any point, but epsilon just

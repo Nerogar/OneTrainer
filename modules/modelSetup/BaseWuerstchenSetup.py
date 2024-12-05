@@ -22,6 +22,7 @@ from modules.util.dtype_util import (
 )
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -113,6 +114,14 @@ class BaseWuerstchenSetup(
             ],
             config.enable_autocast_cache,
         )
+
+        if model.model_type.is_wuerstchen_v2():
+            quantize_layers(model.decoder_text_encoder, self.train_device, model.train_dtype)
+        quantize_layers(model.decoder_decoder, self.train_device, model.train_dtype)
+        quantize_layers(model.decoder_vqgan, self.train_device, model.train_dtype)
+        quantize_layers(model.effnet_encoder, self.train_device, model.effnet_encoder_train_dtype)
+        quantize_layers(model.prior_text_encoder, self.train_device, model.train_dtype)
+        quantize_layers(model.prior_prior, self.train_device, model.prior_train_dtype)
 
     def _setup_additional_embeddings(
             self,
