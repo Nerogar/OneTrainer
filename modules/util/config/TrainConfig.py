@@ -172,6 +172,7 @@ class TrainModelPartConfig(BaseConfig):
     dropout_probability: float
     train_embedding: bool
     attention_mask: bool
+    guidance_scale: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -191,6 +192,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
+        data.append(("guidance_scale", 1.0, float, False))
 
         return TrainModelPartConfig(data)
 
@@ -248,6 +250,8 @@ class TrainConfig(BaseConfig):
     output_model_format: ModelFormat
     output_model_destination: str
     gradient_checkpointing: GradientCheckpointingMethod
+    enable_async_offloading: bool
+    enable_activation_offloading: bool
     layer_offload_fraction: float
     force_circular_padding: bool
 
@@ -704,6 +708,8 @@ class TrainConfig(BaseConfig):
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
+        data.append(("enable_async_offloading", True, bool, False))
+        data.append(("enable_activation_offloading", True, bool, False))
         data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
 

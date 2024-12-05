@@ -438,13 +438,13 @@ class BaseFluxSetup(
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
+                    [scaled_noisy_latent_image, scaled_latent_conditioning_image, batch['latent_mask']], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
 
             if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([1.0], device=self.train_device)
+                guidance = torch.tensor([config.prior.guidance_scale], device=self.train_device)
                 guidance = guidance.expand(latent_input.shape[0])
             else:
                 guidance = None

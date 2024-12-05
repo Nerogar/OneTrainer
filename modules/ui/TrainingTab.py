@@ -1,3 +1,4 @@
+from modules.ui.OffloadingWindow import OffloadingWindow
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
@@ -146,7 +147,7 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0)
-        self.__create_transformer_frame(column_1, 1)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_align_prop_frame(column_2, 0)
@@ -250,8 +251,8 @@ class TrainingTab:
         # gradient checkpointing
         components.label(frame, 4, 0, "Gradient checkpointing",
                          tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        components.options(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
-                           "gradient_checkpointing")
+        components.options_adv(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
+                           "gradient_checkpointing", adv_command=self.__open_offloading_window)
 
         # gradient checkpointing layer offloading
         components.label(frame, 5, 0, "Layer offload fraction",
@@ -574,7 +575,7 @@ class TrainingTab:
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
-    def __create_transformer_frame(self, master, row):
+    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -599,6 +600,12 @@ class TrainingTab:
         components.label(frame, 3, 0, "Force Attention Mask",
                          tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
         components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
+
+        if supports_guidance_scale:
+            # guidance scale
+            components.label(frame, 4, 0, "Guidance Scale",
+                             tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
+            components.entry(frame, 4, 1, self.ui_state, "prior.guidance_scale")
 
     def __create_noise_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -719,6 +726,10 @@ class TrainingTab:
 
     def __open_timestep_distribution_window(self):
         window = TimestepDistributionWindow(self.master, self.train_config, self.ui_state)
+        self.master.wait_window(window)
+
+    def __open_offloading_window(self):
+        window = OffloadingWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
     def __restore_optimizer_config(self, *args):

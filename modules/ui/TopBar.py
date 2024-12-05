@@ -86,6 +86,7 @@ class TopBar:
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
                 ("PixArt Sigma", ModelType.PIXART_SIGMA),
                 ("Flux Dev", ModelType.FLUX_DEV_1),
+                ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
