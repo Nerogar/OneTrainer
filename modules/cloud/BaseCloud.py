@@ -1,23 +1,28 @@
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.config.CloudConfig import CloudConfig
+import json
+from abc import ABCMeta, abstractmethod
+from pathlib import Path
+
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.CloudConfig import CloudConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.time_util import get_string_timestamp
 
-from abc import ABCMeta, abstractmethod
-import json
-from pathlib import Path
 
 class BaseCloud(metaclass=ABCMeta):
     def __init__(self, config: TrainConfig):
-        super(BaseCloud, self).__init__()
+        super().__init__()
         self.config = config
-        
+
 
     def setup(self):
         self._connect()
-        if self.config.cloud.install_onetrainer: self._install_onetrainer()
-        if self.config.cloud.tensorboard_tunnel: self._make_tensorboard_tunnel()
+
+        if self.config.cloud.install_onetrainer:
+            self._install_onetrainer()
+
+        if self.config.cloud.tensorboard_tunnel:
+            self._make_tensorboard_tunnel()
 
     def download_output_model(self):
         local=Path(self.config.local_output_model_destination)
@@ -32,27 +37,37 @@ class BaseCloud(metaclass=ABCMeta):
             json.dump(self.config.to_pack_dict(), f, indent=4)
         self._upload_config_file(local_config_path)
 
-        if hasattr(self.config,"local_base_model_name"): self._upload(local=Path(self.config.local_base_model_name),remote=Path(self.config.base_model_name))
-        if self.config.lora_model_name != "": self._upload(local=Path(self.config.local_lora_model_name),remote=Path(self.config.lora_model_name))
-        
-        if self.config.embedding.model_name != "": self._upload(local=Path(self.config.embedding.local_model_name),remote=Path(self.config.embedding.model_name))
+        if hasattr(self.config,"local_base_model_name"):
+            self._upload(local=Path(self.config.local_base_model_name),remote=Path(self.config.base_model_name))
+        if self.config.lora_model_name != "":
+            self._upload(local=Path(self.config.local_lora_model_name),remote=Path(self.config.lora_model_name))
+
+        if self.config.embedding.model_name != "":
+            self._upload(local=Path(self.config.embedding.local_model_name),remote=Path(self.config.embedding.model_name))
         for add_embedding in self.config.additional_embeddings:
-            if add_embedding.model_name != "": self._upload(local=Path(add_embedding.local_model_name),remote=Path(add_embedding.model_name))
-        
+            if add_embedding.model_name != "":
+                self._upload(local=Path(add_embedding.local_model_name),remote=Path(add_embedding.model_name))
+
         for concept in self.config.concepts:
             print(f"uploading concept {concept.name}...")
-            if commands and commands.get_stop_command(): return
+            if commands and commands.get_stop_command():
+                return
             self._upload(local=Path(concept.local_path),remote=Path(concept.path),commands=commands)
             if len(concept.text.local_prompt_path) > 0:
                 self._upload(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))
 
     @staticmethod
     def _filter_download(config : CloudConfig,path : Path):
-        if 'samples' in path.parts: return config.download_samples
-        elif 'save' in path.parts: return config.download_saves
-        elif 'backup' in path.parts: return config.download_backups
-        elif 'tensorboard' in path.parts: return config.download_tensorboard
-        else: return True
+        if 'samples' in path.parts:
+            return config.download_samples
+        elif 'save' in path.parts:
+            return config.download_saves
+        elif 'backup' in path.parts:
+            return config.download_backups
+        elif 'tensorboard' in path.parts:
+            return config.download_tensorboard
+        else:
+            return True
 
 
     @abstractmethod
@@ -80,11 +95,11 @@ class BaseCloud(metaclass=ABCMeta):
         pass
 
     def _create(self):
-        raise NotSupportedException("creating clouds not supported for this cloud type")
+        raise NotImplementedError("creating clouds not supported for this cloud type")
 
     def delete(self):
         raise NotImplementedError("deleting this cloud type not supported")
-    
+
     def stop(self):
         raise NotImplementedError("stopping this cloud type not supported")
 
@@ -118,5 +133,3 @@ class BaseCloud(metaclass=ABCMeta):
     @abstractmethod
     def delete_workspace(self):
         pass
-
-

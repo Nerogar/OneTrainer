@@ -1,25 +1,23 @@
 import os
 import threading
 import time
-import json
-
 from pathlib import Path
+
+from modules.cloud.LinuxCloud import LinuxCloud
+from modules.cloud.RunpodCloud import RunpodCloud
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.TrainProgress import TrainProgress
-from modules.util.enum.CloudType import CloudType
 from modules.util.enum.CloudAction import CloudAction
-from modules.cloud.LinuxCloud import LinuxCloud
-from modules.cloud.RunpodCloud import RunpodCloud
-from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.enum.CloudType import CloudType
+from modules.util.TrainProgress import TrainProgress
 
 
 class CloudTrainer(BaseTrainer):
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
-        super(CloudTrainer, self).__init__(config, callbacks, commands)
+        super().__init__(config, callbacks, commands)
         self.error_caught=False
         self.callback_thread=None
         self.sync_thread=None
@@ -34,8 +32,10 @@ class CloudTrainer(BaseTrainer):
             super()._start_tensorboard()
 
         match config.cloud.type:
-            case CloudType.RUNPOD: self.cloud=RunpodCloud(self.remote_config)
-            case CloudType.LINUX: self.cloud=LinuxCloud(self.remote_config)
+            case CloudType.RUNPOD:
+                self.cloud=RunpodCloud(self.remote_config)
+            case CloudType.LINUX:
+                self.cloud=LinuxCloud(self.remote_config)
 
     def start(self):
         try:
@@ -48,7 +48,7 @@ class CloudTrainer(BaseTrainer):
         except:
             self.error_caught=True
             raise
-        
+
         def on_command(commands : TrainCommands):
             backup_on_command = commands.get_and_reset_on_command() #don't pickle a Callable
             self.cloud.send_commands(commands)
@@ -63,7 +63,7 @@ class CloudTrainer(BaseTrainer):
                 time.sleep(1)
         self.callback_thread = threading.Thread(target=callback)
         self.callback_thread.start()
-        
+
         def sync():
             try:
                 while not self.stop_event.is_set():
@@ -76,13 +76,14 @@ class CloudTrainer(BaseTrainer):
 
         self.sync_thread = threading.Thread(target=sync)
         self.sync_thread.start()
-                
+
         if self.config.continue_last_backup:
             print('warning: backups are not uploaded, but expected to be on the cloud already!')
 
     def train(self):
         try:
-            if self.commands.get_stop_command(): return
+            if self.commands.get_stop_command():
+                return
 
             self.callbacks.on_update_status("starting trainer on cloud")
             self.cloud.run_trainer()
@@ -98,14 +99,16 @@ class CloudTrainer(BaseTrainer):
             self.callback_thread.join()
             self.callbacks.on_update_status("waiting for downloads")
             self.sync_thread.join()
-        
+
         if self.sync_exception:
             self.error_caught=True
             raise self.sync_exception
 
     def end(self):
         try:
-            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel: super()._stop_tensorboard()
+            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel:
+                super()._stop_tensorboard()
+
             if self.config.cloud.delete_workspace and not self.error_caught and not self.commands.get_stop_command():
                 self.callbacks.on_update_status("Deleting remote workspace")
                 self.cloud.delete_workspace()
@@ -115,20 +118,25 @@ class CloudTrainer(BaseTrainer):
             self.error_caught=True
             raise
         finally:
-            if self.error_caught: action=self.config.cloud.on_error
-            elif self.commands.get_stop_command(): action=CloudAction.NONE
-            else: action=self.config.cloud.on_finish
-            
-            if action == CloudAction.DELETE: self.cloud.delete()
-            elif action == CloudAction.STOP: self.cloud.stop()
-            
+            if self.error_caught:
+                action=self.config.cloud.on_error
+            elif self.commands.get_stop_command():
+                action=CloudAction.NONE
+            else:
+                action=self.config.cloud.on_finish
+
+            if action == CloudAction.DELETE:
+                self.cloud.delete()
+            elif action == CloudAction.STOP:
+                self.cloud.stop()
+
             del self.cloud
 
     @staticmethod
     def __make_remote_config(local : TrainConfig):
         remote = TrainConfig.default_values().from_dict(local.to_pack_dict())
         remote.cloud = local.cloud #share cloud config, so UI can be updated to IP, port, cloudid etc.
-        
+
         def adjust(config,attribute : str):
             path=getattr(config,attribute)
             setattr(config,"local_"+attribute,path)
@@ -147,7 +155,7 @@ class CloudTrainer(BaseTrainer):
         adjust(remote.embedding,"model_name")
         for add_embedding in remote.additional_embeddings:
             adjust(add_embedding,"model_name")
-        
+
         remote.concept_file_name=""
         remote.concepts = [concept for concept in remote.concepts if concept.enabled]
 
@@ -161,9 +169,11 @@ class CloudTrainer(BaseTrainer):
     def __adjust_path(pathstr : str,remote_dir : str):
         if len(pathstr.strip()) > 0:
             path=Path(pathstr)
-            if path.is_absolute(): path=path.relative_to(path.anchor)  #remove windows drive name C:
+            if path.is_absolute():
+                path=path.relative_to(path.anchor)  #remove windows drive name C:
             return (Path(remote_dir,"remote") / path).as_posix()
-        else: return ""
+        else:
+            return ""
 
 
     def backup(self, train_progress: TrainProgress):
@@ -171,4 +181,3 @@ class CloudTrainer(BaseTrainer):
 
     def save(self, train_progress: TrainProgress):
         pass
-

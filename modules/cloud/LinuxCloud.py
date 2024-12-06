@@ -1,29 +1,30 @@
-import fabric
-import shlex
 import pickle
+import shlex
+import socket
 import threading
 import time
-import socket
+from pathlib import Path
 
 from modules.cloud.BaseCloud import BaseCloud
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.config.CloudConfig import CloudConfig
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.CloudConfig import CloudConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.time_util import get_string_timestamp
-from pathlib import Path
+
+import fabric
 
 
 class LinuxCloud(BaseCloud):
     def __init__(self, config: TrainConfig):
-        super(LinuxCloud, self).__init__(config)
+        super().__init__(config)
         self.connection=None
         self.callback_connection=None
         self.command_connection=None
         self.sync_connection=None
         self.tensorboard_tunnel_stop=None
-        
+
         name=config.cloud.run_id if config.cloud.detach_trainer else get_string_timestamp()
         self.callback_file=f'{config.cloud.remote_dir}/{name}.callback'
         self.command_pipe=f'{config.cloud.remote_dir}/{name}.command'
@@ -33,25 +34,28 @@ class LinuxCloud(BaseCloud):
         self.pid_file=f'{config.cloud.remote_dir}/{name}.pid'
 
     def _connect(self):
-        if self.connection: return
+        if self.connection:
+            return
+
         config=self.config.cloud
         if config.host != '' and config.port != '':
             self.connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.connection.open()
-            
+
             self.callback_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.callback_connection.open()
-            
+
             self.command_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.command_connection.open()
             #the command connection isn't used for long periods of time; prevent remote from closing it:
             self.command_connection.transport.set_keepalive(30)
-            
+
             self.sync_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
             self.sync_connection.open()
-        else: raise ValueError('Host and port required for SSH connection')
-    
-        
+        else:
+            raise ValueError('Host and port required for SSH connection')
+
+
     def setup(self):
         super().setup()
         self.connection.run(f'mkfifo {shlex.quote(self.command_pipe)}',warn=True,hide=True,in_stream=False)
@@ -87,13 +91,16 @@ class LinuxCloud(BaseCloud):
     def close(self):
         if self.tensorboard_tunnel_stop is not None:
             self.tensorboard_tunnel_stop.set()
-        if self.callback_connection: self.callback_connection.close()
-        if self.command_connection: self.command_connection.close()
-        if self.sync_connection: self.sync_connection.close()
-        if self.connection: self.connection.close()
+        if self.callback_connection:
+            self.callback_connection.close()
+        if self.command_connection:
+            self.command_connection.close()
+        if self.sync_connection:
+            self.sync_connection.close()
+        if self.connection:
+            self.connection.close()
 
     def can_reattach(self):
-        config=self.config.cloud
         result=self.connection.run(f"test -f {self.pid_file}",warn=True,in_stream=False)
         return result.exited == 0
 
@@ -104,8 +111,8 @@ class LinuxCloud(BaseCloud):
 
     def run_trainer(self):
         config=self.config.cloud
-        self.connection.put(f'scripts/train_remote.py',f'{config.onetrainer_dir}/scripts/train_remote.py') #TODO remove
-        self.connection.put(f'modules/util/args/TrainArgs.py',f'{config.onetrainer_dir}/modules/util/args/TrainArgs.py') #TODO remove
+        self.connection.put('scripts/train_remote.py',f'{config.onetrainer_dir}/scripts/train_remote.py') #TODO remove
+        self.connection.put('modules/util/args/TrainArgs.py',f'{config.onetrainer_dir}/modules/util/args/TrainArgs.py') #TODO remove
 
         if self.can_reattach():
             print(f"Reattaching to run id {config.run_id}\n\n")
@@ -114,9 +121,11 @@ class LinuxCloud(BaseCloud):
 
 
         cmd="export PYTHONUNBUFFERED=1"
-        if config.huggingface_token != "": cmd+=f" && export HF_TOKEN={config.huggingface_token}"
-        if config.huggingface_cache_dir != "": cmd+=f" && export HF_HOME={config.huggingface_cache_dir}"
-        
+        if config.huggingface_token != "":
+            cmd+=f" && export HF_TOKEN={config.huggingface_token}"
+        if config.huggingface_cache_dir != "":
+            cmd+=f" && export HF_HOME={config.huggingface_cache_dir}"
+
         cmd+=f' && {config.onetrainer_dir}/run-cmd.sh train_remote --config-path={shlex.quote(self.config_file)} \
                                                                    --callback-path={shlex.quote(self.callback_file)} \
                                                                    --command-path={shlex.quote(self.command_pipe)}'
@@ -137,7 +146,6 @@ class LinuxCloud(BaseCloud):
             self.connection.run(cmd,in_stream=False)
 
     def __trail_detached_trainer(self):
-        config=self.config.cloud
         cmd=f'tail -f {self.log_file} --pid $(<{self.pid_file})'
         self.connection.run(cmd,in_stream=False)
         #trainer has exited, don't reattach:
@@ -147,7 +155,7 @@ class LinuxCloud(BaseCloud):
 
 
 
-                
+
     def exec_callback(self,callbacks : TrainCallbacks):
         #callbacks are a file instead of a named pipe, because of the blocking behaviour of linux pipes:
         #writing to pipes on the cloud can slow down training, and would cause issues in case
@@ -162,7 +170,7 @@ class LinuxCloud(BaseCloud):
 
         try:
             in_file,out_file,err_file=self.callback_connection.client.exec_command(cmd)
-            
+
             try:
                 while True:
                     try:
@@ -172,7 +180,8 @@ class LinuxCloud(BaseCloud):
                             #wait until there is at least some data before reading:
                             time.sleep(0.1)
                         name=pickle.load(out_file)
-                    except EOFError: return
+                    except EOFError:
+                        return
                     params=pickle.load(out_file)
 
                     fun=getattr(callbacks,name)
@@ -186,9 +195,10 @@ class LinuxCloud(BaseCloud):
                 print("\n\nCallback SSH connection lost. Attempting to reconnect...")
                 self.callback_connection.open()
                 self.exec_callback(callbacks)
-            else: raise
-            
-        
+            else:
+                raise
+
+
     def send_commands(self,commands : TrainCommands):
         try:
             in_file,out_file,err_file=self.command_connection.client.exec_command(
@@ -210,9 +220,10 @@ class LinuxCloud(BaseCloud):
                 print("\n\nCommand SSH connection lost. Attempting to reconnect...")
                 self.command_connection.open()
                 self.send_commands(commands)
-            else: raise
+            else:
+                raise
 
-        
+
     def _upload(self,local : Path,remote : Path,commands : TrainCommands = None):
         update_info=LinuxCloud.__get_update_info(self.connection,remote)
         LinuxCloud.__upload(self.connection,local,remote,update_info,commands=commands)
@@ -246,7 +257,8 @@ class LinuxCloud(BaseCloud):
                 print("\n\nSync SSH connection lost. Attempting to reconnect...")
                 self.sync_connection.open()
                 self.sync_workspace()
-            else: raise
+            else:
+                raise
 
     @staticmethod
     def __get_update_info(connection,remote : Path):
@@ -257,13 +269,14 @@ class LinuxCloud(BaseCloud):
         for line in result.stdout.splitlines():
             sp=line.split('\t')
             ret[Path(sp[0])]=(int(sp[1]),int(sp[2]),sp[3])
-        return ret;
+        return ret
 
     @staticmethod
     def __upload_file(connection,local : Path,remote : Path,update_info,commands=None):
         if remote in update_info:
             if (local.stat().st_size == update_info[remote][0]
-                and local.stat().st_mtime <= update_info[remote][1]): return
+                and local.stat().st_mtime <= update_info[remote][1]):
+                    return
 
         if remote.parent not in update_info:
             connection.run(f'mkdir -p {shlex.quote(remote.parent.as_posix())}',in_stream=False)
@@ -282,35 +295,41 @@ class LinuxCloud(BaseCloud):
             print( "         and start training again.")
         for local_entry in local.iterdir():
             LinuxCloud.__upload(connection,local_entry,remote/local_entry.name,update_info=update_info,commands=commands)
-            if commands and commands.get_stop_command(): return
+            if commands and commands.get_stop_command():
+                return
 
     @staticmethod
     def __upload(connection,local : Path,remote : Path,update_info,commands : TrainCommands=None):
-        if local.is_dir(): LinuxCloud.__upload_dir(connection,local,remote,update_info,commands)
-        else: LinuxCloud.__upload_file(connection,local,remote,update_info)
+        if local.is_dir():
+            LinuxCloud.__upload_dir(connection,local,remote,update_info,commands)
+        else:
+            LinuxCloud.__upload_file(connection,local,remote,update_info)
 
     @staticmethod
     def __download_dir(connection,local : Path,remote : Path,update_info,commands=None,config:CloudConfig=None):
         for remote_entry,info in update_info.items():
-            if commands and commands.get_stop_command(): return
-            if config and not BaseCloud._filter_download(config,remote_entry): continue
-            if not info[2] == 'regular file': continue #update_info is recursive, so no need to go into directories
+            if commands and commands.get_stop_command():
+                return
+            if config and not BaseCloud._filter_download(config,remote_entry):
+                continue
+            if info[2] != 'regular file':
+                continue #update_info is recursive, so no need to go into directories
 
             local_entry=local / remote_entry.relative_to(remote)
             LinuxCloud.__download_file(connection,local=local_entry,remote=remote_entry,update_info=update_info)
-            
+
     @staticmethod
     def __download_file(connection,local : Path, remote : Path,update_info):
         if remote in update_info:
             file_info=update_info[remote]
             if (local.exists()
                 and local.stat().st_size == file_info[0]
-                and local.stat().st_mtime >= file_info[1]): return
+                and local.stat().st_mtime >= file_info[1]):
+                    return
         #else: file doesn't exist remotely, but error will be raised by connection.get()
-        
+
         print(f'\n\ndownloading {local}...')
         connection.get(remote=remote.as_posix(),local=str(local))
 
     def delete_workspace(self):
         self.connection.run(f"rm -r {shlex.quote(self.config.workspace_dir)}",in_stream=False)
-

@@ -6,14 +6,14 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog
 
-from modules.trainer.GenericTrainer import GenericTrainer
 from modules.trainer.CloudTrainer import CloudTrainer
+from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
+from modules.ui.CloudTab import CloudTab
 from modules.ui.ConceptTab import ConceptTab
 from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.LoraTab import LoraTab
-from modules.ui.CloudTab import CloudTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
 from modules.ui.SampleWindow import SampleWindow
@@ -256,7 +256,7 @@ class TrainUI(ctk.CTk):
 
     def create_training_tab(self, master) -> TrainingTab:
         return TrainingTab(master, self.train_config, self.ui_state)
-        
+
     def create_cloud_tab(self, master) -> CloudTab:
         return CloudTab(master, self.train_config, self.ui_state)
 
@@ -578,7 +578,7 @@ class TrainUI(ctk.CTk):
 
         # clear gpu memory
         del trainer
-                
+
         self.training_thread = None
         self.training_commands = None
         torch.clear_autocast_cache()

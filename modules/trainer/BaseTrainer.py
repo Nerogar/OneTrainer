@@ -3,7 +3,6 @@ import subprocess
 import sys
 from abc import ABCMeta, abstractmethod
 
-
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
@@ -105,4 +104,3 @@ class BaseTrainer(
 
     def _stop_tensorboard(self):
         self.tensorboard_subprocess.kill()
-

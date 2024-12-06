@@ -1,23 +1,25 @@
+import secrets
+import time
+
 from modules.cloud.LinuxCloud import LinuxCloud
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 
-
 import runpod
-import time
-import secrets
+
 
 class RunpodCloud(LinuxCloud):
     def __init__(self, config: TrainConfig):
-        super(RunpodCloud, self).__init__(config)
-        
+        super().__init__(config)
+
         runpod.api_key=config.cloud.api_key
 
     def __get_host_port(self):
         config=self.config.cloud
         resumed=False
         while True:
-            if (pod:=runpod.get_pod(config.id)) is None and not resumed: raise ValueError(f"Runpod {config.id} does not exist")
+            if (pod:=runpod.get_pod(config.id)) is None and not resumed:
+                raise ValueError(f"Runpod {config.id} does not exist")
             if pod and pod['desiredStatus'] == "EXITED":
                 self._start()
                 #In edge cases runpod returns incorrect information for resumed pods:
@@ -30,28 +32,33 @@ class RunpodCloud(LinuxCloud):
                         config.host=port['ip']
                         config.port=port['publicPort']
                         if resumed:
-                            try: super()._connect()
-                            except: continue
+                            try:
+                                super()._connect()
+                            except Exception:
+                                continue
                         return
             print("waiting for public IP...")
             time.sleep(5)
-    
-        
+
+
     def _connect(self):
         config=self.config.cloud
 
         pod=None
         if config.id != "":
             pod=runpod.get_pod(config.id)
-            if pod is None: raise ValueError(f"Runpod {config.id} does not exist")
+            if pod is None:
+                raise ValueError(f"Runpod {config.id} does not exist")
         elif config.create:
             self._create()
             pod=runpod.get_pod(config.id)
-            if pod is None: raise ValueError(f"Could not create cloud")
+            if pod is None:
+                raise ValueError("Could not create cloud")
 
-        if pod is not None: self.__get_host_port()
+        if pod is not None:
+            self.__get_host_port()
         super()._connect()
-      
+
     def _create(self):
         config=self.config.cloud
         pod=runpod.create_pod(
@@ -74,7 +81,7 @@ class RunpodCloud(LinuxCloud):
 
     def stop(self):
         runpod.stop_pod(self.config.cloud.id)
-        
+
     def _start(self):
         runpod.resume_pod(self.config.cloud.id,gpu_count=1)
 

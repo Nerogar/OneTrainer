@@ -1,8 +1,8 @@
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
-from modules.util.enum.CloudType import CloudType
 from modules.util.enum.CloudAction import CloudAction
+from modules.util.enum.CloudType import CloudType
 
 
 class CloudConfig(BaseConfig):
@@ -37,10 +37,10 @@ class CloudConfig(BaseConfig):
     on_error: CloudAction
     on_detached_finish: CloudAction
     on_detached_error: CloudAction
-    
+
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super(CloudConfig, self).__init__(data)
+        super().__init__(data)
 
     @staticmethod
     def default_values():
