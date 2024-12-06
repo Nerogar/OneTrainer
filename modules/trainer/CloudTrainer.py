@@ -1,9 +1,6 @@
-import os #TODO only tensorboard
-import subprocess #TODO only tensorboard
-import sys #TODO only tensorboard
+import os
 import threading
 import time
-import copy
 import json
 
 from pathlib import Path
@@ -20,7 +17,6 @@ from modules.util.config.ConceptConfig import ConceptConfig
 
 
 class CloudTrainer(BaseTrainer):
-    tensorboard_subprocess: subprocess.Popen
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super(CloudTrainer, self).__init__(config, callbacks, commands)
@@ -109,7 +105,7 @@ class CloudTrainer(BaseTrainer):
 
     def end(self):
         try:
-            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel: self.tensorboard_subprocess.kill()
+            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel: super()._stop_tensorboard()
             if self.config.cloud.delete_workspace and not self.error_caught and not self.commands.get_stop_command():
                 self.callbacks.on_update_status("Deleting remote workspace")
                 self.cloud.delete_workspace()
@@ -130,8 +126,7 @@ class CloudTrainer(BaseTrainer):
 
     @staticmethod
     def __make_remote_config(local : TrainConfig):
-        CloudTrainer.__load_concepts(local)
-        remote=copy.deepcopy(local)
+        remote = TrainConfig.default_values().from_dict(local.to_pack_dict())
         remote.cloud = local.cloud #share cloud config, so UI can be updated to IP, port, cloudid etc.
         
         def adjust(config,attribute : str):
@@ -170,16 +165,6 @@ class CloudTrainer(BaseTrainer):
             return (Path(remote_dir,"remote") / path).as_posix()
         else: return ""
 
-    @staticmethod
-    def __load_concepts(config): #TODO is there not a function in OT that can do that?
-        #overwrite config.concepts in any case, even if it is not None
-        #the file can be more up to date
-        with open(config.concept_file_name, 'r') as f:
-            config.concepts=[]
-            json_concepts = json.load(f)
-            for json_concept in json_concepts:
-                concept=ConceptConfig.default_values().from_dict(json_concept)
-                config.concepts.append(concept)
 
     def backup(self, train_progress: TrainProgress):
         pass
