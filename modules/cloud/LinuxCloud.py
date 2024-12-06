@@ -28,6 +28,9 @@ class LinuxCloud(BaseCloud):
         self.callback_file=f'{config.cloud.remote_dir}/{name}.callback'
         self.command_pipe=f'{config.cloud.remote_dir}/{name}.command'
         self.config_file=f'{config.cloud.remote_dir}/{name}.json'
+        self.exit_status_file=f'{config.cloud.remote_dir}/{name}.exit'
+        self.log_file=f'{config.cloud.remote_dir}/{name}.log'
+        self.pid_file=f'{config.cloud.remote_dir}/{name}.pid'
 
     def _connect(self):
         if self.connection: return
@@ -91,7 +94,7 @@ class LinuxCloud(BaseCloud):
 
     def can_reattach(self):
         config=self.config.cloud
-        result=self.connection.run(f"test -f {config.remote_dir}/{config.run_id}.pid && test ! -f {config.remote_dir}/{config.run_id}.finished",warn=True,in_stream=False)
+        result=self.connection.run(f"test -f {self.pid_file}",warn=True,in_stream=False)
         return result.exited == 0
 
     def _get_action_cmd(self,action : CloudAction):
@@ -114,31 +117,33 @@ class LinuxCloud(BaseCloud):
         if config.huggingface_token != "": cmd+=f" && export HF_TOKEN={config.huggingface_token}"
         if config.huggingface_cache_dir != "": cmd+=f" && export HF_HOME={config.huggingface_cache_dir}"
         
-        script_cmd=f'{config.onetrainer_dir}/run-cmd.sh train_remote --config-path={shlex.quote(self.config_file)} \
-                                                                    --callback-path={shlex.quote(self.callback_file)} \
-                                                                    --command-path={shlex.quote(self.command_pipe)}'
-
+        cmd+=f' && {config.onetrainer_dir}/run-cmd.sh train_remote --config-path={shlex.quote(self.config_file)} \
+                                                                   --callback-path={shlex.quote(self.callback_file)} \
+                                                                   --command-path={shlex.quote(self.command_pipe)}'
 
         if config.detach_trainer:
-            self.connection.run(f'rm -f {config.remote_dir}/{config.run_id}.finished')
+            self.connection.run(f'rm -f {self.exit_status_file}',in_stream=False)
+
+            cmd=f"({cmd} ; exit_status=$? ; echo $exit_status > {self.exit_status_file}; exit $exit_status)"
 
             #if the callback file still exists 10 seconds after the trainer has exited, the client must be detached, because the clients reads and deletes this file:
-            action_cmd=f"&& (sleep 10 && test -f {shlex.quote(self.callback_file)} && {self._get_action_cmd(config.on_detached_finish)}) \
-                         || (sleep 10 && test -f {shlex.quote(self.callback_file)} && {self._get_action_cmd(config.on_detached_error)})"
+            cmd+=f" && (sleep 10 && test -f {shlex.quote(self.callback_file)} && {self._get_action_cmd(config.on_detached_finish)} || true) \
+                    || (sleep 10 && test -f {shlex.quote(self.callback_file)} && {self._get_action_cmd(config.on_detached_error)})"
 
-            cmd+=f' && (nohup {script_cmd} {action_cmd}) >{config.remote_dir}/{config.run_id}.out 2>&1 & echo $! > {config.remote_dir}/{config.run_id}.pid'
+            cmd=f'(nohup true && {cmd}) > {self.log_file} 2>&1 & echo $! > {self.pid_file}'
             self.connection.run(cmd,disown=True)
             self.__trail_detached_trainer()
         else:
-            cmd+=f' && {script_cmd}'
             self.connection.run(cmd,in_stream=False)
 
     def __trail_detached_trainer(self):
         config=self.config.cloud
-        cmd=f'tail -f {config.remote_dir}/{config.run_id}.out --pid $(<{config.remote_dir}/{config.run_id}.pid)'
+        cmd=f'tail -f {self.log_file} --pid $(<{self.pid_file})'
         self.connection.run(cmd,in_stream=False)
         #trainer has exited, don't reattach:
-        self.connection.run(f'echo 1 > {config.remote_dir}/{config.run_id}.finished')
+        self.connection.run(f'rm -f {self.pid_file}',in_stream=False)
+        #raise an exception if the training process return an exit code != 0:
+        self.connection.run(f'exit $(<{self.exit_status_file})',in_stream=False)
 
 
 
@@ -303,5 +308,5 @@ class LinuxCloud(BaseCloud):
         connection.get(remote=remote.as_posix(),local=str(local))
 
     def delete_workspace(self):
-        self.connection.run(f"rm -r {shlex.quote(self.config.workspace_dir)}")
+        self.connection.run(f"rm -r {shlex.quote(self.config.workspace_dir)}",in_stream=False)
 
