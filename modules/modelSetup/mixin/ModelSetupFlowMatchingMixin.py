@@ -20,7 +20,7 @@ class ModelSetupFlowMatchingMixin(metaclass=ABCMeta):
     ) -> tuple[Tensor, Tensor]:
         if self.__sigma is None:
             num_timesteps = timesteps.shape[-1]
-            all_timesteps = torch.arange(start=0, end=num_timesteps, step=1, dtype=torch.int32, device=scaled_latent_image.device)
+            all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=scaled_latent_image.device)
             self.__sigma = all_timesteps / num_timesteps
             self.__one_minus_sigma = 1.0 - self.__sigma
 

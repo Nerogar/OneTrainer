@@ -311,7 +311,9 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 else config.gradient_accumulation_steps
 
         if self.__sigmas is None and sigmas is not None:
-            self.__sigmas = sigmas
+            num_timesteps = sigmas.shape[0]
+            all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=sigmas.device)
+            self.__sigmas = all_timesteps / num_timesteps
 
         if data['loss_type'] == 'align_prop':
             losses = self.__align_prop_losses(batch, data, config, train_device)
