@@ -225,6 +225,10 @@ class LinuxCloud(BaseCloud):
         update_info=LinuxCloud.__get_update_info(self.connection,remote)
         LinuxCloud.__download_file(self.connection,local,remote,update_info)
 
+    def _download_dir(self,local : Path,remote : Path):
+        update_info=LinuxCloud.__get_update_info(self.connection,remote)
+        LinuxCloud.__download_dir(self.connection,local,remote,update_info)
+
     def sync_workspace(self):
         try:
             update_info=LinuxCloud.__get_update_info(self.sync_connection,Path(self.config.workspace_dir))

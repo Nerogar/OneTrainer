@@ -149,8 +149,9 @@ class CloudTrainer(BaseTrainer):
         adjust(remote,"output_model_destination")
         adjust(remote,"lora_model_name")
 
-        #TODO embedding files
-        
+        adjust(remote.embedding,"model_name")
+        for add_embedding in remote.additional_embeddings:
+            adjust(add_embedding,"model_name")
         
         remote.concept_file_name=""
         remote.concepts = [concept for concept in remote.concepts if concept.enabled]
