@@ -54,6 +54,7 @@ class SampleConfig(BaseConfig):
         data.append(("text_encoder_1_layer_skip", 0, int, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_3_layer_skip", 0, int, False))
+        data.append(("prior_attention_mask", False, bool, False))
         data.append(("force_last_timestep", False, bool, False))
 
         data.append(("sample_inpainting", False, bool, False))
