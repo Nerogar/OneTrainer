@@ -40,3 +40,7 @@ scalene==1.5.45
 
 # ui
 customtkinter==5.2.2
+
+# cloud
+runpod==1.7.4
+fabric==3.2.2
