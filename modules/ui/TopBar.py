@@ -142,7 +142,7 @@ class TopBar:
 
     def __load_available_config_names(self):
         if os.path.isdir(self.dir):
-            for path in os.listdir(self.dir):
+            for path in sorted(os.listdir(self.dir)):
                 if path != "#.json":
                     path = path_util.canonical_join(self.dir, path)
                     if path.endswith(".json") and os.path.isfile(path):
