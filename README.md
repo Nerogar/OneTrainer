@@ -1,6 +1,6 @@
 # OneTrainer
 
-OneTrainer is a one-stop solution for all your stable diffusion training needs.
+OneTrainer is a one-stop solution for all your diffusion training needs.
 
 <a href="https://discord.gg/KwgcQd5scF"><img src="https://discord.com/api/guilds/1102003518203756564/widget.png" alt="OneTrainer Discord"/></a><br>
 
