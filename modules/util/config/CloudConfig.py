@@ -17,6 +17,7 @@ class CloudConfig(BaseConfig):
     gpu_type: str
     volume_size: int
     min_download: int
+    jupyter_password: str
     host: str
     port: int
     user: str
@@ -25,6 +26,7 @@ class CloudConfig(BaseConfig):
     huggingface_cache_dir: str
     onetrainer_dir: str
     install_onetrainer: bool
+    update_onetrainer: bool
     install_cmd: str
     detach_trainer: bool
     run_id: str
@@ -57,6 +59,7 @@ class CloudConfig(BaseConfig):
         data.append(("gpu_type", "", str, False))
         data.append(("volume_size", 100, int, False))
         data.append(("min_download", 0, int, False))
+        data.append(("jupyter_password", "", str, False))
         data.append(("huggingface_token", "", str, False))
         data.append(("host", "", str, False))
         data.append(("port", 0, str, False))
@@ -66,6 +69,7 @@ class CloudConfig(BaseConfig):
         data.append(("onetrainer_dir", "/workspace/OneTrainer", str, False))
         data.append(("install_cmd", "git clone https://github.com/Nerogar/OneTrainer", str, False))
         data.append(("install_onetrainer", True, bool, False))
+        data.append(("update_onetrainer", True, bool, False))
         data.append(("detach_trainer", False, bool, False))
         data.append(("run_id", "job1", str, False))
         data.append(("download_samples", True, bool, False))

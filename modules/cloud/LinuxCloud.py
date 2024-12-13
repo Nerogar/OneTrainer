@@ -39,19 +39,34 @@ class LinuxCloud(BaseCloud):
 
         config=self.config.cloud
         if config.host != '' and config.port != '':
-            self.connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-            self.connection.open()
+            try:
+                self.connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.connection.open()
 
-            self.callback_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-            self.callback_connection.open()
+                self.callback_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.callback_connection.open()
 
-            self.command_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-            self.command_connection.open()
-            #the command connection isn't used for long periods of time; prevent remote from closing it:
-            self.command_connection.transport.set_keepalive(30)
+                self.command_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.command_connection.open()
+                #the command connection isn't used for long periods of time; prevent remote from closing it:
+                self.command_connection.transport.set_keepalive(30)
 
-            self.sync_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-            self.sync_connection.open()
+                self.sync_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.sync_connection.open()
+            except Exception:
+                if self.callback_connection:
+                    self.callback_connection.close()
+                    self.callback_connection=None
+                if self.command_connection:
+                    self.command_connection.close()
+                    self.command_connection=None
+                if self.sync_connection:
+                    self.sync_connection.close()
+                    self.sync_connection=None
+                if self.connection:
+                    self.connection.close()
+                    self.connection=None
+                raise
         else:
             raise ValueError('Host and port required for SSH connection')
 
@@ -63,7 +78,7 @@ class LinuxCloud(BaseCloud):
     def _install_onetrainer(self):
         config=self.config.cloud
         parent=Path(config.onetrainer_dir).parent.as_posix()
-        self.connection.run(f'test -d {shlex.quote(config.onetrainer_dir)} \
+        self.connection.run(f'test -e {shlex.quote(config.onetrainer_dir)} \
                               || (mkdir -p {shlex.quote(parent)} \
                                   && cd {shlex.quote(parent)} \
                                   && {config.install_cmd})',in_stream=False)
@@ -74,6 +89,12 @@ class LinuxCloud(BaseCloud):
                               || (cd {shlex.quote(config.onetrainer_dir)} \
                                   && export PATH=$PATH:/usr/local/cuda/bin \
                                   && ./install.sh)',in_stream=False)
+    def _update_onetrainer(self):
+        config=self.config.cloud
+        self.connection.run(f'test -d {shlex.quote(config.onetrainer_dir)}/venv \
+                              && (cd {shlex.quote(config.onetrainer_dir)} \
+                                  && export PATH=$PATH:/usr/local/cuda/bin \
+                                  && ./update.sh)',in_stream=False)
 
     def _make_tensorboard_tunnel(self):
         self.tensorboard_tunnel_stop=threading.Event()

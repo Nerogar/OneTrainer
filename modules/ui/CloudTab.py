@@ -81,13 +81,16 @@ class CloudTab:
         components.label(self.frame, 5, 2, "Install command",
                          tooltip="The command for installing OneTrainer. Leave the default, unless you want to use a development branch of OneTrainer.")
         components.entry(self.frame, 5, 3, self.ui_state, "cloud.install_cmd")
+        components.label(self.frame, 6, 2, "Update OneTrainer",
+                         tooltip="Update OneTrainer if it already exists on the cloud.")
+        components.switch(self.frame, 6, 3, self.ui_state, "cloud.update_onetrainer")
 
-        components.label(self.frame, 7, 2, "Detach remote trainer",
+        components.label(self.frame, 8, 2, "Detach remote trainer",
                          tooltip="Allows the trainer to keep running even if your connection to the cloud is lost.")
-        components.switch(self.frame, 7, 3, self.ui_state, "cloud.detach_trainer")
-        components.label(self.frame, 8, 2, "Reattach run id",
+        components.switch(self.frame, 8, 3, self.ui_state, "cloud.detach_trainer")
+        components.label(self.frame, 9, 2, "Reattach run id",
                          tooltip="An id identifying the remotely running trainer. In case you have lost connection or closed OneTrainer, it will try to reattach to this id instead of starting a new remote trainer.")
-        components.entry(self.frame, 8, 3, self.ui_state, "cloud.run_id")
+        components.entry(self.frame, 9, 3, self.ui_state, "cloud.run_id")
 
         components.label(self.frame, 10, 2, "Download samples",
                          tooltip="Download samples from the remote workspace directory to your local machine.")
@@ -137,33 +140,37 @@ class CloudTab:
                          tooltip="Set the minimum download speed of the cloud in Mbps.")
         components.entry(self.frame, 5, 5, self.ui_state, "cloud.min_download")
 
-        components.label(self.frame, 6, 4, "Action on finish",
+        components.label(self.frame, 6, 4, "Jupyter password",
+                         tooltip="Jupyter password")
+        components.entry(self.frame, 6, 5, self.ui_state, "cloud.jupyter_password")
+
+        components.label(self.frame, 8, 4, "Action on finish",
                          tooltip="What to do when training finishes and the data has been fully downloaded: Stop or delete the cloud, or do nothing.")
-        components.options_kv(self.frame, 6, 5, [
+        components.options_kv(self.frame, 8, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_finish")
 
-        components.label(self.frame, 7, 4, "Action on error",
+        components.label(self.frame, 9, 4, "Action on error",
                          tooltip="What to do if training stops due to an error: Stop or delete the cloud, or do nothing. Data may be lost.")
-        components.options_kv(self.frame, 7, 5, [
+        components.options_kv(self.frame, 9, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_error")
 
-        components.label(self.frame, 8, 4, "Action on detached finish",
+        components.label(self.frame, 10, 4, "Action on detached finish",
                          tooltip="What to do when training finishes, but the client has been detached and cannot download data. Data may be lost.")
-        components.options_kv(self.frame, 8, 5, [
+        components.options_kv(self.frame, 10, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_detached_finish")
 
-        components.label(self.frame, 9, 4, "Action on detached error",
+        components.label(self.frame, 11, 4, "Action on detached error",
                          tooltip="What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost.")
-        components.options_kv(self.frame, 9, 5, [
+        components.options_kv(self.frame, 11, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),

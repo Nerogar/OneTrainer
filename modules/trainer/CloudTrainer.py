@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from contextlib import suppress
 from pathlib import Path
 
 from modules.cloud.LinuxCloud import LinuxCloud
@@ -125,10 +126,11 @@ class CloudTrainer(BaseTrainer):
             else:
                 action=self.config.cloud.on_finish
 
-            if action == CloudAction.DELETE:
-                self.cloud.delete()
-            elif action == CloudAction.STOP:
-                self.cloud.stop()
+            with suppress(Exception): #can fail if the cloud was not successfully created
+                if action == CloudAction.DELETE:
+                    self.cloud.delete()
+                elif action == CloudAction.STOP:
+                    self.cloud.stop()
 
             del self.cloud
 

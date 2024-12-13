@@ -18,6 +18,9 @@ class BaseCloud(metaclass=ABCMeta):
     def setup(self):
         self._connect()
 
+        if self.config.cloud.update_onetrainer:
+            self._update_onetrainer()
+
         if self.config.cloud.install_onetrainer:
             self._install_onetrainer()
 
@@ -105,6 +108,10 @@ class BaseCloud(metaclass=ABCMeta):
 
     @abstractmethod
     def _install_onetrainer(self):
+        pass
+
+    @abstractmethod
+    def _update_onetrainer(self):
         pass
 
     @abstractmethod

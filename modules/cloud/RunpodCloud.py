@@ -1,4 +1,3 @@
-import secrets
 import time
 
 from modules.cloud.LinuxCloud import LinuxCloud
@@ -63,16 +62,16 @@ class RunpodCloud(LinuxCloud):
         config=self.config.cloud
         pod=runpod.create_pod(
             name=config.name,
-            image_name="runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04",
+            image_name="",
+            template_id="1a33vbssq9",
             gpu_type_id=config.gpu_type,
             cloud_type=config.sub_type,
             support_public_ip=True,
             volume_in_gb=config.volume_size,
             container_disk_in_gb=10,
-            ports="22/tcp,8888/http",
             volume_mount_path="/workspace",
             min_download=config.min_download,
-            env={"JUPYTER_PASSWORD": secrets.token_urlsafe(12)},
+            env={"JUPYTER_PASSWORD": config.jupyter_password},
         )
         config.id=pod['id']
 
