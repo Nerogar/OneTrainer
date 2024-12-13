@@ -1,6 +1,8 @@
+import concurrent.futures
 import pickle
 import shlex
 import socket
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -247,7 +249,7 @@ class LinuxCloud(BaseCloud):
 
     def _upload(self,local : Path,remote : Path,commands : TrainCommands = None):
         update_info=LinuxCloud.__get_update_info(self.connection,remote)
-        LinuxCloud.__upload(self.connection,local,remote,update_info,commands=commands)
+        LinuxCloud.__upload(self.connection,local,remote,update_info,self.config.cloud,commands=commands)
 
     def _upload_config_file(self,local : Path):
         self._upload(local,Path(self.config_file))
@@ -293,7 +295,7 @@ class LinuxCloud(BaseCloud):
         return ret
 
     @staticmethod
-    def __upload_file(connection,local : Path,remote : Path,update_info,commands=None):
+    def __upload_file(connection,local : Path,remote : Path,update_info,config: CloudConfig,commands=None):
         if remote in update_info:
             if (local.stat().st_size == update_info[remote][0]
                 and local.stat().st_mtime <= update_info[remote][1]):
@@ -304,27 +306,62 @@ class LinuxCloud(BaseCloud):
             update_info[remote.parent]=(0,0,'directory')
 
         print(f'uploading {local}...')
-        connection.put(str(local),remote.as_posix())
+        #connection.put(str(local),remote.as_posix())
+        subprocess.run([
+                "scp",
+                "-P", str(config.port),
+                "-o", "StrictHostKeyChecking=no",
+                str(local),
+                f"{config.user}@{config.host}:{remote.as_posix()}",
+            ]).check_returncode()
+
 
     @staticmethod
-    def __upload_dir(connection,local : Path,remote : Path,update_info,commands : TrainCommands=None):
-        n=sum(1 for entry in local.iterdir())
-        if n > 50:
-            print(f"WARNING: Uploading {n} files. Uploading many individual files can be slow via SSH.")
-            print( "         If you prefer, you can interrupt the upload by pressing 'Stop Training',")
-            print(f"         upload your files in {str(local)} manually to the cloud at {remote.as_posix()},")
-            print( "         and start training again.")
-        for local_entry in local.iterdir():
-            LinuxCloud.__upload(connection,local_entry,remote/local_entry.name,update_info=update_info,commands=commands)
-            if commands and commands.get_stop_command():
-                return
+    def __scp_upload_files(files,remote: Path,config: CloudConfig):
+        args=[
+                "scp",
+                "-P", str(config.port),
+                "-o", "StrictHostKeyChecking=no",
+            ]
+        args.extend(files)
+        args.append(f"{config.user}@{config.host}:{remote.as_posix()}")
+        subprocess.run(args).check_returncode()
+
 
     @staticmethod
-    def __upload(connection,local : Path,remote : Path,update_info,commands : TrainCommands=None):
+    def __upload_dir(connection,local : Path,remote : Path,update_info,config: CloudConfig,commands : TrainCommands=None):
+        #n=sum(1 for entry in local.iterdir())
+        #if n > 50:
+        #    print(f"WARNING: Uploading {n} files. Uploading many individual files can be slow via SSH.")
+        #    print( "         If you prefer, you can interrupt the upload by pressing 'Stop Training',")
+        #    print(f"         upload your files in {str(local)} manually to the cloud at {remote.as_posix()},")
+        #    print( "         and start training again.")
+        #for local_entry in local.iterdir():
+        #    LinuxCloud.__upload(connection,local_entry,remote/local_entry.name,update_info=update_info,config=config,commands=commands)
+        #    if commands and commands.get_stop_command():
+        #        return
+        futures=[]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            files=[]
+            for local_entry in local.iterdir():
+                if local_entry.is_file():
+                    files.append(local_entry.as_posix())
+                if len(files) == 10:
+                    futures.append(executor.submit(LinuxCloud.__scp_upload_files,files,remote,config))
+                    files=[]
+            if len(files) > 0:
+                futures.append(executor.submit(LinuxCloud.__scp_upload_files,files,remote,config))
+        for future in futures:
+            future.exception()
+
+
+
+    @staticmethod
+    def __upload(connection,local : Path,remote : Path,update_info,config: CloudConfig,commands : TrainCommands=None):
         if local.is_dir():
-            LinuxCloud.__upload_dir(connection,local,remote,update_info,commands)
+            LinuxCloud.__upload_dir(connection,local,remote,update_info,config,commands)
         else:
-            LinuxCloud.__upload_file(connection,local,remote,update_info)
+            LinuxCloud.__upload_file(connection,local,remote,update_info,config)
 
     @staticmethod
     def __download_dir(connection,local : Path,remote : Path,update_info,commands=None,config:CloudConfig=None):
