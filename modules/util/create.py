@@ -922,6 +922,23 @@ def create_optimizer(
                 adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
             )
+        case Optimizer.ADOPT:
+            from adopt import ADOPT
+            optimizer = ADOPT(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                decouple=optimizer_config.decouple if optimizer_config.decouple is not None else False,
+                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False,
+                maximize=optimizer_config.maximize if optimizer_config.maximize is not None else False,
+                capturable=optimizer_config.capturable if optimizer_config.capturable is not None else False,
+                differentiable=optimizer_config.differentiable if optimizer_config.differentiable is not None else False,
+                fused=optimizer_config.fused if optimizer_config.fused is not None else False,
+            )
+
 
     if state_dict is not None and optimizer is not None:
         if 'param_group_mapping' not in state_dict:
