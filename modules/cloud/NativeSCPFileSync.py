@@ -41,7 +41,6 @@ class NativeSCPFileSync(BaseSSHFileSync):
             max_batch_size=50)
 
     def upload_file(self,local_file: Path,remote_file: Path):
-
         subprocess.run(self.base_args + [
                 str(local_file),
                 f"{self.config.user}@{self.config.host}:{remote_file.as_posix()}",
