@@ -15,9 +15,9 @@ class BaseFileSync(metaclass=ABCMeta):
 
     def sync_up(self,local : Path,remote : Path):
         if local.is_dir():
-            self.sync_up_dir(local_dir=local,remote_dir=remote,recursive=True)
+            self.sync_up_dir(local=local,remote=remote,recursive=True)
         else:
-            self.sync_up_file(local_file=local,remote_file=remote)
+            self.sync_up_file(local=local,remote=remote)
 
     @abstractmethod
     def sync_up_file(self,local : Path,remote : Path):
