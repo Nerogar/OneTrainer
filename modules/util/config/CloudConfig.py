@@ -2,12 +2,14 @@ from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.CloudAction import CloudAction
+from modules.util.enum.CloudFileSync import CloudFileSync
 from modules.util.enum.CloudType import CloudType
 
 
 class CloudConfig(BaseConfig):
     enabled: bool
     type: CloudType
+    file_sync : CloudFileSync
     api_key: str
     create : bool
     name: str
@@ -50,6 +52,7 @@ class CloudConfig(BaseConfig):
 
         data.append(("enabled", False, bool, False))
         data.append(("type", CloudType.RUNPOD, CloudType, False))
+        data.append(("file_sync", CloudFileSync.NATIVE_SCP, CloudFileSync, False))
         data.append(("api_key", "", str, False))
         data.append(("create", True, bool, False))
         data.append(("name", "OneTrainer", str, False))

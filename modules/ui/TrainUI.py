@@ -571,6 +571,8 @@ class TrainUI(ctk.CTk):
                 self.ui_state.get_var("cloud").update(self.train_config.cloud)
             trainer.train()
         except Exception:
+            if self.train_config.cloud.enabled:
+                self.ui_state.get_var("cloud").update(self.train_config.cloud)
             error_caught = True
             traceback.print_exc()
 

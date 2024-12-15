@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+import traceback
 from contextlib import suppress
 from pathlib import Path
 
@@ -22,7 +23,6 @@ class CloudTrainer(BaseTrainer):
         self.error_caught=False
         self.callback_thread=None
         self.sync_thread=None
-        self.sync_exception=None
         self.stop_event=None
         self.cloud=None
         self.remote_config=CloudTrainer.__make_remote_config(config)
@@ -60,20 +60,24 @@ class CloudTrainer(BaseTrainer):
 
         def callback():
             while not self.stop_event.is_set():
-                self.cloud.exec_callback(self.callbacks)
+                try:
+                    self.cloud.exec_callback(self.callbacks)
+                except Exception:
+                    traceback.print_exc()
+                    self.callbacks.on_update_status("error: check the console for more information")
                 time.sleep(1)
+
         self.callback_thread = threading.Thread(target=callback)
         self.callback_thread.start()
 
         def sync():
-            try:
-                while not self.stop_event.is_set():
+            while not self.stop_event.is_set():
+                try:
                     self.cloud.sync_workspace()
-                    time.sleep(5)
-                self.cloud.sync_workspace()
-            except Exception as e:
-                self.sync_exception=e
-                raise
+                except Exception:
+                    traceback.print_exc()
+                    self.callbacks.on_update_status("error: check the console for more information")
+                time.sleep(5)
 
         self.sync_thread = threading.Thread(target=sync)
         self.sync_thread.start()
@@ -100,10 +104,7 @@ class CloudTrainer(BaseTrainer):
             self.callback_thread.join()
             self.callbacks.on_update_status("waiting for downloads")
             self.sync_thread.join()
-
-        if self.sync_exception:
-            self.error_caught=True
-            raise self.sync_exception
+            self.cloud.sync_workspace()
 
     def end(self):
         try:

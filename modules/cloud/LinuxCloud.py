@@ -1,18 +1,17 @@
-import concurrent.futures
 import pickle
 import shlex
-import socket
-import subprocess
 import threading
 import time
 from pathlib import Path
 
 from modules.cloud.BaseCloud import BaseCloud
+from modules.cloud.FabricFileSync import FabricFileSync
+from modules.cloud.NativeSCPFileSync import NativeSCPFileSync
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
+from modules.util.enum.CloudFileSync import CloudFileSync
 from modules.util.time_util import get_string_timestamp
 
 import fabric
@@ -24,7 +23,6 @@ class LinuxCloud(BaseCloud):
         self.connection=None
         self.callback_connection=None
         self.command_connection=None
-        self.sync_connection=None
         self.tensorboard_tunnel_stop=None
 
         name=config.cloud.run_id if config.cloud.detach_trainer else get_string_timestamp()
@@ -46,28 +44,25 @@ class LinuxCloud(BaseCloud):
                 self.connection.open()
 
                 self.callback_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-                self.callback_connection.open()
 
                 self.command_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-                self.command_connection.open()
                 #the command connection isn't used for long periods of time; prevent remote from closing it:
+                self.command_connection.open()
                 self.command_connection.transport.set_keepalive(30)
 
-                self.sync_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
-                self.sync_connection.open()
+
+                match config.file_sync:
+                    case CloudFileSync.NATIVE_SCP:
+                        self.file_sync=NativeSCPFileSync(config)
+                    case CloudFileSync.FABRIC_SFTP:
+                        self.file_sync=FabricFileSync(config)
+
             except Exception:
-                if self.callback_connection:
-                    self.callback_connection.close()
-                    self.callback_connection=None
-                if self.command_connection:
-                    self.command_connection.close()
-                    self.command_connection=None
-                if self.sync_connection:
-                    self.sync_connection.close()
-                    self.sync_connection=None
                 if self.connection:
                     self.connection.close()
                     self.connection=None
+                if self.command_connection:
+                    self.command_connection.close()
                 raise
         else:
             raise ValueError('Host and port required for SSH connection')
@@ -118,10 +113,11 @@ class LinuxCloud(BaseCloud):
             self.callback_connection.close()
         if self.command_connection:
             self.command_connection.close()
-        if self.sync_connection:
-            self.sync_connection.close()
+        if self.file_sync:
+            self.file_sync.close()
         if self.connection:
             self.connection.close()
+            self.connection=None
 
     def can_reattach(self):
         result=self.connection.run(f"test -f {self.pid_file}",warn=True,in_stream=False)
@@ -191,39 +187,33 @@ class LinuxCloud(BaseCloud):
            && cat "{file}.read" \
            && rm "{file}.read"'
 
+        self.callback_connection.open()
+        in_file,out_file,err_file=self.callback_connection.client.exec_command(cmd)
+
         try:
-            in_file,out_file,err_file=self.callback_connection.client.exec_command(cmd)
+            while True:
+                try:
+                    while not out_file.channel.recv_ready() and not out_file.channel.exit_status_ready():
+                        #even though reading from out_file is blocking, it doesn't block if there
+                        #is *no* data available yet, which results in an unpickling error.
+                        #wait until there is at least some data before reading:
+                        time.sleep(0.1)
+                    name=pickle.load(out_file)
+                except EOFError:
+                    return
+                params=pickle.load(out_file)
 
-            try:
-                while True:
-                    try:
-                        while not out_file.channel.recv_ready() and not out_file.channel.exit_status_ready():
-                            #even though reading from out_file is blocking, it doesn't block if there
-                            #is *no* data available yet, which results in an unpickling error.
-                            #wait until there is at least some data before reading:
-                            time.sleep(0.1)
-                        name=pickle.load(out_file)
-                    except EOFError:
-                        return
-                    params=pickle.load(out_file)
-
-                    fun=getattr(callbacks,name)
-                    fun(*params)
-            finally:
-                in_file.close()
-                out_file.close()
-                err_file.close()
-        except Exception:
-            if not self.callback_connection.is_connected:
-                print("\n\nCallback SSH connection lost. Attempting to reconnect...")
-                self.callback_connection.open()
-                self.exec_callback(callbacks)
-            else:
-                raise
+                fun=getattr(callbacks,name)
+                fun(*params)
+        finally:
+            in_file.close()
+            out_file.close()
+            err_file.close()
 
 
     def send_commands(self,commands : TrainCommands):
         try:
+            self.command_connection.open()
             in_file,out_file,err_file=self.command_connection.client.exec_command(
                 f'test -e {shlex.quote(self.command_pipe)} \
                 && cat > {shlex.quote(self.command_pipe)}'
@@ -246,148 +236,13 @@ class LinuxCloud(BaseCloud):
             else:
                 raise
 
-
-    def _upload(self,local : Path,remote : Path,commands : TrainCommands = None):
-        update_info=LinuxCloud.__get_update_info(self.connection,remote)
-        LinuxCloud.__upload(self.connection,local,remote,update_info,self.config.cloud,commands=commands)
-
     def _upload_config_file(self,local : Path):
-        self._upload(local,Path(self.config_file))
-
-
-    def _download_file(self,local : Path,remote : Path):
-        update_info=LinuxCloud.__get_update_info(self.connection,remote)
-        LinuxCloud.__download_file(self.connection,local,remote,update_info)
-
-    def _download_dir(self,local : Path,remote : Path):
-        update_info=LinuxCloud.__get_update_info(self.connection,remote)
-        LinuxCloud.__download_dir(self.connection,local,remote,update_info)
+        self.file_sync.sync_up_file(local,Path(self.config_file))
 
     def sync_workspace(self):
-        try:
-            update_info=LinuxCloud.__get_update_info(self.sync_connection,Path(self.config.workspace_dir))
-            LinuxCloud.__download_dir(self.sync_connection,
-                                      local=Path(self.config.local_workspace_dir),
-                                      remote=Path(self.config.workspace_dir),
-                                      update_info=update_info,
-                                      config=self.config.cloud)
-        except Exception as e:
-            if isinstance(e,socket.error):
-                #Connection.is_connected is True even if SFTP socket is closed. Close and re-open:
-                self.sync_connection.close()
-
-            if not self.sync_connection.is_connected:
-                print("\n\nSync SSH connection lost. Attempting to reconnect...")
-                self.sync_connection.open()
-                self.sync_workspace()
-            else:
-                raise
-
-    @staticmethod
-    def __get_update_info(connection,remote : Path):
-        cmd = f'find {shlex.quote(remote.as_posix())} -exec stat --printf "%n\\t%s\\t%Y\\t%F\\n"' + ' {} \\;'
-        result=connection.run(cmd,warn=True,hide=True,in_stream=False)
-        # dict[filename]: (size,mtime,filetype)
-        ret={}
-        for line in result.stdout.splitlines():
-            sp=line.split('\t')
-            ret[Path(sp[0])]=(int(sp[1]),int(sp[2]),sp[3])
-        return ret
-
-    @staticmethod
-    def __upload_file(connection,local : Path,remote : Path,update_info,config: CloudConfig,commands=None):
-        if remote in update_info:
-            if (local.stat().st_size == update_info[remote][0]
-                and local.stat().st_mtime <= update_info[remote][1]):
-                    return
-
-        if remote.parent not in update_info:
-            connection.run(f'mkdir -p {shlex.quote(remote.parent.as_posix())}',in_stream=False)
-            update_info[remote.parent]=(0,0,'directory')
-
-        print(f'uploading {local}...')
-        #connection.put(str(local),remote.as_posix())
-        subprocess.run([
-                "scp",
-                "-P", str(config.port),
-                "-o", "StrictHostKeyChecking=no",
-                str(local),
-                f"{config.user}@{config.host}:{remote.as_posix()}",
-            ]).check_returncode()
-
-
-    @staticmethod
-    def __scp_upload_files(files,remote: Path,config: CloudConfig):
-        args=[
-                "scp",
-                "-P", str(config.port),
-                "-o", "StrictHostKeyChecking=no",
-            ]
-        args.extend(files)
-        args.append(f"{config.user}@{config.host}:{remote.as_posix()}")
-        subprocess.run(args).check_returncode()
-
-
-    @staticmethod
-    def __upload_dir(connection,local : Path,remote : Path,update_info,config: CloudConfig,commands : TrainCommands=None):
-        #n=sum(1 for entry in local.iterdir())
-        #if n > 50:
-        #    print(f"WARNING: Uploading {n} files. Uploading many individual files can be slow via SSH.")
-        #    print( "         If you prefer, you can interrupt the upload by pressing 'Stop Training',")
-        #    print(f"         upload your files in {str(local)} manually to the cloud at {remote.as_posix()},")
-        #    print( "         and start training again.")
-        #for local_entry in local.iterdir():
-        #    LinuxCloud.__upload(connection,local_entry,remote/local_entry.name,update_info=update_info,config=config,commands=commands)
-        #    if commands and commands.get_stop_command():
-        #        return
-        futures=[]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            files=[]
-            for local_entry in local.iterdir():
-                if local_entry.is_file():
-                    files.append(local_entry.as_posix())
-                if len(files) == 10:
-                    futures.append(executor.submit(LinuxCloud.__scp_upload_files,files,remote,config))
-                    files=[]
-            if len(files) > 0:
-                futures.append(executor.submit(LinuxCloud.__scp_upload_files,files,remote,config))
-        for future in futures:
-            future.exception()
-
-
-
-    @staticmethod
-    def __upload(connection,local : Path,remote : Path,update_info,config: CloudConfig,commands : TrainCommands=None):
-        if local.is_dir():
-            LinuxCloud.__upload_dir(connection,local,remote,update_info,config,commands)
-        else:
-            LinuxCloud.__upload_file(connection,local,remote,update_info,config)
-
-    @staticmethod
-    def __download_dir(connection,local : Path,remote : Path,update_info,commands=None,config:CloudConfig=None):
-        for remote_entry,info in update_info.items():
-            if commands and commands.get_stop_command():
-                return
-            if config and not BaseCloud._filter_download(config,remote_entry):
-                continue
-            if info[2] != 'regular file':
-                continue #update_info is recursive, so no need to go into directories
-
-            local_entry=local / remote_entry.relative_to(remote)
-            LinuxCloud.__download_file(connection,local=local_entry,remote=remote_entry,update_info=update_info)
-
-    @staticmethod
-    def __download_file(connection,local : Path, remote : Path,update_info):
-        if remote in update_info:
-            file_info=update_info[remote]
-            if (local.exists()
-                and local.stat().st_size == file_info[0]
-                and local.stat().st_mtime >= file_info[1]):
-                    return
-        #else: file doesn't exist remotely, but error will be raised by connection.get()
-
-        print(f'\n\ndownloading {local}...')
-        connection.get(remote=remote.as_posix(),local=str(local))
+        self.file_sync.sync_down_dir(local=Path(self.config.local_workspace_dir),
+                                  remote=Path(self.config.workspace_dir),
+                                  filter=lambda path:BaseCloud._filter_download(config=self.config.cloud,path=path))
 
     def delete_workspace(self):
         self.connection.run(f"rm -r {shlex.quote(self.config.workspace_dir)}",in_stream=False)

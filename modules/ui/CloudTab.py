@@ -1,6 +1,7 @@
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
+from modules.util.enum.CloudFileSync import CloudFileSync
 from modules.util.enum.CloudType import CloudType
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -36,33 +37,40 @@ class CloudTab:
             ("LINUX", CloudType.LINUX),
         ], self.ui_state, "cloud.type")
 
-        components.label(self.frame, 2, 0, "API key",
+        components.label(self.frame, 2, 0, "File sync method",
+                         tooltip="Choose NATIVE_SCP to use scp.exe to transfer files. FABRIC_SFTP uses the Paramiko/Fabric SFTP implementation for file transfers instead.")
+        components.options_kv(self.frame, 2, 1, [
+            ("NATIVE_SCP", CloudFileSync.NATIVE_SCP),
+            ("FABRIC_SFTP", CloudFileSync.FABRIC_SFTP),
+        ], self.ui_state, "cloud.file_sync")
+
+        components.label(self.frame, 3, 0, "API key",
                          tooltip="Cloud service API key for RUNPOD. Leave empty for LINUX.")
-        components.entry(self.frame, 2, 1, self.ui_state, "cloud.api_key")
+        components.entry(self.frame, 3, 1, self.ui_state, "cloud.api_key")
 
-        components.label(self.frame, 3, 0, "Huggingface token",
+        components.label(self.frame, 4, 0, "Huggingface token",
                          tooltip="If you provide your Huggingface token, a Huggingface repository path can then be set as the base model in OneTrainer. The model is then directly downloaded from Huggingface to the cloud, avoiding large uploads from your computer.")
-        components.entry(self.frame, 3, 1, self.ui_state, "cloud.huggingface_token")
+        components.entry(self.frame, 4, 1, self.ui_state, "cloud.huggingface_token")
 
-        components.label(self.frame, 4, 0, "Hostname",
+        components.label(self.frame, 5, 0, "Hostname",
                          tooltip="SSH server hostname or IP. Leave empty if you have a Cloud ID or want to automatically create a new cloud.")
-        components.entry(self.frame, 4, 1, self.ui_state, "cloud.host")
+        components.entry(self.frame, 5, 1, self.ui_state, "cloud.host")
 
-        components.label(self.frame, 5, 0, "Port",
+        components.label(self.frame, 6, 0, "Port",
                          tooltip="SSH server port. Leave empty if you have a Cloud ID or want to automatically create a new cloud.")
-        components.entry(self.frame, 5, 1, self.ui_state, "cloud.port")
+        components.entry(self.frame, 6, 1, self.ui_state, "cloud.port")
 
-        components.label(self.frame, 6, 0, "User",
+        components.label(self.frame, 7, 0, "User",
                          tooltip='SSH username. Use "root" for RUNPOD. Your SSH client must be set up to connect to the cloud using a public key, without a password. For RUNPOD, create an ed25519 key locally, and copy the contents of the public keyfile to your "SSH Public Keys" on the RunPod website.')
-        components.entry(self.frame, 6, 1, self.ui_state, "cloud.user")
+        components.entry(self.frame, 7, 1, self.ui_state, "cloud.user")
 
-        components.label(self.frame, 7, 0, "Cloud id",
+        components.label(self.frame, 8, 0, "Cloud id",
                          tooltip="RUNPOD Cloud ID. The cloud service must have a public IP and SSH service. Leave empty if you want to automatically create a new RUNPOD cloud, or if you're connecting to another cloud provider via SSH Hostname and Port.")
-        components.entry(self.frame, 7, 1, self.ui_state, "cloud.id")
+        components.entry(self.frame, 8, 1, self.ui_state, "cloud.id")
 
-        components.label(self.frame, 8, 0, "Make tensorboard TCP tunnel",
+        components.label(self.frame, 9, 0, "Make tensorboard TCP tunnel",
                          tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud")
-        components.switch(self.frame, 8, 1, self.ui_state, "cloud.tensorboard_tunnel")
+        components.switch(self.frame, 9, 1, self.ui_state, "cloud.tensorboard_tunnel")
 
 
 

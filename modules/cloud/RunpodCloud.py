@@ -25,7 +25,7 @@ class RunpodCloud(LinuxCloud):
                 #The pod id seems to disappear for a while, and on recently stopped pods the old public IP and port is still being reported
                 #Therefore, on resumed pods, iterate until there is a successful connection
                 resumed=True
-            elif pod and (runtime:=pod['runtime']) is not None:
+            elif pod and (runtime:=pod['runtime']) is not None and 'ports' in runtime and runtime['ports'] is not None:
                 for port in runtime['ports']:
                     if port['isIpPublic']:
                         config.host=port['ip']
@@ -36,7 +36,10 @@ class RunpodCloud(LinuxCloud):
                             except Exception:
                                 continue
                         return
-            print("waiting for public IP...")
+            if config.id == "":
+                print("waiting for public IP...")
+            else:
+                print(f"waiting for public IP... Status: https://www.runpod.io/console/pods/{config.id}")
             time.sleep(5)
 
 
