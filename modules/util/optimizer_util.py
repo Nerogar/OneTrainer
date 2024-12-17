@@ -149,13 +149,11 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
     Optimizer.ADOPT: {
         "beta1": 0.9,
         "beta2": 0.9999,
+        "weight_decay": 0.0,
+        "decoupled_decay": False,
+        "fixed_decay": False,
+        "cautious": False,
         "eps": 1e-6,
-        "decouple": False,
-        "foreach": False,
-        "maximize": False,
-        "capturable": False,
-        "differentiable": False,
-        "fused": False,
     },
     Optimizer.LAMB: {
         "bias_correction": True,

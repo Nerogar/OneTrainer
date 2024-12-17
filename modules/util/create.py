@@ -929,14 +929,11 @@ def create_optimizer(
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                decouple=optimizer_config.decouple if optimizer_config.decouple is not None else False,
-                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False,
-                maximize=optimizer_config.maximize if optimizer_config.maximize is not None else False,
-                capturable=optimizer_config.capturable if optimizer_config.capturable is not None else False,
-                differentiable=optimizer_config.differentiable if optimizer_config.differentiable is not None else False,
-                fused=optimizer_config.fused if optimizer_config.fused is not None else False,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else False,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                cautious=optimizer_config.cautious if optimizer_config.cautious is not None else False,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
             )
 
 
