@@ -923,7 +923,7 @@ def create_optimizer(
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
             )
         case Optimizer.ADOPT:
-            from adopt import ADOPT
+            from pytorch_optimizer.optimizer.adopt import ADOPT
             optimizer = ADOPT(
                 params=parameters,
                 lr=config.learning_rate,
