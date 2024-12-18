@@ -28,7 +28,7 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
             range_max = 1
             image_tensor = (image_tensor - range_min) / (range_max - range_min)
 
-            image = t(image_tensor.squeeze())
+            image = t(image_tensor.float().squeeze())
 
         image.save(path)
 

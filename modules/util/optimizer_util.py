@@ -146,6 +146,15 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "min_8bit_size": 4096,
         "is_paged": False,
     },
+    Optimizer.ADOPT: {
+        "beta1": 0.9,
+        "beta2": 0.9999,
+        "weight_decay": 0.0,
+        "decoupled_decay": False,
+        "fixed_decay": False,
+        "cautious": False,
+        "eps": 1e-6,
+    },
     Optimizer.LAMB: {
         "bias_correction": True,
         "beta1": 0.9,

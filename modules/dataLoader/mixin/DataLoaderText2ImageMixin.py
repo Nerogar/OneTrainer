@@ -216,14 +216,14 @@ class DataLoaderText2ImageMixin:
             before_cache_image_fun: Callable[[], None] | None = None,
             use_conditioning_image: bool = False,
             vae: AutoencoderKL | None = None,
-            autocast_context: torch.autocast | None = None,
+            autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image' if use_conditioning_image else None,
             replace_probability=config.unmasked_probability, vae=vae,
             possible_resolutions_in_name='possible_resolutions',
-            autocast_contexts=[autocast_context], dtype=train_dtype.torch_dtype(),
+            autocast_contexts=autocast_context, dtype=train_dtype.torch_dtype(),
             before_cache_fun=before_cache_image_fun,
         )
 

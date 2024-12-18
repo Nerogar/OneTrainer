@@ -410,7 +410,7 @@ class GenericTrainer(BaseTrainer):
         if os.path.isfile(self.config.sample_definition_file_name):
             shutil.copy2(self.config.sample_definition_file_name, samples_path)
 
-    def backup(self, train_progress: TrainProgress):
+    def backup(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
         torch_gc()
 
         self.callbacks.on_update_status("creating backup")
@@ -424,7 +424,8 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
 
         try:
-            print("Creating Backup " + backup_path)
+            if print_msg:
+                print_cb("Creating Backup " + backup_path)
 
             self.model_saver.save(
                 self.model,
@@ -456,7 +457,7 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
-    def save(self, train_progress: TrainProgress):
+    def save(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
         torch_gc()
 
         self.callbacks.on_update_status("saving")
@@ -466,7 +467,8 @@ class GenericTrainer(BaseTrainer):
             "save",
             f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
-        print("Saving " + save_path)
+        if print_msg:
+            print_cb("Saving " + save_path)
 
         try:
             if self.model.ema:
@@ -534,7 +536,7 @@ class GenericTrainer(BaseTrainer):
     def __apply_fused_back_pass(self, scaler):
         if self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
             if self.config.gradient_accumulation_steps > 1:
-                raise RuntimeError("fused_back_step can not be used if gradient_accumulation_steps > 1")
+                print("Warning: activating fused_back_pass with gradient_accumulation_steps > 1 does not reduce VRAM usage.")
 
             for param_group in self.model.optimizer.param_groups:
                 for i, parameter in enumerate(param_group["params"]):
@@ -543,17 +545,19 @@ class GenericTrainer(BaseTrainer):
                     if parameter.requires_grad:
                         if scaler:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                                scaler.unscale_parameter_(tensor, self.model.optimizer)
-                                if self.config.clip_grad_norm is not None:
-                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
-                                scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
-                                tensor.grad = None
+                                if self.__is_update_step(self.model.train_progress):
+                                    scaler.unscale_parameter_(tensor, self.model.optimizer)
+                                    if self.config.clip_grad_norm is not None:
+                                        nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
+                                    scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
+                                    tensor.grad = None
                         else:
                             def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
-                                if self.config.clip_grad_norm is not None:
-                                    nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
-                                self.model.optimizer.step_parameter(tensor, param_group, i)
-                                tensor.grad = None
+                                if self.__is_update_step(self.model.train_progress):
+                                    if self.config.clip_grad_norm is not None:
+                                        nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
+                                    self.model.optimizer.step_parameter(tensor, param_group, i)
+                                    tensor.grad = None
 
                         handle = parameter.register_post_accumulate_grad_hook(__grad_hook)
                         self.grad_hook_handles.append(handle)
@@ -655,12 +659,12 @@ class GenericTrainer(BaseTrainer):
 
                     if self.commands.get_and_reset_backup_command():
                         self.model.to(self.temp_device)
-                        self.backup(train_progress)
+                        self.backup(train_progress, True, step_tqdm.write)
                         transferred_to_temp_device = True
 
                     if self.commands.get_and_reset_save_command():
                         self.model.to(self.temp_device)
-                        self.save(train_progress)
+                        self.save(train_progress, True, step_tqdm.write)
                         transferred_to_temp_device = True
 
                     if transferred_to_temp_device:

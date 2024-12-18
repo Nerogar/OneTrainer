@@ -77,24 +77,24 @@ class StableDiffusion3ModelLoader(
         )
 
         if include_text_encoder_1:
-            text_encoder_1 = CLIPTextModelWithProjection.from_pretrained(
+            text_encoder_1 = self._load_transformers_sub_module(
+                CLIPTextModelWithProjection,
+                weight_dtypes.text_encoder,
+                weight_dtypes.train_dtype,
                 base_model_name,
-                subfolder="text_encoder",
-                torch_dtype=weight_dtypes.text_encoder.torch_dtype(),
+                "text_encoder",
             )
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_1 = None
 
         if include_text_encoder_2:
-            text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
+            text_encoder_2 = self._load_transformers_sub_module(
+                CLIPTextModelWithProjection,
+                weight_dtypes.text_encoder_2,
+                weight_dtypes.train_dtype,
                 base_model_name,
-                subfolder="text_encoder_2",
-                torch_dtype=weight_dtypes.text_encoder_2.torch_dtype(),
+                "text_encoder_2",
             )
-            text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_2 = None
 
@@ -102,29 +102,33 @@ class StableDiffusion3ModelLoader(
             text_encoder_3 = self._load_transformers_sub_module(
                 T5EncoderModel,
                 weight_dtypes.text_encoder_3,
+                weight_dtypes.fallback_train_dtype,
                 base_model_name,
                 "text_encoder_3",
             )
-            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(
-                supports_quantization=False))
         else:
             text_encoder_3 = None
 
         if vae_model_name:
-            vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 vae_model_name,
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
             )
         else:
-            vae = AutoencoderKL.from_pretrained(
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 base_model_name,
-                subfolder="vae",
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
+                "vae",
             )
 
         transformer = self._load_diffusers_sub_module(
             SD3Transformer2DModel,
             weight_dtypes.prior,
+            weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
         )
@@ -178,14 +182,29 @@ class StableDiffusion3ModelLoader(
             )
 
         if vae_model_name:
-            pipeline.vae = AutoencoderKL.from_pretrained(
+            pipeline.vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
                 vae_model_name,
-                torch_dtype=weight_dtypes.vae.torch_dtype(),
+            )
+
+        if vae_model_name:
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKL,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                vae_model_name,
+            )
+        else:
+            vae = self._convert_diffusers_sub_module_to_dtype(
+                pipeline.vae, weight_dtypes.vae, weight_dtypes.train_dtype
             )
 
         if pipeline.text_encoder is not None and include_text_encoder_1:
-            text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
-            text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+            text_encoder_1 = self._convert_transformers_sub_module_to_dtype(
+                pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
+            )
             tokenizer_1 = pipeline.tokenizer
         else:
             text_encoder_1 = None
@@ -193,8 +212,9 @@ class StableDiffusion3ModelLoader(
             print("text encoder 1 (clip l) not loaded, continuing without it")
 
         if pipeline.text_encoder_2 is not None and include_text_encoder_2:
-            text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
-            text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(False))
+            text_encoder_2 = self._convert_transformers_sub_module_to_dtype(
+                pipeline.text_encoder_2, weight_dtypes.text_encoder_2, weight_dtypes.train_dtype
+            )
             tokenizer_2 = pipeline.tokenizer_2
         else:
             text_encoder_2 = None
@@ -202,17 +222,18 @@ class StableDiffusion3ModelLoader(
             print("text encoder 2 (clip g) not loaded, continuing without it")
 
         if pipeline.text_encoder_3 is not None and include_text_encoder_3:
-            text_encoder_3 = pipeline.text_encoder_3.to(dtype=weight_dtypes.text_encoder_3.torch_dtype())
-            text_encoder_3.encoder.embed_tokens.to(dtype=weight_dtypes.text_encoder_3.torch_dtype(
-                supports_quantization=False))
+            text_encoder_3 = self._convert_transformers_sub_module_to_dtype(
+                pipeline.text_encoder_3, weight_dtypes.text_encoder_3, weight_dtypes.fallback_train_dtype
+            )
             tokenizer_3 = pipeline.tokenizer_3
         else:
             text_encoder_3 = None
             tokenizer_3 = None
             print("text encoder 3 (t5) not loaded, continuing without it")
 
-        vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())
-        transformer = pipeline.transformer.to(dtype=weight_dtypes.prior.torch_dtype())
+        transformer = self._convert_diffusers_sub_module_to_dtype(
+            pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+        )
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
@@ -238,7 +259,7 @@ class StableDiffusion3ModelLoader(
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
+                 model_names.include_text_encoder_3,
             )
             return
         except Exception:
@@ -263,16 +284,6 @@ class StableDiffusion3ModelLoader(
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
-
-        # try:
-        #     self.__load_ckpt(
-        #         model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-        #         model_names.include_text_encoder, model_names.include_text_encoder_2,
-        #         model_names.include_text_encoder_3,
-        #     )
-        #     return
-        # except Exception:
-        #     stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)

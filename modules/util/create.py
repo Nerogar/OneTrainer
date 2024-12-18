@@ -923,6 +923,20 @@ def create_optimizer(
                 adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
             )
+        case Optimizer.ADOPT:
+            from pytorch_optimizer.optimizer.adopt import ADOPT
+            optimizer = ADOPT(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else False,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                cautious=optimizer_config.cautious if optimizer_config.cautious is not None else False,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
+            )
+
 
     if state_dict is not None and optimizer is not None:
         if 'param_group_mapping' not in state_dict:
@@ -1004,7 +1018,7 @@ def create_lr_scheduler(
         config: TrainConfig,
         optimizer: torch.optim.Optimizer,
         learning_rate_scheduler: LearningRateScheduler,
-        warmup_steps: float,
+        warmup_steps: int | float,
         num_cycles: float,
         num_epochs: int,
         batch_size: int,

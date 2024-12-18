@@ -19,6 +19,7 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -108,6 +109,10 @@ class BasePixArtAlphaSetup(
             ],
             config.enable_autocast_cache,
         )
+
+        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype)
+        quantize_layers(model.vae, self.train_device, model.train_dtype)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype)
 
     def _setup_additional_embeddings(
             self,
@@ -254,7 +259,7 @@ class BasePixArtAlphaSetup(
 
                 truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device, self.temp_device)
+                checkpointed_transformer = create_checkpointed_forward(model.transformer, self.train_device)
 
                 for step in range(config.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \

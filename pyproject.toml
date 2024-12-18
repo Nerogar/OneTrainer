@@ -16,7 +16,7 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF"]
-ignore = ["BLE001", "E402", "E501", "B024", "PGH003", "RET504", "RET505", "SIM102", "UP015"]
+ignore = ["BLE001", "E402", "E501", "B024", "PGH003", "RET504", "RET505", "SIM102", "UP015", "PYI041"]
 
 [tool.ruff.lint.isort.sections]
 hf = ["diffusers*", "transformers*"]

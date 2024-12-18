@@ -23,7 +23,8 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 
 :install_dependencies
 echo installing dependencies
-%PYTHON% -m pip install -r requirements.txt --upgrade-strategy eager
+%PYTHON% -m pip install --upgrade --upgrade-strategy eager pip setuptools
+%PYTHON% -m pip install --upgrade --upgrade-strategy eager -r requirements.txt
 
 :end_success
 echo.

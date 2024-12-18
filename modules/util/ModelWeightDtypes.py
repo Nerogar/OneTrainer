@@ -6,6 +6,8 @@ from modules.util.enum.DataType import DataType
 class ModelWeightDtypes:
     def __init__(
             self,
+            train_dtype: DataType,
+            fallback_train_dtype: DataType,
             unet: DataType,
             prior: DataType,
             text_encoder: DataType,
@@ -19,6 +21,9 @@ class ModelWeightDtypes:
             lora: DataType,
             embedding: DataType,
     ):
+        self.train_dtype = train_dtype
+        self.fallback_train_dtype = fallback_train_dtype
+
         self.unet = unet
         self.prior = prior
         self.text_encoder = text_encoder

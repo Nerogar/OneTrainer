@@ -44,7 +44,7 @@ def lr_lambda_cosine_with_restarts(
         num_cycles: float,
 ):
     def lr_lambda(current_step: int):
-        progress = float(current_step) / float(scheduler_steps)
+        progress = float(min(current_step, scheduler_steps - 1)) / float(scheduler_steps)
         schedule = math.cos(progress * 2.0 * math.pi * num_cycles)
         return max(0.0, 0.5 * (1.0 + schedule))
 
@@ -56,7 +56,7 @@ def lr_lambda_cosine_with_hard_restarts(
         num_cycles: float,
 ):
     def lr_lambda(current_step: int):
-        progress = float(current_step) / float(scheduler_steps)
+        progress = float(min(current_step, scheduler_steps - 1)) / float(scheduler_steps)
         schedule = math.cos(((progress * num_cycles) % 1.0) * math.pi)
         return max(0.0, 0.5 * (1.0 + schedule))
 

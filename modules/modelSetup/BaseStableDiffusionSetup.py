@@ -19,6 +19,7 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -89,6 +90,10 @@ class BaseStableDiffusionSetup(
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
             config.weight_dtypes().embedding if config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
+
+        quantize_layers(model.text_encoder, self.train_device, model.train_dtype)
+        quantize_layers(model.vae, self.train_device, model.train_dtype)
+        quantize_layers(model.unet, self.train_device, model.train_dtype)
 
     def _setup_additional_embeddings(
             self,
@@ -217,7 +222,7 @@ class BaseStableDiffusionSetup(
                             1.0 - config.align_prop_truncate_steps))
                 truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
 
-                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device, self.temp_device)
+                checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device)
 
                 for step in range(config.align_prop_steps):
                     timestep = model.noise_scheduler.timesteps[step] \

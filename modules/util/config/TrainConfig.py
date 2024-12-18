@@ -90,6 +90,7 @@ class TrainOptimizerConfig(BaseConfig):
     adanorm: bool
     adam_debias: bool
     slice_p: int
+    cautious: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -158,6 +159,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("adanorm", False, bool, False))
         data.append(("adam_debias", False, bool, False))
         data.append(("slice_p", None, int, True))
+        data.append(("cautious", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -173,6 +175,7 @@ class TrainModelPartConfig(BaseConfig):
     dropout_probability: float
     train_embedding: bool
     attention_mask: bool
+    guidance_scale: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -192,6 +195,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
+        data.append(("guidance_scale", 1.0, float, False))
 
         return TrainModelPartConfig(data)
 
@@ -249,6 +253,8 @@ class TrainConfig(BaseConfig):
     output_model_format: ModelFormat
     output_model_destination: str
     gradient_checkpointing: GradientCheckpointingMethod
+    enable_async_offloading: bool
+    enable_activation_offloading: bool
     layer_offload_fraction: float
     force_circular_padding: bool
 
@@ -553,7 +559,7 @@ class TrainConfig(BaseConfig):
     def __migration_4(self, data: dict) -> dict:
         migrated_data = data.copy()
 
-        gradient_checkpointing = migrated_data.pop("gradient_checkpointing")
+        gradient_checkpointing = migrated_data.pop("gradient_checkpointing", True)
 
         if gradient_checkpointing:
             migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.ON
@@ -565,13 +571,17 @@ class TrainConfig(BaseConfig):
     def __migration_5(self, data: dict) -> dict:
         migrated_data = data.copy()
 
-        migrated_data["save_every"] = migrated_data.pop("save_after")
-        migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
+        if "save_after" in migrated_data:
+            migrated_data["save_every"] = migrated_data.pop("save_after")
+        if "save_after_unit" in migrated_data:
+            migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
 
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
+            self.train_dtype,
+            self.fallback_train_dtype,
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
             self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
@@ -698,6 +708,8 @@ class TrainConfig(BaseConfig):
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
+        data.append(("enable_async_offloading", True, bool, False))
+        data.append(("enable_activation_offloading", True, bool, False))
         data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
 
@@ -713,8 +725,8 @@ class TrainConfig(BaseConfig):
         data.append(("custom_learning_rate_scheduler", None, str, True))
         data.append(("scheduler_params", [], list[dict[str, str]], True))
         data.append(("learning_rate", 3e-6, float, False))
-        data.append(("learning_rate_warmup_steps", 200, float, False))
-        data.append(("learning_rate_cycles", 1, int, False))
+        data.append(("learning_rate_warmup_steps", 200.0, float, False))
+        data.append(("learning_rate_cycles", 1.0, float, False))
         data.append(("epochs", 100, int, False))
         data.append(("batch_size", 1, int, False))
         data.append(("gradient_accumulation_steps", 1, int, False))
