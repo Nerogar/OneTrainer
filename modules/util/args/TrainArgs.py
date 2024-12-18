@@ -17,6 +17,8 @@ class TrainArgs(BaseArgs):
         # @formatter:off
 
         parser.add_argument("--config-path", type=str, required=True, dest="config_path", help="The path to the config file")
+        parser.add_argument("--callback-path", type=str, required=False, dest="callback_path", help="The path to the callback pickle file")
+        parser.add_argument("--command-path", type=str, required=False, dest="command_path", help="The path to the command pickle file")
 
         # @formatter:on
 
@@ -30,5 +32,7 @@ class TrainArgs(BaseArgs):
 
         # name, default value, data type, nullable
         data.append(("config_path", None, str, True))
+        data.append(("callback_path", None, str, True))
+        data.append(("command_path", None, str, True))
 
         return TrainArgs(data)
