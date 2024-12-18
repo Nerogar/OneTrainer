@@ -61,7 +61,7 @@ class StableDiffusionXLBaseDataLoader(
     def get_data_loader(self) -> TrainDataLoader:
         return self.__dl
 
-    def _preparation_modules(self, config: TrainConfig, model: StableDiffusionXLModel):
+    def _preparation_modules(self, config: TrainConfig, model: StableDiffusionXLModel) -> list:
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
@@ -96,7 +96,7 @@ class StableDiffusionXLBaseDataLoader(
 
         return modules
 
-    def _cache_modules(self, config: TrainConfig, model: StableDiffusionXLModel):
+    def _cache_modules(self, config: TrainConfig, model: StableDiffusionXLModel) -> list:
         image_split_names = ['latent_image', 'original_resolution', 'crop_offset']
 
         if config.masked_training or config.model_type.has_mask_input():
@@ -169,7 +169,7 @@ class StableDiffusionXLBaseDataLoader(
 
         return modules
 
-    def _output_modules(self, config: TrainConfig, model: StableDiffusionXLModel):
+    def _output_modules(self, config: TrainConfig, model: StableDiffusionXLModel) -> list:
         output_names = [
             'image_path', 'latent_image',
             'tokens_1', 'tokens_2',
@@ -215,7 +215,7 @@ class StableDiffusionXLBaseDataLoader(
             train_dtype=model.vae_train_dtype,
         )
 
-    def _debug_modules(self, config: TrainConfig, model: StableDiffusionXLModel):
+    def _debug_modules(self, config: TrainConfig, model: StableDiffusionXLModel) -> list:
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
@@ -259,7 +259,7 @@ class StableDiffusionXLBaseDataLoader(
             model: StableDiffusionXLModel,
             train_progress: TrainProgress,
             is_validation: bool = False,
-    ):
+    ) -> MGDS:
         enumerate_input = self._enumerate_input_modules(config)
         load_input = self._load_input_modules(config, model.vae_train_dtype, model.add_embeddings_to_prompt)
         mask_augmentation = self._mask_augmentation_modules(config)
