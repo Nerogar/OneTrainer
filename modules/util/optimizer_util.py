@@ -269,6 +269,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_coef": 1.0,
         "growth_rate": float('inf'),
         "fsdp_in_use": False,
+        "slice_p": 11,
     },
     Optimizer.DADAPT_ADA_GRAD: {
         "momentum": 0,
