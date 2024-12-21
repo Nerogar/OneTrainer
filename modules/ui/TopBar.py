@@ -87,6 +87,7 @@ class TopBar:
                 ("PixArt Sigma", ModelType.PIXART_SIGMA),
                 ("Flux Dev", ModelType.FLUX_DEV_1),
                 ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
+                ("Sana", ModelType.SANA),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -110,7 +111,8 @@ class TopBar:
                 or self.train_config.model_type.is_stable_diffusion_xl() \
                 or self.train_config.model_type.is_wuerstchen() \
                 or self.train_config.model_type.is_pixart() \
-                or self.train_config.model_type.is_flux():
+                or self.train_config.model_type.is_flux() \
+                or self.train_config.model_type.is_sana():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

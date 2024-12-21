@@ -52,6 +52,8 @@ class ModelTab:
             self.__setup_pixart_alpha_ui()
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui()
+        elif self.train_config.model_type.is_sana():
+            self.__setup_sana_ui()
 
     def __setup_stable_diffusion_ui(self):
         row = 0
@@ -150,6 +152,22 @@ class ModelTab:
         )
 
     def __setup_pixart_alpha_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            has_text_encoder=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_checkpoint=True,
+        )
+
+    def __setup_sana_ui(self):
         row = 0
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
