@@ -8,5 +8,6 @@
         "train": false,
         "weight_dtype": "BFLOAT_16"
     },
-    "training_method": "FINE_TUNE"
+    "training_method": "FINE_TUNE",
+    "train_dtype": "BFLOAT_16"
 }
