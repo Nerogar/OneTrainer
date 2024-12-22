@@ -33,7 +33,7 @@ dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.2.2 # lion optimizer
 prodigyopt==1.0 # prodigy optimizer
 schedulefree==1.3.0 # schedule-free optimizers
-pytorch_optimizer==3.1.2 # pytorch optimizers
+pytorch_optimizer==3.3.0 # pytorch optimizers
 
 # Profiling
 scalene==1.5.45
