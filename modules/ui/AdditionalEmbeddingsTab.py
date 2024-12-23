@@ -54,7 +54,7 @@ class EmbeddingWidget(ctk.CTkFrame):
 
         bottom_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
         bottom_frame.grid(row=1, column=0, sticky="nsew")
-        bottom_frame.grid_columnconfigure(5, weight=1)
+        bottom_frame.grid_columnconfigure(7, weight=1)
 
         # close button
         close_button = ctk.CTkButton(
@@ -104,15 +104,21 @@ class EmbeddingWidget(ctk.CTkFrame):
         trainable_switch = components.switch(bottom_frame, 0, 1, self.ui_state, "train")
         trainable_switch.configure(width=40)
 
+        # output embedding
+        components.label(bottom_frame, 0, 2, "output embedding:",
+                         tooltip="Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage.")
+        output_embedding_switch = components.switch(bottom_frame, 0, 3, self.ui_state, "is_output_embedding")
+        output_embedding_switch.configure(width=40)
+
         # stop training after
-        components.label(bottom_frame, 0, 2, "stop training after:",
+        components.label(bottom_frame, 0, 4, "stop training after:",
                          tooltip="When to stop training the embedding")
-        components.time_entry(bottom_frame, 0, 3, self.ui_state, "stop_training_after", "stop_training_after_unit")
+        components.time_entry(bottom_frame, 0, 5, self.ui_state, "stop_training_after", "stop_training_after_unit")
 
         # initial embedding text
-        components.label(bottom_frame, 0, 4, "initial embedding text:",
+        components.label(bottom_frame, 0, 6, "initial embedding text:",
                          tooltip="The initial embedding text used when creating a new embedding")
-        components.entry(bottom_frame, 0, 5, self.ui_state, "initial_embedding_text")
+        components.entry(bottom_frame, 0, 7, self.ui_state, "initial_embedding_text")
 
     def __randomize_uuid(self, embedding_config: TrainEmbeddingConfig):
         embedding_config.uuid = TrainEmbeddingConfig.default_values().uuid

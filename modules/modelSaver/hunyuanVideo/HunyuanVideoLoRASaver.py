@@ -31,10 +31,16 @@ class HunyuanVideoLoRASaver(
 
         if model.additional_embeddings and model.train_config.bundle_additional_embeddings:
             for embedding in model.additional_embeddings:
-                if embedding.text_encoder_1_vector is not None:
-                    state_dict[f"bundle_emb.{embedding.placeholder}.llama"] = embedding.text_encoder_1_vector
-                if embedding.text_encoder_2_vector is not None:
-                    state_dict[f"bundle_emb.{embedding.placeholder}.clip_l"] = embedding.text_encoder_2_vector
+                if embedding.text_encoder_1_embedding.vector is not None:
+                    state_dict[f"bundle_emb.{embedding.placeholder}.llama"] = embedding.text_encoder_1_embedding.vector
+                if embedding.text_encoder_2_embedding.vector is not None:
+                    state_dict[f"bundle_emb.{embedding.placeholder}.clip_l"] = embedding.text_encoder_2_embedding.vector
+                if embedding.text_encoder_1_embedding.output_vector is not None:
+                    state_dict[f"bundle_emb.{embedding.placeholder}.llama_out"] = \
+                        embedding.text_encoder_1_embedding.output_vector
+                if embedding.text_encoder_2_embedding.output_vector is not None:
+                    state_dict[f"bundle_emb.{embedding.placeholder}.clip_l_out"] = \
+                        embedding.text_encoder_2_embedding.output_vector
 
         return state_dict
 

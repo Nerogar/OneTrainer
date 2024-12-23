@@ -1,8 +1,10 @@
 from abc import ABCMeta
 
+from modules.model.BaseModel import BaseModelEmbedding
+
 import torch
 import torch.nn.functional as F
-from torch import Tensor, nn
+from torch import nn
 
 from transformers import PreTrainedTokenizer
 
@@ -11,25 +13,19 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
     tokenizer: PreTrainedTokenizer
     prefix: str
     orig_module: nn.Embedding
-    additional_embeddings: list[Tensor]
-    additional_embedding_placeholders: list[str]
-    additional_embedding_names: list[str]
+    embeddings: list[BaseModelEmbedding]
 
     def __init__(
             self,
             tokenizer: PreTrainedTokenizer,
             orig_module: nn.Embedding,
-            additional_embeddings: list[Tensor],
-            additional_embedding_placeholders: list[str],
-            additional_embedding_names: list[str],
+            embeddings: list[BaseModelEmbedding],
     ):
         super().__init__()
 
         self.orig_module = orig_module
-        self.additional_embeddings = additional_embeddings
-        self.additional_embedding_placeholders = additional_embedding_placeholders
-        self.additional_embedding_names = additional_embedding_names
-        self.original_token_count = len(tokenizer) - sum(x.shape[0] for x in self.additional_embeddings)
+        self.embeddings = embeddings
+        self.original_token_count = len(tokenizer) - sum(embedding.token_count for embedding in self.embeddings)
 
         self.is_applied = False
         self.orig_forward = self.orig_module.forward
@@ -37,8 +33,8 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
     def forward(self, x, *args, **kwargs):
         if torch.is_grad_enabled() \
-                and len(self.additional_embeddings) > 0 \
-                and all(not x.requires_grad for x in self.additional_embeddings):
+                and len(self.embeddings) > 0 \
+                and all(not embedding.requires_grad() for embedding in self.embeddings):
             # This dummy tensor ensures that the following operation always has a grad_fn
             # if an additional embedding exists and is trained. This fixes an issue with
             # a combination of gradient checkpointing, layer offloading and additional
@@ -51,14 +47,17 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
         # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create
         orig_module_weight = self.orig_module.weight[0:self.original_token_count]
-        weight = torch.cat([orig_module_weight] + self.additional_embeddings + dummy, dim=0)
+        weight = torch.cat(
+            [orig_module_weight] \
+            + [embedding.vector for embedding in self.embeddings] \
+            + dummy,
+            dim=0
+        )
+
         return F.embedding(
             input=x,
             weight=weight,
         )
-
-    def parameters(self):
-        return self.additional_embeddings
 
     def hook_to_module(self):
         if not self.is_applied:
@@ -72,8 +71,8 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
     def normalize_embeddings(self):
         with torch.no_grad():
-            for additional_embedding in self.additional_embeddings:
-                if additional_embedding.requires_grad:  # only normalize if the embedding is learned
-                    copy = torch.nn.functional.normalize(additional_embedding)
+            for embedding in self.embeddings:
+                if embedding.requires_grad:  # only normalize if the embedding is learned
+                    copy = torch.nn.functional.normalize(embedding.vector)
                     copy.mul_(self.orig_median_norm)
-                    additional_embedding.copy_(copy)
+                    embedding.vector.copy_(copy)

@@ -88,7 +88,7 @@ class HunyuanVideoEmbeddingSetup(
 
         model.tokenizer_1 = copy.deepcopy(model.orig_tokenizer_1)
         model.tokenizer_2 = copy.deepcopy(model.orig_tokenizer_2)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)

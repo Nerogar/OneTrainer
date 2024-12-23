@@ -1,6 +1,7 @@
 from abc import ABCMeta
 
-from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
+from modules.model.BaseModel import BaseModelEmbedding
+from modules.util.config.TrainConfig import TrainEmbeddingConfig
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 
 import torch
@@ -34,50 +35,61 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _create_new_embedding(
             self,
+            embedding_config: TrainEmbeddingConfig,
             tokenizer: PreTrainedTokenizer,
             text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel,
-            initial_embedding_text: str,
-            token_count: int | None,
     ) -> Tensor:
         with torch.no_grad():
-            initial_token_ids = tokenizer.encode(
-                initial_embedding_text,
+            initial_token_ids = tokenizer(
+                embedding_config.initial_embedding_text,
+                padding='do_not_pad',
+                truncation=embedding_config.token_count is not None,
                 add_special_tokens=False,
-                max_length=token_count,
-            )
-            pad_token_id = tokenizer.encode(
+                max_length=embedding_config.token_count,
+            ).input_ids
+            pad_token_id = tokenizer(
                 '*',
+                padding='do_not_pad',
+                truncation=True,
                 add_special_tokens=False,
                 max_length=1,
-            )[0]
+            ).input_ids[0]
 
-            if token_count is not None:
-                initial_token_ids += [pad_token_id] * (token_count - len(initial_token_ids))
+            if embedding_config.token_count is not None:
+                initial_token_ids += [pad_token_id] * (embedding_config.token_count - len(initial_token_ids))
 
             all_embeddings = text_encoder.get_input_embeddings().weight.data
             initial_embeddings = [all_embeddings[token_id] for token_id in initial_token_ids]
             return torch.stack(initial_embeddings)
 
-    def _add_embedding_to_tokenizer(
+    def _add_embeddings_to_tokenizer(
             self,
             tokenizer: PreTrainedTokenizer,
-            embedding: list[str],
+            embeddings: list[BaseModelEmbedding],
     ) -> (Tensor, list[bool]):
-        tokenizer.add_tokens(embedding)
+        for embedding in embeddings:
+            tokenizer.add_tokens(embedding.text_tokens)
 
     def _add_embedding_param_groups(
             self,
-            embedding_wrapper: AdditionalEmbeddingWrapper,
+            embeddings: list[BaseModelEmbedding],
             parameter_group_collection: NamedParameterGroupCollection,
             embedding_learning_rate: float,
             prefix: str,
     ):
-        for parameter, placeholder, name in zip(embedding_wrapper.additional_embeddings,
-                                                embedding_wrapper.additional_embedding_placeholders,
-                                                embedding_wrapper.additional_embedding_names, strict=True):
+        for embedding in embeddings:
+            parameter = embedding.output_vector if embedding.is_output_embedding else embedding.vector
             parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name=f"{prefix}/{name}",
-                display_name=f"{prefix}/{placeholder}",
+                unique_name=f"{prefix}/{embedding.uuid}",
+                display_name=f"{prefix}/{embedding.placeholder}",
                 parameters=[parameter],
                 learning_rate=embedding_learning_rate,
             ))
+
+    def _normalize_output_embeddings(self, embeddings: list[BaseModelEmbedding], target_norm: float):
+        with torch.no_grad():
+            for embedding in embeddings:
+                if embedding.is_output_embedding and embedding.output_vector.requires_grad:
+                    copy = torch.nn.functional.normalize(embedding.output_vector)
+                    copy.mul_(target_norm)
+                    embedding.output_vector.copy_(copy)

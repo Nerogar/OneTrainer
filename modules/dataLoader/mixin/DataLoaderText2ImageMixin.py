@@ -18,7 +18,6 @@ from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
-from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.ModifyPath import ModifyPath
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
@@ -66,7 +65,6 @@ class DataLoaderText2ImageMixin:
             self,
             config: TrainConfig,
             train_dtype: DataType,
-            replace_embedding_text_fn: Callable[[str], str],
     ) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, dtype=train_dtype.torch_dtype())
 
@@ -83,8 +81,6 @@ class DataLoaderText2ImageMixin:
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
-        map_embedding_text = MapData(in_name='prompt', out_name='prompt', map_fn=replace_embedding_text_fn)
-
         modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 
         if config.masked_training:
@@ -92,8 +88,6 @@ class DataLoaderText2ImageMixin:
             modules.append(load_mask)
         elif config.model_type.has_mask_input():
             modules.append(generate_mask)
-
-        modules.append(map_embedding_text)
 
         return modules
 
