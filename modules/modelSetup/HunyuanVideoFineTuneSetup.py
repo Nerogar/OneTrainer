@@ -66,6 +66,12 @@ class HunyuanVideoFineTuneSetup(
                 learning_rate=config.prior.learning_rate,
             ))
 
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name="output_embedding",
+            parameters=[model.output_embedding],
+            learning_rate=config.prior.learning_rate,
+        ))
+
         return parameter_group_collection
 
     def __setup_requires_grad(
@@ -104,6 +110,8 @@ class HunyuanVideoFineTuneSetup(
 
         model.vae.requires_grad_(False)
 
+        model.output_embedding.requires_grad_(True)
+
     def setup_model(
             self,
             model: HunyuanVideoModel,
@@ -117,8 +125,9 @@ class HunyuanVideoFineTuneSetup(
 
         model.tokenizer_1 = copy.deepcopy(model.orig_tokenizer_1)
         model.tokenizer_2 = copy.deepcopy(model.orig_tokenizer_2)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
+        model.output_embedding = torch.zeros(size=(4, 4096), dtype=config.train_dtype.torch_dtype(), device=self.train_device)
         self.__setup_requires_grad(model, config)
 
         init_model_parameters(model, self.create_parameters(model, config), self.train_device)

@@ -215,6 +215,7 @@ class TrainEmbeddingConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     token_count: int | None
     initial_embedding_text: str
+    is_output_embedding: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -232,6 +233,7 @@ class TrainEmbeddingConfig(BaseConfig):
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("token_count", 1, int, True))
         data.append(("initial_embedding_text", "*", str, False))
+        data.append(("is_output_embedding", False, bool, False))
 
         return TrainEmbeddingConfig(data)
 
@@ -633,8 +635,12 @@ class TrainConfig(BaseConfig):
         )
 
     def train_any_embedding(self) -> bool:
-        return self.training_method == TrainingMethod.EMBEDDING \
-            or any(embedding.train for embedding in self.additional_embeddings)
+        return ((self.training_method == TrainingMethod.EMBEDDING) and not self.embedding.is_output_embedding) \
+            or any((embedding.train and not embedding.is_output_embedding) for embedding in self.additional_embeddings)
+
+    def train_any_output_embedding(self) -> bool:
+        return ((self.training_method == TrainingMethod.EMBEDDING) and self.embedding.is_output_embedding) \
+            or any((embedding.train and embedding.is_output_embedding) for embedding in self.additional_embeddings)
 
     def train_text_encoder_or_embedding(self) -> bool:
         return (self.text_encoder.train and self.training_method != TrainingMethod.EMBEDDING) \
@@ -650,6 +656,12 @@ class TrainConfig(BaseConfig):
         return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING) \
             or ((self.text_encoder_3.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
+
+    def all_embedding_configs(self):
+        if self.training_method == TrainingMethod.EMBEDDING:
+            return self.additional_embeddings + [self.embedding]
+        else:
+            return self.additional_embeddings
 
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")

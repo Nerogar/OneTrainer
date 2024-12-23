@@ -192,12 +192,9 @@ class HunyuanVideoSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
-        negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
-
         sampler_output = self.__sample_base(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
+            prompt=sample_config.prompt,
+            negative_prompt=sample_config.negative_prompt,
             height=self.quantize_resolution(sample_config.height, 64),
             width=self.quantize_resolution(sample_config.width, 64),
             num_frames=self.quantize_resolution(sample_config.frames - 1, 4) + 1,

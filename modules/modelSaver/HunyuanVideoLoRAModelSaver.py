@@ -1,3 +1,5 @@
+import os
+
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.hunyuanVideo.HunyuanVideoEmbeddingSaver import HunyuanVideoEmbeddingSaver
@@ -28,6 +30,11 @@ class HunyuanVideoLoRAModelSaver(
         lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
         if not model.train_config.bundle_additional_embeddings:
             embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
+
+        torch.save(
+            {"output_embedding": model.output_embedding},
+            os.path.join(output_model_destination, "output_embedding.pt")
+        )
 
         if output_model_format == ModelFormat.INTERNAL:
             self._save_internal_data(model, output_model_destination)

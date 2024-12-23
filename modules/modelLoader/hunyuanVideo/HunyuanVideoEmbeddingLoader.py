@@ -17,25 +17,15 @@ class HunyuanVideoEmbeddingLoader:
     def __load_embedding(
             self,
             embedding_name: str,
-    ) -> tuple[Tensor, Tensor] | None:
+    ) -> dict[str, Tensor] | None:
         if embedding_name == "":
             return None
 
         with contextlib.suppress(Exception):
-            embedding_state = torch.load(embedding_name, weights_only=True)
-
-            text_encoder_1_vector = embedding_state.get("llama", None)
-            text_encoder_2_vector = embedding_state.get("clip_l", None)
-
-            return text_encoder_1_vector, text_encoder_2_vector
+            return torch.load(embedding_name, weights_only=True)
 
         with contextlib.suppress(Exception):
-            embedding_state = load_file(embedding_name)
-
-            text_encoder_1_vector = embedding_state.get("llama", None)
-            text_encoder_2_vector = embedding_state.get("clip_l", None)
-
-            return text_encoder_1_vector, text_encoder_2_vector
+            return load_file(embedding_name)
 
         raise Exception(f"could not load embedding: {embedding_name}")
 
@@ -44,7 +34,7 @@ class HunyuanVideoEmbeddingLoader:
             directory: str,
             embedding_name: EmbeddingName,
             load_single: bool,
-    ) -> tuple[Tensor, Tensor] | None:
+    ) -> dict[str, Tensor] | None:
         if os.path.exists(os.path.join(directory, "meta.json")):
             if load_single:
                 safetensors_embedding_name = os.path.join(
@@ -71,14 +61,14 @@ class HunyuanVideoEmbeddingLoader:
             model: HunyuanVideoModel,
             model_names: ModelNames,
     ):
-        model.additional_embedding_states = []
-
         for embedding_name in model_names.additional_embeddings:
             try:
-                model.additional_embedding_states.append(self.__load_internal(model_names.base_model, embedding_name, False))
+                model.additional_embedding_state_dicts[embedding_name.uuid] = \
+                    self.__load_internal(model_names.base_model, embedding_name, False)
             except Exception as e1:  # noqa: PERF203
                 try:
-                    model.additional_embedding_states.append(self.__load_embedding(embedding_name.model_name))
+                    model.additional_embedding_state_dicts[embedding_name.uuid] = \
+                        self.__load_embedding(embedding_name.model_name)
                 except Exception as e2:
                     e2.__cause__ = e1
                     raise Exception(f"could not load embedding: {embedding_name}") from e2

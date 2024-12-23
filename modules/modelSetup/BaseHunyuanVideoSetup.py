@@ -107,31 +107,29 @@ class BaseHunyuanVideoSetup(
 
         model.vae.enable_tiling()
 
-    def _setup_additional_embeddings(
+    def _setup_embeddings(
             self,
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
         model.additional_embeddings = []
-        for i, embedding_config in enumerate(config.additional_embeddings):
-            embedding_state = model.additional_embedding_states[i]
+        for embedding_config in config.all_embedding_configs():
+            embedding_state = model.additional_embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
                 if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
                     embedding_state_1 = self._create_new_embedding(
+                        embedding_config,
                         model.tokenizer_1,
                         model.text_encoder_1,
-                        config.additional_embeddings[i].initial_embedding_text,
-                        config.additional_embeddings[i].token_count,
                     )
                 else:
                     embedding_state_1 = None
 
                 if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
                     embedding_state_2 = self._create_new_embedding(
+                        embedding_config,
                         model.tokenizer_2,
                         model.text_encoder_2,
-                        config.additional_embeddings[i].initial_embedding_text,
-                        config.additional_embeddings[i].token_count,
                     )
                 else:
                     embedding_state_2 = None
@@ -155,66 +153,14 @@ class BaseHunyuanVideoSetup(
                 embedding_state_1,
                 embedding_state_2,
                 embedding_config.placeholder,
+                embedding_config.is_output_embedding,
             )
             model.additional_embeddings.append(embedding)
-            if model.tokenizer_1 is not None:
-                self._add_embedding_to_tokenizer(model.tokenizer_1, embedding.text_tokens)
-            if model.tokenizer_2 is not None:
-                self._add_embedding_to_tokenizer(model.tokenizer_2, embedding.text_tokens)
 
-    def _setup_embedding(
-            self,
-            model: HunyuanVideoModel,
-            config: TrainConfig,
-    ):
-        model.embedding = None
-
-        embedding_state = model.embedding_state
-        if embedding_state is None:
-            if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
-                embedding_state_1 = self._create_new_embedding(
-                    model.tokenizer_1,
-                    model.text_encoder_1,
-                    config.embedding.initial_embedding_text,
-                    config.embedding.token_count,
-                )
-            else:
-                embedding_state_1 = None
-
-            if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
-                embedding_state_2 = self._create_new_embedding(
-                    model.tokenizer_2,
-                    model.text_encoder_2,
-                    config.embedding.initial_embedding_text,
-                    config.embedding.token_count,
-                )
-            else:
-                embedding_state_2 = None
-        else:
-            embedding_state_1, embedding_state_2 = embedding_state
-
-        if embedding_state_1 is not None:
-            embedding_state_1 = embedding_state_1.to(
-                dtype=model.text_encoder_1.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
-
-        if embedding_state_2 is not None:
-            embedding_state_2 = embedding_state_2.to(
-                dtype=model.text_encoder_2.get_input_embeddings().weight.dtype,
-                device=self.train_device,
-            ).detach()
-
-        model.embedding = HunyuanVideoModelEmbedding(
-            config.embedding.uuid,
-            embedding_state_1,
-            embedding_state_2,
-            config.embedding.placeholder,
-        )
         if model.tokenizer_1 is not None:
-            self._add_embedding_to_tokenizer(model.tokenizer_1, model.embedding.text_tokens)
+            self._add_embeddings_to_tokenizer(model.tokenizer_1, model.all_text_encoder_1_embeddings())
         if model.tokenizer_2 is not None:
-            self._add_embedding_to_tokenizer(model.tokenizer_2, model.embedding.text_tokens)
+            self._add_embeddings_to_tokenizer(model.tokenizer_2, model.all_text_encoder_2_embeddings())
 
     def _setup_embedding_wrapper(
             self,
@@ -225,23 +171,13 @@ class BaseHunyuanVideoSetup(
             model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer_1,
                 orig_module=model.text_encoder_1.embed_tokens,
-                additional_embeddings=[embedding.text_encoder_1_vector for embedding in model.additional_embeddings]
-                                      + ([] if model.embedding is None else [model.embedding.text_encoder_1_vector]),
-                additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
-                additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                           + ([] if model.embedding is None else [model.embedding.uuid]),
+                embeddings=model.all_text_encoder_1_embeddings(),
             )
         if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
             model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer_2,
                 orig_module=model.text_encoder_2.text_model.embeddings.token_embedding,
-                additional_embeddings=[embedding.text_encoder_2_vector for embedding in model.additional_embeddings]
-                                      + ([] if model.embedding is None else [model.embedding.text_encoder_2_vector]),
-                additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
-                additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                           + ([] if model.embedding is None else [model.embedding.uuid]),
+                embeddings=model.all_text_encoder_2_embeddings(),
             )
 
         if model.embedding_wrapper_1 is not None:
