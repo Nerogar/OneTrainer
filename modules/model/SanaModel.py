@@ -47,9 +47,11 @@ class SanaModel(BaseModel):
     # autocast context
     autocast_context: torch.autocast | nullcontext
     text_encoder_autocast_context: torch.autocast | nullcontext
+    vae_autocast_context: torch.autocast | nullcontext
 
     train_dtype: DataType
     text_encoder_train_dtype: DataType
+    vae_train_dtype: DataType
 
     text_encoder_offload_conductor: LayerOffloadConductor | None
     transformer_offload_conductor: LayerOffloadConductor | None
@@ -81,9 +83,11 @@ class SanaModel(BaseModel):
 
         self.autocast_context = nullcontext()
         self.text_encoder_autocast_context = nullcontext()
+        self.vae_autocast_context = nullcontext()
 
         self.train_dtype = DataType.FLOAT_32
         self.text_encoder_train_dtype = DataType.FLOAT_32
+        self.vae_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_offload_conductor = None
         self.transformer_offload_conductor = None

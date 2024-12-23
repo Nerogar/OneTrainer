@@ -103,6 +103,16 @@ class BaseSanaSetup(
             config.enable_autocast_cache,
         )
 
+        model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            config.fallback_train_dtype,
+            [
+                config.weight_dtypes().vae,
+            ],
+            config.enable_autocast_cache,
+        )
+
         quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype)
         quantize_layers(model.vae, self.train_device, model.train_dtype)
         quantize_layers(model.transformer, self.train_device, model.train_dtype)
