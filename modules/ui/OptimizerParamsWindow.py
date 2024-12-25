@@ -101,7 +101,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'd_coef': {'title': 'D Coefficient', 'tooltip': 'Coefficient in the expression for the estimate of d.', 'type': 'float'},
             'dampening': {'title': 'Dampening', 'tooltip': 'Dampening for optimizer_momentum.', 'type': 'float'},
             'decay_rate': {'title': 'Decay Rate', 'tooltip': 'Rate of decay for moment estimation.', 'type': 'float'},
-            'decouple': {'title': 'Decouple', 'tooltip': 'Use AdamW style optimizer_decoupled weight decay.', 'type': 'bool'},
             'differentiable': {'title': 'Differentiable', 'tooltip': 'Whether the optimization function is optimizer_differentiable.', 'type': 'bool'},
             'eps': {'title': 'EPS', 'tooltip': 'A small value to prevent division by zero.', 'type': 'float'},
             'eps2': {'title': 'EPS 2', 'tooltip': 'A small value to prevent division by zero.', 'type': 'float'},
@@ -161,7 +160,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         # Extract the keys for the selected optimizer
         for index, key in enumerate(OPTIMIZER_DEFAULT_PARAMETERS[selected_optimizer].keys()):
             if selected_optimizer == Optimizer.PRODIGY_PLUS_SCHEDULE_FREE and key not in [
-                'beta1', 'beta2', 'eps', 'weight_decay', 'decouple', 'use_bias_correction', 'safeguard_warmup', 'd0', 'd_coef', 'growth_rate', 'fsdp_in_use', 'split_groups', 'split_groups_mean', 'factored', 'fused_back_pass', 'use_stableadamw', 'use_muon_pp', 'use_cautious', 'use_adopt'
+                'beta1', 'beta2', 'eps', 'weight_decay', 'use_bias_correction', 'safeguard_warmup', 'd0', 'd_coef', 'growth_rate', 'fsdp_in_use', 'split_groups', 'split_groups_mean', 'factored', 'fused_back_pass', 'use_stableadamw', 'use_muon_pp', 'use_cautious', 'use_adopt'
             ]:
                 continue
 
