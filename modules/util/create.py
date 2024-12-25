@@ -529,7 +529,7 @@ def create_optimizer(
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
-                       optimizer_config.beta3 if optimizer_config.beta1 is not None else 0.9999,),
+                       optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 1e-2,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
