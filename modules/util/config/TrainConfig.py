@@ -90,6 +90,13 @@ class TrainOptimizerConfig(BaseConfig):
     adanorm: bool
     adam_debias: bool
     cautious: bool
+    split_groups: bool
+    split_groups_mean: bool
+    factored: bool
+    use_stableadamw: bool
+    use_muon_pp: bool
+    use_cautious: bool
+    use_adopt: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -158,6 +165,13 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("adanorm", False, bool, False))
         data.append(("adam_debias", False, bool, False))
         data.append(("cautious", False, bool, False))
+        data.append(("split_groups", True, bool, False))
+        data.append(("split_groups_mean", True, bool, False))
+        data.append(("factored", True, bool, False))
+        data.append(("use_stableadamw", True, bool, False))
+        data.append(("use_muon_pp", False, bool, False))
+        data.append(("use_cautious", False, bool, False))
+        data.append(("use_adopt", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
