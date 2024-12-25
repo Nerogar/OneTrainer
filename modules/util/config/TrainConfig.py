@@ -98,6 +98,16 @@ class TrainOptimizerConfig(BaseConfig):
     use_cautious: bool
     use_adopt: bool
     prodigy_steps: int
+    use_adopt: bool
+    use_cautious: bool
+    use_muon_pp: bool
+    use_stableadamw: bool
+    weight_decay_by_lr: bool
+    factored: bool
+    split_groups: bool
+    split_groups_mean: bool
+    fused_back_pass: bool
+
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)

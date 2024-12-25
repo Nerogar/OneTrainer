@@ -817,10 +817,8 @@ def create_optimizer(
                 params=parameters,
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),                
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
                 safeguard_warmup=optimizer_config.safeguard_warmup if optimizer_config.safeguard_warmup is not None else False,
                 d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
@@ -831,22 +829,18 @@ def create_optimizer(
 
         # PRODIGY_PLUS_SCHEDULE_FREE Optimizer
         case Optimizer.PRODIGY_PLUS_SCHEDULE_FREE:
-            from prodigyplus.prodigy_plus_schedulefree import ProdigyPlusScheduleFree
+            from prodigyplus import ProdigyPlusScheduleFree
             optimizer = ProdigyPlusScheduleFree(
                 params=parameters,
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
-                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None),
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
-                safeguard_warmup=optimizer_config.safeguard_warmup if optimizer_config.safeguard_warmup is not None else False,
                 d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
-                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
-                fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
                 split_groups=optimizer_config.split_groups if optimizer_config.split_groups is not None else True,
                 split_groups_mean=optimizer_config.split_groups_mean if optimizer_config.split_groups_mean is not None else True,
                 factored=optimizer_config.factored if optimizer_config.factored is not None else True,
@@ -855,6 +849,8 @@ def create_optimizer(
                 use_muon_pp=optimizer_config.use_muon_pp if optimizer_config.use_muon_pp is not None else False,
                 use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
                 use_adopt=optimizer_config.use_adopt if optimizer_config.use_adopt is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
+                weight_decay_by_lr=optimizer_config.weight_decay_by_lr if optimizer_config.weight_decay_by_lr is not None else True,
             )
 
         # ADAFactor Optimizer
@@ -998,7 +994,7 @@ def create_optimizer(
                     param_groups.append(old_group)
 
                     old_group['lr'] = new_group['lr']
-                    old_group['initial_lr'] = new_group['initial_lr']
+                    old_group['initial_lr'] = new   _group['initial_lr']
                 else:
                     # the group state was not saved, initialize with an empty group state
                     new_group = new_param_groups[new_group_index]

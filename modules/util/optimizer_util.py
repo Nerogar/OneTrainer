@@ -42,9 +42,9 @@ def update_optimizer_config(train_config: TrainConfig):
         saved_optimizer_config = train_config.optimizer_defaults[str(optimizer)]
         saved_optimizer_config.from_dict(train_config.optimizer.to_dict())
     else:
-        optimizer_donfig = TrainOptimizerConfig.default_values()
-        optimizer_donfig.from_dict(train_config.optimizer.to_dict())
-        train_config.optimizer_defaults[str(optimizer)] = optimizer_donfig
+        optimizer_config = TrainOptimizerConfig.default_values()
+        optimizer_config.from_dict(train_config.optimizer.to_dict())
+        train_config.optimizer_defaults[str(optimizer)] = optimizer_config
 
 
 def init_model_parameters(
@@ -271,17 +271,17 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fsdp_in_use": False,
     },
     Optimizer.PRODIGY_PLUS_SCHEDULE_FREE: {
+        "lr": 1.0,
         "beta1": 0.9,
         "beta2": 0.999,
         "beta3": None,
-        "eps": 1e-8,
-        "weight_decay": 0,
+        "weight_decay": 0.0,
+        "weignt_decay_by_lr": True,
         "use_bias_correction": False,
-        "safeguard_warmup": False,
         "d0": 1e-6,
         "d_coef": 1.0,
         "prodigy_steps": 0,
-        "growth_rate": float('inf'),
+        "eps": 1e-8,
         "split_groups": True,
         "split_groups_mean": True,
         "factored": True,
@@ -290,6 +290,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_muon_pp": False,
         "use_cautious": False,
         "use_adopt": False,
+        "stochastic_rounding": True,
     },
     Optimizer.DADAPT_ADA_GRAD: {
         "momentum": 0,

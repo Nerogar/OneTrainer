@@ -141,15 +141,18 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'r': {'title': 'R', 'tooltip': 'EMA factor.', 'type': 'float'},
             'adanorm': {'title': 'AdaNorm', 'tooltip': 'Whether to use the AdaNorm variant', 'type': 'bool'},
             'adam_debias': {'title': 'Adam Debias', 'tooltip': 'Only correct the denominator to avoid inflating step sizes early in training.', 'type': 'bool'},
-            'cautious': {'title': 'Cautious', 'tooltip': 'Whether to use the Cautious variant.', 'type': 'bool'}, 
-            'split_groups': {'title': 'Split Groups', 'tooltip': 'Whether to split parameter groups.', 'type': 'bool'},
-            'split_groups_mean': {'title': 'Split Groups Mean', 'tooltip': 'Whether to use mean for split groups.', 'type': 'bool'},
-            'factored': {'title': 'Factored', 'tooltip': 'Whether to use factored updates.', 'type': 'bool'},
-            'use_stableadamw': {'title': 'Use StableAdamW', 'tooltip': 'Whether to use StableAdamW variant.', 'type': 'bool'},
+            'split_groups': {'title': 'Split Groups', 'tooltip': 'Track individual adaptation values for each parameter group. Recommended: True', 'type': 'bool'},
+            'split_groups_mean': {'title': 'Split Groups Mean', 'tooltip': 'When split_groups is True, use the harmonic mean of learning rates for all groups. This favours a more conservative LR', 'type': 'bool'},
+            'factored': {'title': 'Factored', 'tooltip': 'Use factored approximation of the second moment, similar to Adafactor. Recommended: True', 'type': 'bool'},
+            'use_stableadamw': {'title': 'Use StableAdamW', 'tooltip': 'Scales parameter updates by the root-mean-square of the normalised gradient, in essence identical to Adafactors gradient scaling. Recommended: True', 'type': 'bool'},
             'use_muon_pp': {'title': 'Use Muon++', 'tooltip': 'Whether to use Muon++ variant.', 'type': 'bool'},
-            'use_cautious': {'title': 'Use Cautious', 'tooltip': 'Whether to use Cautious variant.', 'type': 'bool'},
-            'use_adopt': {'title': 'Use ADOPT', 'tooltip': 'Whether to use ADOPT variant.', 'type': 'bool'},
+            'use_cautious': {'title': 'Use Cautious', 'tooltip': 'Experimental. Perform "cautious" updates, as proposed in https://arxiv.org/pdf/2411.16085. Recommended: False', 'type': 'bool'},
+            'use_adopt': {'title': 'Use ADOPT', 'tooltip': 'Experimental. Partial implementation of (https://arxiv.org/abs/2411.02853). Recommended: False', 'type': 'bool'},
+            'lr': {'title': 'Learning Rate', 'tooltip': 'Learning rate adjustment parameter. Increases or decreases the Prodigy learning rate. Recommended: 1.0', 'type': 'float'},
+            'weignt_decay_by_lr': {'title': 'Weight Decay by LR', 'tooltip': 'If True, weight_decay is multiplied by the adaptive learning rate. Recommended: True', 'type': 'bool'},
+            'prodigy_steps': {'title': 'Prodigy Steps', 'tooltip': 'Freeze Prodigy stepsize adjustments after a certain optimiser step and releases all state memory required. Reccomended: 25% total num steps', 'type': 'int'},
         }
+        
         # @formatter:on
 
         if not self.winfo_exists():  # check if this window isn't open
@@ -160,7 +163,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         # Extract the keys for the selected optimizer
         for index, key in enumerate(OPTIMIZER_DEFAULT_PARAMETERS[selected_optimizer].keys()):
             if selected_optimizer == Optimizer.PRODIGY_PLUS_SCHEDULE_FREE and key not in [
-                'beta1', 'beta2', 'eps', 'weight_decay', 'use_bias_correction', 'safeguard_warmup', 'd0', 'd_coef', 'growth_rate', 'fsdp_in_use', 'split_groups', 'split_groups_mean', 'factored', 'fused_back_pass', 'use_stableadamw', 'use_muon_pp', 'use_cautious', 'use_adopt'
+                'beta1', 'beta2', 'eps', 'weight_decay', 'use_bias_correction', 'safeguard_warmup', 'd0', 'd_coef', 'growth_rate', 'fsdp_in_use', 'split_groups', 'split_groups_mean', 'factored', 'fused_back_pass', 'use_stableadamw', 'use_muon_pp', 'use_cautious', 'use_adopt', 'weignt_decay_by_lr', 'prodigy_steps'
             ]:
                 continue
 
