@@ -831,6 +831,34 @@ def create_optimizer(
                 fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
             )
 
+        # PRODIGY_PLUS_SCHEDULE_FREE Optimizer
+        case Optimizer.PRODIGY_PLUS_SCHEDULE_FREE:
+            from prodigyplus.prodigy_plus_schedulefree import ProdigyPlusScheduleFree
+            optimizer = ProdigyPlusScheduleFree(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                decouple=optimizer_config.decouple if optimizer_config.decouple is not None else True,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
+                safeguard_warmup=optimizer_config.safeguard_warmup if optimizer_config.safeguard_warmup is not None else False,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
+                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
+                fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
+                split_groups=optimizer_config.split_groups if optimizer_config.split_groups is not None else True,
+                split_groups_mean=optimizer_config.split_groups_mean if optimizer_config.split_groups_mean is not None else True,
+                factored=optimizer_config.factored if optimizer_config.factored is not None else True,
+                fused_back_pass=optimizer_config.fused_back_pass if optimizer_config.fused_back_pass is not None else False,
+                use_stableadamw=optimizer_config.use_stableadamw if optimizer_config.use_stableadamw is not None else True,
+                use_muon_pp=optimizer_config.use_muon_pp if optimizer_config.use_muon_pp is not None else False,
+                use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
+                use_adopt=optimizer_config.use_adopt if optimizer_config.use_adopt is not None else False,
+            )
+
         # ADAFactor Optimizer
         case Optimizer.ADAFACTOR:
             from transformers.optimization import Adafactor
