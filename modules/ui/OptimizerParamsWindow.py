@@ -101,7 +101,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'd_coef': {'title': 'D Coefficient', 'tooltip': 'Coefficient in the expression for the estimate of d.', 'type': 'float'},
             'dampening': {'title': 'Dampening', 'tooltip': 'Dampening for optimizer_momentum.', 'type': 'float'},
             'decay_rate': {'title': 'Decay Rate', 'tooltip': 'Rate of decay for moment estimation.', 'type': 'float'},
-            'decouple': {'title': 'Decouple', 'tooltip': 'Use AdamW style optimizer_decoupled weight decay.', 'type': 'bool'},
             'differentiable': {'title': 'Differentiable', 'tooltip': 'Whether the optimization function is optimizer_differentiable.', 'type': 'bool'},
             'eps': {'title': 'EPS', 'tooltip': 'A small value to prevent division by zero.', 'type': 'float'},
             'eps2': {'title': 'EPS 2', 'tooltip': 'A small value to prevent division by zero.', 'type': 'float'},
@@ -142,8 +141,14 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'r': {'title': 'R', 'tooltip': 'EMA factor.', 'type': 'float'},
             'adanorm': {'title': 'AdaNorm', 'tooltip': 'Whether to use the AdaNorm variant', 'type': 'bool'},
             'adam_debias': {'title': 'Adam Debias', 'tooltip': 'Only correct the denominator to avoid inflating step sizes early in training.', 'type': 'bool'},
-            'cautious': {'title': 'Cautious', 'tooltip': 'Whether to use the Cautious variant.', 'type': 'bool'},
-
+            'cautious': {'title': 'Cautious', 'tooltip': 'Whether to use the Cautious variant.', 'type': 'bool'}, 
+            'split_groups': {'title': 'Split Groups', 'tooltip': 'Whether to split parameter groups.', 'type': 'bool'},
+            'split_groups_mean': {'title': 'Split Groups Mean', 'tooltip': 'Whether to use mean for split groups.', 'type': 'bool'},
+            'factored': {'title': 'Factored', 'tooltip': 'Whether to use factored updates.', 'type': 'bool'},
+            'use_stableadamw': {'title': 'Use StableAdamW', 'tooltip': 'Whether to use StableAdamW variant.', 'type': 'bool'},
+            'use_muon_pp': {'title': 'Use Muon++', 'tooltip': 'Whether to use Muon++ variant.', 'type': 'bool'},
+            'use_cautious': {'title': 'Use Cautious', 'tooltip': 'Whether to use Cautious variant.', 'type': 'bool'},
+            'use_adopt': {'title': 'Use ADOPT', 'tooltip': 'Whether to use ADOPT variant.', 'type': 'bool'},
         }
         # @formatter:on
 
@@ -154,6 +159,11 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         # Extract the keys for the selected optimizer
         for index, key in enumerate(OPTIMIZER_DEFAULT_PARAMETERS[selected_optimizer].keys()):
+            if selected_optimizer == Optimizer.PRODIGY_PLUS_SCHEDULE_FREE and key not in [
+                'beta1', 'beta2', 'eps', 'weight_decay', 'use_bias_correction', 'safeguard_warmup', 'd0', 'd_coef', 'growth_rate', 'fsdp_in_use', 'split_groups', 'split_groups_mean', 'factored', 'fused_back_pass', 'use_stableadamw', 'use_muon_pp', 'use_cautious', 'use_adopt'
+            ]:
+                continue
+
             arg_info = KEY_DETAIL_MAP[key]
 
             title = arg_info['title']
