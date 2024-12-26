@@ -43,13 +43,13 @@ class BaseCloud(metaclass=ABCMeta):
 
         if hasattr(self.config,"local_base_model_name"):
             self.file_sync.sync_up(local=Path(self.config.local_base_model_name),remote=Path(self.config.base_model_name))
-        if self.config.lora_model_name != "":
+        if hasattr(self.config,"local_lora_model_name"):
             self.file_sync.sync_up(local=Path(self.config.local_lora_model_name),remote=Path(self.config.lora_model_name))
 
-        if self.config.embedding.model_name != "":
+        if hasattr(self.config.embedding,"local_model_name"):
             self.file_sync.sync_up(local=Path(self.config.embedding.local_model_name),remote=Path(self.config.embedding.model_name))
         for add_embedding in self.config.additional_embeddings:
-            if add_embedding.model_name != "":
+            if hasattr(add_embedding,"local_model_name"):
                 self.file_sync.sync_up(local=Path(add_embedding.local_model_name),remote=Path(add_embedding.model_name))
 
         for concept in self.config.concepts:
@@ -57,10 +57,11 @@ class BaseCloud(metaclass=ABCMeta):
             if commands and commands.get_stop_command():
                 return
 
-            self.file_sync.sync_up_dir(
-                local=Path(concept.local_path),
-                remote=Path(concept.path),
-                recursive=concept.include_subdirectories)
+            if hasattr(concept,"local_path"):
+                self.file_sync.sync_up_dir(
+                    local=Path(concept.local_path),
+                    remote=Path(concept.path),
+                    recursive=concept.include_subdirectories)
 
             if len(concept.text.local_prompt_path) > 0:
                 self.file_sync.sync_up_file(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))

@@ -142,9 +142,12 @@ class CloudTrainer(BaseTrainer):
 
         def adjust(config,attribute : str):
             path=getattr(config,attribute)
-            setattr(config,"local_"+attribute,path)
-            path=CloudTrainer.__adjust_path(path,remote.cloud.remote_dir)
-            setattr(config,attribute,path)
+            if path.startswith("cloud:"):
+                setattr(config,attribute,path.replace("cloud:","",1))
+            elif path != "":
+                setattr(config,"local_"+attribute,path)
+                path=CloudTrainer.__adjust_path(path,remote.cloud.remote_dir)
+                setattr(config,attribute,path)
 
         adjust(remote,"debug_dir")
         adjust(remote,"workspace_dir")
