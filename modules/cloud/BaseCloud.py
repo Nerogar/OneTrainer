@@ -63,7 +63,7 @@ class BaseCloud(metaclass=ABCMeta):
                     remote=Path(concept.path),
                     recursive=concept.include_subdirectories)
 
-            if len(concept.text.local_prompt_path) > 0:
+            if hasattr(concept.text,"local_prompt_path"):
                 self.file_sync.sync_up_file(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))
 
     @staticmethod
