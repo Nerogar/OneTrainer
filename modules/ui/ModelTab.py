@@ -178,9 +178,9 @@ class ModelTab:
         )
         row = self.__create_output_components(
             row,
-            allow_safetensors=True,
+            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=True,
+            allow_checkpoint=False,
         )
 
     def __create_dtype_options(self, include_none:bool=True) -> list[tuple[str, DataType]]:
