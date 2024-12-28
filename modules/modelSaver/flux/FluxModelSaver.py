@@ -2,8 +2,11 @@ import copy
 import os.path
 from pathlib import Path
 
+from safetensors.torch import save_file
+
 from modules.model.FluxModel import FluxModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.util.convert.convert_flux_diffusers_to_ckpt import convert_flux_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
@@ -77,19 +80,15 @@ class FluxModelSaver(
             destination: str,
             dtype: torch.dtype | None,
     ):
-        pass
-        # state_dict = convert_sd3_diffusers_to_ckpt(
-        #     model.vae.state_dict(),
-        #     model.transformer.state_dict(),
-        #     model.text_encoder_1.state_dict() if model.text_encoder_1 is not None else None,
-        #     model.text_encoder_2.state_dict() if model.text_encoder_2 is not None else None,
-        # )
-        # save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-        # self._convert_state_dict_to_contiguous(save_state_dict)
-        #
-        # os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        #
-        # save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
+        state_dict = convert_flux_diffusers_to_ckpt(
+            model.transformer.state_dict(),
+        )
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        self._convert_state_dict_to_contiguous(save_state_dict)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+
+        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_internal(
             self,
