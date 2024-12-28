@@ -32,7 +32,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_window_close)
 
         self.title("Optimizer Settings")
-        self.geometry("800x400")
+        self.geometry("800x500")
         self.resizable(True, True)
         self.wait_visibility()
         self.grab_set()
