@@ -15,7 +15,7 @@ tensorboard==2.18.0
 pytorch-lightning==2.4.0
 
 # stable diffusion
--e git+https://github.com/huggingface/diffusers.git@f35a387#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@55ac1db#egg=diffusers
 transformers==4.47.0
 sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
