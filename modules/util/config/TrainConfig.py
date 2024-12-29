@@ -90,6 +90,7 @@ class TrainOptimizerConfig(BaseConfig):
     r: float
     adanorm: bool
     adam_debias: bool
+    slice_p: int
     cautious: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
@@ -158,6 +159,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("r", None, float, True))
         data.append(("adanorm", False, bool, False))
         data.append(("adam_debias", False, bool, False))
+        data.append(("slice_p", None, int, True))
         data.append(("cautious", False, bool, False))
 
         return TrainOptimizerConfig(data)

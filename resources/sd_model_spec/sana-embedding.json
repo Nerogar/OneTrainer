@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "sana/lora",
+    "modelspec.implementation": "https://github.com/NVlabs/Sana",
+    "modelspec.title": "Sana LoRA"
+}
