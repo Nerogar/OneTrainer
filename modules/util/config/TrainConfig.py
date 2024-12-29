@@ -7,6 +7,7 @@ from typing import Any
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.ConfigPart import ConfigPart
@@ -27,7 +28,6 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
-from modules.util.config.SecretsConfig import SecretsConfig
 
 
 class TrainOptimizerConfig(BaseConfig):

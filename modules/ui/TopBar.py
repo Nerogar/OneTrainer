@@ -3,11 +3,11 @@ import os
 import traceback
 import webbrowser
 from collections.abc import Callable
+from contextlib import suppress
 
 from modules.util import path_util
-from contextlib import suppress
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.SecretsConfig import SecretsConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
@@ -179,7 +179,7 @@ class TopBar:
 
     def open_wiki(self):
         webbrowser.open("https://github.com/Nerogar/OneTrainer/wiki", new=0, autoraise=False)
-        
+
     def __save_new_config(self, name):
         path = self.__save_to_file(name)
 

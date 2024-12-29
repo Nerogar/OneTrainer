@@ -8,8 +8,8 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.config.SecretsConfig import SecretsConfig
+from modules.util.config.TrainConfig import TrainConfig
 
 
 def main():
