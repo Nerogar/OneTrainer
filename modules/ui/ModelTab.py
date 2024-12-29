@@ -53,6 +53,8 @@ class ModelTab:
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui()
 
+
+
     def __setup_stable_diffusion_ui(self):
         row = 0
         row = self.__create_base_dtype_components(row)
@@ -195,6 +197,13 @@ class ModelTab:
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(False),
                               self.ui_state, "weight_dtype")
+
+        row += 1
+
+        # huggingface token
+        components.label(self.scroll_frame, row, 0, "Hugging Face Token",
+                         tooltip="Enter your Hugging Face access token if you have used a Hugging Face repository above.\nThis value is stored separately, not saved to your configuration file.")
+        components.entry(self.scroll_frame, row, 1, self.ui_state, "secrets.huggingface_token")
 
         row += 1
 

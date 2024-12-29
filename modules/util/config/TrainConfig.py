@@ -27,6 +27,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
+from modules.util.config.SecretsConfig import SecretsConfig
 
 
 class TrainOptimizerConfig(BaseConfig):
@@ -399,6 +400,9 @@ class TrainConfig(BaseConfig):
     save_every_unit: TimeUnit
     save_skip_first: int
     save_filename_prefix: str
+
+    # secrets - not saved into config file
+    secrets: SecretsConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
@@ -893,5 +897,9 @@ class TrainConfig(BaseConfig):
         data.append(("save_every_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("save_skip_first", 0, int, False))
         data.append(("save_filename_prefix", "", str, False))
+
+        # secrets
+        secrets = SecretsConfig.default_values()
+        data.append(("secrets", secrets, SecretsConfig, False))
 
         return TrainConfig(data)

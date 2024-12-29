@@ -17,6 +17,7 @@ class TrainArgs(BaseArgs):
         # @formatter:off
 
         parser.add_argument("--config-path", type=str, required=True, dest="config_path", help="The path to the config file")
+        parser.add_argument("--secrets-path", type=str, required=False, dest="secrets_path", help="The path to the secrets file")
 
         # @formatter:on
 
@@ -30,5 +31,6 @@ class TrainArgs(BaseArgs):
 
         # name, default value, data type, nullable
         data.append(("config_path", None, str, True))
+        data.append(("secrets_path", None, str, True))
 
         return TrainArgs(data)

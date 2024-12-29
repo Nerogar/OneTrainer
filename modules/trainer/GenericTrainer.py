@@ -18,6 +18,7 @@ from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+import huggingface_hub
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
@@ -120,6 +121,13 @@ class GenericTrainer(BaseTrainer):
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
                 print("No backup found, continuing without backup...")
+
+        if self.config.secrets.huggingface_token != "":
+            self.callbacks.on_update_status("logging into Hugging Face")
+            huggingface_hub.login(
+                token = self.config.secrets.huggingface_token,
+                new_session = False,
+            )
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
