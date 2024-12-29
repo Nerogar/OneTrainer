@@ -59,6 +59,8 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Stable Cascade", ModelType.STABLE_CASCADE_1),
             ("PixArt Alpha", ModelType.PIXART_ALPHA),
             ("PixArt Sigma", ModelType.PIXART_SIGMA),
+            ("Flux Dev", ModelType.FLUX_DEV_1),
+            ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
         ], self.ui_state, "model_type")
 
         # training method
