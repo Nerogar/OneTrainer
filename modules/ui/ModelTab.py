@@ -53,8 +53,6 @@ class ModelTab:
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui()
 
-
-
     def __setup_stable_diffusion_ui(self):
         row = 0
         row = self.__create_base_dtype_components(row)
