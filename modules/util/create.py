@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
+from modules.dataLoader.SanaBaseDataLoader import SanaBaseDataLoader
 from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3BaseDataLoader
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
@@ -18,6 +19,9 @@ from modules.modelLoader.FluxLoRAModelLoader import FluxLoRAModelLoader
 from modules.modelLoader.PixArtAlphaEmbeddingModelLoader import PixArtAlphaEmbeddingModelLoader
 from modules.modelLoader.PixArtAlphaFineTuneModelLoader import PixArtAlphaFineTuneModelLoader
 from modules.modelLoader.PixArtAlphaLoRAModelLoader import PixArtAlphaLoRAModelLoader
+from modules.modelLoader.SanaEmbeddingModelLoader import SanaEmbeddingModelLoader
+from modules.modelLoader.SanaFineTuneModelLoader import SanaFineTuneModelLoader
+from modules.modelLoader.SanaLoRAModelLoader import SanaLoRAModelLoader
 from modules.modelLoader.StableDiffusion3EmbeddingModelLoader import StableDiffusion3EmbeddingModelLoader
 from modules.modelLoader.StableDiffusion3FineTuneModelLoader import StableDiffusion3FineTuneModelLoader
 from modules.modelLoader.StableDiffusion3LoRAModelLoader import StableDiffusion3LoRAModelLoader
@@ -33,6 +37,7 @@ from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoa
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.FluxSampler import FluxSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
+from modules.modelSampler.SanaSampler import SanaSampler
 from modules.modelSampler.StableDiffusion3Sampler import StableDiffusion3Sampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
@@ -45,6 +50,9 @@ from modules.modelSaver.FluxLoRAModelSaver import FluxLoRAModelSaver
 from modules.modelSaver.PixArtAlphaEmbeddingModelSaver import PixArtAlphaEmbeddingModelSaver
 from modules.modelSaver.PixArtAlphaFineTuneModelSaver import PixArtAlphaFineTuneModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
+from modules.modelSaver.SanaEmbeddingModelSaver import SanaEmbeddingModelSaver
+from modules.modelSaver.SanaFineTuneModelSaver import SanaFineTuneModelSaver
+from modules.modelSaver.SanaLoRAModelSaver import SanaLoRAModelSaver
 from modules.modelSaver.StableDiffusion3EmbeddingModelSaver import StableDiffusion3EmbeddingModelSaver
 from modules.modelSaver.StableDiffusion3FineTuneModelSaver import StableDiffusion3FineTuneModelSaver
 from modules.modelSaver.StableDiffusion3LoRAModelSaver import StableDiffusion3LoRAModelSaver
@@ -64,6 +72,9 @@ from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
 from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.PixArtAlphaLoRASetup import PixArtAlphaLoRASetup
+from modules.modelSetup.SanaEmbeddingSetup import SanaEmbeddingSetup
+from modules.modelSetup.SanaFineTuneSetup import SanaFineTuneSetup
+from modules.modelSetup.SanaLoRASetup import SanaLoRASetup
 from modules.modelSetup.StableDiffusion3EmbeddingSetup import StableDiffusion3EmbeddingSetup
 from modules.modelSetup.StableDiffusion3FineTuneSetup import StableDiffusion3FineTuneSetup
 from modules.modelSetup.StableDiffusion3LoRASetup import StableDiffusion3LoRASetup
@@ -132,6 +143,8 @@ def create_model_loader(
                 return StableDiffusion3FineTuneModelLoader()
             if model_type.is_flux():
                 return FluxFineTuneModelLoader()
+            if model_type.is_sana():
+                return SanaFineTuneModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
@@ -148,6 +161,8 @@ def create_model_loader(
                 return StableDiffusion3LoRAModelLoader()
             if model_type.is_flux():
                 return FluxLoRAModelLoader()
+            if model_type.is_sana():
+                return SanaLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -161,6 +176,8 @@ def create_model_loader(
                 return StableDiffusion3EmbeddingModelLoader()
             if model_type.is_flux():
                 return FluxEmbeddingModelLoader()
+            if model_type.is_sana():
+                return SanaEmbeddingModelLoader()
 
     return None
 
@@ -183,6 +200,8 @@ def create_model_saver(
                 return StableDiffusion3FineTuneModelSaver()
             if model_type.is_flux():
                 return FluxFineTuneModelSaver()
+            if model_type.is_sana():
+                return SanaFineTuneModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelSaver()
@@ -199,6 +218,8 @@ def create_model_saver(
                 return StableDiffusion3LoRAModelSaver()
             if model_type.is_flux():
                 return FluxLoRAModelSaver()
+            if model_type.is_sana():
+                return SanaLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -212,6 +233,8 @@ def create_model_saver(
                 return StableDiffusion3EmbeddingModelSaver()
             if model_type.is_flux():
                 return FluxEmbeddingModelSaver()
+            if model_type.is_sana():
+                return SanaEmbeddingModelSaver()
 
     return None
 
@@ -237,6 +260,8 @@ def create_model_setup(
                 return StableDiffusion3FineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_flux():
                 return FluxFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_sana():
+                return SanaFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -253,6 +278,8 @@ def create_model_setup(
                 return StableDiffusion3LoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_flux():
                 return FluxLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_sana():
+                return SanaLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -266,6 +293,8 @@ def create_model_setup(
                 return StableDiffusion3EmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_flux():
                 return FluxEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_sana():
+                return SanaEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
 
@@ -291,6 +320,8 @@ def create_model_sampler(
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
             if model_type.is_flux():
                 return FluxSampler(train_device, temp_device, model, model_type)
+            if model_type.is_sana():
+                return SanaSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
@@ -307,6 +338,8 @@ def create_model_sampler(
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
             if model_type.is_flux():
                 return FluxSampler(train_device, temp_device, model, model_type)
+            if model_type.is_sana():
+                return SanaSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
@@ -320,6 +353,8 @@ def create_model_sampler(
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
             if model_type.is_flux():
                 return FluxSampler(train_device, temp_device, model, model_type)
+            if model_type.is_sana():
+                return SanaSampler(train_device, temp_device, model, model_type)
 
     return None
 
@@ -341,7 +376,7 @@ def create_data_loader(
         train_progress = TrainProgress()
 
     match training_method:
-        case TrainingMethod.FINE_TUNE:
+        case TrainingMethod.FINE_TUNE | TrainingMethod.LORA | TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_stable_diffusion_xl():
@@ -354,35 +389,11 @@ def create_data_loader(
                 return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_flux():
                 return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_sana():
+                return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-        case TrainingMethod.LORA:
-            if model_type.is_stable_diffusion():
-                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_wuerstchen():
-                return WuerstchenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_pixart():
-                return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_stable_diffusion_3():
-                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_flux():
-                return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-        case TrainingMethod.EMBEDDING:
-            if model_type.is_stable_diffusion():
-                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_wuerstchen():
-                return WuerstchenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_pixart():
-                return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_stable_diffusion_3():
-                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
-            if model_type.is_flux():
-                return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
 
     return None
 
@@ -829,6 +840,7 @@ def create_optimizer(
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
                 growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
                 fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
+                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
             )
 
         # ADAFactor Optimizer
