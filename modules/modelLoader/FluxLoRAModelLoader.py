@@ -25,6 +25,8 @@ class FluxLoRAModelLoader(
         match model_type:
             case ModelType.FLUX_DEV_1:
                 return "resources/sd_model_spec/flux_dev_1.0-lora.json"
+            case ModelType.FLUX_FILL_DEV_1:
+                return "resources/sd_model_spec/flux_dev_fill_1.0-lora.json"
             case _:
                 return None
 
