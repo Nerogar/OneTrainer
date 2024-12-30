@@ -152,7 +152,7 @@ class CloudTrainer(BaseTrainer):
         adjust(remote,"debug_dir")
         adjust(remote,"workspace_dir")
         adjust(remote,"cache_dir")
-        if Path(remote.base_model_name).exists():
+        if Path(remote.base_model_name).exists() or remote.base_model_name.startswith("cloud:"):
             adjust(remote,"base_model_name")
 
         adjust(remote,"output_model_destination")
