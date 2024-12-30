@@ -994,7 +994,7 @@ def create_optimizer(
                     param_groups.append(old_group)
 
                     old_group['lr'] = new_group['lr']
-                    old_group['initial_lr'] = new   _group['initial_lr']
+                    old_group['initial_lr'] = new_group['initial_lr']
                 else:
                     # the group state was not saved, initialize with an empty group state
                     new_group = new_param_groups[new_group_index]
