@@ -3,7 +3,7 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.clip_util import encode_clip
-from modules.model.util.t5_util import encode_t5
+from modules.model.util.llama_util import encode_llama
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
@@ -14,16 +14,26 @@ import torch
 from torch import Tensor
 
 from diffusers import (
-    AutoencoderKL,
+    AutoencoderKLHunyuanVideo,
     DiffusionPipeline,
     FlowMatchEulerDiscreteScheduler,
-    FluxPipeline,
-    FluxTransformer2DModel,
+    HunyuanVideoPipeline,
+    HunyuanVideoTransformer3DModel,
 )
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, LlamaModel, LlamaTokenizer
 
+DEFAULT_PROMPT_TEMPLATE = (
+    "<|start_header_id|>system<|end_header_id|>\n\nDescribe the video by detailing the following aspects: "
+    "1. The main content and theme of the video."
+    "2. The color, shape, size, texture, quantity, text, and spatial relationships of the objects."
+    "3. Actions, events, behaviors temporal relationships, physical movement changes of the objects."
+    "4. background environment, light, style and atmosphere."
+    "5. camera angles, movements, and transitions used in the video:<|eot_id|>"
+    "<|start_header_id|>user<|end_header_id|>\n\n{}<|eot_id|>"
+)
+DEFAULT_PROMPT_TEMPLATE_CROP_START = 95
 
-class FluxModelEmbedding(BaseModelEmbedding):
+class HunyuanVideoModelEmbedding(BaseModelEmbedding):
     def __init__(
             self,
             uuid: str,
@@ -41,30 +51,34 @@ class FluxModelEmbedding(BaseModelEmbedding):
         self.text_encoder_2_vector = text_encoder_2_vector
 
 
-class FluxModel(BaseModel):
+class HunyuanVideoModel(BaseModel):
     # base model data
-    tokenizer_1: CLIPTokenizer | None
-    tokenizer_2: T5Tokenizer | None
+    tokenizer_1: LlamaTokenizer | None
+    tokenizer_2: CLIPTokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
-    text_encoder_1: CLIPTextModel | None
-    text_encoder_2: T5EncoderModel | None
-    vae: AutoencoderKL | None
-    transformer: FluxTransformer2DModel | None
+    text_encoder_1: LlamaModel | None
+    text_encoder_2: CLIPTextModel | None
+    vae: AutoencoderKLHunyuanVideo | None
+    transformer: HunyuanVideoTransformer3DModel | None
+
+    # original copies of base model data
+    orig_tokenizer_1: LlamaTokenizer | None
+    orig_tokenizer_2: CLIPTokenizer | None
 
     # autocast context
     autocast_context: torch.autocast | nullcontext
-    text_encoder_2_autocast_context: torch.autocast | nullcontext
+    transformer_autocast_context: torch.autocast | nullcontext
 
     train_dtype: DataType
-    text_encoder_2_train_dtype: DataType
+    transformer_train_dtype: DataType
 
-    text_encoder_2_offload_conductor: LayerOffloadConductor | None
+    text_encoder_1_offload_conductor: LayerOffloadConductor | None
     transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
-    embedding: FluxModelEmbedding | None
+    embedding: HunyuanVideoModelEmbedding | None
     embedding_state: tuple[Tensor, Tensor] | None
-    additional_embeddings: list[FluxModelEmbedding] | None
+    additional_embeddings: list[HunyuanVideoModelEmbedding] | None
     additional_embedding_states: list[tuple[Tensor, Tensor] | None]
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
@@ -94,13 +108,16 @@ class FluxModel(BaseModel):
         self.vae = None
         self.transformer = None
 
+        self.orig_tokenizer_1 = None
+        self.orig_tokenizer_2 = None
+
         self.autocast_context = nullcontext()
-        self.text_encoder_2_autocast_context = nullcontext()
+        self.transformer_autocast_context = nullcontext()
 
         self.train_dtype = DataType.FLOAT_32
-        self.text_encoder_2_train_dtype = DataType.FLOAT_32
+        self.transformer_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_2_offload_conductor = None
+        self.text_encoder_1_offload_conductor = None
         self.transformer_offload_conductor = None
 
         self.embedding = None
@@ -124,18 +141,18 @@ class FluxModel(BaseModel):
 
     def text_encoder_1_to(self, device: torch.device):
         if self.text_encoder_1 is not None:
-            self.text_encoder_1.to(device=device)
+            if self.text_encoder_1_offload_conductor is not None and \
+                    self.text_encoder_1_offload_conductor.layer_offload_activated():
+                self.text_encoder_1_offload_conductor.to(device)
+            else:
+                self.text_encoder_1.to(device=device)
 
         if self.text_encoder_1_lora is not None:
             self.text_encoder_1_lora.to(device)
 
     def text_encoder_2_to(self, device: torch.device):
         if self.text_encoder_2 is not None:
-            if self.text_encoder_2_offload_conductor is not None and \
-                    self.text_encoder_2_offload_conductor.layer_offload_activated():
-                self.text_encoder_2_offload_conductor.to(device)
-            else:
-                self.text_encoder_2.to(device=device)
+            self.text_encoder_2.to(device=device)
 
         if self.text_encoder_2_lora is not None:
             self.text_encoder_2_lora.to(device)
@@ -163,15 +180,15 @@ class FluxModel(BaseModel):
             self.text_encoder_2.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
-        return FluxPipeline(
+    def create_pipeline(self, use_original_modules: bool) -> DiffusionPipeline:
+        return HunyuanVideoPipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_modules else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_modules else self.tokenizer_2,
         )
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
@@ -185,25 +202,27 @@ class FluxModel(BaseModel):
             text: str = None,
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
-            tokens_mask_2: Tensor = None,
+            tokens_mask_1: Tensor = None,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             text_encoder_1_dropout_probability: float | None = None,
             text_encoder_2_dropout_probability: float | None = None,
-            apply_attention_mask: bool = False,
-            pooled_text_encoder_1_output: Tensor = None,
-            text_encoder_2_output: Tensor = None,
-    ) -> tuple[Tensor, Tensor]:
+            text_encoder_1_output: Tensor = None,
+            pooled_text_encoder_2_output: Tensor = None,
+    ) -> tuple[Tensor, Tensor, Tensor]:
         # tokenize prompt
         if tokens_1 is None and text is not None and self.tokenizer_1 is not None:
+            llama_text = DEFAULT_PROMPT_TEMPLATE.format(text)
+
             tokenizer_output = self.tokenizer_1(
-                text,
+                llama_text,
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=77 + DEFAULT_PROMPT_TEMPLATE_CROP_START,
                 return_tensors="pt",
             )
             tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
+            tokens_mask_1 = tokenizer_output.attention_mask.to(self.text_encoder_1.device)
 
         if tokens_2 is None and text is not None and self.tokenizer_2 is not None:
             tokenizer_output = self.tokenizer_2(
@@ -214,95 +233,57 @@ class FluxModel(BaseModel):
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
-            tokens_mask_2 = tokenizer_output.attention_mask.to(self.text_encoder_2.device)
 
-        _, pooled_text_encoder_1_output = encode_clip(
+        text_encoder_1_output, tokens_mask_1 = encode_llama(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
-            default_layer=-1,
+            default_layer=-3,
             layer_skip=text_encoder_1_layer_skip,
-            add_output=False,
-            text_encoder_output=None,
-            add_pooled_output=True,
-            pooled_text_encoder_output=pooled_text_encoder_1_output,
-            use_attention_mask=False,
+            text_encoder_output=text_encoder_1_output,
+            attention_mask=tokens_mask_1,
+            crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START,
         )
-        if pooled_text_encoder_1_output is None:
-            pooled_text_encoder_1_output = torch.zeros(
-                size=(batch_size, 768),
+        if text_encoder_1_output is None:
+            text_encoder_1_output = torch.zeros(
+                size=(batch_size, 77, 768),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+            tokens_mask_1 = torch.zeros(
+                size=(batch_size, 1),
                 device=train_device,
                 dtype=self.train_dtype.torch_dtype(),
             )
 
-        with self.text_encoder_2_autocast_context:
-            text_encoder_2_output = encode_t5(
-                text_encoder=self.text_encoder_2,
-                tokens=tokens_2,
-                default_layer=-1,
-                layer_skip=text_encoder_2_layer_skip,
-                text_encoder_output=text_encoder_2_output,
-                use_attention_mask=False,
-                attention_mask=tokens_mask_2,
+        _, pooled_text_encoder_2_output = encode_clip(
+            text_encoder=self.text_encoder_2,
+            tokens=tokens_2,
+            default_layer=-1,
+            layer_skip=text_encoder_2_layer_skip,
+            add_output=False,
+            text_encoder_output=None,
+            add_pooled_output=True,
+            pooled_text_encoder_output=pooled_text_encoder_2_output,
+            use_attention_mask=False,
+        )
+        if pooled_text_encoder_2_output is None:
+            pooled_text_encoder_2_output = torch.zeros(
+                size=(batch_size, 768),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
             )
-            if text_encoder_2_output is None:
-                text_encoder_2_output = torch.zeros(
-                    size=(batch_size, 77, 4096),
-                    device=train_device,
-                    dtype=self.train_dtype.torch_dtype(),
-                )
-                tokens_mask_2 = torch.zeros(
-                    size=(batch_size, 1),
-                    device=train_device,
-                    dtype=self.train_dtype.torch_dtype(),
-                )
-
-        if apply_attention_mask:
-            text_encoder_2_output = text_encoder_2_output * tokens_mask_2[:, :, None]
 
         # apply dropout
         if text_encoder_1_dropout_probability is not None:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
+            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
         if text_encoder_2_dropout_probability is not None:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
+            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
 
-        return text_encoder_2_output, pooled_text_encoder_1_output
-
-    def prepare_latent_image_ids(self, height, width, device, dtype):
-        latent_image_ids = torch.zeros(height // 2, width // 2, 3)
-        latent_image_ids[..., 1] = latent_image_ids[..., 1] + torch.arange(height // 2)[:, None]
-        latent_image_ids[..., 2] = latent_image_ids[..., 2] + torch.arange(width // 2)[None, :]
-
-        latent_image_id_height, latent_image_id_width, latent_image_id_channels = latent_image_ids.shape
-
-        latent_image_ids = latent_image_ids.reshape(
-            latent_image_id_height * latent_image_id_width, latent_image_id_channels
-        )
-
-        return latent_image_ids.to(device=device, dtype=dtype)
-
-    def pack_latents(self, latents, batch_size, num_channels_latents, height, width):
-        latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)
-        latents = latents.permute(0, 2, 4, 1, 3, 5)
-        latents = latents.reshape(batch_size, (height // 2) * (width // 2), num_channels_latents * 4)
-
-        return latents
-
-    def unpack_latents(self, latents, height, width):
-        batch_size, num_patches, channels = latents.shape
-
-        height = height // 2
-        width = width // 2
-
-        latents = latents.view(batch_size, height, width, channels // 4, 2, 2)
-        latents = latents.permute(0, 3, 1, 4, 2, 5)
-
-        latents = latents.reshape(batch_size, channels // (2 * 2), height * 2, width * 2)
-
-        return latents
+        return text_encoder_1_output, pooled_text_encoder_2_output, tokens_mask_1

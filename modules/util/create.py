@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
+from modules.dataLoader.HunyuanVideoBaseDataLoader import HunyuanVideoBaseDataLoader
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
 from modules.dataLoader.SanaBaseDataLoader import SanaBaseDataLoader
 from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3BaseDataLoader
@@ -16,6 +17,9 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.FluxEmbeddingModelLoader import FluxEmbeddingModelLoader
 from modules.modelLoader.FluxFineTuneModelLoader import FluxFineTuneModelLoader
 from modules.modelLoader.FluxLoRAModelLoader import FluxLoRAModelLoader
+from modules.modelLoader.HunyuanVideoEmbeddingModelLoader import HunyuanVideoEmbeddingModelLoader
+from modules.modelLoader.HunyuanVideoFineTuneModelLoader import HunyuanVideoFineTuneModelLoader
+from modules.modelLoader.HunyuanVideoLoRAModelLoader import HunyuanVideoLoRAModelLoader
 from modules.modelLoader.PixArtAlphaEmbeddingModelLoader import PixArtAlphaEmbeddingModelLoader
 from modules.modelLoader.PixArtAlphaFineTuneModelLoader import PixArtAlphaFineTuneModelLoader
 from modules.modelLoader.PixArtAlphaLoRAModelLoader import PixArtAlphaLoRAModelLoader
@@ -36,6 +40,7 @@ from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTune
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.FluxSampler import FluxSampler
+from modules.modelSampler.HunyuanVideoSampler import HunyuanVideoSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
 from modules.modelSampler.SanaSampler import SanaSampler
 from modules.modelSampler.StableDiffusion3Sampler import StableDiffusion3Sampler
@@ -69,6 +74,9 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.FluxEmbeddingSetup import FluxEmbeddingSetup
 from modules.modelSetup.FluxFineTuneSetup import FluxFineTuneSetup
 from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
+from modules.modelSetup.HunyuanVideoEmbeddingSetup import HunyuanVideoEmbeddingSetup
+from modules.modelSetup.HunyuanVideoFineTuneSetup import HunyuanVideoFineTuneSetup
+from modules.modelSetup.HunyuanVideoLoRASetup import HunyuanVideoLoRASetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
 from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.PixArtAlphaLoRASetup import PixArtAlphaLoRASetup
@@ -145,6 +153,8 @@ def create_model_loader(
                 return FluxFineTuneModelLoader()
             if model_type.is_sana():
                 return SanaFineTuneModelLoader()
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoFineTuneModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
@@ -163,6 +173,8 @@ def create_model_loader(
                 return FluxLoRAModelLoader()
             if model_type.is_sana():
                 return SanaLoRAModelLoader()
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -178,6 +190,8 @@ def create_model_loader(
                 return FluxEmbeddingModelLoader()
             if model_type.is_sana():
                 return SanaEmbeddingModelLoader()
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoEmbeddingModelLoader()
 
     return None
 
@@ -262,6 +276,8 @@ def create_model_setup(
                 return FluxFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -280,6 +296,8 @@ def create_model_setup(
                 return FluxLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -295,6 +313,8 @@ def create_model_setup(
                 return FluxEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
 
@@ -307,7 +327,7 @@ def create_model_sampler(
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
 ) -> BaseModelSampler:
     match training_method:
-        case TrainingMethod.FINE_TUNE:
+        case TrainingMethod.FINE_TUNE | TrainingMethod.LORA | TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionSampler(train_device, temp_device, model, model_type)
             if model_type.is_stable_diffusion_xl():
@@ -322,39 +342,11 @@ def create_model_sampler(
                 return FluxSampler(train_device, temp_device, model, model_type)
             if model_type.is_sana():
                 return SanaSampler(train_device, temp_device, model, model_type)
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
-        case TrainingMethod.LORA:
-            if model_type.is_stable_diffusion():
-                return StableDiffusionSampler(train_device, temp_device, model, model_type)
-            if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
-            if model_type.is_wuerstchen():
-                return WuerstchenSampler(train_device, temp_device, model, model_type)
-            if model_type.is_pixart():
-                return PixArtAlphaSampler(train_device, temp_device, model, model_type)
-            if model_type.is_stable_diffusion_3():
-                return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
-            if model_type.is_flux():
-                return FluxSampler(train_device, temp_device, model, model_type)
-            if model_type.is_sana():
-                return SanaSampler(train_device, temp_device, model, model_type)
-        case TrainingMethod.EMBEDDING:
-            if model_type.is_stable_diffusion():
-                return StableDiffusionSampler(train_device, temp_device, model, model_type)
-            if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLSampler(train_device, temp_device, model, model_type)
-            if model_type.is_wuerstchen():
-                return WuerstchenSampler(train_device, temp_device, model, model_type)
-            if model_type.is_pixart():
-                return PixArtAlphaSampler(train_device, temp_device, model, model_type)
-            if model_type.is_stable_diffusion_3():
-                return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
-            if model_type.is_flux():
-                return FluxSampler(train_device, temp_device, model, model_type)
-            if model_type.is_sana():
-                return SanaSampler(train_device, temp_device, model, model_type)
 
     return None
 
@@ -391,6 +383,8 @@ def create_data_loader(
                 return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_sana():
                 return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
