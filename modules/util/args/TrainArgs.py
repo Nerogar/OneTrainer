@@ -6,6 +6,7 @@ from modules.util.args.BaseArgs import BaseArgs
 
 class TrainArgs(BaseArgs):
     config_path: str
+    secrets_path: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)

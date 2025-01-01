@@ -200,6 +200,15 @@ class ModelTab:
 
 
     def __create_base_dtype_components(self, row: int) -> int:
+        # huggingface token
+        components.label(self.scroll_frame, row, 0, "Hugging Face Token",
+                         tooltip="Enter your Hugging Face access token if you have used a protected Hugging Face repository below.\nThis value is stored separately, not saved to your configuration file. "
+                                 "Go to https://huggingface.co/settings/tokens to create an access token.",
+                         wide_tooltip=True)
+        components.entry(self.scroll_frame, row, 1, self.ui_state, "secrets.huggingface_token")
+
+        row += 1
+
         # base model
         components.label(self.scroll_frame, row, 0, "Base Model",
                          tooltip="Filename, directory or Hugging Face repository of the base model")
@@ -213,13 +222,6 @@ class ModelTab:
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(False),
                               self.ui_state, "weight_dtype")
-
-        row += 1
-
-        # huggingface token
-        components.label(self.scroll_frame, row, 0, "Hugging Face Token",
-                         tooltip="Enter your Hugging Face access token if you have used a Hugging Face repository above.\nThis value is stored separately, not saved to your configuration file.")
-        components.entry(self.scroll_frame, row, 1, self.ui_state, "secrets.huggingface_token")
 
         row += 1
 
