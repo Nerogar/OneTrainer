@@ -11,12 +11,14 @@ import customtkinter as ctk
 
 class CloudTab:
 
-    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
+    def __init__(self, master, train_config: TrainConfig, ui_state: UIState, parent):
         super().__init__()
 
         self.master = master
         self.train_config = train_config
         self.ui_state = ui_state
+        self.parent = parent
+        self.reattach = False
 
         self.frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         self.frame.grid_columnconfigure(0, weight=0)
@@ -96,28 +98,30 @@ class CloudTab:
         components.label(self.frame, 8, 2, "Detach remote trainer",
                          tooltip="Allows the trainer to keep running even if your connection to the cloud is lost.")
         components.switch(self.frame, 8, 3, self.ui_state, "cloud.detach_trainer")
-        components.label(self.frame, 9, 2, "Reattach run id",
+        components.label(self.frame, 9, 2, "Reattach id",
                          tooltip="An id identifying the remotely running trainer. In case you have lost connection or closed OneTrainer, it will try to reattach to this id instead of starting a new remote trainer.")
         components.entry(self.frame, 9, 3, self.ui_state, "cloud.run_id")
 
-        components.label(self.frame, 10, 2, "Download samples",
+        components.button(self.frame, 10, 2, "Reattach now", self.__reattach)
+
+        components.label(self.frame, 11, 2, "Download samples",
                          tooltip="Download samples from the remote workspace directory to your local machine.")
-        components.switch(self.frame, 10, 3, self.ui_state, "cloud.download_samples")
-        components.label(self.frame, 11, 2, "Download output model",
+        components.switch(self.frame, 11, 3, self.ui_state, "cloud.download_samples")
+        components.label(self.frame, 12, 2, "Download output model",
                          tooltip="Download the final model after training. You can disable this if you plan to use an automatically saved checkpoint instead.")
-        components.switch(self.frame, 11, 3, self.ui_state, "cloud.download_output_model")
-        components.label(self.frame, 12, 2, "Download saved checkpoints",
+        components.switch(self.frame, 12, 3, self.ui_state, "cloud.download_output_model")
+        components.label(self.frame, 13, 2, "Download saved checkpoints",
                          tooltip="Download the automatically saved training checkpoints from the remote workspace directory to your local machine.")
-        components.switch(self.frame, 12, 3, self.ui_state, "cloud.download_saves")
-        components.label(self.frame, 13, 2, "Download backups",
+        components.switch(self.frame, 13, 3, self.ui_state, "cloud.download_saves")
+        components.label(self.frame, 14, 2, "Download backups",
                          tooltip="Download backups from the remote workspace directory to your local machine. It's usually not necessary to download them, because as long as the backups are still available on the cloud, the training can be restarted using one of the cloud's backups.")
-        components.switch(self.frame, 13, 3, self.ui_state, "cloud.download_backups")
-        components.label(self.frame, 14, 2, "Download tensorboard logs",
+        components.switch(self.frame, 14, 3, self.ui_state, "cloud.download_backups")
+        components.label(self.frame, 15, 2, "Download tensorboard logs",
                          tooltip="Download TensorBoard event logs from the remote workspace directory to your local machine. They can then be viewed locally in TensorBoard. It is recommended to disable \"Sample to TensorBoard\" to reduce the event log size.")
-        components.switch(self.frame, 14, 3, self.ui_state, "cloud.download_tensorboard")
-        components.label(self.frame, 15, 2, "Delete remote workspace",
+        components.switch(self.frame, 15, 3, self.ui_state, "cloud.download_tensorboard")
+        components.label(self.frame, 16, 2, "Delete remote workspace",
                          tooltip="Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
-        components.switch(self.frame, 15, 3, self.ui_state, "cloud.delete_workspace")
+        components.switch(self.frame, 16, 3, self.ui_state, "cloud.delete_workspace")
 
         components.label(self.frame, 0, 4, "Create cloud",
                          tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty. Currently supported for RUNPOD.")
@@ -197,3 +201,10 @@ class CloudTab:
             self.gpu_types_menu.configure(values=[gpu['id'] for gpu in gpus])
         except Exception:
             self.gpu_types_menu.configure(values=[])
+
+    def __reattach(self):
+        self.reattach=True
+        try:
+            self.parent.start_training()
+        finally:
+            self.reattach=False

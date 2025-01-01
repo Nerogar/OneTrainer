@@ -134,10 +134,8 @@ class LinuxCloud(BaseCloud):
         self.connection.put('modules/util/args/TrainArgs.py',f'{config.onetrainer_dir}/modules/util/args/TrainArgs.py') #TODO remove
 
         if self.can_reattach():
-            print(f"Reattaching to run id {config.run_id}\n\n")
             self.__trail_detached_trainer()
             return
-
 
         cmd="export PYTHONUNBUFFERED=1"
         if config.huggingface_token != "":

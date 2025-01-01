@@ -18,13 +18,14 @@ from modules.util.TrainProgress import TrainProgress
 
 class CloudTrainer(BaseTrainer):
 
-    def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
+    def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands, reattach: bool=False):
         super().__init__(config, callbacks, commands)
         self.error_caught=False
         self.callback_thread=None
         self.sync_thread=None
         self.stop_event=None
         self.cloud=None
+        self.reattach=reattach
         self.remote_config=CloudTrainer.__make_remote_config(config)
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
@@ -43,7 +44,12 @@ class CloudTrainer(BaseTrainer):
             self.callbacks.on_update_status("setting up cloud")
             self.cloud.setup()
 
-            if not self.cloud.can_reattach():
+            if self.reattach:
+                if not self.cloud.can_reattach():
+                    raise ValueError(f"There is no detached trainer with run id {self.config.cloud.run_id} on this cloud")
+            else:
+                if self.cloud.can_reattach():
+                    raise ValueError(f"a detached trainer with id {self.config.cloud.run_id} is still running. Use \"Reattach now\" to reattach to this trainer!")
                 self.callbacks.on_update_status("uploading config")
                 self.cloud.upload_config(self.commands)
         except:

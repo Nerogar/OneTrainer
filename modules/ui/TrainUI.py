@@ -258,7 +258,7 @@ class TrainUI(ctk.CTk):
         return TrainingTab(master, self.train_config, self.ui_state)
 
     def create_cloud_tab(self, master) -> CloudTab:
-        return CloudTab(master, self.train_config, self.ui_state)
+        return CloudTab(master, self.train_config, self.ui_state,parent=self)
 
     def create_sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
@@ -560,7 +560,7 @@ class TrainUI(ctk.CTk):
         )
 
         if self.train_config.cloud.enabled:
-            trainer = CloudTrainer(self.train_config, self.training_callbacks, self.training_commands)
+            trainer = CloudTrainer(self.train_config, self.training_callbacks, self.training_commands, reattach=self.cloud_tab.reattach)
         else:
             ZLUDA.initialize_devices(self.train_config)
             trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
