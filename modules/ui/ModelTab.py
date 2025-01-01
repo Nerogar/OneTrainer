@@ -200,6 +200,15 @@ class ModelTab:
 
 
     def __create_base_dtype_components(self, row: int) -> int:
+        # huggingface token
+        components.label(self.scroll_frame, row, 0, "Hugging Face Token",
+                         tooltip="Enter your Hugging Face access token if you have used a protected Hugging Face repository below.\nThis value is stored separately, not saved to your configuration file. "
+                                 "Go to https://huggingface.co/settings/tokens to create an access token.",
+                         wide_tooltip=True)
+        components.entry(self.scroll_frame, row, 1, self.ui_state, "secrets.huggingface_token")
+
+        row += 1
+
         # base model
         components.label(self.scroll_frame, row, 0, "Base Model",
                          tooltip="Filename, directory or Hugging Face repository of the base model")

@@ -8,6 +8,7 @@ from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.ConfigPart import ConfigPart
@@ -405,6 +406,9 @@ class TrainConfig(BaseConfig):
     save_every_unit: TimeUnit
     save_skip_first: int
     save_filename_prefix: str
+
+    # secrets - not saved into config file
+    secrets: SecretsConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
@@ -902,5 +906,9 @@ class TrainConfig(BaseConfig):
         data.append(("save_every_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("save_skip_first", 0, int, False))
         data.append(("save_filename_prefix", "", str, False))
+
+        # secrets
+        secrets = SecretsConfig.default_values()
+        data.append(("secrets", secrets, SecretsConfig, False))
 
         return TrainConfig(data)

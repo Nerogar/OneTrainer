@@ -35,6 +35,7 @@ from torch.utils.hooks import RemovableHandle
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
+import huggingface_hub
 from PIL.Image import Image
 from tqdm import tqdm
 
@@ -103,6 +104,13 @@ class GenericTrainer(BaseTrainer):
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
                 print("No backup found, continuing without backup...")
+
+        if self.config.secrets.huggingface_token != "":
+            self.callbacks.on_update_status("logging into Hugging Face")
+            huggingface_hub.login(
+                token = self.config.secrets.huggingface_token,
+                new_session = False,
+            )
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(

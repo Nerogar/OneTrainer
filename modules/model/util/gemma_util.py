@@ -24,6 +24,6 @@ def encode_gemma(
         hidden_state_output_index = default_layer - layer_skip
         text_encoder_output = text_encoder_output.hidden_states[hidden_state_output_index]
         if hidden_state_output_index != -1 and add_layer_norm:
-            text_encoder_output = text_encoder.encoder.final_layer_norm(text_encoder_output)
+            text_encoder_output = text_encoder.norm(text_encoder_output)
 
     return text_encoder_output

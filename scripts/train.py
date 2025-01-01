@@ -8,6 +8,7 @@ from modules.trainer.GenericTrainer import GenericTrainer
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.config.TrainConfig import TrainConfig
 
 
@@ -19,6 +20,14 @@ def main():
     train_config = TrainConfig.default_values()
     with open(args.config_path, "r") as f:
         train_config.from_dict(json.load(f))
+
+    try:
+        with open("secrets.json" if args.secrets_path is None else args.secrets_path, "r") as f:
+            secrets_dict=json.load(f)
+            train_config.secrets = SecretsConfig.default_values().from_dict(secrets_dict)
+    except FileNotFoundError:
+        if args.secrets_path is not None:
+            raise
 
     trainer = GenericTrainer(train_config, callbacks, commands)
 
