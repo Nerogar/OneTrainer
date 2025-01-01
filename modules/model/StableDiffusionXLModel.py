@@ -163,10 +163,12 @@ class StableDiffusionXLModel(BaseModel):
     def force_v_prediction(self):
         self.noise_scheduler.config.prediction_type = 'v_prediction'
         self.sd_config['model']['params']['parameterization'] = 'v'
+        self.model_spec.prediction_type = 'v'
 
     def force_epsilon_prediction(self):
         self.noise_scheduler.config.prediction_type = 'epsilon'
         self.sd_config['model']['params']['parameterization'] = 'epsilon'
+        self.model_spec.prediction_type = 'epsilon'
 
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
