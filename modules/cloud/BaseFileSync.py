@@ -5,12 +5,14 @@ from math import ceil
 from pathlib import Path
 
 from modules.util.config.CloudConfig import CloudConfig
+from modules.util.config.CloudConfig import CloudSecretsConfig
 
 
 class BaseFileSync(metaclass=ABCMeta):
-    def __init__(self, config: CloudConfig):
+    def __init__(self, config: CloudConfig, secrets: CloudSecretsConfig):
         super().__init__()
         self.config = config
+        self.secrets = secrets
 
 
     def sync_up(self,local : Path,remote : Path):

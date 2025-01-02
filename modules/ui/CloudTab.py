@@ -47,32 +47,28 @@ class CloudTab:
         ], self.ui_state, "cloud.file_sync")
 
         components.label(self.frame, 3, 0, "API key",
-                         tooltip="Cloud service API key for RUNPOD. Leave empty for LINUX.")
-        components.entry(self.frame, 3, 1, self.ui_state, "cloud.api_key")
+                         tooltip="Cloud service API key for RUNPOD. Leave empty for LINUX. This value is stored separately, not saved to your configuration file. ")
+        components.entry(self.frame, 3, 1, self.ui_state, "secrets.cloud.api_key")
 
-        components.label(self.frame, 4, 0, "Huggingface token",
-                         tooltip="If you provide your Huggingface token, a Huggingface repository path can then be set as the base model in OneTrainer. The model is then directly downloaded from Huggingface to the cloud, avoiding large uploads from your computer.")
-        components.entry(self.frame, 4, 1, self.ui_state, "cloud.huggingface_token")
-
-        components.label(self.frame, 5, 0, "Hostname",
+        components.label(self.frame, 4, 0, "Hostname",
                          tooltip="SSH server hostname or IP. Leave empty if you have a Cloud ID or want to automatically create a new cloud.")
-        components.entry(self.frame, 5, 1, self.ui_state, "cloud.host")
+        components.entry(self.frame, 4, 1, self.ui_state, "secrets.cloud.host")
 
-        components.label(self.frame, 6, 0, "Port",
+        components.label(self.frame, 5, 0, "Port",
                          tooltip="SSH server port. Leave empty if you have a Cloud ID or want to automatically create a new cloud.")
-        components.entry(self.frame, 6, 1, self.ui_state, "cloud.port")
+        components.entry(self.frame, 5, 1, self.ui_state, "secrets.cloud.port")
 
-        components.label(self.frame, 7, 0, "User",
+        components.label(self.frame, 6, 0, "User",
                          tooltip='SSH username. Use "root" for RUNPOD. Your SSH client must be set up to connect to the cloud using a public key, without a password. For RUNPOD, create an ed25519 key locally, and copy the contents of the public keyfile to your "SSH Public Keys" on the RunPod website.')
-        components.entry(self.frame, 7, 1, self.ui_state, "cloud.user")
+        components.entry(self.frame, 6, 1, self.ui_state, "secrets.cloud.user")
 
-        components.label(self.frame, 8, 0, "Cloud id",
+        components.label(self.frame, 7, 0, "Cloud id",
                          tooltip="RUNPOD Cloud ID. The cloud service must have a public IP and SSH service. Leave empty if you want to automatically create a new RUNPOD cloud, or if you're connecting to another cloud provider via SSH Hostname and Port.")
-        components.entry(self.frame, 8, 1, self.ui_state, "cloud.id")
+        components.entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.id")
 
-        components.label(self.frame, 9, 0, "Make tensorboard TCP tunnel",
+        components.label(self.frame, 8, 0, "Make tensorboard TCP tunnel",
                          tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud")
-        components.switch(self.frame, 9, 1, self.ui_state, "cloud.tensorboard_tunnel")
+        components.switch(self.frame, 8, 1, self.ui_state, "cloud.tensorboard_tunnel")
 
 
 
@@ -153,8 +149,8 @@ class CloudTab:
         components.entry(self.frame, 5, 5, self.ui_state, "cloud.min_download")
 
         components.label(self.frame, 6, 4, "Jupyter password",
-                         tooltip="Jupyter password")
-        components.entry(self.frame, 6, 5, self.ui_state, "cloud.jupyter_password")
+                         tooltip="Jupyter password. This value is stored separately, not saved to your configuration file. ")
+        components.entry(self.frame, 6, 5, self.ui_state, "secrets.cloud.jupyter_password")
 
         components.label(self.frame, 8, 4, "Action on finish",
                          tooltip="What to do when training finishes and the data has been fully downloaded: Stop or delete the cloud, or do nothing.")
@@ -196,7 +192,7 @@ class CloudTab:
     def __set_gpu_types(self):
         import runpod
         try:
-            runpod.api_key=self.train_config.cloud.api_key
+            runpod.api_key=self.train_config.secrets.cloud.api_key
             gpus=runpod.get_gpus()
             self.gpu_types_menu.configure(values=[gpu['id'] for gpu in gpus])
         except Exception:

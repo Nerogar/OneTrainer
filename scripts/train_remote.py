@@ -71,6 +71,14 @@ def main():
     with open(args.config_path, "r") as f:
         train_config.from_dict(json.load(f))
 
+    try:
+        with open("secrets.json" if args.secrets_path is None else args.secrets_path, "r") as f:
+            secrets_dict=json.load(f)
+            train_config.secrets = SecretsConfig.default_values().from_dict(secrets_dict)
+    except FileNotFoundError:
+        if args.secrets_path is not None:
+            raise
+
     trainer = GenericTrainer(train_config, callbacks, commands)
 
     if args.command_path:

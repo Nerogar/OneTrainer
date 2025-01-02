@@ -1,17 +1,17 @@
 from pathlib import Path
 
 from modules.cloud.BaseSSHFileSync import BaseSSHFileSync
-from modules.util.config.CloudConfig import CloudConfig
+from modules.util.config.CloudConfig import CloudConfig, CloudSecretsConfig
 
 import fabric
 
 
 class FabricFileSync(BaseSSHFileSync):
-    def __init__(self, config: CloudConfig):
-        super().__init__(config)
+    def __init__(self, config: CloudConfig, secrets: CloudSecretsConfig):
+        super().__init__(config,secrets)
 
     def __upload_batch(self,local_files,remote_dir : Path):
-        with fabric.Connection(host=self.config.host,port=self.config.port,user=self.config.user) as connection:
+        with fabric.Connection(host=self.secrets.host,port=self.secrets.port,user=self.secrets.user) as connection:
             for local_file in local_files:
                 self.__put(connection,local_file=local_file,remote_file=remote_dir / local_file.name)
 
@@ -26,7 +26,7 @@ class FabricFileSync(BaseSSHFileSync):
                 max_batch_size=100)
 
     def __download_batch(self,local_dir : Path,remote_files):
-        with fabric.Connection(host=self.config.host,port=self.config.port,user=self.config.user) as connection:
+        with fabric.Connection(host=self.secrets.host,port=self.secrets.port,user=self.secrets.user) as connection:
             for remote_file in remote_files:
                 self.__get(connection,local_file=local_dir / remote_file.name,remote_file=remote_file)
 

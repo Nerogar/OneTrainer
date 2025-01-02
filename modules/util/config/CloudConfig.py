@@ -6,24 +6,41 @@ from modules.util.enum.CloudFileSync import CloudFileSync
 from modules.util.enum.CloudType import CloudType
 
 
+class CloudSecretsConfig(BaseConfig):
+    api_key: str
+    jupyter_password: str
+    host: str
+    port: int
+    user: str
+    id: str
+
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super().__init__(data)
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        data.append(("api_key", "", str, False))
+        data.append(("id", "", str, False))
+        data.append(("jupyter_password", "", str, False))
+        data.append(("host", "", str, False))
+        data.append(("port", 0, str, False))
+        data.append(("user", "root", str, False))
+        return CloudSecretsConfig(data)
+
+
 class CloudConfig(BaseConfig):
     enabled: bool
     type: CloudType
     file_sync : CloudFileSync
-    api_key: str
     create : bool
     name: str
-    id: str
     tensorboard_tunnel: bool
     sub_type: str
     gpu_type: str
     volume_size: int
     min_download: int
-    jupyter_password: str
-    host: str
-    port: int
-    user: str
-    huggingface_token: str
     remote_dir: str
     huggingface_cache_dir: str
     onetrainer_dir: str
@@ -53,20 +70,13 @@ class CloudConfig(BaseConfig):
         data.append(("enabled", False, bool, False))
         data.append(("type", CloudType.RUNPOD, CloudType, False))
         data.append(("file_sync", CloudFileSync.NATIVE_SCP, CloudFileSync, False))
-        data.append(("api_key", "", str, False))
         data.append(("create", True, bool, False))
         data.append(("name", "OneTrainer", str, False))
-        data.append(("id", "", str, False))
         data.append(("tensorboard_tunnel", True, bool, False))
         data.append(("sub_type", "", str, False))
         data.append(("gpu_type", "", str, False))
         data.append(("volume_size", 100, int, False))
         data.append(("min_download", 0, int, False))
-        data.append(("jupyter_password", "", str, False))
-        data.append(("huggingface_token", "", str, False))
-        data.append(("host", "", str, False))
-        data.append(("port", 0, str, False))
-        data.append(("user", "root", str, False))
         data.append(("remote_dir", "/workspace", str, False))
         data.append(("huggingface_cache_dir", "/workspace/huggingface_cache", str, False))
         data.append(("onetrainer_dir", "/workspace/OneTrainer", str, False))

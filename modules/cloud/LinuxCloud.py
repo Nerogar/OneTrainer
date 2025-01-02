@@ -38,14 +38,15 @@ class LinuxCloud(BaseCloud):
             return
 
         config=self.config.cloud
-        if config.host != '' and config.port != '':
+        secrets=self.config.secrets.cloud
+        if secrets.host != '' and secrets.port != '':
             try:
-                self.connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
                 self.connection.open()
 
-                self.callback_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.callback_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
 
-                self.command_connection=fabric.Connection(host=config.host,port=config.port,user=config.user)
+                self.command_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
                 #the command connection isn't used for long periods of time; prevent remote from closing it:
                 self.command_connection.open()
                 self.command_connection.transport.set_keepalive(30)
@@ -53,9 +54,9 @@ class LinuxCloud(BaseCloud):
 
                 match config.file_sync:
                     case CloudFileSync.NATIVE_SCP:
-                        self.file_sync=NativeSCPFileSync(config)
+                        self.file_sync=NativeSCPFileSync(config,secrets)
                     case CloudFileSync.FABRIC_SFTP:
-                        self.file_sync=FabricFileSync(config)
+                        self.file_sync=FabricFileSync(config,secrets)
 
             except Exception:
                 if self.connection:
@@ -138,8 +139,8 @@ class LinuxCloud(BaseCloud):
             return
 
         cmd="export PYTHONUNBUFFERED=1"
-        if config.huggingface_token != "":
-            cmd+=f" && export HF_TOKEN={config.huggingface_token}"
+        if self.config.secrets.huggingface_token != "":
+            cmd+=f" && export HF_TOKEN={self.config.secrets.huggingface_token}"
         if config.huggingface_cache_dir != "":
             cmd+=f" && export HF_HOME={config.huggingface_cache_dir}"
 
