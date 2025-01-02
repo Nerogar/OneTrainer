@@ -111,10 +111,25 @@ class BaseModelSetup(
 
         reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
 
-        for name, lr in reported_learning_rates.items():
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
+        isProdigy = config.optimizer.optimizer.name.lower()
+        
+        if isProdigy != "prodigy":
+            for name, lr in reported_learning_rates.items():
+                tensorboard.add_scalar(
+                    f"lr/{name}", lr, model.train_progress.global_step
             )
+        else:
+            optimizer = scheduler.optimizer 
+            for i, param_group in enumerate(optimizer.param_groups):
+                # same as above, only use the prefix.
+                name = parameters[i].split("/")[0]
+                d_value = param_group.get("d", 0.0)
+                lr_value = param_group.get("lr", 0.0)
+                dhat_value = param_group.get("d_hat", 0.0)
+                d_lr = d_value * lr_value
+
+                tensorboard.add_scalar(f"dlr/{name}", d_lr, model.train_progress.global_step)
+                tensorboard.add_scalar(f"d_hat/{name}", dhat_value, model.train_progress.global_step)
 
     def stop_unet_training_elapsed(
             self,
