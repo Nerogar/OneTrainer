@@ -159,6 +159,10 @@ class StableDiffusionXLLoRASetup(
         model.unet_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.unet_lora.hook_to_module()
 
+        if config.rescale_noise_scheduler_to_zero_terminal_snr:
+            model.rescale_noise_scheduler_to_zero_terminal_snr()
+            model.force_v_prediction()
+
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_additional_embeddings(model, config)
