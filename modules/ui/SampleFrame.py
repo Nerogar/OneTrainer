@@ -59,21 +59,31 @@ class SampleFrame(ctk.CTkFrame):
             components.label(bottom_frame, 0, 2, "height:")
             components.entry(bottom_frame, 0, 3, self.ui_state, "height")
 
+            # frames
+            components.label(bottom_frame, 1, 0, "frames:")
+            components.entry(bottom_frame, 1, 1, self.ui_state, "frames",
+                             tooltip="Number of frames to generate. Only used when generating videos.")
+
+            # length
+            components.label(bottom_frame, 1, 2, "length:")
+            components.entry(bottom_frame, 1, 3, self.ui_state, "length",
+                             tooltip="Length in seconds of audio output.")
+
             # seed
-            components.label(bottom_frame, 1, 0, "seed:")
-            components.entry(bottom_frame, 1, 1, self.ui_state, "seed")
+            components.label(bottom_frame, 2, 0, "seed:")
+            components.entry(bottom_frame, 2, 1, self.ui_state, "seed")
 
             # random seed
-            components.label(bottom_frame, 1, 2, "random seed:")
-            components.switch(bottom_frame, 1, 3, self.ui_state, "random_seed")
+            components.label(bottom_frame, 2, 2, "random seed:")
+            components.switch(bottom_frame, 2, 3, self.ui_state, "random_seed")
 
             # cfg scale
-            components.label(bottom_frame, 2, 0, "cfg scale:")
-            components.entry(bottom_frame, 2, 1, self.ui_state, "cfg_scale")
+            components.label(bottom_frame, 3, 0, "cfg scale:")
+            components.entry(bottom_frame, 3, 1, self.ui_state, "cfg_scale")
 
             # sampler
-            components.label(bottom_frame, 2, 2, "sampler:")
-            components.options_kv(bottom_frame, 2, 3, [
+            components.label(bottom_frame, 4, 2, "sampler:")
+            components.options_kv(bottom_frame, 4, 3, [
                 ("DDIM", NoiseScheduler.DDIM),
                 ("Euler", NoiseScheduler.EULER),
                 ("Euler A", NoiseScheduler.EULER_A),
@@ -87,26 +97,26 @@ class SampleFrame(ctk.CTkFrame):
             ], self.ui_state, "noise_scheduler")
 
             # steps
-            components.label(bottom_frame, 3, 0, "steps:")
-            components.entry(bottom_frame, 3, 1, self.ui_state, "diffusion_steps")
+            components.label(bottom_frame, 4, 0, "steps:")
+            components.entry(bottom_frame, 4, 1, self.ui_state, "diffusion_steps")
 
             # inpainting
-            components.label(bottom_frame, 4, 0, "inpainting:",
+            components.label(bottom_frame, 5, 0, "inpainting:",
                              tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
-            components.switch(bottom_frame, 4, 1, self.ui_state, "sample_inpainting")
+            components.switch(bottom_frame, 5, 1, self.ui_state, "sample_inpainting")
 
             # base image path
-            components.label(bottom_frame, 5, 0, "base image path:",
+            components.label(bottom_frame, 6, 0, "base image path:",
                              tooltip="The base image used when inpainting.")
-            components.file_entry(bottom_frame, 5, 1, self.ui_state, "base_image_path",
+            components.file_entry(bottom_frame, 6, 1, self.ui_state, "base_image_path",
                                   allow_model_files=False,
                                   allow_image_files=True,
                                   )
 
             # mask image path
-            components.label(bottom_frame, 5, 2, "mask image path:",
+            components.label(bottom_frame, 7, 2, "mask image path:",
                              tooltip="The mask used when inpainting.")
-            components.file_entry(bottom_frame, 5, 3, self.ui_state, "mask_image_path",
+            components.file_entry(bottom_frame, 7, 3, self.ui_state, "mask_image_path",
                                   allow_model_files=False,
                                   allow_image_files=True,
                                   )

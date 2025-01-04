@@ -7,6 +7,7 @@ PyYAML==6.0.2
 huggingface-hub==0.26.2
 scipy==1.14.1; sys_platform != 'win32'
 matplotlib==3.9.2
+av==13.1.0
 
 # pytorch
 accelerate==1.0.1
