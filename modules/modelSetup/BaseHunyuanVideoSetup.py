@@ -260,36 +260,30 @@ class BaseHunyuanVideoSetup(
             generator.manual_seed(train_progress.global_step)
             rand = Random(train_progress.global_step)
 
-            is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
-
             vae_scaling_factor = model.vae.config['scaling_factor']
-            vae_shift_factor = model.vae.config['shift_factor']
 
-            text_encoder_output, pooled_text_encoder_output = model.encode_text(
+            text_encoder_output, pooled_text_encoder_output, text_encoder_attention_mask = model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],
                 rand=rand,
                 tokens_1=batch.get("tokens_1"),
                 tokens_2=batch.get("tokens_2"),
-                tokens_mask_2=batch.get("tokens_mask_2"),
+                tokens_mask_1=batch.get("tokens_mask_1"),
                 text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
-                    if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
-                text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
-                    if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
+                text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
+                    if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
+                    if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
                 text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
                 text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
-                apply_attention_mask=config.prior.attention_mask,
             )
 
             latent_image = batch['latent_image']
-            scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
+            scaled_latent_image = latent_image * vae_scaling_factor
 
-            scaled_latent_conditioning_image = None
-            if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = \
-                    (batch['latent_conditioning_image'] - vae_shift_factor) * vae_scaling_factor
+            if scaled_latent_image.ndim == 4:
+                scaled_latent_image = scaled_latent_image.unsqueeze(2)
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
@@ -308,56 +302,23 @@ class BaseHunyuanVideoSetup(
                 model.noise_scheduler.timesteps,
             )
 
-            if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                latent_input = torch.concat(
-                    [scaled_noisy_latent_image, scaled_latent_conditioning_image, batch['latent_mask']], 1
-                )
-            else:
-                latent_input = scaled_noisy_latent_image
+            latent_input = scaled_noisy_latent_image
 
             if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([config.prior.guidance_scale], device=self.train_device)
+                guidance = torch.tensor([config.prior.guidance_scale * 1000.0], device=self.train_device)
                 guidance = guidance.expand(latent_input.shape[0])
             else:
                 guidance = None
 
-            text_ids = torch.zeros(
-                size=(text_encoder_output.shape[1], 3),
-                device=self.train_device,
-            )
-
-            image_ids = model.prepare_latent_image_ids(
-                latent_input.shape[2],
-                latent_input.shape[3],
-                self.train_device,
-                model.train_dtype.torch_dtype()
-            )
-
-            packed_latent_input = model.pack_latents(
-                latent_input,
-                latent_input.shape[0],
-                latent_input.shape[1],
-                latent_input.shape[2],
-                latent_input.shape[3],
-            )
-
-            packed_predicted_flow = model.transformer(
-                hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep / 1000,
+            predicted_flow = model.transformer(
+                hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                timestep=timestep,
                 guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                 pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
-                img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
-                joint_attention_kwargs=None,
+                encoder_attention_mask=text_encoder_attention_mask.to(dtype=model.train_dtype.torch_dtype()),
                 return_dict=True
             ).sample
-
-            predicted_flow = model.unpack_latents(
-                packed_predicted_flow,
-                latent_input.shape[2],
-                latent_input.shape[3],
-            )
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
@@ -376,75 +337,57 @@ class BaseHunyuanVideoSetup(
                         train_progress.global_step,
                     )
 
-                    if is_align_prop_step:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noise
+                    self._save_image(
+                        self._project_latent_to_image(latent_noise),
+                        config.debug_dir + "/training_batches",
+                        "1-noise",
+                        train_progress.global_step,
+                    )
 
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-image",
-                            model.train_progress.global_step,
-                        )
-                    else:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noisy image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_noisy_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "2-noisy_image",
+                        train_progress.global_step,
+                    )
 
-                        # noisy image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_noisy_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-noisy_image",
-                            train_progress.global_step,
-                        )
+                    # predicted flow
+                    self._save_image(
+                        self._project_latent_to_image(predicted_flow),
+                        config.debug_dir + "/training_batches",
+                        "3-predicted_flow",
+                        train_progress.global_step,
+                    )
 
-                        # predicted flow
-                        self._save_image(
-                            self._project_latent_to_image(predicted_flow),
-                            config.debug_dir + "/training_batches",
-                            "3-predicted_flow",
-                            train_progress.global_step,
-                        )
+                    # flow
+                    flow = latent_noise - scaled_latent_image
+                    self._save_image(
+                        self._project_latent_to_image(flow),
+                        config.debug_dir + "/training_batches",
+                        "4-flow",
+                        train_progress.global_step,
+                    )
 
-                        # flow
-                        flow = latent_noise - scaled_latent_image
-                        self._save_image(
-                            self._project_latent_to_image(flow),
-                            config.debug_dir + "/training_batches",
-                            "4-flow",
-                            train_progress.global_step,
-                        )
+                    predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
 
-                        predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
+                    # predicted image
+                    self._save_image(
+                        self._project_latent_to_image(predicted_scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "5-predicted_image",
+                        train_progress.global_step,
+                    )
 
-                        # predicted image
-                        self._save_image(
-                            self._project_latent_to_image(predicted_scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "5-predicted_image",
-                            train_progress.global_step,
-                        )
+                    # image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "6-image",
+                        model.train_progress.global_step,
+                    )
 
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "6-image",
-                            model.train_progress.global_step,
-                        )
-
-        # model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(

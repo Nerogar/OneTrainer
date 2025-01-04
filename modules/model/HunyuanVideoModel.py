@@ -278,12 +278,12 @@ class HunyuanVideoModel(BaseModel):
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
+            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
 
         if text_encoder_2_dropout_probability is not None:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
+            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
 
         return text_encoder_1_output, pooled_text_encoder_2_output, tokens_mask_1

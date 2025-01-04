@@ -142,7 +142,7 @@ class SampleWindow(ctk.CTkToplevel):
 
     def __update_preview(self, sampler_output: ModelSamplerOutput):
         if sampler_output.file_type == FileType.IMAGE:
-            image = image = sampler_output.data
+            image = sampler_output.data
             self.image.configure(
                 light_image=image,
                 size=(image.width, image.height),

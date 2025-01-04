@@ -1,3 +1,5 @@
+import copy
+
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSetup.BaseHunyuanVideoSetup import BaseHunyuanVideoSetup
 from modules.util.config.TrainConfig import TrainConfig
@@ -84,8 +86,8 @@ class HunyuanVideoEmbeddingSetup(
         if model.text_encoder_2 is not None:
             model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
+        model.tokenizer_1 = copy.deepcopy(model.orig_tokenizer_1)
+        model.tokenizer_2 = copy.deepcopy(model.orig_tokenizer_2)
         self._setup_additional_embeddings(model, config)
         self._setup_embedding(model, config)
         self._setup_embedding_wrapper(model, config)

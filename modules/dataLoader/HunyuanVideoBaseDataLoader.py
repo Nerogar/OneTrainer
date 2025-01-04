@@ -3,7 +3,11 @@ import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
-from modules.model.HunyuanVideoModel import HunyuanVideoModel
+from modules.model.HunyuanVideoModel import (
+    DEFAULT_PROMPT_TEMPLATE,
+    DEFAULT_PROMPT_TEMPLATE_CROP_START,
+    HunyuanVideoModel,
+)
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -13,8 +17,9 @@ from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeClipText import EncodeClipText
-from mgds.pipelineModules.EncodeT5Text import EncodeT5Text
+from mgds.pipelineModules.EncodeLlamaText import EncodeLlamaText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -64,18 +69,16 @@ class HunyuanVideoBaseDataLoader(
 
     def _preparation_modules(self, config: TrainConfig, model: HunyuanVideoModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        image_to_video = ImageToVideo(in_name='image', out_name='image')
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
-        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
-        tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
-        tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_1.model_max_length)
-        encode_prompt_1 = EncodeClipText(in_name='tokens_1', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name='text_encoder_1_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_1, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
-        encode_prompt_2 = EncodeT5Text(tokens_in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder_2, hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_2_autocast_context], dtype=model.text_encoder_2_train_dtype.torch_dtype())
+        tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=77, format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=77)
+        encode_prompt_1 = EncodeLlamaText(tokens_in_name='tokens_1', tokens_attention_mask_in_name='tokens_mask_1', hidden_state_out_name='text_encoder_1_hidden_state', tokens_attention_mask_out_name='tokens_mask_1', text_encoder=model.text_encoder_1, hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context, model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_states', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
-        modules = [rescale_image, encode_image, image_sample]
+        modules = [rescale_image, image_to_video, encode_image, image_sample]
 
         if model.tokenizer_1:
             modules.append(tokenize_prompt_1)
@@ -84,11 +87,6 @@ class HunyuanVideoBaseDataLoader(
 
         elif config.masked_training:
             modules.append(downscale_mask)
-
-        if config.model_type.has_conditioning_image_input():
-            modules.append(rescale_conditioning_image)
-            modules.append(encode_conditioning_image)
-            modules.append(conditioning_image_sample)
 
         if not config.train_text_encoder_or_embedding() and model.text_encoder_1:
             modules.append(encode_prompt_1)
@@ -113,8 +111,8 @@ class HunyuanVideoBaseDataLoader(
 
         sort_names = image_aggregate_names + image_split_names + [
             'prompt',
-            'tokens_1', 'tokens_mask_1', 'text_encoder_1_hidden_state', 'text_encoder_1_pooled_state',
-            'tokens_2', 'tokens_mask_2', 'text_encoder_2_hidden_state',
+            'tokens_1', 'tokens_mask_1', 'text_encoder_1_hidden_state',
+            'tokens_2', 'tokens_mask_2', 'text_encoder_2_pooled_state',
             'concept'
         ]
 
@@ -122,12 +120,11 @@ class HunyuanVideoBaseDataLoader(
             text_split_names.append('tokens_1')
             text_split_names.append('tokens_mask_1')
             text_split_names.append('text_encoder_1_hidden_state')
-            text_split_names.append('text_encoder_1_pooled_state')
 
         if not config.train_text_encoder_2_or_embedding():
             text_split_names.append('tokens_2')
             text_split_names.append('tokens_mask_2')
-            text_split_names.append('text_encoder_2_hidden_state')
+            text_split_names.append('text_encoder_2_pooled_state')
 
         image_cache_dir = os.path.join(config.cache_dir, "image")
         text_cache_dir = os.path.join(config.cache_dir, "text")
@@ -189,10 +186,9 @@ class HunyuanVideoBaseDataLoader(
 
         if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_1_hidden_state')
-            output_names.append('text_encoder_1_pooled_state')
 
         if not config.train_text_encoder_2_or_embedding():
-            output_names.append('text_encoder_2_hidden_state')
+            output_names.append('text_encoder_2_pooled_state')
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
