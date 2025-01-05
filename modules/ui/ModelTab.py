@@ -108,7 +108,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=True,
+            allow_checkpoint=False,
         )
 
     def __setup_stable_diffusion_xl_ui(self):

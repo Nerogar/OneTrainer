@@ -1,7 +1,7 @@
 import os.path
 from pathlib import Path
 
-from modules.model.FluxModel import FluxModel
+from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 
@@ -11,13 +11,13 @@ from torch import Tensor
 from safetensors.torch import save_file
 
 
-class FluxLoRASaver(
+class HunyuanVideoLoRASaver(
     DtypeModelSaverMixin,
 ):
 
     def __get_state_dict(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_1_lora is not None:
@@ -32,15 +32,15 @@ class FluxLoRASaver(
         if model.additional_embeddings and model.train_config.bundle_additional_embeddings:
             for embedding in model.additional_embeddings:
                 if embedding.text_encoder_1_vector is not None:
-                    state_dict[f"bundle_emb.{embedding.placeholder}.clip_l"] = embedding.text_encoder_1_vector
+                    state_dict[f"bundle_emb.{embedding.placeholder}.llama"] = embedding.text_encoder_1_vector
                 if embedding.text_encoder_2_vector is not None:
-                    state_dict[f"bundle_emb.{embedding.placeholder}.t5"] = embedding.text_encoder_2_vector
+                    state_dict[f"bundle_emb.{embedding.placeholder}.clip_l"] = embedding.text_encoder_2_vector
 
         return state_dict
 
     def __save_ckpt(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
             destination: str,
             dtype: torch.dtype | None,
     ):
@@ -52,7 +52,7 @@ class FluxLoRASaver(
 
     def __save_safetensors(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
             destination: str,
             dtype: torch.dtype | None,
     ):
@@ -64,7 +64,7 @@ class FluxLoRASaver(
 
     def __save_internal(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
             destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
@@ -73,7 +73,7 @@ class FluxLoRASaver(
 
     def save(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,

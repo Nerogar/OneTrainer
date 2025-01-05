@@ -52,6 +52,9 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.FluxEmbeddingModelSaver import FluxEmbeddingModelSaver
 from modules.modelSaver.FluxFineTuneModelSaver import FluxFineTuneModelSaver
 from modules.modelSaver.FluxLoRAModelSaver import FluxLoRAModelSaver
+from modules.modelSaver.HunyuanVideoEmbeddingModelSaver import HunyuanVideoEmbeddingModelSaver
+from modules.modelSaver.HunyuanVideoFineTuneModelSaver import HunyuanVideoFineTuneModelSaver
+from modules.modelSaver.HunyuanVideoLoRAModelSaver import HunyuanVideoLoRAModelSaver
 from modules.modelSaver.PixArtAlphaEmbeddingModelSaver import PixArtAlphaEmbeddingModelSaver
 from modules.modelSaver.PixArtAlphaFineTuneModelSaver import PixArtAlphaFineTuneModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
@@ -216,6 +219,8 @@ def create_model_saver(
                 return FluxFineTuneModelSaver()
             if model_type.is_sana():
                 return SanaFineTuneModelSaver()
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoFineTuneModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelSaver()
@@ -234,6 +239,8 @@ def create_model_saver(
                 return FluxLoRAModelSaver()
             if model_type.is_sana():
                 return SanaLoRAModelSaver()
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -249,6 +256,8 @@ def create_model_saver(
                 return FluxEmbeddingModelSaver()
             if model_type.is_sana():
                 return SanaEmbeddingModelSaver()
+            if model_type.is_hunyuan_video():
+                return HunyuanVideoEmbeddingModelSaver()
 
     return None
 

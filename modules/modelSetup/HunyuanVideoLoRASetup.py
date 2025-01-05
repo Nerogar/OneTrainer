@@ -12,6 +12,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 PRESETS = {
+    "attn-mlp": ["attn", "ff.net"],
     "attn-only": ["attn"],
     "full": [],
 }

@@ -60,14 +60,14 @@ class SampleFrame(ctk.CTkFrame):
             components.entry(bottom_frame, 0, 3, self.ui_state, "height")
 
             # frames
-            components.label(bottom_frame, 1, 0, "frames:")
-            components.entry(bottom_frame, 1, 1, self.ui_state, "frames",
+            components.label(bottom_frame, 1, 0, "frames:",
                              tooltip="Number of frames to generate. Only used when generating videos.")
+            components.entry(bottom_frame, 1, 1, self.ui_state, "frames")
 
             # length
-            components.label(bottom_frame, 1, 2, "length:")
-            components.entry(bottom_frame, 1, 3, self.ui_state, "length",
+            components.label(bottom_frame, 1, 2, "length:",
                              tooltip="Length in seconds of audio output.")
+            components.entry(bottom_frame, 1, 3, self.ui_state, "length")
 
             # seed
             components.label(bottom_frame, 2, 0, "seed:")

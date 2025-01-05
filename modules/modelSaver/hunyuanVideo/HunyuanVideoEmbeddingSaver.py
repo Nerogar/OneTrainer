@@ -1,7 +1,7 @@
 import os.path
 from pathlib import Path
 
-from modules.model.FluxModel import FluxModel, FluxModelEmbedding
+from modules.model.HunyuanVideoModel import HunyuanVideoModel, HunyuanVideoModelEmbedding
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
 
@@ -11,11 +11,11 @@ from torch import Tensor
 from safetensors.torch import save_file
 
 
-class FluxEmbeddingSaver:
+class HunyuanVideoEmbeddingSaver:
 
     def __save_ckpt(
             self,
-            embedding: FluxModelEmbedding | None,
+            embedding: HunyuanVideoModelEmbedding | None,
             embedding_state: tuple[Tensor, Tensor] | None,
             destination: str,
             dtype: torch.dtype | None,
@@ -33,15 +33,15 @@ class FluxEmbeddingSaver:
 
         file = {}
         if text_encoder_1_vector_cpu is not None:
-            file["clip_l"] = text_encoder_1_vector_cpu
+            file["llama"] = text_encoder_1_vector_cpu
         if text_encoder_2_vector_cpu is not None:
-            file["t5"] = text_encoder_2_vector_cpu
+            file["clip_l"] = text_encoder_2_vector_cpu
 
         torch.save(file, destination)
 
     def __save_safetensors(
             self,
-            embedding: FluxModelEmbedding | None,
+            embedding: HunyuanVideoModelEmbedding | None,
             embedding_state: tuple[Tensor, Tensor] | None,
             destination: str,
             dtype: torch.dtype | None,
@@ -59,15 +59,15 @@ class FluxEmbeddingSaver:
 
         file = {}
         if text_encoder_1_vector_cpu is not None:
-            file["clip_l"] = text_encoder_1_vector_cpu
+            file["llama"] = text_encoder_1_vector_cpu
         if text_encoder_2_vector_cpu is not None:
-            file["t5"] = text_encoder_2_vector_cpu
+            file["clip_l"] = text_encoder_2_vector_cpu
 
         save_file(file, destination)
 
     def __save_internal(
             self,
-            embedding: FluxModelEmbedding | None,
+            embedding: HunyuanVideoModelEmbedding | None,
             embedding_state: tuple[Tensor, Tensor, Tensor] | None,
             destination: str,
             save_single: bool,
@@ -93,7 +93,7 @@ class FluxEmbeddingSaver:
 
     def save_single(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,
@@ -128,7 +128,7 @@ class FluxEmbeddingSaver:
 
     def save_multiple(
             self,
-            model: FluxModel,
+            model: HunyuanVideoModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,

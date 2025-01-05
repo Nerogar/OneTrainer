@@ -1,7 +1,7 @@
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.hunyuan_video.HunyuanVideoEmbeddingLoader import HunyuanVideoEmbeddingLoader
-from modules.modelLoader.hunyuan_video.HunyuanVideoModelLoader import HunyuanVideoModelLoader
+from modules.modelLoader.hunyuanVideo.HunyuanVideoEmbeddingLoader import HunyuanVideoEmbeddingLoader
+from modules.modelLoader.hunyuanVideo.HunyuanVideoModelLoader import HunyuanVideoModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
 from modules.util.enum.ModelType import ModelType
@@ -22,10 +22,8 @@ class HunyuanVideoEmbeddingModelLoader(
             model_type: ModelType,
     ) -> str | None:
         match model_type:
-            case ModelType.FLUX_DEV_1:
-                return "resources/sd_model_spec/flux_dev_1.0-embedding.json"
-            case ModelType.FLUX_FILL_DEV_1:
-                return "resources/sd_model_spec/flux_dev_fill_1.0-embedding.json"
+            case ModelType.HUNYUAN_VIDEO:
+                return "resources/sd_model_spec/hunyuan_video-embedding.json"
             case _:
                 return None
 
