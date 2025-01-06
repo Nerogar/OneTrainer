@@ -310,15 +310,16 @@ class BaseHunyuanVideoSetup(
             else:
                 guidance = None
 
-            predicted_flow = model.transformer(
-                hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep,
-                guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
-                pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                encoder_attention_mask=text_encoder_attention_mask.to(dtype=model.train_dtype.torch_dtype()),
-                return_dict=True
-            ).sample
+            with model.transformer_autocast_context:
+                predicted_flow = model.transformer(
+                    hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=timestep,
+                    guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
+                    pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    encoder_attention_mask=text_encoder_attention_mask.to(dtype=model.train_dtype.torch_dtype()),
+                    return_dict=True
+                ).sample
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
@@ -362,7 +363,6 @@ class BaseHunyuanVideoSetup(
                     )
 
                     # flow
-                    flow = latent_noise - scaled_latent_image
                     self._save_image(
                         self._project_latent_to_image(flow),
                         config.debug_dir + "/training_batches",
