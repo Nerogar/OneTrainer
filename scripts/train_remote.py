@@ -92,11 +92,11 @@ def main():
         trainer.train()
 
     finally:
-        stop_event.set()
         if args.command_path:
+            stop_event.set()
             close_pipe(args.command_path)
+            command_thread.join()
 
-        command_thread.join()
         trainer.end()
 
 

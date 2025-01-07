@@ -73,7 +73,7 @@ class LinuxCloud(BaseCloud):
         super().setup()
         self.connection.run(f'mkfifo {shlex.quote(self.command_pipe)}',warn=True,hide=True,in_stream=False)
 
-    def _install_onetrainer(self):
+    def _install_onetrainer(self, update: bool=False):
         config=self.config.cloud
         parent=Path(config.onetrainer_dir).parent.as_posix()
         self.connection.run(f'test -e {shlex.quote(config.onetrainer_dir)} \
@@ -83,16 +83,16 @@ class LinuxCloud(BaseCloud):
 
         #OT requires cuda in PATH, but runpod only sets that up in bashprofile, which is not used by fabric
         #TODO test with other clouds
-        self.connection.run(f'test -d {shlex.quote(config.onetrainer_dir)}/venv \
-                              || (cd {shlex.quote(config.onetrainer_dir)} \
+        result=self.connection.run(f"test -d {shlex.quote(config.onetrainer_dir)}/venv",warn=True,in_stream=False)
+        if result.exited == 0:
+            if update:
+                self.connection.run(f'cd {shlex.quote(config.onetrainer_dir)} \
+                                      && export PATH=$PATH:/usr/local/cuda/bin \
+                                      && ./update.sh',in_stream=False)
+        else:
+            self.connection.run(f'cd {shlex.quote(config.onetrainer_dir)} \
                                   && export PATH=$PATH:/usr/local/cuda/bin \
-                                  && ./install.sh)',in_stream=False)
-    def _update_onetrainer(self):
-        config=self.config.cloud
-        self.connection.run(f'test -d {shlex.quote(config.onetrainer_dir)}/venv \
-                              && (cd {shlex.quote(config.onetrainer_dir)} \
-                                  && export PATH=$PATH:/usr/local/cuda/bin \
-                                  && ./update.sh)',in_stream=False)
+                                  && ./install.sh',in_stream=False)
 
     def _make_tensorboard_tunnel(self):
         self.tensorboard_tunnel_stop=threading.Event()
