@@ -5,6 +5,9 @@ from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.clip_util import encode_clip
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
+    rescale_noise_scheduler_to_zero_terminal_snr,
+)
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 
@@ -156,6 +159,19 @@ class StableDiffusionXLModel(BaseModel):
             unet=self.unet,
             scheduler=self.noise_scheduler,
         )
+
+    def force_v_prediction(self):
+        self.noise_scheduler.config.prediction_type = 'v_prediction'
+        self.sd_config['model']['params']['parameterization'] = 'v'
+        self.model_spec.prediction_type = 'v'
+
+    def force_epsilon_prediction(self):
+        self.noise_scheduler.config.prediction_type = 'epsilon'
+        self.sd_config['model']['params']['parameterization'] = 'epsilon'
+        self.model_spec.prediction_type = 'epsilon'
+
+    def rescale_noise_scheduler_to_zero_terminal_snr(self):
+        rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
 
     def add_embeddings_to_prompt(self, prompt: str) -> str:
         return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
