@@ -131,9 +131,6 @@ class LinuxCloud(BaseCloud):
 
     def run_trainer(self):
         config=self.config.cloud
-        self.connection.put('scripts/train_remote.py',f'{config.onetrainer_dir}/scripts/train_remote.py') #TODO remove
-        self.connection.put('modules/util/args/TrainArgs.py',f'{config.onetrainer_dir}/modules/util/args/TrainArgs.py') #TODO remove
-
         if self.can_reattach():
             self.__trail_detached_trainer()
             return
