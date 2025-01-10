@@ -205,36 +205,41 @@ class TrainingTab:
                          tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate. Values >1 are interpeted as a fixed number of steps, values <=1 are intepreted as a percentage of the total training steps (ex. 0.2 = 20% of the total step count)")
         components.entry(frame, 3, 1, self.ui_state, "learning_rate_warmup_steps")
 
+        # learning rate min factor
+        components.label(frame, 4, 0, "Learning Rate Min Factor",
+                         tooltip="Unit = float. Method = percentage. For a factor of 0.1, the final LR will be 10% of the initial LR. If the initial LR is 1e-4, the final LR will be 1e-5.")
+        components.entry(frame, 4, 1, self.ui_state, "learning_rate_min_factor")
+
         # learning rate cycles
-        components.label(frame, 4, 0, "Learning Rate Cycles",
+        components.label(frame, 5, 0, "Learning Rate Cycles",
                          tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
-        components.entry(frame, 4, 1, self.ui_state, "learning_rate_cycles")
+        components.entry(frame, 5, 1, self.ui_state, "learning_rate_cycles")
 
         # epochs
-        components.label(frame, 5, 0, "Epochs",
+        components.label(frame, 6, 0, "Epochs",
                          tooltip="The number of epochs for a full training run")
-        components.entry(frame, 5, 1, self.ui_state, "epochs")
+        components.entry(frame, 6, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(frame, 6, 0, "Batch Size",
+        components.label(frame, 7, 0, "Batch Size",
                          tooltip="The batch size of one training step")
-        components.entry(frame, 6, 1, self.ui_state, "batch_size")
+        components.entry(frame, 7, 1, self.ui_state, "batch_size")
 
         # accumulation steps
-        components.label(frame, 7, 0, "Accumulation Steps",
+        components.label(frame, 8, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(frame, 7, 1, self.ui_state, "gradient_accumulation_steps")
+        components.entry(frame, 8, 1, self.ui_state, "gradient_accumulation_steps")
 
         # Learning Rate Scaler
-        components.label(frame, 8, 0, "Learning Rate Scaler",
+        components.label(frame, 9, 0, "Learning Rate Scaler",
                          tooltip="Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)")
-        components.options(frame, 8, 1, [str(x) for x in list(LearningRateScaler)], self.ui_state,
+        components.options(frame, 9, 1, [str(x) for x in list(LearningRateScaler)], self.ui_state,
                            "learning_rate_scaler")
 
         # clip grad norm
-        components.label(frame, 9, 0, "Clip Grad Norm",
+        components.label(frame, 10, 0, "Clip Grad Norm",
                          tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
-        components.entry(frame, 9, 1, self.ui_state, "clip_grad_norm")
+        components.entry(frame, 10, 1, self.ui_state, "clip_grad_norm")
 
     def __create_base2_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

@@ -1031,6 +1031,7 @@ def create_lr_scheduler(
         learning_rate_scheduler: LearningRateScheduler,
         warmup_steps: int | float,
         num_cycles: float,
+        min_factor: float,
         num_epochs: int,
         batch_size: int,
         approximate_epoch_length: int,
@@ -1059,27 +1060,29 @@ def create_lr_scheduler(
 
         case LearningRateScheduler.LINEAR:
             lr_lambda = lr_lambda_linear(
-                scheduler_steps
+                scheduler_steps, min_factor
             )
 
         case LearningRateScheduler.COSINE:
             lr_lambda = lr_lambda_cosine(
-                scheduler_steps
+                scheduler_steps, min_factor
             )
 
         case LearningRateScheduler.COSINE_WITH_RESTARTS:
             lr_lambda = lr_lambda_cosine_with_restarts(
-                scheduler_steps, num_cycles
+                scheduler_steps, num_cycles, min_factor
             )
 
         case LearningRateScheduler.COSINE_WITH_HARD_RESTARTS:
             lr_lambda = lr_lambda_cosine_with_hard_restarts(
-                scheduler_steps, num_cycles
+                scheduler_steps, num_cycles, min_factor
             )
+
         case LearningRateScheduler.REX:
             lr_lambda = lr_lambda_rex(
-                scheduler_steps
+                scheduler_steps, min_factor
             )
+            
         case LearningRateScheduler.ADAFACTOR:
             from transformers.optimization import AdafactorSchedule
             return AdafactorSchedule(
