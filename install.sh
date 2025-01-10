@@ -5,3 +5,5 @@ set -e
 source "${BASH_SOURCE[0]%/*}/lib.include.sh"
 
 prepare_runtime_environment
+
+git rev-parse HEAD > last-commit.sha
