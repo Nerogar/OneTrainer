@@ -197,6 +197,7 @@ class FluxSampler(BaseModelSampler):
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
+            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
@@ -463,6 +464,7 @@ class FluxSampler(BaseModelSampler):
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
+            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

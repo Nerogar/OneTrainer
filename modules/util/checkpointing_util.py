@@ -34,8 +34,6 @@ def __kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any
             parameters.append(kwargs[key])
         elif value.default is not value.empty:
             parameters.append(value.default)
-        else:
-            raise Exception("could not convert from kwargs to args")
 
     return tuple(parameters)
 
@@ -243,7 +241,7 @@ def enable_checkpointing_for_t5_encoder_layers(
         if isinstance(child_module, T5Block):
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
-                ["hidden_states"],
+                [],  # No activation offloading, because the output might be taken from the middle of the network
                 conductor, layer_index,
             )
             layer_index += 1
@@ -262,7 +260,7 @@ def enable_checkpointing_for_gemma_layers(
         if isinstance(child_module, Gemma2DecoderLayer):
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
-                ["hidden_states"],
+                [],  # No activation offloading, because the output might be taken from the middle of the network
                 conductor, layer_index,
             )
             layer_index += 1
@@ -281,7 +279,7 @@ def enable_checkpointing_for_llama_encoder_layers(
         if isinstance(child_module, LlamaDecoderLayer):
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
-                ["hidden_states"],
+                [],  # No activation offloading, because the output might be taken from the middle of the network
                 conductor, layer_index,
             )
             layer_index += 1
@@ -300,7 +298,7 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
         if isinstance(child_module, JointTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
-                [],
+                ["hidden_states", "encoder_hidden_states"],
                 conductor, layer_index,
             )
             layer_index += 1

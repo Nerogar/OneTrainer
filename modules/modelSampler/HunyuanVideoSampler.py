@@ -159,6 +159,7 @@ class HunyuanVideoSampler(BaseModelSampler):
             image = video_processor.postprocess(image, output_type='pt')
 
             self.model.vae_to(self.temp_device)
+            torch_gc()
 
             is_image = image.shape[2] == 1
             if is_image:

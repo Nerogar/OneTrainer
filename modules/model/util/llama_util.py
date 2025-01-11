@@ -19,6 +19,7 @@ def encode_llama(
             attention_mask=attention_mask if use_attention_mask else None,
             output_hidden_states=True,
             return_dict=True,
+            use_cache=False,
         )
         hidden_state_output_index = default_layer - layer_skip
         text_encoder_output = text_encoder_output.hidden_states[hidden_state_output_index]

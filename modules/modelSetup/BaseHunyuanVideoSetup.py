@@ -12,6 +12,7 @@ from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_clip_encoder_layers,
     enable_checkpointing_for_hunyuan_video_transformer,
+    enable_checkpointing_for_llama_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
@@ -67,7 +68,7 @@ class BaseHunyuanVideoSetup(
                 enable_checkpointing_for_hunyuan_video_transformer(model.transformer, config)
             if model.text_encoder_1 is not None:
                 model.text_encoder_1_offload_conductor = \
-                    enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
+                    enable_checkpointing_for_llama_encoder_layers(model.text_encoder_1, config)
             if model.text_encoder_2 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
 
