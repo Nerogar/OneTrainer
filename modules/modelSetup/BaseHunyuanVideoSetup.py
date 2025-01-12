@@ -105,6 +105,8 @@ class BaseHunyuanVideoSetup(
         quantize_layers(model.vae, self.train_device, model.train_dtype)
         quantize_layers(model.transformer, self.train_device, model.transformer_train_dtype)
 
+        model.vae.enable_tiling()
+
     def _setup_additional_embeddings(
             self,
             model: HunyuanVideoModel,
