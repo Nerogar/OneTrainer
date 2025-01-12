@@ -392,6 +392,7 @@ class TrainConfig(BaseConfig):
     sample_image_format: ImageFormat
     samples_to_tensorboard: bool
     non_ema_sampling: bool
+    skip_sample_on_train_start: bool
 
     # cloud settings
     cloud: CloudConfig
@@ -895,6 +896,7 @@ class TrainConfig(BaseConfig):
         data.append(("sample_image_format", ImageFormat.JPG, ImageFormat, False))
         data.append(("samples_to_tensorboard", True, bool, False))
         data.append(("non_ema_sampling", True, bool, False))
+        data.append(("skip_sample_on_train_start", False, bool, False))
 
         # backup settings
         data.append(("backup_after", 30, int, False))

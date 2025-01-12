@@ -293,6 +293,10 @@ class TrainUI(ctk.CTk):
                          tooltip="Whether to include sample images in the Tensorboard output.")
         components.switch(sub_frame, 0, 3, self.ui_state, "samples_to_tensorboard")
 
+        components.label(sub_frame, 0, 4, "Skip samples on train start",
+                         tooltip="Whether to skip generating sample images at the start of training.")
+        components.switch(sub_frame, 0, 5, self.ui_state, "skip_sample_on_train_start")
+
         # table
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
