@@ -6,8 +6,15 @@ from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameter
 import torch
 from torch import Tensor
 
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer, \
-    GemmaTokenizer, Gemma2Model
+from transformers import (
+    CLIPTextModel,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    Gemma2Model,
+    GemmaTokenizer,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 from transformers.tokenization_utils import Trie
 
 

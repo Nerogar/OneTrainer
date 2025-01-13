@@ -2,11 +2,11 @@ from pathlib import Path
 
 from modules.modelSetup.FluxLoRASetup import PRESETS as flux_presets
 from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
+from modules.modelSetup.SanaLoRASetup import PRESETS as sana_presets
 from modules.modelSetup.StableDiffusion3LoRASetup import PRESETS as sd3_presets
 from modules.modelSetup.StableDiffusionLoRASetup import PRESETS as sd_presets
 from modules.modelSetup.StableDiffusionXLLoRASetup import PRESETS as sdxl_presets
 from modules.modelSetup.WuerstchenLoRASetup import PRESETS as sc_presets
-from modules.modelSetup.SanaLoRASetup import PRESETS as sana_presets
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import PeftType

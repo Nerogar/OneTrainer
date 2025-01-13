@@ -2,11 +2,11 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.EMAMode import EMAMode
 from modules.util import create
 from modules.util.args.SampleArgs import SampleArgs
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import ModelNames

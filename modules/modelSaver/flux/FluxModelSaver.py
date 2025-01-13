@@ -2,8 +2,6 @@ import copy
 import os.path
 from pathlib import Path
 
-from safetensors.torch import save_file
-
 from modules.model.FluxModel import FluxModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert.convert_flux_diffusers_to_ckpt import convert_flux_diffusers_to_ckpt
@@ -12,6 +10,8 @@ from modules.util.enum.ModelFormat import ModelFormat
 import torch
 
 from transformers import T5EncoderModel
+
+from safetensors.torch import save_file
 
 
 class FluxModelSaver(

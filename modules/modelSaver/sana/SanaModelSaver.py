@@ -2,11 +2,11 @@ import copy
 import os.path
 from pathlib import Path
 
-import torch
-
 from modules.model.SanaModel import SanaModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
+
+import torch
 
 
 class SanaModelSaver(
