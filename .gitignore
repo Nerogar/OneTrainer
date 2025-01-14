@@ -15,6 +15,7 @@ debug*.py
 /training_samples
 /training_user_settings
 /external
+/update.var
 config.json
 secrets.json
 
