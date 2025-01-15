@@ -4,7 +4,7 @@ opencv-python==4.10.0.84
 pillow==11.0.0
 tqdm==4.66.6
 PyYAML==6.0.2
-huggingface-hub==0.26.2
+huggingface-hub==0.27.1
 scipy==1.14.1; sys_platform != 'win32'
 matplotlib==3.9.2
 av==13.1.0
@@ -16,7 +16,7 @@ tensorboard==2.18.0
 pytorch-lightning==2.4.0
 
 # stable diffusion
--e git+https://github.com/huggingface/diffusers.git@edb8c1b#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@c944f06#egg=diffusers
 transformers==4.47.0
 sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
