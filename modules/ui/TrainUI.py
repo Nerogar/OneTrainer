@@ -615,12 +615,8 @@ class TrainUI(ctk.CTk):
         ], initialdir=".", initialfile="config.json")
 
         if file_path:
-            config_dict=self.train_config.to_pack_dict()
-            if 'secrets' in config_dict:
-                config_dict.pop('secrets')
-
             with open(file_path, "w") as f:
-                json.dump(config_dict, f, indent=4)
+                json.dump(self.train_config.to_pack_dict(secrets=False), f, indent=4)
 
     def sample_now(self):
         train_commands = self.training_commands

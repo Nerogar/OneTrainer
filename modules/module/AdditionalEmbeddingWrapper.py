@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from transformers import CLIPTokenizer, T5Tokenizer, GemmaTokenizer
+from transformers import CLIPTokenizer, GemmaTokenizer, T5Tokenizer
 
 
 class AdditionalEmbeddingWrapper(metaclass=ABCMeta):

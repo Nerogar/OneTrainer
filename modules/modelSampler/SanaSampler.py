@@ -3,10 +3,6 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-import torch
-from PIL.Image import Image
-from tqdm import tqdm
-
 from modules.model.SanaModel import SanaModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.util.config.SampleConfig import SampleConfig
@@ -14,6 +10,11 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.torch_util import torch_gc
+
+import torch
+
+from PIL.Image import Image
+from tqdm import tqdm
 
 
 class SanaSampler(BaseModelSampler):

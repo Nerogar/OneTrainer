@@ -4,8 +4,7 @@ from abc import ABCMeta, abstractmethod
 from math import ceil
 from pathlib import Path
 
-from modules.util.config.CloudConfig import CloudConfig
-from modules.util.config.CloudConfig import CloudSecretsConfig
+from modules.util.config.CloudConfig import CloudConfig, CloudSecretsConfig
 
 
 class BaseFileSync(metaclass=ABCMeta):

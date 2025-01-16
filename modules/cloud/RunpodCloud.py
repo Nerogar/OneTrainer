@@ -14,7 +14,6 @@ class RunpodCloud(LinuxCloud):
         runpod.api_key=config.secrets.cloud.api_key
 
     def __get_host_port(self):
-        config=self.config.cloud
         secrets=self.config.secrets.cloud
         resumed=False
         while True:

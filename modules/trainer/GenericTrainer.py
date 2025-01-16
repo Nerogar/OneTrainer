@@ -151,7 +151,7 @@ class GenericTrainer(BaseTrainer):
         os.makedirs(Path(path).absolute(), exist_ok=True)
         path = path_util.canonical_join(path, f"{get_string_timestamp()}.json")
         with open(path, "w") as f:
-            json.dump(self.config.to_pack_dict(), f, indent=4)
+            json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
 
     def __clear_cache(self):
         print(
@@ -395,7 +395,7 @@ class GenericTrainer(BaseTrainer):
         os.makedirs(Path(config_path).absolute(), exist_ok=True)
 
         with open(args_path, "w") as f:
-            json.dump(self.config.to_dict(), f, indent=4)
+            json.dump(self.config.to_settings_dict(secrets=False), f, indent=4)
         if os.path.isfile(self.config.concept_file_name):
             shutil.copy2(self.config.concept_file_name, concepts_path)
         if os.path.isfile(self.config.sample_definition_file_name):

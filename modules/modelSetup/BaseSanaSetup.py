@@ -1,9 +1,6 @@
 from abc import ABCMeta
 from random import Random
 
-import torch
-from torch import Tensor
-
 from modules.model.SanaModel import SanaModel, SanaModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -12,15 +9,19 @@ from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
-from modules.util.TrainProgress import TrainProgress
 from modules.util.checkpointing_util import (
-    enable_checkpointing_for_gemma_layers, enable_checkpointing_for_sana_transformer,
+    enable_checkpointing_for_gemma_layers,
+    enable_checkpointing_for_sana_transformer,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
+from modules.util.TrainProgress import TrainProgress
+
+import torch
+from torch import Tensor
 
 
 class BaseSanaSetup(
