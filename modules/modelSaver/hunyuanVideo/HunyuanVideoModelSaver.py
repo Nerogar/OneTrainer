@@ -4,11 +4,14 @@ from pathlib import Path
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.util.convert.convert_hunyuan_video_diffusers_to_ckpt import convert_hunyuan_video_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 
 from transformers import T5EncoderModel
+
+from safetensors.torch import save_file
 
 
 class HunyuanVideoModelSaver(
@@ -77,8 +80,15 @@ class HunyuanVideoModelSaver(
             destination: str,
             dtype: torch.dtype | None,
     ):
-        # TODO
-        pass
+        state_dict = convert_hunyuan_video_diffusers_to_ckpt(
+            model.transformer.state_dict(),
+        )
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        self._convert_state_dict_to_contiguous(save_state_dict)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+
+        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_internal(
             self,
