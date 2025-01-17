@@ -73,6 +73,7 @@ class HunyuanVideoBaseDataLoader(
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
+        mask_to_video = ImageToVideo(in_name='latent_mask', out_name='latent_mask')
         tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=77, format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
         tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=77)
         encode_prompt_1 = EncodeLlamaText(tokens_in_name='tokens_1', tokens_attention_mask_in_name='tokens_mask_1', hidden_state_out_name='text_encoder_1_hidden_state', tokens_attention_mask_out_name='tokens_mask_1', text_encoder=model.text_encoder_1, hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context, model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
@@ -87,6 +88,7 @@ class HunyuanVideoBaseDataLoader(
 
         if config.masked_training:
             modules.append(downscale_mask)
+            modules.append(mask_to_video)
 
         if not config.train_text_encoder_or_embedding() and model.text_encoder_1:
             modules.append(encode_prompt_1)
