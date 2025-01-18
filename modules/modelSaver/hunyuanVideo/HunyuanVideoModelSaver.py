@@ -30,7 +30,7 @@ class HunyuanVideoModelSaver(
         if dtype is not None:
             # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
             # the tokenizer tries to reload from the file system otherwise
-            tokenizer_1 = pipeline.tokenizer_1
+            tokenizer_1 = pipeline.tokenizer
             tokenizer_1.__deepcopy__ = lambda memo: tokenizer_1
 
             save_pipeline = copy.deepcopy(pipeline)
@@ -40,7 +40,7 @@ class HunyuanVideoModelSaver(
         else:
             save_pipeline = pipeline
 
-        text_encoder_1 = save_pipeline.text_encoder_1
+        text_encoder_1 = save_pipeline.text_encoder
         if text_encoder_1 is not None:
             text_encoder_1_save_pretrained = text_encoder_1.save_pretrained
             def save_pretrained_llama(
