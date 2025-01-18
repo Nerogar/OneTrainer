@@ -83,6 +83,7 @@ def lr_lambda_rex(
         min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
+        # https://arxiv.org/abs/2107.04197
         max_lr = 1
         min_lr = 0
         d = 0.9
