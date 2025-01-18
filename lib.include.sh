@@ -25,6 +25,7 @@ export OT_CONDA_ENV="${OT_CONDA_ENV:-conda_env}"
 export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python}"
 export OT_PYTHON_VENV="${OT_PYTHON_VENV:-venv}"
 export OT_PREFER_VENV="${OT_PREFER_VENV:-false}"
+export OT_LAZY_UPDATES="${OT_LAZY_UPDATES:-false}"
 export OT_CUDA_LOWMEM_MODE="${OT_CUDA_LOWMEM_MODE:-false}"
 export OT_PLATFORM_REQUIREMENTS="${OT_PLATFORM_REQUIREMENTS:-detect}"
 export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
@@ -35,6 +36,7 @@ export OT_PYTHON_VERSION_MINIMUM="3.10"
 export OT_PYTHON_VERSION_TOO_HIGH="3.13"
 export OT_CONDA_USE_PYTHON_VERSION="3.10"
 export OT_MUST_INSTALL_REQUIREMENTS="false"
+export OT_UPDATE_METADATA_FILE="${SCRIPT_DIR}/update.var"
 export OT_HOST_OS="$(uname -s)"
 
 # Force PyTorch to use fallbacks on Mac systems.
@@ -68,7 +70,7 @@ function print_error {
 
 function print_debug {
     if [[ "${OT_SCRIPT_DEBUG}" == "true" ]]; then
-        print "$*"
+        print "Debug: $*"
     fi
 }
 
@@ -77,6 +79,33 @@ function print_command {
     printf "[OneTrainer] + %s\n" "$(escape_shell_command "$@")"
 }
 
+# Retrieves the most recent Git commit's hash.
+function get_current_git_hash {
+    # NOTE: Will not detect local code changes, only the newest commit's hash.
+    git rev-parse HEAD
+}
+
+# Writes update-check metadata to disk.
+function save_update_metadata {
+    get_current_git_hash >"${OT_UPDATE_METADATA_FILE}"
+}
+
+# Checks whether the current Git state matches the last-seen metadata state.
+function is_update_metadata_changed {
+    if [[ -f "${OT_UPDATE_METADATA_FILE}" ]]; then
+        local saved_hash="$(<"${OT_UPDATE_METADATA_FILE}")"
+        local current_hash="$(get_current_git_hash)"
+        print_debug "Saved Metadata Hash=\"${saved_hash}\", Current Hash=\"${current_hash}\""
+        if [[ "${saved_hash}" == "${current_hash}" ]]; then
+            # Signal "failure", meaning "metadata is NOT outdated, abort".
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# Escapes all special regex characters in string.
 function regex_escape {
     sed 's/[][\.|$(){}?+*^]/\\&/g' <<<"$*"
 }
@@ -335,6 +364,16 @@ function install_requirements_in_active_env {
     run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools
     run_pip_in_active_env install --upgrade --upgrade-strategy eager -r requirements-global.txt -r "$(get_platform_requirements_path)"
     export OT_MUST_INSTALL_REQUIREMENTS="false"
+
+    # Write update-check metadata to disk if user has requested "lazy updates",
+    # otherwise delete any old, leftover metadata to avoid clutter.
+    if [[ "${OT_LAZY_UPDATES}" == "true" ]]; then
+        print_debug "Saving current update-check metadata to disk..."
+        save_update_metadata
+    elif [[ -f "${OT_UPDATE_METADATA_FILE}" ]]; then
+        print_debug "Deleting outdated update-check metadata from disk..."
+        rm -f "${OT_UPDATE_METADATA_FILE}"
+    fi
 }
 
 function install_requirements_in_active_env_if_necessary {
@@ -390,7 +429,17 @@ function prepare_runtime_environment {
 
     # If this is an upgrade, always ensure that we have the latest dependencies,
     # otherwise only install requirements if the environment was newly created.
+    # NOTE: If "OT_LAZY_UPDATES" is "true", we will check the last update status
+    # to determine if the source code has changed since our previous reqs update,
+    # otherwise we'll fall back to the normal "only update if new env" mode.
+    local force_update="false"
     if [[ "$1" == "upgrade" ]]; then
+        if [[ "${OT_LAZY_UPDATES}" == "false" ]] || is_update_metadata_changed; then
+            force_update="true"
+        fi
+    fi
+    if [[ "${force_update}" == "true" ]]; then
+        print_debug "Triggering a forced update of the environment's dependencies..."
         install_requirements_in_active_env
     else
         install_requirements_in_active_env_if_necessary
