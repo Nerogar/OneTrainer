@@ -88,10 +88,12 @@ class LinuxCloud(BaseCloud):
             if update:
                 self.connection.run(f'cd {shlex.quote(config.onetrainer_dir)} \
                                       && export PATH=$PATH:/usr/local/cuda/bin \
+                                      && export OT_LAZY_UPDATES=true \
                                       && ./update.sh',in_stream=False)
         else:
             self.connection.run(f'cd {shlex.quote(config.onetrainer_dir)} \
                                   && export PATH=$PATH:/usr/local/cuda/bin \
+                                  && export OT_LAZY_UPDATES=true \
                                   && ./install.sh',in_stream=False)
 
     def _make_tensorboard_tunnel(self):
