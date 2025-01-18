@@ -93,8 +93,10 @@ class Optimizer(Enum):
     # Small helper for adjusting learning rates to adaptive optimizers.
     def maybe_adjust_lrs(self, lrs: dict[str, float], optimizer: torch.optim.Optimizer):
         if self.is_adaptive:
-            d = optimizer.param_groups[0]["d"]
-            return {key: lr * d if lr is not None else None for key, lr in lrs.items()}
+            return {
+                key: (lr * optimizer.param_groups[i].get("d", 1.0) if lr is not None else None)
+                for i, (key, lr) in enumerate(lrs.items())
+            }
         return lrs
 
     def __str__(self):
