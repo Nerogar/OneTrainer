@@ -1,0 +1,16 @@
+{
+    "backup_after": 10,
+    "base_model_name": "hunyuanvideo-community/HunyuanVideo",
+    "batch_size": 4,
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.5,
+    "learning_rate": 0.0003,
+    "model_type": "HUNYUAN_VIDEO",
+    "output_model_destination": "models/lora.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "512",
+    "timestep_distribution": "LOGIT_NORMAL",
+    "train_dtype": "BFLOAT_16",
+    "training_method": "LORA",
+    "weight_dtype": "FLOAT_8"
+}
