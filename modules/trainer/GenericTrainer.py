@@ -609,6 +609,7 @@ class GenericTrainer(BaseTrainer):
                     learning_rate_scheduler=self.config.learning_rate_scheduler,
                     warmup_steps=self.config.learning_rate_warmup_steps,
                     num_cycles=self.config.learning_rate_cycles,
+                    min_factor=self.config.learning_rate_min_factor,
                     num_epochs=self.config.epochs,
                     approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
                     batch_size=self.config.batch_size,
