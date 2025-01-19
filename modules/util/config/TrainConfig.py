@@ -742,7 +742,7 @@ class TrainConfig(BaseConfig):
         data.append(("learning_rate", 3e-6, float, False))
         data.append(("learning_rate_warmup_steps", 200.0, float, False))
         data.append(("learning_rate_cycles", 1.0, float, False))
-        data.append(("learning_rate_min_factor", 1.0, float, False))
+        data.append(("learning_rate_min_factor", 0.0, float, False))
         data.append(("epochs", 100, int, False))
         data.append(("batch_size", 1, int, False))
         data.append(("gradient_accumulation_steps", 1, int, False))
