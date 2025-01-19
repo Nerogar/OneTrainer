@@ -93,7 +93,7 @@ def lr_lambda_rex(
             val = min_lr + (max_lr - min_lr) * ((1 - progress) / div)
         else:
             val = min_lr
-        
+
         factor = apply_min_factor(val, min_factor)
         return factor
 

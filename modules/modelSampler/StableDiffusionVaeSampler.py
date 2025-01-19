@@ -1,12 +1,13 @@
-import os
 from collections.abc import Callable
-from pathlib import Path
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.enum.AudioFormat import AudioFormat
+from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.VideoFormat import VideoFormat
 
 import torch
 from torchvision.transforms import transforms
@@ -32,7 +33,9 @@ class StableDiffusionVaeSampler(BaseModelSampler):
             sample_config: SampleConfig,
             destination: str,
             image_format: ImageFormat,
-            on_sample: Callable[[Image], None] = lambda _: None,
+            video_format: VideoFormat,
+            audio_format: AudioFormat,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
@@ -62,9 +65,14 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         image_tensor = image_tensor.clamp(0, 1)
 
         t_out = transforms.ToPILImage()
-        image = t_out(image_tensor.float())
+        sampler_output = ModelSamplerOutput(
+            file_type=FileType.IMAGE,
+            data=t_out(image_tensor.float()),
+        )
 
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        image.save(destination)
+        self.save_sampler_output(
+            sampler_output, destination,
+            image_format, video_format, audio_format,
+        )
 
-        on_sample(image)
+        on_sample(sampler_output)

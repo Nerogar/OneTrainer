@@ -9,7 +9,7 @@ from pathlib import Path
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
@@ -19,7 +19,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
-from modules.util.enum.ImageFormat import ImageFormat
+from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -36,7 +36,6 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
 import huggingface_hub
-from PIL.Image import Image
 from tqdm import tqdm
 
 
@@ -196,7 +195,6 @@ class GenericTrainer(BaseTrainer):
             train_device: torch.device,
             sample_config_list: list[SampleConfig],
             folder_postfix: str = "",
-            image_format: ImageFormat = ImageFormat.JPG,
             is_custom_sample: bool = False,
     ):
         for i, sample_config in enumerate(sample_config_list):
@@ -219,19 +217,19 @@ class GenericTrainer(BaseTrainer):
 
                     sample_path = os.path.join(
                         sample_dir,
-                        f"{get_string_timestamp()}-training-sample-{train_progress.filename_string()}{image_format.extension()}"
+                        f"{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
                     )
 
-                    def on_sample_default(image: Image):
-                        if self.config.samples_to_tensorboard:
+                    def on_sample_default(sampler_output: ModelSamplerOutput):
+                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
                             self.tensorboard.add_image(
-                                f"sample{str(i)} - {safe_prompt}", pil_to_tensor(image),  # noqa: B023
+                                f"sample{str(i)} - {safe_prompt}", pil_to_tensor(sampler_output.data),  # noqa: B023
                                 train_progress.global_step
                             )
-                        self.callbacks.on_sample_default(image)
+                        self.callbacks.on_sample_default(sampler_output)
 
-                    def on_sample_custom(image: Image):
-                        self.callbacks.on_sample_custom(image)
+                    def on_sample_custom(sampler_output: ModelSamplerOutput):
+                        self.callbacks.on_sample_custom(sampler_output)
 
                     on_sample = on_sample_custom if is_custom_sample else on_sample_default
                     on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
@@ -246,6 +244,8 @@ class GenericTrainer(BaseTrainer):
                         sample_config=sample_config,
                         destination=sample_path,
                         image_format=self.config.sample_image_format,
+                        video_format=self.config.sample_video_format,
+                        audio_format=self.config.sample_audio_format,
                         on_sample=on_sample,
                         on_update_progress=on_update_progress,
                     )
@@ -289,7 +289,6 @@ class GenericTrainer(BaseTrainer):
             train_progress=train_progress,
             train_device=train_device,
             sample_config_list=sample_params_list,
-            image_format=self.config.sample_image_format,
             is_custom_sample=is_custom_sample,
         )
 
@@ -302,7 +301,6 @@ class GenericTrainer(BaseTrainer):
                 train_progress=train_progress,
                 train_device=train_device,
                 sample_config_list=sample_params_list,
-                image_format=self.config.sample_image_format,
                 folder_postfix=" - no-ema",
             )
 

@@ -16,7 +16,7 @@ class FluxEmbeddingSaver:
     def __save_ckpt(
             self,
             embedding: FluxModelEmbedding | None,
-            embedding_state: tuple[Tensor, Tensor, Tensor] | None,
+            embedding_state: tuple[Tensor, Tensor] | None,
             destination: str,
             dtype: torch.dtype | None,
     ):
@@ -33,7 +33,7 @@ class FluxEmbeddingSaver:
 
         file = {}
         if text_encoder_1_vector_cpu is not None:
-            file["clip_g"] = text_encoder_1_vector_cpu
+            file["clip_l"] = text_encoder_1_vector_cpu
         if text_encoder_2_vector_cpu is not None:
             file["t5"] = text_encoder_2_vector_cpu
 
@@ -42,7 +42,7 @@ class FluxEmbeddingSaver:
     def __save_safetensors(
             self,
             embedding: FluxModelEmbedding | None,
-            embedding_state: tuple[Tensor, Tensor, Tensor] | None,
+            embedding_state: tuple[Tensor, Tensor] | None,
             destination: str,
             dtype: torch.dtype | None,
     ):
@@ -59,7 +59,7 @@ class FluxEmbeddingSaver:
 
         file = {}
         if text_encoder_1_vector_cpu is not None:
-            file["clip_g"] = text_encoder_1_vector_cpu
+            file["clip_l"] = text_encoder_1_vector_cpu
         if text_encoder_2_vector_cpu is not None:
             file["t5"] = text_encoder_2_vector_cpu
 

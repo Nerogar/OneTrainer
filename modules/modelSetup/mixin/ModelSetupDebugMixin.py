@@ -40,7 +40,7 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         with open(path, "w") as f:
             f.write(text)
 
-    def _decode_tokens(self, tokens:Tensor, tokenizer):
+    def _decode_tokens(self, tokens: Tensor, tokenizer):
         return tokenizer.decode(
             token_ids=tokens[0],
             skip_special_tokens=True,
@@ -78,6 +78,9 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         )
 
         with torch.no_grad():
+            if latent_tensor.ndim == 5:
+                latent_tensor = latent_tensor[:, :, 0, :, :]
+
             result = torch.nn.functional.conv2d(latent_tensor, weight)
             result_min = result.min()
             result_max = result.max()

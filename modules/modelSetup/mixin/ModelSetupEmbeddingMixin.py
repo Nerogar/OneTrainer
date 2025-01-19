@@ -9,13 +9,11 @@ from torch import Tensor
 from transformers import (
     CLIPTextModel,
     CLIPTextModelWithProjection,
-    CLIPTokenizer,
     Gemma2Model,
-    GemmaTokenizer,
+    LlamaModel,
     T5EncoderModel,
-    T5Tokenizer,
 )
-from transformers.tokenization_utils import Trie
+from transformers.tokenization_utils import PreTrainedTokenizer, Trie
 
 
 class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
@@ -24,7 +22,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _remove_added_embeddings_from_tokenizer(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
+            tokenizer: PreTrainedTokenizer,
     ):
         if tokenizer:
             added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
@@ -36,8 +34,8 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _create_new_embedding(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
-            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model,
+            tokenizer: PreTrainedTokenizer,
+            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel,
             initial_embedding_text: str,
             token_count: int,
     ) -> Tensor:
@@ -60,7 +58,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _add_embedding_to_tokenizer(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
+            tokenizer: PreTrainedTokenizer,
             embedding: list[str],
     ) -> (Tensor, list[bool]):
         tokenizer.add_tokens(embedding)

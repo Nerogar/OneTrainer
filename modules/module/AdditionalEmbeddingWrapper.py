@@ -4,11 +4,11 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from transformers import CLIPTokenizer, GemmaTokenizer, T5Tokenizer
+from transformers import PreTrainedTokenizer
 
 
 class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
-    tokenizer: CLIPTokenizer | T5Tokenizer
+    tokenizer: PreTrainedTokenizer
     prefix: str
     orig_module: nn.Embedding
     additional_embeddings: list[Tensor]
@@ -17,7 +17,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
     def __init__(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
+            tokenizer: PreTrainedTokenizer,
             orig_module: nn.Embedding,
             additional_embeddings: list[Tensor],
             additional_embedding_placeholders: list[str],
@@ -36,9 +36,22 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
         self.orig_median_norm = torch.norm(self.orig_module.weight, dim=1).median().item()
 
     def forward(self, x, *args, **kwargs):
+        if torch.is_grad_enabled() \
+                and len(self.additional_embeddings) > 0 \
+                and all(not x.requires_grad for x in self.additional_embeddings):
+            # This dummy tensor ensures that the following operation always has a grad_fn
+            # if an additional embedding exists and is trained. This fixes an issue with
+            # a combination of gradient checkpointing, layer offloading and additional
+            # embedding training when stopping the additional embedding training early.
+            dummy = torch.zeros(size=(1, self.orig_module.weight.shape[1]), dtype = self.orig_module.weight.dtype, device=self.orig_module.weight.device)
+            dummy.requires_grad_(True)
+            dummy = [dummy]
+        else:
+            dummy = []
+
         # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create
         orig_module_weight = self.orig_module.weight[0:self.original_token_count]
-        weight = torch.cat([orig_module_weight] + self.additional_embeddings, dim=0)
+        weight = torch.cat([orig_module_weight] + self.additional_embeddings + dummy, dim=0)
         return F.embedding(
             input=x,
             weight=weight,

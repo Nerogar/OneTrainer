@@ -1,19 +1,20 @@
+import copy
 import inspect
-import os
 from collections.abc import Callable
-from pathlib import Path
 
 from modules.model.SanaModel import SanaModel
-from modules.modelSampler.BaseModelSampler import BaseModelSampler
+from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.enum.AudioFormat import AudioFormat
+from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.enum.VideoFormat import VideoFormat
 from modules.util.torch_util import torch_gc
 
 import torch
 
-from PIL.Image import Image
 from tqdm import tqdm
 
 
@@ -47,7 +48,7 @@ class SanaSampler(BaseModelSampler):
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-    ) -> Image:
+    ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
             if random_seed:
@@ -55,7 +56,7 @@ class SanaSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = self.pipeline.scheduler
+            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -158,21 +159,27 @@ class SanaSampler(BaseModelSampler):
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
+            torch_gc()
 
-            return image[0]
+            return ModelSamplerOutput(
+                file_type=FileType.IMAGE,
+                data=image[0],
+            )
 
     def sample(
             self,
             sample_config: SampleConfig,
             destination: str,
             image_format: ImageFormat,
-            on_sample: Callable[[Image], None] = lambda _: None,
+            video_format: VideoFormat,
+            audio_format: AudioFormat,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
         negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
 
-        image = self.__sample_base(
+        sampler_output = self.__sample_base(
             prompt=prompt,
             negative_prompt=negative_prompt,
             height=self.quantize_resolution(sample_config.height, 32),
@@ -188,7 +195,9 @@ class SanaSampler(BaseModelSampler):
             on_update_progress=on_update_progress,
         )
 
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        image.save(destination)
+        self.save_sampler_output(
+            sampler_output, destination,
+            image_format, video_format, audio_format,
+        )
 
-        on_sample(image)
+        on_sample(sampler_output)
