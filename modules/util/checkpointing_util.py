@@ -13,6 +13,7 @@ from diffusers.models.attention import BasicTransformerBlock, JointTransformerBl
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
 from diffusers.models.transformers.transformer_hunyuan_video import (
+    HunyuanVideoIndividualTokenRefinerBlock,
     HunyuanVideoSingleTransformerBlock,
     HunyuanVideoTransformerBlock,
 )
@@ -358,6 +359,15 @@ def enable_checkpointing_for_hunyuan_video_transformer(
     conductor = LayerOffloadConductor(orig_module, config)
 
     layer_index = 0
+    for child_module in orig_module.modules():
+        if isinstance(child_module, HunyuanVideoIndividualTokenRefinerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
     for child_module in orig_module.modules():
         if isinstance(child_module, HunyuanVideoTransformerBlock):
             child_module.forward = create_checkpointed_forward(
