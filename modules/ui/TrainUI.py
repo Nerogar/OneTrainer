@@ -416,7 +416,7 @@ class TrainUI(ctk.CTk):
 
         # token count
         components.label(frame, 1, 0, "Token count",
-                         tooltip="The token count used when creating a new embedding")
+                         tooltip="The token count used when creating a new embedding. Leave empty to auto detect from the initial embedding text.")
         components.entry(frame, 1, 1, self.ui_state, "embedding.token_count")
 
         # initial embedding text

@@ -211,7 +211,7 @@ class TrainEmbeddingConfig(BaseConfig):
     train: bool
     stop_training_after: int
     stop_training_after_unit: TimeUnit
-    token_count: int
+    token_count: int | None
     initial_embedding_text: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
@@ -228,7 +228,7 @@ class TrainEmbeddingConfig(BaseConfig):
         data.append(("train", True, bool, False))
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
-        data.append(("token_count", 1, int, False))
+        data.append(("token_count", 1, int, True))
         data.append(("initial_embedding_text", "*", str, False))
 
         return TrainEmbeddingConfig(data)

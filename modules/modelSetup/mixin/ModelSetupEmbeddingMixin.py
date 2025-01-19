@@ -37,7 +37,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             tokenizer: PreTrainedTokenizer,
             text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel,
             initial_embedding_text: str,
-            token_count: int,
+            token_count: int | None,
     ) -> Tensor:
         with torch.no_grad():
             initial_token_ids = tokenizer.encode(
@@ -48,9 +48,11 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             pad_token_id = tokenizer.encode(
                 '*',
                 add_special_tokens=False,
-                max_length=token_count,
+                max_length=1,
             )[0]
-            initial_token_ids += [pad_token_id] * (token_count - len(initial_token_ids))
+
+            if token_count is not None:
+                initial_token_ids += [pad_token_id] * (token_count - len(initial_token_ids))
 
             all_embeddings = text_encoder.get_input_embeddings().weight.data
             initial_embeddings = [all_embeddings[token_id] for token_id in initial_token_ids]
