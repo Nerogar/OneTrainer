@@ -117,7 +117,7 @@ class FluxBaseDataLoader(
 
         sort_names = image_aggregate_names + image_split_names + [
             'prompt',
-            'tokens_1', 'tokens_mask_1', 'text_encoder_1_hidden_state', 'text_encoder_1_pooled_state',
+            'tokens_1', 'tokens_mask_1', 'text_encoder_1_pooled_state',
             'tokens_2', 'tokens_mask_2', 'text_encoder_2_hidden_state',
             'concept'
         ]
@@ -125,7 +125,6 @@ class FluxBaseDataLoader(
         if not config.train_text_encoder_or_embedding():
             text_split_names.append('tokens_1')
             text_split_names.append('tokens_mask_1')
-            text_split_names.append('text_encoder_1_hidden_state')
             text_split_names.append('text_encoder_1_pooled_state')
 
         if not config.train_text_encoder_2_or_embedding():
@@ -192,7 +191,6 @@ class FluxBaseDataLoader(
             output_names.append('latent_conditioning_image')
 
         if not config.train_text_encoder_or_embedding():
-            output_names.append('text_encoder_1_hidden_state')
             output_names.append('text_encoder_1_pooled_state')
 
         if not config.train_text_encoder_2_or_embedding():

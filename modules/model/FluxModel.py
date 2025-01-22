@@ -63,9 +63,9 @@ class FluxModel(BaseModel):
 
     # persistent embedding training data
     embedding: FluxModelEmbedding | None
-    embedding_state: tuple[Tensor, Tensor, Tensor] | None
+    embedding_state: tuple[Tensor, Tensor] | None
     additional_embeddings: list[FluxModelEmbedding] | None
-    additional_embedding_states: list[tuple[Tensor, Tensor, Tensor] | None]
+    additional_embedding_states: list[tuple[Tensor, Tensor] | None]
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
 
