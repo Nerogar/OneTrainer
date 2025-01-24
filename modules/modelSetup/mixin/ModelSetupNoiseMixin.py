@@ -154,7 +154,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             timestep = num_train_timesteps*shift*timestep/((shift-1)*timestep + num_train_timesteps)
 
 
-            return timestep
+            return timestep.int()
 
     def _get_timestep_continuous(
             self,
