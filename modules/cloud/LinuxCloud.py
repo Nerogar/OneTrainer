@@ -39,34 +39,34 @@ class LinuxCloud(BaseCloud):
 
         config=self.config.cloud
         secrets=self.config.secrets.cloud
-        if secrets.host != '' and secrets.port != '':
-            try:
-                self.connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
-                self.connection.open()
 
-                self.callback_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
-
-                self.command_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
-                #the command connection isn't used for long periods of time; prevent remote from closing it:
-                self.command_connection.open()
-                self.command_connection.transport.set_keepalive(30)
-
-
-                match config.file_sync:
-                    case CloudFileSync.NATIVE_SCP:
-                        self.file_sync=NativeSCPFileSync(config,secrets)
-                    case CloudFileSync.FABRIC_SFTP:
-                        self.file_sync=FabricFileSync(config,secrets)
-
-            except Exception:
-                if self.connection:
-                    self.connection.close()
-                    self.connection=None
-                if self.command_connection:
-                    self.command_connection.close()
-                raise
-        else:
+        if secrets.host == '' or secrets.port == '':
             raise ValueError('Host and port required for SSH connection')
+
+        try:
+            self.connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.connection.open()
+
+            self.callback_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+
+            self.command_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            #the command connection isn't used for long periods of time; prevent remote from closing it:
+            self.command_connection.open()
+            self.command_connection.transport.set_keepalive(30)
+
+            match config.file_sync:
+                case CloudFileSync.NATIVE_SCP:
+                    self.file_sync=NativeSCPFileSync(config,secrets)
+                case CloudFileSync.FABRIC_SFTP:
+                    self.file_sync=FabricFileSync(config,secrets)
+
+        except Exception:
+            if self.connection:
+                self.connection.close()
+                self.connection=None
+            if self.command_connection:
+                self.command_connection.close()
+            raise
 
 
     def setup(self):
@@ -137,7 +137,9 @@ class LinuxCloud(BaseCloud):
             self.__trail_detached_trainer()
             return
 
-        cmd="export PYTHONUNBUFFERED=1"
+        cmd="export PYTHONUNBUFFERED=1 \
+             && export OT_LAZY_UPDATES=true"
+
         if self.config.secrets.huggingface_token != "":
             cmd+=f" && export HF_TOKEN={self.config.secrets.huggingface_token}"
         if config.huggingface_cache_dir != "":

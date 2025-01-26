@@ -177,6 +177,11 @@ class CloudTrainer(BaseTrainer):
             adjust(concept,"path")
             adjust(concept.text,"prompt_path")
 
+        if remote.train_device == "cpu":
+            #if there is no local GPU, "cpu" is the default, but not correct for cloud training
+            print("warning: replacing Train Device cpu with cuda")
+            remote.train_device = "cuda"
+
         return remote
 
     @staticmethod
