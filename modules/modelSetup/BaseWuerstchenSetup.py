@@ -216,7 +216,6 @@ class BaseWuerstchenSetup(
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
-            is_validation: bool = False,
     ) -> dict:
         with model.autocast_context:
             latent_image = batch['latent_image']
@@ -226,7 +225,7 @@ class BaseWuerstchenSetup(
                 scaled_latent_image = latent_image
 
             batch_seed = train_progress.global_step
-            if is_validation:
+            if deterministic:
                 batch_seed = 0
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
