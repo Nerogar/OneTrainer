@@ -69,6 +69,7 @@ class BaseModelSetup(
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
+            is_validation: bool = False,
     ) -> dict:
         pass
 

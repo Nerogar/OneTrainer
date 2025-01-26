@@ -192,11 +192,15 @@ class BasePixArtAlphaSetup(
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
+            is_validation: bool = False,
     ) -> dict:
         with model.autocast_context:
+            batch_seed = train_progress.global_step
+            if is_validation:
+                batch_seed = 0
             generator = torch.Generator(device=config.train_device)
-            generator.manual_seed(train_progress.global_step)
-            rand = Random(train_progress.global_step)
+            generator.manual_seed(batch_seed)
+            rand = Random(batch_seed)
 
             is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
 
