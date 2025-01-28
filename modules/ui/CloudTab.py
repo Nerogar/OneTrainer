@@ -7,6 +7,8 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
+import webbrowser
+
 
 
 class CloudTab:
@@ -66,7 +68,7 @@ class CloudTab:
                          tooltip="RUNPOD Cloud ID. The cloud service must have a public IP and SSH service. Leave empty if you want to automatically create a new RUNPOD cloud, or if you're connecting to another cloud provider via SSH Hostname and Port.")
         components.entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.id")
 
-        components.label(self.frame, 8, 0, "Make tensorboard TCP tunnel",
+        components.label(self.frame, 8, 0, "Tensorboard TCP tunnel",
                          tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud")
         components.switch(self.frame, 8, 1, self.ui_state, "cloud.tensorboard_tunnel")
 
@@ -96,9 +98,12 @@ class CloudTab:
         components.switch(self.frame, 8, 3, self.ui_state, "cloud.detach_trainer")
         components.label(self.frame, 9, 2, "Reattach id",
                          tooltip="An id identifying the remotely running trainer. In case you have lost connection or closed OneTrainer, it will try to reattach to this id instead of starting a new remote trainer.")
-        components.entry(self.frame, 9, 3, self.ui_state, "cloud.run_id")
-
-        components.button(self.frame, 10, 2, "Reattach now", self.__reattach)
+        reattach_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
+        reattach_frame.grid(row=9, column=3, padx=0, pady=0, sticky="new")
+        reattach_frame.grid_columnconfigure(0, weight=1)
+        reattach_frame.grid_columnconfigure(1, weight=1)
+        components.entry(reattach_frame, 0, 0, self.ui_state, "cloud.run_id", width=60)
+        components.button(reattach_frame, 0, 1, "Reattach now", self.__reattach)
 
         components.label(self.frame, 11, 2, "Download samples",
                          tooltip="Download samples from the remote workspace directory to your local machine.")
@@ -119,66 +124,72 @@ class CloudTab:
                          tooltip="Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
         components.switch(self.frame, 16, 3, self.ui_state, "cloud.delete_workspace")
 
-        components.label(self.frame, 0, 4, "Create cloud",
+        components.label(self.frame, 1, 4, "Create cloud via API",
                          tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty. Currently supported for RUNPOD.")
-        components.switch(self.frame, 0, 5, self.ui_state, "cloud.create")
-        components.label(self.frame, 1, 4, "Cloud name",
+        create_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
+        create_frame.grid(row=1, column=5, padx=0, pady=0, sticky="new")
+        create_frame.grid_columnconfigure(0, weight=0)
+        create_frame.grid_columnconfigure(1, weight=1)
+        components.switch(create_frame, 0, 0, self.ui_state, "cloud.create")
+        components.button(create_frame, 0, 1, "Create cloud via website", self.__create_cloud)
+
+        components.label(self.frame, 2, 4, "Cloud name",
                          tooltip="The name of the new cloud instance.")
-        components.entry(self.frame, 1, 5, self.ui_state, "cloud.name")
-        components.label(self.frame, 2, 4, "Type",
+        components.entry(self.frame, 2, 5, self.ui_state, "cloud.name")
+        components.label(self.frame, 3, 4, "Type",
                          tooltip="Select the RunPod cloud type. See RunPod's website for details.")
-        components.options_kv(self.frame, 2, 5, [
+        components.options_kv(self.frame, 3, 5, [
             ("", ""),
             ("Community", "COMMUNITY"),
             ("Secure", "SECURE"),
         ], self.ui_state, "cloud.sub_type")
 
 
-        components.label(self.frame, 3, 4, "GPU",
+        components.label(self.frame, 4, 4, "GPU",
                          tooltip="Select the GPU type. Enter an API key before pressing the button.")
 
-        _,gpu_components=components.options_adv(self.frame, 3, 5, [("")], self.ui_state, "cloud.gpu_type",adv_command=self.__set_gpu_types)
+        _,gpu_components=components.options_adv(self.frame, 4, 5, [("")], self.ui_state, "cloud.gpu_type",adv_command=self.__set_gpu_types)
         self.gpu_types_menu=gpu_components['component']
 
-        components.label(self.frame, 4, 4, "Volume size",
+        components.label(self.frame, 5, 4, "Volume size",
                          tooltip="Set the storage volume size in GB. This volume persists only until the cloud is deleted - not a RunPod network volume")
-        components.entry(self.frame, 4, 5, self.ui_state, "cloud.volume_size")
+        components.entry(self.frame, 5, 5, self.ui_state, "cloud.volume_size")
 
-        components.label(self.frame, 5, 4, "Min download",
+        components.label(self.frame, 6, 4, "Min download",
                          tooltip="Set the minimum download speed of the cloud in Mbps.")
-        components.entry(self.frame, 5, 5, self.ui_state, "cloud.min_download")
+        components.entry(self.frame, 6, 5, self.ui_state, "cloud.min_download")
 
-        components.label(self.frame, 6, 4, "Jupyter password",
+        components.label(self.frame, 7, 4, "Jupyter password",
                          tooltip="Jupyter password. This value is stored separately, not saved to your configuration file. ")
-        components.entry(self.frame, 6, 5, self.ui_state, "secrets.cloud.jupyter_password")
+        components.entry(self.frame, 7, 5, self.ui_state, "secrets.cloud.jupyter_password")
 
-        components.label(self.frame, 8, 4, "Action on finish",
+        components.label(self.frame, 9, 4, "Action on finish",
                          tooltip="What to do when training finishes and the data has been fully downloaded: Stop or delete the cloud, or do nothing.")
-        components.options_kv(self.frame, 8, 5, [
+        components.options_kv(self.frame, 9, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_finish")
 
-        components.label(self.frame, 9, 4, "Action on error",
+        components.label(self.frame, 10, 4, "Action on error",
                          tooltip="What to do if training stops due to an error: Stop or delete the cloud, or do nothing. Data may be lost.")
-        components.options_kv(self.frame, 9, 5, [
+        components.options_kv(self.frame, 10, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_error")
 
-        components.label(self.frame, 10, 4, "Action on detached finish",
+        components.label(self.frame, 11, 4, "Action on detached finish",
                          tooltip="What to do when training finishes, but the client has been detached and cannot download data. Data may be lost.")
-        components.options_kv(self.frame, 10, 5, [
+        components.options_kv(self.frame, 11, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_detached_finish")
 
-        components.label(self.frame, 11, 4, "Action on detached error",
+        components.label(self.frame, 12, 4, "Action on detached error",
                          tooltip="What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost.")
-        components.options_kv(self.frame, 11, 5, [
+        components.options_kv(self.frame, 12, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
@@ -190,13 +201,12 @@ class CloudTab:
         self.frame.pack(fill="both", expand=1)
 
     def __set_gpu_types(self):
-        import runpod
-        try:
+        self.gpu_types_menu.configure(values=[])
+        if self.train_config.cloud.type == CloudType.RUNPOD:
+            import runpod
             runpod.api_key=self.train_config.secrets.cloud.api_key
             gpus=runpod.get_gpus()
             self.gpu_types_menu.configure(values=[gpu['id'] for gpu in gpus])
-        except Exception:
-            self.gpu_types_menu.configure(values=[])
 
     def __reattach(self):
         self.reattach=True
@@ -204,3 +214,7 @@ class CloudTab:
             self.parent.start_training()
         finally:
             self.reattach=False
+
+    def __create_cloud(self):
+        if self.train_config.cloud.type == CloudType.RUNPOD:
+            webbrowser.open("https://www.runpod.io/console/deploy?template=1a33vbssq9&type=gpu", new=0, autoraise=False)
