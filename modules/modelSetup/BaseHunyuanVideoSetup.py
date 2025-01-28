@@ -259,9 +259,12 @@ class BaseHunyuanVideoSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
+            batch_seed = train_progress.global_step
+            if deterministic:
+                batch_seed = 0
             generator = torch.Generator(device=config.train_device)
-            generator.manual_seed(train_progress.global_step)
-            rand = Random(train_progress.global_step)
+            generator.manual_seed(batch_seed)
+            rand = Random(batch_seed)
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 

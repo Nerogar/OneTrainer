@@ -341,7 +341,7 @@ class GenericTrainer(BaseTrainer):
 
                 with torch.no_grad():
                     model_output_data = self.model_setup.predict(
-                        self.model, validation_batch, self.config, train_progress)
+                        self.model, validation_batch, self.config, train_progress, deterministic=True)
                     loss_validation = self.model_setup.calculate_loss(
                         self.model, validation_batch, model_output_data, self.config)
 
