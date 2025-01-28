@@ -1,3 +1,11 @@
+"""
+`train.py` serves as the primary script for training models.
+
+It uses the `GenericTrainer` to handle the core training logic.
+The script uses `TrainArgs` to parse command-line arguments, offering a way to configure training sessions.
+A JSON configuration file is used to specify training parameters.
+This script is used with `create_train_files.py` to create a training session.
+"""
 from util.import_util import script_imports
 
 script_imports()
@@ -12,6 +20,14 @@ from modules.util.config.TrainConfig import TrainConfig
 
 
 def main():
+    """
+    Trains a model.
+
+    Parses command line arguments using TrainArgs.
+    Reads a JSON configuration file to configure the training process.
+    Initializes and starts the GenericTrainer.
+    Starts and ends the training process, handling keyboard interrupts gracefully.
+    """
     args = TrainArgs.parse_args()
     callbacks = TrainCallbacks()
     commands = TrainCommands()

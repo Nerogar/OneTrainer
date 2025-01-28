@@ -1,3 +1,11 @@
+"""
+The `sample.py` script is a tool for generating samples from a pre-trained model.
+
+It uses `SampleArgs` for parsing command-line arguments to adjust sampling parameters.
+The script employs `create_model_loader` to load the model and `create_model_setup` to prepare it for sampling.
+`create_model_sampler` is then used to generate the sample.
+This script is useful for quickly generating images.
+"""
 from util.import_util import script_imports
 
 script_imports()
@@ -12,6 +20,15 @@ from modules.util.torch_util import default_device
 
 
 def main():
+    """
+    Samples from a model.
+
+    Parses command line arguments using SampleArgs.
+    Creates a model loader and setup based on the specified model type.
+    Loads the base model and sets it to evaluation mode.
+    Creates a model sampler based on the model type.
+    Samples the model and saves the output to the specified destination.
+    """
     args = SampleArgs.parse_args()
     device = default_device
 

@@ -1,3 +1,12 @@
+"""
+The `convert_model.py` script provides functionality for model conversion between different types and formats.
+
+It leverages the `create_model_loader` and `create_model_saver` utilities to manage the loading and saving of models.
+This script is essential when transitioning a model from one representation (e.g., a training checkpoint) to another (e.g., a deployable format).
+It accepts `ConvertModelArgs` to parse command-line inputs for flexibility.
+It supports various `TrainingMethod` enums, such as FINE_TUNE, LORA, and EMBEDDING.
+It outputs a new model in the desired format, and dtype.
+"""
 from util.import_util import script_imports
 
 script_imports()
@@ -11,6 +20,16 @@ from modules.util.ModelNames import EmbeddingName, ModelNames
 
 
 def main():
+    """
+    Converts a model from one type to another.
+
+    Parses command line arguments using ConvertModelArgs.
+    Creates a model loader and saver based on the specified model type and training method.
+    Loads the input model and saves it to the output destination in the specified format and data type.
+
+    Raises:
+        Exception: If the model cannot be loaded due to an unknown training method.
+    """
     args = ConvertModelArgs.parse_args()
 
     model_loader = create.create_model_loader(model_type=args.model_type, training_method=args.training_method)

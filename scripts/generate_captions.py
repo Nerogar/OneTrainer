@@ -1,3 +1,10 @@
+"""
+The `generate_captions.py` script automates the process of generating textual descriptions for images.
+
+It supports multiple captioning models, including `Blip2Model`, `BlipModel`, and `WDModel`.
+The script uses `GenerateCaptionsArgs` for parsing command-line arguments, providing a flexible interface for various options.
+This script is typically employed to produce captions for datasets used in training.
+"""
 from util.import_util import script_imports
 
 script_imports()
@@ -12,6 +19,14 @@ import torch
 
 
 def main():
+    """
+    Generates captions for images.
+
+    Parses command line arguments using GenerateCaptionsArgs.
+    Initializes the specified model for generating captions.
+    Captions the folder of images using the specified model.
+    Prints an error message if there is an error while processing the image.
+    """
     args = GenerateCaptionsArgs.parse_args()
 
     model = None

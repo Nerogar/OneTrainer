@@ -1,3 +1,10 @@
+"""
+`create_train_files.py` is designed to generate essential configuration and data files for training.
+
+It processes command-line arguments via `CreateTrainFilesArgs`, providing flexibility in specifying output destinations.
+The script constructs default configurations for `TrainConfig`, `ConceptConfig`, and `SampleConfig`, which are then serialized into JSON format.
+The generated files are used by `train.py` to train a model.
+"""
 from util.import_util import script_imports
 
 script_imports()
@@ -13,6 +20,13 @@ from modules.util.config.TrainConfig import TrainConfig
 
 
 def main():
+    """
+    Creates training files (config, concepts, samples).
+
+    Parses command line arguments using CreateTrainFilesArgs.
+    Creates default configuration, concept, and sample files if output destinations are specified.
+    Writes the created files to the specified output destinations in JSON format.
+    """
     args = CreateTrainFilesArgs.parse_args()
 
     print(args.to_dict())

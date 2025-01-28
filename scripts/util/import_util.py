@@ -1,4 +1,17 @@
 def script_imports(allow_zluda: bool = True):
+    """
+    Performs script imports for the project.
+
+    This function handles setting up the correct library paths for
+    the OneTrainer project and loads ZLUDA if applicable.
+    It also filters out Triton warnings on startup.
+
+    Args:
+        allow_zluda (bool): Whether ZLUDA is allowed to be loaded.
+
+    Returns:
+        None: This function does not return a value.
+    """
     import logging
     import os
     import sys
