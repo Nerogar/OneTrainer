@@ -317,9 +317,7 @@ class BaseStableDiffusion3Setup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = train_progress.global_step
-            if deterministic:
-                batch_seed = 0
+            batch_seed = 0 if deterministic else train_progress.global_step
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
