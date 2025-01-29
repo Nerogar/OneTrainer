@@ -28,13 +28,14 @@ class FluxModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            transformer_model_name: str,
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model, model_type, weight_dtypes, base_model_name, vae_model_name,
+                model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name,
                 include_text_encoder_1, include_text_encoder_2,
             )
         else:
@@ -46,6 +47,7 @@ class FluxModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            transformer_model_name: str,
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
@@ -109,13 +111,22 @@ class FluxModelLoader(
                 "vae",
             )
 
-        transformer = self._load_diffusers_sub_module(
-            FluxTransformer2DModel,
-            weight_dtypes.prior,
-            weight_dtypes.train_dtype,
-            base_model_name,
-            "transformer",
-        )
+        if transformer_model_name:
+            transformer = FluxTransformer2DModel.from_single_file(
+                transformer_model_name,
+                torch_dtype = weight_dtypes.prior.torch_dtype(),
+            )
+            transformer = self._convert_diffusers_sub_module_to_dtype(
+                transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+            )
+        else:
+            transformer = self._load_diffusers_sub_module(
+                FluxTransformer2DModel,
+                weight_dtypes.prior,
+                weight_dtypes.train_dtype,
+                base_model_name,
+                "transformer",
+            )
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
@@ -146,13 +157,23 @@ class FluxModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            transformer_model_name: str,
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
     ):
+        if transformer_model_name:
+            transformer = FluxTransformer2DModel.from_single_file(
+                transformer_model_name,
+                torch_dtype = weight_dtypes.prior.torch_dtype(),
+            )
+        else:
+            transformer=None
+
         pipeline = FluxPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
             safety_checker=None,
+            transformer=transformer,
         )
 
         if include_text_encoder_2:
@@ -218,7 +239,7 @@ class FluxModelLoader(
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
             )
             return
@@ -227,7 +248,7 @@ class FluxModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
             )
             return
@@ -236,7 +257,7 @@ class FluxModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
             )
             return
