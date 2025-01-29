@@ -6,7 +6,7 @@ from transformers import Gemma2Model
 def encode_gemma(
         text_encoder: Gemma2Model,
         tokens: Tensor | None = None,
-        default_layer: int = 0,
+        default_layer: int = -1,
         layer_skip: int = 0,
         text_encoder_output: Tensor | None = None,
         use_attention_mask: bool = True,

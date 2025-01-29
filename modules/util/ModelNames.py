@@ -17,8 +17,8 @@ class ModelNames:
             decoder_model: str = "",
             vae_model: str = "",
             lora: str = "",
-            embedding: EmbeddingName = None,
-            additional_embeddings: list[EmbeddingName] = None,
+            embedding: EmbeddingName | None = None,
+            additional_embeddings: list[EmbeddingName] | None = None,
             include_text_encoder: bool = True,
             include_text_encoder_2: bool = True,
             include_text_encoder_3: bool = True,
@@ -29,8 +29,14 @@ class ModelNames:
         self.decoder_model = decoder_model
         self.vae_model = vae_model
         self.lora = lora
-        self.embedding = EmbeddingName if embedding is None else embedding
+        self.embedding = embedding
         self.additional_embeddings = [] if additional_embeddings is None else additional_embeddings
         self.include_text_encoder = include_text_encoder
         self.include_text_encoder_2 = include_text_encoder_2
         self.include_text_encoder_3 = include_text_encoder_3
+
+    def all_embedding(self):
+        if self.embedding is not None:
+            return self.additional_embeddings + [self.embedding]
+        else:
+            return self.additional_embeddings

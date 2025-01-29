@@ -1,4 +1,5 @@
 from abc import ABCMeta
+from collections.abc import Callable
 
 from modules.model.BaseModel import BaseModelEmbedding
 from modules.util.config.TrainConfig import TrainEmbeddingConfig
@@ -36,9 +37,15 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     def _create_new_embedding(
             self,
             embedding_config: TrainEmbeddingConfig,
-            tokenizer: PreTrainedTokenizer,
-            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel,
-    ) -> Tensor:
+            tokenizer: PreTrainedTokenizer | None,
+            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel | None,
+            create_output_embedding_fn: Callable[[str, int], Tensor] | None = None,
+    ) -> Tensor | None:
+        if tokenizer is None or text_encoder is None:
+            return None
+
+        vector = None
+
         with torch.no_grad():
             initial_token_ids = tokenizer(
                 embedding_config.initial_embedding_text,
@@ -60,7 +67,18 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
             all_embeddings = text_encoder.get_input_embeddings().weight.data
             initial_embeddings = [all_embeddings[token_id] for token_id in initial_token_ids]
-            return torch.stack(initial_embeddings)
+            vector = torch.stack(initial_embeddings)
+
+            if embedding_config.is_output_embedding and create_output_embedding_fn is not None:
+                token_count = len(initial_token_ids)
+
+                vector = create_output_embedding_fn(
+                    embedding_config.initial_embedding_text + token_count * '*',
+                    token_count,
+                )
+
+                vector = vector[1:token_count + 1]  # cut off BOS token
+        return vector
 
     def _add_embeddings_to_tokenizer(
             self,

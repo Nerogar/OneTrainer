@@ -74,7 +74,6 @@ class HunyuanVideoSampler(BaseModelSampler):
             prompt_embedding, pooled_prompt_embedding, prompt_attention_mask = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )

@@ -114,27 +114,26 @@ class BaseHunyuanVideoSetup(
     ):
         model.additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
-            embedding_state = model.additional_embedding_state_dicts.get(embedding_config.uuid, None)
+            embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
-                if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
-                    embedding_state_1 = self._create_new_embedding(
-                        embedding_config,
-                        model.tokenizer_1,
-                        model.text_encoder_1,
-                    )
-                else:
-                    embedding_state_1 = None
+                embedding_state_1 = self._create_new_embedding(
+                    embedding_config,
+                    model.tokenizer_1,
+                    model.text_encoder_1,
+                    lambda text, token_count: model.encode_text(
+                        text=text,
+                        train_device=self.temp_device,
+                    )[0]
+                )
 
-                if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
-                    embedding_state_2 = self._create_new_embedding(
-                        embedding_config,
-                        model.tokenizer_2,
-                        model.text_encoder_2,
-                    )
-                else:
-                    embedding_state_2 = None
+                embedding_state_2 = self._create_new_embedding(
+                    embedding_config,
+                    model.tokenizer_2,
+                    model.text_encoder_2,
+                )
             else:
-                embedding_state_1, embedding_state_2 = embedding_state
+                embedding_state_1 = embedding_state.get("llama_out", embedding_state.get("llama", None))
+                embedding_state_2 = embedding_state.get("clip_l_out", embedding_state.get("clip_l", None))
 
             if embedding_state_1 is not None:
                 embedding_state_1 = embedding_state_1.to(
@@ -155,7 +154,10 @@ class BaseHunyuanVideoSetup(
                 embedding_config.placeholder,
                 embedding_config.is_output_embedding,
             )
-            model.additional_embeddings.append(embedding)
+            if embedding_config.uuid == config.embedding.uuid:
+                model.embedding = embedding
+            else:
+                model.additional_embeddings.append(embedding)
 
         if model.tokenizer_1 is not None:
             self._add_embeddings_to_tokenizer(model.tokenizer_1, model.all_text_encoder_1_embeddings())
