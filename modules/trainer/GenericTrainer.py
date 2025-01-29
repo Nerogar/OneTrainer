@@ -5,6 +5,8 @@ import shutil
 import traceback
 from collections.abc import Callable
 from pathlib import Path
+from requests.exceptions import ConnectionError
+import contextlib
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
@@ -106,10 +108,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
-            huggingface_hub.login(
-                token = self.config.secrets.huggingface_token,
-                new_session = False,
-            )
+            with contextlib.suppress(ConnectionError):
+                huggingface_hub.login(
+                    token = self.config.secrets.huggingface_token,
+                    new_session = False,
+                )
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
