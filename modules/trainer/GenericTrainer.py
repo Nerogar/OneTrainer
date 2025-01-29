@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import os
@@ -5,8 +6,6 @@ import shutil
 import traceback
 from collections.abc import Callable
 from pathlib import Path
-from requests.exceptions import ConnectionError
-import contextlib
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
@@ -38,6 +37,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
 import huggingface_hub
+from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
 
