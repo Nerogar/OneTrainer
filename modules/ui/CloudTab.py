@@ -1,4 +1,6 @@
 
+import webbrowser
+
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudFileSync import CloudFileSync
@@ -7,8 +9,6 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
-import webbrowser
-
 
 
 class CloudTab:

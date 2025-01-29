@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import os
@@ -36,6 +37,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
 import huggingface_hub
+from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
 
@@ -106,10 +108,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
-            huggingface_hub.login(
-                token = self.config.secrets.huggingface_token,
-                new_session = False,
-            )
+            with contextlib.suppress(ConnectionError):
+                huggingface_hub.login(
+                    token = self.config.secrets.huggingface_token,
+                    new_session = False,
+                )
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
