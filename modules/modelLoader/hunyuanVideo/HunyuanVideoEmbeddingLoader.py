@@ -33,21 +33,13 @@ class HunyuanVideoEmbeddingLoader:
             self,
             directory: str,
             embedding_name: EmbeddingName,
-            load_single: bool,
     ) -> dict[str, Tensor] | None:
         if os.path.exists(os.path.join(directory, "meta.json")):
-            if load_single:
-                safetensors_embedding_name = os.path.join(
-                    directory,
-                    "embedding",
-                    "embedding.safetensors",
-                )
-            else:
-                safetensors_embedding_name = os.path.join(
-                    directory,
-                    "embedding",
-                    f"{embedding_name.uuid}.safetensors",
-                )
+            safetensors_embedding_name = os.path.join(
+                directory,
+                "additional_embeddings",
+                f"{embedding_name.uuid}.safetensors",
+            )
 
             if os.path.exists(safetensors_embedding_name):
                 return self.__load_embedding(safetensors_embedding_name)
@@ -56,35 +48,20 @@ class HunyuanVideoEmbeddingLoader:
         else:
             raise Exception("not an internal model")
 
-    def load_multiple(
+    def load(
             self,
             model: HunyuanVideoModel,
+            directory: str,
             model_names: ModelNames,
     ):
-        for embedding_name in model_names.additional_embeddings:
+        for embedding_name in model_names.all_embedding():
             try:
-                model.additional_embedding_state_dicts[embedding_name.uuid] = \
-                    self.__load_internal(model_names.base_model, embedding_name, False)
+                model.embedding_state_dicts[embedding_name.uuid] = \
+                    self.__load_internal(directory, embedding_name)
             except Exception as e1:  # noqa: PERF203
                 try:
-                    model.additional_embedding_state_dicts[embedding_name.uuid] = \
+                    model.embedding_state_dicts[embedding_name.uuid] = \
                         self.__load_embedding(embedding_name.model_name)
                 except Exception as e2:
                     e2.__cause__ = e1
                     raise Exception(f"could not load embedding: {embedding_name}") from e2
-
-    def load_single(
-            self,
-            model: HunyuanVideoModel,
-            model_names: ModelNames,
-    ):
-        embedding_name = model_names.embedding
-
-        try:
-            model.embedding_state = self.__load_internal(model_names.embedding.model_name, embedding_name, True)
-        except Exception as e1:
-            try:
-                model.embedding_state = self.__load_embedding(embedding_name.model_name)
-            except Exception as e2:
-                e2.__cause__ = e1
-                raise Exception(f"could not load embedding: {embedding_name}") from e2

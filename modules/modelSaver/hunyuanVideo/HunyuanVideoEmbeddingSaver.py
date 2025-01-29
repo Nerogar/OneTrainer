@@ -85,22 +85,14 @@ class HunyuanVideoEmbeddingSaver:
     def __save_internal(
             self,
             embedding: HunyuanVideoModelEmbedding | None,
-            embedding_state: tuple[Tensor, Tensor, Tensor] | None,
+            embedding_state: dict[str, Tensor] | None,
             destination: str,
-            save_single: bool,
     ):
-        if save_single:
-            safetensors_embedding_name = os.path.join(
-                destination,
-                "embedding",
-                "embedding.safetensors",
-            )
-        else:
-            safetensors_embedding_name = os.path.join(
-                destination,
-                "additional_embeddings",
-                f"{embedding.text_encoder_1_embedding.uuid}.safetensors",
-            )
+        safetensors_embedding_name = os.path.join(
+            destination,
+            "additional_embeddings",
+            f"{embedding.text_encoder_1_embedding.uuid}.safetensors",
+        )
         self.__save_safetensors(
             embedding,
             embedding_state,
@@ -116,7 +108,7 @@ class HunyuanVideoEmbeddingSaver:
             dtype: torch.dtype | None,
     ):
         embedding = model.embedding
-        embedding_state = model.embedding_state_dict
+        embedding_state = list(model.embedding_state_dicts.values())[0]
 
         match output_model_format:
             case ModelFormat.DIFFUSERS:
@@ -140,7 +132,6 @@ class HunyuanVideoEmbeddingSaver:
                     embedding,
                     embedding_state,
                     output_model_destination,
-                    True,
                 )
 
     def save_multiple(
@@ -150,15 +141,16 @@ class HunyuanVideoEmbeddingSaver:
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        embedding_uuids = set(model.additional_embedding_state_dicts.keys() \
+        embedding_uuids = set(model.embedding_state_dicts.keys() \
                               | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
 
         embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.additional_embeddings}
 
         for embedding_uuid in embedding_uuids:
             embedding = embeddings.get(embedding_uuid)
-            embedding_state = model.additional_embedding_state_dicts.get(embedding_uuid, None)
-            embedding_name = safe_filename(embedding.placeholder, allow_spaces=False, max_length=None)
+            embedding_state = model.embedding_state_dicts.get(embedding_uuid, None)
+            embedding_name = safe_filename(embedding.text_encoder_1_embedding.placeholder,
+                                           allow_spaces=False, max_length=None)
 
             match output_model_format:
                 case ModelFormat.DIFFUSERS:
@@ -182,5 +174,4 @@ class HunyuanVideoEmbeddingSaver:
                         embedding,
                         embedding_state,
                         output_model_destination,
-                        False,
                     )

@@ -83,9 +83,8 @@ class HunyuanVideoModel(BaseModel):
 
     # persistent embedding training data
     embedding: HunyuanVideoModelEmbedding | None
-    embedding_state_dict: dict[str, Tensor] | None
     additional_embeddings: list[HunyuanVideoModelEmbedding] | None
-    additional_embedding_state_dicts: dict[str, dict[str, Tensor]] | None
+    embedding_state_dicts: dict[str, dict[str, Tensor]] | None
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
 
@@ -127,9 +126,8 @@ class HunyuanVideoModel(BaseModel):
         self.transformer_offload_conductor = None
 
         self.embedding = None
-        self.embedding_state_dict = {}
         self.additional_embeddings = []
-        self.additional_embedding_state_dicts = {}
+        self.embedding_state_dicts = {}
         self.embedding_wrapper_1 = None
         self.embedding_wrapper_2 = None
 
@@ -214,7 +212,7 @@ class HunyuanVideoModel(BaseModel):
     def encode_text(
             self,
             train_device: torch.device,
-            batch_size: int,
+            batch_size: int = 1,
             rand: Random | None = None,
             text: str = None,
             tokens_1: Tensor = None,

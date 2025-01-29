@@ -42,7 +42,7 @@ class HunyuanVideoEmbeddingModelLoader(
 
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
-        embedding_loader.load_multiple(model, model_names)
+        embedding_loader.load_multiple(model, model_names.embedding, model_names)
         embedding_loader.load_single(model, model_names)
 
         return model
