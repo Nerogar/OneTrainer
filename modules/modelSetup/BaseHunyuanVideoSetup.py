@@ -112,7 +112,7 @@ class BaseHunyuanVideoSetup(
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
-        model.additional_embeddings = []
+        additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
             embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
@@ -120,10 +120,10 @@ class BaseHunyuanVideoSetup(
                     embedding_config,
                     model.tokenizer_1,
                     model.text_encoder_1,
-                    lambda text, token_count: model.encode_text(
+                    lambda text: model.encode_text(
                         text=text,
                         train_device=self.temp_device,
-                    )[0]
+                    )[0][0][1:]
                 )
 
                 embedding_state_2 = self._create_new_embedding(
@@ -157,7 +157,9 @@ class BaseHunyuanVideoSetup(
             if embedding_config.uuid == config.embedding.uuid:
                 model.embedding = embedding
             else:
-                model.additional_embeddings.append(embedding)
+                additional_embeddings.append(embedding)
+
+        model.additional_embeddings = additional_embeddings
 
         if model.tokenizer_1 is not None:
             self._add_embeddings_to_tokenizer(model.tokenizer_1, model.all_text_encoder_1_embeddings())
