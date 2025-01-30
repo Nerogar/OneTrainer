@@ -39,7 +39,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             embedding_config: TrainEmbeddingConfig,
             tokenizer: PreTrainedTokenizer | None,
             text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel | None,
-            create_output_embedding_fn: Callable[[str, int], Tensor] | None = None,
+            create_output_embedding_fn: Callable[[str], Tensor] | None = None,
     ) -> Tensor | None:
         if tokenizer is None or text_encoder is None:
             return None
@@ -74,10 +74,8 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
                 vector = create_output_embedding_fn(
                     embedding_config.initial_embedding_text + token_count * '*',
-                    token_count,
-                )
+                )[:token_count]
 
-                vector = vector[1:token_count + 1]  # cut off BOS token
         return vector
 
     def _add_embeddings_to_tokenizer(
