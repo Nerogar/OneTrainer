@@ -683,6 +683,17 @@ class TrainingTab:
                          tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
         components.entry(frame, 6, 1, self.ui_state, "noising_bias")
 
+        # timestep shift
+        components.label(frame, 7, 0, "Timestep Shift",
+                         tooltip="Shift the timestep distribution. Use the preview to see more details.")
+        components.entry(frame, 7, 1, self.ui_state, "timestep_shift")
+
+        # dynamic timestep shifting
+        components.label(frame, 8, 0, "Dynamic Timestep Shifting",
+                         tooltip="Dynamically shift the timestep distribution based on resolution. Use the preview to see more details.")
+        components.switch(frame, 8, 1, self.ui_state, "dynamic_timestep_shifting")
+
+
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

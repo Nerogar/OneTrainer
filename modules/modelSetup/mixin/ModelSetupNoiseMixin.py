@@ -55,6 +55,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
+            latent_width: int | None = None,
+            latent_height: int | None = None,
     ) -> Tensor:
         if deterministic:
             # -1 is for zero-based indexing
@@ -69,13 +71,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             num_timestep = max_timestep - min_timestep
 
             if config.timestep_distribution == TimestepDistribution.UNIFORM:
-                return torch.randint(
-                    low=min_timestep,
-                    high=max_timestep,
-                    size=(batch_size,),
-                    generator=generator,
-                    device=generator.device,
-                ).long()
+                timestep = min_timestep + (max_timestep - min_timestep) * torch.rand(batch_size,generator=generator,device=generator.device)
             elif config.timestep_distribution == TimestepDistribution.SIGMOID:
                 if self.__weights is None:
                     bias = config.noising_bias + 0.5
@@ -86,7 +82,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     self.__weights = weights
 
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-                return samples.to(dtype=torch.long, device=generator.device)
+                timestep = samples.to(dtype=torch.long, device=generator.device)
             # elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:  ## multinomial implementation
             #     if self.__weights is None:
             #         bias = config.noising_bias
@@ -110,7 +106,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
                 normal = torch.normal(bias, scale, size=(batch_size,), generator=generator, device=generator.device)
                 logit_normal = normal.sigmoid()
-                return (logit_normal * num_timestep + min_timestep).int()
+                timestep = logit_normal * num_timestep + min_timestep
             elif config.timestep_distribution == TimestepDistribution.HEAVY_TAIL:
                 scale = config.noising_weight
 
@@ -120,7 +116,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     device=generator.device,
                 )
                 u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
-                return (u * num_timestep + min_timestep).int()
+                timestep = u * num_timestep + min_timestep
             elif config.timestep_distribution == TimestepDistribution.COS_MAP:
                 if self.__weights is None:
                     weights = torch.linspace(0, 1, num_timestep)
@@ -128,8 +124,39 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     self.__weights = weights
 
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-                return samples.to(dtype=torch.long, device=generator.device)
-            return None
+                timestep = samples.to(dtype=torch.long, device=generator.device)
+            else:
+                return None
+
+
+            shift = config.timestep_shift
+            if config.dynamic_timestep_shifting:
+                if not latent_width or not latent_height:
+                    raise NotImplementedError("Dynamic timestep shifting not support by this model")
+
+                base_seq_len = 256
+                max_seq_len = 4096
+                base_shift = 0.5
+                max_shift = 1.15
+                patch_size = 2
+
+                image_seq_len = (latent_width // patch_size) * (latent_height // patch_size)
+                m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
+                b = base_shift - m * base_seq_len
+                mu = image_seq_len * m + b
+
+                shift = math.exp(mu)
+
+            if shift != 1.0 and (
+                config.timestep_distribution == TimestepDistribution.SIGMOID
+                or config.timestep_distribution == TimestepDistribution.COS_MAP
+            ):
+                raise NotImplementedError("Timestep shifting not implemented for SIGMOID and COS_MAP distributions")
+
+            timestep = num_train_timesteps * shift * timestep / ((shift-1) * timestep + num_train_timesteps)
+
+
+            return timestep.int()
 
     def _get_timestep_continuous(
             self,
