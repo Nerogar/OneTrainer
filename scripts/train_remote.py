@@ -6,6 +6,7 @@ import json
 import os
 import pickle
 import threading
+import traceback
 from contextlib import suppress
 
 from modules.trainer.GenericTrainer import GenericTrainer
@@ -17,12 +18,17 @@ from modules.util.config.TrainConfig import TrainConfig
 
 
 def write_request(filename,name, *params):
-    with suppress(FileNotFoundError):
-        os.rename(filename,filename+'.write')
-    with open(filename+'.write', 'ab') as f:
-        pickle.dump(name,f)
-        pickle.dump(params,f)
-    os.rename(filename+'.write',filename)
+    try:
+        with suppress(FileNotFoundError):
+            os.rename(filename,filename+'.write')
+        with open(filename+'.write', 'ab') as f:
+            pickle.dump(name,f)
+            pickle.dump(params,f)
+        os.rename(filename+'.write',filename)
+    except Exception:
+        #TrainCallbacks is suppressing all exceptions; at least print them:
+        traceback.print_exc()
+        raise
 
 def close_pipe(filename):
     with open(filename, 'wb'): #send EOF by closing
