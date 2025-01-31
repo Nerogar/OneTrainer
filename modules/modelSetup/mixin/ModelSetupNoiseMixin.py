@@ -55,8 +55,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
-            latent_width = None,
-            latent_height = None,
+            latent_width: int | None = None,
+            latent_height: int | None = None,
     ) -> Tensor:
         if deterministic:
             # -1 is for zero-based indexing
@@ -82,7 +82,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     self.__weights = weights
 
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-                timestep = samples.to(dtype=torch.long,device=generator.device)
+                timestep = samples.to(dtype=torch.long, device=generator.device)
             # elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:  ## multinomial implementation
             #     if self.__weights is None:
             #         bias = config.noising_bias
@@ -124,7 +124,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     self.__weights = weights
 
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-                timestep = samples.to(dtype=torch.long,device=generator.device)
+                timestep = samples.to(dtype=torch.long, device=generator.device)
             else:
                 return None
 
@@ -134,11 +134,13 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 if not latent_width or not latent_height:
                     raise NotImplementedError("Dynamic timestep shifting not support by this model")
 
-                image_seq_len = (latent_width // 2) * (latent_height // 2)
                 base_seq_len = 256
                 max_seq_len = 4096
                 base_shift = 0.5
                 max_shift = 1.15
+                patch_size = 2
+
+                image_seq_len = (latent_width // patch_size) * (latent_height // patch_size)
                 m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
                 b = base_shift - m * base_seq_len
                 mu = image_seq_len * m + b
@@ -151,7 +153,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             ):
                 raise NotImplementedError("Timestep shifting not implemented for SIGMOID and COS_MAP distributions")
 
-            timestep = num_train_timesteps*shift*timestep/((shift-1)*timestep + num_train_timesteps)
+            timestep = num_train_timesteps * shift * timestep / ((shift-1) * timestep + num_train_timesteps)
 
 
             return timestep.int()
