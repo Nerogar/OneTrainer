@@ -18,6 +18,7 @@ from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
+from mgds.pipelineModules.LoadVideo import LoadVideo
 from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.ModifyPath import ModifyPath
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
@@ -44,8 +45,11 @@ class DataLoaderText2ImageMixin:
     def __init__(self):
         pass
 
-    def _enumerate_input_modules(self, config: TrainConfig) -> list:
+    def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
         supported_extensions = path_util.supported_image_extensions()
+
+        if allow_videos:
+            supported_extensions |= path_util.supported_video_extensions()
 
         collect_paths = CollectPaths(
             concept_in_name='concept', path_in_name='path', path_out_name='image_path', concept_out_name='concept',
@@ -68,10 +72,11 @@ class DataLoaderText2ImageMixin:
             train_dtype: DataType,
             replace_embedding_text_fn: Callable[[str], str],
     ) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, dtype=train_dtype.torch_dtype())
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
+        load_video = LoadVideo(path_in_name='image_path', video_out_name='image', range_min=0, range_max=1, target_frame_count=25, target_frame_rate=24, supported_extensions=path_util.supported_video_extensions(), dtype=train_dtype.torch_dtype())
 
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, dtype=train_dtype.torch_dtype())
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, supported_extensions={".png"}, dtype=train_dtype.torch_dtype())
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -85,7 +90,7 @@ class DataLoaderText2ImageMixin:
 
         map_embedding_text = MapData(in_name='prompt', out_name='prompt', map_fn=replace_embedding_text_fn)
 
-        modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
+        modules = [load_image, load_video, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 
         if config.masked_training:
             modules.append(generate_mask)
@@ -147,6 +152,21 @@ class DataLoaderText2ImageMixin:
 
         return modules
 
+    def _crop_modules(self, config: TrainConfig):
+        inputs = ['image']
+
+        if config.masked_training or config.model_type.has_mask_input():
+            inputs.append('mask')
+
+        if config.model_type.has_depth_input():
+            inputs.append('depth')
+
+        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
+
+        modules = [scale_crop]
+
+        return modules
+
     def _augmentation_modules(self, config: TrainConfig):
         inputs = ['image']
 
@@ -180,21 +200,6 @@ class DataLoaderText2ImageMixin:
             caps_randomize,
             shuffle_tags,
         ]
-
-        return modules
-
-    def _crop_modules(self, config: TrainConfig):
-        inputs = ['image']
-
-        if config.masked_training or config.model_type.has_mask_input():
-            inputs.append('mask')
-
-        if config.model_type.has_depth_input():
-            inputs.append('depth')
-
-        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
-
-        modules = [scale_crop]
 
         return modules
 

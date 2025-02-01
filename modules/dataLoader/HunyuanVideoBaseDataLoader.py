@@ -263,7 +263,7 @@ class HunyuanVideoBaseDataLoader(
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
-        enumerate_input = self._enumerate_input_modules(config)
+        enumerate_input = self._enumerate_input_modules(config, allow_videos=True)
         load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt)
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, 64)
