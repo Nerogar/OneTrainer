@@ -30,7 +30,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         if config.offset_noise_weight > 0:
             offset_noise = torch.randn(
-                (source_tensor.shape[0], source_tensor.shape[1], 1, 1),
+                (source_tensor.shape[0], source_tensor.shape[1], *[1 for _ in range(source_tensor.ndim - 2)]),
                 generator=generator,
                 device=config.train_device,
                 dtype=source_tensor.dtype
