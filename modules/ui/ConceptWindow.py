@@ -1,4 +1,5 @@
 import os
+import pathlib
 import random
 
 from modules.util import path_util
@@ -236,10 +237,10 @@ class ConceptWindow(ctk.CTkToplevel):
         components.entry(frame, 10, 3, self.image_ui_state, "resolution_override")
 
         # image
-        preview = self.__get_preview_image()
+        image_preview, filename_preview, caption_preview = self.__get_preview_image()
         self.image = ctk.CTkImage(
-            light_image=preview,
-            size=preview.size,
+            light_image=image_preview,
+            size=image_preview.size,
         )
         image_label = ctk.CTkLabel(master=frame, text="", image=self.image, height=300, width=300)
         image_label.grid(row=0, column=4, rowspan=6)
@@ -255,6 +256,15 @@ class ConceptWindow(ctk.CTkToplevel):
 
         prev_preview_button.configure(width=40)
         next_preview_button.configure(width=40)
+
+        #caption and filename preview
+        self.filename_preview = ctk.CTkLabel(master=frame, text=filename_preview, width=300, anchor="nw", justify="left", padx=10, wraplength=280)
+        self.filename_preview.grid(row=7, column=4)
+        self.caption_preview = ctk.CTkTextbox(master=frame, width = 300, height = 150, wrap="word",
+                                              bg_color="white", border_width=3, corner_radius=3, border_color="#3B8ED0")
+        self.caption_preview.insert(index="1.0", text=caption_preview)
+        self.caption_preview.configure(state="disabled")
+        self.caption_preview.grid(row=8, column=4, rowspan = 4)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -335,14 +345,20 @@ class ConceptWindow(ctk.CTkToplevel):
         self.__update_image_preview()
 
     def __update_image_preview(self):
-        preview = self.__get_preview_image()
-        self.image.configure(light_image=preview, size=preview.size)
+        image_preview, filename_preview, caption_preview = self.__get_preview_image()
+        self.image.configure(light_image=image_preview, size=image_preview.size)
+        self.filename_preview.configure(text=filename_preview)
+        self.caption_preview.configure(state="normal")
+        self.caption_preview.delete(index1="1.0", index2="end")
+        self.caption_preview.insert(index="1.0", text=caption_preview)
+        self.caption_preview.configure(state="disabled")
 
     def __get_preview_image(self):
         preview_image_path = "resources/icons/icon.png"
 
         file_index = -1
-        if os.path.isdir(self.concept.path):
+        #check only top-level directory if subdirectories disabled
+        if os.path.isdir(self.concept.path) and not self.concept.include_subdirectories:
             for path in os.scandir(self.concept.path):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() \
@@ -353,12 +369,25 @@ class ConceptWindow(ctk.CTkToplevel):
                     file_index += 1
                     if file_index == self.image_preview_file_index:
                         break
+        #check all directories with glob if subdirectories enabled
+        elif os.path.isdir(self.concept.path) and self.concept.include_subdirectories:
+            for path in pathlib.Path(self.concept.path).rglob("*.*"):
+                extension = os.path.splitext(path)[1]
+                if path.is_file() \
+                        and path_util.is_supported_image_extension(extension) \
+                        and not path.name.endswith("-masklabel.png"):
+                    preview_image_path = path_util.canonical_join(self.concept.path, path)
+
+                    file_index += 1
+                    if file_index == self.image_preview_file_index:
+                        break
+
 
         image = Image.open(preview_image_path).convert("RGB")
         image_tensor = functional.to_tensor(image)
 
-        splitext = os.path.splitext(os.path.basename(preview_image_path))
-        preview_mask_path = path_util.canonical_join(self.concept.path, splitext[0] + "-masklabel.png")
+        splitext = os.path.splitext(preview_image_path)
+        preview_mask_path = path_util.canonical_join(splitext[0] + "-masklabel.png")
         if not os.path.isfile(preview_mask_path):
             preview_mask_path = None
 
@@ -429,6 +458,20 @@ class ConceptWindow(ctk.CTkToplevel):
         data = pipeline.__next__()
         image_tensor = data['image']
         mask_tensor = data['mask']
+        #display filename and first line of base caption from prompt source
+        #will try to change to preview caption with text variations at some point
+        filename_output = os.path.basename(preview_image_path)
+        try:
+            if self.concept.text.prompt_source == "sample":
+                with open(splitext[0] + ".txt") as prompt_file:
+                    prompt_output = prompt_file.readline()
+            elif self.concept.text.prompt_source == "filename":
+                prompt_output = os.path.splitext(os.path.basename(preview_image_path))[0]
+            elif self.concept.text.prompt_source == "concept":
+                with open(self.concept.text.prompt_path) as prompt_file:
+                    prompt_output = prompt_file.readline()
+        except FileNotFoundError:
+            prompt_output = "No caption found."
 
         mask_tensor = torch.clamp(mask_tensor, 0.3, 1)
         image_tensor = image_tensor * mask_tensor
@@ -437,7 +480,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         image.thumbnail((300, 300))
 
-        return image
+        return image, filename_output, prompt_output
 
     def __ok(self):
         self.destroy()
