@@ -34,3 +34,4 @@ pixi.toml
 # misc files
 /src
 train.bat
+debug_report.log
