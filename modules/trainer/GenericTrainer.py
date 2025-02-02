@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import os
@@ -36,6 +37,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
 import huggingface_hub
+from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
 
@@ -106,10 +108,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
-            huggingface_hub.login(
-                token = self.config.secrets.huggingface_token,
-                new_session = False,
-            )
+            with contextlib.suppress(ConnectionError):
+                huggingface_hub.login(
+                    token = self.config.secrets.huggingface_token,
+                    new_session = False,
+                )
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
@@ -581,6 +584,7 @@ class GenericTrainer(BaseTrainer):
         lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
+        ema_loss_steps = 0
         for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -701,7 +705,9 @@ class GenericTrainer(BaseTrainer):
 
                         self.tensorboard.add_scalar("loss/train_step", accumulated_loss, train_progress.global_step)
                         ema_loss = ema_loss or accumulated_loss
-                        ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
+                        ema_loss_steps += 1
+                        ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
+                        ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss * (1 - ema_loss_decay))
                         step_tqdm.set_postfix({
                             'loss': accumulated_loss,
                             'smooth loss': ema_loss,
