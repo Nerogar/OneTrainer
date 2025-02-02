@@ -1,7 +1,7 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
     - id: check-merge-conflict
     - id: check-case-conflict
     - id: check-illegal-windows-names
@@ -20,3 +20,6 @@ repos:
     - id: ruff
       args: ["--fix"]
       types_or: [ python, pyi, jupyter ]
+
+ci:
+  autofix_prs: false
