@@ -122,21 +122,15 @@ class ConceptWidget(ctk.CTkFrame):
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
 
-        #check only top-level directory if subdirectories disabled
-        if os.path.isdir(self.concept.path) and not self.concept.include_subdirectories:
-            for path in os.scandir(self.concept.path):
+        if self.concept.include_subdirectories:
+            filelist = [file for file in pathlib.Path(self.concept.path).glob("**/*.*") if file.is_file()]
+        else:
+            filelist = [file for file in pathlib.Path(self.concept.path).glob("*.*")  if file.is_file()]
+
+        if os.path.isdir(self.concept.path):
+            for path in filelist:
                 extension = os.path.splitext(path)[1]
-                if path.is_file() \
-                        and path_util.is_supported_image_extension(extension) \
-                        and not path.name.endswith("-masklabel.png"):
-                    preview_path = path_util.canonical_join(self.concept.path, path.name)
-                    break
-        #check all directories with glob if subdirectories enabled
-        elif os.path.isdir(self.concept.path) and self.concept.include_subdirectories:
-            for path in pathlib.Path(self.concept.path).rglob("*.*"):
-                extension = os.path.splitext(path)[1]
-                if path.is_file() \
-                        and path_util.is_supported_image_extension(extension) \
+                if path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
                     preview_path = path_util.canonical_join(self.concept.path, path)
                     break

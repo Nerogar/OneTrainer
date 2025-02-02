@@ -355,26 +355,17 @@ class ConceptWindow(ctk.CTkToplevel):
 
     def __get_preview_image(self):
         preview_image_path = "resources/icons/icon.png"
-
         file_index = -1
-        #check only top-level directory if subdirectories disabled
-        if os.path.isdir(self.concept.path) and not self.concept.include_subdirectories:
-            for path in os.scandir(self.concept.path):
-                extension = os.path.splitext(path)[1]
-                if path.is_file() \
-                        and path_util.is_supported_image_extension(extension) \
-                        and not path.name.endswith("-masklabel.png"):
-                    preview_image_path = path_util.canonical_join(self.concept.path, path.name)
 
-                    file_index += 1
-                    if file_index == self.image_preview_file_index:
-                        break
-        #check all directories with glob if subdirectories enabled
-        elif os.path.isdir(self.concept.path) and self.concept.include_subdirectories:
-            for path in pathlib.Path(self.concept.path).rglob("*.*"):
+        if self.concept.include_subdirectories:
+            filelist = [file for file in pathlib.Path(self.concept.path).glob("**/*.*") if file.is_file()]
+        else:
+            filelist = [file for file in pathlib.Path(self.concept.path).glob("*.*") if file.is_file()]
+
+        if os.path.isdir(self.concept.path):
+            for path in filelist:
                 extension = os.path.splitext(path)[1]
-                if path.is_file() \
-                        and path_util.is_supported_image_extension(extension) \
+                if path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
                     preview_image_path = path_util.canonical_join(self.concept.path, path)
 
