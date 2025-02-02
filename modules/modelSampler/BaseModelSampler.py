@@ -32,16 +32,20 @@ class ModelSamplerOutput:
 
     #Reduce to a JPEG bytestream for cloud training:
     def __reduce__(self):
-        if self.file_type == FileType.IMAGE:
-            b = io.BytesIO()
-            self.data.save(b, format='JPEG')
-            return (ModelSamplerOutput, (self.file_type, b.getvalue()))
-        elif self.file_type == FileType.VIDEO:
-            #do not transfer videos; they are not shown anyway
-            #the video sample file is transferred via workspace sync
-            return (ModelSamplerOutput, (self.file_type, None))
-        elif sampler_output.file_type == FileType.AUDIO:
-            pass #TODO
+        match self.file_type:
+            case FileType.IMAGE:
+                b = io.BytesIO()
+                self.data.save(b, format='JPEG')
+                return ModelSamplerOutput, (self.file_type, b.getvalue())
+            case FileType.VIDEO:
+                #do not transfer videos; they are not shown anyway
+                #the video sample file is transferred via workspace sync
+                return ModelSamplerOutput, (self.file_type, None)
+            case FileType.AUDIO:
+                # TODO
+                return ModelSamplerOutput, (self.file_type, None)
+            case _:
+                return ModelSamplerOutput, (self.file_type, None)
 
 
 class BaseModelSampler(metaclass=ABCMeta):
