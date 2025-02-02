@@ -356,16 +356,12 @@ class ConceptWindow(ctk.CTkToplevel):
     def __get_preview_image(self):
         preview_image_path = "resources/icons/icon.png"
         file_index = -1
-
-        if self.concept.include_subdirectories:
-            filelist = [file for file in pathlib.Path(self.concept.path).glob("**/*.*") if file.is_file()]
-        else:
-            filelist = [file for file in pathlib.Path(self.concept.path).glob("*.*") if file.is_file()]
+        glob_pattern = "**/*.*" if self.concept.include_subdirectories else "*.*"
 
         if os.path.isdir(self.concept.path):
-            for path in filelist:
+            for path in pathlib.Path(self.concept.path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
-                if path_util.is_supported_image_extension(extension) \
+                if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
                     preview_image_path = path_util.canonical_join(self.concept.path, path)
 
