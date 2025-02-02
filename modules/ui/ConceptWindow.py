@@ -70,6 +70,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         self.title("Concept")
         self.geometry("800x630")
+        self.geometry("800x700")
         self.resizable(True, True)
         self.wait_visibility()
         self.grab_set()
@@ -364,11 +365,9 @@ class ConceptWindow(ctk.CTkToplevel):
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
                     preview_image_path = path_util.canonical_join(self.concept.path, path)
-
                     file_index += 1
                     if file_index == self.image_preview_file_index:
                         break
-
 
         image = Image.open(preview_image_path).convert("RGB")
         image_tensor = functional.to_tensor(image)
