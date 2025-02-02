@@ -87,7 +87,7 @@ def get_os_info() -> dict[str, Any]:
 
 def get_cpu_info() -> tuple[str, str]:
     """
-    Retrieve the human-friendly CPU model name and the technical CPU details.
+    Retrieve a semi human-friendly CPU model name and the technical CPU details. This is not the marketing name.
 
     :return: A tuple (model_name, technical_name)
     """
@@ -121,6 +121,9 @@ def get_cpu_info() -> tuple[str, str]:
     else:
         technical_name = platform.processor() or "Unavailable"
         return ("", technical_name)
+
+
+# TODO Figure out how to determine what type of drive it is; SATA or NVME
 
 
 def get_hardware_info() -> dict[str, Any]:
