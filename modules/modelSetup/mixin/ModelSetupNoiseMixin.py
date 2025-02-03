@@ -70,65 +70,6 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             max_timestep = int(num_train_timesteps * config.max_noising_strength)
             num_timestep = max_timestep - min_timestep
 
-            if config.timestep_distribution == TimestepDistribution.UNIFORM:
-                timestep = min_timestep + (max_timestep - min_timestep) * torch.rand(batch_size,generator=generator,device=generator.device)
-            elif config.timestep_distribution == TimestepDistribution.SIGMOID:
-                if self.__weights is None:
-                    bias = config.noising_bias + 0.5
-                    weight = config.noising_weight
-
-                    weights = torch.linspace(0, 1, num_timestep)
-                    weights = 1 / (1 + torch.exp(-weight * (weights - bias)))  # Sigmoid
-                    self.__weights = weights
-
-                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-                timestep = samples.to(dtype=torch.long, device=generator.device)
-            # elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:  ## multinomial implementation
-            #     if self.__weights is None:
-            #         bias = config.noising_bias
-            #         scale = config.noising_weight + 1.0
-            #
-            #         weights = torch.linspace(0, 1, num_timestep)
-            #         weights = \
-            #             (1.0 / (scale * math.sqrt(2.0 * torch.pi))) \
-            #             * (1.0 / (weights * (1.0 - weights))) \
-            #             * torch.exp(
-            #                 -((torch.logit(weights) - bias) ** 2.0) / (2.0 * scale ** 2.0)
-            #             )
-            #         weights.nan_to_num_(0)
-            #         self.__weights = weights
-            #
-            #     samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-            #     return samples.to(dtype=torch.long, device=generator.device)
-            elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
-                bias = config.noising_bias
-                scale = config.noising_weight + 1.0
-
-                normal = torch.normal(bias, scale, size=(batch_size,), generator=generator, device=generator.device)
-                logit_normal = normal.sigmoid()
-                timestep = logit_normal * num_timestep + min_timestep
-            elif config.timestep_distribution == TimestepDistribution.HEAVY_TAIL:
-                scale = config.noising_weight
-
-                u = torch.rand(
-                    size=(batch_size,),
-                    generator=generator,
-                    device=generator.device,
-                )
-                u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
-                timestep = u * num_timestep + min_timestep
-            elif config.timestep_distribution == TimestepDistribution.COS_MAP:
-                if self.__weights is None:
-                    weights = torch.linspace(0, 1, num_timestep)
-                    weights = 2.0 / (math.pi - 2.0 * math.pi * weights + 2.0 * math.pi * weights ** 2.0)
-                    self.__weights = weights
-
-                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
-                timestep = samples.to(dtype=torch.long, device=generator.device)
-            else:
-                return None
-
-
             shift = config.timestep_shift
             if config.dynamic_timestep_shifting:
                 if not latent_width or not latent_height:
@@ -147,14 +88,69 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
                 shift = math.exp(mu)
 
-            if shift != 1.0 and (
-                config.timestep_distribution == TimestepDistribution.SIGMOID
-                or config.timestep_distribution == TimestepDistribution.COS_MAP
-            ):
-                raise NotImplementedError("Timestep shifting not implemented for SIGMOID and COS_MAP distributions")
+            if config.timestep_distribution in [
+                TimestepDistribution.UNIFORM,
+                TimestepDistribution.LOGIT_NORMAL,
+                TimestepDistribution.HEAVY_TAIL
+            ]:
+                # continuous implementations
+                if config.timestep_distribution == TimestepDistribution.UNIFORM:
+                    timestep = min_timestep + (max_timestep - min_timestep) \
+                               * torch.rand(batch_size, generator=generator, device=generator.device)
+                elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
+                    bias = config.noising_bias
+                    scale = config.noising_weight + 1.0
 
-            timestep = num_train_timesteps * shift * timestep / ((shift-1) * timestep + num_train_timesteps)
+                    normal = torch.normal(bias, scale, size=(batch_size,), generator=generator, device=generator.device)
+                    logit_normal = normal.sigmoid()
+                    timestep = logit_normal * num_timestep + min_timestep
+                elif config.timestep_distribution == TimestepDistribution.HEAVY_TAIL:
+                    scale = config.noising_weight
 
+                    u = torch.rand(
+                        size=(batch_size,),
+                        generator=generator,
+                        device=generator.device,
+                    )
+                    u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
+                    timestep = u * num_timestep + min_timestep
+
+                timestep = num_train_timesteps * shift * timestep / ((shift - 1) * timestep + num_train_timesteps)
+            else:
+                # Shifting a discrete distribution is done in two steps:
+                # 1. Apply the inverse shift to the linspace.
+                #    This moves the sample points of the function to their shifted place.
+                # 2. Multiply the result with the derivative of the inverse shift function.
+                #    The derivative is an approximation of the distance between sample points.
+                #    Or in other words, the size of a shifted bucket in the original function.
+                linspace = torch.linspace(0, 1, num_timestep)
+                linspace = linspace / (shift - shift * linspace + linspace)
+
+                linspace_derivative = torch.linspace(0, 1, num_timestep)
+                linspace_derivative = shift / (shift + linspace_derivative - (linspace_derivative * shift)).pow(2)
+
+                # continuous implementations
+                if config.timestep_distribution == TimestepDistribution.COS_MAP:
+                    if self.__weights is None:
+
+                        weights = 2.0 / (math.pi - 2.0 * math.pi * linspace + 2.0 * math.pi * linspace ** 2.0)
+                        weights *= linspace_derivative
+                        self.__weights = weights
+
+                    samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
+                    timestep = samples.to(dtype=torch.long, device=generator.device)
+                elif config.timestep_distribution == TimestepDistribution.SIGMOID:
+                    if self.__weights is None:
+                        bias = config.noising_bias + 0.5
+                        weight = config.noising_weight
+
+                        weights = linspace / (shift - shift * linspace + linspace)
+                        weights = 1 / (1 + torch.exp(-weight * (weights - bias)))  # Sigmoid
+                        weights *= linspace_derivative
+                        self.__weights = weights
+
+                    samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True) + min_timestep
+                    timestep = samples.to(dtype=torch.long, device=generator.device)
 
             return timestep.int()
 
