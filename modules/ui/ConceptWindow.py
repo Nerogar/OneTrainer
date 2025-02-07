@@ -69,7 +69,6 @@ class ConceptWindow(ctk.CTkToplevel):
         self.image_preview_file_index = 0
 
         self.title("Concept")
-        self.geometry("800x630")
         self.geometry("800x700")
         self.resizable(True, True)
         self.wait_visibility()
@@ -261,8 +260,7 @@ class ConceptWindow(ctk.CTkToplevel):
         #caption and filename preview
         self.filename_preview = ctk.CTkLabel(master=frame, text=filename_preview, width=300, anchor="nw", justify="left", padx=10, wraplength=280)
         self.filename_preview.grid(row=7, column=4)
-        self.caption_preview = ctk.CTkTextbox(master=frame, width = 300, height = 150, wrap="word",
-                                              bg_color="white", border_width=3, corner_radius=3, border_color="#3B8ED0")
+        self.caption_preview = ctk.CTkTextbox(master=frame, width = 300, height = 150, wrap="word", border_width=2)
         self.caption_preview.insert(index="1.0", text=caption_preview)
         self.caption_preview.configure(state="disabled")
         self.caption_preview.grid(row=8, column=4, rowspan = 4)
