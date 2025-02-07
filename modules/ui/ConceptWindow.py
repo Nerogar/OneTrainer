@@ -1,12 +1,13 @@
+import math
 import os
 import random
-import time
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from scripts import concept_stats
 
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
@@ -371,11 +372,24 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Total number of caption files which lack a corresponding image file")
         self.caption_count_preview_unpaired = components.label(frame, 6, 3, text="-")
 
+        #resolution info
+        components.label(frame, 7, 0, "Max Pixels",
+                         tooltip="Largest image in the concept by number of pixels (width * height)")
+        self.pixel_max_preview = components.label(frame, 8, 0, text="-")
+        components.label(frame, 7, 1, "Avg Pixels",
+                         tooltip="Average size of images in the concept by number of pixels (width * height)")
+        self.pixel_avg_preview = components.label(frame, 8, 1, text="-")
+        components.label(frame, 7, 2, "Min Pixels",
+                         tooltip="Smallest image in the concept by number of pixels (width * height)")
+        self.pixel_min_preview = components.label(frame, 8, 2, text="-")
+
         #refresh stats - must be after all labels are defined or will give error
-        components.label(frame, 0, 1, text="Warning!", tooltip="Will be slow for large folders!")
-        self.processing_time = components.label(frame, 0, 2, text="-", tooltip="Time taken to process concept directory")
-        components.button(master=frame, row=0, column=0, text="Refresh", command=lambda: self.__update_concept_stats(True, False),
-                          tooltip="Reload statistics for the concept directory")
+        components.label(frame, 0, 2, text="Warning!", tooltip="Will be slow for large folders!")
+        self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
+        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__update_concept_stats(False),
+                          tooltip="Reload basic statistics for the concept directory")
+        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__update_concept_stats(True),
+                          tooltip="Reload advanced statistics for the concept directory")
         #self.__update_concept_stats(True, True)
 
         frame.pack(fill="both", expand=1)
@@ -494,84 +508,44 @@ class ConceptWindow(ctk.CTkToplevel):
 
         return image
 
-    def __update_concept_stats(self, advanced_checks : bool, allow_abort : bool):
-        stats_dict = self.__get_concept_stats(advanced_checks, allow_abort)
+    def __update_concept_stats(self, advanced_checks : bool):
+        self.__get_concept_stats(advanced_checks)
 
-        self.processing_time.configure(text=str(stats_dict["processing_time"]) + " s")
+        self.processing_time.configure(text=str(self.concept.concept_stats["processing_time"]) + " s")
         #file size
-        self.file_size_preview.configure(text=str(int(stats_dict["file_size"]/1048576)) + " MB")
+        self.file_size_preview.configure(text=str(int(self.concept.concept_stats["file_size"]/1048576)) + " MB")
 
         #directory count
-        self.dir_count_preview.configure(text=stats_dict["directory_count"])
+        self.dir_count_preview.configure(text=self.concept.concept_stats["directory_count"])
 
         #image count
-        self.image_count_preview.configure(text=stats_dict["image_count"])
-        self.image_count_mask_preview.configure(text=stats_dict["image_with_mask_count"])
-        self.image_count_caption_preview.configure(text=stats_dict["image_with_caption_count"])
+        self.image_count_preview.configure(text=self.concept.concept_stats["image_count"])
+        if advanced_checks:
+            self.image_count_mask_preview.configure(text=self.concept.concept_stats["image_with_mask_count"])
+            self.image_count_caption_preview.configure(text=self.concept.concept_stats["image_with_caption_count"])
 
         #mask count
-        self.mask_count_preview.configure(text=stats_dict["mask_count"])
-        self.mask_count_preview_unpaired.configure(text=str(stats_dict["mask_count"]-stats_dict["paired_masks"]))
+        self.mask_count_preview.configure(text=self.concept.concept_stats["mask_count"])
+        if advanced_checks:
+            self.mask_count_preview_unpaired.configure(text=str(self.concept.concept_stats["mask_count"]-self.concept.concept_stats["paired_masks"]))
 
         #caption count
-        self.caption_count_preview.configure(text=stats_dict["caption_count"])
-        self.caption_count_preview_unpaired.configure(text=str(stats_dict["caption_count"]-stats_dict["paired_captions"]))
+        self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
+        if advanced_checks:
+            self.caption_count_preview_unpaired.configure(text=str(self.concept.concept_stats["caption_count"]-self.concept.concept_stats["paired_captions"]))
 
-    def __get_concept_stats(self, advanced_checks : bool, allow_abort : bool):
-        stats_dict = {
-            "file_size" : 0,
-            "image_count" : 0,
-            "image_with_mask_count" : 0,
-            "image_with_caption_count" : 0,
-            "mask_count" : 0,
-            "paired_masks" : 0,
-            "caption_count" : 0,
-            "paired_captions" : 0,
-            "processing_time" : 0,
-            "directory_count" : 0
-        }
+        #resolution info
+        if advanced_checks:
+            max_pixels = self.concept.concept_stats["max_pixels"]
+            avg_pixels = self.concept.concept_stats["avg_pixels"]
+            min_pixels = self.concept.concept_stats["min_pixels"]
 
-        def fast_scandir(dirname):
-            subfolders = [f for f in os.scandir(dirname) if f.is_dir()]
-            for dirname in subfolders:
-                subfolders.extend(fast_scandir(dirname))
-            return subfolders
+            self.pixel_max_preview.configure(text=f'{str(round(max_pixels/1000000, 2))} M\napprox. {int(math.sqrt(max_pixels))}x{int(math.sqrt(max_pixels))}')
+            self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} M\napprox. {int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
+            self.pixel_min_preview.configure(text=f'{str(round(min_pixels/1000000, 2))} M\napprox. {int(math.sqrt(min_pixels))}x{int(math.sqrt(min_pixels))}')
 
-        time_start = time.perf_counter()
-        extensions_list = path_util.SUPPORTED_IMAGE_EXTENSIONS
-        if self.concept.include_subdirectories:
-            dir_list = fast_scandir(self.concept.path)
-            dir_list.append(self.concept.path)    #add top-level directory
-        else:
-            dir_list = [self.concept.path]
-
-        for dir in dir_list:
-            file_list = [f for f in os.scandir(dir) if f.is_file]
-            file_list_str = [x.path for x in file_list]
-            for path in file_list:
-                basename, extension = os.path.splitext(path)
-                if extension.lower() in extensions_list \
-                        and not path.name.endswith("-masklabel.png"):
-                    stats_dict["image_count"] += 1
-                    stats_dict["file_size"] += path.stat().st_size
-                    if advanced_checks and (basename + "-masklabel.png") in file_list_str:
-                        stats_dict["paired_masks"] += 1
-                        stats_dict["image_with_mask_count"] += 1
-                    if advanced_checks and (basename + ".txt") in file_list_str:
-                        stats_dict["paired_captions"] += 1
-                        stats_dict["image_with_caption_count"] += 1
-                elif path.name.endswith("-masklabel.png"):
-                    stats_dict["mask_count"] += 1
-                    stats_dict["file_size"] += path.stat().st_size
-                elif extension == ".txt":
-                    stats_dict["caption_count"] += 1
-                    stats_dict["file_size"] += path.stat().st_size
-
-        stats_dict["directory_count"] = len(dir_list)
-        stats_dict["processing_time"] = round(time.perf_counter() - time_start, 2)
-
-        return stats_dict
-
+    def __get_concept_stats(self, advanced_checks : bool):
+        self.concept.concept_stats = concept_stats.get_concept_stats(self.concept, advanced_checks)
 
     def __ok(self):
         self.destroy()
