@@ -1,3 +1,4 @@
+import math
 import os
 import pathlib
 import random
@@ -7,6 +8,7 @@ from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from scripts import concept_stats
 
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
@@ -84,6 +86,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.general_tab = self.__general_tab(tabview.add("general"), concept)
         self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
+        self.concept_stats_tab = self.__concept_stats_tab(tabview.add("stats"))
 
         components.button(self, 1, 0, "ok", self.__ok)
 
@@ -335,6 +338,72 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.pack(fill="both", expand=1)
         return frame
 
+    def __concept_stats_tab(self, master):
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0, minsize=150)
+        frame.grid_columnconfigure(1, weight=0, minsize=100)
+        frame.grid_columnconfigure(2, weight=0, minsize=100)
+
+        #file size
+        components.label(frame, 1, 0, "Total Size",
+                         tooltip="Total size of all image, mask, and caption files")
+        self.file_size_preview = components.label(frame, 2, 0, text="-")
+
+        #subdirectory count
+        components.label(frame, 1, 1, "Directories",
+                         tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) main concept directory")
+        self.dir_count_preview = components.label(frame, 2, 1, text="-")
+
+        #basic img stats
+        components.label(frame, 3, 0, "Total Images",
+                         tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
+        self.image_count_preview = components.label(frame, 4, 0, text="-")
+        components.label(frame, 3, 1, "Total Masks",
+                         tooltip="Total number of mask files, any file ending in '-masklabel.png'")
+        self.mask_count_preview = components.label(frame, 4, 1, text="-")
+        components.label(frame, 3, 2, "Total Captions",
+                         tooltip="Total number of caption files, any .txt file")
+        self.caption_count_preview = components.label(frame, 4, 2, text="-")
+
+        #advanced img stats
+        components.label(frame, 5, 0, "Images with Masks",
+                         tooltip="Total number of image files with an associated mask")
+        self.image_count_mask_preview = components.label(frame, 6, 0, text="-")
+        components.label(frame, 5, 1, "Unpaired Masks",
+                         tooltip="Total number of mask files which lack a corresponding image file")
+        self.mask_count_preview_unpaired = components.label(frame, 6, 1, text="-")
+        components.label(frame, 5, 2, "Images with Captions",
+                         tooltip="Total number of image files with an associated caption")
+        self.image_count_caption_preview = components.label(frame, 6, 2, text="-")
+        components.label(frame, 5, 3, "Unpaired Captions",
+                         tooltip="Total number of caption files which lack a corresponding image file")
+        self.caption_count_preview_unpaired = components.label(frame, 6, 3, text="-")
+
+        #resolution info
+        components.label(frame, 7, 0, "Max Pixels",
+                         tooltip="Largest image in the concept by number of pixels (width * height)")
+        self.pixel_max_preview = components.label(frame, 8, 0, text="-")
+        components.label(frame, 7, 1, "Avg Pixels",
+                         tooltip="Average size of images in the concept by number of pixels (width * height)")
+        self.pixel_avg_preview = components.label(frame, 8, 1, text="-")
+        components.label(frame, 7, 2, "Min Pixels",
+                         tooltip="Smallest image in the concept by number of pixels (width * height)")
+        self.pixel_min_preview = components.label(frame, 8, 2, text="-")
+
+        #refresh stats - must be after all labels are defined or will give error
+        components.label(frame, 0, 2, text="Warning!", tooltip="Will be slow for large folders!")
+        self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
+        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__update_concept_stats(True, False),
+                          tooltip="Reload basic statistics for the concept directory")
+        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__update_concept_stats(True, True),
+                          tooltip="Reload advanced statistics for the concept directory")
+
+        #automatically get basic stats if available
+        self.__update_concept_stats(False, False)
+
+        frame.pack(fill="both", expand=1)
+        return frame
+
     def __prev_image_preview(self):
         self.image_preview_file_index = max(self.image_preview_file_index - 1, 0)
         self.__update_image_preview()
@@ -465,6 +534,51 @@ class ConceptWindow(ctk.CTkToplevel):
         image.thumbnail((300, 300))
 
         return image, filename_output, prompt_output
+
+    def __update_concept_stats(self, force_refresh : bool, advanced_checks : bool):
+        #only runs scan if specifically requested, otherwise loads from concept config
+        if force_refresh or len(self.concept.concept_stats) == 0:
+            self.__get_concept_stats(advanced_checks)
+            self.processing_time.configure(text=str(self.concept.concept_stats["processing_time"]) + " s")
+
+        #file size
+        self.file_size_preview.configure(text=str(int(self.concept.concept_stats["file_size"]/1048576)) + " MB")
+
+        #directory count
+        self.dir_count_preview.configure(text=self.concept.concept_stats["directory_count"])
+
+        #image count
+        self.image_count_preview.configure(text=self.concept.concept_stats["image_count"])
+        self.image_count_mask_preview.configure(text=self.concept.concept_stats["image_with_mask_count"])
+        self.image_count_caption_preview.configure(text=self.concept.concept_stats["image_with_caption_count"])
+
+        #mask count
+        self.mask_count_preview.configure(text=self.concept.concept_stats["mask_count"])
+        self.mask_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_masks"])
+
+        #caption count
+        self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
+        self.caption_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_captions"])
+
+        #resolution info
+        max_pixels = self.concept.concept_stats["max_pixels"]
+        avg_pixels = self.concept.concept_stats["avg_pixels"]
+        min_pixels = self.concept.concept_stats["min_pixels"]
+
+        if any(isinstance(x, str) for x in [max_pixels, avg_pixels, min_pixels]):
+            self.pixel_max_preview.configure(text=self.concept.concept_stats["max_pixels"])
+            self.pixel_avg_preview.configure(text=self.concept.concept_stats["avg_pixels"])
+            self.pixel_min_preview.configure(text=self.concept.concept_stats["min_pixels"])
+        else:
+            self.pixel_max_preview.configure(text=f'{str(round(max_pixels/1000000, 2))} M\napprox. {int(math.sqrt(max_pixels))}x{int(math.sqrt(max_pixels))}')
+            self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} M\napprox. {int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
+            self.pixel_min_preview.configure(text=f'{str(round(min_pixels/1000000, 2))} M\napprox. {int(math.sqrt(min_pixels))}x{int(math.sqrt(min_pixels))}')
+
+    def __get_concept_stats(self, advanced_checks : bool):
+        new_stats = concept_stats.get_concept_stats(self.concept, advanced_checks)
+        for key, val in new_stats.items():
+            if key not in self.concept.concept_stats or val != "-":
+                self.concept.concept_stats[key] = val
 
     def __ok(self):
         self.destroy()
