@@ -7,7 +7,7 @@ PyYAML==6.0.2
 huggingface-hub==0.27.1
 scipy==1.14.1; sys_platform != 'win32'
 matplotlib==3.9.2
-av==14.1.0
+av==13.1.0 # using an older version. only update once torchvision has been updated as well.
 
 # pytorch
 accelerate==1.0.1

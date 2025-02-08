@@ -46,7 +46,8 @@ class DataLoaderText2ImageMixin:
         pass
 
     def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
-        supported_extensions = path_util.supported_image_extensions()
+        supported_extensions = set()
+        supported_extensions |= path_util.supported_image_extensions()
 
         if allow_videos:
             supported_extensions |= path_util.supported_video_extensions()
