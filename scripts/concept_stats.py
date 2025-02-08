@@ -15,18 +15,28 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
     stats_dict = {
                 "file_size" : 0,
                 "image_count" : 0,
-                "image_with_mask_count" : 0,
-                "image_with_caption_count" : 0,
+                "image_with_mask_count" : "-",
+                "image_with_caption_count" : "-",
                 "mask_count" : 0,
-                "paired_masks" : 0,
+                "unpaired_masks" : "-",
                 "caption_count" : 0,
-                "paired_captions" : 0,
+                "unpaired_captions" : "-",
                 "processing_time" : 0,
                 "directory_count" : 0,
-                "max_pixels" : 0,
-                "min_pixels" : 1000000000,
-                "avg_pixels" : 0
+                "max_pixels" : "-",
+                "min_pixels" : "-",
+                "avg_pixels" : "-"
             }
+
+    #advanced stats default to "-" if not measured, but need to be initialized if they are
+    if advanced_checks:
+        stats_dict["image_with_mask_count"] = 0
+        stats_dict["image_with_caption_count"] = 0
+        stats_dict["unpaired_masks"] = 0
+        stats_dict["unpaired_captions"] = 0
+        stats_dict["max_pixels"] = 0
+        stats_dict["min_pixels"] = 1000000000
+        stats_dict["avg_pixels"] = 0
 
     #fast recursive directory scan from https://stackoverflow.com/a/40347279
     def fast_scandir(dirname):
@@ -43,6 +53,9 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
     else:
         dir_list = [conceptconfig.path]
 
+    paired_masks = 0
+    paired_captions = 0
+
     for dir in dir_list:
         file_list = [f for f in os.scandir(dir) if f.is_file]
         file_list_str = [x.path for x in file_list]
@@ -54,10 +67,10 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
                 if advanced_checks:
                     #check if image has a corresponding mask/caption in the same directory
                     if (basename + "-masklabel.png") in file_list_str:
-                        stats_dict["paired_masks"] += 1
+                        paired_masks += 1
                         stats_dict["image_with_mask_count"] += 1
                     if (basename + ".txt") in file_list_str:
-                        stats_dict["paired_captions"] += 1
+                        paired_captions += 1
                         stats_dict["image_with_caption_count"] += 1
                     #get image resolution info
                     img = Image.open(path)
@@ -74,7 +87,11 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
                 stats_dict["caption_count"] += 1
                 stats_dict["file_size"] += path.stat().st_size
 
-    stats_dict["directory_count"] = len(dir_list)
-    stats_dict["processing_time"] = round(time.perf_counter() - time_start, 3)
+        #update every directory loop
+        stats_dict["directory_count"] += 1
+        if advanced_checks:
+            stats_dict["unpaired_masks"] = stats_dict["mask_count"]-paired_masks
+            stats_dict["unpaired_captions"] = stats_dict["caption_count"]-paired_captions
+        stats_dict["processing_time"] = round(time.perf_counter() - time_start, 3)
 
     return stats_dict

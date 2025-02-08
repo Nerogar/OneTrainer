@@ -345,29 +345,27 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) main concept directory")
         self.dir_count_preview = components.label(frame, 2, 1, text="-")
 
-        #image count
+        #basic img stats
         components.label(frame, 3, 0, "Total Images",
                          tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
         self.image_count_preview = components.label(frame, 4, 0, text="-")
-        components.label(frame, 3, 1, "Images with Masks",
-                         tooltip="Total number of image files with an associated mask")
-        self.image_count_mask_preview = components.label(frame, 4, 1, text="-")
-        components.label(frame, 3, 2, "Images with Captions",
-                         tooltip="Total number of image files with an associated caption")
-        self.image_count_caption_preview = components.label(frame, 4, 2, text="-")
-
-        #mask count
-        components.label(frame, 5, 0, "Total Masks",
+        components.label(frame, 3, 1, "Total Masks",
                          tooltip="Total number of mask files, any file ending in '-masklabel.png'")
-        self.mask_count_preview = components.label(frame, 6, 0, text="-")
+        self.mask_count_preview = components.label(frame, 4, 1, text="-")
+        components.label(frame, 3, 2, "Total Captions",
+                         tooltip="Total number of caption files, any .txt file")
+        self.caption_count_preview = components.label(frame, 4, 2, text="-")
+
+        #advanced img stats
+        components.label(frame, 5, 0, "Images with Masks",
+                         tooltip="Total number of image files with an associated mask")
+        self.image_count_mask_preview = components.label(frame, 6, 0, text="-")
         components.label(frame, 5, 1, "Unpaired Masks",
                          tooltip="Total number of mask files which lack a corresponding image file")
         self.mask_count_preview_unpaired = components.label(frame, 6, 1, text="-")
-
-        #caption count
-        components.label(frame, 5, 2, "Total Captions",
-                         tooltip="Total number of caption files, any .txt file")
-        self.caption_count_preview = components.label(frame, 6, 2, text="-")
+        components.label(frame, 5, 2, "Images with Captions",
+                         tooltip="Total number of image files with an associated caption")
+        self.image_count_caption_preview = components.label(frame, 6, 2, text="-")
         components.label(frame, 5, 3, "Unpaired Captions",
                          tooltip="Total number of caption files which lack a corresponding image file")
         self.caption_count_preview_unpaired = components.label(frame, 6, 3, text="-")
@@ -386,11 +384,13 @@ class ConceptWindow(ctk.CTkToplevel):
         #refresh stats - must be after all labels are defined or will give error
         components.label(frame, 0, 2, text="Warning!", tooltip="Will be slow for large folders!")
         self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
-        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__update_concept_stats(False),
+        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__update_concept_stats(True, False),
                           tooltip="Reload basic statistics for the concept directory")
-        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__update_concept_stats(True),
+        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__update_concept_stats(True, True),
                           tooltip="Reload advanced statistics for the concept directory")
-        #self.__update_concept_stats(True, True)
+
+        #automatically get basic stats if available
+        self.__update_concept_stats(False, False)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -508,10 +508,12 @@ class ConceptWindow(ctk.CTkToplevel):
 
         return image
 
-    def __update_concept_stats(self, advanced_checks : bool):
-        self.__get_concept_stats(advanced_checks)
+    def __update_concept_stats(self, force_refresh : bool, advanced_checks : bool):
+        #only runs scan if specifically requested, otherwise loads from concept config
+        if force_refresh or len(self.concept.concept_stats) == 0:
+            self.__get_concept_stats(advanced_checks)
+            self.processing_time.configure(text=str(self.concept.concept_stats["processing_time"]) + " s")
 
-        self.processing_time.configure(text=str(self.concept.concept_stats["processing_time"]) + " s")
         #file size
         self.file_size_preview.configure(text=str(int(self.concept.concept_stats["file_size"]/1048576)) + " MB")
 
@@ -520,32 +522,36 @@ class ConceptWindow(ctk.CTkToplevel):
 
         #image count
         self.image_count_preview.configure(text=self.concept.concept_stats["image_count"])
-        if advanced_checks:
-            self.image_count_mask_preview.configure(text=self.concept.concept_stats["image_with_mask_count"])
-            self.image_count_caption_preview.configure(text=self.concept.concept_stats["image_with_caption_count"])
+        self.image_count_mask_preview.configure(text=self.concept.concept_stats["image_with_mask_count"])
+        self.image_count_caption_preview.configure(text=self.concept.concept_stats["image_with_caption_count"])
 
         #mask count
         self.mask_count_preview.configure(text=self.concept.concept_stats["mask_count"])
-        if advanced_checks:
-            self.mask_count_preview_unpaired.configure(text=str(self.concept.concept_stats["mask_count"]-self.concept.concept_stats["paired_masks"]))
+        self.mask_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_masks"])
 
         #caption count
         self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
-        if advanced_checks:
-            self.caption_count_preview_unpaired.configure(text=str(self.concept.concept_stats["caption_count"]-self.concept.concept_stats["paired_captions"]))
+        self.caption_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_captions"])
 
         #resolution info
-        if advanced_checks:
-            max_pixels = self.concept.concept_stats["max_pixels"]
-            avg_pixels = self.concept.concept_stats["avg_pixels"]
-            min_pixels = self.concept.concept_stats["min_pixels"]
+        max_pixels = self.concept.concept_stats["max_pixels"]
+        avg_pixels = self.concept.concept_stats["avg_pixels"]
+        min_pixels = self.concept.concept_stats["min_pixels"]
 
+        if any(isinstance(x, str) for x in [max_pixels, avg_pixels, min_pixels]):
+            self.pixel_max_preview.configure(text=self.concept.concept_stats["max_pixels"])
+            self.pixel_avg_preview.configure(text=self.concept.concept_stats["avg_pixels"])
+            self.pixel_min_preview.configure(text=self.concept.concept_stats["min_pixels"])
+        else:
             self.pixel_max_preview.configure(text=f'{str(round(max_pixels/1000000, 2))} M\napprox. {int(math.sqrt(max_pixels))}x{int(math.sqrt(max_pixels))}')
             self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} M\napprox. {int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
             self.pixel_min_preview.configure(text=f'{str(round(min_pixels/1000000, 2))} M\napprox. {int(math.sqrt(min_pixels))}x{int(math.sqrt(min_pixels))}')
 
     def __get_concept_stats(self, advanced_checks : bool):
-        self.concept.concept_stats = concept_stats.get_concept_stats(self.concept, advanced_checks)
+        new_stats = concept_stats.get_concept_stats(self.concept, advanced_checks)
+        for key, val in new_stats.items():
+            if key not in self.concept.concept_stats or val != "-":
+                self.concept.concept_stats[key] = val
 
     def __ok(self):
         self.destroy()
