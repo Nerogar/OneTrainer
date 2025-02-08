@@ -496,6 +496,8 @@ class GenericTrainer(BaseTrainer):
         torch_gc()
 
     def __needs_sample(self, train_progress: TrainProgress):
+        if self.config.skip_sample_on_train_start and train_progress.epoch == 0 and train_progress.epoch_step == 0:
+            return False
         return self.repeating_action_needed(
             "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
         )
