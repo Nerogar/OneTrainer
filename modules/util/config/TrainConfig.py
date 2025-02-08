@@ -293,6 +293,7 @@ class TrainConfig(BaseConfig):
     enable_autocast_cache: bool
     only_cache: bool
     resolution: str
+    frames: str
     attention_mechanism: AttentionMechanism
     align_prop: bool
     align_prop_probability: float
@@ -761,6 +762,7 @@ class TrainConfig(BaseConfig):
         data.append(("enable_autocast_cache", True, bool, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
+        data.append(("frames", "25", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
         data.append(("align_prop", False, bool, False))
         data.append(("align_prop_probability", 0.1, float, False))
