@@ -3,11 +3,8 @@ import platform
 import re
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-import requests
 
 try:
     import psutil
@@ -85,24 +82,31 @@ def get_os_info() -> dict[str, Any]:
     return os_info
 
 
-def get_cpu_info() -> tuple[str, str]:
+def get_cpu_info() -> tuple[str, str, int]:
     """
-    Retrieve a semi human-friendly CPU model name and the technical CPU details. This is not the marketing name.
+    Retrieve a semi human-friendly CPU model name, technical CPU details,
+    and the number of physical CPU cores.
 
-    :return: A tuple (model_name, technical_name)
+    :return: A tuple (model_name, technical_name, core_count)
     """
+    import psutil
+
     system = platform.system()
+
+    def get_core_count() -> int:
+        core_count = psutil.cpu_count(logical=False)
+        return core_count if core_count else 1
+
     if system == "Linux":
         try:
             with open("/proc/cpuinfo", "r") as f:
                 cpuinfo = f.read()
             m = re.search(r"model name\s*:\s*(.*)", cpuinfo)
-            # Human-friendly model name; if not found, leave it empty.
             model_name = m.group(1).strip() if m else ""
         except Exception:
             model_name = ""
         technical_name = platform.processor() or "Unavailable"
-        return (model_name, technical_name)
+        return (model_name, technical_name, get_core_count())
     elif system == "Windows":
         try:
             result = subprocess.run(
@@ -112,69 +116,43 @@ def get_cpu_info() -> tuple[str, str]:
                 text=True,
             )
             lines = result.stdout.strip().splitlines()
-            # Take the WMIC output if available, else return empty string.
             model_name = lines[1].strip() if len(lines) >= 2 else ""
         except Exception:
             model_name = ""
         technical_name = platform.processor() or "Unavailable"
-        return (model_name, technical_name)
+        return (model_name, technical_name, get_core_count())
     else:
         technical_name = platform.processor() or "Unavailable"
-        return ("", technical_name)
-
-
-# TODO Figure out how to determine what type of drive it is; SATA or NVME
+        return ("", technical_name, get_core_count())
 
 
 def get_hardware_info() -> dict[str, Any]:
     """
-    Gather hardware information including total RAM, drive details,
-    and CPU technical information.
-
-    :return: Dictionary containing CPU technical details, total RAM in GB,
-             and drive information.
+    Gather hardware information including total RAM, CPU technical information,
+    and the number of CPU cores.
     """
-    _, technical_name = get_cpu_info()
+    # (model_name, technical_name, core_count)
+    _, technical_name, core_count = get_cpu_info()
     try:
         total_ram = round(psutil.virtual_memory().total / (1024**3), 2)
     except Exception:
         total_ram = "Unavailable"
-    drives: list[str] = []
-    try:
-        partitions = psutil.disk_partitions(all=False)
-        for p in partitions:
-            try:
-                usage = psutil.disk_usage(p.mountpoint)
-                size_gb = round(usage.total / (1024**3), 2)
-            except Exception:
-                size_gb = "Unknown"
-            drives.append(
-                f"Drive: {p.device} mounted on {p.mountpoint} | Size: {size_gb} GB | Type: {p.fstype}"
-            )
-    except Exception:
-        drives.append("No physical drive information available.")
     return {
         "CPU": technical_name,
+        "CoreCount": core_count,
         "TotalRAMGB": total_ram,
-        "Drives": drives,
     }
 
 
 def query_nvidia_gpu_extended_info(index: str) -> str:
     """
-    Query extended information for NVIDIA GPU using nvidia-smi.
+    Query limited extended information for NVIDIA GPU using nvidia-smi.
+    Only returns the driver version and power limit.
 
     :param index: GPU index as a string.
-    :return: A formatted string with extended NVIDIA GPU info.
+    :return: A formatted string with NVIDIA GPU driver version and power limit.
     """
-    query = (
-        "driver_version,power.limit,clocks.current.graphics,clocks.current.memory,"
-        "temperature.gpu,pstate,clocks_event_reasons.supported,clocks_event_reasons.active,"
-        "clocks_event_reasons.gpu_idle,clocks_event_reasons.applications_clocks_setting,"
-        "clocks_event_reasons.sw_power_cap,clocks_event_reasons.hw_slowdown,"
-        "clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.hw_power_brake_slowdown,"
-        "clocks_event_reasons.sw_thermal_slowdown,clocks_event_reasons.sync_boost"
-    )
+    query = "driver_version,power.limit"
     cmd = [
         "nvidia-smi",
         f"--query-gpu={query}",
@@ -183,32 +161,16 @@ def query_nvidia_gpu_extended_info(index: str) -> str:
         index,
     ]
     merged_output = run_command(cmd)
-    if not merged_output:
+    if not merged_output or "NVIDIA-SMI has failed" in merged_output:
         return "    Extended info unavailable."
-    if (
-        "NVIDIA-SMI has failed" in merged_output
-        or "NotSupported" in merged_output
-    ):
-        return "    Extended info unavailable."
+
     values = [val.strip() for val in merged_output.split(",")]
+    if len(values) < 2:
+        return "    Extended info unavailable."
+
     info_lines = [
         f"    Driver version: {values[0]}",
         f"    Power Limit: {values[1]} W",
-        f"    Current core clock: {values[2]} MHz",
-        f"    Memory clock: {values[3]} MHz",
-        f"    Temp: {values[4]} °C",
-        f"    PState: {values[5]}",
-        "    Clocks Throttle Reasons:",
-        f"         Supported: {values[6]}",
-        f"         Active: {values[7]}",
-        f"         GPU Idle: {values[8]}",
-        f"         Applications Clocks Setting: {values[9]}",
-        f"         SW Power Cap: {values[10]}",
-        f"         HW Slowdown: {values[11]}",
-        f"         HW Thermal Slowdown: {values[12]}",
-        f"         HW Power Brake Slowdown: {values[13]}",
-        f"         SW Thermal Slowdown: {values[14]}",
-        f"         Sync Boost: {values[15]}",
     ]
     return "\n".join(info_lines)
 
@@ -321,33 +283,97 @@ def get_python_info() -> dict[str, Any]:
 
 def get_git_info() -> str:
     """
-    Retrieve the current Git branch name.
+    Retrieve Git information including current branch, commit hash,
+    and any modified files compared to the upstream branch.
 
-    :return: The current Git branch or an error message if not available.
+    :return: A formatted string with Git details or an error message if not available.
     """
-    cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
-    branch = run_command(cmd)
+    branch = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     if branch is None:
         return "Not a Git repository or git not installed."
-    return branch
+
+    commit = run_command(["git", "rev-parse", "HEAD"]) or "Unavailable"
+    git_info = f"Branch: {branch}\nCommit: {commit}"
+
+    upstream = run_command(
+        [
+            "git",
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            "@{u}",
+        ]
+    )
+    if upstream:
+        diff_files = (
+            run_command(["git", "diff", "--name-only", "@{u}"]) or ""
+        )
+        if diff_files.strip():
+            modified_files = "\n".join(
+                f"  {line}" for line in diff_files.splitlines()
+            )
+            git_info += f"\nModified Files (differs from {upstream}):\n{modified_files}"
+        else:
+            git_info += (
+                f"\nNo modifications relative to upstream ({upstream})."
+            )
+    else:
+        git_info += "\nNo upstream branch tracking information available."
+
+    return git_info
 
 
 def test_url(url: str) -> str:
     """
-    Test network connectivity by sending a HEAD request to a URL.
+    Test network connectivity by pinging the host extracted from a URL.
+    Reports packet loss from the ping command.
 
     :param url: The URL to test.
-    :return: A string describing the success or failure of the request.
+    :return: A string describing the success or failure and packet loss.
     """
     logging.info("Pinging URL: %s", url)
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    host = parsed.netloc
+    count = "4"  # number of ping packets
+
+    # Determine ping parameters based on OS
+    cmd = ["ping", "-n", count, host] if platform.system() == "Windows" else ["ping", "-c", count, host]
+
     try:
-        start = datetime.now()
-        response = requests.head(url, timeout=15)
-        duration = int((datetime.now() - start).total_seconds() * 1000)
-        if response.status_code == 200:
-            return f"Success (Response Time: {duration} ms)"
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True
+        )
+        output = result.stdout
+        packet_loss = "Unavailable"
+        if platform.system() == "Windows":
+            # Windows output sample: "Lost = 0 (0% loss)"
+            m = re.search(r"\((\d+)% loss\)", output)
+            if m:
+                packet_loss = m.group(1) + "%"
         else:
-            return f"Success (Status Code: {response.status_code}, Response Time: {duration} ms)"
+            # Linux output sample: "0.0% packet loss"
+            m = re.search(r"(\d+(?:\.\d+)?)% packet loss", output)
+            if m:
+                packet_loss = m.group(1) + "%"
+        return f"Ping to {host} successful: Packet Loss: {packet_loss}"
+    except subprocess.CalledProcessError as e:
+        logging.warning(
+            "Ping to %s failed. Using requests fallback. Error: %s",
+            host,
+            e,
+        )
+        try:
+            import requests
+
+            r = requests.get(url, timeout=5)
+            if r.status_code == 200:
+                return f"Requests to {host} succeeded (fallback)."
+            else:
+                return f"Requests to {host} failed (fallback). Status code: {r.status_code}"
+        except Exception as ex:
+            return f"Requests fallback also failed: {ex}"
     except Exception as e:
         return f"Failure: {e}"
 
@@ -419,14 +445,10 @@ def main() -> None:
     report.append("")
 
     report.append("=== Hardware Information ===")
-    report.append(f"CPU: {hardware_info['CPU']}")
-    report.append(f"Total RAM: {hardware_info['TotalRAMGB']} GB")
-    report.append("=== Drive Information ===")
-    report.extend(
-        hardware_info["Drives"]
-        if hardware_info["Drives"]
-        else ["No physical drive information available."]
+    report.append(
+        f"CPU: {hardware_info['CPU']} (Cores: {hardware_info['CoreCount']})"
     )
+    report.append(f"Total RAM: {hardware_info['TotalRAMGB']} GB")
     report.append("")
 
     report.append("=== GPU Information ===")
@@ -451,7 +473,7 @@ def main() -> None:
     report.append("")
 
     report.append("=== Git Information ===")
-    report.append(f"Current Git Branch: {git_branch}")
+    report.append(f"Current Git {git_branch}")
     report.append("")
 
     report.append("=== Network Connectivity ===")
