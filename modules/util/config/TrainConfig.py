@@ -130,6 +130,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
         data.append(("initial_accumulator_value", None, int, True))
+        data.append(("initial_accumulator", None, float, True))
         data.append(("is_paged", False, bool, False))
         data.append(("log_every", None, int, True))
         data.append(("lr_decay", None, float, True))
