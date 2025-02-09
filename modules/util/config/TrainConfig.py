@@ -326,6 +326,9 @@ class TrainConfig(BaseConfig):
     noising_weight: float
     noising_bias: float
 
+    timestep_shift: float
+    dynamic_timestep_shifting: bool
+
     # unet
     unet: TrainModelPartConfig
 
@@ -792,6 +795,9 @@ class TrainConfig(BaseConfig):
         data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
         data.append(("noising_weight", 0.0, float, False))
         data.append(("noising_bias", 0.0, float, False))
+        data.append(("timestep_shift", 1.0, float, False))
+        data.append(("dynamic_timestep_shifting", False, bool, False))
+
 
         # unet
         unet = TrainModelPartConfig.default_values()
