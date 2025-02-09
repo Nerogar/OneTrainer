@@ -26,6 +26,9 @@ import torch
 from torchvision.transforms import functional
 
 import customtkinter as ctk
+from customtkinter import AppearanceModeTracker, ThemeManager
+from matplotlib import pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from PIL import Image
 
 
@@ -332,65 +335,102 @@ class ConceptWindow(ctk.CTkToplevel):
     def __concept_stats_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         frame.grid_columnconfigure(0, weight=0, minsize=150)
-        frame.grid_columnconfigure(1, weight=0, minsize=100)
-        frame.grid_columnconfigure(2, weight=0, minsize=100)
+        frame.grid_columnconfigure(1, weight=0, minsize=150)
+        frame.grid_columnconfigure(2, weight=0, minsize=150)
+        frame.grid_columnconfigure(3, weight=0, minsize=150)
 
         #file size
-        components.label(frame, 1, 0, "Total Size",
+        components.label(frame, 1, 0, "Total Size", pad=0,
                          tooltip="Total size of all image, mask, and caption files")
-        self.file_size_preview = components.label(frame, 2, 0, text="-")
+        self.file_size_preview = components.label(frame, 2, 0, pad=0, text="-")
 
         #subdirectory count
-        components.label(frame, 1, 1, "Directories",
+        components.label(frame, 1, 1, "Directories", pad=0,
                          tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) main concept directory")
-        self.dir_count_preview = components.label(frame, 2, 1, text="-")
+        self.dir_count_preview = components.label(frame, 2, 1, pad=0, text="-")
 
         #basic img stats
-        components.label(frame, 3, 0, "Total Images",
+        components.label(frame, 3, 0, "\nTotal Images", pad=0,
                          tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
-        self.image_count_preview = components.label(frame, 4, 0, text="-")
-        components.label(frame, 3, 1, "Total Masks",
+        self.image_count_preview = components.label(frame, 4, 0, pad=0, text="-")
+        components.label(frame, 3, 1, "\nTotal Masks", pad=0,
                          tooltip="Total number of mask files, any file ending in '-masklabel.png'")
-        self.mask_count_preview = components.label(frame, 4, 1, text="-")
-        components.label(frame, 3, 2, "Total Captions",
+        self.mask_count_preview = components.label(frame, 4, 1, pad=0, text="-")
+        components.label(frame, 3, 2, "\nTotal Captions", pad=0,
                          tooltip="Total number of caption files, any .txt file")
-        self.caption_count_preview = components.label(frame, 4, 2, text="-")
+        self.caption_count_preview = components.label(frame, 4, 2, pad=0, text="-")
 
         #advanced img stats
-        components.label(frame, 5, 0, "Images with Masks",
+        components.label(frame, 5, 0, "\nImages with Masks", pad=0,
                          tooltip="Total number of image files with an associated mask")
-        self.image_count_mask_preview = components.label(frame, 6, 0, text="-")
-        components.label(frame, 5, 1, "Unpaired Masks",
-                         tooltip="Total number of mask files which lack a corresponding image file")
-        self.mask_count_preview_unpaired = components.label(frame, 6, 1, text="-")
-        components.label(frame, 5, 2, "Images with Captions",
+        self.image_count_mask_preview = components.label(frame, 6, 0, pad=0, text="-")
+        components.label(frame, 5, 1, "\nUnpaired Masks", pad=0,
+                         tooltip="Total number of mask files which lack a corresponding image file - if >0, check your data set!")
+        self.mask_count_preview_unpaired = components.label(frame, 6, 1, pad=0, text="-")
+        components.label(frame, 5, 2, "\nImages with Captions", pad=0,
                          tooltip="Total number of image files with an associated caption")
-        self.image_count_caption_preview = components.label(frame, 6, 2, text="-")
-        components.label(frame, 5, 3, "Unpaired Captions",
-                         tooltip="Total number of caption files which lack a corresponding image file")
-        self.caption_count_preview_unpaired = components.label(frame, 6, 3, text="-")
+        self.image_count_caption_preview = components.label(frame, 6, 2, pad=0, text="-")
+        components.label(frame, 5, 3, "\nUnpaired Captions", pad=0,
+                         tooltip="Total number of caption files which lack a corresponding image file - if >0, check your data set!")
+        self.caption_count_preview_unpaired = components.label(frame, 6, 3, pad=0, text="-")
 
         #resolution info
-        components.label(frame, 7, 0, "Max Pixels",
+        components.label(frame, 7, 0, "\nMax Pixels", pad=0,
                          tooltip="Largest image in the concept by number of pixels (width * height)")
-        self.pixel_max_preview = components.label(frame, 8, 0, text="-")
-        components.label(frame, 7, 1, "Avg Pixels",
+        self.pixel_max_preview = components.label(frame, 8, 0, pad=0, text="-", wraplength=150)
+        components.label(frame, 7, 1, "\nAvg Pixels", pad=0,
                          tooltip="Average size of images in the concept by number of pixels (width * height)")
-        self.pixel_avg_preview = components.label(frame, 8, 1, text="-")
-        components.label(frame, 7, 2, "Min Pixels",
+        self.pixel_avg_preview = components.label(frame, 8, 1, pad=0, text="-", wraplength=150)
+        components.label(frame, 7, 2, "\nMin Pixels", pad=0,
                          tooltip="Smallest image in the concept by number of pixels (width * height)")
-        self.pixel_min_preview = components.label(frame, 8, 2, text="-")
+        self.pixel_min_preview = components.label(frame, 8, 2, pad=0, text="-", wraplength=150)
+
+        #bucket info
+        components.label(frame, 9, 0, "\nAspect Bucketing", pad=0,
+                         tooltip="List of all possible buckets and the number of images in each one, defined as width/height. Buckets range from 0.25 (1:4 extremely tall) to 4 (4:1 extremely wide).")
+        components.label(frame, 9, 1, "\nSmallest Buckets:", pad=0,
+                         tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be dropped during training!")
+        self.small_bucket_preview = components.label(frame, 10, 1, pad=0, text="-")
+
+        # plot
+        appearance_mode = AppearanceModeTracker.get_mode()
+        background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
+        text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
+        background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
+        text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
+
+        plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
+        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2.5))
+        self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
+        self.canvas.get_tk_widget().grid(row=11, column=0, columnspan=4, rowspan=2)
+        self.bucket_fig.tight_layout()
+
+        self.bucket_fig.set_facecolor(background_color)
+        self.bucket_ax.set_facecolor(background_color)
+        self.bucket_ax.spines['bottom'].set_color(text_color)
+        self.bucket_ax.spines['left'].set_color(text_color)
+        self.bucket_ax.spines['top'].set_color(text_color)
+        self.bucket_ax.spines['right'].set_color(text_color)
+        self.bucket_ax.tick_params(axis='x', colors=text_color, which="both")
+        self.bucket_ax.tick_params(axis='y', colors=text_color, which="both")
+        self.bucket_ax.xaxis.label.set_color(text_color)
+        self.bucket_ax.yaxis.label.set_color(text_color)
 
         #refresh stats - must be after all labels are defined or will give error
-        components.label(frame, 0, 2, text="Warning!", tooltip="Will be slow for large folders!")
-        self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
         components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__update_concept_stats(True, False),
                           tooltip="Reload basic statistics for the concept directory")
         components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__update_concept_stats(True, True),
                           tooltip="Reload advanced statistics for the concept directory")
+        components.label(frame, 0, 2, text="Warning!", tooltip="Will be slow for large folders, particularly ones on HDDs!")
+        self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
 
         #automatically get basic stats if available
-        self.__update_concept_stats(False, False)
+        try:
+            self.__update_concept_stats(False, False)   #load stats from config if available
+        except KeyError:
+            self.__update_concept_stats(True, False)    #force rescan if config is empty
+        except FileNotFoundError:                       #avoid error when loading concept window without config path defined
+            pass
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -538,19 +578,37 @@ class ConceptWindow(ctk.CTkToplevel):
         avg_pixels = self.concept.concept_stats["avg_pixels"]
         min_pixels = self.concept.concept_stats["min_pixels"]
 
-        if any(isinstance(x, str) for x in [max_pixels, avg_pixels, min_pixels]):
-            self.pixel_max_preview.configure(text=self.concept.concept_stats["max_pixels"])
-            self.pixel_avg_preview.configure(text=self.concept.concept_stats["avg_pixels"])
-            self.pixel_min_preview.configure(text=self.concept.concept_stats["min_pixels"])
+        if any(isinstance(x, str) for x in [max_pixels, avg_pixels, min_pixels]):   #will be str if adv stats were not taken
+            self.pixel_max_preview.configure(text=max_pixels)
+            self.pixel_avg_preview.configure(text=avg_pixels)
+            self.pixel_min_preview.configure(text=min_pixels)
         else:
-            self.pixel_max_preview.configure(text=f'{str(round(max_pixels/1000000, 2))} M\napprox. {int(math.sqrt(max_pixels))}x{int(math.sqrt(max_pixels))}')
-            self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} M\napprox. {int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
-            self.pixel_min_preview.configure(text=f'{str(round(min_pixels/1000000, 2))} M\napprox. {int(math.sqrt(min_pixels))}x{int(math.sqrt(min_pixels))}')
+            #formatted as (#pixels/1000000) MP, widthxheight, \n filename
+            self.pixel_max_preview.configure(text=f'{str(round(max_pixels[0]/1000000, 2))} MP, {max_pixels[2]}\n{max_pixels[1]}')
+            self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} MP, ~{int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
+            self.pixel_min_preview.configure(text=f'{str(round(min_pixels[0]/1000000, 2))} MP, {min_pixels[2]}\n{min_pixels[1]}')
+
+        #bucketing
+        aspect_buckets = self.concept.concept_stats["aspect_buckets"]
+        if len(aspect_buckets) != 0 and max(val for val in aspect_buckets.values()) > 0:    #check aspect_bucket data exists and is not all zero
+            min_val = min(val for val in aspect_buckets.values() if val > 0)                #smallest nonzero values
+            if max(val for val in aspect_buckets.values()) > min_val:                       #check if any buckets larger than min_val exist
+                min_val2 = min(val for val in aspect_buckets.values() if (val > 0 and val != min_val))  #second smallest bucket
+            else:
+                min_val2 = min_val  #if no second smallest bucket exists set to min_val
+            min_aspect_buckets = {key: val for key,val in aspect_buckets.items() if val in (min_val, min_val2)}
+            self.small_bucket_preview.configure(text=min_aspect_buckets)
+
+        self.bucket_ax.cla()
+        aspects = [str(x) for x in list(aspect_buckets.keys())]
+        counts = list(aspect_buckets.values())
+        self.bucket_ax.bar(aspects, counts)
+        self.canvas.draw()
 
     def __get_concept_stats(self, advanced_checks : bool):
         new_stats = concept_stats.get_concept_stats(self.concept, advanced_checks)
         for key, val in new_stats.items():
-            if key not in self.concept.concept_stats or val != "-":
+            if key not in self.concept.concept_stats or not (val == "-" or val == {}):     #only update if key isn't in old config or new val isn't null
                 self.concept.concept_stats[key] = val
 
     def __ok(self):
