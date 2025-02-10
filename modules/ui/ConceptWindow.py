@@ -385,12 +385,23 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Smallest image in the concept by number of pixels (width * height)")
         self.pixel_min_preview = components.label(frame, 8, 2, pad=0, text="-", wraplength=150)
 
+        #caption info
+        components.label(frame, 9, 0, "\nMax Caption Length", pad=0,
+                         tooltip="Largest caption in concept by character count")
+        self.caption_max_preview = components.label(frame, 10, 0, pad=0, text="-", wraplength=150)
+        components.label(frame, 9, 1, "\nAvg Caption Length", pad=0,
+                         tooltip="Average length of caption in concept by character count")
+        self.caption_avg_preview = components.label(frame, 10, 1, pad=0, text="-", wraplength=150)
+        components.label(frame, 9, 2, "\nMin Caption Length", pad=0,
+                         tooltip="Smallest caption in concept by character count")
+        self.caption_min_preview = components.label(frame, 10, 2, pad=0, text="-", wraplength=150)
+
         #bucket info
-        components.label(frame, 9, 0, "\nAspect Bucketing", pad=0,
+        components.label(frame, 11, 0, "\nAspect Bucketing", pad=0,
                          tooltip="List of all possible buckets and the number of images in each one, defined as width/height. Buckets range from 0.25 (1:4 extremely tall) to 4 (4:1 extremely wide).")
-        components.label(frame, 9, 1, "\nSmallest Buckets:", pad=0,
+        components.label(frame, 11, 1, "\nSmallest Buckets:", pad=0,
                          tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be dropped during training!")
-        self.small_bucket_preview = components.label(frame, 10, 1, pad=0, text="-")
+        self.small_bucket_preview = components.label(frame, 12, 1, pad=0, text="-")
 
         # plot
         appearance_mode = AppearanceModeTracker.get_mode()
@@ -402,7 +413,7 @@ class ConceptWindow(ctk.CTkToplevel):
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2.5))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
-        self.canvas.get_tk_widget().grid(row=11, column=0, columnspan=4, rowspan=2)
+        self.canvas.get_tk_widget().grid(row=13, column=0, columnspan=4, rowspan=2)
         self.bucket_fig.tight_layout()
 
         self.bucket_fig.set_facecolor(background_color)
@@ -587,6 +598,21 @@ class ConceptWindow(ctk.CTkToplevel):
             self.pixel_max_preview.configure(text=f'{str(round(max_pixels[0]/1000000, 2))} MP, {max_pixels[2]}\n{max_pixels[1]}')
             self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} MP, ~{int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
             self.pixel_min_preview.configure(text=f'{str(round(min_pixels[0]/1000000, 2))} MP, {min_pixels[2]}\n{min_pixels[1]}')
+
+        #caption info
+        max_caption_length = self.concept.concept_stats["max_caption_length"]
+        avg_caption_length = self.concept.concept_stats["avg_caption_length"]
+        min_caption_length = self.concept.concept_stats["min_caption_length"]
+
+        if any(isinstance(x, str) for x in [max_caption_length, avg_caption_length, min_caption_length]):   #will be str if adv stats were not taken
+            self.caption_max_preview.configure(text=max_caption_length)
+            self.caption_avg_preview.configure(text=avg_caption_length)
+            self.caption_min_preview.configure(text=min_caption_length)
+        else:
+            #formatted as (#pixels/1000000) MP, widthxheight, \n filename
+            self.caption_max_preview.configure(text=f'{max_caption_length[0]} chars, {max_caption_length[2]} words\n{max_caption_length[1]}')
+            self.caption_avg_preview.configure(text=f'{int(avg_caption_length[0])} chars, {int(avg_caption_length[1])} words')
+            self.caption_min_preview.configure(text=f'{min_caption_length[0]} chars, {min_caption_length[2]} words\n{min_caption_length[1]}')
 
         #bucketing
         aspect_buckets = self.concept.concept_stats["aspect_buckets"]

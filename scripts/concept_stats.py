@@ -26,6 +26,9 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
                 "max_pixels" : "-",
                 "min_pixels" : "-",
                 "avg_pixels" : "-",
+                "max_caption_length" : "-",
+                "min_caption_length" : "-",
+                "avg_caption_length" : "-",
                 "aspect_buckets" : {}
             }
 
@@ -39,9 +42,12 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
         stats_dict["image_with_caption_count"] = 0
         stats_dict["unpaired_masks"] = 0
         stats_dict["unpaired_captions"] = 0
-        stats_dict["max_pixels"] = [0,"-","-"]
-        stats_dict["min_pixels"] = [1000000000,"-","-"]
+        stats_dict["max_pixels"] = [0,"-","-"]                  #max pixels, file path, resolution (wxh)
+        stats_dict["min_pixels"] = [1000000000,"-","-"]         #min pixels, file path, resolution (wxh)
         stats_dict["avg_pixels"] = 0
+        stats_dict["max_caption_length"] = [0,"-",0]            #max char count, filepath, word count
+        stats_dict["min_caption_length"] = [1000000000,"-",0]   #min char count, filepath, word count
+        stats_dict["avg_caption_length"] = [0,0]                #avg char count, avg word count
 
         #currently hardcoded, pull from AspectBucketing in mgds eventually
         all_possible_input_aspects = [
@@ -101,6 +107,18 @@ def get_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
                     if (basename + ".txt") in file_list_str:
                         paired_captions += 1
                         stats_dict["image_with_caption_count"] += 1
+                        with open(basename + ".txt", "r") as captionfile:
+                            captionlist = captionfile.read().splitlines()
+                            #get character/word count of captions, split by newlines
+                            for caption in captionlist:
+                                char_count = len(caption)
+                                word_count = len(caption.split())
+                                if char_count > stats_dict["max_caption_length"][0]:
+                                    stats_dict["max_caption_length"] = [char_count, os.path.relpath(path, conceptconfig.path), word_count]
+                                if char_count < stats_dict["min_caption_length"][0]:
+                                    stats_dict["min_caption_length"] = [char_count, os.path.relpath(path, conceptconfig.path), word_count]
+                                stats_dict["avg_caption_length"][0] += (char_count - stats_dict["avg_caption_length"][0])/stats_dict["image_count"]
+                                stats_dict["avg_caption_length"][1] += (word_count - stats_dict["avg_caption_length"][1])/stats_dict["image_count"]
                     #get image resolution info
                     img = Image.open(path)
                     width, height = img.size
