@@ -340,67 +340,84 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(3, weight=0, minsize=150)
 
         #file size
-        components.label(frame, 1, 0, "Total Size", pad=0,
+        self.file_size_label = components.label(frame, 1, 0, "Total Size", pad=0,
                          tooltip="Total size of all image, mask, and caption files")
+        self.file_size_label.configure(font=ctk.CTkFont(underline=True))
         self.file_size_preview = components.label(frame, 2, 0, pad=0, text="-")
 
         #subdirectory count
-        components.label(frame, 1, 1, "Directories", pad=0,
+        self.dir_count_label = components.label(frame, 1, 1, "Directories", pad=0,
                          tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) main concept directory")
+        self.dir_count_label.configure(font=ctk.CTkFont(underline=True))
         self.dir_count_preview = components.label(frame, 2, 1, pad=0, text="-")
 
         #basic img stats
-        components.label(frame, 3, 0, "\nTotal Images", pad=0,
+        self.image_count_label = components.label(frame, 3, 0, "\nTotal Images", pad=0,
                          tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
+        self.image_count_label.configure(font=ctk.CTkFont(underline=True))
         self.image_count_preview = components.label(frame, 4, 0, pad=0, text="-")
-        components.label(frame, 3, 1, "\nTotal Masks", pad=0,
+        self.mask_count_label = components.label(frame, 3, 1, "\nTotal Masks", pad=0,
                          tooltip="Total number of mask files, any file ending in '-masklabel.png'")
+        self.mask_count_label.configure(font=ctk.CTkFont(underline=True))
         self.mask_count_preview = components.label(frame, 4, 1, pad=0, text="-")
-        components.label(frame, 3, 2, "\nTotal Captions", pad=0,
+        self.caption_count_label = components.label(frame, 3, 2, "\nTotal Captions", pad=0,
                          tooltip="Total number of caption files, any .txt file")
+        self.caption_count_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_count_preview = components.label(frame, 4, 2, pad=0, text="-")
 
         #advanced img stats
-        components.label(frame, 5, 0, "\nImages with Masks", pad=0,
+        self.image_count_mask_label = components.label(frame, 5, 0, "\nImages with Masks", pad=0,
                          tooltip="Total number of image files with an associated mask")
+        self.image_count_mask_label.configure(font=ctk.CTkFont(underline=True))
         self.image_count_mask_preview = components.label(frame, 6, 0, pad=0, text="-")
-        components.label(frame, 5, 1, "\nUnpaired Masks", pad=0,
+        self.mask_count_label_unpaired = components.label(frame, 5, 1, "\nUnpaired Masks", pad=0,
                          tooltip="Total number of mask files which lack a corresponding image file - if >0, check your data set!")
+        self.mask_count_label_unpaired.configure(font=ctk.CTkFont(underline=True))
         self.mask_count_preview_unpaired = components.label(frame, 6, 1, pad=0, text="-")
-        components.label(frame, 5, 2, "\nImages with Captions", pad=0,
+        self.image_count_caption_label = components.label(frame, 5, 2, "\nImages with Captions", pad=0,
                          tooltip="Total number of image files with an associated caption")
+        self.image_count_caption_label.configure(font=ctk.CTkFont(underline=True))
         self.image_count_caption_preview = components.label(frame, 6, 2, pad=0, text="-")
-        components.label(frame, 5, 3, "\nUnpaired Captions", pad=0,
+        self.caption_count_label_unpaired = components.label(frame, 5, 3, "\nUnpaired Captions", pad=0,
                          tooltip="Total number of caption files which lack a corresponding image file - if >0, check your data set!")
+        self.caption_count_label_unpaired.configure(font=ctk.CTkFont(underline=True))
         self.caption_count_preview_unpaired = components.label(frame, 6, 3, pad=0, text="-")
 
         #resolution info
-        components.label(frame, 7, 0, "\nMax Pixels", pad=0,
+        self.pixel_max_label = components.label(frame, 7, 0, "\nMax Pixels", pad=0,
                          tooltip="Largest image in the concept by number of pixels (width * height)")
+        self.pixel_max_label.configure(font=ctk.CTkFont(underline=True))
         self.pixel_max_preview = components.label(frame, 8, 0, pad=0, text="-", wraplength=150)
-        components.label(frame, 7, 1, "\nAvg Pixels", pad=0,
+        self.pixel_avg_label = components.label(frame, 7, 1, "\nAvg Pixels", pad=0,
                          tooltip="Average size of images in the concept by number of pixels (width * height)")
+        self.pixel_avg_label.configure(font=ctk.CTkFont(underline=True))
         self.pixel_avg_preview = components.label(frame, 8, 1, pad=0, text="-", wraplength=150)
-        components.label(frame, 7, 2, "\nMin Pixels", pad=0,
+        self.pixel_min_label = components.label(frame, 7, 2, "\nMin Pixels", pad=0,
                          tooltip="Smallest image in the concept by number of pixels (width * height)")
+        self.pixel_min_label.configure(font=ctk.CTkFont(underline=True))
         self.pixel_min_preview = components.label(frame, 8, 2, pad=0, text="-", wraplength=150)
 
         #caption info
-        components.label(frame, 9, 0, "\nMax Caption Length", pad=0,
+        self.caption_max_label = components.label(frame, 9, 0, "\nMax Caption Length", pad=0,
                          tooltip="Largest caption in concept by character count")
+        self.caption_max_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_max_preview = components.label(frame, 10, 0, pad=0, text="-", wraplength=150)
-        components.label(frame, 9, 1, "\nAvg Caption Length", pad=0,
+        self.caption_avg_label = components.label(frame, 9, 1, "\nAvg Caption Length", pad=0,
                          tooltip="Average length of caption in concept by character count")
+        self.caption_avg_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_avg_preview = components.label(frame, 10, 1, pad=0, text="-", wraplength=150)
-        components.label(frame, 9, 2, "\nMin Caption Length", pad=0,
+        self.caption_min_label = components.label(frame, 9, 2, "\nMin Caption Length", pad=0,
                          tooltip="Smallest caption in concept by character count")
+        self.caption_min_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_min_preview = components.label(frame, 10, 2, pad=0, text="-", wraplength=150)
 
         #bucket info
-        components.label(frame, 11, 0, "\nAspect Bucketing", pad=0,
+        self.aspect_bucket_label = components.label(frame, 11, 0, "\nAspect Bucketing", pad=0,
                          tooltip="List of all possible buckets and the number of images in each one, defined as width/height. Buckets range from 0.25 (1:4 extremely tall) to 4 (4:1 extremely wide).")
-        components.label(frame, 11, 1, "\nSmallest Buckets:", pad=0,
+        self.aspect_bucket_label.configure(font=ctk.CTkFont(underline=True))
+        self.small_bucket_label = components.label(frame, 11, 1, "\nSmallest Buckets", pad=0,
                          tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be dropped during training!")
+        self.small_bucket_label.configure(font=ctk.CTkFont(underline=True))
         self.small_bucket_preview = components.label(frame, 12, 1, pad=0, text="-")
 
         # plot
@@ -411,7 +428,7 @@ class ConceptWindow(ctk.CTkToplevel):
         text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
-        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2.5))
+        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
         self.canvas.get_tk_widget().grid(row=13, column=0, columnspan=4, rowspan=2)
         self.bucket_fig.tight_layout()
@@ -420,7 +437,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.set_facecolor(background_color)
         self.bucket_ax.spines['bottom'].set_color(text_color)
         self.bucket_ax.spines['left'].set_color(text_color)
-        self.bucket_ax.spines['top'].set_color(text_color)
+        self.bucket_ax.spines['top'].set_visible(False)
         self.bucket_ax.spines['right'].set_color(text_color)
         self.bucket_ax.tick_params(axis='x', colors=text_color, which="both")
         self.bucket_ax.tick_params(axis='y', colors=text_color, which="both")
@@ -623,12 +640,17 @@ class ConceptWindow(ctk.CTkToplevel):
             else:
                 min_val2 = min_val  #if no second smallest bucket exists set to min_val
             min_aspect_buckets = {key: val for key,val in aspect_buckets.items() if val in (min_val, min_val2)}
-            self.small_bucket_preview.configure(text=min_aspect_buckets)
+            min_bucket_str = ""
+            for key, val in min_aspect_buckets.items():
+                min_bucket_str += f'aspect {key}: {val} img\n'
+            min_bucket_str.strip()
+            self.small_bucket_preview.configure(text=min_bucket_str)
 
         self.bucket_ax.cla()
         aspects = [str(x) for x in list(aspect_buckets.keys())]
         counts = list(aspect_buckets.values())
-        self.bucket_ax.bar(aspects, counts)
+        b = self.bucket_ax.bar(aspects, counts)
+        self.bucket_ax.bar_label(b)
         self.canvas.draw()
 
     def __get_concept_stats(self, advanced_checks : bool):
