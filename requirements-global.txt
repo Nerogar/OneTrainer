@@ -46,6 +46,6 @@ customtkinter==5.2.2
 runpod==1.7.4
 fabric==3.2.2
 
-#debug
+# debug
 psutil==6.1.1
 requests==2.32.3

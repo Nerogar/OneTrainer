@@ -1,19 +1,22 @@
+#!/usr/bin/env python3
+import json
 import logging
+import os
 import platform
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
-try:
-    import psutil
-except ImportError:
-    logging.error(
-        "psutil module is required. Install it with: pip install psutil"
-    )
-    sys.exit(1)
+import psutil
+import requests
 
+# Run ./run-cmd.sh generate_debug_report to generate the debug report on Linux or Mac. Windows users should double click export_debug.bat
+
+logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -21,55 +24,61 @@ logging.basicConfig(
 )
 
 
+# Avoids locale-related issues with subprocesses as mentioned by Johnny
+def subprocess_run(
+    cmd: list[str], **kwargs
+) -> subprocess.CompletedProcess:
+    """
+    Run a subprocess with enforced locale settings and default kwargs.
+    """
+    proc_env = os.environ.copy()
+    proc_env["LC_ALL"] = "C"
+    kwargs.setdefault("check", True)
+    kwargs.setdefault("capture_output", True)
+    kwargs.setdefault("text", True)
+    kwargs["env"] = proc_env
+    return subprocess.run(cmd, **kwargs)
+
+
 def run_command(cmd: list[str]) -> str | None:
     """
-    Helper function to run a shell command using subprocess.run.
-
-    :param cmd: The command and arguments to run.
-    :return: The standard output as a string if successful, otherwise None.
+    Run a shell command using subprocess_run.
+    Returns the stripped stdout if successful; otherwise, None.
     """
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        result = subprocess_run(cmd)
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        logging.error(
-            "Command '%s' failed with error: %s", " ".join(cmd), e.stderr
+        logger.error(
+            f"Command '{' '.join(map(shlex.quote, cmd))}' failed: {e.stderr}"
         )
-    except Exception as e:
-        logging.error(
-            "Unexpected error when running command '%s': %s",
-            " ".join(cmd),
-            e,
+    except Exception:
+        logger.exception(
+            f"Unexpected error running command: {' '.join(map(shlex.quote, cmd))}"
         )
     return None
 
 
-def convert_path(path: str | None) -> str | None:
+def anonymize_path(path: str | None) -> str | None:
     """
-    Anonymize user paths for both Windows and Linux.
-
-    :param path: The original path string.
-    :return: The anonymized path.
+    Anonymize user paths for both Windows and Linux as there is no need to collect that.
     """
     if not path:
         return path
-    # Replace Windows user paths
-    path = re.sub(r"C:\\Users\\[^\\]+", r"C:\\Users\\anonymous", path)
-    # Replace Linux user paths
-    path = re.sub(r"/home/[^/]+", r"/home/anonymous", path)
+    # Replace Windows user paths.
+    path = re.sub(r"(?i)^([A-Z]:\\Users)\\[^\\]+", r"\1\\anonymous", path)
+    # Replace Linux user paths.
+    path = re.sub(r"(?i)^/home/[^/]+", r"/home/anonymous", path)
     return path
 
 
 def get_os_info() -> dict[str, Any]:
-    """Return a dictionary with OS details."""
+    """
+    Return a dictionary with OS details.
+    """
     try:
         uname = platform.uname()
-        os_info = {
+        return {
             "System": uname.system,
             "Node": uname.node,
             "Release": uname.release,
@@ -78,8 +87,8 @@ def get_os_info() -> dict[str, Any]:
             "Processor": uname.processor,
         }
     except Exception as e:
-        os_info = {"Error": str(e)}
-    return os_info
+        logger.exception("Failed to get OS info")
+        return {"Error": str(e)}
 
 
 def get_cpu_info() -> tuple[str, str, int]:
@@ -87,58 +96,59 @@ def get_cpu_info() -> tuple[str, str, int]:
     Retrieve a semi human-friendly CPU model name, technical CPU details,
     and the number of physical CPU cores.
 
-    :return: A tuple (model_name, technical_name, core_count)
+    Returns:
+        A tuple (model_name, technical_name, core_count)
     """
-    import psutil
-
     system = platform.system()
 
     def get_core_count() -> int:
-        core_count = psutil.cpu_count(logical=False)
-        return core_count if core_count else 1
+        return psutil.cpu_count(logical=False) or 1
 
     if system == "Linux":
         try:
             with open("/proc/cpuinfo", "r") as f:
                 cpuinfo = f.read()
-            m = re.search(r"model name\s*:\s*(.*)", cpuinfo)
-            model_name = m.group(1).strip() if m else ""
+            match = re.search(r"model name\s*:\s*(.*)", cpuinfo)
+            model_name = match.group(1).strip() if match else "Unavailable"
         except Exception:
-            model_name = ""
+            logger.exception("Error reading /proc/cpuinfo")
+            model_name = "Unavailable"
         technical_name = platform.processor() or "Unavailable"
-        return (model_name, technical_name, get_core_count())
+        return model_name, technical_name, get_core_count()
     elif system == "Windows":
         try:
-            result = subprocess.run(
-                ["wmic", "cpu", "get", "Name"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            lines = result.stdout.strip().splitlines()
-            model_name = lines[1].strip() if len(lines) >= 2 else ""
+            result = subprocess_run(["wmic", "cpu", "get", "Name"])
+            # Split lines, filter empty ones, skip header
+            lines = [
+                line.strip()
+                for line in result.stdout.splitlines()
+                if line.strip()
+            ]
+            model_name = lines[1] if len(lines) > 1 else ""
         except Exception:
+            logger.exception("Error retrieving CPU info via WMIC")
             model_name = ""
         technical_name = platform.processor() or "Unavailable"
-        return (model_name, technical_name, get_core_count())
+        return model_name, technical_name, get_core_count()
     else:
         technical_name = platform.processor() or "Unavailable"
-        return ("", technical_name, get_core_count())
+        return model_name, technical_name, get_core_count()
 
 
 def get_hardware_info() -> dict[str, Any]:
     """
-    Gather hardware information including total RAM, CPU technical information,
-    and the number of CPU cores.
+    Gather hardware information including total RAM,
+    CPU technical information, and the number of CPU cores.
     """
-    # (model_name, technical_name, core_count)
-    _, technical_name, core_count = get_cpu_info()
+    model_name, technical_name, core_count = get_cpu_info()
     try:
         total_ram = round(psutil.virtual_memory().total / (1024**3), 2)
     except Exception:
+        logger.exception("Error retrieving RAM info")
         total_ram = "Unavailable"
     return {
-        "CPU": technical_name,
+        "CPU": model_name,
+        "TechnicalCPU": technical_name,
         "CoreCount": core_count,
         "TotalRAMGB": total_ram,
     }
@@ -146,11 +156,8 @@ def get_hardware_info() -> dict[str, Any]:
 
 def query_nvidia_gpu_extended_info(index: str) -> str:
     """
-    Query limited extended information for NVIDIA GPU using nvidia-smi.
-    Only returns the driver version and power limit.
-
-    :param index: GPU index as a string.
-    :return: A formatted string with NVIDIA GPU driver version and power limit.
+    Query extended information for NVIDIA GPU using nvidia-smi.
+    Returns the driver version and power limit.
     """
     query = "driver_version,power.limit"
     cmd = [
@@ -163,11 +170,9 @@ def query_nvidia_gpu_extended_info(index: str) -> str:
     merged_output = run_command(cmd)
     if not merged_output or "NVIDIA-SMI has failed" in merged_output:
         return "    Extended info unavailable."
-
     values = [val.strip() for val in merged_output.split(",")]
     if len(values) < 2:
         return "    Extended info unavailable."
-
     info_lines = [
         f"    Driver version: {values[0]}",
         f"    Power Limit: {values[1]} W",
@@ -178,20 +183,19 @@ def query_nvidia_gpu_extended_info(index: str) -> str:
 def get_nvidia_gpu_info() -> list[dict[str, Any]]:
     """
     Retrieve NVIDIA GPU information using nvidia-smi.
-
-    :return: A list of dictionaries containing NVIDIA GPU details.
+    Returns a list of dictionaries containing NVIDIA GPU details.
     """
     nvidia_gpus: list[dict[str, str]] = []
     cmd = ["nvidia-smi", "-L"]
     output = run_command(cmd)
     if not output:
-        logging.error("nvidia-smi did not return valid output.")
+        logger.error("nvidia-smi did not return valid output.")
         return []
     for line in output.splitlines():
-        m = re.match(r"GPU (\d+): (.*) \(UUID:", line)
-        if m:
-            index = m.group(1)
-            name = m.group(2)
+        match = re.match(r"GPU (\d+): (.*) \(UUID:", line)
+        if match:
+            index = match.group(1)
+            name = match.group(2)
             nvidia_gpus.append({"Index": index, "Name": name})
     extended_gpus: list[dict[str, Any]] = []
     for gpu in nvidia_gpus:
@@ -207,32 +211,157 @@ def get_nvidia_gpu_info() -> list[dict[str, Any]]:
     return extended_gpus
 
 
+def parse_lshw_block(block_lines: list[str]) -> dict[str, Any]:
+    """
+    Parse a block of lshw output and extract GPU details.
+    Fallback in case lspci is not available.
+    """
+    gpu = {
+        "Identifier": "Unknown",
+        "Name": "Unknown",
+        "ExtendedInfo": "",
+        "Vendor": "Unknown",
+    }
+    extended_info_lines = []
+    found_vga = False
+
+    for line in block_lines:
+        if "VGA compatible controller:" in line:
+            found_vga = True
+            # Try to extract identifier (e.g., "01:00.0").
+            id_match = re.search(r"\b\d{2}:\d{2}\.\d\b", line)
+            if id_match:
+                gpu["Identifier"] = id_match.group()
+            else:
+                tokens = line.split()
+                gpu["Identifier"] = tokens[1] if len(tokens) > 1 else "N/A"
+            details = line.split("VGA compatible controller:", 1)[
+                1
+            ].strip()
+            gpu["Name"] = details
+            if "AMD" in details or "ATI" in details:
+                gpu["Vendor"] = "AMD"
+            elif "Intel" in details:
+                gpu["Vendor"] = "Intel"
+            elif "NVIDIA" in details:
+                gpu["Vendor"] = "NVIDIA"
+        else:
+            extended_info_lines.append(line.strip())
+    if extended_info_lines:
+        gpu["ExtendedInfo"] = "\n    ".join(
+            line for line in extended_info_lines if line
+        )
+    if not found_vga:
+        description = ""
+        product = ""
+        bus_info = ""
+        for line in block_lines:
+            line = line.strip()
+            if line.startswith("*-"):
+                continue
+            if ":" in line:
+                key, val = line.split(":", 1)
+                key = key.strip().lower()
+                val = val.strip()
+                if key == "description":
+                    description = val
+                elif key == "product":
+                    product = val
+                elif key == "vendor":
+                    gpu["Vendor"] = val
+                elif key == "bus info":
+                    bus_info = val
+        if bus_info:
+            gpu["Identifier"] = bus_info
+        name_parts = []
+        if description:
+            name_parts.append(description)
+        if product:
+            name_parts.append(product)
+        gpu["Name"] = " ".join(name_parts) if name_parts else gpu["Name"]
+    return gpu
+
+
+def get_intel_amd_gpu_info() -> list[dict[str, Any]]:
+    """
+    Retrieve driver-specific GPU info for Intel/AMD (and some NVIDIA discrete)
+    on Windows via PowerShell.
+    Returns a list of GPU info dictionaries.
+    """
+    ps_command = r"""
+                Get-CimInstance -ClassName Win32_VideoController | ForEach-Object {
+                    $adapterRAM = if ($_.AdapterRAM -gt 0) { $_.AdapterRAM } else {
+                        if ($_.VideoModeDescription -match '(\d+) x (\d+) x (\d+) colors') {
+                            $width = [int]$Matches[1]
+                            $height = [int]$Matches[2]
+                            $colors = [int]$Matches[3]
+                            $bitsPerPixel = [Math]::Log($colors, 2)
+                            $estimatedRAM = ($width * $height * $bitsPerPixel / 8)
+                            [Math]::Max($estimatedRAM, 1GB)
+                        } else { 0 }
+                    }
+                    [PSCustomObject]@{
+                        Name = $_.Name
+                        AdapterCompatibility = $_.AdapterCompatibility
+                        DriverVersion = $_.DriverVersion
+                    }
+                } | Where-Object {
+                    $_.AdapterCompatibility -match 'NVIDIA|AMD|ATI|Advanced Micro Devices|Intel' -and
+                    $_.Name -notmatch 'Intel.*Graphics' -and
+                    $_.Name -notmatch 'AMD.*Graphics$' -and (
+                        $_.Name -match 'NVIDIA|GeForce|Quadro|Tesla' -or
+                        $_.Name -match 'AMD|Radeon|FirePro' -or
+                        $_.Name -match 'Intel.*Arc'
+                    )
+                } | ConvertTo-Json
+                """
+    try:
+        result = subprocess_run(["powershell", "-Command", ps_command])
+        output = result.stdout.strip()
+        if output:
+            parsed = json.loads(output)
+            gpu_list = [parsed] if isinstance(parsed, dict) else parsed
+            for gpu in gpu_list:
+                gpu.setdefault(
+                    "Identifier", gpu.get("Name", "Unknown GPU")
+                )
+                gpu.setdefault(
+                    "Vendor", gpu.get("AdapterCompatibility", "Unknown")
+                )
+            return gpu_list
+    except Exception:
+        logger.exception("Error retrieving Intel/AMD GPU info")
+    return []
+
+
 def get_generic_gpu_info() -> list[dict[str, Any]]:
     """
-    Retrieve GPU information from non-NVIDIA sources such as AMD or Intel systems using lspci.
-
-    :return: A list of dictionaries containing GPU details.
+    Retrieve GPU information from non-NVIDIA sources such as AMD or Intel.
+    On Windows, attempts to retrieve driver-specific info using PowerShell.
     """
     gpus: list[dict[str, Any]] = []
     if platform.system() == "Windows":
-        # Limited support on Windows without additional modules.
-        return gpus
-    cmd = ["lspci"]
-    output = run_command(cmd)
+        return get_intel_amd_gpu_info()
+
+    try:
+        output = run_command(["lspci"])
+    except Exception:
+        logger.exception("Error running lspci")
+        output = ""
+
     if output:
         for line in output.splitlines():
             if re.search("VGA compatible controller", line, re.IGNORECASE):
-                identifier = line.split()[0]
-                name = " ".join(line.split()[1:])
+                parts = line.split()
+                identifier = parts[0]
+                name = " ".join(parts[1:])
                 vendor = "Unknown"
-                # Determine vendor based on keywords.
                 if "AMD" in line or "ATI" in line:
                     vendor = "AMD"
                 elif "Intel" in line:
                     vendor = "Intel"
                 elif "NVIDIA" in line:
-                    # Already handled in NVIDIA specific function.
-                    continue
+                    continue  # NVIDIA handled separately.
                 gpus.append(
                     {
                         "Identifier": identifier,
@@ -241,25 +370,59 @@ def get_generic_gpu_info() -> list[dict[str, Any]]:
                         "Vendor": vendor,
                     }
                 )
+    else:
+        try:
+            fallback_output = run_command(
+                ["sudo", "lshw", "-numeric", "-C", "display"]
+            )
+        except Exception:
+            logger.exception("Error running lshw")
+            fallback_output = ""
+
+        if fallback_output:
+            block_lines = []
+            in_display_block = False
+            for line in fallback_output.splitlines():
+                if line.lstrip().startswith("*-display"):
+                    if in_display_block and block_lines:
+                        gpu = parse_lshw_block(block_lines)
+                        if gpu:
+                            gpus.append(gpu)
+                        block_lines = []
+                    in_display_block = True
+                    block_lines.append(line)
+                elif in_display_block:
+                    if line and not line.startswith(" "):
+                        gpu = parse_lshw_block(block_lines)
+                        if gpu:
+                            gpus.append(gpu)
+                        in_display_block = False
+                        block_lines = []
+                    else:
+                        block_lines.append(line)
+            if in_display_block and block_lines:
+                gpu = parse_lshw_block(block_lines)
+                if gpu:
+                    gpus.append(gpu)
     return gpus
 
 
 def get_gpu_info() -> list[dict[str, Any]]:
     """
-    Gather GPU information from NVIDIA and generic sources (e.g., AMD, Intel).
-
-    :return: A list of GPU information dictionaries.
+    Gather GPU information from NVIDIA and generic sources.
+    If NVIDIA GPUs are detected via nvidia-smi, only return those.
+    Otherwise, fall back to generic GPU detection.
     """
-    gpus = get_nvidia_gpu_info()
-    gpus += get_generic_gpu_info()
-    return gpus
+    nvidia_gpus = get_nvidia_gpu_info()
+    if not nvidia_gpus:
+        return get_generic_gpu_info()
+    return nvidia_gpus
 
 
 def get_python_info() -> dict[str, Any]:
     """
-    Retrieve Python environment information including version, executable path, pip freeze output, and PyTorch info.
-
-    :return: A dictionary with Python environment details.
+    Retrieve Python environment information including version, executable path,
+    pip freeze output, and PyTorch info.
     """
     info: dict[str, Any] = {
         "PythonVersion": sys.version.split()[0],
@@ -271,7 +434,7 @@ def get_python_info() -> dict[str, Any]:
     pip_out = run_command(cmd)
     if pip_out:
         info["PipFreeze"] = "\n".join(
-            "    " + line for line in pip_out.splitlines()
+            f"    {line}" for line in pip_out.splitlines()
         )
         for line in pip_out.splitlines():
             if line.startswith("torch=="):
@@ -285,8 +448,6 @@ def get_git_info() -> str:
     """
     Retrieve Git information including current branch, commit hash,
     and any modified files compared to the upstream branch.
-
-    :return: A formatted string with Git details or an error message if not available.
     """
     branch = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     if branch is None:
@@ -327,62 +488,51 @@ def test_url(url: str) -> str:
     """
     Test network connectivity by pinging the host extracted from a URL.
     Reports packet loss from the ping command.
-
-    :param url: The URL to test.
-    :return: A string describing the success or failure and packet loss.
     """
-    logging.info("Pinging URL: %s", url)
-    from urllib.parse import urlparse
-
+    logger.info(f"Pinging URL: {url}")
     parsed = urlparse(url)
     host = parsed.netloc
-    count = "4"  # number of ping packets
+    count = "4"  # Number of ping packets
 
-    # Determine ping parameters based on OS
-    cmd = ["ping", "-n", count, host] if platform.system() == "Windows" else ["ping", "-c", count, host]
-
+    cmd = (
+        ["ping", "-n", count, host]
+        if platform.system() == "Windows"
+        else ["ping", "-c", count, host]
+    )
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True
-        )
+        result = subprocess_run(cmd)
         output = result.stdout
         packet_loss = "Unavailable"
         if platform.system() == "Windows":
-            # Windows output sample: "Lost = 0 (0% loss)"
             m = re.search(r"\((\d+)% loss\)", output)
             if m:
-                packet_loss = m.group(1) + "%"
+                packet_loss = f"{m.group(1)}%"
         else:
-            # Linux output sample: "0.0% packet loss"
             m = re.search(r"(\d+(?:\.\d+)?)% packet loss", output)
             if m:
-                packet_loss = m.group(1) + "%"
+                packet_loss = f"{m.group(1)}%"
         return f"Ping to {host} successful: Packet Loss: {packet_loss}"
     except subprocess.CalledProcessError as e:
-        logging.warning(
-            "Ping to %s failed. Using requests fallback. Error: %s",
-            host,
-            e,
+        logger.warning(
+            f"Ping to {host} failed. Using requests fallback. Error: {e}"
         )
         try:
-            import requests
-
             r = requests.get(url, timeout=5)
             if r.status_code == 200:
                 return f"Requests to {host} succeeded (fallback)."
             else:
                 return f"Requests to {host} failed (fallback). Status code: {r.status_code}"
         except Exception as ex:
+            logger.exception("Requests fallback failed")
             return f"Requests fallback also failed: {ex}"
     except Exception as e:
+        logger.exception("Unexpected error during ping")
         return f"Failure: {e}"
 
 
 def get_intel_microcode_info() -> str:
     """
     Retrieve microcode information for Intel CPUs on supported systems.
-
-    :return: A string with microcode details or a message if not applicable.
     """
     result = "CPU is not detected as 13th or 14th Gen Intel - microcode info not applicable."
     try:
@@ -410,94 +560,100 @@ def get_intel_microcode_info() -> str:
                     "14th Gen detected. Microcode revision: Unavailable"
                 )
     except Exception as e:
+        logger.exception("Error retrieving microcode information")
         result = f"Unable to retrieve microcode information: {e}"
     return result
 
 
-def main() -> None:
+def build_report() -> list[str]:
     """
-    Main function to generate and save the debug report.
+    Collect system information and build the debug report.
     """
-    current_dir = Path.cwd()
-    logging.info("Current directory: %s", current_dir)
-    if current_dir.name != "OneTrainer":
-        logging.warning(
-            "Expected to run from the OneTrainer folder. Current folder: %s",
-            current_dir,
-        )
-
     os_info = get_os_info()
     hardware_info = get_hardware_info()
     gpu_info = get_gpu_info()
     python_info = get_python_info()
-    git_branch = get_git_info()
+    git_info = get_git_info()
     pyPi_status = test_url("https://pypi.org/")
     huggingface_status = test_url("https://huggingface.co")
     google_status = test_url("https://www.google.com")
     intel_microcode = get_intel_microcode_info()
 
-    report: list[str] = []
-    report.append("=== System Information ===")
-    report.append(
-        f"OS: {os_info.get('System', 'Unavailable')} {os_info.get('Release', '')}"
-    )
-    report.append(f"Version: {os_info.get('Version', 'Unavailable')}")
-    report.append("")
-
-    report.append("=== Hardware Information ===")
-    report.append(
-        f"CPU: {hardware_info['CPU']} (Cores: {hardware_info['CoreCount']})"
-    )
-    report.append(f"Total RAM: {hardware_info['TotalRAMGB']} GB")
-    report.append("")
-
-    report.append("=== GPU Information ===")
+    report = [
+        "=== System Information ===",
+        f"OS: {os_info.get('System', 'Unavailable')} {os_info.get('Release', '')}",
+        f"Version: {os_info.get('Version', 'Unavailable')}",
+        "",
+        "=== Hardware Information ===",
+        f"CPU: {hardware_info.get('CPU', 'Unavailable')} (Cores: {hardware_info.get('CoreCount', 'Unavailable')})",
+        f"Total RAM: {hardware_info.get('TotalRAMGB', 'Unavailable')} GB",
+        "",
+        "=== GPU Information ===",
+    ]
     if gpu_info:
         for gpu in gpu_info:
             report.append(
-                f"{gpu['Identifier']}: {gpu['Name']} [{gpu['Vendor']}]"
+                f"{gpu.get('Identifier', 'Unknown')}: {gpu.get('Name', 'Unnamed')} [{gpu.get('Vendor', 'Unknown')}]"
             )
-            report.append(gpu["ExtendedInfo"])
+            extended_info = gpu.get("ExtendedInfo", "")
+            if extended_info:
+                report.append(extended_info)
     else:
         report.append("No GPUs detected.")
-    report.append("")
-
-    report.append("=== Python Environment ===")
-    report.append(f"Global Python Version: {python_info['PythonVersion']}")
-    report.append(
-        f"Python Executable Path: {convert_path(python_info['PythonPath'])}"
+    report.extend(
+        [
+            "",
+            "=== Python Environment ===",
+            f"Global Python Version: {python_info.get('PythonVersion', 'Unavailable')}",
+            f"Python Executable Path: {anonymize_path(python_info.get('PythonPath'))}",
+            f"PyTorch Info: {python_info.get('PyTorchInfo', 'Unavailable')}",
+            "pip freeze output:",
+            python_info.get("PipFreeze", "Unavailable"),
+            "",
+            "=== Git Information ===",
+            git_info,
+            "",
+            "=== Network Connectivity ===",
+            f"PyPI (https://pypi.org/): {pyPi_status}",
+            f"HuggingFace (https://huggingface.co): {huggingface_status}",
+            f"Google (https://www.google.com): {google_status}",
+            "",
+            "=== Intel Microcode Information ===",
+            intel_microcode,
+            "",
+        ]
     )
-    report.append(f"PyTorch Info: {python_info['PyTorchInfo']}")
-    report.append("pip freeze output:")
-    report.append(python_info["PipFreeze"])
-    report.append("")
+    return report
 
-    report.append("=== Git Information ===")
-    report.append(f"Current Git {git_branch}")
-    report.append("")
 
-    report.append("=== Network Connectivity ===")
-    report.append(f"PyPI (https://pypi.org/): {pyPi_status}")
-    report.append(
-        f"HuggingFace (https://huggingface.co): {huggingface_status}"
-    )
-    report.append(f"Google (https://www.google.com): {google_status}")
-    report.append("")
-
-    report.append("=== Intel Microcode Information ===")
-    report.append(intel_microcode)
-    report.append("")
-
-    output_file = Path("debug_report.log")
+def write_report(report: list[str], output_file: Path) -> None:
+    """
+    Write the report to the given output file with final anonymization.
+    """
     try:
-        # Final anonymization of Windows user paths in report
-        output_file.write_text(
-            "\n".join(convert_path(line) for line in report),
-            encoding="utf-8",
+        anonymized_report = "\n".join(
+            anonymize_path(line) for line in report
         )
-        logging.info("Report assembled and saved to %s", output_file)
-    except Exception as e:
-        logging.error("Failed to write report to file: %s", e)
+        output_file.write_text(anonymized_report, encoding="utf-8")
+        logger.info(f"Report assembled and saved to {output_file}")
+    except Exception:
+        logger.exception("Failed to write report to file")
+
+
+def main() -> None:
+    """
+    Main function to collect info, build the debug report, and write it to a file.
+    """
+    current_dir = Path.cwd()
+    logger.info(f"Current directory: {current_dir}")
+    if current_dir.name != "OneTrainer":
+        logger.warning(
+            f"Expected to run from the OneTrainer folder. Current folder: {current_dir}"
+        )
+
+    report = build_report()
+    output_file = Path("debug_report.log")
+    write_report(report, output_file)
 
 
 if __name__ == "__main__":
