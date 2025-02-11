@@ -23,6 +23,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+# == Helper Functions ==
+
 
 # Avoids locale-related issues with subprocesses as mentioned by Johnny
 def subprocess_run(
@@ -70,6 +72,9 @@ def anonymize_path(path: str | None) -> str | None:
     # Replace Linux user paths.
     path = re.sub(r"(?i)^/home/[^/]+", r"/home/anonymous", path)
     return path
+
+
+# == OS and  Functions ==
 
 
 def get_os_info() -> dict[str, Any]:
@@ -135,10 +140,9 @@ def get_cpu_info() -> tuple[str, str, int]:
         return model_name, technical_name, get_core_count()
 
 
-def get_hardware_info() -> dict[str, Any]:
+def get_system_specifications() -> dict[str, Any]:
     """
-    Gather hardware information including total RAM,
-    CPU technical information, and the number of CPU cores.
+    Gather system hardware specifications including CPU details and total RAM.
     """
     model_name, technical_name, core_count = get_cpu_info()
     try:
@@ -152,6 +156,44 @@ def get_hardware_info() -> dict[str, Any]:
         "CoreCount": core_count,
         "TotalRAMGB": total_ram,
     }
+
+
+def get_intel_microcode_info() -> str:
+    """
+    Retrieve microcode information for Intel CPUs on supported systems.
+    """
+    result = "CPU is not detected as 13th or 14th Gen Intel - microcode info not applicable."
+    try:
+        cpu_name = platform.processor() or ""
+        if platform.system() == "Linux":
+            with open("/proc/cpuinfo", "r") as f:
+                cpuinfo = f.read()
+            m = re.search(r"microcode\s*:\s*(\S+)", cpuinfo)
+            microcode = m.group(1) if m else "Unavailable"
+            if re.search(r"i\d-13", cpu_name, re.IGNORECASE):
+                result = (
+                    f"13th Gen detected. Microcode revision: {microcode}"
+                )
+            elif re.search(r"i\d-14", cpu_name, re.IGNORECASE):
+                result = (
+                    f"14th Gen detected. Microcode revision: {microcode}"
+                )
+        else:
+            if re.search(r"i\d-13", cpu_name, re.IGNORECASE):
+                result = (
+                    "13th Gen detected. Microcode revision: Unavailable"
+                )
+            elif re.search(r"i\d-14", cpu_name, re.IGNORECASE):
+                result = (
+                    "14th Gen detected. Microcode revision: Unavailable"
+                )
+    except Exception as e:
+        logger.exception("Error retrieving microcode information")
+        result = f"Unable to retrieve microcode information: {e}"
+    return result
+
+
+# == GPU Functions ==
 
 
 def query_nvidia_gpu_extended_info(index: str) -> str:
@@ -419,6 +461,9 @@ def get_gpu_info() -> list[dict[str, Any]]:
     return nvidia_gpus
 
 
+# == Software Functions ==
+
+
 def get_python_info() -> dict[str, Any]:
     """
     Retrieve Python environment information including version, executable path,
@@ -483,6 +528,7 @@ def get_git_info() -> str:
 
     return git_info
 
+# == Miscellaneous Functions ==
 
 def test_url(url: str) -> str:
     """
@@ -530,47 +576,14 @@ def test_url(url: str) -> str:
         return f"Failure: {e}"
 
 
-def get_intel_microcode_info() -> str:
-    """
-    Retrieve microcode information for Intel CPUs on supported systems.
-    """
-    result = "CPU is not detected as 13th or 14th Gen Intel - microcode info not applicable."
-    try:
-        cpu_name = platform.processor() or ""
-        if platform.system() == "Linux":
-            with open("/proc/cpuinfo", "r") as f:
-                cpuinfo = f.read()
-            m = re.search(r"microcode\s*:\s*(\S+)", cpuinfo)
-            microcode = m.group(1) if m else "Unavailable"
-            if re.search(r"i\d-13", cpu_name, re.IGNORECASE):
-                result = (
-                    f"13th Gen detected. Microcode revision: {microcode}"
-                )
-            elif re.search(r"i\d-14", cpu_name, re.IGNORECASE):
-                result = (
-                    f"14th Gen detected. Microcode revision: {microcode}"
-                )
-        else:
-            if re.search(r"i\d-13", cpu_name, re.IGNORECASE):
-                result = (
-                    "13th Gen detected. Microcode revision: Unavailable"
-                )
-            elif re.search(r"i\d-14", cpu_name, re.IGNORECASE):
-                result = (
-                    "14th Gen detected. Microcode revision: Unavailable"
-                )
-    except Exception as e:
-        logger.exception("Error retrieving microcode information")
-        result = f"Unable to retrieve microcode information: {e}"
-    return result
-
+# == Main Functions ==
 
 def build_report() -> list[str]:
     """
     Collect system information and build the debug report.
     """
     os_info = get_os_info()
-    hardware_info = get_hardware_info()
+    hardware_info = get_system_specifications()
     gpu_info = get_gpu_info()
     python_info = get_python_info()
     git_info = get_git_info()
