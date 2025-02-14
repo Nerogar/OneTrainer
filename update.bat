@@ -5,11 +5,25 @@ if not defined PYTHON (set PYTHON=python)
 if not defined VENV_DIR (set "VENV_DIR=%~dp0%venv")
 
 :git_pull
-echo pulling updates
-%GIT% pull
-if %ERRORLEVEL% == 0 goto :check_venv
-echo could not pull updates
-goto :end_error
+echo Updating from master branch
+%GIT% fetch origin
+if %ERRORLEVEL% NEQ 0 (
+    echo Could not fetch updates
+    goto :end_error
+)
+
+%GIT% checkout -f master
+if %ERRORLEVEL% NEQ 0 (
+    echo Could not switch to master branch
+    goto :end_error
+)
+
+%GIT% pull origin master
+if %ERRORLEVEL% NEQ 0 (
+    echo Could not pull updates
+    goto :end_error
+)
+goto :check_venv
 
 :check_venv
 dir "%VENV_DIR%" > NUL 2> NUL
