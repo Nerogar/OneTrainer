@@ -14,7 +14,9 @@ from urllib.parse import urlparse
 import psutil
 import requests
 
-# Run ./run-cmd.sh generate_debug_report to generate the debug report on Linux or Mac. Windows users should double click export_debug.bat
+# Generating a debug report:
+# Mac/Linux: Execute `./run-cmd.sh generate_debug_report`
+# Windows: Double-click on `export_debug.bat`
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -26,7 +28,6 @@ logging.basicConfig(
 # == Helper Functions ==
 
 
-# Avoids locale-related issues with subprocesses as mentioned by Johnny
 def subprocess_run(
     cmd: list[str], **kwargs
 ) -> subprocess.CompletedProcess:
@@ -34,6 +35,7 @@ def subprocess_run(
     Run a subprocess with enforced locale settings and default kwargs.
     """
     proc_env = os.environ.copy()
+    # Force external utilities to output US English ASCII with US formattin
     proc_env["LC_ALL"] = "C"
     kwargs.setdefault("check", True)
     kwargs.setdefault("capture_output", True)
@@ -52,11 +54,11 @@ def run_command(cmd: list[str]) -> str | None:
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         logger.error(
-            f"Command '{' '.join(map(shlex.quote, cmd))}' failed: {e.stderr}"
+            f'Command "{" ".join(map(shlex.quote, cmd))}" failed: {e.stderr}'
         )
     except Exception:
         logger.exception(
-            f"Unexpected error running command: {' '.join(map(shlex.quote, cmd))}"
+            f'Unexpected error running command: "{" ".join(map(shlex.quote, cmd))}"'
         )
     return None
 
@@ -71,10 +73,12 @@ def anonymize_path(path: str | None) -> str | None:
     path = re.sub(r"(?i)^([A-Z]:\\Users)\\[^\\]+", r"\1\\anonymous", path)
     # Replace Linux user paths.
     path = re.sub(r"(?i)^/home/[^/]+", r"/home/anonymous", path)
+    # Replace MacOS user paths.
+    path = re.sub(r"(?i)^/Users/[^/]+", r"/Users/anonymous", path)
     return path
 
 
-# == OS and  Functions ==
+# == OS and CPU Functions ==
 
 
 def get_os_info() -> dict[str, Any]:
@@ -83,11 +87,47 @@ def get_os_info() -> dict[str, Any]:
     """
     try:
         uname = platform.uname()
+        system = uname.system
+        version = uname.version
+
+        # Special handling for Linux distributions
+        if system == "Linux":
+            # Try to get distribution info using /etc/os-release
+            try:
+                with open("/etc/os-release", "r") as f:
+                    os_release = {}
+                    for line in f:
+                        if "=" in line:
+                            key, value = line.rstrip().split("=", 1)
+                            os_release[key] = value.strip('"')
+
+                # Use PRETTY_NAME or fallback to NAME + VERSION_ID
+                if "PRETTY_NAME" in os_release:
+                    version = os_release["PRETTY_NAME"]
+                elif "NAME" in os_release and "VERSION_ID" in os_release:
+                    version = (
+                        f"{os_release['NAME']} {os_release['VERSION_ID']}"
+                    )
+            except Exception:
+                # Fallback to lsb_release command if available
+                try:
+                    result = subprocess.run(
+                        ["lsb_release", "-d"],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                    if result.stdout.startswith("Description:"):
+                        version = result.stdout.split(":", 1)[1].strip()
+                except Exception:
+                    # Keep original version if both methods fail
+                    pass
+
         return {
-            "System": uname.system,
+            "System": system,
             "Node": uname.node,
             "Release": uname.release,
-            "Version": uname.version,
+            "Version": version,
             "Machine": uname.machine,
             "Processor": uname.processor,
         }
@@ -113,8 +153,8 @@ def get_cpu_info() -> tuple[str, str, int]:
         try:
             with open("/proc/cpuinfo", "r") as f:
                 cpuinfo = f.read()
-            match = re.search(r"model name\s*:\s*(.*)", cpuinfo)
-            model_name = match.group(1).strip() if match else "Unavailable"
+            m = re.search(r"model name\s*:\s*(.*)", cpuinfo)
+            model_name = m.group(1).strip() if m else "Unavailable"
         except Exception:
             logger.exception("Error reading /proc/cpuinfo")
             model_name = "Unavailable"
@@ -129,13 +169,31 @@ def get_cpu_info() -> tuple[str, str, int]:
                 for line in result.stdout.splitlines()
                 if line.strip()
             ]
-            model_name = lines[1] if len(lines) > 1 else ""
+            model_name = lines[1] if len(lines) > 1 else "Unavailable"
         except Exception:
             logger.exception("Error retrieving CPU info via WMIC")
-            model_name = ""
+            model_name = "Unavailable"
         technical_name = platform.processor() or "Unavailable"
         return model_name, technical_name, get_core_count()
+    elif system == "Darwin":
+        try:
+            result = subprocess_run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"]
+            )
+            model_name = result.stdout.strip() or "Unavailable"
+        except Exception:
+            logger.exception("Error retrieving CPU info via sysctl")
+            model_name = "Unavailable"
+        # Use platform.machine() as fallback for the technical name
+        technical_name = (
+            platform.processor() or platform.machine() or "Unavailable"
+        )
+        # (Optional) Log if Apple Silicon is detected:
+        if platform.machine() == "arm64":
+            logger.info("Apple Silicon (arm64) detected.")
+        return model_name, technical_name, get_core_count()
     else:
+        model_name = "Unavailable"
         technical_name = platform.processor() or "Unavailable"
         return model_name, technical_name, get_core_count()
 
@@ -255,73 +313,83 @@ def get_nvidia_gpu_info() -> list[dict[str, Any]]:
 
 def parse_lshw_block(block_lines: list[str]) -> dict[str, Any]:
     """
-    Parse a block of lshw output and extract GPU details.
-    Fallback in case lspci is not available.
+    Parse GPU information from lshw JSON output.
+    Extracts relevant GPU details from the device tree.
     """
-    gpu = {
-        "Identifier": "Unknown",
-        "Name": "Unknown",
-        "ExtendedInfo": "",
-        "Vendor": "Unknown",
-    }
-    extended_info_lines = []
-    found_vga = False
-
-    for line in block_lines:
-        if "VGA compatible controller:" in line:
-            found_vga = True
-            # Try to extract identifier (e.g., "01:00.0").
-            id_match = re.search(r"\b\d{2}:\d{2}\.\d\b", line)
-            if id_match:
-                gpu["Identifier"] = id_match.group()
-            else:
-                tokens = line.split()
-                gpu["Identifier"] = tokens[1] if len(tokens) > 1 else "N/A"
-            details = line.split("VGA compatible controller:", 1)[
-                1
-            ].strip()
-            gpu["Name"] = details
-            if "AMD" in details or "ATI" in details:
-                gpu["Vendor"] = "AMD"
-            elif "Intel" in details:
-                gpu["Vendor"] = "Intel"
-            elif "NVIDIA" in details:
-                gpu["Vendor"] = "NVIDIA"
-        else:
-            extended_info_lines.append(line.strip())
-    if extended_info_lines:
-        gpu["ExtendedInfo"] = "\n    ".join(
-            line for line in extended_info_lines if line
+    try:
+        # Run lshw with JSON output
+        result = subprocess_run(
+            ["lshw", "-json", "-sanitize", "-C", "display"]
         )
-    if not found_vga:
-        description = ""
-        product = ""
-        bus_info = ""
-        for line in block_lines:
-            line = line.strip()
-            if line.startswith("*-"):
-                continue
-            if ":" in line:
-                key, val = line.split(":", 1)
-                key = key.strip().lower()
-                val = val.strip()
-                if key == "description":
-                    description = val
-                elif key == "product":
-                    product = val
-                elif key == "vendor":
-                    gpu["Vendor"] = val
-                elif key == "bus info":
-                    bus_info = val
-        if bus_info:
-            gpu["Identifier"] = bus_info
-        name_parts = []
-        if description:
-            name_parts.append(description)
-        if product:
-            name_parts.append(product)
-        gpu["Name"] = " ".join(name_parts) if name_parts else gpu["Name"]
-    return gpu
+        devices = json.loads(result.stdout)
+
+        # Handle both single device and list of devices
+        if not isinstance(devices, list):
+            devices = [devices]
+
+        gpu = {
+            "Identifier": "Unknown",
+            "Name": "Unknown",
+            "ExtendedInfo": "",
+            "Vendor": "Unknown",
+        }
+
+        for device in devices:
+            if device.get("class") == "display":
+                # Get device identifier from PCI bus info
+                gpu["Identifier"] = device.get("businfo", "Unknown")
+
+                # Construct name from product info
+                name_parts = []
+                if device.get("product"):
+                    name_parts.append(device["product"])
+                if device.get("description"):
+                    name_parts.append(device["description"])
+                gpu["Name"] = (
+                    " ".join(name_parts) if name_parts else "Unknown"
+                )
+
+                # Determine vendor
+                vendor = device.get("vendor", "")
+                if "AMD" in vendor or "ATI" in vendor:
+                    gpu["Vendor"] = "AMD"
+                elif "Intel" in vendor:
+                    gpu["Vendor"] = "Intel"
+                elif "NVIDIA" in vendor:
+                    gpu["Vendor"] = "NVIDIA"
+
+                # Build extended info
+                extended = []
+                if device.get("version"):
+                    extended.append(f"Version: {device['version']}")
+                if device.get("configuration", {}).get("driver"):
+                    extended.append(
+                        f"Driver: {device['configuration']['driver']}"
+                    )
+                if device.get("capabilities"):
+                    caps = device["capabilities"]
+                    if isinstance(caps, dict):
+                        extended.append(
+                            "Capabilities: " + ", ".join(caps.keys())
+                        )
+                gpu["ExtendedInfo"] = (
+                    "\n    ".join(extended)
+                    if extended
+                    else "No extended info available"
+                )
+
+                break  # Take first display device
+
+        return gpu
+
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        logger.error(f"Error parsing lshw JSON output: {e}")
+        return {
+            "Identifier": "Error",
+            "Name": "Error parsing GPU info",
+            "ExtendedInfo": str(e),
+            "Vendor": "Unknown",
+        }
 
 
 def get_intel_amd_gpu_info() -> list[dict[str, Any]]:
@@ -380,73 +448,106 @@ def get_generic_gpu_info() -> list[dict[str, Any]]:
     """
     Retrieve GPU information from non-NVIDIA sources such as AMD or Intel.
     On Windows, attempts to retrieve driver-specific info using PowerShell.
+    On macOS, uses system_profiler to gather display information.
+    Returns a list of dictionaries containing GPU details.
     """
     gpus: list[dict[str, Any]] = []
-    if platform.system() == "Windows":
+    system = platform.system()
+
+    if system == "Windows":
         return get_intel_amd_gpu_info()
-
-    try:
-        output = run_command(["lspci"])
-    except Exception:
-        logger.exception("Error running lspci")
-        output = ""
-
-    if output:
-        for line in output.splitlines():
-            if re.search("VGA compatible controller", line, re.IGNORECASE):
-                parts = line.split()
-                identifier = parts[0]
-                name = " ".join(parts[1:])
-                vendor = "Unknown"
-                if "AMD" in line or "ATI" in line:
-                    vendor = "AMD"
-                elif "Intel" in line:
-                    vendor = "Intel"
-                elif "NVIDIA" in line:
-                    continue  # NVIDIA handled separately.
-                gpus.append(
-                    {
-                        "Identifier": identifier,
-                        "Name": name,
-                        "ExtendedInfo": "    No extended info available.",
-                        "Vendor": vendor,
-                    }
-                )
-    else:
+    elif system == "Darwin":
         try:
-            fallback_output = run_command(
-                ["sudo", "lshw", "-numeric", "-C", "display"]
+            # Query GPU info via system_profiler in JSON format.
+            output = run_command(
+                ["system_profiler", "SPDisplaysDataType", "-json"]
             )
+            if output:
+                data = json.loads(output)
+                displays = data.get("SPDisplaysDataType", [])
+                for display in displays:
+                    gpu_name = display.get("sppci_model", "Unknown")
+                    vendor = display.get("spdisplays_vendor", "Unknown")
+                    identifier = display.get("spdisplays_bus", "Unknown")
+                    extended_info_parts = []
+                    if "spdisplays_vram" in display:
+                        extended_info_parts.append(
+                            f"VRAM: {display['spdisplays_vram']}"
+                        )
+                    if "spdisplays_resolution" in display:
+                        extended_info_parts.append(
+                            f"Resolution: {display['spdisplays_resolution']}"
+                        )
+                    extended_info = (
+                        "\n    ".join(extended_info_parts)
+                        if extended_info_parts
+                        else "No extended info available"
+                    )
+                    gpus.append(
+                        {
+                            "Identifier": identifier,
+                            "Name": gpu_name,
+                            "Vendor": vendor,
+                            "ExtendedInfo": extended_info,
+                        }
+                    )
         except Exception:
-            logger.exception("Error running lshw")
-            fallback_output = ""
+            logger.exception("Error retrieving GPU info on macOS")
+        return gpus
+    else:
+        # Linux (and fallback) implementation using lspci
+        try:
+            output = run_command(["lspci", "-vmm"])
+        except Exception:
+            logger.exception("Error running lspci")
+            return gpus
 
-        if fallback_output:
-            block_lines = []
-            in_display_block = False
-            for line in fallback_output.splitlines():
-                if line.lstrip().startswith("*-display"):
-                    if in_display_block and block_lines:
-                        gpu = parse_lshw_block(block_lines)
-                        if gpu:
-                            gpus.append(gpu)
-                        block_lines = []
-                    in_display_block = True
-                    block_lines.append(line)
-                elif in_display_block:
-                    if line and not line.startswith(" "):
-                        gpu = parse_lshw_block(block_lines)
-                        if gpu:
-                            gpus.append(gpu)
-                        in_display_block = False
-                        block_lines = []
-                    else:
-                        block_lines.append(line)
-            if in_display_block and block_lines:
-                gpu = parse_lshw_block(block_lines)
-                if gpu:
-                    gpus.append(gpu)
-    return gpus
+        if not output:
+            return gpus
+
+        # Split into device blocks - each starts with "Slot:"
+        device_blocks = re.split(r"(?m)^Slot:", output)
+        for block in device_blocks:
+            if not block.strip():
+                continue
+            # Check if this is a VGA/display device
+            class_match = re.search(
+                r"^Class:\s*(VGA compatible controller|3D controller)",
+                block,
+                re.MULTILINE,
+            )
+            if not class_match:
+                continue
+            # Extract key information
+            vendor_match = re.search(
+                r"^Vendor:\s*(.+)$", block, re.MULTILINE
+            )
+            device_match = re.search(
+                r"^Device:\s*(.+)$", block, re.MULTILINE
+            )
+            slot_match = re.search(r"^\s*(.+)$", block, re.MULTILINE)
+            if not (vendor_match and device_match and slot_match):
+                continue
+            vendor = vendor_match.group(1).strip()
+            device_name = device_match.group(1).strip()
+            slot = slot_match.group(1).strip()
+            # Skip NVIDIA GPUs as they're handled separately
+            if "NVIDIA" in vendor:
+                continue
+            vendor_category = "Unknown"
+            if any(x in vendor for x in ["AMD", "ATI", "Advanced Micro"]):
+                vendor_category = "AMD"
+            elif "Intel" in vendor:
+                vendor_category = "Intel"
+            gpus.append(
+                {
+                    "Identifier": f"PCI Slot {slot}",
+                    "Name": device_name,
+                    "Vendor": vendor_category,
+                    "ExtendedInfo": f"    Vendor: {vendor}\n    PCI Slot: {slot}",
+                }
+            )
+        return gpus
 
 
 def get_gpu_info() -> list[dict[str, Any]]:
@@ -528,7 +629,9 @@ def get_git_info() -> str:
 
     return git_info
 
+
 # == Miscellaneous Functions ==
+
 
 def test_url(url: str) -> str:
     """
@@ -577,6 +680,7 @@ def test_url(url: str) -> str:
 
 
 # == Main Functions ==
+
 
 def build_report() -> list[str]:
     """
