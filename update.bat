@@ -5,13 +5,18 @@ if not defined PYTHON (set PYTHON=python)
 if not defined VENV_DIR (set "VENV_DIR=%~dp0%venv")
 
 :git_pull
-echo Updating from master branch
+echo Attempting to update current branch
 %GIT% fetch origin
 if %ERRORLEVEL% NEQ 0 (
     echo Could not fetch updates
     goto :end_error
 )
 
+%GIT% pull
+if %ERRORLEVEL% == 0 goto :check_venv
+
+echo Current branch pull failed, switching to master
+FOR /F "tokens=* USEBACKQ" %%F IN (`%GIT% rev-parse --abbrev-ref HEAD`) DO SET current_branch=%%F
 %GIT% checkout -f master
 if %ERRORLEVEL% NEQ 0 (
     echo Could not switch to master branch
