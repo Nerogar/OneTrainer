@@ -1,6 +1,7 @@
 import gc
 from collections.abc import Callable
 from contextlib import nullcontext
+from typing import Any
 
 import torch
 
@@ -30,7 +31,7 @@ def get_tensors(
         return [data.data]
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
-            if i in include_parameter_indices or include_parameter_indices is None:
+            if include_parameter_indices is None or i in include_parameter_indices:
                 tensors.extend(get_tensors(elem))
     elif isinstance(data, dict) and include_parameter_indices is None:
         for elem in data.values():
@@ -38,6 +39,42 @@ def get_tensors(
 
     return tensors
 
+def add_dummy_grad_fn_(
+        data: torch.Tensor | list | tuple | dict,
+) -> Any:
+    if isinstance(data, list):
+        for i, elem in enumerate(data):
+            if isinstance(elem, torch.Tensor):
+                grad_tensor = torch\
+                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
+                data[i] = torch.cat([elem, grad_tensor], dim=0)
+                return data
+            else:
+                data[i] = add_dummy_grad_fn_(elem)
+    if isinstance(data, tuple):
+        for i, elem in enumerate(data):
+            if isinstance(elem, torch.Tensor):
+                grad_tensor = torch\
+                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
+                data = list(data)
+                data[i] = torch.cat([elem, grad_tensor], dim=0)
+                data = tuple(data)
+                return data
+            else:
+                data = list(data)
+                data[i] = add_dummy_grad_fn_(elem)
+                data = tuple(data)
+    elif isinstance(data, dict):
+        for key, elem in data.items():
+            if isinstance(elem, torch.Tensor):
+                grad_tensor = torch \
+                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
+                data[key] = torch.cat([elem, grad_tensor], dim=0)
+                return data
+            else:
+                data[key] = add_dummy_grad_fn_(elem)
+
+    return data
 
 def tensors_to_device_(
         data: torch.Tensor | list | tuple | dict,
@@ -58,7 +95,7 @@ def tensors_to_device_(
         tensor_transferred = True
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
-            if i in include_parameter_indices or include_parameter_indices is None:
+            if include_parameter_indices is None or i in include_parameter_indices:
                 tensor_transferred |= tensors_to_device_(elem, device, non_blocking=non_blocking, allocator=allocator)
     elif isinstance(data, dict) and include_parameter_indices is None:
         for elem in data.values():
