@@ -64,7 +64,7 @@ class GenericTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, get_string_timestamp()))
+        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
         if config.tensorboard:
             super()._start_tensorboard()
 
