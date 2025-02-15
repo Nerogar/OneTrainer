@@ -760,14 +760,20 @@ class GenericTrainer(BaseTrainer):
 
             if self.model.ema:
                 self.model.ema.copy_ema_to(self.parameters, store_temp=False)
-
-            print("Saving " + self.config.output_model_destination)
+            if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
+                save_path = os.path.join(
+                    self.config.output_model_destination,
+                    f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.config.output_model_format.file_extension()}"
+                )
+            else:
+                save_path = self.config.output_model_destination
+            print("Saving " + save_path)
 
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,
                 output_model_format=self.config.output_model_format,
-                output_model_destination=self.config.output_model_destination,
+                output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
         elif self.model is not None:

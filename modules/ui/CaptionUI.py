@@ -48,7 +48,7 @@ class CaptionUI(ctk.CTkToplevel):
 
         self.title("OneTrainer")
         self.geometry("1280x980")
-        self.resizable(False, False)
+        self.resizable(True, True)
         self.wait_visibility()
         self.focus_set()
 
