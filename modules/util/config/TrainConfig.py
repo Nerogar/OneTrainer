@@ -395,12 +395,12 @@ class TrainConfig(BaseConfig):
     samples: list[SampleConfig]
     sample_after: float
     sample_after_unit: TimeUnit
+    sample_skip_first: int
     sample_image_format: ImageFormat
     sample_video_format: VideoFormat
     sample_audio_format: AudioFormat
     samples_to_tensorboard: bool
     non_ema_sampling: bool
-    sample_skip_first: int
 
     # cloud settings
     cloud: CloudConfig
@@ -911,12 +911,12 @@ class TrainConfig(BaseConfig):
         data.append(("samples", None, list[SampleConfig], True))
         data.append(("sample_after", 10, int, False))
         data.append(("sample_after_unit", TimeUnit.MINUTE, TimeUnit, False))
+        data.append(("sample_skip_first", 0, int, False))
         data.append(("sample_image_format", ImageFormat.JPG, ImageFormat, False))
         data.append(("sample_video_format", VideoFormat.MP4, VideoFormat, False))
         data.append(("sample_audio_format", AudioFormat.MP3, AudioFormat, False))
         data.append(("samples_to_tensorboard", True, bool, False))
         data.append(("non_ema_sampling", True, bool, False))
-        data.append(("sample_skip_first", 0, int, False))
 
         # backup settings
         data.append(("backup_after", 30, int, False))

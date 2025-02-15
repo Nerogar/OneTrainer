@@ -499,7 +499,7 @@ class GenericTrainer(BaseTrainer):
         return self.single_action_elapsed(
             "sample_skip_first", self.config.sample_skip_first, self.config.sample_after_unit, train_progress
         ) and self.repeating_action_needed(
-            "sample", self.config.sample_after, self.config.sample_after_unit, train_progress, start_at_zero=False
+            "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
         )
 
     def __needs_backup(self, train_progress: TrainProgress):
