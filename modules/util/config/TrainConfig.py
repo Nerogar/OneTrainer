@@ -60,6 +60,7 @@ class TrainOptimizerConfig(BaseConfig):
     fused_back_pass: bool
     growth_rate: float
     initial_accumulator_value: int
+    initial_accumulator: float
     is_paged: bool
     log_every: int
     lr_decay: float
