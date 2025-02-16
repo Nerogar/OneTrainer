@@ -60,6 +60,7 @@ class TrainOptimizerConfig(BaseConfig):
     fused_back_pass: bool
     growth_rate: float
     initial_accumulator_value: int
+    initial_accumulator: float
     is_paged: bool
     log_every: int
     lr_decay: float
@@ -130,6 +131,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
         data.append(("initial_accumulator_value", None, int, True))
+        data.append(("initial_accumulator", None, float, True))
         data.append(("is_paged", False, bool, False))
         data.append(("log_every", None, int, True))
         data.append(("lr_decay", None, float, True))
@@ -326,6 +328,9 @@ class TrainConfig(BaseConfig):
     noising_weight: float
     noising_bias: float
 
+    timestep_shift: float
+    dynamic_timestep_shifting: bool
+
     # unet
     unet: TrainModelPartConfig
 
@@ -393,6 +398,7 @@ class TrainConfig(BaseConfig):
     samples: list[SampleConfig]
     sample_after: float
     sample_after_unit: TimeUnit
+    sample_skip_first: int
     sample_image_format: ImageFormat
     sample_video_format: VideoFormat
     sample_audio_format: AudioFormat
@@ -793,6 +799,9 @@ class TrainConfig(BaseConfig):
         data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
         data.append(("noising_weight", 0.0, float, False))
         data.append(("noising_bias", 0.0, float, False))
+        data.append(("timestep_shift", 1.0, float, False))
+        data.append(("dynamic_timestep_shifting", False, bool, False))
+
 
         # unet
         unet = TrainModelPartConfig.default_values()
@@ -906,6 +915,7 @@ class TrainConfig(BaseConfig):
         data.append(("samples", None, list[SampleConfig], True))
         data.append(("sample_after", 10, int, False))
         data.append(("sample_after_unit", TimeUnit.MINUTE, TimeUnit, False))
+        data.append(("sample_skip_first", 0, int, False))
         data.append(("sample_image_format", ImageFormat.JPG, ImageFormat, False))
         data.append(("sample_video_format", VideoFormat.MP4, VideoFormat, False))
         data.append(("sample_audio_format", AudioFormat.MP3, AudioFormat, False))

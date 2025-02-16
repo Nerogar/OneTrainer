@@ -1,4 +1,5 @@
 import os
+import pathlib
 
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
@@ -120,14 +121,14 @@ class ConceptWidget(ctk.CTkFrame):
 
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
+        glob_pattern = "**/*.*" if self.concept.include_subdirectories else "*.*"
 
         if os.path.isdir(self.concept.path):
-            for path in os.scandir(self.concept.path):
+            for path in pathlib.Path(self.concept.path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
-                if path.is_file() \
-                        and path_util.is_supported_image_extension(extension) \
+                if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
-                    preview_path = path_util.canonical_join(self.concept.path, path.name)
+                    preview_path = path_util.canonical_join(self.concept.path, path)
                     break
 
         image = Image.open(preview_path)

@@ -4,6 +4,7 @@ from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
+from modules.util.torch_util import add_dummy_grad_fn_, has_grad_fn
 
 import torch
 from torch import nn
@@ -89,11 +90,14 @@ def create_checkpointed_forward(
             args = bound_conductor.before_layer(bound_layer_index, call_id, args)
             output = orig_forward(*args)
             bound_conductor.after_layer(bound_layer_index, call_id, args)
+
+            # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
+            if torch.is_grad_enabled() and not has_grad_fn(output):
+                output = add_dummy_grad_fn_(output)
+
             return output
 
         def custom_forward(
-                # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-                dummy: torch.Tensor,
                 call_index: int,
                 *args,
         ):
@@ -126,7 +130,7 @@ def create_checkpointed_forward(
                 )
             else:
                 args = __kwargs_to_args(orig_forward, args, kwargs)
-                return custom_forward(None, call_id, *args)
+                return custom_forward(call_id, *args)
     else:
         def custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
