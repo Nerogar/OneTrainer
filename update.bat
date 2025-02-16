@@ -1,8 +1,14 @@
 @echo off
 
-if not defined GIT (set GIT=git)
-if not defined PYTHON (set PYTHON=python)
-if not defined VENV_DIR (set "VENV_DIR=%~dp0%venv")
+if not defined GIT (
+    set GIT=git
+)
+if not defined PYTHON (
+    set PYTHON=python
+)
+if not defined VENV_DIR (
+    set "VENV_DIR=%~dp0%venv"
+)
 
 :git_pull
 echo Attempting to update current branch
@@ -12,29 +18,32 @@ if %ERRORLEVEL% NEQ 0 (
     goto :end_error
 )
 
+echo Pulling changes...
 %GIT% pull
-if %ERRORLEVEL% == 0 goto :check_venv
-
-echo Current branch pull failed, switching to master
-FOR /F "tokens=* USEBACKQ" %%F IN (`%GIT% rev-parse --abbrev-ref HEAD`) DO SET current_branch=%%F
-%GIT% checkout -f master
 if %ERRORLEVEL% NEQ 0 (
-    echo Could not switch to master branch
+    echo Git pull failed.
     goto :end_error
 )
 
-%GIT% pull origin master
-if %ERRORLEVEL% NEQ 0 (
-    echo Could not pull updates
-    goto :end_error
+REM Warn if not on master branch; Assume user is competent to avoid breaking custom changes.
+FOR /F "tokens=* USEBACKQ" %%F IN (`%GIT% rev-parse --abbrev-ref HEAD`) DO (
+    set current_branch=%%F
 )
+if /I not "%current_branch%"=="master" (
+    echo WARNING: You are on branch %current_branch%. To update master, please switch manually:
+    echo         git checkout master
+)
+
 goto :check_venv
 
 :check_venv
 dir "%VENV_DIR%" > NUL 2> NUL
-if %ERRORLEVEL% == 0 goto :activate_venv
-echo venv not found, please run install.bat first
-goto :end_error
+if %ERRORLEVEL% NEQ 0 (
+    echo venv not found, please run install.bat first
+    goto :end_error
+) else (
+    goto :activate_venv
+)
 
 :activate_venv
 echo activating venv %VENV_DIR%
@@ -43,21 +52,29 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 :install_dependencies
 echo installing dependencies
 %PYTHON% -m pip install --upgrade --upgrade-strategy eager pip setuptools
+if %ERRORLEVEL% NEQ 0 (
+    echo pip upgrade failed.
+    goto :end_error
+)
 %PYTHON% -m pip install --upgrade --upgrade-strategy eager -r requirements.txt
+if %ERRORLEVEL% NEQ 0 (
+    echo Installing requirements failed.
+    goto :end_error
+)
 
 :end_success
 echo.
 echo ***********
 echo Update done
 echo ***********
-goto:end
+goto :end
 
 :end_error
 echo.
 echo *******************
 echo Error during update
 echo *******************
-goto:end
+goto :end
 
 :end
 pause
