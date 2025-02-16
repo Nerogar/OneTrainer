@@ -27,13 +27,13 @@ pooch==1.8.2
 open-clip-torch==2.28.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@fcaec25#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@db15d3c#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.2.2 # lion optimizer
 prodigyopt==1.1.1 # prodigy optimizer
-schedulefree==1.3.0 # schedule-free optimizers
+schedulefree==1.4.0 # schedule-free optimizers
 pytorch_optimizer==3.3.0 # pytorch optimizers
 
 # Profiling
