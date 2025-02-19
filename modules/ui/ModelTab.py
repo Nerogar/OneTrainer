@@ -100,6 +100,7 @@ class ModelTab:
         row = self.__create_base_components(
             row,
             has_prior=True,
+            allow_override_prior=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_vae=True,
@@ -265,7 +266,7 @@ class ModelTab:
             if allow_override_prior:
                 # prior model
                 components.label(self.scroll_frame, row, 0, "Prior Model",
-                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model. For Flux, it must be a safetensors file that only contains the transformer.")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
