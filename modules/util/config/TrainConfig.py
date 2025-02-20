@@ -60,6 +60,7 @@ class TrainOptimizerConfig(BaseConfig):
     fused_back_pass: bool
     growth_rate: float
     initial_accumulator_value: int
+    initial_accumulator: float
     is_paged: bool
     log_every: int
     lr_decay: float
@@ -130,6 +131,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
         data.append(("initial_accumulator_value", None, int, True))
+        data.append(("initial_accumulator", None, float, True))
         data.append(("is_paged", False, bool, False))
         data.append(("log_every", None, int, True))
         data.append(("lr_decay", None, float, True))
@@ -293,6 +295,7 @@ class TrainConfig(BaseConfig):
     enable_autocast_cache: bool
     only_cache: bool
     resolution: str
+    frames: str
     attention_mechanism: AttentionMechanism
     align_prop: bool
     align_prop_probability: float
@@ -765,6 +768,7 @@ class TrainConfig(BaseConfig):
         data.append(("enable_autocast_cache", True, bool, False))
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
+        data.append(("frames", "25", str, False))
         data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
         data.append(("align_prop", False, bool, False))
         data.append(("align_prop_probability", 0.1, float, False))
