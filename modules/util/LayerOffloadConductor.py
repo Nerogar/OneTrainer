@@ -7,7 +7,7 @@ from modules.util.quantization_util import get_offload_tensor_bytes, offload_qua
 from modules.util.torch_util import (
     create_stream_context,
     device_equals,
-    get_tensors,
+    get_tensor_data,
     pin_tensor_,
     replace_tensors_,
     tensors_match_device,
@@ -881,7 +881,7 @@ class LayerOffloadConductor:
             if event is not None:
                 event.wait(self.__activations_transfer_stream)
 
-            tensors = get_tensors(activations, tensor_indices)
+            tensors = get_tensor_data(activations, tensor_indices)
             if activations_allocator is not None:
                 activations_allocator.reserve_cache(tensors)
             tensors_to_device_(activations, device, tensor_indices, non_blocking=self.__async_transfer, allocator=allocator_fn)

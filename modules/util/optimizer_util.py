@@ -405,4 +405,16 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "adam_debias": False,
         "eps": 1e-8,
     },
+    Optimizer.YOGI: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "weight_decay": 0.0,
+        "decoupled_decay": True,
+        "fixed_decay": False,
+        "r": 0.95,
+        "adanorm": False,
+        "adam_debias": False,
+        "initial_accumulator": 1e-6,
+        "eps": 1e-3,
+    },
 }

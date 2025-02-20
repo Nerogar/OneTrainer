@@ -937,6 +937,8 @@ def create_optimizer(
                 adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
             )
+
+        # ADOPT Optimizer
         case Optimizer.ADOPT:
             from pytorch_optimizer.optimizer.adopt import ADOPT
             optimizer = ADOPT(
@@ -951,6 +953,23 @@ def create_optimizer(
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
             )
 
+        # YOGI Optimizer
+        case Optimizer.YOGI:
+            from pytorch_optimizer.optimizer.yogi import Yogi
+            optimizer = Yogi(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
+                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
+                r=optimizer_config.r if optimizer_config.r is not None else 0.95,
+                adanorm=optimizer_config.adanorm if optimizer_config.adanorm is not None else False,
+                adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
+                initial_accumulator=optimizer_config.initial_accumulator if optimizer_config.initial_accumulator is not None else 1e-6,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-3,
+            )
 
     if state_dict is not None and optimizer is not None:
         if 'param_group_mapping' not in state_dict:
