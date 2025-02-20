@@ -7,6 +7,7 @@ import re
 import shlex
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -35,7 +36,7 @@ def subprocess_run(
     Run a subprocess with enforced locale settings and default kwargs.
     """
     proc_env = os.environ.copy()
-    # Force external utilities to output US English ASCII with US formattin
+    # Force external utilities to output US English ASCII with US formatting
     proc_env["LC_ALL"] = "C"
     kwargs.setdefault("check", True)
     kwargs.setdefault("capture_output", True)
@@ -63,9 +64,17 @@ def run_command(cmd: list[str]) -> str | None:
     return None
 
 
+def safe_call(func, default, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        logger.exception(f"Error in {func.__name__}: {e}")
+        return default
+
+
 def anonymize_path(path: str | None) -> str | None:
     """
-    Anonymize user paths for both Windows and Linux as there is no need to collect that.
+    Anonymize user paths for both Windows, Linux and Mac as there is no need to collect that.
     """
     if not path:
         return path
@@ -254,6 +263,44 @@ def get_intel_microcode_info() -> str:
 # == GPU Functions ==
 
 
+def determine_vendor(vendor_str: str) -> str:
+    lower_vendor = vendor_str.lower()
+    if any(
+        x.lower() in lower_vendor for x in ["AMD", "ATI", "Advanced Micro"]
+    ):
+        return "AMD"
+    elif "intel" in lower_vendor:
+        return "Intel"
+    elif "nvidia" in lower_vendor:
+        return "NVIDIA"
+    return "Unknown"
+
+
+def build_extended_info(info_items: list[str]) -> str:
+    return "\n".join("    " + item for item in info_items) if info_items else "No extended info available"
+
+
+def get_nvidia_gpu_info() -> list[dict[str, Any]]:
+    output = run_command(["nvidia-smi", "-L"])
+    if not output:
+        logger.error("nvidia-smi did not return valid output.")
+        return []
+    nvidia_gpus = [
+        {"Index": m.group(1), "Name": m.group(2)}
+        for line in output.splitlines()
+        if (m := re.match(r"GPU (\d+): (.*) \(UUID:", line))
+    ]
+    return [
+        {
+            "Identifier": f"NVIDIA GPU (Index {gpu['Index']})",
+            "Name": gpu["Name"],
+            "ExtendedInfo": query_nvidia_gpu_extended_info(gpu["Index"]),
+            "Vendor": "NVIDIA",
+        }
+        for gpu in nvidia_gpus
+    ]
+
+
 def query_nvidia_gpu_extended_info(index: str) -> str:
     """
     Query extended information for NVIDIA GPU using nvidia-smi.
@@ -280,41 +327,9 @@ def query_nvidia_gpu_extended_info(index: str) -> str:
     return "\n".join(info_lines)
 
 
-def get_nvidia_gpu_info() -> list[dict[str, Any]]:
+def get_lshw_gpu_info() -> dict[str, Any]:
     """
-    Retrieve NVIDIA GPU information using nvidia-smi.
-    Returns a list of dictionaries containing NVIDIA GPU details.
-    """
-    nvidia_gpus: list[dict[str, str]] = []
-    cmd = ["nvidia-smi", "-L"]
-    output = run_command(cmd)
-    if not output:
-        logger.error("nvidia-smi did not return valid output.")
-        return []
-    for line in output.splitlines():
-        match = re.match(r"GPU (\d+): (.*) \(UUID:", line)
-        if match:
-            index = match.group(1)
-            name = match.group(2)
-            nvidia_gpus.append({"Index": index, "Name": name})
-    extended_gpus: list[dict[str, Any]] = []
-    for gpu in nvidia_gpus:
-        info = query_nvidia_gpu_extended_info(gpu["Index"])
-        extended_gpus.append(
-            {
-                "Identifier": f"NVIDIA GPU (Index {gpu['Index']})",
-                "Name": gpu["Name"],
-                "ExtendedInfo": info,
-                "Vendor": "NVIDIA",
-            }
-        )
-    return extended_gpus
-
-
-def parse_lshw_block(block_lines: list[str]) -> dict[str, Any]:
-    """
-    Parse GPU information from lshw JSON output.
-    Extracts relevant GPU details from the device tree.
+    Parse GPU information from lshw JSON output using filtering to display class only.
     """
     try:
         # Run lshw with JSON output
@@ -349,16 +364,11 @@ def parse_lshw_block(block_lines: list[str]) -> dict[str, Any]:
                     " ".join(name_parts) if name_parts else "Unknown"
                 )
 
-                # Determine vendor
-                vendor = device.get("vendor", "")
-                if "AMD" in vendor or "ATI" in vendor:
-                    gpu["Vendor"] = "AMD"
-                elif "Intel" in vendor:
-                    gpu["Vendor"] = "Intel"
-                elif "NVIDIA" in vendor:
-                    gpu["Vendor"] = "NVIDIA"
+                # Determine vendor using the new helper function
+                vendor_str = device.get("vendor", "")
+                gpu["Vendor"] = determine_vendor(vendor_str)
 
-                # Build extended info
+                # Build extended info using the new helper function
                 extended = []
                 if device.get("version"):
                     extended.append(f"Version: {device['version']}")
@@ -366,17 +376,14 @@ def parse_lshw_block(block_lines: list[str]) -> dict[str, Any]:
                     extended.append(
                         f"Driver: {device['configuration']['driver']}"
                     )
-                if device.get("capabilities"):
-                    caps = device["capabilities"]
-                    if isinstance(caps, dict):
-                        extended.append(
-                            "Capabilities: " + ", ".join(caps.keys())
-                        )
-                gpu["ExtendedInfo"] = (
-                    "\n    ".join(extended)
-                    if extended
-                    else "No extended info available"
-                )
+                if device.get("capabilities") and isinstance(
+                    device["capabilities"], dict
+                ):
+                    extended.append(
+                        "Capabilities: "
+                        + ", ".join(device["capabilities"].keys())
+                    )
+                gpu["ExtendedInfo"] = build_extended_info(extended)
 
                 break  # Take first display device
 
@@ -392,39 +399,97 @@ def parse_lshw_block(block_lines: list[str]) -> dict[str, Any]:
         }
 
 
-def get_intel_amd_gpu_info() -> list[dict[str, Any]]:
+def get_lspci_gpu_info() -> list[dict[str, Any]]:
     """
-    Retrieve driver-specific GPU info for Intel/AMD (and some NVIDIA discrete)
-    on Windows via PowerShell.
+    Retrieve GPU information using lspci.
+    Parses lspci output and returns a list of non-NVIDIA GPUs.
+    """
+    RE_CLASS = re.compile(
+        r"^Class:\s*(VGA compatible controller|3D controller)",
+        re.MULTILINE,
+    )
+    RE_VENDOR = re.compile(r"^Vendor:\s*(.+)$", re.MULTILINE)
+    RE_DEVICE = re.compile(r"^Device:\s*(.+)$", re.MULTILINE)
+    RE_SLOT = re.compile(r"^\s*(.+)$", re.MULTILINE)
+
+    gpus: list[dict[str, Any]] = []
+    try:
+        output = run_command(["lspci", "-vmm"])
+    except Exception:
+        logger.exception("Error running lspci")
+        return gpus
+
+    if not output:
+        return gpus
+
+    # Split into device blocks - each starts with "Slot:"
+    device_blocks = re.split(r"(?m)^Slot:", output)
+    for block in device_blocks:
+        if not block.strip():
+            continue
+        # Check if this is a VGA/display device using the compiled regex
+        if not RE_CLASS.search(block):
+            continue
+        vendor_match = RE_VENDOR.search(block)
+        device_match = RE_DEVICE.search(block)
+        slot_match = RE_SLOT.search(block)
+        if not (vendor_match and device_match and slot_match):
+            continue
+
+        vendor_str = vendor_match.group(1).strip()
+        # Skip NVIDIA GPUs since they are handled elsewhere
+        if determine_vendor(vendor_str) == "NVIDIA":
+            continue
+
+        slot = slot_match.group(1).strip()
+        gpus.append(
+            {
+                "Identifier": f"PCI Slot {slot}",
+                "Name": device_match.group(1).strip(),
+                "Vendor": determine_vendor(vendor_str),
+                "ExtendedInfo": build_extended_info(
+                    [
+                        f"Vendor: {vendor_str}",
+                        f"PCI Slot: {slot}",
+                    ]
+                ),
+            }
+        )
+    return gpus
+
+
+def get_generic_gpu_info() -> list[dict[str, Any]]:
+    """
+    Retrieve driver-specific GPU info for Intel/AMD on Windows via PowerShell.
     Returns a list of GPU info dictionaries.
     """
-    ps_command = r"""
-                Get-CimInstance -ClassName Win32_VideoController | ForEach-Object {
-                    $adapterRAM = if ($_.AdapterRAM -gt 0) { $_.AdapterRAM } else {
-                        if ($_.VideoModeDescription -match '(\d+) x (\d+) x (\d+) colors') {
-                            $width = [int]$Matches[1]
-                            $height = [int]$Matches[2]
-                            $colors = [int]$Matches[3]
-                            $bitsPerPixel = [Math]::Log($colors, 2)
-                            $estimatedRAM = ($width * $height * $bitsPerPixel / 8)
-                            [Math]::Max($estimatedRAM, 1GB)
-                        } else { 0 }
-                    }
-                    [PSCustomObject]@{
-                        Name = $_.Name
-                        AdapterCompatibility = $_.AdapterCompatibility
-                        DriverVersion = $_.DriverVersion
-                    }
-                } | Where-Object {
-                    $_.AdapterCompatibility -match 'NVIDIA|AMD|ATI|Advanced Micro Devices|Intel' -and
-                    $_.Name -notmatch 'Intel.*Graphics' -and
-                    $_.Name -notmatch 'AMD.*Graphics$' -and (
-                        $_.Name -match 'NVIDIA|GeForce|Quadro|Tesla' -or
-                        $_.Name -match 'AMD|Radeon|FirePro' -or
-                        $_.Name -match 'Intel.*Arc'
-                    )
-                } | ConvertTo-Json
-                """
+    ps_command = textwrap.dedent(r"""
+        Get-CimInstance -ClassName Win32_VideoController | ForEach-Object {
+            $adapterRAM = if ($_.AdapterRAM -gt 0) { $_.AdapterRAM } else {
+                if ($_.VideoModeDescription -match '(\d+) x (\d+) x (\d+) colors') {
+                    $width = [int]$Matches[1]
+                    $height = [int]$Matches[2]
+                    $colors = [int]$Matches[3]
+                    $bitsPerPixel = [Math]::Log($colors, 2)
+                    $estimatedRAM = ($width * $height * $bitsPerPixel / 8)
+                    [Math]::Max($estimatedRAM, 1GB)
+                } else { 0 }
+            }
+            [PSCustomObject]@{
+                Name = $_.Name
+                AdapterCompatibility = $_.AdapterCompatibility
+                DriverVersion = $_.DriverVersion
+            }
+        } | Where-Object {
+            $_.AdapterCompatibility -match 'NVIDIA|AMD|ATI|Advanced Micro Devices|Intel' -and
+            $_.Name -notmatch 'Intel.*Graphics' -and
+            $_.Name -notmatch 'AMD.*Graphics$' -and (
+                $_.Name -match 'NVIDIA|GeForce|Quadro|Tesla' -or
+                $_.Name -match 'AMD|Radeon|FirePro' -or
+                $_.Name -match 'Intel.*Arc'
+            )
+        } | ConvertTo-Json
+    """)
     try:
         result = subprocess_run(["powershell", "-Command", ps_command])
         output = result.stdout.strip()
@@ -444,122 +509,92 @@ def get_intel_amd_gpu_info() -> list[dict[str, Any]]:
     return []
 
 
-def get_generic_gpu_info() -> list[dict[str, Any]]:
+def get_macos_gpu_info() -> list[dict[str, Any]]:
     """
-    Retrieve GPU information from non-NVIDIA sources such as AMD or Intel.
-    On Windows, attempts to retrieve driver-specific info using PowerShell.
-    On macOS, uses system_profiler to gather display information.
+    Retrieve GPU information on macOS using system_profiler.
     Returns a list of dictionaries containing GPU details.
     """
     gpus: list[dict[str, Any]] = []
-    system = platform.system()
-
-    if system == "Windows":
-        return get_intel_amd_gpu_info()
-    elif system == "Darwin":
-        try:
-            # Query GPU info via system_profiler in JSON format.
-            output = run_command(
-                ["system_profiler", "SPDisplaysDataType", "-json"]
-            )
-            if output:
-                data = json.loads(output)
-                displays = data.get("SPDisplaysDataType", [])
-                for display in displays:
-                    gpu_name = display.get("sppci_model", "Unknown")
-                    vendor = display.get("spdisplays_vendor", "Unknown")
-                    identifier = display.get("spdisplays_bus", "Unknown")
-                    extended_info_parts = []
-                    if "spdisplays_vram" in display:
-                        extended_info_parts.append(
-                            f"VRAM: {display['spdisplays_vram']}"
-                        )
-                    if "spdisplays_resolution" in display:
-                        extended_info_parts.append(
-                            f"Resolution: {display['spdisplays_resolution']}"
-                        )
-                    extended_info = (
-                        "\n    ".join(extended_info_parts)
-                        if extended_info_parts
-                        else "No extended info available"
+    try:
+        output = run_command(
+            ["system_profiler", "SPDisplaysDataType", "-json"]
+        )
+        if output:
+            data = json.loads(output)
+            displays = data.get("SPDisplaysDataType", [])
+            for display in displays:
+                gpu_name = display.get("sppci_model", "Unknown")
+                vendor = display.get("spdisplays_vendor", "Unknown")
+                identifier = display.get("spdisplays_bus", "Unknown")
+                extended_info_parts = []
+                if "spdisplays_vram" in display:
+                    extended_info_parts.append(
+                        f"VRAM: {display['spdisplays_vram']}"
                     )
-                    gpus.append(
-                        {
-                            "Identifier": identifier,
-                            "Name": gpu_name,
-                            "Vendor": vendor,
-                            "ExtendedInfo": extended_info,
-                        }
+                if "spdisplays_resolution" in display:
+                    extended_info_parts.append(
+                        f"Resolution: {display['spdisplays_resolution']}"
                     )
-        except Exception:
-            logger.exception("Error retrieving GPU info on macOS")
-        return gpus
-    else:
-        # Linux (and fallback) implementation using lspci
-        try:
-            output = run_command(["lspci", "-vmm"])
-        except Exception:
-            logger.exception("Error running lspci")
-            return gpus
+                extended_info = build_extended_info(extended_info_parts)
 
-        if not output:
-            return gpus
-
-        # Split into device blocks - each starts with "Slot:"
-        device_blocks = re.split(r"(?m)^Slot:", output)
-        for block in device_blocks:
-            if not block.strip():
-                continue
-            # Check if this is a VGA/display device
-            class_match = re.search(
-                r"^Class:\s*(VGA compatible controller|3D controller)",
-                block,
-                re.MULTILINE,
-            )
-            if not class_match:
-                continue
-            # Extract key information
-            vendor_match = re.search(
-                r"^Vendor:\s*(.+)$", block, re.MULTILINE
-            )
-            device_match = re.search(
-                r"^Device:\s*(.+)$", block, re.MULTILINE
-            )
-            slot_match = re.search(r"^\s*(.+)$", block, re.MULTILINE)
-            if not (vendor_match and device_match and slot_match):
-                continue
-            vendor = vendor_match.group(1).strip()
-            device_name = device_match.group(1).strip()
-            slot = slot_match.group(1).strip()
-            # Skip NVIDIA GPUs as they're handled separately
-            if "NVIDIA" in vendor:
-                continue
-            vendor_category = "Unknown"
-            if any(x in vendor for x in ["AMD", "ATI", "Advanced Micro"]):
-                vendor_category = "AMD"
-            elif "Intel" in vendor:
-                vendor_category = "Intel"
-            gpus.append(
-                {
-                    "Identifier": f"PCI Slot {slot}",
-                    "Name": device_name,
-                    "Vendor": vendor_category,
-                    "ExtendedInfo": f"    Vendor: {vendor}\n    PCI Slot: {slot}",
-                }
-            )
-        return gpus
+                gpus.append(
+                    {
+                        "Identifier": identifier,
+                        "Name": gpu_name,
+                        "Vendor": vendor,
+                        "ExtendedInfo": extended_info,
+                    }
+                )
+    except Exception:
+        logger.exception("Error retrieving GPU info on macOS")
+    return gpus
 
 
 def get_gpu_info() -> list[dict[str, Any]]:
     """
-    Gather GPU information from NVIDIA and generic sources.
-    If NVIDIA GPUs are detected via nvidia-smi, only return those.
-    Otherwise, fall back to generic GPU detection.
+    Gather GPU information using a multi-stage approach.
+    First, try NVIDIA native detection; if that fails,
+    then attempt to use lspci; if that also fails,
+    fall back to parsing lshw JSON output.
+    Each branch is wrapped in try/except blocks for error tolerance.
     """
-    nvidia_gpus = get_nvidia_gpu_info()
-    if not nvidia_gpus:
-        return get_generic_gpu_info()
-    return nvidia_gpus
+    try:
+        system = platform.system()
+
+        # x86 MacOS (Old and Hackintoshes) are not supported. M-series macs are all thats accounted for.
+        if system == "Darwin":
+            return safe_call(get_macos_gpu_info, [])
+
+        # Obviously NVIDIA GPUs are the most common, so we check for them first after short-circuiting for Mac.
+        # Approach works for both Windows and Linux.
+        nvidia = safe_call(get_nvidia_gpu_info, [])
+        if nvidia:
+            return nvidia
+
+        # Next most common case is Intel/AMD GPUs on Windows, check via powershell
+        if system == "Windows":
+            return safe_call(get_generic_gpu_info, [])
+
+        # If not nvidia and is Linux, try lspci first, then fall back to lshw.
+        if system == "Linux":
+            lspci = safe_call(get_lspci_gpu_info, [])
+            if lspci:
+                return lspci
+            lshw = safe_call(get_lshw_gpu_info, {})
+            if lshw.get("Name") and lshw.get("Name") != "Unknown":
+                return [lshw]
+
+        return []
+    except Exception as e:
+        logger.exception(f"Error in get_gpu_info: {e}")
+        return [
+            {
+                "Identifier": "Unknown",
+                "Name": "Unknown GPU",
+                "Vendor": "Unknown",
+                "ExtendedInfo": build_extended_info([]),
+            }
+        ]
 
 
 # == Software Functions ==
