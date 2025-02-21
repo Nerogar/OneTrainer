@@ -1,6 +1,8 @@
+import asyncio
 import math
 import os
 import random
+import time
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -88,7 +90,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.general_tab = self.__general_tab(tabview.add("general"), concept)
         self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
-        self.concept_stats_tab = self.__concept_stats_tab(tabview.add("stats"))
+        self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
         components.button(self, 1, 0, "ok", self.__ok)
 
@@ -445,19 +447,19 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.yaxis.label.set_color(text_color)
 
         #refresh stats - must be after all labels are defined or will give error
-        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__update_concept_stats(True, False),
+        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: asyncio.run(self.__get_concept_stats(False, 9999)),
                           tooltip="Reload basic statistics for the concept directory")
-        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__update_concept_stats(True, True),
-                          tooltip="Reload advanced statistics for the concept directory")
+        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: [asyncio.run(self.__get_concept_stats(False, 9999)), asyncio.run(self.__get_concept_stats(True, 9999))],
+                          tooltip="Reload advanced statistics for the concept directory")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
         components.label(frame, 0, 2, text="Warning!", tooltip="Will be slow for large folders, particularly ones on HDDs!")
         self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
 
         #automatically get basic stats if available
         try:
-            self.__update_concept_stats(False, False)   #load stats from config if available
+            self.__update_concept_stats()      #load stats from config if available
         except KeyError:
-            self.__update_concept_stats(True, False)    #force rescan if config is empty
-        except FileNotFoundError:                       #avoid error when loading concept window without config path defined
+            asyncio.run(self.__get_concept_stats(False, 1))    #force rescan if config is empty, timeout of 1 sec
+        except FileNotFoundError:              #avoid error when loading concept window without config path defined
             pass
 
         frame.pack(fill="both", expand=1)
@@ -576,14 +578,10 @@ class ConceptWindow(ctk.CTkToplevel):
 
         return image
 
-    def __update_concept_stats(self, force_refresh : bool, advanced_checks : bool):
-        #only runs scan if specifically requested, otherwise loads from concept config
-        if force_refresh or len(self.concept.concept_stats) == 0:
-            self.__get_concept_stats(advanced_checks)
-            self.processing_time.configure(text=str(self.concept.concept_stats["processing_time"]) + " s")
-
+    def __update_concept_stats(self):
         #file size
         self.file_size_preview.configure(text=str(int(self.concept.concept_stats["file_size"]/1048576)) + " MB")
+        self.processing_time.configure(text=str(round(self.concept.concept_stats["processing_time"], 2)) + " s")
 
         #directory count
         self.dir_count_preview.configure(text=self.concept.concept_stats["directory_count"])
@@ -653,11 +651,33 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.bar_label(b)
         self.canvas.draw()
 
-    def __get_concept_stats(self, advanced_checks : bool):
-        new_stats = concept_stats.get_concept_stats(self.concept, advanced_checks)
-        for key, val in new_stats.items():
-            if key not in self.concept.concept_stats or not (val == "-" or val == {}):     #only update if key isn't in old config or new val isn't null
-                self.concept.concept_stats[key] = val
+    async def __get_concept_stats(self, advanced_checks : bool, waittime : float):
+        start_time = time.perf_counter()
+        last_update = time.perf_counter()
+        subfolders = [self.concept.path]
+        stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
+        for dir in subfolders:
+            stats_dict = concept_stats.folder_scan(dir, stats_dict, advanced_checks, self.concept)
+            stats_dict["processing_time"] = time.perf_counter() - start_time
+            if self.concept.include_subdirectories:
+                subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
+            self.concept.concept_stats = stats_dict
+            #cancel if longer than waiting time
+            if (time.perf_counter() - start_time) > waittime:
+                stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
+                stats_dict["processing_time"] = time.perf_counter() - start_time
+                self.concept.concept_stats = stats_dict
+                break
+            #update GUI approx every second
+            if time.perf_counter() > (last_update + 1):
+                last_update = time.perf_counter()
+                self.__update_concept_stats()
+                self.concept_stats_tab.update()
+
+        self.__update_concept_stats()
+
+    async def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
+        await asyncio.to_thread(self.__get_concept_stats(advanced_checks, waittime))
 
     def __ok(self):
         self.destroy()
