@@ -86,8 +86,11 @@ class TrainUI(ctk.CTk):
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
 
-    def close(self):
+        self.protocol("WM_DELETE_WINDOW", self.__close)
+
+    def __close(self):
         self.top_bar_component.save_default()
+        self.quit()
 
     def top_bar(self, master):
         return TopBar(
