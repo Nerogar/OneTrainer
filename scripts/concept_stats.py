@@ -8,6 +8,9 @@ import time
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 
+from mgds.pipelineModules.AspectBucketing import AspectBucketing
+
+import imagesize
 from PIL import Image
 
 
@@ -53,21 +56,8 @@ def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
         stats_dict["min_caption_length"] = [1000000000,"-",0]   #min char count, filepath, word count
         stats_dict["avg_caption_length"] = [0,0]                #avg char count, avg word count
 
-        #currently hardcoded, pull from AspectBucketing in mgds eventually
-        all_possible_input_aspects = [
-                (1.0, 1.0),
-                (1.0, 1.25),
-                (1.0, 1.5),
-                (1.0, 1.75),
-                (1.0, 2.0),
-                (1.0, 2.5),
-                (1.0, 3.0),
-                (1.0, 3.5),
-                (1.0, 4.0),
-            ]
-
         aspect_ratio_list = []
-        for aspect in all_possible_input_aspects:
+        for aspect in AspectBucketing(0,"","","","","","","","","").all_possible_input_aspects:   #input parameters don't matter but can't be blank
             aspect_ratio_list.append(round(aspect[0]/aspect[1], 2))
             aspect_ratio_list.append(round(aspect[1]/aspect[0], 2))
         aspect_ratio_list = list(set(aspect_ratio_list))
@@ -110,8 +100,11 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                             stats_dict["avg_caption_length"][0] += (char_count - stats_dict["avg_caption_length"][0])/stats_dict["image_count"]
                             stats_dict["avg_caption_length"][1] += (word_count - stats_dict["avg_caption_length"][1])/stats_dict["image_count"]
                 #get image resolution info
-                img = Image.open(path)
-                width, height = img.size
+                try:    #use imagesize if possible due to better speed
+                    width, height = imagesize.get(path.path)
+                except ValueError:     #use PIL if not supported by imagesize
+                    img = Image.open(path)
+                    width, height = img.size
                 pixels = width*height
                 true_aspect = width/height
                 nearest_aspect = min(aspect_ratio_list, key=lambda x:abs(x-true_aspect))
