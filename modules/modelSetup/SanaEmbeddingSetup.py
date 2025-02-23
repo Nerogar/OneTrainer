@@ -31,7 +31,8 @@ class SanaEmbeddingSetup(
         parameter_group_collection = NamedParameterGroupCollection()
 
         self._add_embedding_param_groups(
-            model.embedding_wrapper, parameter_group_collection, config.embedding_learning_rate, "embeddings"
+            model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+            "embeddings"
         )
 
         return parameter_group_collection
@@ -41,18 +42,10 @@ class SanaEmbeddingSetup(
             model: SanaModel,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
         model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
-
-        model.embedding.text_encoder_vector.requires_grad_(True)
-
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config,
-                                                                                  model.train_progress, i)
-            embedding.text_encoder_vector.requires_grad_(train_embedding)
 
     def setup_model(
             self,
@@ -62,8 +55,7 @@ class SanaEmbeddingSetup(
         model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
-        self._setup_additional_embeddings(model, config)
-        self._setup_embedding(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 

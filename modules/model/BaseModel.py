@@ -9,6 +9,7 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.TrainProgress import TrainProgress
 
 import torch
+from torch import Tensor
 from torch.optim import Optimizer
 
 from transformers import PreTrainedTokenizer
@@ -39,6 +40,8 @@ class BaseModelEmbedding:
             self.output_vector = None
 
         self.text_tokens = [f"<{uuid4()}>" for _ in range(self.token_count)]
+        self.joint_text_tokens = ''.join(self.text_tokens)
+        self.joint_tokens_cache = None  # a cache for the joint_text_tokens when sent through the tokenizer
 
     def requires_grad(self) -> bool:
         if self.is_output_embedding:
@@ -64,6 +67,7 @@ class BaseModel(metaclass=ABCMeta):
     train_progress: TrainProgress
     model_spec: ModelSpec | None
     train_config: TrainConfig | None
+    embedding_state_dicts: dict[str, dict[str, Tensor]] | None
 
     def __init__(
             self,
@@ -78,6 +82,7 @@ class BaseModel(metaclass=ABCMeta):
         self.train_progress = TrainProgress()
         self.model_spec = None
         self.train_config = None
+        self.embedding_state_dicts = {}
 
     @abstractmethod
     def to(self, device: torch.device):
@@ -93,28 +98,32 @@ class BaseModel(metaclass=ABCMeta):
             prompt: str,
     ) -> str:
         for embedding in additional_embeddings:
-            embedding_string = ''.join(embedding.text_tokens)
-            prompt = prompt.replace(embedding.placeholder, embedding_string)
+            prompt = prompt.replace(embedding.placeholder, embedding.joint_text_tokens)
 
         return prompt
 
-
     @staticmethod
-    def _replace_tokens(
+    def _apply_output_embeddings(
+            embeddings: list[BaseModelEmbedding],
             tokenizer: PreTrainedTokenizer,
-            embedding_text_tokens: str,
-            embedding_vectors: torch.Tensor,
             tokens: torch.Tensor,
             text_encoder_output: torch.Tensor,
-    ):
-        embedding_tokens = tokenizer(
-            embedding_text_tokens,
-            add_special_tokens=False,
-            return_tensors="pt",
-        ).input_ids.to(text_encoder_output.device)
+    ) -> torch.Tensor:
+        for embedding in embeddings:
+            if embedding.is_output_embedding:
+                text_encoder_output = text_encoder_output.to(dtype=torch.float32)
 
-        batch_size = text_encoder_output.shape[0]
+                if embedding.joint_tokens_cache is None:
+                    embedding.joint_tokens_cache = tokenizer(
+                        embedding.joint_text_tokens,
+                        add_special_tokens=False,
+                        return_tensors="pt",
+                    ).input_ids.to(text_encoder_output.device)
 
-        embedding_tokens = embedding_tokens.expand(batch_size, -1)
-        idx_0, idx_1, idx_2 = (tokens.unsqueeze(1) == embedding_tokens.unsqueeze(2)).nonzero(as_tuple=True)
-        text_encoder_output[idx_0, idx_2] = embedding_vectors[idx_1]
+                batch_size = text_encoder_output.shape[0]
+
+                embedding_tokens = embedding.joint_tokens_cache.expand(batch_size, -1)
+                idx_0, idx_1, idx_2 = (tokens.unsqueeze(1) == embedding_tokens.unsqueeze(2)).nonzero(as_tuple=True)
+                text_encoder_output[idx_0, idx_2] = embedding.output_vector[idx_1]
+
+        return text_encoder_output

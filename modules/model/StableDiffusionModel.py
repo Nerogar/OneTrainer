@@ -26,20 +26,20 @@ from diffusers import (
 from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DPTImageProcessor
 
 
-class StableDiffusionModelEmbedding(BaseModelEmbedding):
+class StableDiffusionModelEmbedding:
     def __init__(
             self,
             uuid: str,
             text_encoder_vector: Tensor | None,
             placeholder: str,
+            is_output_embedding: bool,
     ):
-        super().__init__(
+        self.text_encoder_embedding = BaseModelEmbedding(
             uuid=uuid,
-            token_count=text_encoder_vector.shape[0],
             placeholder=placeholder,
+            vector=text_encoder_vector,
+            is_output_embedding=is_output_embedding,
         )
-
-        self.text_encoder_vector = text_encoder_vector
 
 
 class StableDiffusionModel(BaseModel):
@@ -59,9 +59,7 @@ class StableDiffusionModel(BaseModel):
 
     # persistent embedding training data
     embedding: StableDiffusionModelEmbedding | None
-    embedding_state: Tensor | None
     additional_embeddings: list[StableDiffusionModelEmbedding] | None
-    additional_embedding_states: list[Tensor | None]
     embedding_wrapper: AdditionalEmbeddingWrapper | None
 
     # persistent lora training data
@@ -93,9 +91,7 @@ class StableDiffusionModel(BaseModel):
         self.train_dtype = DataType.FLOAT_32
 
         self.embedding = None
-        self.embedding_state = None
         self.additional_embeddings = []
-        self.additional_embedding_states = []
         self.embedding_wrapper = None
 
         self.text_encoder_lora = None
@@ -104,6 +100,10 @@ class StableDiffusionModel(BaseModel):
 
         self.sd_config = None
         self.sd_config_filename = None
+
+    def all_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_embedding] if self.embedding is not None else [])
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -182,13 +182,13 @@ class StableDiffusionModel(BaseModel):
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
 
-    def add_embeddings_to_prompt(self, prompt: str) -> str:
-        return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
+    def add_text_encoder_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_embeddings(), prompt)
 
     def encode_text(
             self,
             train_device: torch.device,
-            batch_size: int,
+            batch_size: int = 1,
             rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
@@ -198,7 +198,7 @@ class StableDiffusionModel(BaseModel):
     ):
         if tokens is None:
             tokenizer_output = self.tokenizer(
-                text,
+                self.add_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
@@ -215,6 +215,13 @@ class StableDiffusionModel(BaseModel):
             add_pooled_output=False,
             use_attention_mask=False,
             add_layer_norm=True,
+        )
+
+        text_encoder_output = self._apply_output_embeddings(
+            self.all_text_encoder_embeddings(),
+            self.tokenizer,
+            tokens,
+            text_encoder_output,
         )
 
         # apply dropout

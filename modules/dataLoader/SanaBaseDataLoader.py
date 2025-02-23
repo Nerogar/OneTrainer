@@ -14,6 +14,7 @@ from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeGemmaText import EncodeGemmaText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.SaveText import SaveText
@@ -67,11 +68,12 @@ class SanaBaseDataLoader(
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.train_dtype.torch_dtype())
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.03125)
+        add_embeddings_to_prompt = MapData(in_name='prompt', out_name='prompt', map_fn=model.add_text_encoder_embeddings_to_prompt)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.train_dtype.torch_dtype())
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=max_token_length)
         encode_prompt = EncodeGemmaText(tokens_in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_autocast_context], dtype=model.text_encoder_train_dtype.torch_dtype())
 
-        modules = [rescale_image, encode_image, tokenize_prompt]
+        modules = [rescale_image, encode_image, add_embeddings_to_prompt, tokenize_prompt]
 
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -141,7 +143,12 @@ class SanaBaseDataLoader(
         return modules
 
     def _output_modules(self, config: TrainConfig, model: SanaModel):
-        output_names = ['latent_image', 'tokens', 'tokens_mask', 'image_path', 'prompt']
+        output_names = [
+            'image_path', 'latent_image',
+            'prompt',
+            'tokens',
+            'tokens_mask',
+        ]
 
         if config.masked_training or config.model_type.has_mask_input():
             output_names.append('latent_mask')
@@ -224,7 +231,7 @@ class SanaBaseDataLoader(
             is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config)
-        load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt)
+        load_input = self._load_input_modules(config, model.train_dtype)
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, 32)
         crop_modules = self._crop_modules(config)

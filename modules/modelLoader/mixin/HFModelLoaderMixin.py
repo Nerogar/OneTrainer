@@ -21,6 +21,8 @@ from safetensors.torch import load_file
 
 
 class HFModelLoaderMixin(metaclass=ABCMeta):
+    def __init__(self):
+        super().__init__()
 
     def __load_sub_module(
             self,

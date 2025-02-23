@@ -1,95 +1,40 @@
 import os.path
-from pathlib import Path
+from copy import copy
 
 from modules.model.FluxModel import FluxModel, FluxModelEmbedding
+from modules.modelSaver.mixin.EmbeddingSaverMixin import EmbeddingSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
 
 import torch
 from torch import Tensor
 
-from safetensors.torch import save_file
 
+class FluxEmbeddingSaver(
+    EmbeddingSaverMixin
+):
+    def __init__(self):
+        super().__init__()
 
-class FluxEmbeddingSaver:
-
-    def __save_ckpt(
+    def _to_state_dict(
             self,
             embedding: FluxModelEmbedding | None,
-            embedding_state: tuple[Tensor, Tensor] | None,
-            destination: str,
+            embedding_state_dict: dict[str, Tensor] | None,
             dtype: torch.dtype | None,
     ):
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        state_dict = copy(embedding_state_dict)
 
-        if embedding is None:
-            text_encoder_1_vector_cpu = embedding_state[0]
-            text_encoder_2_vector_cpu = embedding_state[1]
-        else:
-            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype) \
-                if embedding.text_encoder_1_vector is not None else None
-            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype) \
-                if embedding.text_encoder_2_vector is not None else None
+        if embedding is not None:
+            if embedding.text_encoder_1_embedding.vector is not None:
+                state_dict["clip_l"] = embedding.text_encoder_1_embedding.vector.to(device="cpu", dtype=dtype)
+            if embedding.text_encoder_2_embedding.vector is not None:
+                state_dict["t5"] = embedding.text_encoder_2_embedding.vector.to(device="cpu", dtype=dtype)
+            if embedding.text_encoder_1_embedding.output_vector is not None:
+                state_dict["clip_l_out"] = embedding.text_encoder_1_embedding.output_vector.to(device="cpu", dtype=dtype)
+            if embedding.text_encoder_2_embedding.output_vector is not None:
+                state_dict["t5_out"] = embedding.text_encoder_2_embedding.output_vector.to(device="cpu", dtype=dtype)
 
-        file = {}
-        if text_encoder_1_vector_cpu is not None:
-            file["clip_l"] = text_encoder_1_vector_cpu
-        if text_encoder_2_vector_cpu is not None:
-            file["t5"] = text_encoder_2_vector_cpu
-
-        torch.save(file, destination)
-
-    def __save_safetensors(
-            self,
-            embedding: FluxModelEmbedding | None,
-            embedding_state: tuple[Tensor, Tensor] | None,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-
-        if embedding is None:
-            text_encoder_1_vector_cpu = embedding_state[0]
-            text_encoder_2_vector_cpu = embedding_state[1]
-        else:
-            text_encoder_1_vector_cpu = embedding.text_encoder_1_vector.to(device="cpu", dtype=dtype) \
-                if embedding.text_encoder_1_vector is not None else None
-            text_encoder_2_vector_cpu = embedding.text_encoder_2_vector.to(device="cpu", dtype=dtype) \
-                if embedding.text_encoder_2_vector is not None else None
-
-        file = {}
-        if text_encoder_1_vector_cpu is not None:
-            file["clip_l"] = text_encoder_1_vector_cpu
-        if text_encoder_2_vector_cpu is not None:
-            file["t5"] = text_encoder_2_vector_cpu
-
-        save_file(file, destination)
-
-    def __save_internal(
-            self,
-            embedding: FluxModelEmbedding | None,
-            embedding_state: tuple[Tensor, Tensor, Tensor] | None,
-            destination: str,
-            save_single: bool,
-    ):
-        if save_single:
-            safetensors_embedding_name = os.path.join(
-                destination,
-                "embedding",
-                "embedding.safetensors",
-            )
-        else:
-            safetensors_embedding_name = os.path.join(
-                destination,
-                "additional_embeddings",
-                f"{embedding.uuid}.safetensors",
-            )
-        self.__save_safetensors(
-            embedding,
-            embedding_state,
-            safetensors_embedding_name,
-            None,
-        )
+        return state_dict
 
     def save_single(
             self,
@@ -99,31 +44,30 @@ class FluxEmbeddingSaver:
             dtype: torch.dtype | None,
     ):
         embedding = model.embedding
-        embedding_state = model.embedding_state
+        embedding_state = list(model.embedding_state_dicts.values())[0]
 
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
             case ModelFormat.CKPT:
-                self.__save_ckpt(
-                    embedding,
-                    embedding_state,
-                    os.path.join(output_model_destination),
-                    dtype,
-                )
-            case ModelFormat.SAFETENSORS:
-                self.__save_safetensors(
-                    embedding,
-                    embedding_state,
-                    os.path.join(output_model_destination),
-                    dtype,
-                )
-            case ModelFormat.INTERNAL:
-                self.__save_internal(
+                self._save_ckpt(
                     embedding,
                     embedding_state,
                     output_model_destination,
-                    True,
+                    dtype,
+                )
+            case ModelFormat.SAFETENSORS:
+                self._save_safetensors(
+                    embedding,
+                    embedding_state,
+                    output_model_destination,
+                    dtype,
+                )
+            case ModelFormat.INTERNAL:
+                self._save_internal(
+                    embedding,
+                    embedding_state,
+                    output_model_destination,
                 )
 
     def save_multiple(
@@ -133,33 +77,37 @@ class FluxEmbeddingSaver:
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        for i in range(max(len(model.additional_embeddings), len(model.additional_embedding_states))):
-            embedding = model.additional_embeddings[i] if i < len(model.additional_embeddings) else None
-            embedding_state = \
-                model.additional_embedding_states[i] if i < len(model.additional_embedding_states) else None
-            embedding_name = safe_filename(embedding.placeholder, allow_spaces=False, max_length=None)
+        embedding_uuids = set(model.embedding_state_dicts.keys() \
+                              | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
+
+        embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.additional_embeddings}
+
+        for embedding_uuid in embedding_uuids:
+            embedding = embeddings.get(embedding_uuid)
+            embedding_state = model.embedding_state_dicts.get(embedding_uuid, None)
+            embedding_name = safe_filename(embedding.text_encoder_1_embedding.placeholder,
+                                           allow_spaces=False, max_length=None)
 
             match output_model_format:
                 case ModelFormat.DIFFUSERS:
                     raise NotImplementedError
                 case ModelFormat.CKPT:
-                    self.__save_ckpt(
+                    self._save_ckpt(
                         embedding,
                         embedding_state,
                         os.path.join(f"{output_model_destination}_embeddings", f"{embedding_name}.pt"),
                         dtype,
                     )
                 case ModelFormat.SAFETENSORS:
-                    self.__save_safetensors(
+                    self._save_safetensors(
                         embedding,
                         embedding_state,
                         os.path.join(f"{output_model_destination}_embeddings", f"{embedding_name}.safetensors"),
                         dtype,
                     )
                 case ModelFormat.INTERNAL:
-                    self.__save_internal(
+                    self._save_internal(
                         embedding,
                         embedding_state,
                         output_model_destination,
-                        False,
                     )

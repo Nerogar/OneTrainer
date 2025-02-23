@@ -84,7 +84,6 @@ class HunyuanVideoModel(BaseModel):
     # persistent embedding training data
     embedding: HunyuanVideoModelEmbedding | None
     additional_embeddings: list[HunyuanVideoModelEmbedding] | None
-    embedding_state_dicts: dict[str, dict[str, Tensor]] | None
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
 
@@ -127,7 +126,6 @@ class HunyuanVideoModel(BaseModel):
 
         self.embedding = None
         self.additional_embeddings = []
-        self.embedding_state_dicts = {}
         self.embedding_wrapper_1 = None
         self.embedding_wrapper_2 = None
 
@@ -288,18 +286,12 @@ class HunyuanVideoModel(BaseModel):
                 dtype=self.train_dtype.torch_dtype(),
             )
 
-        # apply output embeddings
-        for embedding in self.all_text_encoder_1_embeddings():
-            if embedding.is_output_embedding:
-                text_encoder_1_output = text_encoder_1_output.to(dtype=torch.float32)
-
-                self._replace_tokens(
-                    self.tokenizer_1,
-                    self.add_text_encoder_1_embeddings_to_prompt(embedding.placeholder),
-                    embedding.output_vector,
-                    tokens_1,
-                    text_encoder_1_output,
-                )
+        text_encoder_1_output = self._apply_output_embeddings(
+            self.all_text_encoder_1_embeddings(),
+            self.tokenizer_1,
+            tokens_1,
+            text_encoder_1_output,
+        )
 
         # apply dropout
         if text_encoder_1_dropout_probability is not None:

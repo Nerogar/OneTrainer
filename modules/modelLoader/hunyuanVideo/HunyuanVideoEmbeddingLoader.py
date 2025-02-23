@@ -1,52 +1,13 @@
-import contextlib
-import os
-
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
-from modules.util.ModelNames import EmbeddingName, ModelNames
-
-import torch
-from torch import Tensor
-
-from safetensors.torch import load_file
+from modules.modelLoader.mixin.EmbeddingLoaderMixin import EmbeddingLoaderMixin
+from modules.util.ModelNames import ModelNames
 
 
-class HunyuanVideoEmbeddingLoader:
+class HunyuanVideoEmbeddingLoader(
+    EmbeddingLoaderMixin
+):
     def __init__(self):
         super().__init__()
-
-    def __load_embedding(
-            self,
-            embedding_name: str,
-    ) -> dict[str, Tensor] | None:
-        if embedding_name == "":
-            return None
-
-        with contextlib.suppress(Exception):
-            return torch.load(embedding_name, weights_only=True)
-
-        with contextlib.suppress(Exception):
-            return load_file(embedding_name)
-
-        raise Exception(f"could not load embedding: {embedding_name}")
-
-    def __load_internal(
-            self,
-            directory: str,
-            embedding_name: EmbeddingName,
-    ) -> dict[str, Tensor] | None:
-        if os.path.exists(os.path.join(directory, "meta.json")):
-            safetensors_embedding_name = os.path.join(
-                directory,
-                "additional_embeddings",
-                f"{embedding_name.uuid}.safetensors",
-            )
-
-            if os.path.exists(safetensors_embedding_name):
-                return self.__load_embedding(safetensors_embedding_name)
-            else:
-                return self.__load_embedding(embedding_name.model_name)
-        else:
-            raise Exception("not an internal model")
 
     def load(
             self,
@@ -54,14 +15,4 @@ class HunyuanVideoEmbeddingLoader:
             directory: str,
             model_names: ModelNames,
     ):
-        for embedding_name in model_names.all_embedding():
-            try:
-                model.embedding_state_dicts[embedding_name.uuid] = \
-                    self.__load_internal(directory, embedding_name)
-            except Exception as e1:  # noqa: PERF203
-                try:
-                    model.embedding_state_dicts[embedding_name.uuid] = \
-                        self.__load_embedding(embedding_name.model_name)
-                except Exception as e2:
-                    e2.__cause__ = e1
-                    raise Exception(f"could not load embedding: {embedding_name}") from e2
+        self._load(model, directory, model_names)

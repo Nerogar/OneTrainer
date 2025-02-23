@@ -116,21 +116,22 @@ class BaseHunyuanVideoSetup(
         for embedding_config in config.all_embedding_configs():
             embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
-                embedding_state_1 = self._create_new_embedding(
-                    embedding_config,
-                    model.tokenizer_1,
-                    model.text_encoder_1,
-                    lambda text: model.encode_text(
-                        text=text,
-                        train_device=self.temp_device,
-                    )[0][0][1:]
-                )
+                with model.autocast_context:
+                    embedding_state_1 = self._create_new_embedding(
+                        embedding_config,
+                        model.tokenizer_1,
+                        model.text_encoder_1,
+                        lambda text: model.encode_text(
+                            text=text,
+                            train_device=self.temp_device,
+                        )[0][0][1:],
+                    )
 
-                embedding_state_2 = self._create_new_embedding(
-                    embedding_config,
-                    model.tokenizer_2,
-                    model.text_encoder_2,
-                )
+                    embedding_state_2 = self._create_new_embedding(
+                        embedding_config,
+                        model.tokenizer_2,
+                        model.text_encoder_2,
+                    )
             else:
                 embedding_state_1 = embedding_state.get("llama_out", embedding_state.get("llama", None))
                 embedding_state_2 = embedding_state.get("clip_l_out", embedding_state.get("clip_l", None))
@@ -188,6 +189,29 @@ class BaseHunyuanVideoSetup(
             model.embedding_wrapper_1.hook_to_module()
         if model.embedding_wrapper_2 is not None:
             model.embedding_wrapper_2.hook_to_module()
+
+    def _setup_embeddings_requires_grad(
+            self,
+            model: HunyuanVideoModel,
+            config: TrainConfig,
+    ):
+        if model.text_encoder_1 is not None:
+            for embedding, embedding_config in zip(model.all_text_encoder_1_embeddings(),
+                                                   config.all_embedding_configs(), strict=True):
+                train_embedding_1 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
+                    and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+                embedding.requires_grad_(train_embedding_1)
+
+        if model.text_encoder_2 is not None:
+            for embedding, embedding_config in zip(model.all_text_encoder_2_embeddings(),
+                                                   config.all_embedding_configs(), strict=True):
+                train_embedding_2 = \
+                    embedding_config.train \
+                    and config.text_encoder_2.train_embedding \
+                    and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+                embedding.requires_grad_(train_embedding_2)
 
     def predict(
             self,

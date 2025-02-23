@@ -50,9 +50,9 @@ class WuerstchenLoRASetup(
                 learning_rate=config.text_encoder.learning_rate,
             ))
 
-        if config.train_any_embedding():
+        if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
-                model.prior_embedding_wrapper, parameter_group_collection, config.embedding_learning_rate,
+                model.all_prior_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                 "prior_embeddings"
             )
 
@@ -70,6 +70,7 @@ class WuerstchenLoRASetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
         model.prior_text_encoder.requires_grad_(False)
         model.prior_prior.requires_grad_(False)
         if model.model_type.is_wuerstchen_v2():
@@ -83,17 +84,10 @@ class WuerstchenLoRASetup(
                                  not self.stop_text_encoder_training_elapsed(config, model.train_progress)
             model.prior_text_encoder_lora.requires_grad_(train_text_encoder)
 
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.prior_text_encoder_vector.requires_grad_(train_embedding)
-
         if model.prior_prior_lora is not None:
             train_unet = config.unet.train and \
                          not self.stop_unet_training_elapsed(config, model.train_progress)
             model.prior_prior_lora.requires_grad_(train_unet)
-
 
     def setup_model(
             self,
@@ -129,7 +123,7 @@ class WuerstchenLoRASetup(
         model.prior_prior_lora.hook_to_module()
 
         self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 

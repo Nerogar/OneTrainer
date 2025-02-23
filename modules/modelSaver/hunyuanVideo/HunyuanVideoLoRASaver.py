@@ -14,6 +14,8 @@ from safetensors.torch import save_file
 class HunyuanVideoLoRASaver(
     DtypeModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def __get_state_dict(
             self,

@@ -81,7 +81,7 @@ class HunyuanVideoLoRASetup(
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
-
+        self._setup_embeddings_requires_grad(model, config)
         if model.text_encoder_1 is not None:
             model.text_encoder_1.requires_grad_(False)
         if model.text_encoder_2 is not None:
@@ -98,22 +98,6 @@ class HunyuanVideoLoRASetup(
             train_text_encoder_2 = config.text_encoder_2.train and \
                                    not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
             model.text_encoder_2_lora.requires_grad_(train_text_encoder_2)
-
-        for embedding, embedding_config in zip(model.all_text_encoder_1_embeddings(), config.all_embedding_configs(), strict=True):
-            if model.text_encoder_1 is not None:
-                train_embedding_1 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                embedding.requires_grad_(train_embedding_1)
-
-        for embedding, embedding_config in zip(model.all_text_encoder_2_embeddings(), config.all_embedding_configs(), strict=True):
-            if model.text_encoder_2 is not None:
-                train_embedding_2 = \
-                    embedding_config.train \
-                    and config.text_encoder_2.train_embedding \
-                    and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                embedding.requires_grad_(train_embedding_2)
 
         if model.transformer_lora is not None:
             train_transformer = config.prior.train and \

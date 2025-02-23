@@ -45,9 +45,10 @@ class StableDiffusionLoRASetup(
                 learning_rate=config.text_encoder.learning_rate,
             ))
 
-        if config.train_any_embedding():
+        if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
-                model.embedding_wrapper, parameter_group_collection, config.embedding_learning_rate, "embeddings"
+                model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings"
             )
 
         if config.unet.train:
@@ -64,6 +65,7 @@ class StableDiffusionLoRASetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
         model.text_encoder.requires_grad_(False)
         model.unet.requires_grad_(False)
         model.vae.requires_grad_(False)
@@ -72,12 +74,6 @@ class StableDiffusionLoRASetup(
             train_text_encoder = config.text_encoder.train and \
                                  not self.stop_text_encoder_training_elapsed(config, model.train_progress)
             model.text_encoder_lora.requires_grad_(train_text_encoder)
-
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.text_encoder_vector.requires_grad_(train_embedding)
 
         if model.unet_lora is not None:
             train_unet = config.unet.train and \
@@ -123,7 +119,7 @@ class StableDiffusionLoRASetup(
             model.force_v_prediction()
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
