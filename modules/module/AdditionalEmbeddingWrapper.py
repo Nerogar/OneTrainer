@@ -58,7 +58,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
     def normalize_embeddings(self):
         with torch.no_grad():
             for embedding in self.embeddings:
-                if embedding.requires_grad:  # only normalize if the embedding is learned
+                if embedding.vector.requires_grad:  # only normalize if the embedding is learned
                     copy = torch.nn.functional.normalize(embedding.vector)
                     copy.mul_(self.orig_median_norm)
                     embedding.vector.copy_(copy)

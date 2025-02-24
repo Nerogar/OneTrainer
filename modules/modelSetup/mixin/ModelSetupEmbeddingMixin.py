@@ -102,10 +102,9 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
                 learning_rate=embedding_learning_rate,
             ))
 
-    def _normalize_output_embeddings(self, embeddings: list[BaseModelEmbedding], target_norm: float):
+    def _normalize_output_embeddings(self, embeddings: list[BaseModelEmbedding]):
         with torch.no_grad():
             for embedding in embeddings:
                 if embedding.is_output_embedding and embedding.output_vector.requires_grad:
-                    copy = torch.nn.functional.normalize(embedding.output_vector)
-                    copy.mul_(target_norm)
-                    embedding.output_vector.copy_(copy)
+                    std = embedding.output_vector.std(dim=1).mean()
+                    embedding.output_vector.mul_(embedding.original_output_vector_std / std)

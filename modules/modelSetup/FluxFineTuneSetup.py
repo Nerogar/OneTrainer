@@ -156,6 +156,7 @@ class FluxFineTuneSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
+            self._normalize_output_embeddings(model.all_text_encoder_2_embeddings())
             if model.embedding_wrapper_1 is not None:
                 model.embedding_wrapper_1.normalize_embeddings()
             if model.embedding_wrapper_2 is not None:

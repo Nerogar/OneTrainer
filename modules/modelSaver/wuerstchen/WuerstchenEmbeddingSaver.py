@@ -22,7 +22,7 @@ class WuerstchenEmbeddingSaver(
             embedding_state_dict: dict[str, Tensor] | None,
             dtype: torch.dtype | None,
     ):
-        state_dict = copy(embedding_state_dict)
+        state_dict = copy(embedding_state_dict) if embedding_state_dict is not None else {}
 
         if embedding is not None:
             if embedding.prior_text_encoder_embedding.vector is not None:

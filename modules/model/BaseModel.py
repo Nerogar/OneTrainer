@@ -32,12 +32,15 @@ class BaseModelEmbedding:
             if is_output_embedding:
                 self.vector = torch.zeros_like(vector).requires_grad_(False)
                 self.output_vector = vector.to(dtype=torch.float32)
+                self.original_output_vector_std = self.output_vector.std(dim=1).mean()
             else:
                 self.vector = vector
                 self.output_vector = None
+                self.original_output_vector_std = None
         else:
             self.vector = None
             self.output_vector = None
+            self.original_output_vector_std = None
 
         self.text_tokens = [f"<{uuid4()}>" for _ in range(self.token_count)]
         self.joint_text_tokens = ''.join(self.text_tokens)
