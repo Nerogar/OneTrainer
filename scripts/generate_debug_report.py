@@ -35,17 +35,19 @@ class Utility:
     def subprocess_run(
         cmd: list[str], **kwargs
     ) -> subprocess.CompletedProcess:
-        """
-        Run a subprocess with enforced locale settings and default kwargs.
-        """
+        """Run a subprocess with enforced locale settings and default kwargs."""
         proc_env = os.environ.copy()
         # Force external utilities to output US English ASCII with US formatting
         proc_env["LC_ALL"] = "C"
-        kwargs.setdefault("check", True)
-        kwargs.setdefault("capture_output", True)
-        kwargs.setdefault("text", True)
-        kwargs["env"] = proc_env
-        return subprocess.run(cmd, **kwargs)
+
+        # Someone I showed didnt like multiple kwargs.setdefault, changed to this
+        defaults = {
+            "check": True,
+            "capture_output": True,
+            "text": True,
+            "env": proc_env,
+        }
+        return subprocess.run(cmd, **{**defaults, **kwargs})
 
     @staticmethod
     def run_command(cmd: list[str]) -> str | None:
@@ -76,19 +78,18 @@ class Utility:
 
     @staticmethod
     def anonymize_path(path: str | None) -> str | None:
-        """
-        Anonymize user paths for both Windows, Linux and Mac as there is no need to collect that.
-        """
+        """Anonymize user paths for both Windows, Linux and Mac."""
         if not path:
             return path
-        # Replace Windows user paths.
-        path = re.sub(
-            r"(?i)^([A-Z]:\\Users)\\[^\\]+", r"\1\\anonymous", path
-        )
-        # Replace Linux user paths.
-        path = re.sub(r"(?i)^/home/[^/]+", r"/home/anonymous", path)
-        # Replace MacOS user paths.
-        path = re.sub(r"(?i)^/Users/[^/]+", r"/Users/anonymous", path)
+
+        patterns = [
+            (r"(?i)^([A-Z]:\\Users)\\[^\\]+", r"\1\\anonymous"),  # Windows
+            (r"(?i)^/home/[^/]+", r"/home/anonymous"),  # Linux
+            (r"(?i)^/Users/[^/]+", r"/Users/anonymous"),  # macOS
+        ]
+
+        for pattern, replacement in patterns:
+            path = re.sub(pattern, replacement, path)
         return path
 
 
@@ -105,14 +106,14 @@ class OSInfo:
 
             # Special handling for Linux distributions
             if system == "Linux":
-                # Try to get distribution info using /etc/os-release
                 try:
                     with open("/etc/os-release", "r") as f:
-                        os_release = {}
-                        for line in f:
-                            if "=" in line:
-                                key, value = line.rstrip().split("=", 1)
-                                os_release[key] = value.strip('"')
+                        os_release = {
+                            key: value.strip('"')
+                            for line in f
+                            if "=" in line
+                            for key, value in [line.rstrip().split("=", 1)]
+                        }
 
                     # Use PRETTY_NAME or fallback to NAME + VERSION_ID
                     if "PRETTY_NAME" in os_release:
@@ -569,8 +570,7 @@ class GPUCollector:
     def determine_vendor(vendor_str: str) -> str:
         lower_vendor = vendor_str.lower()
         if any(
-            x.lower() in lower_vendor
-            for x in ["AMD", "ATI", "Advanced Micro"]
+            x in lower_vendor for x in {"amd", "ati", "advanced micro"}
         ):
             return "AMD"
         elif "intel" in lower_vendor:
@@ -591,10 +591,9 @@ class GPUCollector:
     def get_all() -> list[GPUInfo]:
         """
         Gather GPU information using a multi-stage approach.
-        First, try NVIDIA native detection; if that fails,
+        First Mac, then NVIDIA, then Intel/AMD on Windows,
         then attempt to use lspci; if that also fails,
         fall back to parsing lshw JSON output.
-        Each branch is wrapped in try/except blocks for error tolerance.
         """
         try:
             system = platform.system()
@@ -605,9 +604,9 @@ class GPUCollector:
 
             # Obviously NVIDIA GPUs are the most common, so we check for them first after short-circuiting for Mac.
             # Approach works for both Windows and Linux.
-            nvidia = Utility.safe_call(GPUCollector.get_nvidia, [])
-            if nvidia:
-                return nvidia
+            nvidia_gpus = Utility.safe_call(GPUCollector.get_nvidia, [])
+            if nvidia_gpus:
+                return nvidia_gpus
 
             # Next most common case is Intel/AMD GPUs on Windows, check via powershell
             if system == "Windows":
@@ -615,12 +614,17 @@ class GPUCollector:
 
             # If not nvidia and is Linux, try lspci first, then fall back to lshw.
             if system == "Linux":
-                lspci = Utility.safe_call(GPUCollector.get_lspci, [])
-                if lspci:
-                    return lspci
-                lshw = Utility.safe_call(GPUCollector.get_lshw, None)
-                if lshw and lshw.Name and lshw.Name != "Unknown":
-                    return [lshw]
+                lspci_gpus = Utility.safe_call(GPUCollector.get_lspci, [])
+                if lspci_gpus:
+                    return lspci_gpus
+
+                lshw_gpu = Utility.safe_call(GPUCollector.get_lshw, None)
+                if (
+                    lshw_gpu
+                    and lshw_gpu.Name
+                    and lshw_gpu.Name != "Unknown"
+                ):
+                    return [lshw_gpu]
 
             return []
         except Exception as e:
@@ -668,41 +672,62 @@ class SoftwareInfo:
         the current branch, commit hash, and any modified files compared to the upstream branch.
         """
         # Get remote repository URL info for fork detection.
-        remote_url = Utility.run_command(["git", "config", "--get", "remote.origin.url"])
+        remote_url = Utility.run_command(
+            ["git", "config", "--get", "remote.origin.url"]
+        )
         if remote_url:
             import re
+
             match = re.search(
                 r"[:/](?P<user>[^/]+)/(?P<repo>[^/.]+)(\.git)?$",
                 remote_url,
             )
-            repo_info = f"Repo: {match.group('user')}/{match.group('repo')}" if match else f"Remote URL: {remote_url}"
+            repo_info = (
+                f"Repo: {match.group('user')}/{match.group('repo')}"
+                if match
+                else f"Remote URL: {remote_url}"
+            )
         else:
             repo_info = "No remote repository URL available."
 
-        branch = Utility.run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        branch = Utility.run_command(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+        )
         if branch is None:
             return "Not a Git repository or git not installed."
 
-        commit = Utility.run_command(["git", "rev-parse", "HEAD"]) or "Unavailable"
+        commit = (
+            Utility.run_command(["git", "rev-parse", "HEAD"])
+            or "Unavailable"
+        )
         # Insert repo info at the top, followed by branch and commit.
         git_info = f"{repo_info}\nBranch: {branch}\nCommit: {commit}"
 
-        upstream = Utility.run_command([
-            "git",
-            "rev-parse",
-            "--abbrev-ref",
-            "--symbolic-full-name",
-            "@{u}",
-        ])
+        upstream = Utility.run_command(
+            [
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "@{u}",
+            ]
+        )
         if upstream:
-            diff_files = Utility.run_command(["git", "diff", "--name-only", "@{u}"]) or ""
+            diff_files = (
+                Utility.run_command(["git", "diff", "--name-only", "@{u}"])
+                or ""
+            )
             if diff_files.strip():
-                modified_files = "\n".join(f"  {line}" for line in diff_files.splitlines())
+                modified_files = "\n".join(
+                    f"  {line}" for line in diff_files.splitlines()
+                )
                 git_info += f"\nModified Files (differs from {upstream}):\n{modified_files}"
             else:
                 git_info += f"\nNo modifications relative to upstream ({upstream})."
         else:
-            git_info += "\nNo upstream branch tracking information available."
+            git_info += (
+                "\nNo upstream branch tracking information available."
+            )
 
         return git_info
 
@@ -754,6 +779,19 @@ class NetworkInfo:
             logger.exception("Unexpected error during ping")
             return f"Failure: {e}"
 
+    @staticmethod
+    def test_connectivity() -> dict[str, tuple[str, str]]:
+        """Test connectivity to key services."""
+        urls = {
+            "PyPI": "https://pypi.org/",
+            "HuggingFace": "https://huggingface.co",
+            "Google": "https://www.google.com",
+        }
+        return {
+            name: (url, NetworkInfo.test_url(url))
+            for name, url in urls.items()
+        }
+
 
 class ReportBuilder:
     @staticmethod
@@ -766,9 +804,7 @@ class ReportBuilder:
         gpu_info = GPUCollector.get_all()
         python_info = SoftwareInfo.get_python_info()
         git_info = SoftwareInfo.get_git_info()
-        pyPi_status = NetworkInfo.test_url("https://pypi.org/")
-        huggingface_status = NetworkInfo.test_url("https://huggingface.co")
-        google_status = NetworkInfo.test_url("https://www.google.com")
+        network_status = NetworkInfo.test_connectivity()
         intel_microcode = IntelMicrocode.get_info()
 
         report = [
@@ -805,9 +841,10 @@ class ReportBuilder:
                 git_info,
                 "",
                 "=== Network Connectivity ===",
-                f"PyPI (https://pypi.org/): {pyPi_status}",
-                f"HuggingFace (https://huggingface.co): {huggingface_status}",
-                f"Google (https://www.google.com): {google_status}",
+                *[
+                    f"{name} ({url}): {status}"
+                    for name, (url, status) in network_status.items()
+                ],
                 "",
                 "=== Intel Microcode Information ===",
                 intel_microcode,
@@ -832,9 +869,8 @@ class ReportBuilder:
 
 
 def main() -> None:
-    """
-    Main function to collect info, build the debug report, and write it to a file.
-    """
+    """Main function to collect info, build the debug report, and write it to a file."""
+
     current_dir = Path.cwd()
     logger.info(f"Current directory: {current_dir}")
     if current_dir.name != "OneTrainer":
@@ -842,9 +878,16 @@ def main() -> None:
             f"Expected to run from the OneTrainer folder. Current folder: {current_dir}"
         )
 
-    report = ReportBuilder.build_report()
-    output_file = Path("debug_report.log")
-    ReportBuilder.write_report(report, output_file)
+    try:
+        report = ReportBuilder.build_report()
+        output_file = Path("debug_report.log")
+        ReportBuilder.write_report(report, output_file)
+        print(
+            f"Debug report created successfully: {output_file.absolute()}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate debug report: {e}")
+        raise
 
 
 if __name__ == "__main__":
