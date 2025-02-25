@@ -10,12 +10,13 @@ import onnxruntime
 
 
 class WDModel(BaseImageCaptionModel):
-    def __init__(self, device: torch.device, dtype: torch.dtype):
+    def __init__(self, device: torch.device, dtype: torch.dtype, wd_model_name):
         self.device = device
         self.dtype = dtype
+        self.wd_model_name = wd_model_name
 
         model_path = huggingface_hub.hf_hub_download(
-            "SmilingWolf/wd-v1-4-vit-tagger-v2", "model.onnx"
+            "SmilingWolf/"+wd_model_name, "model.onnx"
         )
         if device.type == 'cpu':
             provider = "CPUExecutionProvider"
@@ -24,7 +25,7 @@ class WDModel(BaseImageCaptionModel):
         self.model = onnxruntime.InferenceSession(model_path, providers=[provider])
 
         label_path = huggingface_hub.hf_hub_download(
-            "SmilingWolf/wd-v1-4-vit-tagger-v2", "selected_tags.csv"
+            "SmilingWolf/"+wd_model_name, "selected_tags.csv"
         )
         self.tag_names = []
         self.rating_indexes = []
