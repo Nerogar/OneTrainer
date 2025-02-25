@@ -367,8 +367,9 @@ class GPUCollector:
 
                     # Determine vendor using the new helper function
                     vendor_str = device.get("vendor", "")
+                    product_str = device.get("product", "")
                     gpu["Vendor"] = GPUCollector.determine_vendor(
-                        vendor_str
+                        vendor_str, product_str
                     )
 
                     # Build extended info using the new helper function
@@ -447,16 +448,21 @@ class GPUCollector:
                 continue
 
             vendor_str = vendor_match.group(1).strip()
+            device_str = device_match.group(1).strip()
+
+            # Use both vendor string and device string for detection
+            vendor = GPUCollector.determine_vendor(vendor_str, device_str)
+
             # Skip NVIDIA GPUs since they are handled elsewhere
-            if GPUCollector.determine_vendor(vendor_str) == "NVIDIA":
+            if vendor == "NVIDIA":
                 continue
 
             slot = slot_match.group(1).strip()
             gpus.append(
                 GPUInfo(
                     Identifier=f"PCI Slot {slot}",
-                    Name=device_match.group(1).strip(),
-                    Vendor=GPUCollector.determine_vendor(vendor_str),
+                    Name=device_str,
+                    Vendor=vendor,
                     ExtendedInfo=GPUCollector.build_extended_info(
                         [f"Vendor: {vendor_str}", f"PCI Slot: {slot}"]
                     ),
@@ -567,16 +573,34 @@ class GPUCollector:
         return gpus
 
     @staticmethod
-    def determine_vendor(vendor_str: str) -> str:
-        lower_vendor = vendor_str.lower()
-        if any(
-            x in lower_vendor for x in {"amd", "ati", "advanced micro"}
+    def determine_vendor(vendor_str: str, device_name: str = "") -> str:
+        """
+        Determine the GPU vendor from vendor string and optionally device name.
+        Takes both the vendor string and device name into account for more accurate detection.
+        """
+        lower_vendor = vendor_str.lower() if vendor_str else ""
+        lower_device = device_name.lower() if device_name else ""
+
+        # Check for NVIDIA keywords in either string
+        if "nvidia" in lower_vendor or any(
+            x in lower_device
+            for x in {"geforce", "rtx", "gtx", "quadro", "tesla", "titan"}
         ):
-            return "AMD"
-        elif "intel" in lower_vendor:
-            return "Intel"
-        elif "nvidia" in lower_vendor:
             return "NVIDIA"
+        # Check for AMD keywords
+        elif any(
+            x in lower_vendor
+            for x in {
+                "amd",
+                "ati",
+                "advanced micro",
+            }
+        ) or any(x in lower_device for x in {"radeon", "firepro"}):
+            return "AMD"
+        # Check for Intel
+        elif "intel" in lower_vendor or "intel" in lower_device:
+            return "Intel"
+
         return "Unknown"
 
     @staticmethod
