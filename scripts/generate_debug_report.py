@@ -703,6 +703,19 @@ class SoftwareInfo:
         # Insert repo info at the top, followed by branch and commit.
         git_info = f"{repo_info}\nBranch: {branch}\nCommit: {commit}"
 
+        # Check for untracked files
+        untracked_files = Utility.run_command(
+            ["git", "ls-files", "--others", "--exclude-standard"]
+        )
+        if untracked_files and untracked_files.strip():
+            untracked_list = "\n".join(
+                f"  {line}" for line in untracked_files.splitlines()
+            )
+            git_info += f"\nUntracked Files:\n{untracked_list}"
+        else:
+            git_info += "\nNo untracked files."
+
+        # Check for modified files relative to upstream
         upstream = Utility.run_command(
             [
                 "git",
