@@ -2,6 +2,8 @@
 
 set -e
 
+SUPPORTED_VERSIONS="3.10.x, 3.11.x, 3.12.x"
+
 # Detect absolute path to the directory where "lib.include.sh" resides.
 export SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
@@ -394,7 +396,7 @@ function show_runtime_solutions {
         # NOTE: We tell the user what to do, since automated removal is risky.
         print "Solution: Switch your Conda environment to the required Python version by deleting your old environment, and then run OneTrainer again.\n\nTo delete the outdated Conda environment, execute the following command:\n\"${OT_CONDA_CMD}\" remove -y --prefix \"${conda_env_path}\" --all"
     else
-        print "Solution: Either install the required Python version via pyenv (https://github.com/pyenv/pyenv) and set the project directory's Python version with \"pyenv install <version>\" followed by \"pyenv local <version>\", or install Miniconda if you prefer that we automatically manage everything for you (https://docs.anaconda.com/miniconda/). Remember to manually delete any previous Venv or Conda environment which was created with a different Python version. Read \"LAUNCH-SCRIPTS.md\" for more detailed instructions."
+        print "Solution: Either install a Python version supported by OneTrainer (${SUPPORTED_VERSIONS}) via pyenv (https://github.com/pyenv/pyenv) and set the project directory's Python version with \"pyenv install <version>\" followed by \"pyenv local <version>\", or install Miniconda if you prefer that we automatically manage everything for you (https://docs.anaconda.com/miniconda/). Remember to manually delete any previous Venv or Conda environment which was created with a different Python version. Read \"LAUNCH-SCRIPTS.md\" for more detailed instructions."
     fi
 }
 
