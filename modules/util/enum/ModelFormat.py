@@ -22,3 +22,6 @@ class ModelFormat(Enum):
                 return '.safetensors'
             case _:
                 return ''
+
+    def is_single_file(self) -> bool:
+        return self.file_extension() != ''

@@ -76,6 +76,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     ):
         losses = 0
 
+        mean_dim = list(range(1, data['predicted'].ndim))
+
         # MSE/L2 Loss
         if config.mse_strength != 0:
             losses += masked_losses(
@@ -87,7 +89,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
-            ).mean([1, 2, 3]) * config.mse_strength
+            ).mean(mean_dim) * config.mse_strength
 
         # MAE/L1 Loss
         if config.mae_strength != 0:
@@ -100,7 +102,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
-            ).mean([1, 2, 3]) * config.mae_strength
+            ).mean(mean_dim) * config.mae_strength
 
         # log-cosh Loss
         if config.log_cosh_strength != 0:
@@ -112,7 +114,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
-            ).mean([1, 2, 3]) * config.log_cosh_strength
+            ).mean(mean_dim) * config.log_cosh_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data and self.__coefficients is not None:
@@ -128,7 +130,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
-            ).mean([1, 2, 3]) * config.vb_loss_strength
+            ).mean(mean_dim) * config.vb_loss_strength
 
         return losses
 
@@ -140,13 +142,15 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     ):
         losses = 0
 
+        mean_dim = list(range(1, data['predicted'].ndim))
+
         # MSE/L2 Loss
         if config.mse_strength != 0:
             losses += F.mse_loss(
                 data['predicted'].to(dtype=torch.float32),
                 data['target'].to(dtype=torch.float32),
                 reduction='none'
-            ).mean([1, 2, 3]) * config.mse_strength
+            ).mean(mean_dim) * config.mse_strength
 
         # MAE/L1 Loss
         if config.mae_strength != 0:
@@ -154,14 +158,14 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 data['predicted'].to(dtype=torch.float32),
                 data['target'].to(dtype=torch.float32),
                 reduction='none'
-            ).mean([1, 2, 3]) * config.mae_strength
+            ).mean(mean_dim) * config.mae_strength
 
         # log-cosh Loss
         if config.log_cosh_strength != 0:
             losses += self.__log_cosh_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32)
-                ).mean([1, 2, 3]) * config.log_cosh_strength
+                ).mean(mean_dim) * config.log_cosh_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data:
@@ -172,11 +176,11 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 t=data['timestep'],
                 predicted_eps=data['predicted'].to(dtype=torch.float32),
                 predicted_var_values=data['predicted_var_values'].to(dtype=torch.float32),
-            ).mean([1, 2, 3]) * config.vb_loss_strength
+            ).mean(mean_dim) * config.vb_loss_strength
 
         if config.masked_training and config.normalize_masked_area_loss:
             clamped_mask = torch.clamp(batch['latent_mask'], config.unmasked_weight, 1)
-            mask_mean = clamped_mask.mean(dim=(1, 2, 3))
+            mask_mean = clamped_mask.mean(mean_dim)
             losses /= mask_mean
 
         return losses

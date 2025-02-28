@@ -95,7 +95,7 @@ class EmbeddingWidget(ctk.CTkFrame):
 
         # token count
         components.label(top_frame, 0, 6, "token count:",
-                         tooltip="The token count used when creating a new embedding")
+                         tooltip="The token count used when creating a new embedding. Leave empty to auto detect from the initial embedding text.")
         token_count_entry = components.entry(top_frame, 0, 7, self.ui_state, "token_count")
         token_count_entry.configure(width=40)
 

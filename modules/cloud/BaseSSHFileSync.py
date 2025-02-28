@@ -3,8 +3,7 @@ from abc import abstractmethod
 from pathlib import Path
 
 from modules.cloud.BaseFileSync import BaseFileSync
-from modules.util.config.CloudConfig import CloudConfig
-from modules.util.config.CloudConfig import CloudSecretsConfig
+from modules.util.config.CloudConfig import CloudConfig, CloudSecretsConfig
 
 import fabric
 

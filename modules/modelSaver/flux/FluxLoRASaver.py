@@ -34,7 +34,7 @@ class FluxLoRASaver(
                 if embedding.text_encoder_1_vector is not None:
                     state_dict[f"bundle_emb.{embedding.placeholder}.clip_l"] = embedding.text_encoder_1_vector
                 if embedding.text_encoder_2_vector is not None:
-                    state_dict[f"bundle_emb.{embedding.placeholder}.clip_g"] = embedding.text_encoder_2_vector
+                    state_dict[f"bundle_emb.{embedding.placeholder}.t5"] = embedding.text_encoder_2_vector
 
         return state_dict
 

@@ -23,6 +23,8 @@
 
 - `OT_PREFER_VENV`: If set to `true`, Conda will be ignored even if it exists on the system, and Python Venv will be used instead. This ensures that people who use `pyenv` (to choose which Python version to run on the host) can easily set up their desired Python Venv environments. Defaults to `false`.
 
+- `OT_LAZY_UPDATES`: If set to `true`, OneTrainer's self-update process will only update the Python environment's dependencies if the OneTrainer source code has been modified since the previous dependency update. This speeds up executions of `update.sh`, and is generally safe, but may miss some updates and important bugfixes for external third-party dependencies. If you use this option, you must set it permanently for *every* script (not just `update.sh`). Defaults to `false`.
+
 - `OT_CUDA_LOWMEM_MODE`: If set to `true`, it enables aggressive garbage collection in PyTorch to help with low-memory GPUs. Defaults to `false`.
 
 - `OT_PLATFORM_REQUIREMENTS`: Allows you to override which platform-specific "requirements" file you want to install. Defaults to `detect`, which automatically detects whether you have an AMD or NVIDIA GPU. But people with multi-GPU systems can use this setting to force a specific GPU acceleration framework's requirements. Valid values are `requirements-rocm.txt` for AMD, `requirements-cuda.txt` for NVIDIA, and `requirements-default.txt` for non-AMD/NVIDIA systems.

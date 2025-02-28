@@ -34,12 +34,9 @@ class BaseCloud(metaclass=ABCMeta):
 
     def upload_config(self,commands : TrainCommands=None):
         local_config_path=Path(self.config.local_workspace_dir,f"remote_config-{get_string_timestamp()}.json")
-        config_dict=self.config.to_pack_dict()
-        if 'secrets' in config_dict:
-            #no need to upload secrets - hugging face token is transferred via environment variable:
-            config_dict.pop('secrets')
+        #no need to upload secrets - hugging face token is transferred via environment variable:
         with local_config_path.open(mode="w") as f:
-            json.dump(config_dict, f, indent=4)
+            json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
         self._upload_config_file(local_config_path)
 
         if hasattr(self.config,"local_base_model_name"):

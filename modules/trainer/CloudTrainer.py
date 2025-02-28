@@ -143,7 +143,7 @@ class CloudTrainer(BaseTrainer):
 
     @staticmethod
     def __make_remote_config(local : TrainConfig):
-        remote = TrainConfig.default_values().from_dict(local.to_pack_dict())
+        remote = TrainConfig.default_values().from_dict(local.to_pack_dict(secrets=True))
         #share cloud config, so UI can be updated to IP, port, cloudid:
         remote.cloud = local.cloud
         remote.secrets.cloud = local.secrets.cloud
@@ -178,6 +178,11 @@ class CloudTrainer(BaseTrainer):
         for concept in remote.concepts:
             adjust(concept,"path")
             adjust(concept.text,"prompt_path")
+
+        if remote.train_device == "cpu":
+            #if there is no local GPU, "cpu" is the default, but not correct for cloud training
+            print("warning: replacing Train Device cpu with cuda")
+            remote.train_device = "cuda"
 
         return remote
 

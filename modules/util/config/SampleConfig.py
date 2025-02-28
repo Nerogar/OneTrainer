@@ -10,6 +10,8 @@ class SampleConfig(BaseConfig):
     negative_prompt: str
     height: int
     width: int
+    frames: int
+    length: float
     seed: int
     random_seed: bool
     diffusion_steps: int
@@ -45,6 +47,8 @@ class SampleConfig(BaseConfig):
         data.append(("negative_prompt", "", str, False))
         data.append(("height", 512, int, False))
         data.append(("width", 512, int, False))
+        data.append(("frames", 1, int, False))
+        data.append(("length", 10.0, float, False))
         data.append(("seed", 42, int, False))
         data.append(("random_seed", False, bool, False))
         data.append(("diffusion_steps", 20, int, False))

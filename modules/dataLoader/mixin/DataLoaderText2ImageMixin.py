@@ -15,9 +15,11 @@ from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
 from mgds.pipelineModules.GetFilename import GetFilename
+from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
+from mgds.pipelineModules.LoadVideo import LoadVideo
 from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.ModifyPath import ModifyPath
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
@@ -44,12 +46,17 @@ class DataLoaderText2ImageMixin:
     def __init__(self):
         pass
 
-    def _enumerate_input_modules(self, config: TrainConfig) -> list:
-        supported_extensions = path_util.supported_image_extensions()
+    def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
+        supported_extensions = set()
+        supported_extensions |= path_util.supported_image_extensions()
+
+        if allow_videos:
+            supported_extensions |= path_util.supported_video_extensions()
 
         collect_paths = CollectPaths(
-            concept_in_name='concept', path_in_name='path', path_out_name='image_path', concept_out_name='concept',
-            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel'], include_subdirectories_in_name='concept.include_subdirectories'
+            concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
+            path_out_name='image_path', concept_out_name='concept',
+            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
         )
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
@@ -67,11 +74,15 @@ class DataLoaderText2ImageMixin:
             config: TrainConfig,
             train_dtype: DataType,
             replace_embedding_text_fn: Callable[[str], str],
+            allow_video: bool = False,
     ) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, dtype=train_dtype.torch_dtype())
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
+        load_video = LoadVideo(path_in_name='image_path', target_frame_count_in_name='settings.target_frames', video_out_name='image', range_min=0, range_max=1, target_frame_rate=24, supported_extensions=path_util.supported_video_extensions(), dtype=train_dtype.torch_dtype())
+        image_to_video = ImageToVideo(in_name='image', out_name='image')
 
-        generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1, channels=1)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, dtype=train_dtype.torch_dtype())
+        generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1)
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, supported_extensions={".png"}, dtype=train_dtype.torch_dtype())
+        mask_to_video = ImageToVideo(in_name='mask', out_name='mask')
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -85,13 +96,22 @@ class DataLoaderText2ImageMixin:
 
         map_embedding_text = MapData(in_name='prompt', out_name='prompt', map_fn=replace_embedding_text_fn)
 
-        modules = [load_image, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
+
+        modules = [load_image, load_video]
+
+        if allow_video:
+            modules.append(image_to_video)
+
+        modules.extend([load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text])
 
         if config.masked_training:
             modules.append(generate_mask)
             modules.append(load_mask)
         elif config.model_type.has_mask_input():
             modules.append(generate_mask)
+
+        if allow_video:
+            modules.append(mask_to_video)
 
         modules.append(map_embedding_text)
 
@@ -114,7 +134,7 @@ class DataLoaderText2ImageMixin:
 
         return modules
 
-    def _aspect_bucketing_in(self, config: TrainConfig, aspect_bucketing_quantization: int):
+    def _aspect_bucketing_in(self, config: TrainConfig, aspect_bucketing_quantization: int, frame_dim_enabled:bool=False):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
         aspect_bucketing_quantization = AspectBucketing(
@@ -123,6 +143,8 @@ class DataLoaderText2ImageMixin:
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
             target_resolutions_override_in_name='concept.image.resolution_override',
+            target_frames_in_name='settings.target_frames',
+            frame_dim_enabled=frame_dim_enabled,
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
             possible_resolutions_out_name='possible_resolutions'
@@ -144,6 +166,21 @@ class DataLoaderText2ImageMixin:
             modules.append(aspect_bucketing_quantization)
         else:
             modules.append(single_aspect_calculation)
+
+        return modules
+
+    def _crop_modules(self, config: TrainConfig):
+        inputs = ['image']
+
+        if config.masked_training or config.model_type.has_mask_input():
+            inputs.append('mask')
+
+        if config.model_type.has_depth_input():
+            inputs.append('depth')
+
+        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
+
+        modules = [scale_crop]
 
         return modules
 
@@ -180,21 +217,6 @@ class DataLoaderText2ImageMixin:
             caps_randomize,
             shuffle_tags,
         ]
-
-        return modules
-
-    def _crop_modules(self, config: TrainConfig):
-        inputs = ['image']
-
-        if config.masked_training or config.model_type.has_mask_input():
-            inputs.append('mask')
-
-        if config.model_type.has_depth_input():
-            inputs.append('depth')
-
-        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
-
-        modules = [scale_crop]
 
         return modules
 

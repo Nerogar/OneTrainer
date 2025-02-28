@@ -61,6 +61,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("PixArt Sigma", ModelType.PIXART_SIGMA),
             ("Flux Dev", ModelType.FLUX_DEV_1),
             ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
+            ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
         ], self.ui_state, "model_type")
 
         # training method

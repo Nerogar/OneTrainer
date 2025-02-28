@@ -262,9 +262,10 @@ class BaseFluxSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
+            batch_seed = 0 if deterministic else train_progress.global_step
             generator = torch.Generator(device=config.train_device)
-            generator.manual_seed(train_progress.global_step)
-            rand = Random(train_progress.global_step)
+            generator.manual_seed(batch_seed)
+            rand = Random(batch_seed)
 
             is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
 
@@ -427,6 +428,8 @@ class BaseFluxSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                latent_height=scaled_latent_image.shape[-2],
+                latent_width=scaled_latent_image.shape[-1],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

@@ -1,7 +1,7 @@
 # pytorch
-torch==2.5.1
-torchvision==0.20.1
-onnxruntime==1.19.2
+torch==2.6.0
+torchvision==0.21.0
+onnxruntime==1.20.1
 
 # xformers
 # TODO

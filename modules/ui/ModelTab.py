@@ -54,6 +54,8 @@ class ModelTab:
             self.__setup_flux_ui()
         elif self.train_config.model_type.is_sana():
             self.__setup_sana_ui()
+        elif self.train_config.model_type.is_hunyuan_video():
+            self.__setup_hunyuan_video_ui()
 
     def __setup_stable_diffusion_ui(self):
         row = 0
@@ -88,10 +90,7 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [
-                TrainingMethod.FINE_TUNE,
-                TrainingMethod.FINE_TUNE_VAE,
-            ],
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=True,
         )
 
@@ -109,11 +108,8 @@ class ModelTab:
         row = self.__create_output_components(
             row,
             allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [
-                TrainingMethod.FINE_TUNE,
-                TrainingMethod.FINE_TUNE_VAE,
-            ],
-            allow_checkpoint=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_checkpoint=False,
         )
 
     def __setup_stable_diffusion_xl_ui(self):
@@ -182,6 +178,23 @@ class ModelTab:
             allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_checkpoint=False,
+        )
+
+    def __setup_hunyuan_video_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            has_text_encoder_1=True,
+            has_text_encoder_2=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_checkpoint=True,
         )
 
     def __create_dtype_options(self, include_none:bool=True) -> list[tuple[str, DataType]]:

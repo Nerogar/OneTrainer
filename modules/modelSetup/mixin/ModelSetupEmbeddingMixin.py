@@ -6,9 +6,14 @@ from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameter
 import torch
 from torch import Tensor
 
-from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer, \
-    GemmaTokenizer, Gemma2Model
-from transformers.tokenization_utils import Trie
+from transformers import (
+    CLIPTextModel,
+    CLIPTextModelWithProjection,
+    Gemma2Model,
+    LlamaModel,
+    T5EncoderModel,
+)
+from transformers.tokenization_utils import PreTrainedTokenizer, Trie
 
 
 class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
@@ -17,7 +22,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _remove_added_embeddings_from_tokenizer(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
+            tokenizer: PreTrainedTokenizer,
     ):
         if tokenizer:
             added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
@@ -29,10 +34,10 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _create_new_embedding(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
-            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model,
+            tokenizer: PreTrainedTokenizer,
+            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel,
             initial_embedding_text: str,
-            token_count: int,
+            token_count: int | None,
     ) -> Tensor:
         with torch.no_grad():
             initial_token_ids = tokenizer.encode(
@@ -43,9 +48,11 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             pad_token_id = tokenizer.encode(
                 '*',
                 add_special_tokens=False,
-                max_length=token_count,
+                max_length=1,
             )[0]
-            initial_token_ids += [pad_token_id] * (token_count - len(initial_token_ids))
+
+            if token_count is not None:
+                initial_token_ids += [pad_token_id] * (token_count - len(initial_token_ids))
 
             all_embeddings = text_encoder.get_input_embeddings().weight.data
             initial_embeddings = [all_embeddings[token_id] for token_id in initial_token_ids]
@@ -53,7 +60,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _add_embedding_to_tokenizer(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
+            tokenizer: PreTrainedTokenizer,
             embedding: list[str],
     ) -> (Tensor, list[bool]):
         tokenizer.add_tokens(embedding)

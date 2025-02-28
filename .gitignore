@@ -1,25 +1,37 @@
+# development
 .idea
-.python-version
-/.venv*
-/venv*
-/conda_env*
+*.bak
+*.pyc
+*.swp
+*~
+debug*.ipynb
+debug*.py
 /debug*
+
+# user data
 /workspace*
 /models*
 /training_concepts
 /training_samples
 /training_user_settings
 /external
-debug*.py
-debug*.ipynb
-train.bat
+/update.var
 config.json
-*.pyc
-*.bak
-/src
+secrets.json
+
+# environments
+/.venv*
+/venv*
+/conda_env*
+.python-version
+*.egg-info
+
 # pixi environments
 .pixi
 pixi.lock
 pixi.toml
-*.egg-info
-secrets.json
+
+# misc files
+/src
+train.bat
+debug_report.log

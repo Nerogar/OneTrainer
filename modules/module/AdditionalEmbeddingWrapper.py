@@ -4,11 +4,11 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from transformers import CLIPTokenizer, T5Tokenizer, GemmaTokenizer
+from transformers import PreTrainedTokenizer
 
 
 class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
-    tokenizer: CLIPTokenizer | T5Tokenizer
+    tokenizer: PreTrainedTokenizer
     prefix: str
     orig_module: nn.Embedding
     additional_embeddings: list[Tensor]
@@ -17,7 +17,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
     def __init__(
             self,
-            tokenizer: CLIPTokenizer | T5Tokenizer | GemmaTokenizer,
+            tokenizer: PreTrainedTokenizer,
             orig_module: nn.Embedding,
             additional_embeddings: list[Tensor],
             additional_embedding_placeholders: list[str],
