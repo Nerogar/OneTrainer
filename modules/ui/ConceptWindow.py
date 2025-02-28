@@ -1,5 +1,5 @@
-import asyncio
 import math
+import multiprocessing
 import os
 import pathlib
 import random
@@ -350,7 +350,7 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(2, weight=0, minsize=150)
         frame.grid_columnconfigure(3, weight=0, minsize=150)
 
-        self.cancel_scan_flag = False
+        self.cancel_scan_flag = multiprocessing.Event()
 
         #file size
         self.file_size_label = components.label(frame, 1, 0, "Total Size", pad=0,
@@ -458,12 +458,12 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.yaxis.label.set_color(text_color)
 
         #refresh stats - must be after all labels are defined or will give error
-        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: asyncio.run(self.__get_concept_stats(False, 9999)),
+        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__get_concept_stats_threaded(False, 9999),
                           tooltip="Reload basic statistics for the concept directory")
-        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: [asyncio.run(self.__get_concept_stats(False, 9999)), asyncio.run(self.__get_concept_stats(True, 9999))],
+        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: [self.__get_concept_stats_threaded(False, 9999), self.__get_concept_stats(True, 9999)],
                           tooltip="Reload advanced statistics for the concept directory")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
-        components.button(master=frame, row=0, column=2, text="Abort Scan", command=asyncio.run(self.__cancel_concept_stats()),
-                          tooltip="Stop the currently running scan if it's taking a long time - will be slow on large folders and on HDDs")
+        components.button(master=frame, row=0, column=2, text="Abort Scan", command=self.cancel_scan_flag.set(),
+                          tooltip="Stop the currently running scan if it's taking a long time - scan will be slow on large folders and on HDDs")
         self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
 
         #automatically get basic stats if available
@@ -471,9 +471,9 @@ class ConceptWindow(ctk.CTkToplevel):
             self.__update_concept_stats()      #load stats from config if available
         except KeyError:
             start_time = time.perf_counter()
-            asyncio.run(self.__get_concept_stats(False, 1))    #force rescan if config is empty, timeout of 1 sec
+            self.__get_concept_stats_threaded(False, 1)    #force rescan if config is empty, timeout of 1 sec
             if (time.perf_counter() - start_time) < 0.1:
-                asyncio.run(self.__get_concept_stats(True, 1))    #do advanced scan automatically if basic <0.1s
+                self.__get_concept_stats_threaded(True, 1)    #do advanced scan automatically if basic took <0.1s
 
         except FileNotFoundError:              #avoid error when loading concept window without config path defined
             pass
@@ -685,7 +685,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.bar_label(b)
         self.canvas.draw()
 
-    async def __get_concept_stats(self, advanced_checks : bool, waittime : float):
+    def __get_concept_stats(self, advanced_checks : bool, waittime : float):
         start_time = time.perf_counter()
         last_update = time.perf_counter()
         subfolders = [self.concept.path]
@@ -697,11 +697,11 @@ class ConceptWindow(ctk.CTkToplevel):
                 subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
             self.concept.concept_stats = stats_dict
             #cancel if longer than waiting time
-            if (time.perf_counter() - start_time) > waittime or self.cancel_scan_flag:
+            if (time.perf_counter() - start_time) > waittime or self.cancel_scan_flag.is_set():
                 stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
                 stats_dict["processing_time"] = time.perf_counter() - start_time
                 self.concept.concept_stats = stats_dict
-                self.cancel_scan_flag = False
+                self.cancel_scan_flag.clear()
                 break
             #update GUI approx every second
             if time.perf_counter() > (last_update + 1):
@@ -711,11 +711,12 @@ class ConceptWindow(ctk.CTkToplevel):
 
         self.__update_concept_stats()
 
-    async def __cancel_concept_stats(self):
-        self.cancel_scan_flag = True
+    def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
+        self.p = multiprocessing.Process(target=self.__get_concept_stats(advanced_checks, waittime),daemon=True)
+        self.p.start()
 
-    async def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
-        await asyncio.to_thread(self.__get_concept_stats(advanced_checks, waittime))
+    def __cancel_concept_stats(self):
+        self.cancel_scan_flag.set()
 
     def __ok(self):
         self.destroy()
