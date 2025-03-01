@@ -109,6 +109,10 @@ class StableDiffusionXLModel(BaseModel):
         self.sd_config = None
         self.sd_config_filename = None
 
+    def all_embeddings(self) -> list[StableDiffusionXLModelEmbedding]:
+        return self.additional_embeddings \
+               + ([self.embedding] if self.embedding is not None else [])
+
     def all_text_encoder_1_embeddings(self) -> list[BaseModelEmbedding]:
         return [embedding.text_encoder_1_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_1_embedding] if self.embedding is not None else [])

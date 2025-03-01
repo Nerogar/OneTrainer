@@ -43,6 +43,9 @@ class FluxEmbeddingSaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
+        embedding_uuid = list(model.embedding_state_dicts.keys())[0] if model.embedding is None \
+            else model.embedding.text_encoder_1_embedding.uuid
+
         embedding = model.embedding
         embedding_state = list(model.embedding_state_dicts.values())[0]
 
@@ -67,6 +70,7 @@ class FluxEmbeddingSaver(
                 self._save_internal(
                     embedding,
                     embedding_state,
+                    embedding_uuid,
                     output_model_destination,
                 )
 
@@ -80,7 +84,7 @@ class FluxEmbeddingSaver(
         embedding_uuids = set(model.embedding_state_dicts.keys() \
                               | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
 
-        embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.additional_embeddings}
+        embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.all_embeddings()}
 
         for embedding_uuid in embedding_uuids:
             embedding = embeddings.get(embedding_uuid)
@@ -109,5 +113,6 @@ class FluxEmbeddingSaver(
                     self._save_internal(
                         embedding,
                         embedding_state,
+                        embedding_uuid,
                         output_model_destination,
                     )

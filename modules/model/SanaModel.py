@@ -100,6 +100,10 @@ class SanaModel(BaseModel):
         self.transformer_lora = None
         self.lora_state_dict = None
 
+    def all_embeddings(self) -> list[SanaModelEmbedding]:
+        return self.additional_embeddings \
+               + ([self.embedding] if self.embedding is not None else [])
+
     def all_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
         return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_embedding] if self.embedding is not None else [])

@@ -60,12 +60,13 @@ class EmbeddingSaverMixin(metaclass=ABCMeta):
             self,
             embedding: Any | None,
             embedding_state: dict[str, Tensor] | None,
+            embedding_uuid: str,
             destination: str,
     ):
         safetensors_embedding_name = os.path.join(
             destination,
             "embeddings",
-            f"{embedding.text_encoder_1_embedding.uuid}.safetensors",
+            f"{embedding_uuid}.safetensors",
         )
         self._save_safetensors(
             embedding,

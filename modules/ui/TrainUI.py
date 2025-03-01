@@ -442,6 +442,11 @@ class TrainUI(ctk.CTk):
                          tooltip="The placeholder used when using the embedding in a prompt")
         components.entry(frame, 4, 1, self.ui_state, "embedding.placeholder")
 
+        # output embedding
+        components.label(frame, 5, 0, "output embedding:",
+                         tooltip="Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage.")
+        components.switch(frame, 5, 1, self.ui_state, "embedding.is_output_embedding")
+
         frame.pack(fill="both", expand=1)
         return frame
 
