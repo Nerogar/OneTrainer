@@ -82,7 +82,7 @@ class SanaBaseDataLoader(
             modules.append(rescale_conditioning_image)
             modules.append(encode_conditioning_image)
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
 
         return modules
@@ -132,7 +132,7 @@ class SanaBaseDataLoader(
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if not config.text_encoder.train and not config.train_any_embedding():
+            if not config.train_text_encoder_or_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -156,7 +156,7 @@ class SanaBaseDataLoader(
         if config.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
         sort_names = output_names + ['concept']

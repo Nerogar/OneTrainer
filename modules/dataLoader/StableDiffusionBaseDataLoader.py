@@ -88,7 +88,7 @@ class StableDiffusionBaseDataLoader(
         if config.model_type.has_depth_input():
             modules.append(downscale_depth)
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
 
         return modules
@@ -141,7 +141,7 @@ class StableDiffusionBaseDataLoader(
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if not config.text_encoder.train and not config.train_any_embedding():
+            if not config.train_text_encoder_or_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -154,7 +154,7 @@ class StableDiffusionBaseDataLoader(
     def _output_modules(self, config: TrainConfig, model: StableDiffusionModel):
         output_names = [
             'image_path', 'latent_image',
-            'prompt'
+            'prompt',
             'tokens',
         ]
 
@@ -167,7 +167,7 @@ class StableDiffusionBaseDataLoader(
         if config.model_type.has_depth_input():
             output_names.append('latent_depth')
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
         sort_names = output_names + ['concept']
