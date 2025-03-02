@@ -75,7 +75,7 @@ Manual update
 
 ## Usage
 
-To start the UI, run `start-ui.bat`. [You can find a quick start guide here.](docs/QuickStartGuide.md), and a more
+To start the UI, run `start-ui.bat`. [You can find a technically focused quick start guide here](docs/QuickStartGuide.md), and a more
 detailed overview of different topics [here](docs/Overview.md).
 
 If you need more control, OneTrainer supports two modes of operation. Command line only, and a UI.
@@ -126,7 +126,9 @@ greatly improving the chances that your pull request will be accepted quickly an
 
 - **[MGDS](https://github.com/Nerogar/mgds)**: A custom dataset implementation for Pytorch that is built around the idea
   of a node based graph.
-- **[StableTuner](https://github.com/devilismyfriend/StableTuner)**: Another training application for Stable Diffusion.
-  OneTrainer takes a lot of inspiration from StableTuner and wouldn't exist without it.
+- **[Stability Matrix](https://github.com/LykosAI/StabilityMatrix)**: A swiss-army knife installer which wraps and installs a broad range diffusion software packages
 - **[Visions of Chaos](https://softology.pro/voc.htm)**: A collection of machine learning tools that also includes
   OneTrainer.
+- **[StableTuner](https://github.com/devilismyfriend/StableTuner)**: A now defunct (archived) training application for Stable Diffusion.
+  OneTrainer takes a lot of inspiration from StableTuner and wouldn't exist without it.
+
