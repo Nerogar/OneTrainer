@@ -7,7 +7,7 @@ if not defined PYTHON (
     set PYTHON=python
 )
 if not defined VENV_DIR (
-    set "VENV_DIR=%~dp0%venv"
+    set "VENV_DIR=%~dp0venv"
 )
 
 :git_pull
@@ -42,8 +42,24 @@ if %ERRORLEVEL% NEQ 0 (
     echo venv not found, please run install.bat first
     goto :end_error
 ) else (
-    goto :activate_venv
+    goto :check_python_version
 )
+
+:check_python_version
+echo Checking Python version...
+"%PYTHON%" --version
+if %ERRORLEVEL% NEQ 0 (
+    goto :end_error
+)
+
+echo.
+set "CHECK_CMD="%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13"
+%CHECK_CMD% 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    goto :wrong_python_version
+)
+goto :activate_venv
 
 :activate_venv
 echo activating venv %VENV_DIR%
@@ -68,6 +84,14 @@ echo ***********
 echo Update done
 echo ***********
 goto :end
+
+:wrong_python_version
+echo.
+echo Please install Python 3.10.x, 3.11.x or 3.12.x from:
+echo https://www.python.org/downloads/windows/
+echo.
+echo Reminder: Do not rely on installation videos; they are often out of date.
+goto :end_error
 
 :end_error
 echo.

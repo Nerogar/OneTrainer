@@ -2,10 +2,11 @@
 setlocal EnableDelayedExpansion
 
 if not defined PYTHON (set "PYTHON=python")
+:: %~dp0 expands to the full directory path of the script (with trailing backslash)
 if not defined VENV_DIR (set "VENV_DIR=%~dp0venv")
 
 :: ----------------------------------------------------------------------------
-:: 1. Check that a real Python is available in PATH (ignoring the Windows Store alias)
+:: 1. Check that a real Python version is available in PATH (ignoring the Windows Store alias)
 :: ----------------------------------------------------------------------------
 :check_python_exists
 set "REAL_PYTHON="
@@ -17,12 +18,7 @@ for /f "delims=" %%p in ('where %PYTHON% 2^>nul ^| findstr /v /i "WindowsApps"')
 :found_valid_python
 if "%REAL_PYTHON%"=="" (
     echo Error: Python was not found in your PATH. It is likely that you have not installed Python yet.
-    echo.
-    echo Please install Python 3.10.x, 3.11.x or 3.12.x from:
-    echo https://www.python.org/downloads/windows/
-    echo.
-    echo Reminder: Do not rely on installation videos; they are often out of date.
-    goto end_error
+    goto :wrong_python_version
 ) else (
     set "PYTHON=%REAL_PYTHON%"
 )
@@ -43,11 +39,7 @@ set "CHECK_CMD="%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13"
 %CHECK_CMD% 2>&1
 if errorlevel 1 (
     echo.
-    echo Please install Python 3.10.x, 3.11.x or 3.12.x from:
-    echo https://www.python.org/downloads/windows/
-    echo.
-    echo Reminder: Do not rely on installation videos; they are often out of date.
-    goto end_error
+    goto :wrong_python_version
 )
 
 :: ----------------------------------------------------------------------------
@@ -84,6 +76,14 @@ goto end_error
 echo Continuing with ZLUDA installation...
 %PYTHON% scripts\install_zluda.py
 goto end_success
+
+:wrong_python_version
+echo.
+echo Please install Python 3.10.x, 3.11.x or 3.12.x from:
+echo https://www.python.org/downloads/windows/
+echo.
+echo Reminder: Do not rely on installation videos; they are often out of date.
+goto end_error
 
 :end_success
 echo.
