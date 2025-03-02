@@ -715,7 +715,7 @@ class GenericTrainer(BaseTrainer):
                             'smooth loss': ema_loss,
                         })
                         
-                        if ema_loss > self.config.stop_training_at_high_loss_thresold and self.config.stop_training_at_high_loss_thresold is not None and self.config.stop_training_at_high_loss_thresold > 0:
+                        if self.config.stop_training_at_high_loss_thresold is not None and self.config.stop_training_at_high_loss_thresold > 0 and ema_loss > self.config.stop_training_at_high_loss_thresold:
                             step_tqdm.write(f'Smooth loss is higher than specified thresold of {self.config.stop_training_at_high_loss_thresold}, stopping training.')
                             self.commands.stop()
 
