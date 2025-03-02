@@ -364,19 +364,23 @@ class ConceptWindow(ctk.CTkToplevel):
         self.dir_count_label.configure(font=ctk.CTkFont(underline=True))
         self.dir_count_preview = components.label(frame, 2, 1, pad=0, text="-")
 
-        #basic img stats
+        #basic img/vid stats
         self.image_count_label = components.label(frame, 3, 0, "\nTotal Images", pad=0,
                          tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
         self.image_count_label.configure(font=ctk.CTkFont(underline=True))
         self.image_count_preview = components.label(frame, 4, 0, pad=0, text="-")
-        self.mask_count_label = components.label(frame, 3, 1, "\nTotal Masks", pad=0,
+        self.video_count_label = components.label(frame, 3, 1, "\nTotal Videos", pad=0,
+                         tooltip="Total number of video files, any of the extensions " + str(path_util.SUPPORTED_VIDEO_EXTENSIONS))
+        self.video_count_label.configure(font=ctk.CTkFont(underline=True))
+        self.video_count_preview = components.label(frame, 4, 1, pad=0, text="-")
+        self.mask_count_label = components.label(frame, 3, 2, "\nTotal Masks", pad=0,
                          tooltip="Total number of mask files, any file ending in '-masklabel.png'")
         self.mask_count_label.configure(font=ctk.CTkFont(underline=True))
-        self.mask_count_preview = components.label(frame, 4, 1, pad=0, text="-")
-        self.caption_count_label = components.label(frame, 3, 2, "\nTotal Captions", pad=0,
+        self.mask_count_preview = components.label(frame, 4, 2, pad=0, text="-")
+        self.caption_count_label = components.label(frame, 3, 3, "\nTotal Captions", pad=0,
                          tooltip="Total number of caption files, any .txt file")
         self.caption_count_label.configure(font=ctk.CTkFont(underline=True))
-        self.caption_count_preview = components.label(frame, 4, 2, pad=0, text="-")
+        self.caption_count_preview = components.label(frame, 4, 3, pad=0, text="-")
 
         #advanced img stats
         self.image_count_mask_label = components.label(frame, 5, 0, "\nImages with Masks", pad=0,
@@ -387,51 +391,85 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Total number of mask files which lack a corresponding image file - if >0, check your data set!")
         self.mask_count_label_unpaired.configure(font=ctk.CTkFont(underline=True))
         self.mask_count_preview_unpaired = components.label(frame, 6, 1, pad=0, text="-")
-        self.image_count_caption_label = components.label(frame, 5, 2, "\nImages with Captions", pad=0,
+        #currently no masks for videos
+
+        self.image_count_caption_label = components.label(frame, 7, 0, "\nImages with Captions", pad=0,
                          tooltip="Total number of image files with an associated caption")
         self.image_count_caption_label.configure(font=ctk.CTkFont(underline=True))
-        self.image_count_caption_preview = components.label(frame, 6, 2, pad=0, text="-")
-        self.caption_count_label_unpaired = components.label(frame, 5, 3, "\nUnpaired Captions", pad=0,
+        self.image_count_caption_preview = components.label(frame, 8, 0, pad=0, text="-")
+        self.video_count_caption_label = components.label(frame, 7, 1, "\nVideos with Captions", pad=0,
+                         tooltip="Total number of video files with an associated caption")
+        self.video_count_caption_label.configure(font=ctk.CTkFont(underline=True))
+        self.video_count_caption_preview = components.label(frame, 8, 1, pad=0, text="-")
+        self.caption_count_label_unpaired = components.label(frame, 7, 2, "\nUnpaired Captions", pad=0,
                          tooltip="Total number of caption files which lack a corresponding image file - if >0, check your data set!")
         self.caption_count_label_unpaired.configure(font=ctk.CTkFont(underline=True))
-        self.caption_count_preview_unpaired = components.label(frame, 6, 3, pad=0, text="-")
+        self.caption_count_preview_unpaired = components.label(frame, 8, 2, pad=0, text="-")
 
         #resolution info
-        self.pixel_max_label = components.label(frame, 7, 0, "\nMax Pixels", pad=0,
+        self.pixel_max_label = components.label(frame, 9, 0, "\nMax Pixels", pad=0,
                          tooltip="Largest image in the concept by number of pixels (width * height)")
         self.pixel_max_label.configure(font=ctk.CTkFont(underline=True))
-        self.pixel_max_preview = components.label(frame, 8, 0, pad=0, text="-", wraplength=150)
-        self.pixel_avg_label = components.label(frame, 7, 1, "\nAvg Pixels", pad=0,
+        self.pixel_max_preview = components.label(frame, 10, 0, pad=0, text="-", wraplength=150)
+        self.pixel_avg_label = components.label(frame, 9, 1, "\nAvg Pixels", pad=0,
                          tooltip="Average size of images in the concept by number of pixels (width * height)")
         self.pixel_avg_label.configure(font=ctk.CTkFont(underline=True))
-        self.pixel_avg_preview = components.label(frame, 8, 1, pad=0, text="-", wraplength=150)
-        self.pixel_min_label = components.label(frame, 7, 2, "\nMin Pixels", pad=0,
+        self.pixel_avg_preview = components.label(frame, 10, 1, pad=0, text="-", wraplength=150)
+        self.pixel_min_label = components.label(frame, 9, 2, "\nMin Pixels", pad=0,
                          tooltip="Smallest image in the concept by number of pixels (width * height)")
         self.pixel_min_label.configure(font=ctk.CTkFont(underline=True))
-        self.pixel_min_preview = components.label(frame, 8, 2, pad=0, text="-", wraplength=150)
+        self.pixel_min_preview = components.label(frame, 10, 2, pad=0, text="-", wraplength=150)
+
+        #video length info
+        self.length_max_label = components.label(frame, 11, 0, "\nMax Length", pad=0,
+                         tooltip="Longest video in the concept by number of frames")
+        self.length_max_label.configure(font=ctk.CTkFont(underline=True))
+        self.length_max_preview = components.label(frame, 12, 0, pad=0, text="-", wraplength=150)
+        self.length_avg_label = components.label(frame, 11, 1, "\nAvg Length", pad=0,
+                         tooltip="Average length of videos in the concept by number of frames")
+        self.length_avg_label.configure(font=ctk.CTkFont(underline=True))
+        self.length_avg_preview = components.label(frame, 12, 1, pad=0, text="-", wraplength=150)
+        self.length_min_label = components.label(frame, 11, 2, "\nMin Length", pad=0,
+                         tooltip="Shortest video in the concept by number of frames")
+        self.length_min_label.configure(font=ctk.CTkFont(underline=True))
+        self.length_min_preview = components.label(frame, 12, 2, pad=0, text="-", wraplength=150)
+
+        #video fps info
+        self.fps_max_label = components.label(frame, 13, 0, "\nMax FPS", pad=0,
+                         tooltip="Video in concept with highest fps")
+        self.fps_max_label.configure(font=ctk.CTkFont(underline=True))
+        self.fps_max_preview = components.label(frame, 14, 0, pad=0, text="-", wraplength=150)
+        self.fps_avg_label = components.label(frame, 13, 1, "\nAvg FPS", pad=0,
+                         tooltip="Average fps of videos in the concept")
+        self.fps_avg_label.configure(font=ctk.CTkFont(underline=True))
+        self.fps_avg_preview = components.label(frame, 14, 1, pad=0, text="-", wraplength=150)
+        self.fps_min_label = components.label(frame, 13, 2, "\nMin FPS", pad=0,
+                         tooltip="Video in concept with the lowest fps")
+        self.fps_min_label.configure(font=ctk.CTkFont(underline=True))
+        self.fps_min_preview = components.label(frame, 14, 2, pad=0, text="-", wraplength=150)
 
         #caption info
-        self.caption_max_label = components.label(frame, 9, 0, "\nMax Caption Length", pad=0,
+        self.caption_max_label = components.label(frame, 15, 0, "\nMax Caption Length", pad=0,
                          tooltip="Largest caption in concept by character count")
         self.caption_max_label.configure(font=ctk.CTkFont(underline=True))
-        self.caption_max_preview = components.label(frame, 10, 0, pad=0, text="-", wraplength=150)
-        self.caption_avg_label = components.label(frame, 9, 1, "\nAvg Caption Length", pad=0,
+        self.caption_max_preview = components.label(frame, 16, 0, pad=0, text="-", wraplength=150)
+        self.caption_avg_label = components.label(frame, 15, 1, "\nAvg Caption Length", pad=0,
                          tooltip="Average length of caption in concept by character count")
         self.caption_avg_label.configure(font=ctk.CTkFont(underline=True))
-        self.caption_avg_preview = components.label(frame, 10, 1, pad=0, text="-", wraplength=150)
-        self.caption_min_label = components.label(frame, 9, 2, "\nMin Caption Length", pad=0,
+        self.caption_avg_preview = components.label(frame, 16, 1, pad=0, text="-", wraplength=150)
+        self.caption_min_label = components.label(frame, 15, 2, "\nMin Caption Length", pad=0,
                          tooltip="Smallest caption in concept by character count")
         self.caption_min_label.configure(font=ctk.CTkFont(underline=True))
-        self.caption_min_preview = components.label(frame, 10, 2, pad=0, text="-", wraplength=150)
+        self.caption_min_preview = components.label(frame, 16, 2, pad=0, text="-", wraplength=150)
 
         #bucket info
-        self.aspect_bucket_label = components.label(frame, 11, 0, "\nAspect Bucketing", pad=0,
+        self.aspect_bucket_label = components.label(frame, 17, 0, "\nAspect Bucketing", pad=0,
                          tooltip="List of all possible buckets and the number of images in each one, defined as width/height. Buckets range from 0.25 (1:4 extremely tall) to 4 (4:1 extremely wide).")
         self.aspect_bucket_label.configure(font=ctk.CTkFont(underline=True))
-        self.small_bucket_label = components.label(frame, 11, 1, "\nSmallest Buckets", pad=0,
+        self.small_bucket_label = components.label(frame, 17, 1, "\nSmallest Buckets", pad=0,
                          tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be dropped during training!")
         self.small_bucket_label.configure(font=ctk.CTkFont(underline=True))
-        self.small_bucket_preview = components.label(frame, 12, 1, pad=0, text="-")
+        self.small_bucket_preview = components.label(frame, 18, 1, pad=0, text="-")
 
         # plot
         appearance_mode = AppearanceModeTracker.get_mode()
@@ -443,7 +481,7 @@ class ConceptWindow(ctk.CTkToplevel):
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
-        self.canvas.get_tk_widget().grid(row=13, column=0, columnspan=4, rowspan=2)
+        self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
         self.bucket_fig.tight_layout()
 
         self.bucket_fig.set_facecolor(background_color)
@@ -462,21 +500,23 @@ class ConceptWindow(ctk.CTkToplevel):
                           tooltip="Reload basic statistics for the concept directory")
         components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: [self.__get_concept_stats_threaded(False, 9999), self.__get_concept_stats(True, 9999)],
                           tooltip="Reload advanced statistics for the concept directory")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
-        components.button(master=frame, row=0, column=2, text="Abort Scan", command=self.cancel_scan_flag.set(),
+        components.button(master=frame, row=0, column=2, text="Abort Scan", command=lambda: self.__cancel_concept_stats(),
                           tooltip="Stop the currently running scan if it's taking a long time - scan will be slow on large folders and on HDDs")
         self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
 
         #automatically get basic stats if available
         try:
             self.__update_concept_stats()      #load stats from config if available
+            if self.concept.concept_stats["image_count"] == 0:  #force rescan if zero images
+                raise KeyError
         except KeyError:
             start_time = time.perf_counter()
-            self.__get_concept_stats_threaded(False, 1)    #force rescan if config is empty, timeout of 1 sec
-            if (time.perf_counter() - start_time) < 0.1:
-                self.__get_concept_stats_threaded(True, 1)    #do advanced scan automatically if basic took <0.1s
-
-        except FileNotFoundError:              #avoid error when loading concept window without config path defined
-            pass
+            try:
+                self.__get_concept_stats_threaded(False, 1)    #force rescan if config is empty, timeout of 1 sec
+                if (time.perf_counter() - start_time) < 0.05:
+                    self.__get_concept_stats_threaded(True, 1)    #do advanced scan automatically if basic took <0.05s
+            except FileNotFoundError:              #avoid error when loading concept window without config path defined
+                pass
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -625,6 +665,11 @@ class ConceptWindow(ctk.CTkToplevel):
         self.image_count_mask_preview.configure(text=self.concept.concept_stats["image_with_mask_count"])
         self.image_count_caption_preview.configure(text=self.concept.concept_stats["image_with_caption_count"])
 
+        #video count
+        self.video_count_preview.configure(text=self.concept.concept_stats["video_count"])
+        #self.video_count_mask_preview.configure(text=self.concept.concept_stats["video_with_mask_count"])
+        self.video_count_caption_preview.configure(text=self.concept.concept_stats["video_with_caption_count"])
+
         #mask count
         self.mask_count_preview.configure(text=self.concept.concept_stats["mask_count"])
         self.mask_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_masks"])
@@ -648,6 +693,38 @@ class ConceptWindow(ctk.CTkToplevel):
             self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} MP, ~{int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
             self.pixel_min_preview.configure(text=f'{str(round(min_pixels[0]/1000000, 2))} MP, {min_pixels[2]}\n{min_pixels[1]}')
 
+        #video length and fps info
+        max_length = self.concept.concept_stats["max_length"]
+        avg_length = self.concept.concept_stats["avg_length"]
+        min_length = self.concept.concept_stats["min_length"]
+        max_fps = self.concept.concept_stats["max_fps"]
+        avg_fps = self.concept.concept_stats["avg_fps"]
+        min_fps = self.concept.concept_stats["min_fps"]
+
+        if any(isinstance(x, str) for x in [max_length, avg_length, min_length]):   #will be str if adv stats were not taken
+            self.length_max_preview.configure(text=max_pixels)
+            self.length_avg_preview.configure(text=avg_pixels)
+            self.length_min_preview.configure(text=min_pixels)
+            self.fps_max_preview.configure(text=max_fps)
+            self.fps_avg_preview.configure(text=avg_fps)
+            self.fps_min_preview.configure(text=min_fps)
+        elif self.concept.concept_stats["video_count"] == 0:
+            self.length_max_preview.configure(text="-")
+            self.length_avg_preview.configure(text="-")
+            self.length_min_preview.configure(text="-")
+            self.fps_max_preview.configure(text="-")
+            self.fps_avg_preview.configure(text="-")
+            self.fps_min_preview.configure(text="-")
+        else:
+            #formatted as (#frames) frames \n filename
+            self.length_max_preview.configure(text=f'{int(max_length[0])} frames\n{max_length[1]}')
+            self.length_avg_preview.configure(text=f'{int(avg_length)} frames')
+            self.length_min_preview.configure(text=f'{int(min_length[0])} frames\n{min_length[1]}')
+            #formatted as (#ffps) fps \n filename
+            self.fps_max_preview.configure(text=f'{int(max_fps[0])} fps\n{max_fps[1]}')
+            self.fps_avg_preview.configure(text=f'{int(avg_fps)} fps')
+            self.fps_min_preview.configure(text=f'{int(min_fps[0])} fps\n{min_fps[1]}')
+
         #caption info
         max_caption_length = self.concept.concept_stats["max_caption_length"]
         avg_caption_length = self.concept.concept_stats["avg_caption_length"]
@@ -657,8 +734,12 @@ class ConceptWindow(ctk.CTkToplevel):
             self.caption_max_preview.configure(text=max_caption_length)
             self.caption_avg_preview.configure(text=avg_caption_length)
             self.caption_min_preview.configure(text=min_caption_length)
+        elif self.concept.concept_stats["caption_count"] == 0:
+            self.caption_max_preview.configure(text="-")
+            self.caption_avg_preview.configure(text="-")
+            self.caption_min_preview.configure(text="-")
         else:
-            #formatted as (#pixels/1000000) MP, widthxheight, \n filename
+            #formatted as (#chars) chars, (#words) words, \n filename
             self.caption_max_preview.configure(text=f'{max_caption_length[0]} chars, {max_caption_length[2]} words\n{max_caption_length[1]}')
             self.caption_avg_preview.configure(text=f'{int(avg_caption_length[0])} chars, {int(avg_caption_length[1])} words')
             self.caption_min_preview.configure(text=f'{min_caption_length[0]} chars, {min_caption_length[2]} words\n{min_caption_length[1]}')
