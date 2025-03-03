@@ -1,4 +1,4 @@
-# scripts directory
+# OneTrainer Scripts
 
-For documentation on scripts in this directory, see the higher-level README,
- in [the cli-mode subsection](../README.md#cli-mode)
+For an overview of these scripts, see the
+[the cli-mode subsection](../README.md#cli-mode) in the top level OneTrainer README
