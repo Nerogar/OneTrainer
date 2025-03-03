@@ -136,8 +136,8 @@ class BaseFluxSetup(
                         )[0][0][1:],
                     )
             else:
-                embedding_state_1 = embedding_state.get("llama_out", embedding_state.get("llama", None))
                 embedding_state_2 = embedding_state.get("clip_l_out", embedding_state.get("clip_l", None))
+                embedding_state_1 = embedding_state.get("t5_out", embedding_state.get("t5", None))
 
             if embedding_state_1 is not None:
                 embedding_state_1 = embedding_state_1.to(
