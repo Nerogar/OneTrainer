@@ -20,7 +20,11 @@ def main():
     elif args.model == GenerateCaptionsModel.BLIP2:
         model = Blip2Model(torch.device(args.device), args.dtype.torch_dtype())
     elif args.model == GenerateCaptionsModel.WD14_VIT_2:
-        model = WDModel(torch.device(args.device), args.dtype.torch_dtype())
+        model = WDModel(torch.device(args.device), args.dtype.torch_dtype(), "wd-v1-4-vit-tagger-v2", 0.35)
+    elif args.model == GenerateCaptionsModel.WD14_SWINV2_v3:
+        model = WDModel(torch.device(args.device), args.dtype.torch_dtype(), "wd-swinv2-tagger-v3", 0.5)
+    elif args.model == GenerateCaptionsModel.WD14_EVA02_v3:
+        model = WDModel(torch.device(args.device), args.dtype.torch_dtype(), "wd-eva02-large-tagger-v3", 0.35)
 
     model.caption_folder(
         sample_dir=args.sample_dir,
