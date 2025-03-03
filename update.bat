@@ -14,47 +14,85 @@ if not defined VENV_DIR (
 :git_pull
 echo Checking repository and branch information...
 
-REM Check if we're working with the official repo
-FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" config --get remote.origin.url`) DO (
-    set "remote_url=%%F"
-)
-echo Remote origin: %remote_url%
-
 REM Get current branch name
 FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" rev-parse --abbrev-ref HEAD`) DO (
     set "current_branch=%%F"
 )
 echo Current branch: %current_branch%
 
-REM Compare current to expected repo and branch
-set "is_official_repo="
-echo %remote_url% | findstr /i "Nerogar/OneTrainer" >nul && set "is_official_repo=1"
-
-if not defined is_official_repo (
-    echo INFO: You are using a fork or custom repository.
-    echo      This is normal if you've made your own modifications.
-    echo      If unexpected, consider switching to the official Nerogar/OneTrainer repository.
+REM Determine tracking information (remote and branch)
+set "tracking_info="
+FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2^>NUL`) DO (
+    set "tracking_info=%%F"
 )
 
-if /I not "%current_branch%"=="master" (
-    echo INFO: You are on branch %current_branch% instead of master.
-    echo      This is normal if you're working on a specific branch.
-    echo      If unexpected, switch to master with: git checkout master
+if not defined tracking_info (
+    echo INFO: Current branch has no tracking remote configured.
+    echo      This is normal for local-only branches.
+    echo      Updates cannot be pulled automatically. Configure tracking with:
+    echo      git branch --set-upstream-to=origin/master %current_branch%
+) else (
+    for /F "tokens=1,2 delims=/" %%a in ("!tracking_info!") do (
+        set "tracking_remote=%%a"
+        set "tracking_branch=%%b"
+    )
+
+    echo Tracking: !tracking_info!
+
+    REM Get remote URL
+    FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" config --get remote.!tracking_remote!.url`) DO (
+        set "remote_url=%%F"
+    )
+    echo Remote !tracking_remote!: !remote_url!
+
+    REM Check if official repo (fix indentation)
+    set "is_official_repo="
+    echo !remote_url! | findstr /i "Nerogar/OneTrainer" >nul && set "is_official_repo=1"
+
+    set "is_master_branch="
+    if /I "!tracking_branch!"=="master" (set "is_master_branch=1")
+
+    if not defined is_official_repo (set "non_standard_setup=1")
+    if not defined is_master_branch (set "non_standard_setup=1")
+
+    if defined non_standard_setup (
+        echo INFO: Non-standard repository setup detected:
+        if not defined is_official_repo echo        - Using non-official repository: !remote_url!
+        if not defined is_master_branch echo        - On branch !tracking_branch! instead of master
+        echo      This is normal if you're using a fork or working on a specific branch.
+    )
+
+    REM Get current commit hash
+    FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" rev-parse HEAD`) DO (
+        set "local_commit=%%F"
+    )
+    echo Local commit: !local_commit:~0,8!...
+
+    echo Fetching updates...
+    "%GIT%" fetch !tracking_remote!
+    if errorlevel 1 (
+        echo Error: Could not fetch updates
+        goto :end_error
+    )
+
+    REM Get remote commit hash
+    FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" rev-parse !tracking_remote!/!tracking_branch!`) DO (
+        set "remote_commit=%%F"
+    )
+    echo Remote commit: !remote_commit:~0,8!...
+
+    if "!local_commit!"=="!remote_commit!" (
+        echo Repository is already up to date, skipping pull.
+    ) else (
+        echo Updates available, pulling changes...
+        "%GIT%" pull
+        if errorlevel 1 (
+            echo Error: Git pull failed.
+            goto :end_error
+        )
+    )
 )
 
-echo Attempting to update current branch
-"%GIT%" fetch origin
-if errorlevel 1 (
-    echo Error: Could not fetch updates
-    goto :end_error
-)
-
-echo Pulling changes...
-"%GIT%" pull
-if errorlevel 1 (
-    echo Error: Git pull failed.
-    goto :end_error
-)
 goto :check_venv
 
 :check_venv
@@ -75,7 +113,6 @@ if errorlevel 1 (
 )
 
 echo.
-set "SUPPORTED_PY_VERSIONS=3.10.x, 3.11.x or 3.12.x"
 "%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13 2>&1
 if errorlevel 1 (
     echo.
@@ -112,7 +149,7 @@ goto :end
 
 :wrong_python_version
 echo.
-echo Please install Python %SUPPORTED_PY_VERSIONS% from:
+echo Please install a supported Python version from:
 echo https://www.python.org/downloads/windows/
 echo.
 echo Reminder: Do not rely on installation videos; they are often out of date.

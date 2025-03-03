@@ -15,6 +15,7 @@ for /f "delims=" %%p in ('where %PYTHON% 2^>nul ^| findstr /v /i "WindowsApps"')
     goto :found_valid_python
 )
 
+
 :found_valid_python
 if "%REAL_PYTHON%"=="" (
     echo Error: Python was not found in your PATH. It is likely that you have not installed Python yet.
@@ -26,7 +27,6 @@ if "%REAL_PYTHON%"=="" (
 :: ----------------------------------------------------------------------------
 :: 2. Check that Pythons version is supported by OT using version_check.py
 :: ----------------------------------------------------------------------------
-set "SUPPORTED_PY_VERSIONS=3.10.x, 3.11.x or 3.12.x"
 
 :check_python_version
 echo Checking Python version...
@@ -102,7 +102,7 @@ goto :end_success
 
 :wrong_python_version
 echo.
-echo Please install Python %SUPPORTED_PY_VERSIONS% from:
+echo Please install a supported Python version from:
 echo https://www.python.org/downloads/windows/
 echo.
 echo Reminder: Do not rely on installation videos; they are often out of date.
