@@ -78,6 +78,7 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
 
         self.parent = parent
         self.train_config = train_config
+
         self.ui_state = ui_state
 
         self.title("Learning Rate Scheduler Settings")

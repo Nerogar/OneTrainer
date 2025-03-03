@@ -52,12 +52,12 @@ class TrainUI(ctk.CTk):
 
         self.title("OneTrainer")
         try:
-            # Attempt to use the .ico file (works well on Windows)
+            # Windows attempt
             self.iconbitmap("resources/icons/icon.ico")
         except Exception as e:
             print("Error using iconbitmap:", e)
 
-        # Load a PNG icon to set the global icon for future toplevels
+        # Load a PNG icon to set the global icon for future toplevels apparently
         self._icon_photo = PhotoImage(file="resources/icons/icon.png")
         self.wm_iconphoto(True, self._icon_photo)
         self.geometry("1100x740")
