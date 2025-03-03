@@ -255,6 +255,11 @@ class TrainingTab:
                          tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         components.entry(frame, 10, 1, self.ui_state, "clip_grad_norm")
 
+        # Stop training on high loss
+        components.label(frame, 11, 0, "Stop training on high loss",
+                         tooltip="Enter the value of smooth loss at which training should stop")
+        components.entry(frame, 11, 1, self.ui_state, "stop_training_at_high_loss_thresold")
+
     def __create_base2_frame(self, master, row, video_training_enabled: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
