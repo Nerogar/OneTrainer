@@ -64,12 +64,10 @@ def set_window_icon(window: Any) -> None:
     icon_dir = (
         Path(__file__).parent.parent.parent.parent / "resources/icons"
     )
-    print(f"Looking for icons in: {icon_dir}")
 
     try:
         if platform.system() == "Windows":
             ico_path = icon_dir / "icon.ico"
-            print(f"Icon file exists: {ico_path.exists()}")
             if ico_path.exists():
                 # For windows, use the toplevel window if this is a frame
                 if hasattr(window, "winfo_toplevel") and not hasattr(
@@ -88,7 +86,7 @@ def set_window_icon(window: Any) -> None:
                     window = window.winfo_toplevel()
                 window.iconphoto(True, icon_img)
         elif platform.system() == "Darwin":  # macOS
-            # macOS handles icons differently - typically set in the app bundle
+            # macOS are a rabbit hole sadly.
             pass
     except Exception as e:
         print(f"Failed to set window icon: {e}")
