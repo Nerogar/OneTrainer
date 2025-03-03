@@ -25,18 +25,19 @@ if "%REAL_PYTHON%"=="" (
 
 :: ----------------------------------------------------------------------------
 :: 2. Check that Pythons version is supported by OT using version_check.py
-::    (Currently supported versions: 3.10.x, 3.11.x, or 3.12.x)
 :: ----------------------------------------------------------------------------
+set "SUPPORTED_PY_VERSIONS=3.10.x, 3.11.x or 3.12.x"
+
 :check_python_version
 echo Checking Python version...
 "%PYTHON%" --version
 if errorlevel 1 (
-    goto end_error
+    echo Error: Failed to get Python version
+    goto :end_error
 )
 
 echo.
-set "CHECK_CMD="%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13"
-%CHECK_CMD% 2>&1
+"%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13 2>&1
 if errorlevel 1 (
     echo.
     goto :wrong_python_version
@@ -47,14 +48,20 @@ if errorlevel 1 (
 :: ----------------------------------------------------------------------------
 :check_venv
 dir "%VENV_DIR%" >NUL 2>&1
-if not errorlevel 1 goto activate_venv
+if not errorlevel 1 goto :activate_venv
 echo Creating virtual environment in %VENV_DIR%
-%PYTHON% -m venv "%VENV_DIR%"
+"%PYTHON%" -m venv "%VENV_DIR%"
 if errorlevel 1 (
-    echo Couldn't create virtual environment.
-    goto end_error
+    echo Error: Couldn't create virtual environment.
+    echo Checking if venv module is installed...
+    "%PYTHON%" -c "import venv" 2>nul
+    if errorlevel 1 (
+        echo Error: Python venv module not found. Please install it first:
+        echo %PYTHON% -m pip install --user virtualenv
+    )
+    goto :end_error
 )
-goto activate_venv
+goto :activate_venv
 
 :activate_venv
 echo Activating virtual environment: %VENV_DIR%
@@ -62,28 +69,44 @@ set "PYTHON=%VENV_DIR%\Scripts\python.exe"
 
 :install_dependencies
 echo Installing dependencies...
-%PYTHON% -m pip install -r requirements.txt
-if errorlevel 1 goto end_error
+echo This may take a while, please be patient...
+"%PYTHON%" -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo Error: Failed to install dependencies
+    goto :end_error
+)
+echo Dependencies installed successfully
 
 :check_cuda
-for /f "tokens=*" %%i in ('CALL %PYTHON% -c "import torch; print(torch.cuda.is_available())"') do set "CUDA_AVAILABLE=%%i"
-if "%CUDA_AVAILABLE%"=="True" goto end_success
-set /p USE_ZLUDA=CUDA is not available. Are you using AMD GPUs on Windows? (y/n)
-if /i "%USE_ZLUDA%"=="y" goto install_zluda
-goto end_error
+echo Checking for CUDA support...
+for /f "tokens=*" %%i in ('CALL "%PYTHON%" -c "import torch; print(torch.cuda.is_available())"') do set "CUDA_AVAILABLE=%%i"
+if "%CUDA_AVAILABLE%"=="True" goto :end_success
+
+echo CUDA is not available.
+set "USE_ZLUDA="
+:ask_zluda
+set /p USE_ZLUDA=Are you using AMD GPUs on Windows? (y/n):
+if /i "%USE_ZLUDA%"=="y" goto :install_zluda
+if /i "%USE_ZLUDA%"=="n" goto :end_error
+echo Invalid input. Please enter 'y' or 'n'.
+goto :ask_zluda
 
 :install_zluda
 echo Continuing with ZLUDA installation...
-%PYTHON% scripts\install_zluda.py
-goto end_success
+"%PYTHON%" scripts\install_zluda.py
+if errorlevel 1 (
+    echo Error: ZLUDA installation failed
+    goto :end_error
+)
+goto :end_success
 
 :wrong_python_version
 echo.
-echo Please install Python 3.10.x, 3.11.x or 3.12.x from:
+echo Please install Python %SUPPORTED_PY_VERSIONS% from:
 echo https://www.python.org/downloads/windows/
 echo.
 echo Reminder: Do not rely on installation videos; they are often out of date.
-goto end_error
+goto :end_error
 
 :end_success
 echo.

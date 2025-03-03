@@ -1,45 +1,66 @@
 @echo off
+setlocal EnableDelayedExpansion
 
 if not defined GIT (
-    set GIT=git
+    set "GIT=git"
 )
 if not defined PYTHON (
-    set PYTHON=python
+    set "PYTHON=python"
 )
 if not defined VENV_DIR (
     set "VENV_DIR=%~dp0venv"
 )
 
 :git_pull
+echo Checking repository and branch information...
+
+REM Check if we're working with the official repo
+FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" config --get remote.origin.url`) DO (
+    set "remote_url=%%F"
+)
+echo Remote origin: %remote_url%
+
+REM Get current branch name
+FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" rev-parse --abbrev-ref HEAD`) DO (
+    set "current_branch=%%F"
+)
+echo Current branch: %current_branch%
+
+REM Compare current to expected repo and branch
+set "is_official_repo="
+echo %remote_url% | findstr /i "Nerogar/OneTrainer" >nul && set "is_official_repo=1"
+
+if not defined is_official_repo (
+    echo INFO: You are using a fork or custom repository.
+    echo      This is normal if you've made your own modifications.
+    echo      If unexpected, consider switching to the official Nerogar/OneTrainer repository.
+)
+
+if /I not "%current_branch%"=="master" (
+    echo INFO: You are on branch %current_branch% instead of master.
+    echo      This is normal if you're working on a specific branch.
+    echo      If unexpected, switch to master with: git checkout master
+)
+
 echo Attempting to update current branch
-%GIT% fetch origin
-if %ERRORLEVEL% NEQ 0 (
-    echo Could not fetch updates
+"%GIT%" fetch origin
+if errorlevel 1 (
+    echo Error: Could not fetch updates
     goto :end_error
 )
 
 echo Pulling changes...
-%GIT% pull
-if %ERRORLEVEL% NEQ 0 (
-    echo Git pull failed.
+"%GIT%" pull
+if errorlevel 1 (
+    echo Error: Git pull failed.
     goto :end_error
 )
-
-REM Warn if not on master branch; Assume user is competent to avoid breaking custom changes.
-FOR /F "tokens=* USEBACKQ" %%F IN (`%GIT% rev-parse --abbrev-ref HEAD`) DO (
-    set current_branch=%%F
-)
-if /I not "%current_branch%"=="master" (
-    echo WARNING: You are on branch %current_branch%. To update master, please switch manually:
-    echo         git checkout master
-)
-
 goto :check_venv
 
 :check_venv
-dir "%VENV_DIR%" > NUL 2> NUL
-if %ERRORLEVEL% NEQ 0 (
-    echo venv not found, please run install.bat first
+dir "%VENV_DIR%" >NUL 2>NUL
+if errorlevel 1 (
+    echo Error: Virtual environment not found, please run install.bat first
     goto :end_error
 ) else (
     goto :check_python_version
@@ -48,33 +69,37 @@ if %ERRORLEVEL% NEQ 0 (
 :check_python_version
 echo Checking Python version...
 "%PYTHON%" --version
-if %ERRORLEVEL% NEQ 0 (
+if errorlevel 1 (
+    echo Error: Failed to get Python version
     goto :end_error
 )
 
 echo.
-set "CHECK_CMD="%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13"
-%CHECK_CMD% 2>&1
-if %ERRORLEVEL% NEQ 0 (
+set "SUPPORTED_PY_VERSIONS=3.10.x, 3.11.x or 3.12.x"
+"%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13 2>&1
+if errorlevel 1 (
     echo.
     goto :wrong_python_version
 )
 goto :activate_venv
 
 :activate_venv
-echo activating venv %VENV_DIR%
-set PYTHON="%VENV_DIR%\Scripts\python.exe"
+echo Activating virtual environment: %VENV_DIR%
+set "PYTHON=%VENV_DIR%\Scripts\python.exe"
 
 :install_dependencies
-echo installing dependencies
-%PYTHON% -m pip install --upgrade --upgrade-strategy eager pip setuptools
-if %ERRORLEVEL% NEQ 0 (
-    echo pip upgrade failed.
+echo Installing dependencies...
+echo Upgrading pip and setuptools...
+"%PYTHON%" -m pip install --upgrade --upgrade-strategy eager pip setuptools
+if errorlevel 1 (
+    echo Error: pip upgrade failed.
     goto :end_error
 )
-%PYTHON% -m pip install --upgrade --upgrade-strategy eager -r requirements.txt
-if %ERRORLEVEL% NEQ 0 (
-    echo Installing requirements failed.
+
+echo Installing requirements (this may take a while)...
+"%PYTHON%" -m pip install --upgrade --upgrade-strategy eager -r requirements.txt
+if errorlevel 1 (
+    echo Error: Installing requirements failed.
     goto :end_error
 )
 
@@ -87,7 +112,7 @@ goto :end
 
 :wrong_python_version
 echo.
-echo Please install Python 3.10.x, 3.11.x or 3.12.x from:
+echo Please install Python %SUPPORTED_PY_VERSIONS% from:
 echo https://www.python.org/downloads/windows/
 echo.
 echo Reminder: Do not rely on installation videos; they are often out of date.
@@ -102,3 +127,4 @@ goto :end
 
 :end
 pause
+exit /b %errorlevel%
