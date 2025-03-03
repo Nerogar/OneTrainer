@@ -10,10 +10,11 @@ import onnxruntime
 
 
 class WDModel(BaseImageCaptionModel):
-    def __init__(self, device: torch.device, dtype: torch.dtype, wd_model_name):
+    def __init__(self, device: torch.device, dtype: torch.dtype, wd_model_name, prob_limit):
         self.device = device
         self.dtype = dtype
         self.wd_model_name = wd_model_name
+        self.prob_limit = prob_limit
 
         model_path = huggingface_hub.hf_hub_download(
             "SmilingWolf/"+wd_model_name, "model.onnx"
@@ -64,7 +65,7 @@ class WDModel(BaseImageCaptionModel):
         probs = self.model.run([label_name], {input_name: image})[0]
         probs = probs[0].astype(float)
 
-        general_labels = [(self.tag_names[i], probs[i]) for i in self.general_indexes if probs[i] > 0.35]
+        general_labels = [(self.tag_names[i], probs[i]) for i in self.general_indexes if probs[i] > self.prob_limit]
 
         sorted_general_labels = sorted(general_labels, key=lambda label: label[1], reverse=True)
         predicted_caption = ", ".join([
