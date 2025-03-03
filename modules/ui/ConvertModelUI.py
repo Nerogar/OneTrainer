@@ -11,6 +11,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.torch_util import torch_gc
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -24,6 +25,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         self.title("Convert models")
         self.geometry("550x350")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.focus_set()
 
@@ -40,6 +42,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         self.main_frame(self.frame)
 
         self.frame.pack(fill="both", expand=True)
+        self.after(150, lambda: set_window_icon(self))
 
     def main_frame(self, master):
         # model type

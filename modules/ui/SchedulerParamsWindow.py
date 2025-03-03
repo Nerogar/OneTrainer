@@ -2,6 +2,7 @@ from modules.ui.ConfigList import ConfigList
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -78,12 +79,12 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
 
         self.parent = parent
         self.train_config = train_config
-
         self.ui_state = ui_state
 
         self.title("Learning Rate Scheduler Settings")
         self.geometry("800x400")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -98,9 +99,9 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.frame.grid_columnconfigure(1, weight=1)
         self.expand_frame = ctk.CTkFrame(self.frame, bg_color="transparent")
         self.expand_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
-
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
+        self.after(150, lambda: set_window_icon(self))
 
     def main_frame(self, master):
         if self.train_config.learning_rate_scheduler is LearningRateScheduler.CUSTOM:
