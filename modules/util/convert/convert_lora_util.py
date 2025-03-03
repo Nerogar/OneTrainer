@@ -81,7 +81,7 @@ def convert_to_diffusers(
 ) -> dict[str, Tensor]:
     return __convert(state_dict, key_sets, 'diffusers')
 
-def convert_to__legacy_diffusers(
+def convert_to_legacy_diffusers(
         state_dict: dict[str, Tensor],
         key_sets: list[LoraConversionKeySet],
 ) -> dict[str, Tensor]:
