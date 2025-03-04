@@ -28,8 +28,8 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 ![OneTrainerGUI.gif](resources/images/OneTrainerGUI.gif)
 
 > [!NOTE]
-> Explore our 📚 wiki for essential tips and tutorials. Start [here!](https://github.com/Nerogar/OneTrainer/wiki).
-> For command-line references see the [cli section](../README.md#cli-mode)
+> Explore our 📚 wiki for essential tips and tutorials after installing. Start [here!](https://github.com/Nerogar/OneTrainer/wiki).
+> For command-line usage, see the [CLI Mode section](#cli-mode).
 
 
 ## Installation
