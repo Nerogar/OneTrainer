@@ -314,7 +314,7 @@ class TrainConfig(BaseConfig):
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
     clip_grad_norm: float
-    stop_training_at_high_loss_thresold: float
+    stop_training_at_high_loss_threshold: float
 
     # noise
     offset_noise_weight: float
@@ -788,7 +788,7 @@ class TrainConfig(BaseConfig):
         data.append(("loss_scaler", LossScaler.NONE, LossScaler, False))
         data.append(("learning_rate_scaler", LearningRateScaler.NONE, LearningRateScaler, False))
         data.append(("clip_grad_norm", 1.0, float, True))
-        data.append(("stop_training_at_high_loss_thresold", 0.0, float, True))
+        data.append(("stop_training_at_high_loss_threshold", 0.0, float, True))
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))

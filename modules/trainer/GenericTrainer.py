@@ -714,8 +714,8 @@ class GenericTrainer(BaseTrainer):
                             'loss': accumulated_loss,
                             'smooth loss': ema_loss,
                         })
-                        if self.config.stop_training_at_high_loss_thresold is not None and self.config.stop_training_at_high_loss_thresold > 0 and ema_loss > self.config.stop_training_at_high_loss_thresold:
-                            step_tqdm.write(f'Smooth loss is higher than specified thresold of {self.config.stop_training_at_high_loss_thresold}, stopping training.')
+                        if self.config.stop_training_at_high_loss_threshold is not None and self.config.stop_training_at_high_loss_threshold > 0 and ema_loss > self.config.stop_training_at_high_loss_threshold:
+                            step_tqdm.write(f'Smooth loss is higher than specified threshold of {self.config.stop_training_at_high_loss_threshold}, stopping training.')
                             self.commands.stop()
 
                         self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)

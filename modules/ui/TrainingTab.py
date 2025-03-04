@@ -258,7 +258,7 @@ class TrainingTab:
         # Stop training on high loss
         components.label(frame, 11, 0, "Stop training on high loss",
                          tooltip="Enter the value of smooth loss at which training should stop")
-        components.entry(frame, 11, 1, self.ui_state, "stop_training_at_high_loss_thresold")
+        components.entry(frame, 11, 1, self.ui_state, "stop_training_at_high_loss_threshold")
 
     def __create_base2_frame(self, master, row, video_training_enabled: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
