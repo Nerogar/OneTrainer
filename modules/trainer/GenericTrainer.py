@@ -10,7 +10,10 @@ from pathlib import Path
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.BaseModelSampler import (
+    BaseModelSampler,
+    ModelSamplerOutput,
+)
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
@@ -273,17 +276,27 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
-        if not sample_params_list:
+        if sample_params_list is not None:
+            is_custom_sample = True
+        else:
             if self.config.samples is not None:
                 sample_params_list = self.config.samples
             else:
-                with open(self.config.sample_definition_file_name, 'r') as f:
-                    samples = json.load(f)
-                    for i in range(len(samples)):
-                        samples[i] = SampleConfig.default_values().from_dict(samples[i])
-                    sample_params_list = samples
-        else:
-            is_custom_sample = True
+                try:
+                    with open(self.config.sample_definition_file_name, 'r') as f:
+                        samples = json.load(f)
+                        for i in range(len(samples)):
+                            samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                        sample_params_list = samples
+                except (FileNotFoundError, json.JSONDecodeError, OSError, PermissionError) as e:
+                    print(f"Error loading sample definition file {self.config.sample_definition_file_name}: {str(e)}")
+                    print("Skipping sampling and continuing with training...")
+                    # Restore the model to training state and return early
+                    self.model_setup.setup_train_device(self.model, self.config)
+                    if self.config.optimizer.optimizer.is_schedule_free:
+                        torch.clear_autocast_cache()
+                        self.model.optimizer.train()
+                    return
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)

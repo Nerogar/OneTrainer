@@ -179,9 +179,44 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
     return frame
 
 
-def icon_button(master, row, column, text, command):
-    component = ctk.CTkButton(master, text=text, width=40, command=command)
+def icon_button(master, row, column, text, command, width=40, tooltip=None, image=None, compound="left", **kwargs):
+    """
+    Create a button with an icon and optional text
+    Parameters:
+        master: Parent widget
+        row, column: Grid position
+        text: Button text
+        command: Callback function
+        width: Button width (default 40 for icon-only buttons)
+        tooltip: Optional tooltip text
+        image: Optional CTkImage to use as icon
+        compound: Position of image relative to text ('left', 'right', 'top', 'bottom')
+    """
+    button_config = {
+        "text": text,
+        "command": command,
+        "width": width,
+    }
+
+    # Add image if provided
+    if image is not None:
+        button_config["image"] = image
+        button_config["compound"] = compound
+
+        # Auto-adjust width if text is also present
+        if text and width == 40:  # Default width
+            text_width = len(text) * 6 + 30  # Include space for icon and padding
+            button_config["width"] = max(40, text_width)
+
+    # Add any additional kwargs
+    button_config.update(kwargs)
+
+    component = ctk.CTkButton(master, **button_config)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+
+    if tooltip:
+        ToolTip(component, tooltip, x_position=25)
+
     return component
 
 
@@ -307,6 +342,7 @@ def switch(
         var_name: str,
         command: Callable[[], None] = None,
         text: str = "",
+        tooltip: str = None,  # Add tooltip parameter
 ):
     var = ui_state.get_var(var_name)
     if command:
@@ -314,6 +350,10 @@ def switch(
 
     component = ctk.CTkSwitch(master, variable=var, text=text)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+
+    # Add tooltip if provided
+    if tooltip:
+        ToolTip(component, tooltip)
 
     def create_destroy(component):
         orig_destroy = component.destroy
