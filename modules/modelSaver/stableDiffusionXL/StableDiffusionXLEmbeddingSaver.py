@@ -84,11 +84,15 @@ class StableDiffusionXLEmbeddingSaver(
         embedding_uuids = set(model.embedding_state_dicts.keys() \
                               | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
 
-        embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.all_embeddings()}
+        embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.additional_embeddings}
 
         for embedding_uuid in embedding_uuids:
             embedding = embeddings.get(embedding_uuid)
             embedding_state = model.embedding_state_dicts.get(embedding_uuid, None)
+
+            if embedding is None and embedding_state is None:
+                continue
+
             embedding_name = safe_filename(embedding.text_encoder_1_embedding.placeholder,
                                            allow_spaces=False, max_length=None)
 
