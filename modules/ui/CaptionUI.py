@@ -28,7 +28,23 @@ import numpy as np
 from customtkinter import ScalingTracker, ThemeManager
 from PIL import Image, ImageDraw
 
-_icon_cache = {}
+
+# UI Constants - centralized here for easy modification
+class UIConstants:
+    # Window dimensions
+    WINDOW_WIDTH = 900
+    WINDOW_HEIGHT = 650
+
+    # Image display dimensions
+    IMAGE_CONTAINER_WIDTH = 512
+    IMAGE_CONTAINER_HEIGHT = 512
+
+    # File list dimensions
+    FILE_LIST_WIDTH = 250
+    FILE_LIST_WRAPLENGTH = 230
+
+    # Icon dimensions
+    ICON_SIZE = (24, 24)
 
 
 class CaptionUI(ctk.CTkToplevel):
@@ -47,11 +63,11 @@ class CaptionUI(ctk.CTkToplevel):
             "include_subdirectories": initial_include_subdirectories
         }
         self.config_ui_state = UIState(self, self.config_ui_data)
-        # Fixed image size
-        self.image_size = 650
 
         self.title("OneTrainer")
-        self.geometry("900x650")  # Fixed initial size
+        self.geometry(
+            f"{UIConstants.WINDOW_WIDTH}x{UIConstants.WINDOW_HEIGHT}"
+        )
         self.resizable(True, True)
         self.wait_visibility()
         self.focus_set()
@@ -80,6 +96,7 @@ Mouse wheel: increase or decrease brush size"""
         # relative path from self.dir to each image
         self.image_rel_paths = []
         self.current_image_index = -1
+        self.icons = {}
 
         self.top_bar(self)
 
@@ -109,6 +126,15 @@ Mouse wheel: increase or decrease brush size"""
         self.mask_editing_alpha = None
         self.prompt_var = None
         self.prompt_component = None
+
+        # Initialize display dimensions and offsets
+        self.display_width = 0
+        self.display_height = 0
+        self.left_offset = 0
+        self.top_offset = 0
+
+
+
         self.content_column(self.bottom_frame)
 
         self.load_directory()
@@ -117,13 +143,12 @@ Mouse wheel: increase or decrease brush size"""
         top_frame = ctk.CTkFrame(master)
         top_frame.grid(row=0, column=0, sticky="nsew")
 
-        # Load icons for buttons
-        icon_size = (24, 24)
-        load_icon_img = load_icon("load", icon_size)
-        mask_icon_img = load_icon("auto-mask", icon_size)
-        caption_icon_img = load_icon("auto-caption", icon_size)
-        explorer_icon_img = load_icon("explorer", icon_size)
-        help_icon_img = load_icon("help", icon_size)
+        # Load icons for buttons and store them in self.icons
+        self.icons["load"] = load_icon("load", UIConstants.ICON_SIZE)
+        self.icons["mask"] = load_icon("auto-mask", UIConstants.ICON_SIZE)
+        self.icons["caption"] = load_icon("auto-caption", UIConstants.ICON_SIZE)
+        self.icons["explorer"] = load_icon("explorer", UIConstants.ICON_SIZE)
+        self.icons["help"] = load_icon("help", UIConstants.ICON_SIZE)
 
         # Create buttons with icons and auto-sizing
         components.icon_button(
@@ -132,7 +157,7 @@ Mouse wheel: increase or decrease brush size"""
             0,
             "Load",
             self.open_directory,
-            image=load_icon_img,
+            image=self.icons["load"],
             tooltip="Load a directory of images to edit",
         )
         components.icon_button(
@@ -141,7 +166,7 @@ Mouse wheel: increase or decrease brush size"""
             1,
             "Auto-Mask",
             self.open_mask_window,
-            image=mask_icon_img,
+            image=self.icons["mask"],
             tooltip="Open a dialog to automatically generate masks",
         )
         components.icon_button(
@@ -150,7 +175,7 @@ Mouse wheel: increase or decrease brush size"""
             2,
             "Auto-Caption",
             self.open_caption_window,
-            image=caption_icon_img,
+            image=self.icons["caption"],
             tooltip="Open a dialog to automatically generate captions",
         )
 
@@ -161,7 +186,7 @@ Mouse wheel: increase or decrease brush size"""
                 3,
                 "Open in Explorer",
                 self.open_in_explorer,
-                image=explorer_icon_img,
+                image=self.icons["explorer"],
                 tooltip="Open file location in Windows Explorer",
             )
 
@@ -183,7 +208,7 @@ Mouse wheel: increase or decrease brush size"""
             6,
             "Help",
             self.print_help,
-            image=help_icon_img,
+            image=self.icons["help"],
             tooltip=self.help_text,
         )
 
@@ -192,7 +217,9 @@ Mouse wheel: increase or decrease brush size"""
             self.image_labels = []
             self.file_list.destroy()
 
-        self.file_list = ctk.CTkScrollableFrame(master, width=250)
+        self.file_list = ctk.CTkScrollableFrame(
+            master, width=UIConstants.FILE_LIST_WIDTH
+        )
         self.file_list.grid(row=0, column=0, sticky="nsew")
 
         for i, filename in enumerate(self.image_rel_paths):
@@ -205,7 +232,9 @@ Mouse wheel: increase or decrease brush size"""
 
             # wrapping to cap excessively long filenames
             label = ctk.CTkLabel(
-                self.file_list, text=filename, wraplength=230
+                self.file_list,
+                text=filename,
+                wraplength=UIConstants.FILE_LIST_WRAPLENGTH,
             )
             label.bind("<Button-1>", __create_switch_image(i))
 
@@ -213,7 +242,14 @@ Mouse wheel: increase or decrease brush size"""
             label.grid(row=i, column=0, padx=2, pady=2, sticky="nsw")
 
     def content_column(self, master):
-        image = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
+        image = Image.new(
+            "RGBA",
+            (
+                UIConstants.IMAGE_CONTAINER_WIDTH,
+                UIConstants.IMAGE_CONTAINER_HEIGHT,
+            ),
+            (0, 0, 0, 0),
+        )
 
         right_frame = ctk.CTkFrame(master, fg_color="transparent")
         right_frame.grid(row=0, column=1, sticky="nsew")
@@ -221,14 +257,23 @@ Mouse wheel: increase or decrease brush size"""
         # Update grid configuration to let buttons use only the space they need
         right_frame.grid_columnconfigure(0, weight=0)  # Draw button column
         right_frame.grid_columnconfigure(1, weight=0)  # Fill button column
-        right_frame.grid_columnconfigure(2, weight=1)  # Enable mask checkbox (expand)
-        right_frame.grid_columnconfigure(3, weight=0)  # Alpha textbox (fixed size)
-        right_frame.grid_columnconfigure(4, weight=1)  # Alpha label (expand remaining)
-        right_frame.grid_rowconfigure(1, weight=1)  # Make image row expandable
+        right_frame.grid_columnconfigure(
+            2, weight=1
+        )  # Enable mask checkbox (expand)
+        right_frame.grid_columnconfigure(
+            3, weight=0
+        )  # Alpha textbox (fixed size)
+        right_frame.grid_columnconfigure(
+            4, weight=1
+        )  # Alpha label (expand remaining)
+        right_frame.grid_rowconfigure(
+            1, weight=1
+        )  # Make image row expandable
 
         # Reduce padding on buttons and add icons
-        draw_icon_img = load_icon("draw", (24, 24))
-        fill_icon_img = load_icon("fill", (24, 24))
+        self.icons["draw"] = load_icon("draw", UIConstants.ICON_SIZE)
+        self.icons["fill"] = load_icon("fill", UIConstants.ICON_SIZE)
+
 
         components.icon_button(
             right_frame,
@@ -236,7 +281,7 @@ Mouse wheel: increase or decrease brush size"""
             0,
             "Draw",
             self.draw_mask_editing_mode,
-            image=draw_icon_img,
+            image=self.icons["draw"],
             tooltip="draw a mask using a brush",
         )
         components.icon_button(
@@ -245,7 +290,7 @@ Mouse wheel: increase or decrease brush size"""
             1,
             "Fill",
             self.fill_mask_editing_mode,
-            image=fill_icon_img,
+            image=self.icons["fill"],
             tooltip="draw a mask using a fill tool",
         )
 
@@ -290,7 +335,13 @@ Mouse wheel: increase or decrease brush size"""
         self.image_container.grid_columnconfigure(0, weight=1)
 
         # image
-        self.image = ctk.CTkImage(light_image=image, size=(512, 512))
+        self.image = ctk.CTkImage(
+            light_image=image,
+            size=(
+                UIConstants.IMAGE_CONTAINER_WIDTH,
+                UIConstants.IMAGE_CONTAINER_HEIGHT,
+            ),
+        )
         self.image_label = ctk.CTkLabel(
             master=self.image_container, text="", image=self.image
         )
@@ -404,7 +455,7 @@ Mouse wheel: increase or decrease brush size"""
 
             try:
                 with open(prompt_name, "r", encoding="utf-8") as f:
-                    return f.readlines()[0].strip()
+                    return f.read().strip()  # Read the entire file
             except Exception:
                 return ""
         else:
@@ -427,9 +478,9 @@ Mouse wheel: increase or decrease brush size"""
         if not self.pil_image:
             return
 
-        # Container size (fixed for this implementation)
-        container_width = 512
-        container_height = 512
+        # Container size (using constants)
+        container_width = UIConstants.IMAGE_CONTAINER_WIDTH
+        container_height = UIConstants.IMAGE_CONTAINER_HEIGHT
 
         # Calculate aspect ratio of original image
         img_aspect = self.image_width / self.image_height
@@ -525,9 +576,19 @@ Mouse wheel: increase or decrease brush size"""
             self.image_height = self.pil_image.height
 
             self.refresh_image()
-            self.prompt_var.set(prompt)
+
+            # Update textbox content
+            self.prompt_component.delete("1.0", "end")
+            self.prompt_component.insert("1.0", prompt)
         else:
-            image = Image.new("RGB", (512, 512), (0, 0, 0))
+            image = Image.new(
+                "RGB",
+                (
+                    UIConstants.IMAGE_CONTAINER_WIDTH,
+                    UIConstants.IMAGE_CONTAINER_HEIGHT,
+                ),
+                (0, 0, 0),
+            )
             self.image.configure(light_image=image)
 
     def draw_mask_radius(self, delta, raw_event):
@@ -536,6 +597,39 @@ Mouse wheel: increase or decrease brush size"""
         self.mask_draw_radius = max(
             0.0025, self.mask_draw_radius * multiplier
         )
+
+    def get_adjusted_cursor_position(self, event):
+        """
+        Converts window cursor position to image-relative coordinates.
+        Returns None if cursor is outside the image area.
+        """
+        # 1. Apply display scaling adjustment for high DPI displays
+        display_scaling = ScalingTracker.get_window_scaling(self)
+        event_x = event.x / display_scaling
+        event_y = event.y / display_scaling
+
+        # 2. Apply centering offset adjustment
+        event_x -= self.left_offset
+        event_y -= self.top_offset
+
+        # 3. Check if the click is within the image boundaries
+        if (
+            event_x < 0
+            or event_x >= self.display_width
+            or event_y < 0
+            or event_y >= self.display_height
+        ):
+            return None  # Click is outside the actual image area
+
+        return (event_x, event_y)
+
+    def convert_display_to_image_coords(self, display_x, display_y):
+        """
+        Converts display coordinates to original image coordinates
+        """
+        img_x = int((display_x / self.display_width) * self.image_width)
+        img_y = int((display_y / self.display_height) * self.image_height)
+        return (img_x, img_y)
 
     def edit_mask(self, event):
         if not self.enable_mask_editing_var.get():
@@ -549,56 +643,46 @@ Mouse wheel: increase or decrease brush size"""
         ) == 0 or self.current_image_index >= len(self.image_rel_paths):
             return
 
-        # Get the display scaling factor for high DPI displays
-        display_scaling = ScalingTracker.get_window_scaling(self)
+        # Get adjusted cursor position relative to the image
+        cursor_pos = self.get_adjusted_cursor_position(event)
+        if cursor_pos is None:
+            return  # Cursor is outside the image area
 
-        # Adjust event coordinates for scaling
-        event_x = event.x / display_scaling
-        event_y = event.y / display_scaling
+        event_x, event_y = cursor_pos
 
-        # Account for the centering offset
-        event_x -= getattr(self, "left_offset", 0)
-        event_y -= getattr(self, "top_offset", 0)
-
-        # Check if the click is within the image boundaries
-        if (
-            event_x < 0
-            or event_x >= getattr(self, "display_width", 0)
-            or event_y < 0
-            or event_y >= getattr(self, "display_height", 0)
-        ):
-            return  # Click is outside the actual image area
-
-        # Convert screen coordinates to original image coordinates
-        start_x = int((event_x / self.display_width) * self.image_width)
-        start_y = int((event_y / self.display_height) * self.image_height)
+        # Convert display coordinates to original image coordinates
+        start_x, start_y = self.convert_display_to_image_coords(
+            event_x, event_y
+        )
 
         # Handle previous position for drawing lines
         if hasattr(self, "mask_draw_x") and hasattr(self, "mask_draw_y"):
-            prev_x = self.mask_draw_x - getattr(self, "left_offset", 0)
-            prev_y = self.mask_draw_y - getattr(self, "top_offset", 0)
-
-            # Check if previous position was within image
-            if (
-                0 <= prev_x < self.display_width
-                and 0 <= prev_y < self.display_height
-            ):
-                end_x = int(
-                    (prev_x / self.display_width) * self.image_width
+            prev_pos = self.get_adjusted_cursor_position(
+                type(
+                    "obj",
+                    (object,),
+                    {
+                        "x": self.mask_draw_x
+                        * ScalingTracker.get_window_scaling(self),
+                        "y": self.mask_draw_y
+                        * ScalingTracker.get_window_scaling(self),
+                    },
                 )
-                end_y = int(
-                    (prev_y / self.display_height) * self.image_height
+            )
+
+            if prev_pos is not None:
+                prev_x, prev_y = prev_pos
+                end_x, end_y = self.convert_display_to_image_coords(
+                    prev_x, prev_y
                 )
             else:
-                end_x = start_x
-                end_y = start_y
+                end_x, end_y = start_x, start_y
         else:
-            end_x = start_x
-            end_y = start_y
+            end_x, end_y = start_x, start_y
 
         # Store current position for next event
-        self.mask_draw_x = event_x + getattr(self, "left_offset", 0)
-        self.mask_draw_y = event_y + getattr(self, "top_offset", 0)
+        self.mask_draw_x = event_x + self.left_offset
+        self.mask_draw_y = event_y + self.top_offset
 
         is_right = False
         is_left = False
@@ -736,7 +820,8 @@ Mouse wheel: increase or decrease brush size"""
 
             try:
                 with open(prompt_name, "w", encoding="utf-8") as f:
-                    f.write(self.prompt_var.get())
+                    # Get text from the textbox instead of StringVar
+                    f.write(self.prompt_component.get("1.0", "end-1c"))
             except Exception:
                 return
 
