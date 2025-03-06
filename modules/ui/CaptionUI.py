@@ -32,9 +32,10 @@ class CaptionUI(ctk.CTkToplevel):
     """Multi-purpose image editor with captioning and masking functionality."""
 
     # UI Constants
-    WINDOW_WIDTH = 1000
-    WINDOW_HEIGHT = 700
-    IMAGE_CONTAINER_SIZE = 512
+    WINDOW_WIDTH = 1018
+    WINDOW_HEIGHT = 768
+    IMAGE_CONTAINER_WIDTH = 768
+    IMAGE_CONTAINER_HEIGHT = 512
     FILE_LIST_WIDTH = 250
     MASK_MIN_OPACITY = 0.3
     DEFAULT_BRUSH_SIZE = 0.01
@@ -424,27 +425,32 @@ Mouse wheel: Adjust brush size
 
     def _create_image_container(self, parent) -> None:
         """Create the image display container."""
-        self.image_container = ctk.CTkFrame(parent)
+        self.image_container = ctk.CTkFrame(
+            parent, fg_color="#242424"
+        )
         self.image_container.grid(
             row=1, column=0, sticky="nsew", padx=0, pady=0
         )
         self.image_container.grid_columnconfigure(0, weight=1)
         self.image_container.grid_rowconfigure(0, weight=1)
 
-        # Create image display
+        # Create image display with initial dimensions (will be updated after layout)
         self.image = ctk.CTkImage(
             light_image=Image.new(
                 "RGB",
-                (self.IMAGE_CONTAINER_SIZE, self.IMAGE_CONTAINER_SIZE),
+                (self.IMAGE_CONTAINER_WIDTH, self.IMAGE_CONTAINER_HEIGHT),
                 (32, 32, 32),
             ),
-            size=(self.IMAGE_CONTAINER_SIZE, self.IMAGE_CONTAINER_SIZE),
+            size=(self.IMAGE_CONTAINER_WIDTH, self.IMAGE_CONTAINER_HEIGHT),
         )
 
         self.image_label = ctk.CTkLabel(
             self.image_container, text="", image=self.image
         )
         self.image_label.grid(row=0, column=0, sticky="nsew")
+
+        # Add this: Update image dimensions after initial layout
+        self.after(100, self._update_image_container_size)
 
         # Bind mask editing events
         self.image_label.bind("<Motion>", self._handle_mask_edit)
@@ -457,12 +463,27 @@ Mouse wheel: Adjust brush size
             "<ButtonRelease-3>", self._handle_mask_edit_end
         )
 
+        # Bind resize event
+        self.bind("<Configure>", self._on_resize)
+
         # Bind mouse wheel for brush size adjustment
         bind_mousewheel(
             self.image_label,
             {self.image_label.children["!label"]},
             self._adjust_brush_size,
         )
+
+    def _update_image_container_size(self):
+        """Update the image to use actual container size once it's available."""
+        container_width = self.image_container.winfo_width()
+        container_height = self.image_container.winfo_height()
+
+        if container_width > 10 and container_height > 10:
+            # Instead of just updating the size, do a full refresh
+            self._refresh_image()
+        else:
+            # Wait a bit longer and try again
+            self.after(100, self._update_image_container_size)
 
     def _create_caption_area(self, parent) -> None:
         """Create the caption editing area."""
@@ -741,50 +762,103 @@ Mouse wheel: Adjust brush size
         self._refresh_image()
         self._refresh_caption()
 
+    def _on_resize(self, event=None) -> None:
+        """Handle window resize events."""
+        # Only refresh if we have an image and the container is visible
+        if self.pil_image and self.image_container.winfo_ismapped():
+            # Add a small delay to avoid excessive refreshes during resize
+            self.after_cancel(self._resize_after) if hasattr(
+                self, "_resize_after"
+            ) else None
+            self._resize_after = self.after(100, self._refresh_image)
+
     def _refresh_image(self) -> None:
         """Update the displayed image."""
         if not self.pil_image:
             return
 
-        # Container dimensions
-        container_size = self.IMAGE_CONTAINER_SIZE
+        # Step 1: Get container dimensions
+        container_width = self.image_container.winfo_width()
+        container_height = self.image_container.winfo_height()
 
-        # Calculate display dimensions based on aspect ratio
+        # Use minimum sizes for initialization
+        if container_width < 10:
+            container_width = self.IMAGE_CONTAINER_WIDTH
+        if container_height < 10:
+            container_height = self.IMAGE_CONTAINER_HEIGHT
+
+        # Add padding to ensure there's always some margin
+        padding = 20  # pixels of padding on each side
+        available_width = container_width - (padding * 2)
+        available_height = container_height - (padding * 2)
+
+        # Step 2: Calculate target dimensions that maintain aspect ratio
         img_aspect = self.image_width / self.image_height
 
-        if img_aspect > 1:  # Wider than tall
-            display_width = container_size
-            display_height = int(container_size / img_aspect)
-        else:  # Taller than wide or square
-            display_height = container_size
-            display_width = int(container_size * img_aspect)
+        # Calculate dimensions that fit within BOTH width and height constraints
+        width_constrained = available_width
+        height_from_width = int(width_constrained / img_aspect)
 
-        # Store display dimensions for mouse coordinate calculations
+        height_constrained = available_height
+        width_from_height = int(height_constrained * img_aspect)
+
+        # Use whichever is smaller to ensure image fits completely
+        if height_from_width <= available_height:
+            display_width = width_constrained
+            display_height = height_from_width
+        else:
+            display_width = width_from_height
+            display_height = height_constrained
+
+        # Prevent upscaling beyond original dimensions
+        if (
+            display_width > self.image_width
+            or display_height > self.image_height
+        ):
+            # Scale down proportionally
+            scale = min(
+                self.image_width / display_width,
+                self.image_height / display_height,
+            )
+            display_width = int(display_width * scale)
+            display_height = int(display_height * scale)
+
+        # Step 3: Store final dimensions for mouse coordinate calculations
         self.display_width = display_width
         self.display_height = display_height
 
-        # Calculate centering offsets
-        self.left_offset = (container_size - display_width) // 2
-        self.top_offset = (container_size - display_height) // 2
+        # Step 4: Center the image in the container
+        self.left_offset = (container_width - display_width) // 2
+        self.top_offset = (container_height - display_height) // 2
 
-        # Create blank canvas for centering
+        # Step 5: Create a blank canvas of container size
         canvas = Image.new(
-            "RGB", (container_size, container_size), (32, 32, 32)
+            "RGB", (container_width, container_height), (32, 32, 32)
         )
 
-        # Resize image
-        resized_image = self.pil_image.resize(
-            (display_width, display_height), Image.Resampling.LANCZOS
-        )
-
-        # Handle mask display
-        if self.pil_mask:
-            resized_mask = self.pil_mask.resize(
-                (display_width, display_height), Image.Resampling.NEAREST
+        # Step 6: Resize image to display dimensions
+        if (
+            display_width > 0 and display_height > 0
+        ):  # Avoid zero-size errors
+            resized_image = self.pil_image.resize(
+                (display_width, display_height), Image.Resampling.LANCZOS
             )
+        else:
+            # Fallback if we have invalid dimensions
+            resized_image = self.pil_image.copy()
+            print("Warning: Invalid display dimensions calculated")
+
+        # Step 7: Handle mask if present
+        if self.pil_mask:
+            if display_width > 0 and display_height > 0:
+                resized_mask = self.pil_mask.resize(
+                    (display_width, display_height),
+                    Image.Resampling.NEAREST,
+                )
+            else:
+                resized_mask = self.pil_mask.copy()
 
             if self.display_only_mask:
-                # Show only the mask
                 final_image = resized_mask
             else:
                 # Blend image with mask
@@ -793,8 +867,8 @@ Mouse wheel: Adjust brush size
                 )
                 np_mask = np.array(resized_mask, dtype=np.float32) / 255.0
 
-                # Apply minimum opacity to better visualize the mask
-                if np.min(np_mask) == 0:  # Common case optimization
+                # Apply minimum opacity
+                if np.min(np_mask) == 0:  # Common case
                     np_mask = (
                         np_mask * (1.0 - self.MASK_MIN_OPACITY)
                         + self.MASK_MIN_OPACITY
@@ -805,17 +879,19 @@ Mouse wheel: Adjust brush size
                         1.0 - self.MASK_MIN_OPACITY
                     ) + self.MASK_MIN_OPACITY
 
-                # Apply mask to image
+                # Apply mask
                 np_result = (np_image * np_mask * 255.0).astype(np.uint8)
                 final_image = Image.fromarray(np_result, mode="RGB")
         else:
             final_image = resized_image
 
-        # Paste final image onto canvas
+        # Step 8: Paste image onto canvas
         canvas.paste(final_image, (self.left_offset, self.top_offset))
 
-        # Update displayed image
-        self.image.configure(light_image=canvas)
+        # Step 9: Update the displayed image with BOTH parameters set correctly
+        self.image.configure(
+            light_image=canvas, size=(container_width, container_height)
+        )
 
     def _refresh_caption(self) -> None:
         """Update the displayed caption."""
@@ -829,7 +905,7 @@ Mouse wheel: Adjust brush size
         # Create an empty image
         empty_image = Image.new(
             "RGB",
-            (self.IMAGE_CONTAINER_SIZE, self.IMAGE_CONTAINER_SIZE),
+            (self.IMAGE_CONTAINER_WIDTH, self.IMAGE_CONTAINER_HEIGHT),
             (32, 32, 32),
         )
         self.image.configure(light_image=empty_image)
@@ -909,42 +985,49 @@ Mouse wheel: Adjust brush size
         # Get scaling factor
         display_scaling = ScalingTracker.get_window_scaling(self)
 
-        # Adjust coordinates for scaling
-        event_x = event.x / display_scaling - self.left_offset
-        event_y = event.y / display_scaling - self.top_offset
+        # Adjust coordinates for scaling and container offsets
+        event_x = event.x / display_scaling
+        event_y = event.y / display_scaling
+
+        # Translate to image-local coordinates
+        image_x = event_x - self.left_offset
+        image_y = event_y - self.top_offset
 
         # Check if within image boundaries
         if not (
-            0 <= event_x < self.display_width
-            and 0 <= event_y < self.display_height
+            0 <= image_x < self.display_width
+            and 0 <= image_y < self.display_height
         ):
             return 0, 0, 0, 0
 
         # Convert to original image coordinates
-        start_x = int(event_x / self.display_width * self.image_width)
-        start_y = int(event_y / self.display_height * self.image_height)
+        start_x = int(image_x / self.display_width * self.image_width)
+        start_y = int(image_y / self.display_height * self.image_height)
 
         # Calculate previous position for continuous drawing
         if hasattr(self, "mask_draw_x") and hasattr(self, "mask_draw_y"):
-            prev_x = self.mask_draw_x - self.left_offset
-            prev_y = self.mask_draw_y - self.top_offset
+            # Get image-local coordinates from stored raw coordinates
+            prev_image_x = self.mask_draw_x - self.left_offset
+            prev_image_y = self.mask_draw_y - self.top_offset
 
             if (
-                0 <= prev_x < self.display_width
-                and 0 <= prev_y < self.display_height
+                0 <= prev_image_x < self.display_width
+                and 0 <= prev_image_y < self.display_height
             ):
-                end_x = int(prev_x / self.display_width * self.image_width)
+                end_x = int(
+                    prev_image_x / self.display_width * self.image_width
+                )
                 end_y = int(
-                    prev_y / self.display_height * self.image_height
+                    prev_image_y / self.display_height * self.image_height
                 )
             else:
                 end_x, end_y = start_x, start_y
         else:
             end_x, end_y = start_x, start_y
 
-        # Store current position
-        self.mask_draw_x = event_x + self.left_offset
-        self.mask_draw_y = event_y + self.top_offset
+        # Store current raw position (not image-local)
+        self.mask_draw_x = event_x
+        self.mask_draw_y = event_y
 
         return start_x, start_y, end_x, end_y
 
