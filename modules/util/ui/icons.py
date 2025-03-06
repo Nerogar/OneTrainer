@@ -38,7 +38,8 @@ def load_icon(icon_name, size=(24, 24)):
 
     if os.path.exists(png_path):
         try:
-            img = Image.open(png_path)
+            # Load image and convert to RGBA to handle palette-based PNGs
+            img = Image.open(png_path).convert("RGBA")
 
             resampling = Image.Resampling.BICUBIC if max(size) <= 24 else Image.Resampling.LANCZOS
 

@@ -238,21 +238,40 @@ Mouse wheel: Adjust brush size
 
     def _create_file_list(self, parent) -> None:
         """Create the file list panel."""
-        # Create a frame to contain both the header and the scrollable list
+        # Create a frame to contain the scrollable list
         file_area_frame = ctk.CTkFrame(parent, fg_color="transparent")
         file_area_frame.grid(
             row=0, column=0, sticky="nsew", padx=(0, 10), pady=0
         )
         file_area_frame.grid_columnconfigure(0, weight=1)
-        file_area_frame.grid_rowconfigure(0, weight=0)  # Header (fixed)
         file_area_frame.grid_rowconfigure(
-            1, weight=1
-        )  # File list (expandable)
+            0, weight=1
+        )  # Make file list expandable
 
-        # Create the header with folder icon and name
-        header_frame = ctk.CTkFrame(file_area_frame)
+        # Create scrollable frame for file list
+        self.file_list = ctk.CTkScrollableFrame(
+            file_area_frame,
+            width=self.FILE_LIST_WIDTH,
+            scrollbar_fg_color="transparent",
+            scrollbar_button_hover_color="grey75",
+            scrollbar_button_color="grey50",
+        )
+        self.file_list.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+
+        # Store reference to the scrollbar for dynamic visibility management
+        self._file_list_scrollbar = self.file_list._scrollbar
+
+        # Hide the scrollbar initially - only show it when needed
+        self._file_list_scrollbar.grid_remove()
+
+        # Create header with folder icon and name inside the scrollable frame
+        header_frame = ctk.CTkFrame(self.file_list)
         header_frame.grid(
-            row=0, column=0, sticky="ew", padx=0, pady=(0, 5)
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=2,
+            pady=(2, 4),  # Reduced bottom padding
         )
         header_frame.grid_columnconfigure(
             1, weight=1
@@ -275,22 +294,6 @@ Mouse wheel: Adjust brush size
         self.folder_name_label.grid(
             row=0, column=1, sticky="ew", padx=0, pady=5
         )
-
-        # Create scrollable frame for file list
-        self.file_list = ctk.CTkScrollableFrame(
-            file_area_frame,
-            width=self.FILE_LIST_WIDTH,
-            scrollbar_fg_color="transparent",
-            scrollbar_button_hover_color="grey75",
-            scrollbar_button_color="grey50",
-        )
-        self.file_list.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
-
-        # Store reference to the scrollbar for dynamic visibility management
-        self._file_list_scrollbar = self.file_list._scrollbar
-
-        # Hide the scrollbar initially - only show it when needed
-        self._file_list_scrollbar.grid_remove()
 
         self.image_labels = []  # Will be populated when loading directory
 
@@ -563,21 +566,45 @@ Mouse wheel: Adjust brush size
 
         self.image_labels = []
 
-        # Create new labels for each file
+        # Recreate the header (unchanged)
+        header_frame = ctk.CTkFrame(self.file_list)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=2, pady=(2, 4))
+        header_frame.grid_columnconfigure(1, weight=1)
+        folder_icon = load_icon("folder-tree", (20, 20))
+        folder_icon_label = ctk.CTkLabel(header_frame, text="", image=folder_icon)
+        folder_icon_label.grid(row=0, column=0, padx=(5, 3), pady=5)
+        folder_path = os.path.abspath(self.dir) if self.dir else "No folder selected"
+        self.folder_name_label = ctk.CTkLabel(
+            header_frame,
+            text=folder_path,
+            anchor="w",
+            font=("Segoe UI", 12, "bold"),
+            wraplength=self.FILE_LIST_WIDTH - 35,
+        )
+        self.folder_name_label.grid(row=0, column=1, sticky="ew", padx=0, pady=5)
+
+        # Create new labels for each file without per-iteration try/except.
+        # Sanitize the filename (this ensures non-ASCII is handled correctly).
         for i, filename in enumerate(self.image_rel_paths):
+            safe_filename = (
+                filename
+                if isinstance(filename, str)
+                else filename.decode("utf-8", errors="replace")
+            )
             label = ctk.CTkLabel(
                 self.file_list,
-                text=filename,
+                text=safe_filename,
                 wraplength=self.FILE_LIST_WIDTH - 20,
+                font=("Segoe UI", 11),
             )
-            # Using lambda with default argument to avoid closure issue
-            label.bind(
-                "<Button-1>", lambda e, idx=i: self._switch_to_image(idx)
+            label.bind("<Button-1>", lambda e, idx=i: self._switch_to_image(idx))
+            top_padding = 1 if i == 0 else 2
+            label.grid(
+                row=i + 1, column=0, sticky="w", padx=2, pady=(top_padding, 2)
             )
-            label.grid(row=i, column=0, sticky="w", padx=2, pady=2)
             self.image_labels.append(label)
 
-        # Update scrollbar visibility after updating contents
+        # Update scrollbar after updating contents
         self.after(100, self._update_scrollbar_visibility)
 
     def _update_scrollbar_visibility(self) -> None:
