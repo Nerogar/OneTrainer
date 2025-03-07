@@ -100,7 +100,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.progress.update()
 
     def create_captions(self):
-        self.parent.load_captioning_model(self.model_var.get())
+        self.parent.model_manager.load_captioning_model(self.model_var.get())
 
         mode = {
             "Replace all captions": "replace",
@@ -108,7 +108,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             "Add as new line": "add",
         }[self.mode_var.get()]
 
-        self.parent.captioning_model.caption_folder(
+        self.parent.model_manager.captioning_model.caption_folder(
             sample_dir=self.path_entry.get(),
             initial_caption=self.caption_entry.get(),
             caption_prefix=self.prefix_entry.get(),
