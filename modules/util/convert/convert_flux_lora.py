@@ -62,10 +62,28 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
     return keys
 
 
+def __map_clip(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
+    keys = []
+
+    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, ""), combine(key_prefix.diffusers_prefix, ""))]
+
+    return keys
+
+
+def __map_t5(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
+    keys = []
+
+    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, ""), combine(key_prefix.diffusers_prefix, ""))]
+
+    return keys
+
+
 def convert_flux_lora_key_sets() -> list[LoraConversionKeySet]:
     keys = []
 
     keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
     keys += __map_transformer(LoraConversionKeySet("lora_transformer", "lora_transformer"))
+    keys += __map_clip(LoraConversionKeySet("lora_clip_l", "lora_te1"))
+    keys += __map_t5(LoraConversionKeySet("lora_t5", "lora_te2"))
 
     return keys
