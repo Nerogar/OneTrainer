@@ -51,7 +51,7 @@ def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
     if not os.path.isdir(conceptconfig.path):
         return stats_dict
 
-    #advanced stats default to "-" above if not measured, but need to be initialized if they are
+    #advanced stats default to "-" above if not measured, but need to be initialized to specific values if they are
     if advanced_checks:
         stats_dict["image_with_mask_count"] = 0
         stats_dict["image_with_caption_count"] = 0
@@ -76,7 +76,7 @@ def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
 
         aspect_ratio_list = []
         for aspect in AspectBucketing(0,"","","","","","","","","").all_possible_input_aspects:   #input parameters don't matter but can't be blank
-            aspect_ratio_list.append(round(aspect[0]/aspect[1], 2))
+            aspect_ratio_list.append(round(aspect[0]/aspect[1], 2))     #get both wide and tall ratios
             aspect_ratio_list.append(round(aspect[1]/aspect[0], 2))
         aspect_ratio_list = list(set(aspect_ratio_list))
         aspect_ratio_list.sort()
@@ -92,7 +92,8 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
     vid_extensions_list = path_util.SUPPORTED_VIDEO_EXTENSIONS
     aspect_ratio_list = list(stats_dict["aspect_buckets"].keys())
     file_list = [f for f in os.scandir(dir) if f.is_file()]
-    file_list_str = [x.path for x in file_list]     #faster to check list of strings than list of path objects
+    file_list_str = [x.path for x in file_list]     #seems faster to check list of strings for matching files than list of path objects
+
     for path in file_list:
         basename, extension = os.path.splitext(path)
         if extension.lower() in img_extensions_list and not path.name.endswith("-masklabel.png"):
@@ -108,7 +109,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                     stats_dict["image_with_caption_count"] += 1
                     with open(basename + ".txt", "r") as captionfile:
                         captionlist = captionfile.read().splitlines()
-                        #get character/word count of captions, split by newlines
+                        #get character/word count of captions, split by newlines in each text file
                         for caption in captionlist:
                             char_count = len(caption)
                             word_count = len(caption.split())
@@ -129,14 +130,14 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                     width, height = img.size
                     img.close()
                 pixels = width*height
-                true_aspect = width/height
-                nearest_aspect = min(aspect_ratio_list, key=lambda x:abs(x-true_aspect))
+                true_aspect = height/width
+                nearest_aspect = min(aspect_ratio_list, key=lambda x:abs(x-true_aspect))    #try to match math used in aspect bucketing
                 stats_dict["aspect_buckets"][nearest_aspect] += 1
 
                 if pixels > stats_dict["max_pixels"][0]:
-                    stats_dict["max_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}x{height}']
+                    stats_dict["max_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}w x {height}h']
                 if pixels < stats_dict["min_pixels"][0]:
-                    stats_dict["min_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}x{height}']
+                    stats_dict["min_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}w x {height}h']
                 stats_dict["avg_pixels"] += (pixels - stats_dict["avg_pixels"])/(stats_dict["image_count"] + stats_dict["video_count"])
 
         elif extension.lower() in vid_extensions_list:
@@ -152,7 +153,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                     stats_dict["video_with_caption_count"] += 1
                     with open(basename + ".txt", "r") as captionfile:
                         captionlist = captionfile.read().splitlines()
-                        #get character/word count of captions, split by newlines
+                        #get character/word count of captions, split by newlines in each text file
                         for caption in captionlist:
                             char_count = len(caption)
                             word_count = len(caption.split())
@@ -171,14 +172,14 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 vid.release()
 
                 pixels = width*height
-                true_aspect = width/height
+                true_aspect = height/width
                 nearest_aspect = min(aspect_ratio_list, key=lambda x:abs(x-true_aspect))
                 stats_dict["aspect_buckets"][nearest_aspect] += 1
 
                 if pixels > stats_dict["max_pixels"][0]:
-                    stats_dict["max_pixels"] = [pixels, os.path.relpath(path, dir), f'{width}x{height}']
+                    stats_dict["max_pixels"] = [pixels, os.path.relpath(path, dir), f'{width}w x {height}h']
                 if pixels < stats_dict["min_pixels"][0]:
-                    stats_dict["min_pixels"] = [pixels, os.path.relpath(path, dir), f'{width}x{height}']
+                    stats_dict["min_pixels"] = [pixels, os.path.relpath(path, dir), f'{width}w x {height}h']
                 stats_dict["avg_pixels"] += (pixels - stats_dict["avg_pixels"])/(stats_dict["image_count"] + stats_dict["video_count"])
 
                 if length > stats_dict["max_length"][0]:
@@ -203,17 +204,25 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
     #update every directory loop
     stats_dict["directory_count"] += 1
     if advanced_checks:
+        #check for number of "orphaned" mask/caption files as the difference between the total count and the count of image/mask or image/caption pairs
         stats_dict["unpaired_masks"] = stats_dict["mask_count"]-stats_dict["paired_masks"]
         stats_dict["unpaired_captions"] = stats_dict["caption_count"]-stats_dict["paired_captions"]
 
     return stats_dict
 
 #loop through all subfolders of top-level path
-def subfolder_scan(dirpath, stats_dict, advanced_checks):
+def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, waittime : float):
+    stats_dict = init_concept_stats(conceptconfig, advanced_checks)
     start_time = time.perf_counter()
-    subfolders = [dirpath]
+    subfolders = [conceptconfig.path]
     for dir in subfolders:
         stats_dict = folder_scan(dir, stats_dict, advanced_checks)
         stats_dict["processing_time"] = time.perf_counter() - start_time
         subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
+
+        if (time.perf_counter() - start_time) > waittime:
+            stats_dict = init_concept_stats(conceptconfig, advanced_checks)
+            stats_dict["processing_time"] = time.perf_counter() - start_time
+            return stats_dict
+
     return stats_dict

@@ -93,6 +93,9 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
+        #automatically get concept stats if required, or read from concept config
+        self.__auto_update_concept_stats()
+
         components.button(self, 1, 0, "ok", self.__ok)
 
     def __general_tab(self, master, concept: ConceptConfig):
@@ -354,17 +357,18 @@ class ConceptWindow(ctk.CTkToplevel):
 
         #file size
         self.file_size_label = components.label(frame, 1, 0, "Total Size", pad=0,
-                         tooltip="Total size of all image, mask, and caption files")
+                         tooltip="Total size of all image, mask, and caption files in MB")
         self.file_size_label.configure(font=ctk.CTkFont(underline=True))
         self.file_size_preview = components.label(frame, 2, 0, pad=0, text="-")
 
         #subdirectory count
         self.dir_count_label = components.label(frame, 1, 1, "Directories", pad=0,
-                         tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) main concept directory")
+                         tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) the main concept directory")
         self.dir_count_label.configure(font=ctk.CTkFont(underline=True))
         self.dir_count_preview = components.label(frame, 2, 1, pad=0, text="-")
 
-        #basic img/vid stats
+        #basic img/vid stats - count of each type in the concept
+        #the \n at the start of the label gives it better vertical spacing with other rows
         self.image_count_label = components.label(frame, 3, 0, "\nTotal Images", pad=0,
                          tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
         self.image_count_label.configure(font=ctk.CTkFont(underline=True))
@@ -382,7 +386,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.caption_count_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_count_preview = components.label(frame, 4, 3, pad=0, text="-")
 
-        #advanced img stats
+        #advanced img/vid stats - how many img/vid files have a mask or caption of the same name
         self.image_count_mask_label = components.label(frame, 5, 0, "\nImages with Masks", pad=0,
                          tooltip="Total number of image files with an associated mask")
         self.image_count_mask_label.configure(font=ctk.CTkFont(underline=True))
@@ -391,7 +395,7 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Total number of mask files which lack a corresponding image file - if >0, check your data set!")
         self.mask_count_label_unpaired.configure(font=ctk.CTkFont(underline=True))
         self.mask_count_preview_unpaired = components.label(frame, 6, 1, pad=0, text="-")
-        #currently no masks for videos
+        #currently no masks for videos?
 
         self.image_count_caption_label = components.label(frame, 7, 0, "\nImages with Captions", pad=0,
                          tooltip="Total number of image files with an associated caption")
@@ -402,7 +406,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.video_count_caption_label.configure(font=ctk.CTkFont(underline=True))
         self.video_count_caption_preview = components.label(frame, 8, 1, pad=0, text="-")
         self.caption_count_label_unpaired = components.label(frame, 7, 2, "\nUnpaired Captions", pad=0,
-                         tooltip="Total number of caption files which lack a corresponding image file - if >0, check your data set!")
+                         tooltip="Total number of caption files which lack a corresponding image file - if >0, check your data set! If using 'from file name' or 'from single text file' then this can be ignored.")
         self.caption_count_label_unpaired.configure(font=ctk.CTkFont(underline=True))
         self.caption_count_preview_unpaired = components.label(frame, 8, 2, pad=0, text="-")
 
@@ -450,28 +454,29 @@ class ConceptWindow(ctk.CTkToplevel):
 
         #caption info
         self.caption_max_label = components.label(frame, 15, 0, "\nMax Caption Length", pad=0,
-                         tooltip="Largest caption in concept by character count")
+                         tooltip="Largest caption in concept by character count. For token count, assume ~2 tokens/word")
         self.caption_max_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_max_preview = components.label(frame, 16, 0, pad=0, text="-", wraplength=150)
         self.caption_avg_label = components.label(frame, 15, 1, "\nAvg Caption Length", pad=0,
-                         tooltip="Average length of caption in concept by character count")
+                         tooltip="Average length of caption in concept by character count. For token count, assume ~2 tokens/word")
         self.caption_avg_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_avg_preview = components.label(frame, 16, 1, pad=0, text="-", wraplength=150)
         self.caption_min_label = components.label(frame, 15, 2, "\nMin Caption Length", pad=0,
-                         tooltip="Smallest caption in concept by character count")
+                         tooltip="Smallest caption in concept by character count. For token count, assume ~2 tokens/word")
         self.caption_min_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_min_preview = components.label(frame, 16, 2, pad=0, text="-", wraplength=150)
 
-        #bucket info
+        #aspect bucket info
         self.aspect_bucket_label = components.label(frame, 17, 0, "\nAspect Bucketing", pad=0,
-                         tooltip="List of all possible buckets and the number of images in each one, defined as width/height. Buckets range from 0.25 (1:4 extremely tall) to 4 (4:1 extremely wide).")
+                         tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (1:4 extremely wide) to 4 (4:1 extremely tall). \
+                            Images which don't match a bucket exactly are cropped to the nearest one.")
         self.aspect_bucket_label.configure(font=ctk.CTkFont(underline=True))
         self.small_bucket_label = components.label(frame, 17, 1, "\nSmallest Buckets", pad=0,
-                         tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be dropped during training!")
+                         tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be ignored during training! See the wiki for more details.")
         self.small_bucket_label.configure(font=ctk.CTkFont(underline=True))
         self.small_bucket_preview = components.label(frame, 18, 1, pad=0, text="-")
 
-        # plot
+        #aspect bucketing plot, mostly copied from timestep preview graph
         appearance_mode = AppearanceModeTracker.get_mode()
         background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
         text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
@@ -501,22 +506,8 @@ class ConceptWindow(ctk.CTkToplevel):
         components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: [self.__get_concept_stats_threaded(False, 9999), self.__get_concept_stats(True, 9999)],
                           tooltip="Reload advanced statistics for the concept directory")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
         components.button(master=frame, row=0, column=2, text="Abort Scan", command=lambda: self.__cancel_concept_stats(),
-                          tooltip="Stop the currently running scan if it's taking a long time - scan will be slow on large folders and on HDDs")
+                          tooltip="Stop the currently running scan if it's taking a long time - advanced scan will be slow on large folders and on HDDs")
         self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
-
-        #automatically get basic stats if available
-        try:
-            self.__update_concept_stats()      #load stats from config if available
-            if self.concept.concept_stats["image_count"] == 0:  #force rescan if zero images
-                raise KeyError
-        except KeyError:
-            start_time = time.perf_counter()
-            try:
-                self.__get_concept_stats_threaded(False, 1)    #force rescan if config is empty, timeout of 1 sec
-                if (time.perf_counter() - start_time) < 0.05:
-                    self.__get_concept_stats_threaded(True, 1)    #do advanced scan automatically if basic took <0.05s
-            except FileNotFoundError:              #avoid error when loading concept window without config path defined
-                pass
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -683,14 +674,14 @@ class ConceptWindow(ctk.CTkToplevel):
         avg_pixels = self.concept.concept_stats["avg_pixels"]
         min_pixels = self.concept.concept_stats["min_pixels"]
 
-        if any(isinstance(x, str) for x in [max_pixels, avg_pixels, min_pixels]):   #will be str if adv stats were not taken
-            self.pixel_max_preview.configure(text=max_pixels)
-            self.pixel_avg_preview.configure(text=avg_pixels)
-            self.pixel_min_preview.configure(text=min_pixels)
+        if any(isinstance(x, str) for x in [max_pixels, avg_pixels, min_pixels]) or self.concept.concept_stats["image_count"] == 0:   #will be str if adv stats were not taken
+            self.pixel_max_preview.configure(text="-")
+            self.pixel_avg_preview.configure(text="-")
+            self.pixel_min_preview.configure(text="-")
         else:
-            #formatted as (#pixels/1000000) MP, widthxheight, \n filename
+            #formatted as (#pixels/1000000) MP, width x height, \n filename
             self.pixel_max_preview.configure(text=f'{str(round(max_pixels[0]/1000000, 2))} MP, {max_pixels[2]}\n{max_pixels[1]}')
-            self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} MP, ~{int(math.sqrt(avg_pixels))}x{int(math.sqrt(avg_pixels))}')
+            self.pixel_avg_preview.configure(text=f'{str(round(avg_pixels/1000000, 2))} MP, ~{int(math.sqrt(avg_pixels))}w x {int(math.sqrt(avg_pixels))}h')
             self.pixel_min_preview.configure(text=f'{str(round(min_pixels[0]/1000000, 2))} MP, {min_pixels[2]}\n{min_pixels[1]}')
 
         #video length and fps info
@@ -701,14 +692,7 @@ class ConceptWindow(ctk.CTkToplevel):
         avg_fps = self.concept.concept_stats["avg_fps"]
         min_fps = self.concept.concept_stats["min_fps"]
 
-        if any(isinstance(x, str) for x in [max_length, avg_length, min_length]):   #will be str if adv stats were not taken
-            self.length_max_preview.configure(text=max_pixels)
-            self.length_avg_preview.configure(text=avg_pixels)
-            self.length_min_preview.configure(text=min_pixels)
-            self.fps_max_preview.configure(text=max_fps)
-            self.fps_avg_preview.configure(text=avg_fps)
-            self.fps_min_preview.configure(text=min_fps)
-        elif self.concept.concept_stats["video_count"] == 0:
+        if any(isinstance(x, str) for x in [max_length, avg_length, min_length]) or self.concept.concept_stats["video_count"] == 0:   #will be str if adv stats were not taken
             self.length_max_preview.configure(text="-")
             self.length_avg_preview.configure(text="-")
             self.length_min_preview.configure(text="-")
@@ -720,7 +704,7 @@ class ConceptWindow(ctk.CTkToplevel):
             self.length_max_preview.configure(text=f'{int(max_length[0])} frames\n{max_length[1]}')
             self.length_avg_preview.configure(text=f'{int(avg_length)} frames')
             self.length_min_preview.configure(text=f'{int(min_length[0])} frames\n{min_length[1]}')
-            #formatted as (#ffps) fps \n filename
+            #formatted as (#fps) fps \n filename
             self.fps_max_preview.configure(text=f'{int(max_fps[0])} fps\n{max_fps[1]}')
             self.fps_avg_preview.configure(text=f'{int(avg_fps)} fps')
             self.fps_min_preview.configure(text=f'{int(min_fps[0])} fps\n{min_fps[1]}')
@@ -730,11 +714,7 @@ class ConceptWindow(ctk.CTkToplevel):
         avg_caption_length = self.concept.concept_stats["avg_caption_length"]
         min_caption_length = self.concept.concept_stats["min_caption_length"]
 
-        if any(isinstance(x, str) for x in [max_caption_length, avg_caption_length, min_caption_length]):   #will be str if adv stats were not taken
-            self.caption_max_preview.configure(text=max_caption_length)
-            self.caption_avg_preview.configure(text=avg_caption_length)
-            self.caption_min_preview.configure(text=min_caption_length)
-        elif self.concept.concept_stats["caption_count"] == 0:
+        if any(isinstance(x, str) for x in [max_caption_length, avg_caption_length, min_caption_length]) or self.concept.concept_stats["caption_count"] == 0:   #will be str if adv stats were not taken
             self.caption_max_preview.configure(text="-")
             self.caption_avg_preview.configure(text="-")
             self.caption_min_preview.configure(text="-")
@@ -744,11 +724,11 @@ class ConceptWindow(ctk.CTkToplevel):
             self.caption_avg_preview.configure(text=f'{int(avg_caption_length[0])} chars, {int(avg_caption_length[1])} words')
             self.caption_min_preview.configure(text=f'{min_caption_length[0]} chars, {min_caption_length[2]} words\n{min_caption_length[1]}')
 
-        #bucketing
+        #aspect bucketing
         aspect_buckets = self.concept.concept_stats["aspect_buckets"]
         if len(aspect_buckets) != 0 and max(val for val in aspect_buckets.values()) > 0:    #check aspect_bucket data exists and is not all zero
             min_val = min(val for val in aspect_buckets.values() if val > 0)                #smallest nonzero values
-            if max(val for val in aspect_buckets.values()) > min_val:                       #check if any buckets larger than min_val exist
+            if max(val for val in aspect_buckets.values()) > min_val:                       #check if any buckets larger than min_val exist - if all images are same aspect then there won't be
                 min_val2 = min(val for val in aspect_buckets.values() if (val > 0 and val != min_val))  #second smallest bucket
             else:
                 min_val2 = min_val  #if no second smallest bucket exists set to min_val
@@ -774,18 +754,18 @@ class ConceptWindow(ctk.CTkToplevel):
         for dir in subfolders:
             stats_dict = concept_stats.folder_scan(dir, stats_dict, advanced_checks, self.concept)
             stats_dict["processing_time"] = time.perf_counter() - start_time
-            if self.concept.include_subdirectories:
+            if self.concept.include_subdirectories:     #add all subfolders of current directory to for loop
                 subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
             self.concept.concept_stats = stats_dict
-            #cancel if longer than waiting time
+            #cancel and set init stats if longer than waiting time or cancel flag set
             if (time.perf_counter() - start_time) > waittime or self.cancel_scan_flag.is_set():
                 stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
                 stats_dict["processing_time"] = time.perf_counter() - start_time
                 self.concept.concept_stats = stats_dict
                 self.cancel_scan_flag.clear()
                 break
-            #update GUI approx every second
-            if time.perf_counter() > (last_update + 1):
+            #update GUI approx every half second
+            if time.perf_counter() > (last_update + 0.5):
                 last_update = time.perf_counter()
                 self.__update_concept_stats()
                 self.concept_stats_tab.update()
@@ -793,11 +773,24 @@ class ConceptWindow(ctk.CTkToplevel):
         self.__update_concept_stats()
 
     def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
-        self.p = multiprocessing.Process(target=self.__get_concept_stats(advanced_checks, waittime),daemon=True)
+        self.p = multiprocessing.Process(target=self.__get_concept_stats(advanced_checks, waittime), daemon=True)
         self.p.start()
 
     def __cancel_concept_stats(self):
         self.cancel_scan_flag.set()
+
+    def __auto_update_concept_stats(self):
+        try:
+            self.__update_concept_stats()      #load stats from config if available, else raises KeyError
+            if self.concept.concept_stats["image_count"] == 0:  #force rescan if zero images
+                raise KeyError
+        except KeyError:
+            try:
+                self.__get_concept_stats_threaded(False, 2)    #force rescan if config is empty, timeout of 2 sec
+                if self.concept.concept_stats["processing_time"] < 0.1:
+                    self.__get_concept_stats_threaded(True, 2)    #do advanced scan automatically if basic took <0.1s
+            except FileNotFoundError:              #avoid error when loading concept window without config path defined
+                pass
 
     def __ok(self):
         self.destroy()
