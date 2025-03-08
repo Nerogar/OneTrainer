@@ -546,9 +546,21 @@ Mouse wheel: increase or decrease brush size"""
                 print("loading Blip2 model, this may take a while")
                 self.captioning_model = Blip2Model(default_device, torch.float16)
         elif model == "WD14 VIT v2":
-            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
+            modeltarget = "wd-v1-4-vit-tagger-v2"
+            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel) or modeltarget != self.captioning_model.wd_model_name:
                 print("loading WD14_VIT_v2 model, this may take a while")
-                self.captioning_model = WDModel(default_device, torch.float16)
+                self.captioning_model = WDModel(default_device, torch.float16, modeltarget, 0.35)
+        elif model == "WD14 SWINV2 v3":
+            modeltarget = "wd-swinv2-tagger-v3"
+            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel) or modeltarget != self.captioning_model.wd_model_name:
+                print("loading WD14_SWINV2_v3 model, this may take a while")
+                self.captioning_model = WDModel(default_device, torch.float16, modeltarget, 0.35)
+
+        elif model == "WD14 EVA02 v3":
+            modeltarget = "wd-eva02-large-tagger-v3"
+            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel) or modeltarget != self.captioning_model.wd_model_name:
+                print("loading WD14_EVA02_v3 model, this may take a while")
+                self.captioning_model = WDModel(default_device, torch.float16, modeltarget, 0.5)
 
     def print_help(self):
         print(self.help_text)
