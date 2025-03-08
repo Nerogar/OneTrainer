@@ -858,6 +858,8 @@ class ModelManager:
             "Blip": BlipModel,
             "Blip2": Blip2Model,
             "WD14 VIT v2": WDModel,
+            "WD EVA02-Large Tagger v3": WDModel,
+            "WD SwinV2 Tagger v3": WDModel,
         }
 
         self._masking_registry = {
@@ -869,6 +871,8 @@ class ModelManager:
 
         self.masking_model = None
         self.captioning_model = None
+        self.current_masking_model_name = None
+        self.current_captioning_model_name = None
 
     def get_available_captioning_models(self) -> list[str]:
         """Return a list of available captioning models."""
@@ -883,10 +887,16 @@ class ModelManager:
     ) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None:
         """Load the specified masking model, unloading any captioning model."""
         self.captioning_model = None
+        self.current_captioning_model_name = None
 
         if model not in self._masking_registry:
             print(f"Unknown masking model: {model}")
             return None
+
+        # If the requested model is already loaded, return it
+        if self.current_masking_model_name == model and self.masking_model is not None:
+            print(f"Model {model} is already loaded")
+            return self.masking_model
 
         model_class = self._masking_registry[model]
 
@@ -895,6 +905,7 @@ class ModelManager:
         ):
             print(f"Loading {model} model, this may take a while")
             self.masking_model = model_class(self.device, torch.float32)
+            self.current_masking_model_name = model
 
         return self.masking_model
 
@@ -903,10 +914,19 @@ class ModelManager:
     ) -> BlipModel | Blip2Model | WDModel | None:
         """Load the specified captioning model, unloading any masking model."""
         self.masking_model = None
+        self.current_masking_model_name = None
 
         if model not in self._captioning_registry:
             print(f"Unknown captioning model: {model}")
             return None
+
+        # If the requested model is already loaded, return it
+        if (
+            self.current_captioning_model_name == model
+            and self.captioning_model is not None
+        ):
+            print(f"Model {model} is already loaded")
+            return self.captioning_model
 
         model_class = self._captioning_registry[model]
 
@@ -914,9 +934,17 @@ class ModelManager:
             self.captioning_model, model_class
         ):
             print(f"Loading {model} model, this may take a while")
-            self.captioning_model = model_class(
-                self.device, self.precision
-            )
+
+            # For WDModel, pass the model name
+            if model_class == WDModel:
+                self.captioning_model = model_class(
+                    self.device, self.precision, model_name=model
+                )
+            else:
+                self.captioning_model = model_class(
+                    self.device, self.precision
+                )
+            self.current_captioning_model_name = model
 
         return self.captioning_model
 
