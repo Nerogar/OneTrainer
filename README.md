@@ -6,127 +6,154 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
 ## Features
 
-- **Supported models**: FLUX.1, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
-  PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
-- **Model formats**: diffusers and ckpt models
-- **Training methods**: Full fine-tuning, LoRA, embeddings
-- **Masked Training**: Let the training focus on just certain parts of the samples.
-- **Automatic backups**: Fully back up your training progress regularly during training. This includes all information
-  to seamlessly continue training.
-- **Image augmentation**: Apply random transforms such as rotation, brightness, contrast or saturation to each image
-  sample to quickly create a more diverse dataset.
-- **Tensorboard**: A simple tensorboard integration to track the training progress.
-- **Multiple prompts per image**: Train the model on multiple different prompts per image sample.
-- **Noise Scheduler Rescaling**: From the paper
-  [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
-- **EMA**: Train your own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage.
-- **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target
-  resolutions, buckets are created automatically.
-- **Multi Resolution Training**: Train multiple resolutions at the same time.
-- **Dataset Tooling**: Automatically caption your dataset using BLIP, BLIP2 and WD-1.4, or create masks for masked
-  training using ClipSeg or Rembg.
-- **Model Tooling**: Convert between different model formats from a simple UI.
-- **Sampling UI**: Sample the model during training without switching to a different application.
-- **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper
-  [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)
+-   **Supported models**: FLUX.1, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
+    PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
+-   **Model formats**: diffusers and ckpt models
+-   **Training methods**: Full fine-tuning, LoRA, embeddings
+-   **Masked Training**: Let the training focus on just certain parts of the samples
+-   **Automatic backups**: Fully back up your training progress regularly during training. This includes all information to seamlessly continue training
+-   **Image augmentation**: Apply random transforms such as rotation, brightness, contrast or saturation to each image sample to quickly create a more diverse dataset
+-   **Tensorboard**: A simple tensorboard integration to track the training progress
+-   **Multiple prompts per image**: Train the model on multiple different prompts per image sample
+-   **Noise Scheduler Rescaling**: From the paper
+    [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
+-   **EMA**: Train your own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage
+-   **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target resolutions, buckets are created automatically
+-   **Multi Resolution Training**: Train multiple resolutions at the same time
+-   **Dataset Tooling**: Automatically caption your dataset using BLIP, BLIP2 and WD-1.4, or create masks for masked training using ClipSeg or Rembg
+-   **Model Tooling**: Convert between different model formats from a simple UI
+-   **Sampling UI**: Sample the model during training without switching to a different application
+-   **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)
 
 ![OneTrainerGUI.gif](resources/images/OneTrainerGUI.gif)
 
+> [!NOTE]
+> Explore our 📚 wiki for essential tips and tutorials after installing. Start [here!](https://github.com/Nerogar/OneTrainer/wiki).
+> For command-line usage, see the [CLI Mode section](#cli-mode).
+
+
 ## Installation
 
-Installing OneTrainer requires Python >=3.10 and <3.13. You can download Python
-here https://www.python.org/downloads/windows/.
-Then follow these steps:
+> [!IMPORTANT]
+> Installing OneTrainer requires Python >=3.10 and <3.13.
+> You can download Python at https://www.python.org/downloads/windows/.
+> Then follow the below steps.
 
-Automatic installation
+#### Automatic installation
 
-- Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
-- Run:
-    - Windows: `install.bat`
-    - Unix based systems: `install.sh`
+1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
+2. Run:
+    - Windows: Double click or execute `install.bat`
+    - Unix based systems: Execute `install.sh`
 
-Manual installation
+#### Manual installation
 
-- Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
-- Navigate into the cloned directory `cd OneTrainer`
-- Set up a virtual environment `python -m venv venv`
-- Activate the new venv:
-    - Windows: `venv\scripts\activate`
+1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
+2. Navigate into the cloned directory `cd OneTrainer`
+3. Set up a virtual environment `python -m venv venv`
+4. Activate the new venv:
+    - Windows: `venv/scripts/activate`
     - Unix based systems: `source venv/bin/activate`
-- Install the requirements `pip install -r requirements.txt`
+5. Install the requirements `pip install -r requirements.txt`
 
-In some linux distribution, you might need to install libGL, for instance on ubuntu you will need to run:
-```
-sudo apt-get update
-sudo apt-get install libgl1
-```
+> [!Tip]
+> Some Linux distributions are missing required packages for instance: On Ubuntu you must install `libGL`:
+>
+> ```bash
+> sudo apt-get update
+> sudo apt-get install libgl1
+> ```
+>
+> Additionally its been reported Alpine Linux and Arch linux may be missing tkinter. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
 ## Updating
 
-Automatic update
+#### Automatic update
 
-- Run `update.bat` or `update.sh`
+-   Run `update.bat` or `update.sh`
 
-Manual update
+#### Manual update
 
-- Pull changes `git pull`
-- Activate the venv `venv\scripts\activate`
-- Re-Install all requirements `pip install -r requirements.txt --force-reinstall`
+1. Cd to folder containing the repo `cd OneTrainer`
+2. Pull changes `git pull`
+3. Activate the venv `venv/scripts/activate`
+4. Re-install all requirements `pip install -r requirements.txt --force-reinstall`
 
 ## Usage
 
-To start the UI, run `start-ui.bat`. [You can find a quick start guide here.](docs/QuickStartGuide.md), and a more
-detailed overview of different topics [here](docs/Overview.md).
+OneTrainer can be used in **two primary modes**: a graphical user interface (GUI) and a **command-line interface (CLI)** for finer control.
 
-If you need more control, OneTrainer supports two modes of operation. Command line only, and a UI.
-All commands need to be run inside the active venv created during installation.
+For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md). Otherwise visit [our wiki!](https://github.com/Nerogar/OneTrainer)
 
-All functionality is split into different scrips located in the `scripts` directory. This currently includes:
+### GUI Mode
 
-- `train.py` The central training script
-- `train_ui.py` A UI for training
-- `caption_ui.py` A UI for manual or automatic captioning and mask creation for masked training
-- `convert_model_ui.py` A UI for model conversions
-- `convert_model.py` A utility to convert between different model formats
-- `sample.py` A utility to sample any model
-- `create_train_files.py` A utility to create files needed when training only from the CLI
-- `generate_captions.py` A utility to automatically create captions for your dataset
-- `generate_masks.py` A utility to automatically create masks for your dataset
-- `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
+#### Windows
+
+-   To start the UI, navigate to the OneTrainer folder and double-click `start-ui.bat`
+
+#### Unix-based systems
+
+-   Execute `start-ui.sh` and the GUI will pop up.
+
+### CLI Mode
+
+If you need more control or a headless approach OT also supports the command-line interface. All commands **need** to be run inside the active venv created during installation.
+
+All functionality is split into different scripts located in the `scripts` directory. This currently includes:
+
+-   `train.py` The central training script
+-   `train_ui.py` A UI for training
+-   `caption_ui.py` A UI for manual or automatic captioning and mask creation for masked training
+-   `convert_model_ui.py` A UI for model conversions
+-   `convert_model.py` A utility to convert between different model formats
+-   `sample.py` A utility to sample any model
+-   `create_train_files.py` A utility to create files needed when training only from the CLI
+-   `generate_captions.py` A utility to automatically create captions for your dataset
+-   `generate_masks.py` A utility to automatically create masks for your dataset
+-   `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
 
 To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`
 
-If you are on Mac or Linux, read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how
-to run OneTrainer and its various scripts on your system.
+If you are on Mac or Linux, you can also read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system.
+
+## Troubleshooting
+
+For general troubleshooting or questions, ask in [Discussions](https://github.com/Nerogar/OneTrainer/discussions), check the [Wiki](https://github.com/Nerogar/OneTrainer/wiki) or join our [Discord](https://discord.gg/KwgcQd5scF).
+
+If you encounter a reproducible error you first must run update.bat or update.sh and confirm the issue is still able to be reproduced. Then export anonymized debug information to help us solve an issue you are facing and upload it as part of your Github Issues submission.
+
+-   On Windows double click `export_debug.bat`
+-   On Unix-based systems execute `./run-cmd.sh generate_debug_report`
+
+These will both create a `debug_report.log`.
+
+> [!WARNING]
+> We require this file for Github issues going forward, failure to provide it or not manually providing the necessary info will lead to the issue being closed in most circumstances
 
 ## Contributing
 
 Contributions are always welcome in any form. You can open issues, participate in discussions, or even open pull
-requests for new or improved functionality. You can find more information [here](docs/Contributing.md).
+requests for new or improved functionality. You can find more information about contributing [here](docs/Contributing.md).
 
 Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
 For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.
 
-You also **NEED** to **install the required developer dependencies** for your current user and enable the Git commit
-hooks, via the following commands (works on all platforms; Windows, Linux and Mac):
+You also **NEED** to **install the required developer dependencies** for your current user and enable the Git commit hooks, via the following commands (works on all platforms; Windows, Linux and Mac):
+
+> [!IMPORTANT]
+> Be sure to run those commands _without activating your venv or Conda environment_, since [pre-commit](https://pre-commit.com/) is supposed to be installed outside any environment.
 
 ```sh
+cd OneTrainer
 pip install -r requirements-dev.txt
 pre-commit install
 ```
 
-(Be sure to run those commands *without activating your venv or Conda environment,*
-since [pre-commit](https://pre-commit.com/) is supposed to be installed outside any environment.)
-
-Now all of your commits will automatically be verified for common errors and code style issues, so that code
-reviewers can focus on the architecture of your changes without wasting time on style/formatting issues, thus
-greatly improving the chances that your pull request will be accepted quickly and effortlessly.
+Now all of your commits will automatically be verified for common errors and code style issues, so that code reviewers can focus on the architecture of your changes without wasting time on style/formatting issues, thus greatly improving the chances that your pull request will be accepted quickly and effortlessly.
 
 ## Related Projects
 
-- **[MGDS](https://github.com/Nerogar/mgds)**: A custom dataset implementation for Pytorch that is built around the idea
-  of a node based graph.
-- **[StableTuner](https://github.com/devilismyfriend/StableTuner)**: Another training application for Stable Diffusion.
-  OneTrainer takes a lot of inspiration from StableTuner and wouldn't exist without it.
-- **[Visions of Chaos](https://softology.pro/voc.htm)**: A collection of machine learning tools that also includes
-  OneTrainer.
+-   **[MGDS](https://github.com/Nerogar/mgds)**: A custom dataset implementation for Pytorch that is built around the idea of a node based graph.
+-   **[Stability Matrix](https://github.com/LykosAI/StabilityMatrix)**: A swiss-army knife installer which wraps and installs a broad range diffusion software packages including OneTrainer
+-   **[Visions of Chaos](https://softology.pro/voc.htm)**: A collection of machine learning tools that also includes OneTrainer.
+-   **[StableTuner](https://github.com/devilismyfriend/StableTuner)**: A now defunct (archived) training application for Stable Diffusion. OneTrainer takes a lot of inspiration from StableTuner and wouldn't exist without it.

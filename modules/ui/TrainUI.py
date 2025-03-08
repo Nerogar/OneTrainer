@@ -36,6 +36,7 @@ from modules.zluda import ZLUDA
 import torch
 
 import customtkinter as ctk
+from customtkinter import AppearanceModeTracker
 
 
 class TrainUI(ctk.CTk):
@@ -53,7 +54,8 @@ class TrainUI(ctk.CTk):
         self.title("OneTrainer")
         self.geometry("1100x740")
 
-        ctk.set_appearance_mode("System")
+        # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration
+        ctk.set_appearance_mode("Light" if AppearanceModeTracker.detect_appearance_mode() == 0 else "Dark")
         ctk.set_default_color_theme("blue")
 
         self.train_config = TrainConfig.default_values()
@@ -86,8 +88,11 @@ class TrainUI(ctk.CTk):
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
 
-    def close(self):
+        self.protocol("WM_DELETE_WINDOW", self.__close)
+
+    def __close(self):
         self.top_bar_component.save_default()
+        self.quit()
 
     def top_bar(self, master):
         return TopBar(
