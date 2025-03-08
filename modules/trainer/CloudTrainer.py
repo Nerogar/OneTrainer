@@ -162,6 +162,8 @@ class CloudTrainer(BaseTrainer):
         adjust(remote,"cache_dir")
         if Path(remote.base_model_name).exists() or remote.base_model_name.startswith("cloud:"):
             adjust(remote,"base_model_name")
+        if Path(remote.prior.model_name).exists() or remote.prior.model_name.startswith("cloud:"):
+            adjust(remote.prior,"model_name")
 
         adjust(remote,"output_model_destination")
         adjust(remote,"lora_model_name")
