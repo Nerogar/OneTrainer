@@ -19,6 +19,7 @@ from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeClipText import EncodeClipText
 from mgds.pipelineModules.EncodeLlamaText import EncodeLlamaText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -71,16 +72,20 @@ class HunyuanVideoBaseDataLoader(
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        tokenize_prompt_1 = Tokenize(in_name='prompt', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=77, format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
-        tokenize_prompt_2 = Tokenize(in_name='prompt', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=77)
-        encode_prompt_1 = EncodeLlamaText(tokens_in_name='tokens_1', tokens_attention_mask_in_name='tokens_mask_1', hidden_state_out_name='text_encoder_1_hidden_state', tokens_attention_mask_out_name='tokens_mask_1', text_encoder=model.text_encoder_1, hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context, model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        add_embeddings_to_prompt_1 = MapData(in_name='prompt', out_name='prompt_1', map_fn=model.add_text_encoder_1_embeddings_to_prompt)
+        add_embeddings_to_prompt_2 = MapData(in_name='prompt', out_name='prompt_2', map_fn=model.add_text_encoder_2_embeddings_to_prompt)
+        tokenize_prompt_1 = Tokenize(in_name='prompt_1', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=77, format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        tokenize_prompt_2 = Tokenize(in_name='prompt_2', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=77)
+        encode_prompt_1 = EncodeLlamaText(tokens_name='tokens_1', tokens_attention_mask_in_name='tokens_mask_1', hidden_state_out_name='text_encoder_1_hidden_state', tokens_attention_mask_out_name='tokens_mask_1', text_encoder=model.text_encoder_1, hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context, model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
         encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_states', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False, text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
         modules = [rescale_image, encode_image, image_sample]
 
         if model.tokenizer_1:
+            modules.append(add_embeddings_to_prompt_1)
             modules.append(tokenize_prompt_1)
         if model.tokenizer_2:
+            modules.append(add_embeddings_to_prompt_2)
             modules.append(tokenize_prompt_2)
 
         if config.masked_training:
@@ -108,9 +113,8 @@ class HunyuanVideoBaseDataLoader(
         text_split_names = []
 
         sort_names = image_aggregate_names + image_split_names + [
-            'prompt',
-            'tokens_1', 'tokens_mask_1', 'text_encoder_1_hidden_state',
-            'tokens_2', 'tokens_mask_2', 'text_encoder_2_pooled_state',
+            'prompt_1', 'tokens_1', 'tokens_mask_1', 'text_encoder_1_hidden_state',
+            'prompt_2', 'tokens_2', 'tokens_mask_2', 'text_encoder_2_pooled_state',
             'concept'
         ]
 
@@ -171,9 +175,10 @@ class HunyuanVideoBaseDataLoader(
     def _output_modules(self, config: TrainConfig, model: HunyuanVideoModel):
         output_names = [
             'image_path', 'latent_image',
+            'prompt_1', 'prompt_2',
             'tokens_1', 'tokens_2',
             'tokens_mask_1', 'tokens_mask_2',
-            'original_resolution', 'crop_resolution', 'crop_offset', 'prompt',
+            'original_resolution', 'crop_resolution', 'crop_offset',
         ]
 
         if config.masked_training or config.model_type.has_mask_input():
@@ -258,7 +263,7 @@ class HunyuanVideoBaseDataLoader(
             is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config, allow_videos=True)
-        load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt, allow_video=True)
+        load_input = self._load_input_modules(config, model.train_dtype, allow_video=True)
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, 64, True)
         crop_modules = self._crop_modules(config)

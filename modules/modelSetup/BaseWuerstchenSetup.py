@@ -123,21 +123,26 @@ class BaseWuerstchenSetup(
         quantize_layers(model.prior_text_encoder, self.train_device, model.train_dtype)
         quantize_layers(model.prior_prior, self.train_device, model.prior_train_dtype)
 
-    def _setup_additional_embeddings(
+    def _setup_embeddings(
             self,
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        model.additional_embeddings = []
-        for i, embedding_config in enumerate(config.additional_embeddings):
-            embedding_state = model.additional_embedding_states[i]
+        additional_embeddings = []
+        for embedding_config in config.all_embedding_configs():
+            embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
                 embedding_state = self._create_new_embedding(
+                    embedding_config,
                     model.prior_tokenizer,
                     model.prior_text_encoder,
-                    config.additional_embeddings[i].initial_embedding_text,
-                    config.additional_embeddings[i].token_count,
+                    lambda text: model.encode_text(
+                        text=text,
+                        train_device=self.temp_device,
+                    )[0][0][1:],
                 )
+            else:
+                embedding_state = embedding_state.get("clip_g_out", embedding_state.get("clip_g", None))
 
             embedding_state = embedding_state.to(
                 dtype=model.prior_text_encoder.get_input_embeddings().weight.dtype,
@@ -145,36 +150,19 @@ class BaseWuerstchenSetup(
             ).detach()
 
             embedding = WuerstchenModelEmbedding(
-                embedding_config.uuid, embedding_state, embedding_config.placeholder,
+                embedding_config.uuid,
+                embedding_state,
+                embedding_config.placeholder,
+                embedding_config.is_output_embedding,
             )
-            model.additional_embeddings.append(embedding)
-            self._add_embedding_to_tokenizer(model.prior_tokenizer, embedding.text_tokens)
+            if embedding_config.uuid == config.embedding.uuid:
+                model.embedding = embedding
+            else:
+                additional_embeddings.append(embedding)
 
-    def _setup_embedding(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
-    ):
-        model.embedding = None
+            model.additional_embeddings = additional_embeddings
 
-        embedding_state = model.embedding_state
-        if embedding_state is None:
-            embedding_state = self._create_new_embedding(
-                model.prior_tokenizer,
-                model.prior_text_encoder,
-                config.embedding.initial_embedding_text,
-                config.embedding.token_count,
-            )
-
-        embedding_state = embedding_state.to(
-            dtype=model.prior_text_encoder.get_input_embeddings().weight.dtype,
-            device=self.train_device,
-        ).detach()
-
-        model.embedding = WuerstchenModelEmbedding(
-            config.embedding.uuid, embedding_state, config.embedding.placeholder,
-        )
-        self._add_embedding_to_tokenizer(model.prior_tokenizer, model.embedding.text_tokens)
+            self._add_embeddings_to_tokenizer(model.prior_tokenizer, model.all_prior_text_encoder_embeddings())
 
     def _setup_embedding_wrapper(
             self,
@@ -184,14 +172,20 @@ class BaseWuerstchenSetup(
         model.prior_embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.prior_tokenizer,
             orig_module=model.prior_text_encoder.text_model.embeddings.token_embedding,
-            additional_embeddings=[embedding.prior_text_encoder_vector for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.prior_text_encoder_vector]),
-            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
-            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+            embeddings=model.all_prior_text_encoder_embeddings(),
         )
         model.prior_embedding_wrapper.hook_to_module()
+
+    def _setup_embeddings_requires_grad(
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
+    ):
+        for embedding, embedding_config in zip(model.all_prior_text_encoder_embeddings(),
+                                               config.all_embedding_configs(), strict=True):
+            train_embedding = embedding_config.train and \
+                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+            embedding.requires_grad_(train_embedding)
 
     def __alpha_cumprod(
             self,
