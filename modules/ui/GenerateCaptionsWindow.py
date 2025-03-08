@@ -1,5 +1,7 @@
 from tkinter import filedialog
 
+from modules.util.ui.ui_utils import set_window_icon
+
 import customtkinter as ctk
 
 
@@ -22,6 +24,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.title("Batch generate captions")
         self.geometry("360x360")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
