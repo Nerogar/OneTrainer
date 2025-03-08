@@ -1,8 +1,8 @@
 """
-Refactored OneTrainer Image Editor
+OneTrainer Dataset Tools
 
-This module defines a CTkToplevel window for image editing with file
-browsing, captioning, and mask editing capabilities.
+This module defines a CTkToplevel window for image editing with the capbility to automatically
+or manually caption and mask images from a loaded directory.
 """
 
 import contextlib
