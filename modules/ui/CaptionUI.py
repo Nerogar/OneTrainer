@@ -5,16 +5,16 @@ This module defines a CTkToplevel window for image editing with file
 browsing, captioning, and mask editing capabilities.
 """
 
-import os
+import contextlib
 import platform
 import subprocess
 import tkinter as tk
 from collections.abc import Callable
 from enum import Enum
+from pathlib import Path
 from tkinter import filedialog
 from typing import TypeAlias
 
-# External module imports (assumed available)
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
@@ -43,39 +43,26 @@ RGBColor: TypeAlias = tuple[int, int, int]
 ImageCoordinates: TypeAlias = tuple[int, int, int, int]
 
 
+
 def scan_for_supported_images(
-    directory: str,
+    directory: Path,
     include_subdirs: bool,
-    is_supported: Callable[[str], bool],
-) -> list[str]:
-    """
-    Scan a directory for supported images.
-
-    Args:
-        directory: The directory path.
-        include_subdirs: Whether to include subdirectories.
-        is_supported: A callable that returns True if the file extension is supported.
-
-    Returns:
-        A sorted list of relative image paths.
-    """
+    is_supported: Callable[[Path], bool],
+) -> list[Path]:
+    directory = Path(directory)
     if include_subdirs:
-        results = []
-        for root, _, files in os.walk(directory):
-            results.extend(
-                os.path.relpath(os.path.join(root, filename), directory)
-                for filename in files
-                if is_supported(filename)
-            )
+        results = [
+            p.relative_to(directory)
+            for p in directory.glob('**/*')
+            if p.is_file() and is_supported(p)
+        ]
     else:
         results = [
-            filename
-            for filename in os.listdir(directory)
-            if os.path.isfile(os.path.join(directory, filename))
-            and is_supported(filename)
+            p.name
+            for p in directory.iterdir()
+            if p.is_file() and is_supported(p)
         ]
-    results.sort()
-    return results
+    return sorted(results)
 
 
 class CaptionUI(ctk.CTkToplevel):
@@ -444,10 +431,19 @@ class CaptionUI(ctk.CTkToplevel):
         self.bind("<Control-y>", self.mask_editor.redo_mask_edit)
 
     def _update_file_list(self) -> None:
-        """Refresh the file list UI."""
+        """Refresh the file list UI with optimized updates."""
+        # Store current scroll position to restore after update - use contextlib.suppress pattern
+        current_scroll = 0  # Default value
+        with contextlib.suppress(Exception):
+            current_scroll = self.file_list._parent_canvas.yview()[0]
+
+        # Clear existing widgets
         for widget in self.file_list.winfo_children():
             widget.destroy()
+
         self.image_labels = []
+
+        # Create header with consistent Path usage
         header_frame = ctk.CTkFrame(self.file_list)
         header_frame.grid(
             row=0, column=0, sticky="ew", padx=2, pady=(2, 4)
@@ -457,9 +453,14 @@ class CaptionUI(ctk.CTkToplevel):
         ctk.CTkLabel(header_frame, text="", image=folder_icon).grid(
             row=0, column=0, padx=(5, 3), pady=5
         )
+
+        # Use pathlib consistently
         folder_path: str = (
-            os.path.abspath(self.dir) if self.dir else "No folder selected"
+            str(Path(self.dir).absolute())
+            if self.dir
+            else "No folder selected"
         )
+
         self.folder_name_label = ctk.CTkLabel(
             header_frame,
             text=folder_path,
@@ -470,12 +471,31 @@ class CaptionUI(ctk.CTkToplevel):
         self.folder_name_label.grid(
             row=0, column=1, sticky="ew", padx=0, pady=5
         )
-        for i, filename in enumerate(self.image_rel_paths):
+
+        # Add virtualization for large directories
+        MAX_VISIBLE_FILES = 500
+        if len(self.image_rel_paths) > MAX_VISIBLE_FILES:
+            warning = ctk.CTkLabel(
+                self.file_list,
+                text=f"Showing {MAX_VISIBLE_FILES} of {len(self.image_rel_paths)} files",
+                text_color="orange",
+                font=("Segoe UI", 10, "italic"),
+            )
+            warning.grid(row=1, column=0, sticky="ew", padx=2, pady=5)
+            display_files = self.image_rel_paths[:MAX_VISIBLE_FILES]
+            start_row = 2
+        else:
+            display_files = self.image_rel_paths
+            start_row = 1
+
+        # Create file labels
+        for i, filename in enumerate(display_files):
             safe_filename: str = (
                 filename
                 if isinstance(filename, str)
                 else filename.decode("utf-8", errors="replace")
             )
+
             label = ctk.CTkLabel(
                 self.file_list,
                 text=safe_filename,
@@ -489,14 +509,24 @@ class CaptionUI(ctk.CTkToplevel):
                 ),
             )
             label.grid(
-                row=i + 1,
+                row=i + start_row,
                 column=0,
                 sticky="w",
                 padx=2,
                 pady=(1 if i == 0 else 2, 2),
             )
             self.image_labels.append(label)
-        self.after(100, self._update_scrollbar_visibility)
+
+        # Update scroll position and scrollbar
+        self.after(
+            100, lambda: self._restore_scroll_position(current_scroll)
+        )
+        self.after(200, self._update_scrollbar_visibility)
+
+    def _restore_scroll_position(self, position: float) -> None:
+        """Restore scroll position after updating file list."""
+        with contextlib.suppress(Exception):
+            self.file_list._parent_canvas.yview_moveto(position)
 
     def _update_scrollbar_visibility(self) -> None:
         """Update scrollbar visibility based on file list content."""
@@ -701,10 +731,10 @@ class ImageHandler:
             < len(self.parent.image_rel_paths)
         ):
             return
-        image_path: str = os.path.join(
-            self.parent.dir,
-            self.parent.image_rel_paths[self.parent.current_image_index],
-        )
+
+        # Use pathlib for path operations
+        image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+
         try:
             self.parent.pil_image = Image.open(image_path).convert("RGB")
             self.parent.image_width = self.parent.pil_image.width
@@ -712,8 +742,9 @@ class ImageHandler:
         except Exception as e:
             print(f"Error loading image {image_path}: {e}")
             self.parent.pil_image = None
-        mask_path: str = os.path.splitext(image_path)[0] + "-masklabel.png"
-        if os.path.exists(mask_path):
+
+        mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
+        if mask_path.exists():
             try:
                 self.parent.pil_mask = Image.open(mask_path).convert("RGB")
                 self.parent.mask_editor.reset_for_new_image()
@@ -723,23 +754,22 @@ class ImageHandler:
         else:
             self.parent.pil_mask = None
             self.parent.mask_editor.reset_for_new_image()
-        caption_path: str = os.path.splitext(image_path)[0] + ".txt"
-        if os.path.exists(caption_path):
+
+        caption_path = image_path.with_suffix(".txt")
+        if caption_path.exists():
             try:
-                with open(caption_path, "r", encoding="utf-8") as f:
-                    content: str = f.read().strip()
-                    self.parent.caption_lines = content.split("\n")
-                    self.parent.caption_lines.extend(
-                        [""] * (5 - len(self.parent.caption_lines))
-                    )
-                    self.parent.caption_lines = self.parent.caption_lines[
-                        :5
-                    ]
+                content = caption_path.read_text(encoding="utf-8").strip()
+                self.parent.caption_lines = content.split("\n")
+                self.parent.caption_lines.extend(
+                    [""] * (5 - len(self.parent.caption_lines))
+                )
+                self.parent.caption_lines = self.parent.caption_lines[:5]
             except Exception as e:
                 print(f"Error loading caption {caption_path}: {e}")
                 self.parent.caption_lines = [""] * 5
         else:
             self.parent.caption_lines = [""] * 5
+
         self.parent.current_caption_line = 0
         self.parent.caption_line_var.set(
             self.parent.caption_line_values[0]
@@ -749,10 +779,9 @@ class ImageHandler:
 
     def is_supported_image(self, filename: str) -> bool:
         """Determine if the file is a supported image."""
-        name, ext = os.path.splitext(filename)
-        return path_util.is_supported_image_extension(
-            ext
-        ) and not name.endswith("-masklabel")
+        path = Path(filename)
+        return (path_util.is_supported_image_extension(path.suffix) and
+                not path.stem.endswith("-masklabel"))
 
 
 class NavigationManager:
@@ -813,8 +842,8 @@ class ModelManager:
     ) -> None:
         self.device: torch.device = device or default_device
         self.precision: torch.dtype = precision or torch.float16
-        self.masking_model = None
-        self.captioning_model = None
+        self.masking_model: ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None = None
+        self.captioning_model: BlipModel | Blip2Model | WDModel | None = None
 
     def load_masking_model(self, model: str) -> None:
         self.captioning_model = None
@@ -865,16 +894,18 @@ class ModelManager:
             print("Loading WD14_VIT_v2 model, this may take a while")
             self.captioning_model = WDModel(self.device, self.precision)
 
-    def get_masking_model(self):
+    def get_masking_model(self) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None:
         return self.masking_model
 
-    def get_captioning_model(self):
+    def get_captioning_model(self) -> BlipModel | Blip2Model | WDModel | None:
         return self.captioning_model
 
 
 class FileManager:
     def __init__(self, parent: CaptionUI) -> None:
         self.parent: CaptionUI = parent
+        self._last_saved_caption = {}  # Simple cache to track saved content
+        self._mask_modified = {}  # Track if mask has been modified
 
     def save_changes(self, event: tk.Event | None = None) -> None:
         """Save the current mask and caption data to disk."""
@@ -884,54 +915,80 @@ class FileManager:
             < len(self.parent.image_rel_paths)
         ):
             return
-        image_path: str = os.path.join(
-            self.parent.dir,
-            self.parent.image_rel_paths[self.parent.current_image_index],
+
+        # Use pathlib for path operations
+        image_path = (
+            Path(self.parent.dir)
+            / self.parent.image_rel_paths[self.parent.current_image_index]
         )
+        image_key = str(image_path)
+
+        # Handle mask saving if it exists and was modified
         if self.parent.pil_mask:
-            mask_path: str = (
-                os.path.splitext(image_path)[0] + "-masklabel.png"
+            mask_path = image_path.with_name(
+                f"{image_path.stem}-masklabel.png"
             )
-            try:
-                self.parent.pil_mask.save(mask_path)
-                print(f"Saved mask to {mask_path}")
-            except Exception as e:
-                print(f"Error saving mask: {e}")
-        current_text: str = self.parent.caption_entry.get()
+            if self._mask_modified.get(image_key, False):
+                try:
+                    self.parent.pil_mask.save(mask_path)
+                    print(f"Saved mask to {mask_path}")
+                    self._mask_modified[image_key] = False
+                except Exception as e:
+                    print(f"Error saving mask: {e}")
+
+        # Handle caption saving with change detection
+        current_text = self.parent.caption_entry.get()
         self.parent.caption_lines[self.parent.current_caption_line] = (
             current_text
         )
-        caption_path: str = os.path.splitext(image_path)[0] + ".txt"
-        try:
-            non_empty_lines: list[str] = [
-                line for line in self.parent.caption_lines if line
-            ]
-            with open(caption_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(non_empty_lines))
-            print(f"Saved caption to {caption_path}")
-        except Exception as e:
-            print(f"Error saving caption: {e}")
+
+        non_empty_lines = [
+            line for line in self.parent.caption_lines if line
+        ]
+        caption_content = "\n".join(non_empty_lines)
+        caption_path = image_path.with_suffix(".txt")
+
+        # Only save if content has changed
+        if self._last_saved_caption.get(image_key) != caption_content:
+            # Double-check against file content if file exists
+            should_save = True
+            if caption_path.exists():
+                try:
+                    file_content = caption_path.read_text(
+                        encoding="utf-8"
+                    ).strip()
+                    should_save = file_content != caption_content
+                except Exception:
+                    # If reading fails, we'll save anyway
+                    pass
+
+            if should_save:
+                try:
+                    caption_path.write_text(
+                        caption_content, encoding="utf-8"
+                    )
+                    print(f"Saved caption to {caption_path}")
+                    self._last_saved_caption[image_key] = caption_content
+                except Exception as e:
+                    print(f"Error saving caption: {e}")
 
     def open_in_explorer(self) -> None:
         """Open the current image location in the system file explorer."""
         if not (
-            0
-            <= self.parent.current_image_index
-            < len(self.parent.image_rel_paths)
+            0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)
         ):
             return
-        image_path: str = os.path.join(
-            self.parent.dir,
-            self.parent.image_rel_paths[self.parent.current_image_index],
-        )
-        image_path = os.path.normpath(os.path.realpath(image_path))
+
+        image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+        image_path = image_path.resolve()  # Gets absolute normalized path
+
         try:
             if platform.system() == "Windows":
-                subprocess.Popen(f"explorer /select,{image_path}")
-            elif platform.system() == "Darwin":
-                subprocess.Popen(["open", "-R", image_path])
-            else:
-                subprocess.Popen(["xdg-open", os.path.dirname(image_path)])
+                subprocess.run(["explorer", f"/select,{image_path}"], check=False)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", "-R", str(image_path)], check=False)
+            else:  # Linux
+                subprocess.run(["xdg-open", str(image_path.parent)], check=False)
         except Exception as e:
             print(f"Error opening file in explorer: {e}")
 
@@ -946,18 +1003,35 @@ class FileManager:
         """Load image file paths from the selected directory."""
         if not self.parent.dir:
             return
-        folder_name: str = os.path.basename(
-            os.path.normpath(self.parent.dir)
-        )
-        self.parent.folder_name_label.configure(text=folder_name)
-        include_subdirs: bool = self.parent.config_ui_data[
-            "include_subdirectories"
-        ]
-        self.parent.image_rel_paths = scan_for_supported_images(
-            self.parent.dir,
-            include_subdirs,
-            self.parent.image_handler.is_supported_image,
-        )
+
+        dir_path = Path(self.parent.dir)
+        self.parent.folder_name_label.configure(text=dir_path.name)
+
+        include_subdirs = self.parent.config_ui_data["include_subdirectories"]
+
+        # For huge directories, show immediate feedback that loading is happening
+        if include_subdirs:
+            print(f"Scanning directory {dir_path} (including subdirectories)")
+        else:
+            print(f"Scanning directory {dir_path}")
+
+        # Use pathlib for scanning directories
+        if not include_subdirs and platform.system() == "Windows":
+            # Fast path for non-recursive Windows scanning
+            self.parent.image_rel_paths = []
+            is_supported = self.parent.image_handler.is_supported_image
+            for entry in dir_path.iterdir():
+                if entry.is_file() and is_supported(entry.name):
+                    self.parent.image_rel_paths.append(entry.name)
+            self.parent.image_rel_paths.sort()
+        else:
+            # Fall back to the existing scan function for recursive or non-Windows
+            self.parent.image_rel_paths = scan_for_supported_images(
+                str(dir_path),
+                include_subdirs,
+                self.parent.image_handler.is_supported_image,
+            )
+
         self.parent._update_file_list()
         if self.parent.image_rel_paths:
             self.parent.navigation_manager.switch_to_image(0)
@@ -1029,12 +1103,12 @@ class MaskEditor:
         self.edit_started: bool = False
         self._cached_image_dimensions: tuple[int, int] = (0, 0)
 
-    def decrease_brush_size(self, event=None) -> str:
+    def decrease_brush_size(self, event: tk.Event | None = None) -> str:
         """Decrease the brush size."""
         self.mask_draw_radius = max(0.0025, self.mask_draw_radius / 1.25)
         return "break"
 
-    def increase_brush_size(self, event=None) -> str:
+    def increase_brush_size(self, event: tk.Event | None = None) -> str:
         """Increase the brush size."""
         self.mask_draw_radius = min(0.5, self.mask_draw_radius * 1.25)
         return "break"
@@ -1243,7 +1317,7 @@ class MaskEditor:
             self.parent.pil_mask = Image.fromarray(np_mask, "RGB")
             self.parent.image_handler.refresh_image()
 
-    def adjust_brush_size(self, delta: float, raw_event) -> None:
+    def adjust_brush_size(self, delta: float, raw_event: object) -> None:
         """Adjust the brush size based on mouse wheel movement."""
         multiplier: float = 1.0 + (
             delta * (0.03 if self.mask_draw_radius < 0.05 else 0.05)
@@ -1253,18 +1327,23 @@ class MaskEditor:
         )
 
     def _save_mask_to_history(self) -> None:
-        """Save the current mask state to history for undo/redo."""
-        if self.parent.pil_mask is None:
-            return
-        current_mask: Image.Image = self.parent.pil_mask.copy()
-        if self.mask_history_position < len(self.mask_history) - 1:
-            self.mask_history = self.mask_history[
-                : self.mask_history_position + 1
-            ]
-        self.mask_history.append(current_mask)
-        if len(self.mask_history) > self.mask_history_limit:
-            self.mask_history.pop(0)
-        self.mask_history_position = len(self.mask_history) - 1
+            """Save the current mask state to history for undo/redo."""
+            if self.parent.pil_mask is None:
+                return
+            current_mask: Image.Image = self.parent.pil_mask.copy()
+            if self.mask_history_position < len(self.mask_history) - 1:
+                self.mask_history = self.mask_history[
+                    : self.mask_history_position + 1
+                ]
+            self.mask_history.append(current_mask)
+            if len(self.mask_history) > self.mask_history_limit:
+                self.mask_history.pop(0)
+            self.mask_history_position = len(self.mask_history) - 1
+
+            # Mark the mask as modified for the current image
+            if hasattr(self.parent.file_manager, '_mask_modified') and self.parent.dir and 0 <= self.parent.current_image_index < len(self.parent.image_rel_paths):
+                image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+                self.parent.file_manager._mask_modified[str(image_path)] = True
 
     def undo_mask_edit(
         self, event: tk.Event | None = None
