@@ -116,11 +116,18 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _setup_window(self) -> None:
         """Set up window properties."""
-        self.title("OneTrainer Image Editor")
+        self.title("Dataset Tools")
         self.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
         self.resizable(True, True)
         self.wait_visibility()
         self.focus_set()
+        self.lift()  # Raise window to the top
+        self.grab_set()  # Make this window modal
+
+        # Schedule releasing topmost attribute after window is fully shown
+        self.attributes("-topmost", True)
+        self.after(100, lambda: self.attributes("-topmost", False))
+
         self.help_text: str = (
                 "Keyboard shortcuts:\n\n"
                 "Left/Right arrows: Navigate between images\n"
@@ -845,62 +852,82 @@ class ModelManager:
     ) -> None:
         self.device: torch.device = device or default_device
         self.precision: torch.dtype = precision or torch.float16
-        self.masking_model: ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None = None
-        self.captioning_model: BlipModel | Blip2Model | WDModel | None = None
 
-    def load_masking_model(self, model: str) -> None:
-        self.captioning_model = None
-        if model == "ClipSeg" and (
-            self.masking_model is None
-            or not isinstance(self.masking_model, ClipSegModel)
-        ):
-            print("Loading ClipSeg model, this may take a while")
-            self.masking_model = ClipSegModel(self.device, torch.float32)
-        elif model == "Rembg" and (
-            self.masking_model is None
-            or not isinstance(self.masking_model, RembgModel)
-        ):
-            print("Loading Rembg model, this may take a while")
-            self.masking_model = RembgModel(self.device, torch.float32)
-        elif model == "Rembg-Human" and (
-            self.masking_model is None
-            or not isinstance(self.masking_model, RembgHumanModel)
-        ):
-            print("Loading Rembg-Human model, this may take a while")
-            self.masking_model = RembgHumanModel(
-                self.device, torch.float32
-            )
-        elif model == "Hex Color" and (
-            self.masking_model is None
-            or not isinstance(self.masking_model, MaskByColor)
-        ):
-            self.masking_model = MaskByColor(self.device, torch.float32)
+        # Model registries for better extensibility
+        self._captioning_registry = {
+            "Blip": BlipModel,
+            "Blip2": Blip2Model,
+            "WD14 VIT v2": WDModel,
+        }
 
-    def load_captioning_model(self, model: str) -> None:
+        self._masking_registry = {
+            "ClipSeg": ClipSegModel,
+            "Rembg": RembgModel,
+            "Rembg-Human": RembgHumanModel,
+            "Hex Color": MaskByColor,
+        }
+
         self.masking_model = None
-        if model == "Blip" and (
-            self.captioning_model is None
-            or not isinstance(self.captioning_model, BlipModel)
-        ):
-            print("Loading Blip model, this may take a while")
-            self.captioning_model = BlipModel(self.device, self.precision)
-        elif model == "Blip2" and (
-            self.captioning_model is None
-            or not isinstance(self.captioning_model, Blip2Model)
-        ):
-            print("Loading Blip2 model, this may take a while")
-            self.captioning_model = Blip2Model(self.device, self.precision)
-        elif model == "WD14 VIT v2" and (
-            self.captioning_model is None
-            or not isinstance(self.captioning_model, WDModel)
-        ):
-            print("Loading WD14_VIT_v2 model, this may take a while")
-            self.captioning_model = WDModel(self.device, self.precision)
+        self.captioning_model = None
 
-    def get_masking_model(self) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None:
+    def get_available_captioning_models(self) -> list[str]:
+        """Return a list of available captioning models."""
+        return list(self._captioning_registry.keys())
+
+    def get_available_masking_models(self) -> list[str]:
+        """Return a list of available masking models."""
+        return list(self._masking_registry.keys())
+
+    def load_masking_model(
+        self, model: str
+    ) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None:
+        """Load the specified masking model, unloading any captioning model."""
+        self.captioning_model = None
+
+        if model not in self._masking_registry:
+            print(f"Unknown masking model: {model}")
+            return None
+
+        model_class = self._masking_registry[model]
+
+        if self.masking_model is None or not isinstance(
+            self.masking_model, model_class
+        ):
+            print(f"Loading {model} model, this may take a while")
+            self.masking_model = model_class(self.device, torch.float32)
+
         return self.masking_model
 
-    def get_captioning_model(self) -> BlipModel | Blip2Model | WDModel | None:
+    def load_captioning_model(
+        self, model: str
+    ) -> BlipModel | Blip2Model | WDModel | None:
+        """Load the specified captioning model, unloading any masking model."""
+        self.masking_model = None
+
+        if model not in self._captioning_registry:
+            print(f"Unknown captioning model: {model}")
+            return None
+
+        model_class = self._captioning_registry[model]
+
+        if self.captioning_model is None or not isinstance(
+            self.captioning_model, model_class
+        ):
+            print(f"Loading {model} model, this may take a while")
+            self.captioning_model = model_class(
+                self.device, self.precision
+            )
+
+        return self.captioning_model
+
+    def get_masking_model(
+        self,
+    ) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None:
+        return self.masking_model
+
+    def get_captioning_model(
+        self,
+    ) -> BlipModel | Blip2Model | WDModel | None:
         return self.captioning_model
 
 
@@ -1010,11 +1037,15 @@ class FileManager:
         dir_path = Path(self.parent.dir)
         self.parent.folder_name_label.configure(text=dir_path.name)
 
-        include_subdirs = self.parent.config_ui_data["include_subdirectories"]
+        include_subdirs = self.parent.config_ui_data[
+            "include_subdirectories"
+        ]
 
         # For huge directories, show immediate feedback that loading is happening
         if include_subdirs:
-            print(f"Scanning directory {dir_path} (including subdirectories)")
+            print(
+                f"Scanning directory {dir_path} (including subdirectories)"
+            )
         else:
             print(f"Scanning directory {dir_path}")
 
@@ -1040,6 +1071,16 @@ class FileManager:
             self.parent.navigation_manager.switch_to_image(0)
         else:
             self.parent.clear_ui()
+
+        # Regain focus after directory is loaded
+        self.parent.focus_set()
+        self.parent.lift()
+
+        # Temporarily set topmost to ensure focus, then remove it
+        self.parent.attributes("-topmost", True)
+        self.parent.after(
+            100, lambda: self.parent.attributes("-topmost", False)
+        )
 
 
 class CaptionManager:

@@ -1,5 +1,6 @@
 import contextlib
 import os
+import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
@@ -79,6 +80,23 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         Returns: the generated caption
         """
 
+    def _is_effectively_empty(self, caption):
+        if caption is None:
+            return True
+
+        if isinstance(caption, list):
+            if len(caption) == 0:
+                return True
+
+            # Check if all items in the list are effectively empty
+            return all(
+                self._is_effectively_empty(item) for item in caption
+            )
+
+        # For strings, remove all whitespace and chars that don't affect training
+        stripped = re.sub(r'[\s\.,_`();:"\'-]+', "", caption)
+        return len(stripped) == 0
+
     def caption_image(
             self,
             filename: str,
@@ -97,13 +115,15 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             caption_postfix (`str`): add this to the end of the generated caption
             mode (`str`): can be one of
                 - replace: creates a new caption for all samples, even if a caption already exists
-                - fill: creates a new caption for all samples without a caption
+                - fill: creates a new caption for all samples without a caption or with empty/whitespace captions
                 - add: creates a new caption for all samples, appending if a caption already exists
         """
         caption_sample = CaptionSample(filename)
 
         existing_caption = caption_sample.get_caption()
-        if mode == 'fill' and existing_caption is not None and existing_caption != "":
+
+        # For fill mode, check if caption is effectively empty (including whitespace/punctuation only)
+        if mode == 'fill' and not self._is_effectively_empty(existing_caption):
             return
 
         predicted_caption = self.generate_caption(caption_sample, initial_caption, caption_prefix, caption_postfix)
