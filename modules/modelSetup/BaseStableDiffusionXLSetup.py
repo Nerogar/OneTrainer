@@ -16,16 +16,12 @@ from modules.util.checkpointing_util import (
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
-
-from diffusers.models.attention_processor import AttnProcessor, AttnProcessor2_0, XFormersAttnProcessor
-from diffusers.utils import is_xformers_available
 
 
 class BaseStableDiffusionXLSetup(
@@ -43,29 +39,6 @@ class BaseStableDiffusionXLSetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            model.unet.set_attn_processor(AttnProcessor())
-        elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-            try:
-                model.unet.set_attn_processor(XFormersAttnProcessor())
-                model.vae.enable_xformers_memory_efficient_attention()
-            except Exception as e:
-                print(
-                    "Could not enable memory efficient attention. Make sure xformers is installed"
-                    f" correctly and a GPU is available: {e}"
-                )
-        elif config.attention_mechanism == AttentionMechanism.SDP:
-            model.unet.set_attn_processor(AttnProcessor2_0())
-
-            if is_xformers_available():
-                try:
-                    model.vae.enable_xformers_memory_efficient_attention()
-                except Exception as e:
-                    print(
-                        "Could not enable memory efficient attention. Make sure xformers is installed"
-                        f" correctly and a GPU is available: {e}"
-                    )
-
         if config.gradient_checkpointing.enabled():
             model.unet.enable_gradient_checkpointing()
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)

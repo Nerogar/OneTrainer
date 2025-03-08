@@ -3,7 +3,6 @@ from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -254,13 +253,6 @@ class TrainingTab:
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
         row = 0
-
-        # attention mechanism
-        components.label(frame, row, 0, "Attention",
-                         tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(frame, row, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
-                           "attention_mechanism")
-        row += 1
 
         # ema
         components.label(frame, row, 0, "EMA",
