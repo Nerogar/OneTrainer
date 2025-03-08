@@ -125,11 +125,10 @@ class PixArtAlphaLoRASetup(
             model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or config.align_prop or not config.latent_caching
+        vae_on_train_device = self.debug_mode or not config.latent_caching
         text_encoder_on_train_device = \
             config.text_encoder.train \
             or config.train_any_embedding() \
-            or config.align_prop \
             or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)

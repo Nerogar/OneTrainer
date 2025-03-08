@@ -198,8 +198,6 @@ class BaseSanaSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
-
             vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, text_encoder_attention_mask = model.encode_text(
@@ -269,73 +267,56 @@ class BaseSanaSetup(
                         train_progress.global_step,
                     )
 
-                    if is_align_prop_step:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noise
+                    self._save_image(
+                        self._project_latent_to_image(latent_noise),
+                        config.debug_dir + "/training_batches",
+                        "1-noise",
+                        train_progress.global_step,
+                    )
 
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-image",
-                            model.train_progress.global_step,
-                        )
-                    else:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noisy image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_noisy_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "2-noisy_image",
+                        train_progress.global_step,
+                    )
 
-                        # noisy image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_noisy_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-noisy_image",
-                            train_progress.global_step,
-                        )
+                    # predicted flow
+                    self._save_image(
+                        self._project_latent_to_image(predicted_flow),
+                        config.debug_dir + "/training_batches",
+                        "3-predicted_flow",
+                        train_progress.global_step,
+                    )
 
-                        # predicted flow
-                        self._save_image(
-                            self._project_latent_to_image(predicted_flow),
-                            config.debug_dir + "/training_batches",
-                            "3-predicted_flow",
-                            train_progress.global_step,
-                        )
+                    # flow
+                    flow = latent_noise - scaled_latent_image
+                    self._save_image(
+                        self._project_latent_to_image(flow),
+                        config.debug_dir + "/training_batches",
+                        "4-flow",
+                        train_progress.global_step,
+                    )
 
-                        # flow
-                        flow = latent_noise - scaled_latent_image
-                        self._save_image(
-                            self._project_latent_to_image(flow),
-                            config.debug_dir + "/training_batches",
-                            "4-flow",
-                            train_progress.global_step,
-                        )
+                    predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
 
-                        predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
+                    # predicted image
+                    self._save_image(
+                        self._project_latent_to_image(predicted_scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "5-predicted_image",
+                        train_progress.global_step,
+                    )
 
-                        # predicted image
-                        self._save_image(
-                            self._project_latent_to_image(predicted_scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "5-predicted_image",
-                            train_progress.global_step,
-                        )
-
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "6-image",
-                            model.train_progress.global_step,
-                        )
+                    # image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "6-image",
+                        model.train_progress.global_step,
+                    )
 
         return model_output_data
 

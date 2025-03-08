@@ -231,8 +231,6 @@ class BaseFluxSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
-
             vae_scaling_factor = model.vae.config['scaling_factor']
             vae_shift_factor = model.vae.config['shift_factor']
 
@@ -264,128 +262,6 @@ class BaseFluxSetup(
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            if is_align_prop_step and not deterministic:
-                raise NotImplementedError
-                # dummy = torch.zeros((1,), device=self.train_device)
-                # dummy.requires_grad_(True)
-
-                # negative_text_encoder_output, negative_pooled_text_encoder_2_output = model.encode_text(
-                #     train_device=self.train_device,
-                #     batch_size=batch['latent_image'].shape[0],
-                #     rand=rand,
-                #     text="",
-                #     text_encoder_1_layer_skip=config.text_encoder_layer_skip,
-                #     text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                #     apply_attention_mask=config.prior.attention_mask,
-                # )
-                # negative_text_encoder_output = negative_text_encoder_output \
-                #     .expand((scaled_latent_image.shape[0], -1, -1))
-                # negative_pooled_text_encoder_2_output = negative_pooled_text_encoder_2_output \
-                #     .expand((scaled_latent_image.shape[0], -1))
-
-                # model.noise_scheduler.set_timesteps(config.align_prop_steps)
-
-                # scaled_noisy_latent_image = latent_noise
-
-                # timestep_high = int(config.align_prop_steps * config.max_noising_strength)
-                # timestep_low = \
-                #     int(config.align_prop_steps * config.max_noising_strength * (
-                #             1.0 - config.align_prop_truncate_steps))
-
-                # truncate_timestep_index = config.align_prop_steps - rand.randint(timestep_low, timestep_high)
-
-                # # original size of the image
-                # original_height = scaled_noisy_latent_image.shape[2] * 8
-                # original_width = scaled_noisy_latent_image.shape[3] * 8
-                # crops_coords_top = 0
-                # crops_coords_left = 0
-                # target_height = scaled_noisy_latent_image.shape[2] * 8
-                # target_width = scaled_noisy_latent_image.shape[3] * 8
-
-                # add_time_ids = torch.tensor([
-                #     original_height,
-                #     original_width,
-                #     crops_coords_top,
-                #     crops_coords_left,
-                #     target_height,
-                #     target_width
-                # ]).unsqueeze(0).expand((scaled_latent_image.shape[0], -1))
-
-                # add_time_ids = add_time_ids.to(
-                #     dtype=scaled_noisy_latent_image.dtype,
-                #     device=scaled_noisy_latent_image.device,
-                # )
-
-                # added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
-                # negative_added_cond_kwargs = {"text_embeds": negative_pooled_text_encoder_2_output,
-                #                               "time_ids": add_time_ids}
-
-                # checkpointed_unet = create_checkpointed_forward(model.unet, self.train_device)
-
-                # for step in range(config.align_prop_steps):
-                #     timestep = model.noise_scheduler.timesteps[step] \
-                #         .expand((scaled_latent_image.shape[0],)) \
-                #         .to(device=model.unet.device)
-
-                #     if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                #         latent_input = torch.concat(
-                #             [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
-                #         )
-                #     else:
-                #         latent_input = scaled_noisy_latent_image
-
-                #     predicted_latent_noise = checkpointed_unet(
-                #         sample=latent_input,
-                #         timestep=timestep,
-                #         encoder_hidden_states=text_encoder_output,
-                #         added_cond_kwargs=added_cond_kwargs,
-                #     ).sample
-
-                #     negative_predicted_latent_noise = checkpointed_unet(
-                #         sample=latent_input,
-                #         timestep=timestep,
-                #         encoder_hidden_states=negative_text_encoder_output,
-                #         added_cond_kwargs=negative_added_cond_kwargs,
-                #     ).sample
-
-                #     cfg_grad = (predicted_latent_noise - negative_predicted_latent_noise)
-                #     cfg_predicted_latent_noise = negative_predicted_latent_noise + config.align_prop_cfg_scale * cfg_grad
-
-                #     scaled_noisy_latent_image = model.noise_scheduler \
-                #         .step(cfg_predicted_latent_noise, timestep[0].long(), scaled_noisy_latent_image) \
-                #         .prev_sample
-
-                #     if step < truncate_timestep_index:
-                #         scaled_noisy_latent_image = scaled_noisy_latent_image.detach()
-
-                #     if self.debug_mode:
-                #         with torch.no_grad():
-                #             # predicted image
-                #             predicted_image = self._project_latent_to_image(scaled_noisy_latent_image)
-                #             self._save_image(
-                #                 predicted_image,
-                #                 config.debug_dir + "/training_batches",
-                #                 "2-predicted_image_" + str(step),
-                #                 train_progress.global_step,
-                #                 True
-                #             )
-
-                # predicted_latent_image = scaled_noisy_latent_image / vae_scaling_factor
-                # predicted_latent_image = predicted_latent_image.to(dtype=model.vae.dtype)
-
-                # predicted_image = []
-                # for x in predicted_latent_image.split(1):
-                #     predicted_image.append(torch.utils.checkpoint.checkpoint(
-                #         model.vae.decode,
-                #         x,
-                #         use_reentrant=False
-                #     ).sample)
-                # predicted_image = torch.cat(predicted_image)
-
-                # model_output_data = {
-                #     'loss_type': 'align_prop',
-                #     'predicted': predicted_image,
-                # }
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
@@ -471,75 +347,57 @@ class BaseFluxSetup(
                         train_progress.global_step,
                     )
 
-                    if is_align_prop_step:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noise
+                    self._save_image(
+                        self._project_latent_to_image(latent_noise),
+                        config.debug_dir + "/training_batches",
+                        "1-noise",
+                        train_progress.global_step,
+                    )
 
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-image",
-                            model.train_progress.global_step,
-                        )
-                    else:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noisy image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_noisy_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "2-noisy_image",
+                        train_progress.global_step,
+                    )
 
-                        # noisy image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_noisy_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-noisy_image",
-                            train_progress.global_step,
-                        )
+                    # predicted flow
+                    self._save_image(
+                        self._project_latent_to_image(predicted_flow),
+                        config.debug_dir + "/training_batches",
+                        "3-predicted_flow",
+                        train_progress.global_step,
+                    )
 
-                        # predicted flow
-                        self._save_image(
-                            self._project_latent_to_image(predicted_flow),
-                            config.debug_dir + "/training_batches",
-                            "3-predicted_flow",
-                            train_progress.global_step,
-                        )
+                    # flow
+                    flow = latent_noise - scaled_latent_image
+                    self._save_image(
+                        self._project_latent_to_image(flow),
+                        config.debug_dir + "/training_batches",
+                        "4-flow",
+                        train_progress.global_step,
+                    )
 
-                        # flow
-                        flow = latent_noise - scaled_latent_image
-                        self._save_image(
-                            self._project_latent_to_image(flow),
-                            config.debug_dir + "/training_batches",
-                            "4-flow",
-                            train_progress.global_step,
-                        )
+                    predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
 
-                        predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
+                    # predicted image
+                    self._save_image(
+                        self._project_latent_to_image(predicted_scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "5-predicted_image",
+                        train_progress.global_step,
+                    )
 
-                        # predicted image
-                        self._save_image(
-                            self._project_latent_to_image(predicted_scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "5-predicted_image",
-                            train_progress.global_step,
-                        )
+                    # image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "6-image",
+                        model.train_progress.global_step,
+                    )
 
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "6-image",
-                            model.train_progress.global_step,
-                        )
-
-        # model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(
