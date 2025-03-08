@@ -10,7 +10,6 @@ from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AlignPropLoss import AlignPropLoss
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -298,7 +297,6 @@ class TrainConfig(BaseConfig):
     only_cache: bool
     resolution: str
     frames: str
-    attention_mechanism: AttentionMechanism
     align_prop: bool
     align_prop_probability: float
     align_prop_loss: AlignPropLoss
@@ -785,7 +783,6 @@ class TrainConfig(BaseConfig):
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("frames", "25", str, False))
-        data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
         data.append(("align_prop", False, bool, False))
         data.append(("align_prop_probability", 0.1, float, False))
         data.append(("align_prop_loss", AlignPropLoss.AESTHETIC, AlignPropLoss, False))

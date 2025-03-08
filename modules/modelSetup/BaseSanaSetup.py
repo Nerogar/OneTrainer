@@ -42,34 +42,6 @@ class BaseSanaSetup(
             model: SanaModel,
             config: TrainConfig,
     ):
-        # if config.attention_mechanism == AttentionMechanism.DEFAULT:
-        #     for child_module in model.transformer.modules():
-        #         if isinstance(child_module, Attention):
-        #             child_module.set_processor(AttnProcessor())
-        # elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-        #     try:
-        #         for child_module in model.transformer.modules():
-        #             if isinstance(child_module, Attention):
-        #                 child_module.set_processor(XFormersAttnProcessor())
-        #         model.vae.enable_xformers_memory_efficient_attention()
-        #     except Exception as e:
-        #         print(
-        #             "Could not enable memory efficient attention. Make sure xformers is installed"
-        #             f" correctly and a GPU is available: {e}"
-        #         )
-        # elif config.attention_mechanism == AttentionMechanism.SDP:
-        #     for child_module in model.transformer.modules():
-        #         if isinstance(child_module, Attention):
-        #             child_module.set_processor(AttnProcessor2_0())
-        #
-        #     if is_xformers_available():
-        #         try:
-        #             model.vae.enable_xformers_memory_efficient_attention()
-        #         except Exception as e:
-        #             print(
-        #                 "Could not enable memory efficient attention. Make sure xformers is installed"
-        #                 f" correctly and a GPU is available: {e}"
-        #             )
 
         if config.gradient_checkpointing.enabled():
             # model.vae.enable_gradient_checkpointing()
