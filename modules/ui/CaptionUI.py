@@ -122,18 +122,21 @@ class CaptionUI(ctk.CTkToplevel):
         self.wait_visibility()
         self.focus_set()
         self.help_text: str = (
-            "Keyboard shortcuts:\n"
-            "Up/Down arrows: Navigate between images\n"
-            "Tab: Switch between caption lines\n"
-            "Return: Save changes\n"
-            "Ctrl+M: Toggle mask display\n"
-            "Ctrl+D: Switch to draw mode\n"
-            "Ctrl+F: Switch to fill mode\n\n"
-            "When editing masks:\n"
-            "Left click: Add to mask\n"
-            "Right click: Remove from mask\n"
-            "Mouse wheel: Adjust brush size"
-        )
+                "Keyboard shortcuts:\n\n"
+                "Left/Right arrows: Navigate between images\n"
+                "Tab: Switch between caption lines\n"
+                "Return or Ctrl+S: Save changes\n"
+                "Ctrl+M: Toggle mask display\n"
+                "Ctrl+D: Switch to draw mode\n"
+                "Ctrl+F: Switch to fill mode\n"
+                "Ctrl+Z: Undo mask edit\n"
+                "Ctrl+Y: Redo mask edit\n"
+                "[ or ]: Decrease/increase brush size\n\n"
+                "When editing masks:\n"
+                "Left click: Add to mask\n"
+                "Right click: Remove from mask\n"
+                "Mouse wheel: Adjust brush size"
+            )
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
@@ -1228,9 +1231,10 @@ class MaskEditor:
                 opacity = max(0.0, min(1.0, opacity))
             except (ValueError, TypeError):
                 opacity = 1.0
-            rgb_value: int = int(opacity * 255)
-            return (rgb_value, rgb_value, rgb_value)
-        return (0, 0, 0) if not is_left else None
+            # Return black (masked) for left click
+            return (0, 0, 0)
+        # Return white (unmasked) for right click
+        return (255, 255, 255)
 
     def _ensure_mask_exists(self, adding_to_mask: bool) -> None:
         """Ensure a mask image exists for editing."""
