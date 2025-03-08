@@ -302,7 +302,7 @@ class CaptionUI(ctk.CTkToplevel):
             0,
             0,
             "Draw",
-            self.mask_editor.draw_mask_mode,
+            self.mask_editor.switch_to_brush_mode,
             icons["draw"],
             "Draw mask with brush",
         )
@@ -311,7 +311,7 @@ class CaptionUI(ctk.CTkToplevel):
             0,
             1,
             "Fill",
-            self.mask_editor.fill_mask_mode,
+            self.mask_editor.switch_to_fill_mode,
             icons["fill"],
             "Fill areas of the mask",
         )
@@ -424,9 +424,9 @@ class CaptionUI(ctk.CTkToplevel):
         self.bind("<Left>", self.navigation_manager.previous_image)
         component.bind("<Return>", self.file_manager.save_changes)
         self.bind("<Tab>", self.caption_manager.next_caption_line)
-        self.bind("<Control-m>", self.mask_editor.toggle_mask_display)
-        self.bind("<Control-d>", self.mask_editor.draw_mask_mode)
-        self.bind("<Control-f>", self.mask_editor.fill_mask_mode)
+        self.bind("<Control-m>", self.mask_editor.toggle_mask_visibility_mode)
+        self.bind("<Control-d>", self.mask_editor.switch_to_brush_mode)
+        self.bind("<Control-f>", self.mask_editor.switch_to_fill_mode)
         self.bind("<Control-s>", self.file_manager.save_changes)
         self.bind("<bracketleft>", self.mask_editor.decrease_brush_size)
         self.bind("<bracketright>", self.mask_editor.increase_brush_size)
@@ -1152,7 +1152,7 @@ class MaskEditor:
         """Handle mask editing events."""
         if not self._can_edit_mask(event):
             return
-        start_x, start_y, end_x, end_y = self._get_edit_coordinates(event)
+        start_x, start_y, end_x, end_y = self._convert_screen_to_mask_coordinates(event)
         if start_x == end_x == 0 and start_y == end_y == 0:
             return
         is_left: bool = bool(event.state & 0x0100 or event.num == 1)
@@ -1178,7 +1178,7 @@ class MaskEditor:
             < len(self.parent.image_rel_paths)
         )
 
-    def _get_edit_coordinates(self, event: tk.Event) -> ImageCoordinates:
+    def _convert_screen_to_mask_coordinates(self, event: tk.Event) -> ImageCoordinates:
         # Remove the division by the scaling factor (assume event.x/y are already in widget coordinates)
         left_offset: int = self.parent.left_offset
         top_offset: int = self.parent.top_offset
@@ -1221,8 +1221,8 @@ class MaskEditor:
         return start_x, start_y, end_x, end_y
 
 
-    def _get_brush_color(self, is_left: bool) -> RGBColor | None:
-        """Determine the brush color based on editing direction."""
+    def _determine_brush_mask_color(self, is_left: bool) -> RGBColor | None:
+        """Determine the brush color based (b or w) base on the mouse button."""
         if is_left:
             try:
                 opacity: float = float(
@@ -1258,7 +1258,7 @@ class MaskEditor:
         is_right: bool,
     ) -> None:
         """Draw on the mask image."""
-        color: RGBColor | None = self._get_brush_color(is_left)
+        color: RGBColor | None = self._determine_brush_mask_color(is_left)
         if color:
             self._ensure_mask_exists(is_left)
             if not self.edit_started:
@@ -1304,7 +1304,7 @@ class MaskEditor:
         self, start_x: int, start_y: int, is_left: bool, is_right: bool
     ) -> None:
         """Fill an area of the mask image."""
-        color: RGBColor | None = self._get_brush_color(is_left)
+        color: RGBColor | None = self._determine_brush_mask_color(is_left)
         if color:
             self._ensure_mask_exists(is_left)
             if not (
@@ -1375,21 +1375,21 @@ class MaskEditor:
         self.parent.image_handler.refresh_image()
         return "break" if event else None
 
-    def draw_mask_mode(
+    def switch_to_brush_mode(
         self, event: tk.Event | None = None
     ) -> str | None:
         """Switch to draw mask mode."""
         self.mask_editing_mode = EditMode.DRAW
         return "break" if event else None
 
-    def fill_mask_mode(
+    def switch_to_fill_mode(
         self, event: tk.Event | None = None
     ) -> str | None:
         """Switch to fill mask mode."""
         self.mask_editing_mode = EditMode.FILL
         return "break" if event else None
 
-    def toggle_mask_display(self, event: tk.Event | None = None) -> str:
+    def toggle_mask_visibility_mode(self, event: tk.Event | None = None) -> str:
         """Toggle between displaying only the mask or the combined image."""
         self.display_only_mask = not self.display_only_mask
         self.parent.image_handler.refresh_image()
