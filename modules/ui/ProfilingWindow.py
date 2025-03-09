@@ -36,7 +36,7 @@ class ProfilingWindow(ctk.CTkToplevel):
 
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
         self.withdraw()
-        self.after(150, lambda: set_window_icon(self))
+        self.after(200, lambda: set_window_icon(self))
 
     def _dump_stack(self):
         with open('stacks.txt', 'w') as f:
