@@ -10,6 +10,9 @@ import torch
 
 
 class InternalModelLoaderMixin(metaclass=ABCMeta):
+    def __init__(self):
+        super().__init__()
+
     def _load_internal_data(
             self,
             model: BaseModel,

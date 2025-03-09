@@ -1,0 +1,20 @@
+{
+    "base_model_name": "PixArt-sigma/PixArt-XL-2-1024-MS",
+    "batch_size": 4,
+    "model_type": "PIXART_SIGMA",
+    "epochs": 50,
+    "learning_rate": 0.00001,
+    "output_model_destination": "models/lora.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "1024",
+    "text_encoder": {
+        "train": false
+    },
+    "training_method": "LORA",
+    "lora_rank": 16,
+	"lora_alpha": 1.0,
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "weight_dtype": "BFLOAT_16"
+}
