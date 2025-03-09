@@ -1,15 +1,12 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-if not defined GIT (
-    set "GIT=git"
-)
-if not defined PYTHON (
-    set "PYTHON=python"
-)
-if not defined VENV_DIR (
-    set "VENV_DIR=%~dp0venv"
-)
+REM Change to the directory containing the batch file to mitigate PEBCAK
+cd /d "%~dp0"
+
+if not defined GIT ( set "GIT=git" )
+if not defined PYTHON ( set "PYTHON=python" )
+if not defined VENV_DIR ( set "VENV_DIR=%~dp0venv" )
 
 :git_pull
 echo Checking repository and branch information...

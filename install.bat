@@ -1,9 +1,12 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-if not defined PYTHON (set "PYTHON=python")
+REM Change to the directory containing the batch file to mitigate PEBCAK
+cd /d "%~dp0"
+
+if not defined PYTHON ( set "PYTHON=python" )
 :: %~dp0 expands to the full directory path of the script (with trailing backslash)
-if not defined VENV_DIR (set "VENV_DIR=%~dp0venv")
+if not defined VENV_DIR ( set "VENV_DIR=%~dp0venv" )
 
 :: ----------------------------------------------------------------------------
 :: 1. Check that a real Python version is available in PATH (ignoring the Windows Store alias)
