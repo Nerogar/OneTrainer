@@ -22,23 +22,6 @@ class EmbeddingSaverMixin(metaclass=ABCMeta):
     ):
         pass
 
-    def _save_ckpt(
-            self,
-            embedding: Any | None,
-            embedding_state_dict: dict[str, Tensor] | None,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-
-        state_dict = self._to_state_dict(
-            embedding,
-            embedding_state_dict,
-            dtype,
-        )
-
-        torch.save(state_dict, destination)
-
     def _save_safetensors(
             self,
             embedding: Any | None,

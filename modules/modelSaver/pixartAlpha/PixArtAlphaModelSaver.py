@@ -47,25 +47,6 @@ class PixArtAlphaModelSaver(
         if dtype is not None:
             del save_pipeline
 
-    def __save_ckpt(
-            self,
-            model: PixArtAlphaModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = convert_pixart_diffusers_to_ckpt(
-            model.model_type,
-            model.transformer.state_dict(),
-        )
-
-        state_dict = {'state_dict': state_dict}
-
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-        self._convert_state_dict_to_contiguous(save_state_dict)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
-
     def __save_safetensors(
             self,
             model: PixArtAlphaModel,
@@ -100,8 +81,6 @@ class PixArtAlphaModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.CKPT:
-                self.__save_ckpt(model, output_model_destination, dtype)
             case ModelFormat.SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
