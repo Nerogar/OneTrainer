@@ -161,10 +161,11 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
-
+        print(f"DEBUG: BaseImageCaptionModel.caption_images called with {len(filenames)} files, mode={mode}")
         if progress_callback is not None:
             progress_callback(0, len(filenames))
         for i, filename in enumerate(tqdm(filenames)):
+            print(f"DEBUG: Processing file {i+1}/{len(filenames)}: {filename}")
             try:
                 self.caption_image(filename, initial_caption, caption_prefix, caption_postfix, mode)
             except Exception:

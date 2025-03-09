@@ -49,3 +49,8 @@ fabric==3.2.2
 # debug
 psutil==6.1.1
 requests==2.32.3
+
+# captioning (moondream2)
+einops==0.8.1
+pyvips==2.2.3
+pyvips-binary==8.16.0

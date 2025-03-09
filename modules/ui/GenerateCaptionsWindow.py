@@ -20,6 +20,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.parent = parent
         self.config_state: dict[str, Any] = {}
         self._threshold_visible: bool = False
+        self._moondream_options_visible: bool = False
 
         self._setup_window("Batch generate captions", "380x540")
         self.grid_columnconfigure(0, weight=1)
@@ -41,6 +42,10 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         }
         self.config_state["mode_var"] = ctk.StringVar(self, "Create if absent")
 
+        # Add caption length options for Moondream2
+        self.config_state["caption_lengths"] = ["short", "normal"]
+        self.config_state["caption_length_var"] = ctk.StringVar(self, "normal")
+
         self._create_layout(path, parent_include_subdirectories)
 
     def _setup_window(self, title: str, geometry: str) -> None:
@@ -59,6 +64,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.basic_options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.caption_options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.threshold_frame = ctk.CTkFrame(self.main_frame)
+        self.moondream_options_frame = ctk.CTkFrame(self.main_frame)  # New frame for Moondream options
         self.additional_options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.progress_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.buttons_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
@@ -72,6 +78,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         for frame in [
             self.basic_options_frame,
             self.caption_options_frame,
+            self.moondream_options_frame,
             self.additional_options_frame,
             self.progress_frame,
             self.buttons_frame,
@@ -81,12 +88,13 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self._create_basic_options(path)
         self._create_caption_configuration()
         self._create_threshold_configuration()
+        self._create_moondream_configuration()  # New method for Moondream options
         self._create_additional_options(include_subdirectories)
         self._create_progress_indicators()
         self._create_action_buttons()
 
-        self.config_state["model_var"].trace_add("write", lambda *args: self._update_threshold_visibility())
-        self._update_threshold_visibility()
+        self.config_state["model_var"].trace_add("write", lambda *args: self._update_model_specific_options())
+        self._update_model_specific_options()
 
     def _configure_frame(self, frame: ctk.CTkFrame) -> None:
         frame.grid_columnconfigure(0, weight=0, minsize=120)
@@ -241,6 +249,37 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.mcut_explanation_label.grid(row=2, column=0, columnspan=3, sticky="w", padx=10, pady=10)
         self._update_threshold_states()
 
+    def _create_moondream_configuration(self) -> None:
+        """Create configuration options specific to Moondream2 model"""
+        self.moondream_options_frame.grid_columnconfigure(0, weight=0, minsize=120)
+        self.moondream_options_frame.grid_columnconfigure(1, weight=1)
+
+        self.caption_length_label = ctk.CTkLabel(
+            self.moondream_options_frame, text="Caption Length", anchor="w"
+        )
+        self.caption_length_label.grid(row=0, column=0, sticky="w", padx=(10, 5), pady=5)
+
+        self.caption_length_dropdown = ctk.CTkOptionMenu(
+            self.moondream_options_frame,
+            variable=self.config_state["caption_length_var"],
+            values=self.config_state["caption_lengths"],
+            dynamic_resizing=False,
+            width=120,
+        )
+        self.caption_length_dropdown.grid(row=0, column=1, sticky="w", padx=(5, 10), pady=5)
+
+        explanation = (
+            "Choose 'short' for a brief description or 'normal' for a more detailed caption."
+        )
+        self.caption_length_explanation = ctk.CTkLabel(
+            self.moondream_options_frame,
+            text=explanation,
+            font=("", 12),
+            wraplength=330,
+            justify="left",
+        )
+        self.caption_length_explanation.grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=10)
+
     def _create_additional_options(self, include_subdirectories: bool) -> None:
         self.include_subdirectories_label = ctk.CTkLabel(
             self.additional_options_frame, text="Include subfolders", anchor="w"
@@ -283,35 +322,67 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             entry_box.insert(0, selected)
         self.focus_set()
 
-    def _update_threshold_visibility(self, *args: Any) -> None:
+    def _update_model_specific_options(self, *args: Any) -> None:
+        """Update the visibility of model-specific option frames based on selected model"""
         model = self.config_state["model_var"].get()
+        print(f"DEBUG: Selected model name: '{model}'")  # Debug logging
         threshold_height = 150
+        moondream_height = 110  # Height of the Moondream options frame
+
+        # Determine which frames should be visible
         is_supported_wd_model = any(name in model for name in ["WD SwinV2", "WD EVA02", "WD14 VIT"])
+        # Fix the model detection to handle both cases
+        is_moondream_model = "MOONDREAM" in model.upper()
+        print(f"DEBUG: is_moondream_model = {is_moondream_model}")  # Debug logging
 
-        if not self.general_mcut_var.get():
-            if "EVA02" in model:
-                self.general_threshold_var.set("0.5")
-            elif is_supported_wd_model:
-                self.general_threshold_var.set("0.35")
-
+        # Get current window dimensions
         geometry = self.geometry().split("+")[0]
         current_width, current_height = map(int, geometry.split("x"))
+        new_height = current_height
+
+        # Handle Threshold frame visibility
         if is_supported_wd_model and not self._threshold_visible:
-            new_height = current_height + threshold_height
-            self.threshold_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
-            self.additional_options_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=5)
-            self.progress_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
-            self.buttons_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=5)
-            self.geometry(f"{current_width}x{new_height}")
+            new_height += threshold_height
             self._threshold_visible = True
+            self.threshold_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
+            row_offset = 1
         elif not is_supported_wd_model and self._threshold_visible:
-            new_height = current_height - threshold_height
-            self.threshold_frame.grid_remove()
-            self.additional_options_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
-            self.progress_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=5)
-            self.buttons_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
-            self.geometry(f"{current_width}x{new_height}")
+            new_height -= threshold_height
             self._threshold_visible = False
+            self.threshold_frame.grid_remove()
+            row_offset = 0
+        else:
+            row_offset = 1 if self._threshold_visible else 0
+
+        # Handle Moondream options frame visibility
+        if is_moondream_model and not self._moondream_options_visible:
+            print("DEBUG: Showing Moondream options frame")  # Debug logging
+            new_height += moondream_height
+            self._moondream_options_visible = True
+            self.moondream_options_frame.grid(row=2+row_offset, column=0, columnspan=2, sticky="ew", pady=5)
+            row_offset += 1
+        elif not is_moondream_model and self._moondream_options_visible:
+            print("DEBUG: Hiding Moondream options frame")  # Debug logging
+            new_height -= moondream_height
+            self._moondream_options_visible = False
+            self.moondream_options_frame.grid_remove()
+        else:
+            row_offset += 1 if self._moondream_options_visible else 0
+
+        # Update positions of remaining frames
+        self.additional_options_frame.grid(row=2+row_offset, column=0, columnspan=2, sticky="ew", pady=5)
+        self.progress_frame.grid(row=3+row_offset, column=0, columnspan=2, sticky="ew", pady=5)
+        self.buttons_frame.grid(row=4+row_offset, column=0, columnspan=2, sticky="ew", pady=5)
+
+        # Update window size
+        self.geometry(f"{current_width}x{new_height}")
+
+        # For backward compatibility, continue to update threshold states
+        self._update_threshold_states()
+
+    def _update_threshold_visibility(self, *args: Any) -> None:
+        """Legacy method maintained for backward compatibility"""
+        self._update_model_specific_options()
 
     def _update_threshold_states(self) -> None:
         if self.general_mcut_var.get():
@@ -404,11 +475,16 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
     def create_captions(self) -> None:
         model_name = self.config_state["model_var"].get()
-        wd_model_kwargs: dict[str, Any] = {}
+        print(f"DEBUG: Creating captions with model: '{model_name}'")  # Debug logging
+
+        # Model-specific kwargs initialization
+        model_kwargs: dict[str, Any] = {}
+
+        # Set model-specific parameters based on model type
         if "WD" in model_name:
             try:
                 min_general = 0.0 if self.general_mcut_var.get() else float(self.general_threshold_var.get())
-                wd_model_kwargs = {
+                model_kwargs = {
                     "use_mcut_general": self.general_mcut_var.get(),
                     "use_mcut_character": self.character_mcut_var.get(),
                     "min_general_threshold": min_general,
@@ -416,11 +492,18 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 }
             except ValueError:
                 print("Invalid threshold value, using defaults")
-                wd_model_kwargs = {
+                model_kwargs = {
                     "use_mcut_general": self.general_mcut_var.get(),
                     "use_mcut_character": self.character_mcut_var.get(),
                 }
+        elif "MOONDREAM" in model_name.upper():  # Fix model detection here too
+            model_kwargs = {
+                "caption_length": self.config_state["caption_length_var"].get(),
+                "stream": False  # Always use non-streaming mode for batch processing
+            }
+            print(f"DEBUG: Using Moondream settings: {model_kwargs}")  # Debug logging
 
+        # Load or initialize the appropriate model
         if "WD" in model_name:
             self.parent.model_manager.captioning_model = None
             self.parent.model_manager.current_captioning_model_name = None
@@ -429,12 +512,13 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 self.parent.model_manager.device,
                 self.parent.model_manager.precision,
                 model_name=model_name,
-                **wd_model_kwargs,
+                **model_kwargs,
             )
             self.parent.model_manager.captioning_model = captioning_model
             self.parent.model_manager.current_captioning_model_name = model_name
         else:
-            captioning_model = self.parent.model_manager.load_captioning_model(model_name)
+            # For other models including Moondream2
+            captioning_model = self.parent.model_manager.load_captioning_model(model_name, **model_kwargs)
 
         if captioning_model is None:
             print(f"Failed to load model: {model_name}")

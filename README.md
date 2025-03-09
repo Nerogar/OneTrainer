@@ -20,7 +20,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 -   **EMA**: Train your own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage
 -   **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target resolutions, buckets are created automatically
 -   **Multi Resolution Training**: Train multiple resolutions at the same time
--   **Dataset Tooling**: Automatically caption your dataset using BLIP, BLIP2 and WD-1.4, or create masks for masked training using ClipSeg or Rembg
+-   **Dataset Tooling**: Automatically caption your dataset using Moondream2, WDv3 or JoyTag, or create masks for masked training using ClipSeg or Rembg
 -   **Model Tooling**: Convert between different model formats from a simple UI
 -   **Sampling UI**: Sample the model during training without switching to a different application
 -   **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)

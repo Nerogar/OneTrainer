@@ -3,8 +3,8 @@ from util.import_util import script_imports
 script_imports()
 
 from modules.module.Blip2Model import Blip2Model
-from modules.module.BlipModel import BlipModel
-from modules.module.WDModel import WDModel
+from modules.module.BooruModels import BooruModels
+from modules.module.Moondream2Model import Moondream2Model
 from modules.util.args.GenerateCaptionsArgs import GenerateCaptionsArgs
 from modules.util.enum.GenerateCaptionsModel import GenerateCaptionsModel
 
@@ -15,16 +15,18 @@ def main():
     args = GenerateCaptionsArgs.parse_args()
 
     model = None
-    if args.model == GenerateCaptionsModel.BLIP:
-        model = BlipModel(torch.device(args.device), args.dtype.torch_dtype())
+    if args.model == GenerateCaptionsModel.MOONDREAM2:
+        model = Moondream2Model(torch.device(args.device), args.dtype.torch_dtype())
     elif args.model == GenerateCaptionsModel.BLIP2:
         model = Blip2Model(torch.device(args.device), args.dtype.torch_dtype())
     elif args.model == GenerateCaptionsModel.WD14_VIT_2:
-        model = WDModel(torch.device(args.device), args.dtype.torch_dtype(), model_name="WD14 VIT v2")
+        model = BooruModels(torch.device(args.device), args.dtype.torch_dtype(), model_name="WD14 VIT v2")
     elif args.model == GenerateCaptionsModel.WD_EVA02_LARGE_V3:
-        model = WDModel(torch.device(args.device), args.dtype.torch_dtype(), model_name="WD EVA02-Large Tagger v3")
+        model = BooruModels(torch.device(args.device), args.dtype.torch_dtype(), model_name="WD EVA02-Large Tagger v3")
     elif args.model == GenerateCaptionsModel.WD_SWINV2_V3:
-        model = WDModel(torch.device(args.device), args.dtype.torch_dtype(), model_name="WD SwinV2 Tagger v3")
+        model = BooruModels(torch.device(args.device), args.dtype.torch_dtype(), model_name="WD SwinV2 Tagger v3")
+    elif args.model == GenerateCaptionsModel.JOYTAG:
+        model = BooruModels(torch.device(args.device), args.dtype.torch_dtype(), model_name="JoyTag")
 
     model.caption_folder(
         sample_dir=args.sample_dir,

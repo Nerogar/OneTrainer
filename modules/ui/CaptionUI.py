@@ -16,12 +16,12 @@ from tkinter import filedialog
 from typing import TypeAlias
 
 from modules.module.Blip2Model import Blip2Model
-from modules.module.BlipModel import BlipModel
+from modules.module.BooruModels import BooruModels
 from modules.module.ClipSegModel import ClipSegModel
 from modules.module.MaskByColor import MaskByColor
+from modules.module.Moondream2Model import Moondream2Model
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
-from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
@@ -855,11 +855,12 @@ class ModelManager:
 
         # Model registries for better extensibility
         self._captioning_registry = {
-            "Blip": BlipModel,
-            "Blip2": Blip2Model,
-            "WD14 VIT v2": WDModel,
-            "WD EVA02-Large Tagger v3": WDModel,
-            "WD SwinV2 Tagger v3": WDModel,
+            "Moondream 2": Moondream2Model,
+            "Blip2": Blip2Model, #TODO Replace with blip 3 when it comes out.
+            "WD14 VIT v2": BooruModels,
+            "WD EVA02-Large Tagger v3": BooruModels,
+            "WD SwinV2 Tagger v3": BooruModels,
+            "JoyTag": BooruModels,
         }
 
         self._masking_registry = {
@@ -910,8 +911,8 @@ class ModelManager:
         return self.masking_model
 
     def load_captioning_model(
-        self, model: str
-    ) -> BlipModel | Blip2Model | WDModel | None:
+        self, model: str, **kwargs
+    ) -> Blip2Model | BooruModels | Moondream2Model | None:
         """Load the specified captioning model, unloading any masking model."""
         self.masking_model = None
         self.current_masking_model_name = None
@@ -935,14 +936,17 @@ class ModelManager:
         ):
             print(f"Loading {model} model, this may take a while")
 
-            # For WDModel, pass the model name
-            if model_class == WDModel:
+            # For BooruModels, pass the model name
+            if model_class == BooruModels:
+                print(f"Creating BooruModels with model_name='{model}'")
                 self.captioning_model = model_class(
-                    self.device, self.precision, model_name=model
+                    self.device, self.precision, model_name=model, **kwargs
                 )
             else:
+                print(f"Creating {model} with kwargs: {kwargs}")
+                # Pass kwargs to all model types
                 self.captioning_model = model_class(
-                    self.device, self.precision
+                    self.device, self.precision, **kwargs
                 )
             self.current_captioning_model_name = model
 
@@ -955,7 +959,7 @@ class ModelManager:
 
     def get_captioning_model(
         self,
-    ) -> BlipModel | Blip2Model | WDModel | None:
+    ) -> Blip2Model | BooruModels | None:
         return self.captioning_model
 
 
