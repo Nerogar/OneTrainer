@@ -48,18 +48,6 @@ class HunyuanVideoLoRASaver(
 
         return state_dict
 
-    def __save_ckpt(
-            self,
-            model: HunyuanVideoModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
-
     def __save_safetensors(
             self,
             model: HunyuanVideoModel,
@@ -107,8 +95,6 @@ class HunyuanVideoLoRASaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
-            case ModelFormat.CKPT:
-                self.__save_ckpt(model, output_model_destination, dtype)
             case ModelFormat.SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.LEGACY_SAFETENSORS:
