@@ -46,16 +46,16 @@ class HunyuanVideoFineTuneSetup(
                 learning_rate=config.text_encoder_2.learning_rate,
             ))
 
-        if config.train_any_embedding():
+        if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
                 self._add_embedding_param_groups(
-                    model.embedding_wrapper_1, parameter_group_collection, config.embedding_learning_rate,
+                    model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                     "embeddings_1"
                 )
 
             if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
                 self._add_embedding_param_groups(
-                    model.embedding_wrapper_2, parameter_group_collection, config.embedding_learning_rate,
+                    model.all_text_encoder_2_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                     "embeddings_2"
                 )
 
@@ -73,6 +73,8 @@ class HunyuanVideoFineTuneSetup(
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
+
         if model.text_encoder_1 is not None:
             train_text_encoder_1 = config.text_encoder.train and \
                                    not self.stop_text_encoder_training_elapsed(config, model.train_progress)
@@ -82,21 +84,6 @@ class HunyuanVideoFineTuneSetup(
             train_text_encoder_2 = config.text_encoder_2.train and \
                                    not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
             model.text_encoder_2.requires_grad_(train_text_encoder_2)
-
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-            if model.text_encoder_1 is not None:
-                train_embedding_1 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-                embedding.text_encoder_1_vector.requires_grad_(train_embedding_1)
-            if model.text_encoder_2 is not None:
-                train_embedding_2 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-                embedding.text_encoder_2_vector.requires_grad_(train_embedding_2)
 
         train_transformer = config.prior.train and \
                      not self.stop_prior_training_elapsed(config, model.train_progress)
@@ -117,8 +104,9 @@ class HunyuanVideoFineTuneSetup(
 
         model.tokenizer_1 = copy.deepcopy(model.orig_tokenizer_1)
         model.tokenizer_2 = copy.deepcopy(model.orig_tokenizer_2)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
+        model.output_embedding = torch.zeros(size=(4, 4096), dtype=config.train_dtype.torch_dtype(), device=self.train_device)
         self.__setup_requires_grad(model, config)
 
         init_model_parameters(model, self.create_parameters(model, config), self.train_device)
@@ -170,6 +158,7 @@ class HunyuanVideoFineTuneSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
+            self._normalize_output_embeddings(model.all_text_encoder_1_embeddings())
             if model.embedding_wrapper_1 is not None:
                 model.embedding_wrapper_1.normalize_embeddings()
             if model.embedding_wrapper_2 is not None:

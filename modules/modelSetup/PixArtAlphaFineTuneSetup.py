@@ -37,9 +37,10 @@ class PixArtAlphaFineTuneSetup(
                 learning_rate=config.text_encoder.learning_rate,
             ))
 
-        if config.train_any_embedding():
+        if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
-                model.embedding_wrapper, parameter_group_collection, config.embedding_learning_rate, "embeddings"
+                model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings"
             )
 
         if config.prior.train:
@@ -90,7 +91,7 @@ class PixArtAlphaFineTuneSetup(
         #     model.force_epsilon_prediction()
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
@@ -131,5 +132,6 @@ class PixArtAlphaFineTuneSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
+            self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)

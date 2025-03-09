@@ -32,17 +32,20 @@ class StableDiffusion3EmbeddingSetup(
 
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
             self._add_embedding_param_groups(
-                model.embedding_wrapper_1, parameter_group_collection, config.embedding_learning_rate, "embeddings_1"
+                model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings_1"
             )
 
         if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
             self._add_embedding_param_groups(
-                model.embedding_wrapper_2, parameter_group_collection, config.embedding_learning_rate, "embeddings_2"
+                model.all_text_encoder_2_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings_2"
             )
 
         if config.text_encoder_3.train_embedding and model.text_encoder_3 is not None:
             self._add_embedding_param_groups(
-                model.embedding_wrapper_3, parameter_group_collection, config.embedding_learning_rate, "embeddings_3"
+                model.all_text_encoder_3_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings_3"
             )
 
         return parameter_group_collection
@@ -52,6 +55,7 @@ class StableDiffusion3EmbeddingSetup(
             model: StableDiffusion3Model,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
         if model.text_encoder_1 is not None:
             model.text_encoder_1.requires_grad_(False)
         if model.text_encoder_2 is not None:
@@ -60,34 +64,6 @@ class StableDiffusion3EmbeddingSetup(
             model.text_encoder_3.requires_grad_(False)
         model.vae.requires_grad_(False)
         model.transformer.requires_grad_(False)
-
-        if model.text_encoder_1 is not None:
-            model.embedding.text_encoder_1_vector.requires_grad_(config.text_encoder.train_embedding)
-        if model.text_encoder_2 is not None:
-            model.embedding.text_encoder_2_vector.requires_grad_(config.text_encoder_2.train_embedding)
-        if model.text_encoder_3 is not None:
-            model.embedding.text_encoder_3_vector.requires_grad_(config.text_encoder_3.train_embedding)
-
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-            if model.text_encoder_1 is not None:
-                train_embedding_1 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-                embedding.text_encoder_1_vector.requires_grad_(train_embedding_1)
-            if model.text_encoder_2 is not None:
-                train_embedding_2 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-                embedding.text_encoder_2_vector.requires_grad_(train_embedding_2)
-            if model.text_encoder_3 is not None:
-                train_embedding_3 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-                embedding.text_encoder_3_vector.requires_grad_(train_embedding_3)
 
     def setup_model(
             self,
@@ -104,8 +80,7 @@ class StableDiffusion3EmbeddingSetup(
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_3)
-        self._setup_additional_embeddings(model, config)
-        self._setup_embedding(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
@@ -140,6 +115,9 @@ class StableDiffusion3EmbeddingSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
+            self._normalize_output_embeddings(model.all_text_encoder_1_embeddings())
+            self._normalize_output_embeddings(model.all_text_encoder_2_embeddings())
+            self._normalize_output_embeddings(model.all_text_encoder_3_embeddings())
             if model.embedding_wrapper_1 is not None:
                 model.embedding_wrapper_1.normalize_embeddings()
             if model.embedding_wrapper_2 is not None:

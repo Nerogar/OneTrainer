@@ -69,21 +69,19 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
+            prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(*self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-            )
+            ))
 
-            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
+            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(*self.model.encode_text(
                 text=negative_prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-            )
+            ))
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
                 .to(dtype=self.model.train_dtype.torch_dtype())
@@ -307,21 +305,21 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            prompt_embedding, pooled_text_encoder_2_output = self.model.encode_text(
-                text=prompt,
-                train_device=self.train_device,
-                batch_size=1,
-                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-            )
+            prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
+                *self.model.encode_text(
+                    text=prompt,
+                    train_device=self.train_device,
+                    text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                    text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                ))
 
-            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.encode_text(
-                text=negative_prompt,
-                train_device=self.train_device,
-                batch_size=1,
-                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-            )
+            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
+                *self.model.encode_text(
+                    text=negative_prompt,
+                    train_device=self.train_device,
+                    text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                    text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                ))
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
                 .to(dtype=self.model.train_dtype.torch_dtype())
@@ -455,13 +453,10 @@ class StableDiffusionXLSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
-        negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
-
         if self.model_type.has_conditioning_image_input():
             sampler_output = self.__sample_inpainting(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=sample_config.prompt,
+                negative_prompt=sample_config.negative_prompt,
                 height=self.quantize_resolution(sample_config.height, 64),
                 width=self.quantize_resolution(sample_config.width, 64),
                 seed=sample_config.seed,
@@ -480,8 +475,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
             )
         else:
             sampler_output = self.__sample_base(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=sample_config.prompt,
+                negative_prompt=sample_config.negative_prompt,
                 height=self.quantize_resolution(sample_config.height, 64),
                 width=self.quantize_resolution(sample_config.width, 64),
                 seed=sample_config.seed,
