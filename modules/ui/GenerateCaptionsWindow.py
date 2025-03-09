@@ -21,7 +21,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.config_state: dict[str, Any] = {}
         self._threshold_visible: bool = False
 
-        self._setup_window("Batch generate captions", "400x540")
+        self._setup_window("Batch generate captions", "380x540")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -46,7 +46,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
     def _setup_window(self, title: str, geometry: str) -> None:
         self.title(title)
         self.geometry(geometry)
-        self.minsize(400, 380)
+        self.minsize(400, 400)
         self.resizable(True, True)
         self.wait_visibility()
         self.grab_set()
