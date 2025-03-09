@@ -43,28 +43,35 @@ def __convert(
     # TODO: maybe replace with a non O(n^2) algorithm
     for key_set in key_sets:
         for key, tensor in state_dict.items():
-            in_prefixes = []
+            source = ''
+            in_prefix = ''
             out_prefix = ''
 
+            if key.startswith(key_set.omi_prefix):
+                source = 'omi'
+                in_prefix = key_set.omi_prefix
+            elif key.startswith(key_set.diffusers_prefix):
+                source = 'diffusers'
+                in_prefix = key_set.diffusers_prefix
+            elif key.startswith(key_set.legacy_diffusers_prefix):
+                source = 'legacy_diffusers'
+                in_prefix = key_set.legacy_diffusers_prefix
+
             if target == 'omi':
-                in_prefixes = [key_set.diffusers_prefix, key_set.legacy_diffusers_prefix]
                 out_prefix = key_set.omi_prefix
             elif target == 'diffusers':
-                in_prefixes = [key_set.omi_prefix]
                 out_prefix = key_set.diffusers_prefix
             elif target == 'legacy_diffusers':
-                in_prefixes = [key_set.diffusers_prefix]
                 out_prefix = key_set.legacy_diffusers_prefix
 
-            if any(key.startswith(p) for p in in_prefixes):
-                name = key
-                for p in in_prefixes:
-                    name = name.removeprefix(p)
-                if key_set.swap_chunks and name == '.lora_up.weight':
-                    chunk_0, chunk_1 = tensor.chunk(2, dim=0)
-                    tensor = torch.cat([chunk_1, chunk_0], dim=0)
+            name = key.removeprefix(in_prefix)
+            can_swap_chunks = target == 'omi' or source == 'omi'
 
-                out_states[out_prefix + name] = tensor
+            if key_set.swap_chunks and name.endswith('.lora_up.weight') and can_swap_chunks:
+                chunk_0, chunk_1 = tensor.chunk(2, dim=0)
+                tensor = torch.cat([chunk_1, chunk_0], dim=0)
+
+            out_states[out_prefix + name] = tensor
 
     return out_states
 
