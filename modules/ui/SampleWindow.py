@@ -2,7 +2,10 @@ import copy
 import os
 
 from modules.model.BaseModel import BaseModel
-from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.BaseModelSampler import (
+    BaseModelSampler,
+    ModelSamplerOutput,
+)
 from modules.ui.SampleFrame import SampleFrame
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
@@ -14,6 +17,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import torch
@@ -60,6 +64,7 @@ class SampleWindow(ctk.CTkToplevel):
         self.title("Sample")
         self.geometry("1200x800")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.focus_set()
 
@@ -87,6 +92,7 @@ class SampleWindow(ctk.CTkToplevel):
 
         self.progress = components.progress(self, 2, 0)
         components.button(self, 3, 0, "sample", self.__sample)
+        self.after(150, lambda: set_window_icon(self))
 
     def __load_model(self) -> BaseModel:
         model_loader = create.create_model_loader(
