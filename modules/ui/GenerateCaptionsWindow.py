@@ -85,6 +85,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.create_captions_button.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
+        self.after(150, lambda: set_window_icon(self))
 
     def browse_for_path(self, entry_box):
         # get the path from the user

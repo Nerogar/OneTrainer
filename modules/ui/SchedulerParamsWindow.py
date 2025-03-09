@@ -99,6 +99,7 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.frame.grid_columnconfigure(1, weight=1)
         self.expand_frame = ctk.CTkFrame(self.frame, bg_color="transparent")
         self.expand_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
         self.after(150, lambda: set_window_icon(self))

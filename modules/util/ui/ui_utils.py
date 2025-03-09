@@ -6,6 +6,8 @@ from pathlib import Path
 from tkinter import EventType
 from typing import Any
 
+from customtkinter import CTk, CTkToplevel
+
 
 def bind_mousewheel(
     widget: Any,
@@ -46,8 +48,9 @@ def bind_mousewheel(
         widget.bind("<Button-4>", process_mousewheel)
         widget.bind("<Button-5>", process_mousewheel)
 
+WindowType = tk.Tk | tk.Toplevel | CTk | CTkToplevel | Any
 
-def set_window_icon(window: Any) -> None:
+def set_window_icon(window: WindowType | Any) -> None:
     """Set the application window icon based on the current platform
 
     Args:
@@ -61,9 +64,8 @@ def set_window_icon(window: Any) -> None:
     ):
         # Not a window that can have icons
         return
-    icon_dir = (
-        Path(__file__).parent.parent.parent.parent / "resources/icons"
-    )
+
+    icon_dir = Path("resources/icons")
 
     try:
         if platform.system() == "Windows":
@@ -86,7 +88,7 @@ def set_window_icon(window: Any) -> None:
                     window = window.winfo_toplevel()
                 window.iconphoto(True, icon_img)
         elif platform.system() == "Darwin":  # macOS
-            # macOS are a rabbit hole sadly.
+            # macOS is a rabbit hole sadly for icons, so we'll just pass
             pass
     except Exception as e:
         print(f"Failed to set window icon: {e}")

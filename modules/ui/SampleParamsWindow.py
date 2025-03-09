@@ -17,7 +17,7 @@ class SampleParamsWindow(ctk.CTkToplevel):
         self.title("Sample")
         self.geometry("800x500")
         self.resizable(True, True)
-        set_window_icon(self)
+        self.wait_visibility()
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -30,7 +30,7 @@ class SampleParamsWindow(ctk.CTkToplevel):
         frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         components.button(self, 1, 0, "ok", self.__ok)
-        self.after(200, lambda: set_window_icon(self))
+        self.after(150, lambda: set_window_icon(self))
 
     def __ok(self):
         self.destroy()
