@@ -1,5 +1,7 @@
 from tkinter import filedialog
 
+from modules.util.ui.ui_utils import set_window_icon
+
 import customtkinter as ctk
 
 
@@ -22,6 +24,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.title("Batch generate masks")
         self.geometry("360x430")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -96,6 +99,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
+        self.after(150, lambda: set_window_icon(self))
 
     def browse_for_path(self, entry_box):
         # get the path from the user
