@@ -23,7 +23,6 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 -   **Dataset Tooling**: Automatically caption your dataset using BLIP, BLIP2 and WD-1.4, or create masks for masked training using ClipSeg or Rembg
 -   **Model Tooling**: Convert between different model formats from a simple UI
 -   **Sampling UI**: Sample the model during training without switching to a different application
--   **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)
 
 ![OneTrainerGUI.gif](resources/images/OneTrainerGUI.gif)
 

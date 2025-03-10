@@ -134,20 +134,17 @@ class StableDiffusion3FineTuneSetup(
             model: StableDiffusion3Model,
             config: TrainConfig,
     ):
-        vae_on_train_device = config.align_prop or not config.latent_caching
+        vae_on_train_device = not config.latent_caching
         text_encoder_1_on_train_device = \
             config.train_text_encoder_or_embedding() \
-            or config.align_prop \
             or not config.latent_caching
 
         text_encoder_2_on_train_device = \
             config.train_text_encoder_2_or_embedding() \
-            or config.align_prop \
             or not config.latent_caching
 
         text_encoder_3_on_train_device = \
             config.train_text_encoder_3_or_embedding() \
-            or config.align_prop \
             or not config.latent_caching
 
         model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
