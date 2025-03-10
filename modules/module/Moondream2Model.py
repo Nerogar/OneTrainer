@@ -32,8 +32,6 @@ class Moondream2Model(BaseImageCaptionModel):
         self.caption_length = caption_length
         self.stream = stream
 
-        print(f"Initializing Moondream2Model with revision {model_revision}")
-
         device_map = {"": "cuda"} if device.type == "cuda" else None
 
         # Load model and tokenizer
@@ -43,8 +41,6 @@ class Moondream2Model(BaseImageCaptionModel):
             trust_remote_code=True,
             device_map=device_map,
         )
-
-        print("Moondream2 model loaded successfully")
 
     def generate_caption(
         self,

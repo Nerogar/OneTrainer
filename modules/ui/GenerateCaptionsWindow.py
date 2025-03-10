@@ -158,7 +158,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self._create_labeled_widget(self.caption_options_frame, "Caption Prefix", self.prefix_entry, row=1)
 
         self.postfix_entry = ctk.CTkEntry(self.caption_options_frame)
-        self._create_labeled_widget(self.caption_options_frame, "Caption Postfix", self.postfix_entry, row=2)
+        self._create_labeled_widget(self.caption_options_frame, "Caption Suffix", self.postfix_entry, row=2)
 
         blacklist_frame = ctk.CTkFrame(self.caption_options_frame, fg_color="transparent")
         blacklist_frame.grid(row=3, column=1, sticky="ew", padx=(5, 10), pady=5)
