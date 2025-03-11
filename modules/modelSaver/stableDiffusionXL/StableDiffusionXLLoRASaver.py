@@ -76,7 +76,6 @@ class StableDiffusionXLLoRASaver(
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
-
     def __save_internal(
             self,
             model: StableDiffusionXLModel,
@@ -99,6 +98,6 @@ class StableDiffusionXLLoRASaver(
             case ModelFormat.SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.LEGACY_SAFETENSORS:
-                self.__save_safetensors(model, output_model_destination, dtype)
+                self.__save_legacy_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)

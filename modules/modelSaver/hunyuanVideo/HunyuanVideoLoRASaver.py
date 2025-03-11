@@ -98,6 +98,6 @@ class HunyuanVideoLoRASaver(
             case ModelFormat.SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.LEGACY_SAFETENSORS:
-                self.__save_safetensors(model, output_model_destination, dtype)
+                self.__save_legacy_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
