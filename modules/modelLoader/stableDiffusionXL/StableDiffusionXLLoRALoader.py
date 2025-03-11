@@ -2,6 +2,8 @@ import os
 import traceback
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.util.convert.convert_lora_util import convert_to_diffusers
+from modules.util.convert.convert_sdxl_lora import convert_sdxl_lora_key_sets
 from modules.util.ModelNames import ModelNames
 
 import torch
@@ -18,14 +20,17 @@ class StableDiffusionXLLoRALoader:
             model: StableDiffusionXLModel,
             lora_name: str,
     ):
-        model.lora_state_dict = load_file(lora_name)
+        model.lora_state_dict = convert_to_diffusers(load_file(lora_name), convert_sdxl_lora_key_sets())
 
     def __load_ckpt(
             self,
             model: StableDiffusionXLModel,
             lora_name: str,
     ):
-        model.lora_state_dict = torch.load(lora_name, weights_only=True)
+        model.lora_state_dict = convert_to_diffusers(
+            torch.load(lora_name, weights_only=True),
+            convert_sdxl_lora_key_sets(),
+        )
 
     def __load_internal(
             self,

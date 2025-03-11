@@ -43,7 +43,7 @@ def __convert(
     # TODO: maybe replace with a non O(n^2) algorithm
     for key_set in key_sets:
         for key, tensor in state_dict.items():
-            source = ''
+            source = None
             in_prefix = ''
             out_prefix = ''
 
@@ -56,6 +56,9 @@ def __convert(
             elif key.startswith(key_set.legacy_diffusers_prefix):
                 source = 'legacy_diffusers'
                 in_prefix = key_set.legacy_diffusers_prefix
+
+            if source is None:
+                continue
 
             if target == 'omi':
                 out_prefix = key_set.omi_prefix

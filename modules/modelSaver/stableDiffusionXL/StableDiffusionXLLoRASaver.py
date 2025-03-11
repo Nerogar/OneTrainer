@@ -3,6 +3,8 @@ from pathlib import Path
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.util.convert.convert_lora_util import convert_to_legacy_diffusers, convert_to_omi
+from modules.util.convert.convert_sdxl_lora import convert_sdxl_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
@@ -55,8 +57,25 @@ class StableDiffusionXLLoRASaver(
         state_dict = self.__get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
 
+        save_state_dict = convert_to_omi(save_state_dict, convert_sdxl_lora_key_sets())
+
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
+
+    def __save_legacy_safetensors(
+            self,
+            model: StableDiffusionXLModel,
+            destination: str,
+            dtype: torch.dtype | None,
+    ):
+        state_dict = self.__get_state_dict(model)
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+
+        save_state_dict = convert_to_legacy_diffusers(save_state_dict, convert_sdxl_lora_key_sets())
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
+
 
     def __save_internal(
             self,
@@ -78,6 +97,8 @@ class StableDiffusionXLLoRASaver(
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
             case ModelFormat.SAFETENSORS:
+                self.__save_safetensors(model, output_model_destination, dtype)
+            case ModelFormat.LEGACY_SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
