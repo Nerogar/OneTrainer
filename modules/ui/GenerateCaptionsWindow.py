@@ -325,7 +325,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
     def _update_model_specific_options(self, *args: Any) -> None:
         """Update the visibility of model-specific option frames based on selected model"""
         model = self.config_state["model_var"].get()
-        print(f"DEBUG: Selected model name: '{model}'")  # Debug logging
         threshold_height = 150
         moondream_height = 110  # Height of the Moondream options frame
 
@@ -333,7 +332,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         is_supported_wd_model = any(name in model for name in ["WD SwinV2", "WD EVA02", "WD14 VIT"])
         # Fix the model detection to handle both cases
         is_moondream_model = "MOONDREAM" in model.upper()
-        print(f"DEBUG: is_moondream_model = {is_moondream_model}")  # Debug logging
 
         # Get current window dimensions
         geometry = self.geometry().split("+")[0]
@@ -356,13 +354,11 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         # Handle Moondream options frame visibility
         if is_moondream_model and not self._moondream_options_visible:
-            print("DEBUG: Showing Moondream options frame")  # Debug logging
             new_height += moondream_height
             self._moondream_options_visible = True
             self.moondream_options_frame.grid(row=2+row_offset, column=0, columnspan=2, sticky="ew", pady=5)
             row_offset += 1
         elif not is_moondream_model and self._moondream_options_visible:
-            print("DEBUG: Hiding Moondream options frame")  # Debug logging
             new_height -= moondream_height
             self._moondream_options_visible = False
             self.moondream_options_frame.grid_remove()
@@ -475,7 +471,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
     def create_captions(self) -> None:
         model_name = self.config_state["model_var"].get()
-        print(f"DEBUG: Creating captions with model: '{model_name}'")  # Debug logging
 
         # Model-specific kwargs initialization
         model_kwargs: dict[str, Any] = {}
@@ -501,7 +496,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 "caption_length": self.config_state["caption_length_var"].get(),
                 "stream": False  # Always use non-streaming mode for batch processing
             }
-            print(f"DEBUG: Using Moondream settings: {model_kwargs}")  # Debug logging
 
         # Load or initialize the appropriate model
         if "WD" in model_name:
@@ -534,8 +528,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         # Store the original generate_caption method
         original_generate_caption = captioning_model.generate_caption
 
-        def generate_caption_with_blacklist(caption_sample, initial_caption, caption_prefix, caption_postfix):
-            caption = original_generate_caption(caption_sample, initial_caption, caption_prefix, caption_postfix)
+        def generate_caption_with_blacklist(caption_sample, initial, initial_caption, caption_prefix, caption_postfix):
+            caption = original_generate_caption(caption_sample, initial, initial_caption, caption_prefix, caption_postfix)
             filtered_caption = self.filter_blacklisted_tags(caption, model_name)
             print(f"Original caption: {caption}", flush=True)
             print(f"Filtered caption: {filtered_caption}", flush=True)

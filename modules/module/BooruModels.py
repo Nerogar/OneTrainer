@@ -1,9 +1,7 @@
 import csv
 
-from modules.module.BaseImageCaptionModel import (
-    BaseImageCaptionModel,
-    CaptionSample,
-)
+from modules.module.captioning.models import BaseImageCaptionModel
+from modules.module.captioning.sample import CaptionSample
 
 import torch
 
@@ -178,76 +176,57 @@ class BooruModels(BaseImageCaptionModel):
     def generate_caption(
         self,
         caption_sample: CaptionSample,
+        initial: str = "",
         initial_caption: str = "",
         caption_prefix: str = "",
         caption_postfix: str = "",
-    ):
+    ) -> str:
         """Generate a caption for the given image using the model"""
         print(f"Generating caption with model: {self.model_name}")
-
         image = caption_sample.get_image()
 
         # Different preprocessing for JoyTag vs WD models
         if self.model_name == "JoyTag":
-            # JoyTag-specific preprocessing
             input_tensor = self.preprocess_image_joytag(image)
             input_name = self.model.get_inputs()[0].name
             label_name = self.model.get_outputs()[0].name
-
-            # Run inference
             raw_output = self.model.run([label_name], {input_name: input_tensor})[0]
-
-            # Apply sigmoid to convert logits to probabilities
             probs = 1.0 / (1.0 + np.exp(-raw_output))
         else:
-            # Standard WD model preprocessing
             _, height, width, _ = self.model.get_inputs()[0].shape
-            image = image.resize((width, height))
-            image = np.asarray(image)
-            image = image[:, :, ::-1]  # RGB to BGR
-            image = image.astype(np.float32)
-            image = np.expand_dims(image, 0)
-
+            image_resized = image.resize((width, height))
+            image_np = np.asarray(image_resized)
+            image_np = image_np[:, :, ::-1]  # Convert from RGB to BGR
+            image_np = image_np.astype(np.float32)
+            image_np = np.expand_dims(image_np, 0)
             input_name = self.model.get_inputs()[0].name
             label_name = self.model.get_outputs()[0].name
-            probs = self.model.run([label_name], {input_name: image})[0]
+            probs = self.model.run([label_name], {input_name: image_np})[0]
             probs = probs[0].astype(float)
 
-        # Process predictions based on model type
         if self.model_name == "JoyTag":
-            # JoyTag uses a fixed threshold of 0.4 according to official implementation,
-            # after benchmarking it I found for Onnx model 0.387 to be equivalent
             threshold = 0.387
-            sorted_labels = self.process_tags(probs[0], self.general_indexes, threshold)  # Use probs[0] here
+            sorted_labels = self.process_tags(probs[0], self.general_indexes, threshold)
             all_tags = self.format_tags(sorted_labels)
             generated_caption = ", ".join(all_tags)
         else:
-            # WD models with category-specific processing
             labels = list(zip(self.tag_names, probs, strict=False))
-
-            # First handle ratings: pick one with argmax
             ratings_names = [labels[i] for i in self.rating_indexes]
             ratings_dict = dict(ratings_names)
-            # Get the top rating with highest confidence
             top_rating = max(ratings_dict.items(), key=lambda x: x[1])
             rating_tag = top_rating[0].replace("_", " ")
 
-            # Set base thresholds
-            general_threshold = 0.35  # Default for WD14 VIT v2 and SwinV2
+            general_threshold = 0.35
             character_threshold = 0.85
-
-            # Only EVA02 needs a different general threshold
             if "EVA02" in self.model_name:
                 general_threshold = 0.5
 
-            # Calculate thresholds using helper function
             general_threshold = self.calculate_threshold(
                 probs, self.general_indexes,
                 self.use_mcut_general,
                 general_threshold,
                 self.min_general_threshold
             )
-
             character_threshold = self.calculate_threshold(
                 probs, self.character_indexes,
                 self.use_mcut_character,
@@ -255,25 +234,19 @@ class BooruModels(BaseImageCaptionModel):
                 self.min_character_threshold
             )
 
-            # Process tags using helper functions
             sorted_general_labels = self.process_tags(probs, self.general_indexes, general_threshold)
             sorted_character_labels = self.process_tags(probs, self.character_indexes, character_threshold)
-
-            # Format tags and combine
             all_tags = [rating_tag]
             all_tags += self.format_tags(sorted_character_labels)
             all_tags += self.format_tags(sorted_general_labels)
-
-            # Join all tags
             generated_caption = ", ".join(all_tags)
 
-        # Add initial caption if provided
-        if initial_caption:
+        # Add the initial caption; prioritize `initial` if present
+        if initial:
+            generated_caption = f"{initial} {generated_caption}"
+        elif initial_caption:
             generated_caption = f"{initial_caption} {generated_caption}"
 
         # Add prefix and postfix
-        final_caption = (
-            caption_prefix + generated_caption + caption_postfix
-        ).strip()
-
+        final_caption = (caption_prefix + generated_caption + caption_postfix).strip()
         return final_caption

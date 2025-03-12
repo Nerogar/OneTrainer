@@ -1,47 +1,49 @@
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+
+from modules.util.ui.ToolTip import ToolTip
 
 import customtkinter as ctk
 
 
 class GenerateMasksWindow(ctk.CTkToplevel):
     def __init__(
-        self, parent, path, parent_include_subdirectories, *args, **kwargs
-    ):
-        """
-        Window for generating masks for a folder of images
+            self, parent, path, parent_include_subdirectories, *args, **kwargs
+        ):
+            """
+            Window for generating masks for a folder of images
 
-        Parameters:
-            parent (`Tk`): the parent window
-            path (`str`): the path to the folder
-            parent_include_subdirectories (`bool`): whether to include subdirectories
-        """
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        self.parent = parent
+            Parameters:
+                parent (`Tk`): the parent window
+                path (`str`): the path to the folder
+                parent_include_subdirectories (`bool`): whether to include subdirectories
+            """
+            ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+            self.parent = parent
 
-        if path is None:
-            path = ""
+            if path is None:
+                path = ""
 
-        # Setup window properties
-        self._setup_window("Batch generate masks", "360x430")
+            # Setup window properties
+            self._setup_window("Batch generate masks", "360x430")
 
-        # Get available models dynamically
-        self.models = self.parent.model_manager.get_available_masking_models()
-        self.model_var = ctk.StringVar(
-            self, self.models[0] if self.models else ""
-        )
+            # Get available models dynamically
+            self.models = self.parent.model_manager.get_available_masking_models()
+            self.model_var = ctk.StringVar(
+                self, self.models[0] if self.models else ""
+            )
 
-        # Define modes with mapping to API values
-        self.modes = [
-            "Replace all masks",
-            "Create if absent",
-            "Add to existing",
-            "Subtract from existing",
-            "Blend with existing",
-        ]
-        self.mode_var = ctk.StringVar(self, "Create if absent")
+            # Define modes with mapping to API values
+            self.modes = [
+                "Replace all masks",
+                "Create if absent",
+                "Add to existing",
+                "Subtract from existing",
+                "Blend with existing",
+            ]
+            self.mode_var = ctk.StringVar(self, "Create if absent")
 
-        # Set up the UI
-        self._create_layout(path, parent_include_subdirectories)
+            # Set up the UI
+            self._create_layout(path, parent_include_subdirectories)
 
     def _setup_window(self, title, geometry):
         self.title(title)
@@ -60,7 +62,6 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self._create_model_selection()
         self._create_path_selection(path)
         self._create_mask_options()
-        self._create_mode_selection()
         self._create_subdirectory_option(parent_include_subdirectories)
         self._create_progress_indicators()
         self._create_action_buttons()
@@ -88,6 +89,13 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.prompt_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.prompt_entry = ctk.CTkEntry(self.frame, width=200)
         self.prompt_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(self.prompt_entry, "Enter object to detect (e.g. 'person', 'dog', 'car')")
+
+        # Mode (moved up for better flow)
+        self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
+        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
+        self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
         # Threshold
         self.threshold_label = ctk.CTkLabel(self.frame, text="Threshold", width=100)
@@ -95,36 +103,34 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.threshold_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
         self.threshold_entry.insert(0, "0.3")
         self.threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(self.threshold_entry, "Confidence threshold: Lower values detect more objects but may include incorrect regions")
 
-        # Smooth
+        # Smooth - Changed default to 0 since SAM2 has built-in smoothing
         self.smooth_label = ctk.CTkLabel(self.frame, text="Smooth", width=100)
         self.smooth_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
-        self.smooth_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="5")
-        self.smooth_entry.insert(0, 5)
+        self.smooth_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0-10")
+        self.smooth_entry.insert(0, "0")  # Changed default to 0
         self.smooth_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(self.smooth_entry, "Additional smoothing (0=use built-in smoothing, higher values for extra smoothing)")
 
         # Expand
         self.expand_label = ctk.CTkLabel(self.frame, text="Expand", width=100)
         self.expand_label.grid(row=6, column=0, sticky="w", padx=5, pady=5)
-        self.expand_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="10")
-        self.expand_entry.insert(0, 10)
+        self.expand_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0-20")
+        self.expand_entry.insert(0, "10")
         self.expand_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(self.expand_entry, "Expansion pixels: Expands mask boundaries outward")
 
         # Alpha
         self.alpha_label = ctk.CTkLabel(self.frame, text="Alpha", width=100)
         self.alpha_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
-        self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="1")
-        self.alpha_entry.insert(0, 1)
+        self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
+        self.alpha_entry.insert(0, "1")
         self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
-
-    def _create_mode_selection(self):
-        self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
-        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
-        self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(self.alpha_entry, "Blending strength when combining with existing masks")
 
     def _create_subdirectory_option(self, parent_include_subdirectories):
-        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
+        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subdirs", width=100)
         self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
         self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
         self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
@@ -157,6 +163,36 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.progress.update()
 
     def create_masks(self):
+        try:
+            threshold = float(self.threshold_entry.get())
+            if not 0 <= threshold <= 0.90:
+                messagebox.showwarning("Invalid Value", "Threshold must be between 0.0 and 1.0")
+                return
+
+            smooth_pixels = int(self.smooth_entry.get())
+            if smooth_pixels < 0 or smooth_pixels > 10:
+                messagebox.showwarning("Invalid Value", "Smooth pixels should be between 0 and 20")
+                return
+
+            expand_pixels = int(self.expand_entry.get())
+            if expand_pixels < 0 or expand_pixels > 64:
+                messagebox.showwarning("Invalid Value", "Expand pixels should be between 0 and 30")
+                return
+
+            alpha = float(self.alpha_entry.get())
+            if not 0 <= alpha <= 1:
+                messagebox.showwarning("Invalid Value", "Alpha must be between 0.0 and 1.0")
+                return
+
+            # Check for empty prompt
+            prompt = self.prompt_entry.get().strip()
+            if not prompt:
+                messagebox.showwarning("Invalid Input", "Please enter a detection prompt")
+                return
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter valid numeric values for threshold, smooth, expand, and alpha")
+            return
+
         masking_model = self.parent.model_manager.load_masking_model(
             self.model_var.get()
         )

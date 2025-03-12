@@ -54,3 +54,6 @@ requests==2.32.3
 einops==0.8.1
 pyvips==2.2.3
 pyvips-binary==8.16.0
+
+# SAM2 for segmentation masks to combine with moondream2
+-e git+https://github.com/facebookresearch/sam2.git@main#egg=sam-2

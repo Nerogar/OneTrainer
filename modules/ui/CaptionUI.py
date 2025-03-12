@@ -22,6 +22,7 @@ from modules.module.MaskByColor import MaskByColor
 from modules.module.Moondream2Model import Moondream2Model
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
+from modules.module.SAMoondreamModel import MoondreamSAMMaskModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
@@ -64,6 +65,46 @@ def scan_for_supported_images(
         ]
     return sorted(results)
 
+def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
+    """Get platform-specific cursor representation."""
+    # Use global cursor cache
+    if not hasattr(get_platform_cursor, "cursor_cache"):
+        get_platform_cursor.cursor_cache = {}
+
+    # Return from cache if available
+    cache_key = f"{cursor_name}:{fallback_cursor}"
+    if cache_key in get_platform_cursor.cursor_cache:
+        return get_platform_cursor.cursor_cache[cache_key]
+
+    result = fallback_cursor
+    if platform.system() == "Windows":
+        # Look for .cur files which are required for Windows cursors
+        cursor_path = Path(__file__).parent.parent.parent / "resources" / "icons" / "cursors" / f"cursor_{cursor_name}.cur"
+
+        if cursor_path.exists():
+            # Use forward slashes instead of backslashes for Tk or it will freak out
+            normalized_path = str(cursor_path).replace("\\", "/")
+            result = f"@{normalized_path}"
+        else:
+            # Standard cursor names by platform
+            standard_cursors = {
+                "brush": "pencil",
+                "fill": "dotbox",
+            }
+            # Try to map to a standard cursor name, or use fallback
+            result = standard_cursors.get(cursor_name, fallback_cursor)
+    else:
+        # Standard cursor names by platform
+        standard_cursors = {
+            "brush": "pencil",
+            "fill": "dotbox",
+        }
+        # Try to map to a standard cursor name, or use fallback
+        result = standard_cursors.get(cursor_name, fallback_cursor)
+
+    # Cache the result
+    get_platform_cursor.cursor_cache[cache_key] = result
+    return result
 
 class CaptionUI(ctk.CTkToplevel):
     WINDOW_WIDTH: int = 1018
@@ -326,6 +367,7 @@ class CaptionUI(ctk.CTkToplevel):
             tools_frame,
             text="Enable Editing",
             variable=self.enable_mask_editing_var,
+            command=self.mask_editor.update_cursor
         ).grid(row=0, column=2, padx=5, pady=2)
         self.brush_opacity_entry = ctk.CTkEntry(tools_frame, width=40)
         self.brush_opacity_entry.insert(0, "1.0")
@@ -400,6 +442,8 @@ class CaptionUI(ctk.CTkToplevel):
             {self.image_label.children["!label"]},
             self.mask_editor.adjust_brush_size,
         )
+        self.image_label.bind("<Enter>", self.mask_editor.update_cursor)
+        self.image_label.bind("<Leave>", self.mask_editor.set_default_cursor)
 
     def _create_caption_area(self, parent: ctk.CTkFrame) -> None:
         """Create the caption area for editing."""
@@ -868,6 +912,7 @@ class ModelManager:
             "Rembg": RembgModel,
             "Rembg-Human": RembgHumanModel,
             "Hex Color": MaskByColor,
+            "SAMoondream": MoondreamSAMMaskModel,
         }
 
         self.masking_model = None
@@ -884,31 +929,44 @@ class ModelManager:
         return list(self._masking_registry.keys())
 
     def load_masking_model(
-        self, model: str
-    ) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | None:
-        """Load the specified masking model, unloading any captioning model."""
-        self.captioning_model = None
-        self.current_captioning_model_name = None
+            self, model: str
+        ) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | MoondreamSAMMaskModel | None:
+            """Load the specified masking model, unloading any captioning model."""
+            self.captioning_model = None
+            self.current_captioning_model_name = None
 
-        if model not in self._masking_registry:
-            print(f"Unknown masking model: {model}")
-            return None
+            if model not in self._masking_registry:
+                print(f"Unknown masking model: {model}")
+                return None
 
-        # If the requested model is already loaded, return it
-        if self.current_masking_model_name == model and self.masking_model is not None:
-            print(f"Model {model} is already loaded")
+            # If the requested model is already loaded, return it
+            if self.current_masking_model_name == model and self.masking_model is not None:
+                print(f"Model {model} is already loaded")
+                return self.masking_model
+
+            model_class = self._masking_registry[model]
+
+            if self.masking_model is None or not isinstance(
+                self.masking_model, model_class
+            ):
+                print(f"Loading {model} model, this may take a while")
+
+                # Special handling for SAMoondream model
+                if model == "SAMoondream":
+                    print("Creating SAMoondream model with default parameters")
+                    self.masking_model = model_class(
+                        device=self.device,
+                        dtype=torch.float32,
+                        sam2_model_size="large",
+                        moondream_model_revision="2025-01-09"  # Use latest Moondream version
+                    )
+                else:
+                    # Default initialization for other models
+                    self.masking_model = model_class(self.device, torch.float32)
+
+                self.current_masking_model_name = model
+
             return self.masking_model
-
-        model_class = self._masking_registry[model]
-
-        if self.masking_model is None or not isinstance(
-            self.masking_model, model_class
-        ):
-            print(f"Loading {model} model, this may take a while")
-            self.masking_model = model_class(self.device, torch.float32)
-            self.current_masking_model_name = model
-
-        return self.masking_model
 
     def load_captioning_model(
         self, model: str, **kwargs
@@ -1293,7 +1351,6 @@ class MaskEditor:
         self.mask_draw_y = event.y
         return start_x, start_y, end_x, end_y
 
-
     def _determine_brush_mask_color(self, is_left: bool) -> RGBColor | None:
         """Determine the brush color based (b or w) base on the mouse button."""
         if is_left:
@@ -1448,18 +1505,16 @@ class MaskEditor:
         self.parent.image_handler.refresh_image()
         return "break" if event else None
 
-    def switch_to_brush_mode(
-        self, event: tk.Event | None = None
-    ) -> str | None:
+    def switch_to_brush_mode(self, event: tk.Event | None = None) -> str | None:
         """Switch to draw mask mode."""
         self.mask_editing_mode = EditMode.DRAW
+        self.update_cursor()
         return "break" if event else None
 
-    def switch_to_fill_mode(
-        self, event: tk.Event | None = None
-    ) -> str | None:
+    def switch_to_fill_mode(self, event: tk.Event | None = None) -> str | None:
         """Switch to fill mask mode."""
         self.mask_editing_mode = EditMode.FILL
+        self.update_cursor()
         return "break" if event else None
 
     def toggle_mask_visibility_mode(self, event: tk.Event | None = None) -> str:
@@ -1467,3 +1522,37 @@ class MaskEditor:
         self.display_only_mask = not self.display_only_mask
         self.parent.image_handler.refresh_image()
         return "break"
+
+    def update_cursor(self, event: tk.Event | None = None) -> None:
+        """Update the cursor based on the current mask editing mode."""
+        if not self.parent.enable_mask_editing_var.get():
+            self.set_default_cursor()
+            return
+
+        if self.mask_editing_mode == EditMode.DRAW:
+            self.set_brush_cursor()
+        elif self.mask_editing_mode == EditMode.FILL:
+            self.set_fill_cursor()
+
+    def set_brush_cursor(self) -> None:
+        """Set the cursor to brush mode."""
+        brush_cursor = get_platform_cursor("brush", "pencil")
+        if "!label" in self.parent.image_label.children:
+            self.parent.image_label.children["!label"].configure(cursor=brush_cursor)
+        else:
+            self.parent.image_label.configure(cursor=brush_cursor)
+
+    def set_fill_cursor(self) -> None:
+        """Set the cursor to fill mode."""
+        fill_cursor = get_platform_cursor("fill", "dotbox")
+        if "!label" in self.parent.image_label.children:
+            self.parent.image_label.children["!label"].configure(cursor=fill_cursor)
+        else:
+            self.parent.image_label.configure(cursor=fill_cursor)
+
+    def set_default_cursor(self, event: tk.Event | None = None) -> None:
+        """Reset to the default cursor."""
+        if "!label" in self.parent.image_label.children:
+            self.parent.image_label.children["!label"].configure(cursor="")
+        else:
+            self.parent.image_label.configure(cursor="")
