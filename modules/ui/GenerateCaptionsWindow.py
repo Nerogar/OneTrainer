@@ -1,8 +1,10 @@
-import csv
-import os
-import re
 from tkinter import filedialog
 from typing import Any
+
+from modules.module.captioning.utils import (
+    filter_blacklisted_tags,
+    get_blacklist_tags,
+)
 
 import customtkinter as ctk
 
@@ -399,70 +401,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             self.character_threshold_entry.configure(state="normal", placeholder_text="")
             self.character_threshold_label.configure(text_color=("black", "white"))
 
-    def get_blacklist_tags(self, blacklist_text: str, model_name: str) -> list[str]:
-        """Convert blacklist_text to list depending on whether it's a file or a comma-separated string."""
-        delimiter = "," if "WD" in model_name else None
-        if blacklist_text.endswith(".txt") and os.path.isfile(blacklist_text):
-            with open(blacklist_text, encoding="utf-8") as blacklist_file:
-                return [line.rstrip("\n") for line in blacklist_file]
-        elif blacklist_text.endswith(".csv") and os.path.isfile(blacklist_text):
-            with open(blacklist_text, "r", encoding="utf-8") as blacklist_file:
-                return [row[0] for row in csv.reader(blacklist_file)]
-        elif delimiter:
-            return [tag.strip() for tag in blacklist_text.split(delimiter)]
-        else:
-            return [blacklist_text]
-
-    def parse_regex_blacklist(self, blacklist_tags: list[str], caption_tags: list[str]) -> list[str]:
-        """Match regex patterns in blacklist against caption tags."""
-        matched_tags: list[str] = []
-        regex_spchars = set(".^$*+?!{}[]|()\\")
-        for pattern in blacklist_tags:
-            if any(char in regex_spchars for char in pattern):
-                try:
-                    compiled = re.compile(pattern, re.IGNORECASE)
-                    for tag in caption_tags:
-                        if compiled.fullmatch(tag) and tag not in matched_tags:
-                            matched_tags.append(tag)
-                except re.error:
-                    pass
-            else:
-                pattern_lower = pattern.lower()
-                for tag in caption_tags:
-                    if tag.lower() == pattern_lower and tag not in matched_tags:
-                        matched_tags.append(tag)
-        return matched_tags
-
-    def filter_blacklisted_tags(self, caption: str, model_name: str) -> str:
-        blacklist_text = self.blacklist_entry.get().strip()
-        if not blacklist_text:
-            return caption
-
-        # Check if the model contains "WD" and choose delimiter and joiner accordingly.
-        if "WD" in model_name:
-            delimiter = ","
-            joiner = ", "
-        else:
-            delimiter = " "
-            joiner = " "
-
-        blacklist_tags = self.get_blacklist_tags(blacklist_text, model_name)
-        # Trim each tag from the caption by splitting on the chosen delimiter.
-        caption_tags = [tag.strip() for tag in caption.split(delimiter)]
-
-        if self.regex_enabled_var.get():
-            tags_to_remove = self.parse_regex_blacklist(blacklist_tags, caption_tags)
-        else:
-            tags_to_remove = []
-            for tag in caption_tags:
-                for blacklist_tag in blacklist_tags:
-                    if tag.lower() == blacklist_tag.lower().strip():
-                        tags_to_remove.append(tag)
-                        break
-
-        filtered_tags = [tag for tag in caption_tags if tag not in tags_to_remove]
-        return joiner.join(filtered_tags)
-
     def set_progress(self, value: int, max_value: int) -> None:
         progress = value / max_value if max_value > 0 else 0
         self.progress.set(progress)
@@ -491,7 +429,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                     "use_mcut_general": self.general_mcut_var.get(),
                     "use_mcut_character": self.character_mcut_var.get(),
                 }
-        elif "MOONDREAM" in model_name.upper():  # Fix model detection here too
+        elif "MOONDREAM" in model_name.upper():
             model_kwargs = {
                 "caption_length": self.config_state["caption_length_var"].get(),
                 "stream": False  # Always use non-streaming mode for batch processing
@@ -522,7 +460,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         blacklist_text = self.blacklist_entry.get().strip()
         blacklist_tags = []
         if blacklist_text:
-            blacklist_tags = self.get_blacklist_tags(blacklist_text, model_name)
+            blacklist_tags = get_blacklist_tags(blacklist_text, model_name)
             print(f"Loaded blacklist tags: {blacklist_tags}")
 
         # Store the original generate_caption method
@@ -530,7 +468,12 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         def generate_caption_with_blacklist(caption_sample, initial, initial_caption, caption_prefix, caption_postfix):
             caption = original_generate_caption(caption_sample, initial, initial_caption, caption_prefix, caption_postfix)
-            filtered_caption = self.filter_blacklisted_tags(caption, model_name)
+            filtered_caption = filter_blacklisted_tags(
+                caption,
+                blacklist_text,
+                model_name,
+                self.regex_enabled_var.get()
+            )
             print(f"Original caption: {caption}", flush=True)
             print(f"Filtered caption: {filtered_caption}", flush=True)
             return filtered_caption
