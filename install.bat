@@ -1,8 +1,14 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-REM Change to the directory containing the batch file to mitigate PEBCAK
+REM Avoid footgun by explictly navigating to the directory containing the batch file
 cd /d "%~dp0"
+
+REM Verify that OneTrainer is our current working directory
+if not exist "scripts\train_ui.py" (
+    echo Error: train_ui.py does not exist, you have done something very wrong. Reclone the repository.
+    goto :end
+)
 
 if not defined PYTHON ( set "PYTHON=python" )
 :: %~dp0 expands to the full directory path of the script (with trailing backslash)

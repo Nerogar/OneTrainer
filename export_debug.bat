@@ -1,11 +1,11 @@
 @echo off
 
-REM Change to the directory containing the batch file to mitigate PEBCAK
+REM Avoid footgun by explictly navigating to the directory containing the batch file
 cd /d "%~dp0"
 
-REM Check if the debug script exists before proceeding
-if not exist "scripts\generate_debug_report.py" (
-    echo Error: Debug script not found at scripts\generate_debug_report.py
+REM Verify that OneTrainer is our current working directory
+if not exist "scripts\train_ui.py" (
+    echo Error: train_ui.py does not exist, you have done something very wrong. Reclone the repository.
     goto :end
 )
 
