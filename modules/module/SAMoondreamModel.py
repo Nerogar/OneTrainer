@@ -1,6 +1,7 @@
 import gc
+import logging
 import os
-from contextlib import contextmanager
+from contextlib import nullcontext
 from functools import partial
 from pathlib import Path
 
@@ -19,11 +20,8 @@ from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from scipy import ndimage
 
-
-@contextmanager
-def nullcontext():
-    """Simple context manager that does nothing."""
-    yield
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class ModelCache:
@@ -34,7 +32,7 @@ class ModelCache:
         """Get a model from cache or return None"""
         key = f"{model_type}_{use_cuda}"
         if key in self.models:
-            print(f"Using cached {model_type} model...", flush=True)
+            logger.info(f"Using cached {model_type} model...")
             return self.models[key]
         return None
 
@@ -48,7 +46,7 @@ class ModelCache:
         """Remove a model from cache and free memory"""
         key = f"{model_type}_{use_cuda}"
         if key in self.models:
-            print(f"Unloading {model_type} model...", flush=True)
+            logger.info(f"Unloading {model_type} model...")
             del self.models[key]
             gc.collect()
             if use_cuda:
@@ -76,7 +74,7 @@ class ObjectDetector:
                 self.model = cached_model
                 return self
 
-        print("Loading Moondream model...", flush=True)
+        logger.info("Loading Moondream model...")
         self.model = Moondream2Model(
             device=self.device,
             dtype=self.dtype,
@@ -114,13 +112,13 @@ class ObjectDetector:
         detection_results = self.model.generate_detection(caption_sample, prompt)
 
         if not detection_results or 'objects' not in detection_results:
-            print(f"No objects detected for prompt: '{prompt}'", flush=True)
+            logger.info(f"No objects detected for prompt: '{prompt}'")
             return None, [], (0, 0)
 
         objects = detection_results["objects"][:max_objects]
 
         if not objects:
-            print(f"No objects found for prompt: '{prompt}'", flush=True)
+            logger.info(f"No objects found for prompt: '{prompt}'")
             return None, [], (0, 0)
 
         # Convert box format if needed
@@ -148,7 +146,7 @@ class ObjectDetector:
         ]
 
         if not filtered_objects:
-            print("No valid bounding boxes found.", flush=True)
+            logger.info("No valid bounding boxes found.")
             return None, [], (0, 0)
 
         return np_image, filtered_objects, (img_width, img_height)
@@ -171,14 +169,14 @@ class Segmenter:
                 self.predictor = cached_model
                 return self
 
-        print(f"Loading SAM2 model '{self.sam2_model_name}'...", flush=True)
+        logger.info(f"Loading SAM2 model '{self.sam2_model_name}'...")
         try:
             self.predictor = SAM2ImagePredictor.from_pretrained(self.sam2_model_name)
             if self.use_cuda:
                 self.predictor.model.to(device=self.device)
-                print("SAM2 model loaded on CUDA", flush=True)
+                logger.info("SAM2 model loaded on CUDA")
         except Exception as e:
-            print(f"Error loading SAM2 model: {str(e)}", flush=True)
+            logger.error(f"Error loading SAM2 model: {str(e)}")
             raise
 
         if cache:
@@ -209,7 +207,7 @@ class Segmenter:
         try:
             self.predictor.set_image(np_image)
         except Exception as e:
-            print(f"Error setting image for SAM2: {str(e)}", flush=True)
+            logger.error(f"Error setting image for SAM2: {str(e)}")
             return [], []
 
         if not detected_objects:
@@ -294,7 +292,7 @@ class Segmenter:
 
                         # Skip invalid tensors early without try-except
                         if box_slice.numel() == 0 or point_slice.numel() == 0:
-                            print(f"Skipping object {i+1}/{num_objects}: Invalid input tensors", flush=True)
+                            logger.warning(f"Skipping object {i+1}/{num_objects}: Invalid input tensors")
                             continue
 
                         # Pre-declare variables outside try block
@@ -309,7 +307,7 @@ class Segmenter:
                                 multimask_output=True,
                             )
                         except Exception as e:
-                            print(f"Error predicting mask for object {i+1}/{num_objects}: {e}", flush=True)
+                            logger.error(f"Error predicting mask for object {i+1}/{num_objects}: {e}")
                             continue
 
                         # Process results outside the try block when possible
@@ -338,7 +336,7 @@ class Segmenter:
                             torch.cuda.empty_cache()
 
         except Exception as e:
-            print(f"Error in segmentation: {e}", flush=True)
+            logger.error(f"Error in segmentation: {e}")
 
         return boxes_px, refined_masks
 
@@ -521,7 +519,7 @@ class ImageUtility:
                     unique_images.append(img_path)
 
         sorted_images = sorted(unique_images)
-        print(f"Found {len(sorted_images)} unique images", flush=True)
+        logger.info(f"Found {len(sorted_images)} unique images")
         return sorted_images
 
 
@@ -599,12 +597,12 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         # Create a mask sample
         mask_sample = MaskSample(filename, self.device)
 
-        print(f"Processing {filename}", flush=True)
-        print(f"Mask will be saved to: {mask_sample.mask_filename}", flush=True)
+        logger.info(f"Processing {filename}")
+        logger.info(f"Mask will be saved to: {mask_sample.mask_filename}")
 
         # Skip if mode is fill and mask already exists
         if mode == 'fill' and os.path.exists(mask_sample.mask_filename):
-            print(f"Skipping {filename} as mask already exists", flush=True)
+            logger.info(f"Skipping {filename} as mask already exists")
             return
 
         # Ensure models are loaded
@@ -612,13 +610,13 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
 
         # Load image
         image = mask_sample.get_image()
-        print(f"Image loaded, size: {image.size}", flush=True)
+        logger.info(f"Image loaded, size: {image.size}")
 
         # Process each prompt for detection
         combined_mask = None
 
         for prompt in prompts:
-            print(f"Processing prompt: '{prompt}' for {filename}", flush=True)
+            logger.info(f"Processing prompt: '{prompt}' for {filename}")
 
             # Detect objects using Moondream2
             try:
@@ -629,10 +627,10 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
                 )
 
                 if np_image is None or not detected_objects:
-                    print(f"No objects detected for prompt: '{prompt}'", flush=True)
+                    logger.info(f"No objects detected for prompt: '{prompt}'")
                     continue
 
-                print(f"Detected {len(detected_objects)} objects for prompt: '{prompt}'", flush=True)
+                logger.info(f"Detected {len(detected_objects)} objects for prompt: '{prompt}'")
 
                 _, object_masks = self.segmenter.segment(
                     np_image=np_image,
@@ -644,7 +642,7 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
                 )
 
                 if not object_masks:
-                    print(f"No valid masks generated for prompt: '{prompt}'", flush=True)
+                    logger.info(f"No valid masks generated for prompt: '{prompt}'")
                     continue
 
                 # Combine masks for this prompt
@@ -654,13 +652,13 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
                 combined_mask = prompt_mask if combined_mask is None else torch.max(combined_mask, prompt_mask)
 
             except Exception as e:
-                print(f"Error processing prompt '{prompt}': {str(e)}", flush=True)
+                logger.error(f"Error processing prompt '{prompt}': {str(e)}")
                 import traceback
                 traceback.print_exc()
 
         # If no masks were created, return
         if combined_mask is None:
-            print(f"No masks generated for {filename} with prompts {prompts}", flush=True)
+            logger.info(f"No masks generated for {filename} with prompts {prompts}")
             return
         else:
             # Print some stats about the combined mask
@@ -670,11 +668,11 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
                 "mean": combined_mask.mean().item(),
                 "shape": list(combined_mask.shape)
             }
-            print(f"Final mask stats: {mask_stats}", flush=True)
+            logger.debug(f"Final mask stats: {mask_stats}")
 
         # Apply the mask to the sample
         mask_sample.apply_mask(mode, combined_mask, alpha, False)
 
         # Save the mask
         mask_sample.save_mask()
-        print(f"Saved mask for {filename}", flush=True)
+        logger.info(f"Saved mask for {filename}")
