@@ -9,9 +9,12 @@ from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
-from PIL import Image
+from PIL import Image as PILImage
 
 PAD = 10
+ICON_ONLY_WIDTH = 40
+DEFAULT_PAD = 5
+TOOLTIP_X_POSITION = 25
 
 
 def app_title(master, row, column):
@@ -19,7 +22,7 @@ def app_title(master, row, column):
     frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
 
     image_component = ctk.CTkImage(
-        Image.open("resources/icons/icon.png").resize((40, 40), Image.Resampling.LANCZOS),
+       PILImage.open("resources/icons/icon.png").resize((40, 40), PILImage.Resampling.BICUBIC),
         size=(40, 40)
     )
     image_label_component = ctk.CTkLabel(frame, image=image_component, text="")
@@ -178,108 +181,74 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
-def load_image(path, size=None, light_path=None, dark_path=None):
+def icon_button(
+    master: ctk.CTkBaseClass,
+    row: int,
+    column: int,
+    text: str,
+    command: Callable,
+    width: int = ICON_ONLY_WIDTH,
+    tooltip: str | None = None,
+    image: ctk.CTkImage | PILImage.Image | None = None,
+    compound: str = "left",
+    **kwargs,
+) -> ctk.CTkButton:
     """
-    Load an image for use in the UI with proper handling for high DPI displays
+    Create a button with an icon and optional text.
 
     Parameters:
-        path: Path to the image file
-        size: Optional tuple (width, height) to resize the image
-        light_path: Optional separate path for light theme
-        dark_path: Optional separate path for dark theme
+        master: Parent widget.
+        row (int): Grid row position.
+        column (int): Grid column position.
+        text (str): Button text.
+        command (Callable): Callback function.
+        width (int): Button width (default 40 for icon-only buttons).
+        tooltip (Optional[str]): Tooltip text.
+        image (Optional[ctk.CTkImage | Image]): Icon image.
+        compound (str): Position of image relative to text ('left', 'right', 'top', 'bottom').
+        **kwargs: Additional button configuration.
 
     Returns:
-        CTkImage object ready for use
+        ctk.CTkButton: The created button component.
     """
-    light_img = Image.open(light_path if light_path else path)
-    dark_img = Image.open(dark_path if dark_path else path)
+    # Validate that command is callable
+    if not callable(command):
+        raise ValueError("The 'command' parameter must be callable.")
 
-    if size:
-        # Use LANCZOS for downscaling (when target size is smaller than original)
-        # Use BICUBIC for upscaling (when target size is larger than original)
-        light_resampling = (
-            Image.Resampling.LANCZOS
-            if (light_img.width > size[0] or light_img.height > size[1])
-            else Image.Resampling.BICUBIC
-        )
-        dark_resampling = (
-            Image.Resampling.LANCZOS
-            if (dark_img.width > size[0] or dark_img.height > size[1])
-            else Image.Resampling.BICUBIC
-        )
-
-        light_img = light_img.resize(size, light_resampling)
-        dark_img = dark_img.resize(size, dark_resampling)
-
-    return ctk.CTkImage(
-        light_image=light_img,
-        dark_image=dark_img,
-        size=size,  # Let CTkImage handle scaling
-    )
-
-def icon_button(
-    master,
-    row,
-    column,
-    text,
-    command,
-    width=40,
-    tooltip=None,
-    image=None,
-    compound="left",
-    **kwargs,
-):
-    """
-    Create a button with an icon and optional text
-    Parameters:
-        master: Parent widget
-        row, column: Grid position
-        text: Button text
-        command: Callback function
-        width: Button width (default 40 for icon-only buttons)
-        tooltip: Optional tooltip text
-        image: Optional CTkImage to use as icon
-        compound: Position of image relative to text ('left', 'right', 'top', 'bottom')
-    """
     button_config = {
         "text": text,
         "command": command,
         "width": width,
     }
 
-    # Add image if provided
     if image is not None:
-        # Ensure the image is properly scaled for high-DPI displays
+        # Use the image directly if it is a CTkImage; otherwise, try converting it
         if isinstance(image, ctk.CTkImage):
-            # The image is already a CTkImage, use it directly
             button_config["image"] = image
-        else:
-            # Convert PIL Image to CTkImage with proper scaling
+        elif hasattr(image, "size"):
             button_config["image"] = ctk.CTkImage(
                 light_image=image,
                 dark_image=image,
-                size=image.size,  # Use original size, let CTk handle scaling
+                size=image.size,
             )
+        else:
+            raise TypeError("Provided image must be a CTkImage or have a 'size' attribute.")
 
         button_config["compound"] = compound
 
-        # Auto-adjust width if text is also present
-        if text and width == 40:  # Default width
-            text_width = (
-                len(text) * 6 + 30
-            )  # Include space for icon and padding
-            button_config["width"] = max(40, text_width)
+        # Auto-adjust width if text is present and default width is used
+        if text and width == ICON_ONLY_WIDTH:
+            text_width = len(text) * 6 + 30  # Heuristic for text width plus icon/padding
+            button_config["width"] = max(ICON_ONLY_WIDTH, text_width)
 
-    # Add any additional kwargs
+    # Update with any additional keyword arguments
     button_config.update(kwargs)
 
     component = ctk.CTkButton(master, **button_config)
-    component.grid(
-        row=row, column=column, padx=PAD, pady=PAD, sticky="new"
-    )
+    component.grid(row=row, column=column, padx=DEFAULT_PAD, pady=DEFAULT_PAD, sticky="new")
 
     if tooltip:
-        ToolTip(component, tooltip, x_position=25)
+        ToolTip(component, tooltip, x_position=TOOLTIP_X_POSITION)
 
     return component
 
