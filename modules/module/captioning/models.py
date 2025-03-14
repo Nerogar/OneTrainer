@@ -1,8 +1,12 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 from .sample import CaptionSample
 from .utils import get_sample_filenames, is_empty_caption
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class BaseImageCaptionModel(ABC):
@@ -34,7 +38,7 @@ class BaseImageCaptionModel(ABC):
             - "fill": Only set caption if the current one is empty.
             - "add": Append a new caption.
         """
-        print(f"Captioning image: {filename}")  # Debug print
+        logger.info(f"Captioning image: {filename}")
         sample = CaptionSample(filename)
         if mode == "fill" and any(not is_empty_caption(c) for c in sample.captions):
             return
@@ -43,7 +47,8 @@ class BaseImageCaptionModel(ABC):
             sample.set_captions([caption])
         elif mode == "add":
             sample.add_caption(caption)
-        [print(f"Caption: {c}") for c in sample.captions]  # Debug print
+        for c in sample.captions:
+            logger.debug(f"Caption: {c}")
         sample.save_captions()
 
     def caption_images(
@@ -57,16 +62,17 @@ class BaseImageCaptionModel(ABC):
         caption_prefix: str = "",
         caption_postfix: str = "",
     ) -> None:
-        print(f"Caption images processing {len(filenames)} files")  # Debug print
+        logger.info(f"Caption images processing {len(filenames)} files")
         total = len(filenames)
         if progress_callback:
             progress_callback(0, total)
         for idx, filename in enumerate(filenames):
             try:
                 self.caption_image(filename, initial, mode, initial_caption, caption_prefix, caption_postfix)
-            except Exception:
+            except Exception as e:
                 if error_callback:
                     error_callback(filename)
+                logger.error(f"Error captioning {filename}: {e}", exc_info=True)
             if progress_callback:
                 progress_callback(idx + 1, total)
 
@@ -83,7 +89,7 @@ class BaseImageCaptionModel(ABC):
         caption_postfix: str = "",
     ) -> None:
         filenames = get_sample_filenames(sample_dir, include_subdirectories)
-        print(f"Caption folder processing {len(filenames)} files")  # Debug print
+        logger.info(f"Caption folder processing {len(filenames)} files")
         self.caption_images(
             filenames, initial, mode, progress_callback, error_callback,
             initial_caption, caption_prefix, caption_postfix

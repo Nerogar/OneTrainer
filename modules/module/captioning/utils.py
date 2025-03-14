@@ -1,9 +1,13 @@
 import csv
+import logging
 import os
 import re
 from pathlib import Path
 
 from modules.util import path_util
+
+logger = logging.getLogger(__name__)
+
 
 
 def is_supported_image(path: Path) -> bool:
