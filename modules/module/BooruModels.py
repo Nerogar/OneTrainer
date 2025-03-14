@@ -83,24 +83,19 @@ class BooruModels(BaseImageCaptionModel):
         except Exception as e:
             logger.error(f"Error downloading model.onnx from {repo_id}: {e}")
             raise
-
         if device.type == "cpu":
-            provider = "CPUExecutionProvider"
+            providers = ["CPUExecutionProvider"]
         else:
-            provider = (
-                "CUDAExecutionProvider"
+            providers = (
+                ["CUDAExecutionProvider", "CPUExecutionProvider"]
                 if "CUDAExecutionProvider" in onnxruntime.get_available_providers()
-                else "CPUExecutionProvider"
+                else ["CPUExecutionProvider"]
             )
         try:
-            self.model = onnxruntime.InferenceSession(
-                model_path, providers=[provider]
-            )
+            self.model = onnxruntime.InferenceSession(model_path, providers=providers)
         except Exception as e:
             logger.error(f"Error creating ONNX runtime session for model {self.model_name}: {e}")
             raise
-
-        # Remove the duplicate model initialization
 
         self.input = self.model.get_inputs()[0]
         self.output = self.model.get_outputs()[0]
