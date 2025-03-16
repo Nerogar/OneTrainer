@@ -20,16 +20,12 @@ from modules.util.dtype_util import (
     disable_bf16_on_fp16_autocast_context,
     disable_fp16_autocast_context,
 )
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
-
-from diffusers.models.attention_processor import Attention, AttnProcessor, AttnProcessor2_0, XFormersAttnProcessor
-from diffusers.utils import is_xformers_available
 
 
 class BaseWuerstchenSetup(
@@ -47,25 +43,6 @@ class BaseWuerstchenSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        if config.attention_mechanism == AttentionMechanism.DEFAULT:
-            for child_module in model.prior_prior.modules():
-                if isinstance(child_module, Attention):
-                    child_module.set_processor(AttnProcessor())
-        elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-            try:
-                for child_module in model.prior_prior.modules():
-                    if isinstance(child_module, Attention):
-                        child_module.set_processor(XFormersAttnProcessor())
-            except Exception as e:
-                print(
-                    "Could not enable memory efficient attention. Make sure xformers is installed"
-                    f" correctly and a GPU is available: {e}"
-                )
-        elif config.attention_mechanism == AttentionMechanism.SDP:
-            for child_module in model.prior_prior.modules():
-                if isinstance(child_module, Attention):
-                    child_module.set_processor(AttnProcessor2_0())
-
         if config.gradient_checkpointing.enabled():
             if model.model_type.is_wuerstchen_v2():
                 model.prior_prior.enable_gradient_checkpointing()

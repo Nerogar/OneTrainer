@@ -82,7 +82,7 @@ class HunyuanVideoEmbeddingSetup(
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = config.align_prop or not config.latent_caching
+        vae_on_train_device = not config.latent_caching
 
         model.text_encoder_1_to(self.train_device if config.text_encoder.train_embedding else self.temp_device)
         model.text_encoder_2_to(self.train_device if config.text_encoder_2.train_embedding else self.temp_device)
