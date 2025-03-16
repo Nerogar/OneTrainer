@@ -3,8 +3,6 @@ from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.AlignPropLoss import AlignPropLoss
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -86,7 +84,6 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -101,7 +98,6 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -115,7 +111,6 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -140,7 +135,6 @@ class TrainingTab:
         self.__create_prior_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2, supports_vb_loss=True)
 
@@ -154,7 +148,6 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -176,7 +169,7 @@ class TrainingTab:
         self.__create_text_encoder_2_frame(column_0, 2, supports_include=True)
         self.__create_embedding_frame(column_0, 4)
 
-        self.__create_base2_frame(column_1, 0)
+        self.__create_base2_frame(column_1, 0, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2)
 
@@ -255,116 +248,86 @@ class TrainingTab:
                          tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         components.entry(frame, 10, 1, self.ui_state, "clip_grad_norm")
 
-    def __create_base2_frame(self, master, row):
+    def __create_base2_frame(self, master, row, video_training_enabled: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
-
-        # attention mechanism
-        components.label(frame, 0, 0, "Attention",
-                         tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(frame, 0, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
-                           "attention_mechanism")
+        row = 0
 
         # ema
-        components.label(frame, 1, 0, "EMA",
+        components.label(frame, row, 0, "EMA",
                          tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
-        components.options(frame, 1, 1, [str(x) for x in list(EMAMode)], self.ui_state,
-                           "ema")
+        components.options(frame, row, 1, [str(x) for x in list(EMAMode)], self.ui_state, "ema")
+        row += 1
 
         # ema decay
-        components.label(frame, 2, 0, "EMA Decay",
+        components.label(frame, row, 0, "EMA Decay",
                          tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
-        components.entry(frame, 2, 1, self.ui_state, "ema_decay")
+        components.entry(frame, row, 1, self.ui_state, "ema_decay")
+        row += 1
 
         # ema update step interval
-        components.label(frame, 3, 0, "EMA Update Step Interval",
+        components.label(frame, row, 0, "EMA Update Step Interval",
                          tooltip="Number of steps between EMA update steps")
-        components.entry(frame, 3, 1, self.ui_state, "ema_update_step_interval")
+        components.entry(frame, row, 1, self.ui_state, "ema_update_step_interval")
+        row += 1
 
         # gradient checkpointing
-        components.label(frame, 4, 0, "Gradient checkpointing",
+        components.label(frame, row, 0, "Gradient checkpointing",
                          tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        components.options_adv(frame, 4, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
+        components.options_adv(frame, row, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
                            "gradient_checkpointing", adv_command=self.__open_offloading_window)
+        row += 1
 
         # gradient checkpointing layer offloading
-        components.label(frame, 5, 0, "Layer offload fraction",
+        components.label(frame, row, 0, "Layer offload fraction",
                          tooltip="Enables offloading of individual layers during training to reduce VRAM usage. Increases training time and uses more RAM. Only available if checkpointing is set to CPU_OFFLOADED. values between 0 and 1, 0=disabled")
-        components.entry(frame, 5, 1, self.ui_state, "layer_offload_fraction")
+        components.entry(frame, row, 1, self.ui_state, "layer_offload_fraction")
+        row += 1
 
         # train dtype
-        components.label(frame, 6, 0, "Train Data Type",
+        components.label(frame, row, 0, "Train Data Type",
                          tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 6, 1, [
+        components.options_kv(frame, row, 1, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
             ("tfloat32", DataType.TFLOAT_32),
         ], self.ui_state, "train_dtype")
+        row += 1
 
         # fallback train dtype
-        components.label(frame, 7, 0, "Fallback Train Data Type",
+        components.label(frame, row, 0, "Fallback Train Data Type",
                          tooltip="The mixed precision data type used for training stages that don't support float16 data types. This can increase training speed, but reduces precision")
-        components.options_kv(frame, 7, 1, [
+        components.options_kv(frame, row, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], self.ui_state, "fallback_train_dtype")
+        row += 1
 
         # autocast cache
-        components.label(frame, 8, 0, "Autocast Cache",
+        components.label(frame, row, 0, "Autocast Cache",
                          tooltip="Enables the autocast cache. Disabling this reduces memory usage, but increases training time")
-        components.switch(frame, 8, 1, self.ui_state, "enable_autocast_cache")
+        components.switch(frame, row, 1, self.ui_state, "enable_autocast_cache")
+        row += 1
 
         # resolution
-        components.label(frame, 9, 0, "Resolution",
+        components.label(frame, row, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
-        components.entry(frame, 9, 1, self.ui_state, "resolution")
+        components.entry(frame, row, 1, self.ui_state, "resolution")
+        row += 1
+
+        # frames
+        if video_training_enabled:
+            components.label(frame, row, 0, "Frames",
+                             tooltip="The number of frames used for training.")
+            components.entry(frame, row, 1, self.ui_state, "frames")
+            row += 1
 
         # force circular padding
-        components.label(frame, 10, 0, "Force Circular Padding",
+        components.label(frame, row, 0, "Force Circular Padding",
                          tooltip="Enables circular padding for all conv layers to better train seamless images")
-        components.switch(frame, 10, 1, self.ui_state, "force_circular_padding")
-
-    def __create_align_prop_frame(self, master, row):
-        frame = ctk.CTkFrame(master=master, corner_radius=5)
-        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-
-        # align prop
-        components.label(frame, 0, 0, "AlignProp",
-                         tooltip="Enables AlignProp training")
-        components.switch(frame, 0, 1, self.ui_state, "align_prop")
-
-        # align prop probability
-        components.label(frame, 1, 0, "AlignProp Probability",
-                         tooltip="When AlignProp is enabled, specifies the number of training steps done using AlignProp calculations")
-        components.entry(frame, 1, 1, self.ui_state, "align_prop_probability")
-
-        # align prop loss
-        components.label(frame, 2, 0, "AlignProp Loss",
-                         tooltip="Specifies the loss function used for AlignProp calculations")
-        components.options(frame, 2, 1, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
-
-        # align prop weight
-        components.label(frame, 3, 0, "AlignProp Weight",
-                         tooltip="A weight multiplier for the AlignProp loss")
-        components.entry(frame, 3, 1, self.ui_state, "align_prop_weight")
-
-        # align prop steps
-        components.label(frame, 4, 0, "AlignProp Steps",
-                         tooltip="Number of inference steps for each AlignProp step")
-        components.entry(frame, 4, 1, self.ui_state, "align_prop_steps")
-
-        # align prop truncate steps
-        components.label(frame, 5, 0, "AlignProp Truncate Steps",
-                         tooltip="Fraction of steps to randomly truncate when using AlignProp. This is needed to increase model diversity.")
-        components.entry(frame, 5, 1, self.ui_state, "align_prop_truncate_steps")
-
-        # align prop truncate steps
-        components.label(frame, 6, 0, "AlignProp CFG Scale",
-                         tooltip="CFG Scale for inference steps of AlignProp calculations")
-        components.entry(frame, 6, 1, self.ui_state, "align_prop_cfg_scale")
+        components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
 
     def __create_text_encoder_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -377,10 +340,9 @@ class TrainingTab:
         components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
 
         # dropout
-        components.label(frame, row, 0, "Dropout Probability",
+        components.label(frame, 1, 0, "Dropout Probability",
                          tooltip="The Probability for dropping the text encoder conditioning")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
-        row += 1
+        components.entry(frame, 1, 1, self.ui_state, "text_encoder.dropout_probability")
 
         # train text encoder epochs
         components.label(frame, 2, 0, "Stop Training After",
@@ -682,6 +644,17 @@ class TrainingTab:
         components.label(frame, 6, 0, "Noising Bias",
                          tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
         components.entry(frame, 6, 1, self.ui_state, "noising_bias")
+
+        # timestep shift
+        components.label(frame, 7, 0, "Timestep Shift",
+                         tooltip="Shift the timestep distribution. Use the preview to see more details.")
+        components.entry(frame, 7, 1, self.ui_state, "timestep_shift")
+
+        # dynamic timestep shifting
+        components.label(frame, 8, 0, "Dynamic Timestep Shifting",
+                         tooltip="Dynamically shift the timestep distribution based on resolution. Use the preview to see more details.")
+        components.switch(frame, 8, 1, self.ui_state, "dynamic_timestep_shifting")
+
 
 
     def __create_masked_frame(self, master, row):

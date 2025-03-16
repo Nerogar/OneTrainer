@@ -38,6 +38,7 @@ from modules.zluda import ZLUDA
 import torch
 
 import customtkinter as ctk
+from customtkinter import AppearanceModeTracker
 
 
 class TrainUI(ctk.CTk):
@@ -55,7 +56,8 @@ class TrainUI(ctk.CTk):
         self.title("OneTrainer")
         self.geometry("1100x740")
 
-        ctk.set_appearance_mode("System")
+        # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration
+        ctk.set_appearance_mode("Light" if AppearanceModeTracker.detect_appearance_mode() == 0 else "Dark")
         ctk.set_default_color_theme("blue")
 
         self.train_config = TrainConfig.default_values()
@@ -90,8 +92,11 @@ class TrainUI(ctk.CTk):
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
 
-    def close(self):
+        self.protocol("WM_DELETE_WINDOW", self.__close)
+
+    def __close(self):
         self.top_bar_component.save_default()
+        self.quit()
 
     def top_bar(self, master):
         return TopBar(
@@ -274,20 +279,25 @@ class TrainUI(ctk.CTk):
         top_frame.grid(row=0, column=0, sticky="nsew")
         sub_frame = ctk.CTkFrame(master=top_frame, corner_radius=0, fg_color="transparent")
         sub_frame.grid(row=1, column=0, sticky="nsew", columnspan=6)
+
         components.label(top_frame, 0, 0, "Sample After",
                          tooltip="The interval used when automatically sampling from the model during training")
         components.time_entry(top_frame, 0, 1, self.ui_state, "sample_after", "sample_after_unit")
 
-        components.label(top_frame, 0, 2, "Format",
+        components.label(top_frame, 0, 2, "Skip First",
+                         tooltip="Start sampling automatically after this interval has elapsed.")
+        components.entry(top_frame, 0, 3, self.ui_state, "sample_skip_first", width=50, sticky="nw")
+
+        components.label(top_frame, 0, 4, "Format",
                          tooltip="File Format used when saving samples")
-        components.options_kv(top_frame, 0, 3, [
+        components.options_kv(top_frame, 0, 5, [
             ("PNG", ImageFormat.PNG),
             ("JPG", ImageFormat.JPG),
         ], self.ui_state, "sample_image_format")
 
-        components.button(top_frame, 0, 4, "sample now", self.sample_now)
+        components.button(top_frame, 0, 6, "sample now", self.sample_now)
 
-        components.button(top_frame, 0, 5, "manual sample", self.open_sample_ui)
+        components.button(top_frame, 0, 7, "manual sample", self.open_sample_ui)
 
         components.label(sub_frame, 0, 0, "Non-EMA Sampling",
                          tooltip="Whether to include non-ema sampling when using ema.")
@@ -440,6 +450,11 @@ class TrainUI(ctk.CTk):
         components.label(frame, 4, 0, "Placeholder",
                          tooltip="The placeholder used when using the embedding in a prompt")
         components.entry(frame, 4, 1, self.ui_state, "embedding.placeholder")
+
+        # output embedding
+        components.label(frame, 5, 0, "Output embedding",
+                         tooltip="Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage.")
+        components.switch(frame, 5, 1, self.ui_state, "embedding.is_output_embedding")
 
         frame.pack(fill="both", expand=1)
         return frame

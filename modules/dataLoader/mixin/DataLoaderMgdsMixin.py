@@ -32,6 +32,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
 
         settings = {
             "target_resolution": config.resolution,
+            "target_frames": config.frames,
         }
 
         # Just defaults for now.

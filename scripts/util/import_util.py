@@ -5,6 +5,7 @@ def script_imports(allow_zluda: bool = True):
     from pathlib import Path
 
     # Filter out the Triton warning on startup.
+    # xformers is not installed anymore, but might still exist for some installations.
     logging \
         .getLogger("xformers") \
         .addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
