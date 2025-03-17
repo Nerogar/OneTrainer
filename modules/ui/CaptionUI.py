@@ -6,6 +6,7 @@ or manually caption and mask images from a loaded directory.
 """
 
 import contextlib
+import logging
 import platform
 import subprocess
 import tkinter as tk
@@ -39,6 +40,25 @@ import cv2
 import numpy as np
 from customtkinter import ThemeManager
 from PIL import Image, ImageDraw, ImageTk
+
+# Set up module logger
+logger = logging.getLogger(__name__)
+
+# Module Constants
+MAX_VISIBLE_FILES: int = 50
+IMAGE_PADDING: int = 20
+DEFAULT_IMAGE_WIDTH: int = 800
+DEFAULT_IMAGE_HEIGHT: int = 600
+CANVAS_BACKGROUND_COLOR: tuple[int, int, int] = (32, 32, 32)
+MIN_BRUSH_SIZE: float = 0.0025
+MAX_BRUSH_SIZE: float = 0.5
+BRUSH_SIZE_CHANGE_FACTOR: float = 1.25
+MASK_HISTORY_LIMIT: int = 30
+BRUSH_SIZE_WHEEL_SMALL_FACTOR: float = 0.03
+BRUSH_SIZE_WHEEL_LARGE_FACTOR: float = 0.05
+BRUSH_SIZE_THRESHOLD: float = 0.05
+MIN_CONTAINER_SIZE: int = 10
+BRACKET_BRUSH_SIZE_STEP: float = 0.01
 
 RGBColor: TypeAlias = tuple[int, int, int]
 ImageCoordinates: TypeAlias = tuple[int, int, int, int]
@@ -76,30 +96,24 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
     if cache_key in get_platform_cursor.cursor_cache:
         return get_platform_cursor.cursor_cache[cache_key]
 
-    result = fallback_cursor
-    if platform.system() == "Windows":
-        # Look for .cur files which are required for Windows cursors
-        cursor_path = Path(__file__).parent.parent.parent / "resources" / "icons" / "cursors" / f"cursor_{cursor_name}.cur"
+    # Standard cursor names across platforms
+    standard_cursors = {
+        "brush": "pencil",
+        "fill": "dotbox",
+    }
 
+    # First check for custom cursor files on Windows
+    if platform.system() == "Windows":
+        cursor_path = Path(__file__).parent.parent.parent / "resources" / "icons" / "cursors" / f"cursor_{cursor_name}.cur"
         if cursor_path.exists():
             # Use forward slashes instead of backslashes for Tk or it will freak out
             normalized_path = str(cursor_path).replace("\\", "/")
             result = f"@{normalized_path}"
         else:
-            # Standard cursor names by platform
-            standard_cursors = {
-                "brush": "pencil",
-                "fill": "dotbox",
-            }
-            # Try to map to a standard cursor name, or use fallback
+            # Fall back to standard cursor mapping
             result = standard_cursors.get(cursor_name, fallback_cursor)
     else:
-        # Standard cursor names by platform
-        standard_cursors = {
-            "brush": "pencil",
-            "fill": "dotbox",
-        }
-        # Try to map to a standard cursor name, or use fallback
+        # Use standard cursor mapping for non-Windows platforms
         result = standard_cursors.get(cursor_name, fallback_cursor)
 
     # Cache the result
@@ -179,7 +193,7 @@ class CaptionUI(ctk.CTkToplevel):
                 "Ctrl+F: Switch to fill mode\n"
                 "Ctrl+Z: Undo mask edit\n"
                 "Ctrl+Y: Redo mask edit\n"
-                "[ or ]: Decrease/increase brush size\n\n"
+                "[ or ]: Decrease/increase brush size by 0.1\n\n"
                 "When editing masks:\n"
                 "Left click: Add to mask\n"
                 "Right click: Remove from mask\n"
@@ -335,7 +349,8 @@ class CaptionUI(ctk.CTkToplevel):
         """Create the tools bar for mask editing."""
         tools_frame = ctk.CTkFrame(parent, fg_color="#333333")
         tools_frame.grid(row=0, column=0, sticky="new")
-        for i in range(9):
+        # Update the column count for the added button
+        for i in range(10):
             tools_frame.grid_columnconfigure(i, weight=0)
         tools_frame.grid_columnconfigure(5, weight=1)
         icons = {
@@ -344,6 +359,7 @@ class CaptionUI(ctk.CTkToplevel):
             "save": "save",
             "undo": "undo",
             "redo": "redo",
+            "reset": "reset",
         }
         self._create_icon_button(
             tools_frame,
@@ -365,38 +381,52 @@ class CaptionUI(ctk.CTkToplevel):
         )
         ctk.CTkCheckBox(
             tools_frame,
-            text="Enable Editing",
+            text="Edit Mode",
             variable=self.enable_mask_editing_var,
             command=self.mask_editor.update_cursor
         ).grid(row=0, column=2, padx=5, pady=2)
         self.brush_opacity_entry = ctk.CTkEntry(tools_frame, width=40)
         self.brush_opacity_entry.insert(0, "1.0")
         self.brush_opacity_entry.grid(row=0, column=3, padx=5, pady=2)
+        self.brush_opacity_entry.bind("<FocusOut>", self._validate_brush_opacity)
         ctk.CTkLabel(tools_frame, text="Brush Opacity").grid(
             row=0, column=4, padx=2, pady=2
         )
+
         self._create_icon_button(
             tools_frame,
             0,
             6,
-            "",
-            self.file_manager.save_changes,
-            icons["save"],
-            "Save changes",
+            "Clear",
+            self.file_manager.reset_current_image,
+            icons["reset"],
+            "Reset image (clear caption and mask, save to commit change)",
         )
+
         self._create_icon_button(
             tools_frame,
             0,
             7,
             "",
-            lambda: self.mask_editor.undo_mask_edit(),
-            icons["undo"],
-            "Undo last edit",
+            self.file_manager.save_changes,
+            icons["save"],
+            "Save changes",
         )
+
         self._create_icon_button(
             tools_frame,
             0,
             8,
+            "",
+            lambda: self.mask_editor.undo_mask_edit(),
+            icons["undo"],
+            "Undo last edit",
+        )
+
+        self._create_icon_button(
+            tools_frame,
+            0,
+            9,
             "",
             lambda: self.mask_editor.redo_mask_edit(),
             icons["redo"],
@@ -409,11 +439,9 @@ class CaptionUI(ctk.CTkToplevel):
         self.image_container.grid(row=1, column=0, sticky="nsew")
         self.image_container.grid_columnconfigure(0, weight=1)
         self.image_container.grid_rowconfigure(0, weight=1)
-        default_width: int = 800
-        default_height: int = 600
         self.image_container.grid_propagate(False)
         placeholder: Image.Image = Image.new(
-            "RGB", (default_width, default_height), (32, 32, 32)
+            "RGB", (DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT), CANVAS_BACKGROUND_COLOR
         )
         self.image_tk: ImageTk.PhotoImage = ImageTk.PhotoImage(placeholder)
         self.image_label = ctk.CTkLabel(
@@ -436,6 +464,15 @@ class CaptionUI(ctk.CTkToplevel):
         self.image_label.bind(
             "<ButtonRelease-3>", self.mask_editor.handle_mask_edit_end
         )
+        # Add binding for middle mouse button for reset
+        self.image_label.bind("<Button-2>", self._handle_middle_click)
+        # Remove the keyboard bindings from the image label since we're using global bindings now
+        # Make the label focusable for click interactions
+        if "!label" in self.image_label.children:
+            self.image_label.children["!label"].configure(takefocus=1)
+        else:
+            self.image_label.configure(takefocus=1)
+
         self.bind("<Configure>", self.image_handler.on_resize)
         bind_mousewheel(
             self.image_label,
@@ -444,6 +481,11 @@ class CaptionUI(ctk.CTkToplevel):
         )
         self.image_label.bind("<Enter>", self.mask_editor.update_cursor)
         self.image_label.bind("<Leave>", self.mask_editor.set_default_cursor)
+
+    def _handle_middle_click(self, event: tk.Event) -> None:
+        """Handle middle mouse button click as a shortcut for reset."""
+        self.file_manager.reset_current_image()
+        return "break"
 
     def _create_caption_area(self, parent: ctk.CTkFrame) -> None:
         """Create the caption area for editing."""
@@ -467,7 +509,14 @@ class CaptionUI(ctk.CTkToplevel):
         self.caption_entry.grid(
             row=0, column=1, padx=5, pady=5, sticky="ew"
         )
+        # Bind to store value on focus out
+        self.caption_entry.bind("<FocusOut>", self._on_caption_focus_out)
         self._bind_key_events(self.caption_entry)
+
+    def _on_caption_focus_out(self, event: tk.Event | None = None) -> None:
+        """Store caption value when focus changes."""
+        current_text: str = self.caption_entry.get()
+        self.caption_lines[self.current_caption_line] = current_text  # Fixed: removed self.parent reference
 
     def _bind_key_events(self, component: ctk.CTkBaseClass) -> None:
         """Bind common key events to the given component."""
@@ -479,10 +528,44 @@ class CaptionUI(ctk.CTkToplevel):
         self.bind("<Control-d>", self.mask_editor.switch_to_brush_mode)
         self.bind("<Control-f>", self.mask_editor.switch_to_fill_mode)
         self.bind("<Control-s>", self.file_manager.save_changes)
-        self.bind("<bracketleft>", self.mask_editor.decrease_brush_size)
-        self.bind("<bracketright>", self.mask_editor.increase_brush_size)
+        self.bind("<bracketleft>", self.mask_editor.stepped_decrease_brush_size)
+        self.bind("<bracketright>", self.mask_editor.stepped_increase_brush_size)
         self.bind("<Control-z>", self.mask_editor.undo_mask_edit)
         self.bind("<Control-y>", self.mask_editor.redo_mask_edit)
+
+        # Add support for removing focus from entry fields when clicking elsewhere
+        self.bind_all("<Button-1>", self._clear_focus, add="+")
+
+    def _clear_focus(self, event: tk.Event) -> None:
+        """Clear focus from input widgets when clicking elsewhere."""
+        # Skip if already focusing on the clicked widget
+        if event.widget == self.focus_get():
+            return
+
+        # Focus on the main window to remove focus from input widgets
+        focused = self.focus_get()
+        if focused and str(focused).endswith("entry"):
+            # If we're losing focus from an entry, save its content first
+            if focused == self.caption_entry:
+                self._on_caption_focus_out(None)
+            elif focused == self.brush_opacity_entry:
+                self._validate_brush_opacity(None)
+
+            # Set focus to clicked widget or main window
+            self.focus_set()
+
+    def _validate_brush_opacity(self, event: tk.Event | None = None) -> None:
+        """Validate brush opacity value when focus changes."""
+        try:
+            opacity = float(self.brush_opacity_entry.get())
+            # Ensure value is between 0 and 1
+            opacity = max(0.0, min(1.0, opacity))
+            self.brush_opacity_entry.delete(0, "end")
+            self.brush_opacity_entry.insert(0, f"{opacity:.1f}")
+        except (ValueError, TypeError):
+            # Reset to default on invalid input
+            self.brush_opacity_entry.delete(0, "end")
+            self.brush_opacity_entry.insert(0, "1.0")
 
     def _update_file_list(self) -> None:
         """Refresh the file list UI with optimized updates."""
@@ -527,7 +610,6 @@ class CaptionUI(ctk.CTkToplevel):
         )
 
         # Add virtualization for large directories
-        MAX_VISIBLE_FILES = 500
         if len(self.image_rel_paths) > MAX_VISIBLE_FILES:
             warning = ctk.CTkLabel(
                 self.file_list,
@@ -600,7 +682,7 @@ class CaptionUI(ctk.CTkToplevel):
                 ) > 15 else self._file_list_scrollbar.grid_remove()
         except Exception as e:
             self._file_list_scrollbar.grid()
-            print(f"Note: Could not adjust scrollbar visibility: {e}")
+            logger.debug(f"Note: Could not adjust scrollbar visibility: {e}")
 
     def refresh_ui(self) -> None:
         """Refresh the image and caption UI."""
@@ -611,12 +693,12 @@ class CaptionUI(ctk.CTkToplevel):
     def clear_ui(self) -> None:
         """Clear the current image, mask, and caption data."""
         if self.image_container and self.image_container.winfo_ismapped():
-            width = max(10, self.image_container.winfo_width())
-            height = max(10, self.image_container.winfo_height())
+            width = max(MIN_CONTAINER_SIZE, self.image_container.winfo_width())
+            height = max(MIN_CONTAINER_SIZE, self.image_container.winfo_height())
         else:
-            width, height = 800, 600
+            width, height = DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT
         empty_image: Image.Image = Image.new(
-            "RGB", (width, height), (32, 32, 32)
+            "RGB", (width, height), CANVAS_BACKGROUND_COLOR
         )
         self.image_tk = ImageTk.PhotoImage(empty_image)
         self.image_label.configure(image=self.image_tk)
@@ -657,7 +739,7 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _show_help(self) -> None:
         """Show help text (currently printed to console)."""
-        print(self.help_text)
+        logger.info(self.help_text)
 
 
 class ImageHandler:
@@ -670,22 +752,22 @@ class ImageHandler:
         Returns (display_width, display_height, left_offset, top_offset).
         """
         container_width: int = max(
-            10, self.parent.image_container.winfo_width()
+            MIN_CONTAINER_SIZE, self.parent.image_container.winfo_width()
         )
         container_height: int = max(
-            10, self.parent.image_container.winfo_height()
+            MIN_CONTAINER_SIZE, self.parent.image_container.winfo_height()
         )
-        if container_width <= 10:
-            container_width = 800
-        if container_height <= 10:
-            container_height = 600
+        if container_width <= MIN_CONTAINER_SIZE:
+            container_width = DEFAULT_IMAGE_WIDTH
+        if container_height <= MIN_CONTAINER_SIZE:
+            container_height = DEFAULT_IMAGE_HEIGHT
 
         image_width: int = self.parent.image_width
         image_height: int = self.parent.image_height
         if image_width <= 0 or image_height <= 0:
             return 0, 0, 0, 0
 
-        padding: int = 20
+        padding: int = IMAGE_PADDING
         available_width: int = container_width - (padding * 2)
         available_height: int = container_height - (padding * 2)
         scale: float = min(
@@ -703,66 +785,111 @@ class ImageHandler:
         """Refresh and display the current image (with mask, if available) in the container."""
         if not self.parent.pil_image:
             return
-        display_width, display_height, left_offset, top_offset = (
-            self._calculate_display_dimensions()
-        )
+
+        # Get dimensions and create canvas
+        display_dimensions = self._prepare_display()
+        if not all(display_dimensions):
+            return
+
+        # Prepare the image and optional mask
+        final_image = self._prepare_image_with_mask(display_dimensions)
+
+        # Update the display
+        self._update_display(final_image, display_dimensions)
+
+    def _prepare_display(self) -> tuple[int, int, int, int]:
+        """Prepare display dimensions and store in parent."""
+        display_width, display_height, left_offset, top_offset = self._calculate_display_dimensions()
+
+        # Store values in parent for use by other methods
         self.parent.display_width = display_width
         self.parent.display_height = display_height
         self.parent.left_offset = left_offset
         self.parent.top_offset = top_offset
-        container_width: int = self.parent.image_container.winfo_width()
-        container_height: int = self.parent.image_container.winfo_height()
-        canvas: Image.Image = Image.new(
-            "RGB", (container_width, container_height), (32, 32, 32)
-        )
-        if display_width and display_height:
-            resized_image: Image.Image = self.parent.pil_image.resize(
-                (display_width, display_height), Image.Resampling.LANCZOS
-            )
-        else:
-            resized_image = self.parent.pil_image.copy()
+
+        return display_width, display_height, left_offset, top_offset
+
+    def _prepare_image_with_mask(self, dimensions: tuple[int, int, int, int]) -> Image.Image:
+        """Create the final image with mask applied if available."""
+        display_width, display_height, left_offset, top_offset = dimensions
+        container_width = self.parent.image_container.winfo_width()
+        container_height = self.parent.image_container.winfo_height()
+
+        # Create a blank canvas for the final image
+        canvas = Image.new("RGB", (container_width, container_height), CANVAS_BACKGROUND_COLOR)
+
+        # Get resized image
+        resized_image = self._resize_image(display_width, display_height)
+
+        # If mask exists, process it
         if self.parent.pil_mask:
-            resized_mask: Image.Image = self.parent.pil_mask.resize(
-                (display_width, display_height), Image.Resampling.NEAREST
-            )
-            if self.parent.mask_editor.display_only_mask:
-                final_image: Image.Image = resized_mask
-            else:
-                np_image: np.ndarray = (
-                    np.array(resized_image, dtype=np.float32) / 255.0
-                )
-                np_mask: np.ndarray = (
-                    np.array(resized_mask, dtype=np.float32) / 255.0
-                )
-                if np.min(np_mask) == 0:
-                    np_mask = (
-                        np_mask * (1.0 - self.parent.MASK_MIN_OPACITY)
-                        + self.parent.MASK_MIN_OPACITY
-                    )
-                elif np.min(np_mask) < 1:
-                    min_val: float = float(np.min(np_mask))
-                    np_mask = (np_mask - min_val) / (1.0 - min_val) * (
-                        1.0 - self.parent.MASK_MIN_OPACITY
-                    ) + self.parent.MASK_MIN_OPACITY
-                np_result: np.ndarray = (
-                    np_image * np_mask * 255.0
-                ).astype(np.uint8)
-                final_image = Image.fromarray(np_result, mode="RGB")
+            final_image = self._process_masked_image(resized_image, display_width, display_height)
         else:
             final_image = resized_image
+
+        # Paste onto the canvas
         canvas.paste(final_image, (left_offset, top_offset))
-        self.parent.image_tk = ImageTk.PhotoImage(canvas)
+        return canvas
+
+    def _resize_image(self, width: int, height: int) -> Image.Image:
+        """Resize the current image to specified dimensions."""
+        if width and height:
+            return self.parent.pil_image.resize((width, height), Image.Resampling.LANCZOS)
+        return self.parent.pil_image.copy()
+
+    def _process_masked_image(self, resized_image: Image.Image, width: int, height: int) -> Image.Image:
+        """Process image with mask and return the final image."""
+        # Resize mask to match image
+        resized_mask = self.parent.pil_mask.resize((width, height), Image.Resampling.NEAREST)
+
+        # If display_only_mask is true, return just the mask
+        if self.parent.mask_editor.display_only_mask:
+            return resized_mask
+
+        # Otherwise blend mask with image
+        return self._blend_mask_with_image(resized_image, resized_mask)
+
+    def _blend_mask_with_image(self, image: Image.Image, mask: Image.Image) -> Image.Image:
+        """Blend a mask with an image according to mask opacity settings."""
+        # Convert to numpy arrays for processing
+        np_image = np.array(image, dtype=np.float32) / 255.0
+        np_mask = np.array(mask, dtype=np.float32) / 255.0
+
+        # Apply minimum opacity to ensure mask is visible
+        np_mask = self._adjust_mask_opacity(np_mask)
+
+        # Apply mask to image
+        np_result = (np_image * np_mask * 255.0).astype(np.uint8)
+        return Image.fromarray(np_result, mode="RGB")
+
+    def _adjust_mask_opacity(self, np_mask: np.ndarray) -> np.ndarray:
+        """Adjust mask opacity to ensure visibility."""
+        min_opacity = self.parent.MASK_MIN_OPACITY
+
+        if np.min(np_mask) == 0:
+            # Ensure completely masked areas have minimum opacity
+            return np_mask * (1.0 - min_opacity) + min_opacity
+        elif np.min(np_mask) < 1:
+            # Scale mask values between min_opacity and 1.0
+            min_val = float(np.min(np_mask))
+            return (np_mask - min_val) / (1.0 - min_val) * (1.0 - min_opacity) + min_opacity
+
+        return np_mask
+
+    def _update_display(self, final_image: Image.Image, dimensions: tuple) -> None:
+        """Update the Tkinter display with the processed image."""
+        self.parent.image_tk = ImageTk.PhotoImage(final_image)
         self.parent.image_label.configure(image=self.parent.image_tk)
 
     def update_image_container_size(self) -> None:
         """Update container size and refresh image display."""
         if (
-            self.parent.image_container.winfo_width() > 10
-            and self.parent.image_container.winfo_height() > 10
+            self.parent.image_container.winfo_width() > MIN_CONTAINER_SIZE
+            and self.parent.image_container.winfo_height() > MIN_CONTAINER_SIZE
         ):
             self.refresh_image()
         else:
-            self.parent.image_container.config(width=800, height=600)
+            self.parent.image_container.config(width=DEFAULT_IMAGE_WIDTH, height=DEFAULT_IMAGE_HEIGHT)
             self.parent.after(100, self.update_image_container_size)
 
     def on_resize(self, event: tk.Event | None = None) -> None:
@@ -794,7 +921,7 @@ class ImageHandler:
             self.parent.image_width = self.parent.pil_image.width
             self.parent.image_height = self.parent.pil_image.height
         except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
+            logger.error(f"Error loading image {image_path}: {e}")
             self.parent.pil_image = None
 
         mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
@@ -803,7 +930,7 @@ class ImageHandler:
                 self.parent.pil_mask = Image.open(mask_path).convert("RGB")
                 self.parent.mask_editor.reset_for_new_image()
             except Exception as e:
-                print(f"Error loading mask {mask_path}: {e}")
+                logger.error(f"Error loading mask {mask_path}: {e}")
                 self.parent.pil_mask = None
         else:
             self.parent.pil_mask = None
@@ -819,7 +946,7 @@ class ImageHandler:
                 )
                 self.parent.caption_lines = self.parent.caption_lines[:5]
             except Exception as e:
-                print(f"Error loading caption {caption_path}: {e}")
+                logger.error(f"Error loading caption {caption_path}: {e}")
                 self.parent.caption_lines = [""] * 5
         else:
             self.parent.caption_lines = [""] * 5
@@ -836,6 +963,433 @@ class ImageHandler:
         path = Path(filename)
         return (path_util.is_supported_image_extension(path.suffix) and
                 not path.stem.endswith("-masklabel"))
+
+class MaskEditor:
+    DEFAULT_BRUSH_SIZE: float = 0.02
+
+    def __init__(self, parent: CaptionUI) -> None:
+        self.parent: CaptionUI = parent
+        self.mask_draw_x: float = 0.0
+        self.mask_draw_y: float = 0.0
+        self.mask_draw_radius: float = self.DEFAULT_BRUSH_SIZE
+        self.mask_editing_mode: EditMode = EditMode.DRAW
+        self.display_only_mask: bool = False
+        self.mask_history: list[Image.Image] = []
+        self.mask_history_position: int = -1
+        self.mask_history_limit: int = MASK_HISTORY_LIMIT
+        self.is_editing: bool = False
+        self.edit_started: bool = False
+        self._cached_image_dimensions: tuple[int, int] = (0, 0)
+
+    def stepped_decrease_brush_size(self, event: tk.Event | None = None) -> str:
+        """Decrease the brush size by a fixed step."""
+        self.mask_draw_radius = max(MIN_BRUSH_SIZE, self.mask_draw_radius - BRACKET_BRUSH_SIZE_STEP)
+        return "break"
+
+    def stepped_increase_brush_size(self, event: tk.Event | None = None) -> str:
+        """Increase the brush size by a fixed step."""
+        self.mask_draw_radius = min(MAX_BRUSH_SIZE, self.mask_draw_radius + BRACKET_BRUSH_SIZE_STEP)
+        return "break"
+
+    def reset_for_new_image(self) -> None:
+        """Reset mask editing state for a new image."""
+        self.mask_history = []
+        self.mask_history_position = -1
+        self.is_editing = False
+        self.edit_started = False
+        self._cached_image_dimensions = (
+            self.parent.image_width,
+            self.parent.image_height,
+        )
+        if self.parent.pil_mask:
+            self.mask_history.append(self.parent.pil_mask.copy())
+            self.mask_history_position = 0
+
+    def handle_mask_edit_start(self, event: tk.Event) -> None:
+        """Start a mask edit action."""
+        if not self._can_edit_mask(event):
+            return
+        self.is_editing = True
+        self.edit_started = False
+        self.handle_mask_edit(event)
+
+    def handle_mask_edit_end(self, event: tk.Event) -> None:
+        """End a mask edit action."""
+        if not self.is_editing:
+            return
+        self.is_editing = False
+        self.handle_mask_edit(event)
+        if self.edit_started:
+            self._save_mask_to_history()
+            self.edit_started = False
+
+    def handle_mask_edit(self, event: tk.Event) -> None:
+        """Handle mask editing events."""
+        if not self._can_edit_mask(event):
+            return
+
+        # Get coordinates for editing
+        coordinates = self._convert_screen_to_mask_coordinates(event)
+        start_x, start_y, end_x, end_y = coordinates
+
+        if start_x == end_x == 0 and start_y == end_y == 0:
+            return
+
+        # Determine which mouse button is pressed
+        mouse_buttons = self._determine_mouse_buttons(event)
+        is_left, is_right = mouse_buttons
+
+        if not (is_left or is_right) and not self.is_editing:
+            return
+
+        # Apply appropriate editing action
+        self._apply_editing_action(start_x, start_y, end_x, end_y, is_left, is_right)
+
+    def _can_edit_mask(self, event: tk.Event) -> bool:
+        """Check if mask editing is permitted."""
+        return (
+            self.parent.enable_mask_editing_var.get()
+            and event.widget
+            == self.parent.image_label.children.get("!label", event.widget)
+            and self.parent.pil_image is not None
+            and 0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
+        )
+
+    def _convert_screen_to_mask_coordinates(self, event: tk.Event) -> ImageCoordinates:
+        """Convert screen coordinates to mask coordinates."""
+        # Get event coordinates
+        event_position = self._get_event_position(event)
+        if not event_position:
+            return 0, 0, 0, 0
+
+        # Convert to image coordinates
+        start_coordinates = self._convert_to_image_coordinates(event_position)
+        if not start_coordinates:
+            return 0, 0, 0, 0
+
+        # Calculate end coordinates for line drawing
+        end_coordinates = self._get_end_coordinates(event_position)
+
+        # Store current position for next call
+        self._store_current_position(event)
+
+        # Return start_x, start_y, end_x, end_y
+        return start_coordinates[0], start_coordinates[1], end_coordinates[0], end_coordinates[1]
+
+    def _get_event_position(self, event: tk.Event) -> tuple[float, float] | None:
+        """Extract event position and check if it's within the image area."""
+        event_x = event.x
+        event_y = event.y
+        return event_x, event_y
+
+    def _convert_to_image_coordinates(self, position: tuple[float, float]) -> tuple[int, int] | None:
+        """Convert screen coordinates to image coordinates."""
+        event_x, event_y = position
+        left_offset = self.parent.left_offset
+        top_offset = self.parent.top_offset
+        display_width = self.parent.display_width
+        display_height = self.parent.display_height
+
+        # Calculate position relative to image area
+        image_x = event_x - left_offset
+        image_y = event_y - top_offset
+
+        # Check if coordinates are within the image area
+        if not (0 <= image_x < display_width and 0 <= image_y < display_height):
+            return None
+
+        # Convert to original image coordinates
+        image_width = self.parent.image_width
+        image_height = self.parent.image_height
+
+        start_x = int(image_x * image_width / display_width)
+        start_y = int(image_y * image_height / display_height)
+
+        return start_x, start_y
+
+    def _get_end_coordinates(self, current_position: tuple[float, float]) -> tuple[int, int]:
+        """Calculate end coordinates based on previous position for line drawing."""
+        event_x, event_y = current_position
+        left_offset = self.parent.left_offset
+        top_offset = self.parent.top_offset
+        display_width = self.parent.display_width
+        display_height = self.parent.display_height
+        image_width = self.parent.image_width
+        image_height = self.parent.image_height
+
+        # Use previous position if available, otherwise use current position
+        if hasattr(self, "mask_draw_x") and hasattr(self, "mask_draw_y"):
+            prev_image_x = self.mask_draw_x - left_offset
+            prev_image_y = self.mask_draw_y - top_offset
+
+            if 0 <= prev_image_x < display_width and 0 <= prev_image_y < display_height:
+                end_x = int(prev_image_x * image_width / display_width)
+                end_y = int(prev_image_y * image_height / display_height)
+                return end_x, end_y
+
+        # If no previous position or out of bounds, use the starting position
+        start_coords = self._convert_to_image_coordinates(current_position)
+        if start_coords:
+            return start_coords
+        return 0, 0
+
+    def _store_current_position(self, event: tk.Event) -> None:
+        """Store current mouse position for next event processing."""
+        self.mask_draw_x = event.x
+        self.mask_draw_y = event.y
+
+    def _determine_mouse_buttons(self, event: tk.Event) -> tuple[bool, bool]:
+        """Determine which mouse buttons are pressed."""
+        is_left = bool(event.state & 0x0100 or event.num == 1)
+        is_right = bool(event.state & 0x0400 or event.num == 3)
+        return is_left, is_right
+
+    def _apply_editing_action(
+        self,
+        start_x: int,
+        start_y: int,
+        end_x: int,
+        end_y: int,
+        is_left: bool,
+        is_right: bool
+    ) -> None:
+        """Apply the appropriate mask editing action based on current mode."""
+        if self.mask_editing_mode == EditMode.DRAW:
+            self._draw_mask(start_x, start_y, end_x, end_y, is_left, is_right)
+        elif self.mask_editing_mode == EditMode.FILL:
+            self._fill_mask(start_x, start_y, is_left, is_right)
+
+    def _determine_brush_mask_color(self, is_left: bool) -> RGBColor | None:
+        """Determine the brush color based (b or w) base on the mouse button."""
+        if is_left:
+            try:
+                opacity: float = float(
+                    self.parent.brush_opacity_entry.get()
+                )
+                opacity = max(0.0, min(1.0, opacity))
+            except (ValueError, TypeError):
+                opacity = 1.0
+            # Return black (masked) for left click
+            return (0, 0, 0)
+        # Return white (unmasked) for right click
+        return (255, 255, 255)
+
+    def _ensure_mask_exists(self, adding_to_mask: bool) -> None:
+        """Ensure a mask image exists for editing."""
+        if self.parent.pil_mask is None:
+            color: tuple[int, int, int] = (
+                (0, 0, 0) if adding_to_mask else (255, 255, 255)
+            )
+            self.parent.pil_mask = Image.new(
+                "RGB",
+                (self.parent.image_width, self.parent.image_height),
+                color=color,
+            )
+
+    def _draw_mask(
+        self,
+        start_x: int,
+        start_y: int,
+        end_x: int,
+        end_y: int,
+        is_left: bool,
+        is_right: bool,
+    ) -> None:
+        """Draw on the mask image."""
+        color = self._determine_brush_mask_color(is_left)
+        if not color:
+            return
+
+        # Ensure mask exists and prepare for editing
+        self._ensure_mask_exists(is_left)
+        if not self.edit_started:
+            self._save_mask_to_history()
+            self.edit_started = True
+
+        # Calculate brush parameters
+        radius = self._calculate_brush_radius()
+        if radius <= 0 or (start_x == end_x == start_y == end_y == 0):
+            return
+
+        # Draw on the mask
+        self._draw_on_mask(start_x, start_y, end_x, end_y, radius, color)
+
+        # Update display
+        self.parent.image_handler.refresh_image()
+
+    def _calculate_brush_radius(self) -> int:
+        """Calculate brush radius based on mask dimensions and radius setting, ensuring minimum 1px."""
+        max_dimension = max(self.parent.pil_mask.width, self.parent.pil_mask.height)
+        # Ensure radius is at least 1 pixel even with small brush sizes
+        return max(1, int(self.mask_draw_radius * max_dimension))
+
+    def _draw_on_mask(
+        self,
+        start_x: int,
+        start_y: int,
+        end_x: int,
+        end_y: int,
+        radius: int,
+        color: RGBColor
+    ) -> None:
+        """Draw line and end points on mask."""
+        draw = ImageDraw.Draw(self.parent.pil_mask)
+
+        # Draw line between points
+        line_width = 2 * radius + 1
+        draw.line((start_x, start_y, end_x, end_y), fill=color, width=line_width)
+
+        # Draw circle at start point
+        draw.ellipse(
+            (
+                start_x - radius,
+                start_y - radius,
+                start_x + radius,
+                start_y + radius,
+            ),
+            fill=color,
+        )
+
+        # Draw circle at end point if different from start
+        if (start_x, start_y) != (end_x, end_y):
+            draw.ellipse(
+                (
+                    end_x - radius,
+                    end_y - radius,
+                    end_x + radius,
+                    end_y + radius,
+                ),
+                fill=color,
+            )
+
+    def _fill_mask(
+        self, start_x: int, start_y: int, is_left: bool, is_right: bool
+    ) -> None:
+        """Fill an area of the mask image."""
+        color: RGBColor | None = self._determine_brush_mask_color(is_left)
+        if color:
+            self._ensure_mask_exists(is_left)
+            if not (
+                0 <= start_x < self.parent.image_width
+                and 0 <= start_y < self.parent.image_height
+            ):
+                return
+            self._save_mask_to_history()
+            self.edit_started = True
+            np_mask: np.ndarray = np.array(
+                self.parent.pil_mask, dtype=np.uint8
+            )
+            cv2.floodFill(np_mask, None, (start_x, start_y), color)
+            self.parent.pil_mask = Image.fromarray(np_mask, "RGB")
+            self.parent.image_handler.refresh_image()
+
+    def adjust_brush_size(self, delta: float, raw_event: object) -> None:
+        """Adjust the brush size based on mouse wheel movement, ensuring valid size."""
+        multiplier: float = 1.0 + (
+            delta * (BRUSH_SIZE_WHEEL_SMALL_FACTOR if self.mask_draw_radius < BRUSH_SIZE_THRESHOLD else BRUSH_SIZE_WHEEL_LARGE_FACTOR)
+        )
+        # Calculate new size and enforce minimum/maximum
+        new_radius = self.mask_draw_radius * multiplier
+        self.mask_draw_radius = max(MIN_BRUSH_SIZE, min(MAX_BRUSH_SIZE, new_radius))
+
+    def _save_mask_to_history(self) -> None:
+            """Save the current mask state to history for undo/redo."""
+            if self.parent.pil_mask is None:
+                return
+            current_mask: Image.Image = self.parent.pil_mask.copy()
+            if self.mask_history_position < len(self.mask_history) - 1:
+                self.mask_history = self.mask_history[
+                    : self.mask_history_position + 1
+                ]
+            self.mask_history.append(current_mask)
+            if len(self.mask_history) > self.mask_history_limit:
+                self.mask_history.pop(0)
+            self.mask_history_position = len(self.mask_history) - 1
+
+            # Mark the mask as modified for the current image
+            if hasattr(self.parent.file_manager, '_mask_modified') and self.parent.dir and 0 <= self.parent.current_image_index < len(self.parent.image_rel_paths):
+                image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+                self.parent.file_manager._mask_modified[str(image_path)] = True
+
+    def undo_mask_edit(
+        self, event: tk.Event | None = None
+    ) -> str | None:
+        """Undo the last mask edit."""
+        if not self.mask_history or self.mask_history_position <= 0:
+            return "break" if event else None
+        self.mask_history_position -= 1
+        self.parent.pil_mask = self.mask_history[
+            self.mask_history_position
+        ].copy()
+        self.parent.image_handler.refresh_image()
+        return "break" if event else None
+
+    def redo_mask_edit(
+        self, event: tk.Event | None = None
+    ) -> str | None:
+        """Redo the previously undone mask edit."""
+        if self.mask_history_position >= len(self.mask_history) - 1:
+            return "break" if event else None
+        self.mask_history_position += 1
+        self.parent.pil_mask = self.mask_history[
+            self.mask_history_position
+        ].copy()
+        self.parent.image_handler.refresh_image()
+        return "break" if event else None
+
+    def switch_to_brush_mode(self, event: tk.Event | None = None) -> str | None:
+        """Switch to draw mask mode."""
+        self.mask_editing_mode = EditMode.DRAW
+        self.update_cursor()
+        return "break" if event else None
+
+    def switch_to_fill_mode(self, event: tk.Event | None = None) -> str | None:
+        """Switch to fill mask mode."""
+        self.mask_editing_mode = EditMode.FILL
+        self.update_cursor()
+        return "break" if event else None
+
+    def toggle_mask_visibility_mode(self, event: tk.Event | None = None) -> str:
+        """Toggle between displaying only the mask or the combined image."""
+        self.display_only_mask = not self.display_only_mask
+        self.parent.image_handler.refresh_image()
+        return "break"
+
+    def update_cursor(self, event: tk.Event | None = None) -> None:
+        """Update the cursor based on the current mask editing mode."""
+        if not self.parent.enable_mask_editing_var.get():
+            self.set_default_cursor()
+            return
+
+        if self.mask_editing_mode == EditMode.DRAW:
+            self.set_brush_cursor()
+        elif self.mask_editing_mode == EditMode.FILL:
+            self.set_fill_cursor()
+
+    def set_brush_cursor(self) -> None:
+        """Set the cursor to brush mode."""
+        brush_cursor = get_platform_cursor("brush", "pencil")
+        if "!label" in self.parent.image_label.children:
+            self.parent.image_label.children["!label"].configure(cursor=brush_cursor)
+        else:
+            self.parent.image_label.configure(cursor=brush_cursor)
+
+    def set_fill_cursor(self) -> None:
+        """Set the cursor to fill mode."""
+        fill_cursor = get_platform_cursor("fill", "dotbox")
+        if "!label" in self.parent.image_label.children:
+            self.parent.image_label.children["!label"].configure(cursor=fill_cursor)
+        else:
+            self.parent.image_label.configure(cursor=fill_cursor)
+
+    def set_default_cursor(self, event: tk.Event | None = None) -> None:
+        """Reset to the default cursor."""
+        if "!label" in self.parent.image_label.children:
+            self.parent.image_label.children["!label"].configure(cursor="")
+        else:
+            self.parent.image_label.configure(cursor="")
 
 
 class NavigationManager:
@@ -936,12 +1490,12 @@ class ModelManager:
             self.current_captioning_model_name = None
 
             if model not in self._masking_registry:
-                print(f"Unknown masking model: {model}")
+                logger.error(f"Unknown masking model: {model}")
                 return None
 
             # If the requested model is already loaded, return it
             if self.current_masking_model_name == model and self.masking_model is not None:
-                print(f"Model {model} is already loaded")
+                logger.info(f"Model {model} is already loaded")
                 return self.masking_model
 
             model_class = self._masking_registry[model]
@@ -949,11 +1503,11 @@ class ModelManager:
             if self.masking_model is None or not isinstance(
                 self.masking_model, model_class
             ):
-                print(f"Loading {model} model, this may take a while")
+                logger.info(f"Loading {model} model, this may take a while")
 
                 # Special handling for SAMoondream model
                 if model == "SAMoondream":
-                    print("Creating SAMoondream model with default parameters")
+                    logger.debug("Creating SAMoondream model with default parameters")
                     self.masking_model = model_class(
                         device=self.device,
                         dtype=torch.float32,
@@ -976,7 +1530,7 @@ class ModelManager:
         self.current_masking_model_name = None
 
         if model not in self._captioning_registry:
-            print(f"Unknown captioning model: {model}")
+            logger.error(f"Unknown captioning model: {model}")
             return None
 
         # If the requested model is already loaded, return it
@@ -984,7 +1538,7 @@ class ModelManager:
             self.current_captioning_model_name == model
             and self.captioning_model is not None
         ):
-            print(f"Model {model} is already loaded")
+            logger.info(f"Model {model} is already loaded")
             return self.captioning_model
 
         model_class = self._captioning_registry[model]
@@ -992,16 +1546,16 @@ class ModelManager:
         if self.captioning_model is None or not isinstance(
             self.captioning_model, model_class
         ):
-            print(f"Loading {model} model, this may take a while")
+            logger.info(f"Loading {model} model, this may take a while")
 
             # For BooruModels, pass the model name
             if model_class == BooruModels:
-                print(f"Creating BooruModels with model_name='{model}'")
+                logger.debug(f"Creating BooruModels with model_name='{model}'")
                 self.captioning_model = model_class(
                     self.device, self.precision, model_name=model, **kwargs
                 )
             else:
-                print(f"Creating {model} with kwargs: {kwargs}")
+                logger.debug(f"Creating {model} with kwargs: {kwargs}")
                 # Pass kwargs to all model types
                 self.captioning_model = model_class(
                     self.device, self.precision, **kwargs
@@ -1026,6 +1580,33 @@ class FileManager:
         self.parent: CaptionUI = parent
         self._last_saved_caption = {}  # Simple cache to track saved content
         self._mask_modified = {}  # Track if mask has been modified
+        self._reset_pending = {}  # Track images with pending reset
+
+    def reset_current_image(self) -> None:
+        """Reset the current image by clearing caption and mask (preview only until saved)."""
+        if not (0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+            return
+
+        # Get the image path for the current image
+        image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+        image_key = str(image_path)
+
+        # Mark this image as pending reset
+        self._reset_pending[image_key] = True
+
+        # Clear the caption
+        self.parent.caption_lines = [""] * 5
+        self.parent.caption_entry.delete(0, "end")
+
+        # Clear the mask
+        self.parent.pil_mask = None
+        self.parent.mask_editor.reset_for_new_image()
+
+        # Refresh the UI to show the preview
+        self.parent.refresh_ui()
+
+        # Show message to user
+        logger.info("Reset preview applied. Press Ctrl+S or click Save to confirm and delete files.")
 
     def save_changes(self, event: tk.Event | None = None) -> None:
         """Save the current mask and caption data to disk."""
@@ -1043,6 +1624,41 @@ class FileManager:
         )
         image_key = str(image_path)
 
+        # Check if this image is pending reset
+        if self._reset_pending.get(image_key, False):
+            # Actually delete the files
+            mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
+            caption_path = image_path.with_suffix(".txt")
+
+            # Delete mask file if it exists
+            if mask_path.exists():
+                try:
+                    mask_path.unlink()
+                    logger.info(f"Deleted mask file: {mask_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting mask file: {e}")
+
+            # Delete caption file if it exists
+            if caption_path.exists():
+                try:
+                    caption_path.unlink()
+                    logger.info(f"Deleted caption file: {caption_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting caption file: {e}")
+
+            # Clear the pending reset flag
+            self._reset_pending[image_key] = False
+
+            # Clear the saved caption cache
+            if image_key in self._last_saved_caption:
+                del self._last_saved_caption[image_key]
+
+            # Clear the modified mask flag
+            if image_key in self._mask_modified:
+                del self._mask_modified[image_key]
+
+            return
+
         # Handle mask saving if it exists and was modified
         if self.parent.pil_mask:
             mask_path = image_path.with_name(
@@ -1051,10 +1667,10 @@ class FileManager:
             if self._mask_modified.get(image_key, False):
                 try:
                     self.parent.pil_mask.save(mask_path)
-                    print(f"Saved mask to {mask_path}")
+                    logger.info(f"Saved mask to {mask_path}")
                     self._mask_modified[image_key] = False
                 except Exception as e:
-                    print(f"Error saving mask: {e}")
+                    logger.error(f"Error saving mask: {e}")
 
         # Handle caption saving with change detection
         current_text = self.parent.caption_entry.get()
@@ -1087,10 +1703,10 @@ class FileManager:
                     caption_path.write_text(
                         caption_content, encoding="utf-8"
                     )
-                    print(f"Saved caption to {caption_path}")
+                    logger.info(f"Saved caption to {caption_path}")
                     self._last_saved_caption[image_key] = caption_content
                 except Exception as e:
-                    print(f"Error saving caption: {e}")
+                    logger.error(f"Error saving caption: {e}")
 
     def open_in_explorer(self) -> None:
         """Open the current image location in the system file explorer."""
@@ -1110,7 +1726,7 @@ class FileManager:
             else:  # Linux
                 subprocess.run(["xdg-open", str(image_path.parent)], check=False)
         except Exception as e:
-            print(f"Error opening file in explorer: {e}")
+            logger.error(f"Error opening file in explorer: {e}")
 
     def open_directory(self) -> None:
         """Open a directory selection dialog."""
@@ -1133,11 +1749,11 @@ class FileManager:
 
         # For huge directories, show immediate feedback that loading is happening
         if include_subdirs:
-            print(
+            logger.info(
                 f"Scanning directory {dir_path} (including subdirectories)"
             )
         else:
-            print(f"Scanning directory {dir_path}")
+            logger.info(f"Scanning directory {dir_path}")
 
         # Use pathlib for scanning directories
         if not include_subdirs and platform.system() == "Windows":
@@ -1218,341 +1834,3 @@ class CaptionManager:
 class EditMode(Enum):
     DRAW = "draw"
     FILL = "fill"
-
-
-class MaskEditor:
-    DEFAULT_BRUSH_SIZE: float = 0.02
-
-    def __init__(self, parent: CaptionUI) -> None:
-        self.parent: CaptionUI = parent
-        self.mask_draw_x: float = 0.0
-        self.mask_draw_y: float = 0.0
-        self.mask_draw_radius: float = self.DEFAULT_BRUSH_SIZE
-        self.mask_editing_mode: EditMode = EditMode.DRAW
-        self.display_only_mask: bool = False
-        self.mask_history: list[Image.Image] = []
-        self.mask_history_position: int = -1
-        self.mask_history_limit: int = 30
-        self.is_editing: bool = False
-        self.edit_started: bool = False
-        self._cached_image_dimensions: tuple[int, int] = (0, 0)
-
-    def decrease_brush_size(self, event: tk.Event | None = None) -> str:
-        """Decrease the brush size."""
-        self.mask_draw_radius = max(0.0025, self.mask_draw_radius / 1.25)
-        return "break"
-
-    def increase_brush_size(self, event: tk.Event | None = None) -> str:
-        """Increase the brush size."""
-        self.mask_draw_radius = min(0.5, self.mask_draw_radius * 1.25)
-        return "break"
-
-    def reset_for_new_image(self) -> None:
-        """Reset mask editing state for a new image."""
-        self.mask_history = []
-        self.mask_history_position = -1
-        self.is_editing = False
-        self.edit_started = False
-        self._cached_image_dimensions = (
-            self.parent.image_width,
-            self.parent.image_height,
-        )
-        if self.parent.pil_mask:
-            self.mask_history.append(self.parent.pil_mask.copy())
-            self.mask_history_position = 0
-
-    def handle_mask_edit_start(self, event: tk.Event) -> None:
-        """Start a mask edit action."""
-        if not self._can_edit_mask(event):
-            return
-        self.is_editing = True
-        self.edit_started = False
-        self.handle_mask_edit(event)
-
-    def handle_mask_edit_end(self, event: tk.Event) -> None:
-        """End a mask edit action."""
-        if not self.is_editing:
-            return
-        self.is_editing = False
-        self.handle_mask_edit(event)
-        if self.edit_started:
-            self._save_mask_to_history()
-            self.edit_started = False
-
-    def handle_mask_edit(self, event: tk.Event) -> None:
-        """Handle mask editing events."""
-        if not self._can_edit_mask(event):
-            return
-        start_x, start_y, end_x, end_y = self._convert_screen_to_mask_coordinates(event)
-        if start_x == end_x == 0 and start_y == end_y == 0:
-            return
-        is_left: bool = bool(event.state & 0x0100 or event.num == 1)
-        is_right: bool = bool(event.state & 0x0400 or event.num == 3)
-        if not (is_left or is_right) and not self.is_editing:
-            return
-        if self.mask_editing_mode == EditMode.DRAW:
-            self._draw_mask(
-                start_x, start_y, end_x, end_y, is_left, is_right
-            )
-        elif self.mask_editing_mode == EditMode.FILL:
-            self._fill_mask(start_x, start_y, is_left, is_right)
-
-    def _can_edit_mask(self, event: tk.Event) -> bool:
-        """Check if mask editing is permitted."""
-        return (
-            self.parent.enable_mask_editing_var.get()
-            and event.widget
-            == self.parent.image_label.children.get("!label", event.widget)
-            and self.parent.pil_image is not None
-            and 0
-            <= self.parent.current_image_index
-            < len(self.parent.image_rel_paths)
-        )
-
-    def _convert_screen_to_mask_coordinates(self, event: tk.Event) -> ImageCoordinates:
-        # Remove the division by the scaling factor (assume event.x/y are already in widget coordinates)
-        left_offset: int = self.parent.left_offset
-        top_offset: int = self.parent.top_offset
-        display_width: int = self.parent.display_width
-        display_height: int = self.parent.display_height
-        image_width: int = self.parent.image_width
-        image_height: int = self.parent.image_height
-        # Use event.x and event.y directly
-        event_x: float = event.x
-        event_y: float = event.y
-        image_x: float = event_x - left_offset
-        image_y: float = event_y - top_offset
-        if not (
-            0 <= image_x < display_width and 0 <= image_y < display_height
-        ):
-            return 0, 0, 0, 0
-        start_x: int = int(image_x * image_width / display_width)
-        start_y: int = int(image_y * image_height / display_height)
-        # Use previous stored coordinates for a smooth line (if available)
-        if hasattr(self, "mask_draw_x") and hasattr(self, "mask_draw_y"):
-            prev_image_x: float = self.mask_draw_x - left_offset
-            prev_image_y: float = self.mask_draw_y - top_offset
-            if (
-                0 <= prev_image_x < display_width
-                and 0 <= prev_image_y < display_height
-            ):
-                end_x: int = int(
-                    prev_image_x * image_width / display_width
-                )
-                end_y: int = int(
-                    prev_image_y * image_height / display_height
-                )
-            else:
-                end_x, end_y = start_x, start_y
-        else:
-            end_x, end_y = start_x, start_y
-        # Store current event positions for the next call.
-        self.mask_draw_x = event.x
-        self.mask_draw_y = event.y
-        return start_x, start_y, end_x, end_y
-
-    def _determine_brush_mask_color(self, is_left: bool) -> RGBColor | None:
-        """Determine the brush color based (b or w) base on the mouse button."""
-        if is_left:
-            try:
-                opacity: float = float(
-                    self.parent.brush_opacity_entry.get()
-                )
-                opacity = max(0.0, min(1.0, opacity))
-            except (ValueError, TypeError):
-                opacity = 1.0
-            # Return black (masked) for left click
-            return (0, 0, 0)
-        # Return white (unmasked) for right click
-        return (255, 255, 255)
-
-    def _ensure_mask_exists(self, adding_to_mask: bool) -> None:
-        """Ensure a mask image exists for editing."""
-        if self.parent.pil_mask is None:
-            color: tuple[int, int, int] = (
-                (0, 0, 0) if adding_to_mask else (255, 255, 255)
-            )
-            self.parent.pil_mask = Image.new(
-                "RGB",
-                (self.parent.image_width, self.parent.image_height),
-                color=color,
-            )
-
-    def _draw_mask(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        is_left: bool,
-        is_right: bool,
-    ) -> None:
-        """Draw on the mask image."""
-        color: RGBColor | None = self._determine_brush_mask_color(is_left)
-        if color:
-            self._ensure_mask_exists(is_left)
-            if not self.edit_started:
-                self._save_mask_to_history()
-                self.edit_started = True
-            max_dimension: int = max(
-                self.parent.pil_mask.width, self.parent.pil_mask.height
-            )
-            radius: int = int(self.mask_draw_radius * max_dimension)
-            if radius <= 0 or (start_x == end_x == start_y == end_y == 0):
-                return
-            draw: ImageDraw.ImageDraw = ImageDraw.Draw(
-                self.parent.pil_mask
-            )
-            line_width: int = 2 * radius + 1
-            draw.line(
-                (start_x, start_y, end_x, end_y),
-                fill=color,
-                width=line_width,
-            )
-            draw.ellipse(
-                (
-                    start_x - radius,
-                    start_y - radius,
-                    start_x + radius,
-                    start_y + radius,
-                ),
-                fill=color,
-            )
-            if (start_x, start_y) != (end_x, end_y):
-                draw.ellipse(
-                    (
-                        end_x - radius,
-                        end_y - radius,
-                        end_x + radius,
-                        end_y + radius,
-                    ),
-                    fill=color,
-                )
-            self.parent.image_handler.refresh_image()
-
-    def _fill_mask(
-        self, start_x: int, start_y: int, is_left: bool, is_right: bool
-    ) -> None:
-        """Fill an area of the mask image."""
-        color: RGBColor | None = self._determine_brush_mask_color(is_left)
-        if color:
-            self._ensure_mask_exists(is_left)
-            if not (
-                0 <= start_x < self.parent.image_width
-                and 0 <= start_y < self.parent.image_height
-            ):
-                return
-            self._save_mask_to_history()
-            self.edit_started = True
-            np_mask: np.ndarray = np.array(
-                self.parent.pil_mask, dtype=np.uint8
-            )
-            cv2.floodFill(np_mask, None, (start_x, start_y), color)
-            self.parent.pil_mask = Image.fromarray(np_mask, "RGB")
-            self.parent.image_handler.refresh_image()
-
-    def adjust_brush_size(self, delta: float, raw_event: object) -> None:
-        """Adjust the brush size based on mouse wheel movement."""
-        multiplier: float = 1.0 + (
-            delta * (0.03 if self.mask_draw_radius < 0.05 else 0.05)
-        )
-        self.mask_draw_radius = max(
-            0.0025, min(0.5, self.mask_draw_radius * multiplier)
-        )
-
-    def _save_mask_to_history(self) -> None:
-            """Save the current mask state to history for undo/redo."""
-            if self.parent.pil_mask is None:
-                return
-            current_mask: Image.Image = self.parent.pil_mask.copy()
-            if self.mask_history_position < len(self.mask_history) - 1:
-                self.mask_history = self.mask_history[
-                    : self.mask_history_position + 1
-                ]
-            self.mask_history.append(current_mask)
-            if len(self.mask_history) > self.mask_history_limit:
-                self.mask_history.pop(0)
-            self.mask_history_position = len(self.mask_history) - 1
-
-            # Mark the mask as modified for the current image
-            if hasattr(self.parent.file_manager, '_mask_modified') and self.parent.dir and 0 <= self.parent.current_image_index < len(self.parent.image_rel_paths):
-                image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
-                self.parent.file_manager._mask_modified[str(image_path)] = True
-
-    def undo_mask_edit(
-        self, event: tk.Event | None = None
-    ) -> str | None:
-        """Undo the last mask edit."""
-        if not self.mask_history or self.mask_history_position <= 0:
-            return "break" if event else None
-        self.mask_history_position -= 1
-        self.parent.pil_mask = self.mask_history[
-            self.mask_history_position
-        ].copy()
-        self.parent.image_handler.refresh_image()
-        return "break" if event else None
-
-    def redo_mask_edit(
-        self, event: tk.Event | None = None
-    ) -> str | None:
-        """Redo the previously undone mask edit."""
-        if self.mask_history_position >= len(self.mask_history) - 1:
-            return "break" if event else None
-        self.mask_history_position += 1
-        self.parent.pil_mask = self.mask_history[
-            self.mask_history_position
-        ].copy()
-        self.parent.image_handler.refresh_image()
-        return "break" if event else None
-
-    def switch_to_brush_mode(self, event: tk.Event | None = None) -> str | None:
-        """Switch to draw mask mode."""
-        self.mask_editing_mode = EditMode.DRAW
-        self.update_cursor()
-        return "break" if event else None
-
-    def switch_to_fill_mode(self, event: tk.Event | None = None) -> str | None:
-        """Switch to fill mask mode."""
-        self.mask_editing_mode = EditMode.FILL
-        self.update_cursor()
-        return "break" if event else None
-
-    def toggle_mask_visibility_mode(self, event: tk.Event | None = None) -> str:
-        """Toggle between displaying only the mask or the combined image."""
-        self.display_only_mask = not self.display_only_mask
-        self.parent.image_handler.refresh_image()
-        return "break"
-
-    def update_cursor(self, event: tk.Event | None = None) -> None:
-        """Update the cursor based on the current mask editing mode."""
-        if not self.parent.enable_mask_editing_var.get():
-            self.set_default_cursor()
-            return
-
-        if self.mask_editing_mode == EditMode.DRAW:
-            self.set_brush_cursor()
-        elif self.mask_editing_mode == EditMode.FILL:
-            self.set_fill_cursor()
-
-    def set_brush_cursor(self) -> None:
-        """Set the cursor to brush mode."""
-        brush_cursor = get_platform_cursor("brush", "pencil")
-        if "!label" in self.parent.image_label.children:
-            self.parent.image_label.children["!label"].configure(cursor=brush_cursor)
-        else:
-            self.parent.image_label.configure(cursor=brush_cursor)
-
-    def set_fill_cursor(self) -> None:
-        """Set the cursor to fill mode."""
-        fill_cursor = get_platform_cursor("fill", "dotbox")
-        if "!label" in self.parent.image_label.children:
-            self.parent.image_label.children["!label"].configure(cursor=fill_cursor)
-        else:
-            self.parent.image_label.configure(cursor=fill_cursor)
-
-    def set_default_cursor(self, event: tk.Event | None = None) -> None:
-        """Reset to the default cursor."""
-        if "!label" in self.parent.image_label.children:
-            self.parent.image_label.children["!label"].configure(cursor="")
-        else:
-            self.parent.image_label.configure(cursor="")
