@@ -66,8 +66,20 @@ class ObjectDetector:
         self.model_revision = model_revision
         self.model = None
 
-    def load(self, cache=True):
+    def load(self, cache=True, model_manager=None):
         """Load Moondream2 model with optional caching."""
+        # First, check if the parent model manager already has a loaded captioning model
+        if model_manager is not None:
+            if (hasattr(model_manager, 'captioning_model') and
+                model_manager.captioning_model is not None and
+                hasattr(model_manager.captioning_model, '__class__') and
+                model_manager.captioning_model.__class__.__name__ == 'Moondream2Model'):
+
+                logger.info("Reusing existing Moondream2 captioning model from model manager")
+                self.model = model_manager.captioning_model
+                return self
+
+        # Then check local cache
         if cache:
             cached_model = MODEL_CACHE.get("moondream", self.use_cuda)
             if cached_model is not None:
@@ -543,6 +555,7 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         self.device = device
         self.dtype = dtype
         self.use_cuda = device.type == "cuda"
+        self.model_manager = None  # Will be set when loaded through model_manager
 
         # Map model size to proper HF model name
         self.sam2_model_map = {
@@ -569,7 +582,7 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
 
     def _load_models(self):
         """Load both Moondream2 and SAM2 models."""
-        self.detector.load()
+        self.detector.load(model_manager=self.model_manager)
         self.segmenter.load()
 
     def mask_image(

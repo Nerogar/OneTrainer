@@ -1,4 +1,5 @@
-from tkinter import filedialog, messagebox
+import threading
+from tkinter import END, filedialog, messagebox
 
 from modules.util.ui.ToolTip import ToolTip
 
@@ -7,7 +8,7 @@ import customtkinter as ctk
 
 class GenerateMasksWindow(ctk.CTkToplevel):
     def __init__(
-            self, parent, path, parent_include_subdirectories, *args, **kwargs
+            self, parent, path, include_subdirectories, *args, **kwargs
         ):
             """
             Window for generating masks for a folder of images
@@ -15,16 +16,16 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             Parameters:
                 parent (`Tk`): the parent window
                 path (`str`): the path to the folder
-                parent_include_subdirectories (`bool`): whether to include subdirectories
+                include_subdirectories (`bool`): whether to include subdirectories
             """
-            ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+            super().__init__(parent, *args, **kwargs)
             self.parent = parent
 
             if path is None:
                 path = ""
 
             # Setup window properties
-            self._setup_window("Batch generate masks", "360x430")
+            self._setup_window("Batch generate masks", "360x440")
 
             # Get available models dynamically
             self.models = self.parent.model_manager.get_available_masking_models()
@@ -43,7 +44,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             self.mode_var = ctk.StringVar(self, "Create if absent")
 
             # Set up the UI
-            self._create_layout(path, parent_include_subdirectories)
+            self._create_layout(path, include_subdirectories)
 
     def _setup_window(self, title, geometry):
         self.title(title)
@@ -53,20 +54,22 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
 
-    def _create_layout(self, path, parent_include_subdirectories):
+    def _create_layout(self, path, include_subdirectories):
         # Create frame
-        self.frame = ctk.CTkFrame(self, width=600, height=300)
+        self.frame = ctk.CTkFrame(self, width=600, height=340)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        # Configure the root window grid to allow frame expansion
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
         # Create UI components
         self._create_model_selection()
         self._create_path_selection(path)
         self._create_mask_options()
-        self._create_subdirectory_option(parent_include_subdirectories)
+        self._create_subdirectory_option(include_subdirectories)
         self._create_progress_indicators()
         self._create_action_buttons()
-
-        self.frame.pack(fill="both", expand=True)
 
     def _create_model_selection(self):
         self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
@@ -129,10 +132,10 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
         ToolTip(self.alpha_entry, "Blending strength when combining with existing masks")
 
-    def _create_subdirectory_option(self, parent_include_subdirectories):
+    def _create_subdirectory_option(self, include_subdirectories):
         self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subdirs", width=100)
         self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
-        self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
+        self.include_subdirectories_var = ctk.BooleanVar(self, include_subdirectories)
         self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
         self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
@@ -152,7 +155,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         # set the path to the entry box
         # delete entry box text
         entry_box.focus_set()
-        entry_box.delete(0, filedialog.END)
+        entry_box.delete(0, END)  # Using proper END constant
         entry_box.insert(0, path)
         self.focus_set()
 
@@ -166,17 +169,17 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         try:
             threshold = float(self.threshold_entry.get())
             if not 0 <= threshold <= 0.90:
-                messagebox.showwarning("Invalid Value", "Threshold must be between 0.0 and 1.0")
+                messagebox.showwarning("Invalid Value", "Threshold must be between 0.0 and 0.9 for usable results")
                 return
 
             smooth_pixels = int(self.smooth_entry.get())
             if smooth_pixels < 0 or smooth_pixels > 10:
-                messagebox.showwarning("Invalid Value", "Smooth pixels should be between 0 and 20")
+                messagebox.showwarning("Invalid Value", "Smooth pixels should be between 0 and 10")
                 return
 
             expand_pixels = int(self.expand_entry.get())
             if expand_pixels < 0 or expand_pixels > 64:
-                messagebox.showwarning("Invalid Value", "Expand pixels should be between 0 and 30")
+                messagebox.showwarning("Invalid Value", "Expand pixels should be between 0 and 64")
                 return
 
             alpha = float(self.alpha_entry.get())
@@ -193,34 +196,61 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             messagebox.showerror("Invalid Input", "Please enter valid numeric values for threshold, smooth, expand, and alpha")
             return
 
-        masking_model = self.parent.model_manager.load_masking_model(
-            self.model_var.get()
-        )
+        # Disable the create button to prevent multiple clicks
+        self.create_masks_button.configure(state="disabled", text="Processing...")
 
-        # Skip processing if model failed to load
-        if masking_model is None:
-            print(f"Failed to load masking model: {self.model_var.get()}")
-            return
+        # Run the masking process in a background thread
+        thread = threading.Thread(target=self._run_masking_process, args=(prompt, alpha, threshold, smooth_pixels, expand_pixels))
+        thread.daemon = True  # Thread will close when main application closes
+        thread.start()
 
-        mode = {
-            "Replace all masks": "replace",
-            "Create if absent": "fill",
-            "Add to existing": "add",
-            "Subtract from existing": "subtract",
-            "Blend with existing": "blend",
-        }[self.mode_var.get()]
+    def _run_masking_process(self, prompt, alpha, threshold, smooth_pixels, expand_pixels):
+        try:
+            masking_model = self.parent.model_manager.load_masking_model(
+                self.model_var.get()
+            )
 
-        masking_model.mask_folder(
-            sample_dir=self.path_entry.get(),
-            prompts=[self.prompt_entry.get()],
-            mode=mode,
-            alpha=float(self.alpha_entry.get()),
-            threshold=float(self.threshold_entry.get()),
-            smooth_pixels=int(self.smooth_entry.get()),
-            expand_pixels=int(self.expand_entry.get()),
-            progress_callback=self.set_progress,
-            include_subdirectories=self.include_subdirectories_var.get(),
-        )
+            # Skip processing if model failed to load
+            if masking_model is None:
+                print(f"Failed to load masking model: {self.model_var.get()}")
+                return
+
+            # Set model_manager reference if this is a MoondreamSAMMaskModel
+            if hasattr(masking_model, "__class__") and hasattr(masking_model.__class__, "__name__"):
+                if masking_model.__class__.__name__ == "MoondreamSAMMaskModel":
+                    masking_model.model_manager = self.parent.model_manager
+
+            mode = {
+                "Replace all masks": "replace",
+                "Create if absent": "fill",
+                "Add to existing": "add",
+                "Subtract from existing": "subtract",
+                "Blend with existing": "blend",
+            }[self.mode_var.get()]
+
+            masking_model.mask_folder(
+                sample_dir=self.path_entry.get(),
+                prompts=[prompt],
+                mode=mode,
+                alpha=alpha,
+                threshold=threshold,
+                smooth_pixels=smooth_pixels,
+                expand_pixels=expand_pixels,
+                progress_callback=self.set_progress,
+                include_subdirectories=self.include_subdirectories_var.get(),
+            )
+
+            # Use after to safely update UI from the main thread
+            self.after(100, self._update_ui_after_processing)
+        except Exception as e:
+            error_message = str(e)
+            print(f"Error during masking process: {error_message}")
+            # Use after to safely update UI from the main thread
+            self.after(100, lambda: self._handle_masking_error(error_message))
+
+    def _update_ui_after_processing(self):
+        # Re-enable the create button
+        self.create_masks_button.configure(state="normal", text="Create Masks")
 
         # Reload the current image data using image_handler
         if hasattr(self.parent, "image_handler") and hasattr(
@@ -228,3 +258,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         ):
             self.parent.image_handler.load_image_data()
             self.parent.refresh_ui()
+
+    def _handle_masking_error(self, error_message):
+        self.create_masks_button.configure(state="normal", text="Create Masks")
+        messagebox.showerror("Processing Error", f"An error occurred during mask creation:\n{error_message}")

@@ -1,6 +1,7 @@
 import logging
 import os
-from tkinter import filedialog, messagebox
+import threading
+from tkinter import TclError, filedialog, messagebox
 from typing import Any, TypedDict
 
 from modules.module.captioning.utils import (
@@ -271,7 +272,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             text="Enable regex matching for blacklist",
             variable=self.regex_enabled_var,
         )
-        self.regex_enabled_checkbox.grid(row=4, column=1, sticky="w", **self.WIDGET_GRID)
+        widget_grid_no_sticky = {k: v for k, v in self.WIDGET_GRID.items() if k != 'sticky'}
+        self.regex_enabled_checkbox.grid(row=4, column=1, sticky="w", **widget_grid_no_sticky)
 
         # Help text
         help_text = "Enter tags to blacklist, separated by commas. You can also specify a .txt or .csv file path."
@@ -482,11 +484,43 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             self.character_threshold_entry.configure(state="normal", placeholder_text="")
             self.character_threshold_label.configure(text_color=("black", "white"))
 
+    def _window_exists(self) -> bool:
+        """Check if the window still exists and is valid."""
+        try:
+            return self.winfo_exists() == 1
+        except TclError:
+            return False
+
+    def _safely_update_widget(self, widget: Any, **kwargs: Any) -> None:
+        """Safely update a widget if the window still exists."""
+        try:
+            if self._window_exists():
+                widget.configure(**kwargs)
+                widget.update()
+        except (TclError, RuntimeError):
+            # Pass silently if the widget is no longer valid
+            pass
+
     def set_progress(self, value: int, max_value: int) -> None:
+        """Update progress bar safely from any thread."""
         progress = value / max_value if max_value > 0 else 0
-        self.progress.set(progress)
-        self.progress_label.configure(text=f"{value}/{max_value}")
-        self.progress.update()
+
+        # Use after() to schedule UI update on main thread
+        try:
+            if self._window_exists():
+                self.after(0, lambda: self._update_progress_ui(progress, value, max_value))
+        except (TclError, RuntimeError):
+            pass
+
+    def _update_progress_ui(self, progress: float, value: int, max_value: int) -> None:
+        """Update progress UI elements on the main thread."""
+        try:
+            if self._window_exists():
+                self.progress.set(progress)
+                self.progress_label.configure(text=f"{value}/{max_value}")
+                self.progress.update()
+        except (TclError, RuntimeError):
+            pass
 
     def create_captions(self) -> None:
         """Create captions with input validation."""
@@ -611,37 +645,63 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         captioning_model.generate_caption = generate_caption_with_blacklist
 
         # Disable the button while processing
-        self.create_captions_button.configure(state="disabled", text="Processing...")
-        self.create_captions_button.update()
+        self._safely_update_widget(self.create_captions_button, state="disabled", text="Processing...")
 
+        # Get all parameters before starting the thread
         mode = self.config_state["mode_mapping"][self.config_state["mode_var"].get()]
+        initial_caption = self.caption_entry.get()
+        caption_prefix = self.prefix_entry.get()
+        caption_postfix = self.postfix_entry.get()
+        include_subdirectories = self.include_subdirectories_var.get()
+
+        # Create a thread for the captioning process
+        def caption_thread_func():
+            try:
+                captioning_model.caption_folder(
+                    sample_dir=path,
+                    initial_caption=initial_caption,
+                    caption_prefix=caption_prefix,
+                    caption_postfix=caption_postfix,
+                    mode=mode,
+                    progress_callback=self.set_progress,
+                    include_subdirectories=include_subdirectories,
+                )
+                # Schedule success message on the main thread
+                if self._window_exists():
+                    self.after(0, lambda: self._show_info("Process complete", "Caption generation completed successfully."))
+
+                # Schedule UI refresh on the main thread
+                if self._window_exists():
+                    self.after(0, self._refresh_parent_ui)
+
+            except Exception as exception:
+                logger.error(f"Error during caption generation: {exception}")
+                # Capture the error message before using it in the lambda
+                error_message = str(exception)
+                # Schedule error message on the main thread
+                if self._window_exists():
+                    self.after(0, lambda: self._show_error("Caption generation error", f"Error during processing: {error_message}"))
+            finally:
+                # Restore the original generate_caption method
+                captioning_model.generate_caption = original_generate_caption
+                # Re-enable the button on the main thread
+                if self._window_exists():
+                    self.after(0, lambda: self._safely_update_widget(
+                        self.create_captions_button, state="normal", text="Create Captions"))
+
+        # Start the captioning thread
+        caption_thread = threading.Thread(target=caption_thread_func, daemon=True)
+        caption_thread.start()
+
+    def _refresh_parent_ui(self) -> None:
+        """Refresh parent UI safely."""
         try:
-            captioning_model.caption_folder(
-                sample_dir=path,
-                initial_caption=self.caption_entry.get(),
-                caption_prefix=self.prefix_entry.get(),
-                caption_postfix=self.postfix_entry.get(),
-                mode=mode,
-                progress_callback=self.set_progress,
-                include_subdirectories=self.include_subdirectories_var.get(),
-            )
-            # Show success message
-            self._show_info("Process complete", "Caption generation completed successfully.")
-
-        except Exception as e:
-            logger.error(f"Error during caption generation: {e}")
-            self._show_error("Caption generation error", f"Error during processing: {str(e)}")
-
-        finally:
-            # Restore the original generate_caption method
-            captioning_model.generate_caption = original_generate_caption
-            # Re-enable the button
-            self.create_captions_button.configure(state="normal", text="Create Captions")
-            self.create_captions_button.update()
-
-        if hasattr(self.parent, "image_handler") and hasattr(self.parent.image_handler, "load_image_data"):
-            self.parent.image_handler.load_image_data()
-            self.parent.refresh_ui()
+            if self._window_exists() and hasattr(self.parent, "image_handler") and hasattr(self.parent.image_handler, "load_image_data"):
+                self.parent.image_handler.load_image_data()
+                self.parent.refresh_ui()
+        except (TclError, RuntimeError, AttributeError):
+            # Silently pass if window is destroyed or methods don't exist
+            pass
 
     def _validate_float_range(self, value: str, min_val: float, max_val: float) -> bool:
         """Validate if a string represents a float within the specified range."""
@@ -654,9 +714,17 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
     def _show_error(self, title: str, message: str) -> None:
         """Display an error dialog using CTk."""
         messagebox.showerror(title, message)
-        self.focus_set()
+        try:
+            if self._window_exists():
+                self.focus_set()
+        except (TclError, RuntimeError):
+            pass
 
     def _show_info(self, title: str, message: str) -> None:
         """Display an information dialog using CTk."""
         messagebox.showinfo(title, message)
-        self.focus_set()
+        try:
+            if self._window_exists():
+                self.focus_set()
+        except (TclError, RuntimeError):
+            pass
