@@ -1,7 +1,7 @@
 import logging
 import os
 from tkinter import filedialog, messagebox
-from typing import Any, Dict, Literal, TypedDict, Optional
+from typing import Any, TypedDict
 
 from modules.module.captioning.utils import (
     filter_blacklisted_tags,
@@ -135,8 +135,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         label_text: str,
         widget: Any,
         row: int,
-        widget_options: Optional[GridOptions] = None,
-        label_options: Optional[GridOptions] = None,
+        widget_options: GridOptions | None = None,
+        label_options: GridOptions | None = None,
     ) -> None:
         """Create a labeled widget with standard grid options."""
         # Start with default options
@@ -170,7 +170,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         text: str,
         row: int,
         columnspan: int = 2,
-        wraplength: Optional[int] = None,
+        wraplength: int | None = None,
     ) -> ctk.CTkLabel:
         """Create a standardized explanation label."""
         label = ctk.CTkLabel(
@@ -540,7 +540,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 return
         elif self._is_moondream_model(model_name):
             caption_length = self.config_state["caption_length_var"].get()
-            # Validate caption length
+            # Validate caption length from MoonDream
             if caption_length not in self.config_state["caption_lengths"]:
                 self._show_error(
                     "Invalid caption length",
