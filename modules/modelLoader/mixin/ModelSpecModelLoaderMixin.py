@@ -9,6 +9,9 @@ from safetensors import safe_open
 
 
 class ModelSpecModelLoaderMixin(metaclass=ABCMeta):
+    def __init__(self):
+        super().__init__()
+
     def _default_model_spec_name(
             self,
             model_type: ModelType,

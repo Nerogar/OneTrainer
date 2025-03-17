@@ -37,9 +37,9 @@ class WuerstchenFineTuneSetup(
                 learning_rate=config.text_encoder.learning_rate,
             ))
 
-        if config.train_any_embedding():
+        if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
-                model.prior_embedding_wrapper, parameter_group_collection, config.embedding_learning_rate,
+                model.all_prior_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                 "prior_embeddings"
             )
 
@@ -57,6 +57,7 @@ class WuerstchenFineTuneSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
         if model.model_type.is_wuerstchen_v2():
             model.decoder_text_encoder.requires_grad_(False)
         model.decoder_decoder.requires_grad_(False)
@@ -66,12 +67,6 @@ class WuerstchenFineTuneSetup(
         train_text_encoder = config.text_encoder.train and \
                              not self.stop_text_encoder_training_elapsed(config, model.train_progress)
         model.prior_text_encoder.requires_grad_(train_text_encoder)
-
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-            train_embedding = embedding_config.train and \
-                              not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.prior_text_encoder_vector.requires_grad_(train_embedding)
 
         train_prior = config.prior.train and \
                       not self.stop_prior_training_elapsed(config, model.train_progress)
@@ -86,7 +81,7 @@ class WuerstchenFineTuneSetup(
             model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
@@ -108,7 +103,6 @@ class WuerstchenFineTuneSetup(
         text_encoder_on_train_device = \
             config.text_encoder.train \
             or config.train_any_embedding() \
-            or config.align_prop \
             or not config.latent_caching
 
         model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
@@ -137,5 +131,6 @@ class WuerstchenFineTuneSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
+            self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)

@@ -47,6 +47,6 @@ class StableDiffusionXLLoRAModelLoader(
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
         lora_model_loader.load(model, model_names)
-        embedding_loader.load_multiple(model, model_names)
+        embedding_loader.load(model, model_names.lora, model_names)
 
         return model

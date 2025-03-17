@@ -23,9 +23,13 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 -   **Dataset Tooling**: Automatically caption your dataset using Moondream2, WDv3 or JoyTag, or create masks for masked training using ClipSeg or Rembg
 -   **Model Tooling**: Convert between different model formats from a simple UI
 -   **Sampling UI**: Sample the model during training without switching to a different application
--   **AlignProp**: A Reinforcement Learning method for diffusion networks from the paper [Aligning Text-to-Image Diffusion Models With Reward Backpropagation](https://arxiv.org/abs/2310.03739)
 
 ![OneTrainerGUI.gif](resources/images/OneTrainerGUI.gif)
+
+> [!NOTE]
+> Explore our 📚 wiki for essential tips and tutorials after installing. Start [here!](https://github.com/Nerogar/OneTrainer/wiki).
+> For command-line usage, see the [CLI Mode section](#cli-mode).
+
 
 ## Installation
 
@@ -78,7 +82,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 
 OneTrainer can be used in **two primary modes**: a graphical user interface (GUI) and a **command-line interface (CLI)** for finer control.
 
-For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md).
+For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md). Otherwise visit [our wiki!](https://github.com/Nerogar/OneTrainer)
 
 ### GUI Mode
 
