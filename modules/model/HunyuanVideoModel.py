@@ -33,22 +33,28 @@ DEFAULT_PROMPT_TEMPLATE = (
 )
 DEFAULT_PROMPT_TEMPLATE_CROP_START = 95
 
-class HunyuanVideoModelEmbedding(BaseModelEmbedding):
+class HunyuanVideoModelEmbedding:
     def __init__(
             self,
             uuid: str,
-            text_encoder_1_vector: Tensor,
-            text_encoder_2_vector: Tensor,
+            text_encoder_1_vector: Tensor | None,
+            text_encoder_2_vector: Tensor | None,
             placeholder: str,
+            is_output_embedding: bool,
     ):
-        super().__init__(
+        self.text_encoder_1_embedding = BaseModelEmbedding(
             uuid=uuid,
-            token_count=text_encoder_1_vector.shape[0],
             placeholder=placeholder,
+            vector=text_encoder_1_vector,
+            is_output_embedding=is_output_embedding,
         )
 
-        self.text_encoder_1_vector = text_encoder_1_vector
-        self.text_encoder_2_vector = text_encoder_2_vector
+        self.text_encoder_2_embedding = BaseModelEmbedding(
+            uuid=uuid,
+            placeholder=placeholder,
+            vector=text_encoder_2_vector,
+            is_output_embedding=False,
+        )
 
 
 class HunyuanVideoModel(BaseModel):
@@ -77,9 +83,7 @@ class HunyuanVideoModel(BaseModel):
 
     # persistent embedding training data
     embedding: HunyuanVideoModelEmbedding | None
-    embedding_state: tuple[Tensor, Tensor] | None
     additional_embeddings: list[HunyuanVideoModelEmbedding] | None
-    additional_embedding_states: list[tuple[Tensor, Tensor] | None]
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
 
@@ -121,9 +125,7 @@ class HunyuanVideoModel(BaseModel):
         self.transformer_offload_conductor = None
 
         self.embedding = None
-        self.embedding_state = None
         self.additional_embeddings = []
-        self.additional_embedding_states = []
         self.embedding_wrapper_1 = None
         self.embedding_wrapper_2 = None
 
@@ -131,6 +133,18 @@ class HunyuanVideoModel(BaseModel):
         self.text_encoder_2_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
+
+    def all_embeddings(self) -> list[HunyuanVideoModelEmbedding]:
+        return self.additional_embeddings \
+               + ([self.embedding] if self.embedding is not None else [])
+
+    def all_text_encoder_1_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_1_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_1_embedding] if self.embedding is not None else [])
+
+    def all_text_encoder_2_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_2_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_2_embedding] if self.embedding is not None else [])
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -191,13 +205,16 @@ class HunyuanVideoModel(BaseModel):
             tokenizer_2=self.orig_tokenizer_2 if use_original_modules else self.tokenizer_2,
         )
 
-    def add_embeddings_to_prompt(self, prompt: str) -> str:
-        return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
+    def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_1_embeddings(), prompt)
+
+    def add_text_encoder_2_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_2_embeddings(), prompt)
 
     def encode_text(
             self,
             train_device: torch.device,
-            batch_size: int,
+            batch_size: int = 1,
             rand: Random | None = None,
             text: str = None,
             tokens_1: Tensor = None,
@@ -215,7 +232,7 @@ class HunyuanVideoModel(BaseModel):
             llama_text = DEFAULT_PROMPT_TEMPLATE.format(text)
 
             tokenizer_output = self.tokenizer_1(
-                llama_text,
+                self.add_text_encoder_1_embeddings_to_prompt(llama_text),
                 padding='max_length',
                 truncation=True,
                 max_length=77 + DEFAULT_PROMPT_TEMPLATE_CROP_START,
@@ -226,7 +243,7 @@ class HunyuanVideoModel(BaseModel):
 
         if tokens_2 is None and text is not None and self.tokenizer_2 is not None:
             tokenizer_output = self.tokenizer_2(
-                text,
+                self.add_text_encoder_2_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
@@ -234,7 +251,7 @@ class HunyuanVideoModel(BaseModel):
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
 
-        text_encoder_1_output, tokens_mask_1 = encode_llama(
+        text_encoder_1_output, tokens_mask_1, tokens_1 = encode_llama(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
             default_layer=-3,
@@ -272,6 +289,13 @@ class HunyuanVideoModel(BaseModel):
                 device=train_device,
                 dtype=self.train_dtype.torch_dtype(),
             )
+
+        text_encoder_1_output = self._apply_output_embeddings(
+            self.all_text_encoder_1_embeddings(),
+            self.tokenizer_1,
+            tokens_1,
+            text_encoder_1_output,
+        )
 
         # apply dropout
         if text_encoder_1_dropout_probability is not None:

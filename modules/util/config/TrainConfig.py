@@ -9,8 +9,6 @@ from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.SecretsConfig import SecretsConfig
-from modules.util.enum.AlignPropLoss import AlignPropLoss
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -215,6 +213,7 @@ class TrainEmbeddingConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     token_count: int | None
     initial_embedding_text: str
+    is_output_embedding: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -232,6 +231,7 @@ class TrainEmbeddingConfig(BaseConfig):
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("token_count", 1, int, True))
         data.append(("initial_embedding_text", "*", str, False))
+        data.append(("is_output_embedding", False, bool, False))
 
         return TrainEmbeddingConfig(data)
 
@@ -296,14 +296,6 @@ class TrainConfig(BaseConfig):
     only_cache: bool
     resolution: str
     frames: str
-    attention_mechanism: AttentionMechanism
-    align_prop: bool
-    align_prop_probability: float
-    align_prop_loss: AlignPropLoss
-    align_prop_weight: float
-    align_prop_steps: int
-    align_prop_truncate_steps: float
-    align_prop_cfg_scale: float
     mse_strength: float
     mae_strength: float
     log_cosh_strength: float
@@ -624,7 +616,8 @@ class TrainConfig(BaseConfig):
             decoder_model=self.decoder.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
-            embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name),
+            embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name) \
+                if self.training_method == TrainingMethod.EMBEDDING else None,
             additional_embeddings=[EmbeddingName(embedding.uuid, embedding.model_name) for embedding in
                                    self.additional_embeddings],
             include_text_encoder=self.text_encoder.include,
@@ -633,23 +626,36 @@ class TrainConfig(BaseConfig):
         )
 
     def train_any_embedding(self) -> bool:
-        return self.training_method == TrainingMethod.EMBEDDING \
-            or any(embedding.train for embedding in self.additional_embeddings)
+        return ((self.training_method == TrainingMethod.EMBEDDING) and not self.embedding.is_output_embedding) \
+            or any((embedding.train and not embedding.is_output_embedding) for embedding in self.additional_embeddings)
+
+    def train_any_output_embedding(self) -> bool:
+        return ((self.training_method == TrainingMethod.EMBEDDING) and self.embedding.is_output_embedding) \
+            or any((embedding.train and embedding.is_output_embedding) for embedding in self.additional_embeddings)
 
     def train_text_encoder_or_embedding(self) -> bool:
-        return (self.text_encoder.train and self.training_method != TrainingMethod.EMBEDDING) \
+        return (self.text_encoder.train and self.training_method != TrainingMethod.EMBEDDING
+                and not self.embedding.is_output_embedding) \
             or ((self.text_encoder.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
 
     def train_text_encoder_2_or_embedding(self) -> bool:
-        return (self.text_encoder_2.train and self.training_method != TrainingMethod.EMBEDDING) \
+        return (self.text_encoder_2.train and self.training_method != TrainingMethod.EMBEDDING
+                and not self.embedding.is_output_embedding) \
             or ((self.text_encoder_2.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
 
     def train_text_encoder_3_or_embedding(self) -> bool:
-        return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING) \
+        return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING
+                and not self.embedding.is_output_embedding) \
             or ((self.text_encoder_3.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
+
+    def all_embedding_configs(self):
+        if self.training_method == TrainingMethod.EMBEDDING:
+            return self.additional_embeddings + [self.embedding]
+        else:
+            return self.additional_embeddings
 
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")
@@ -769,14 +775,6 @@ class TrainConfig(BaseConfig):
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("frames", "25", str, False))
-        data.append(("attention_mechanism", AttentionMechanism.XFORMERS, AttentionMechanism, False))
-        data.append(("align_prop", False, bool, False))
-        data.append(("align_prop_probability", 0.1, float, False))
-        data.append(("align_prop_loss", AlignPropLoss.AESTHETIC, AlignPropLoss, False))
-        data.append(("align_prop_weight", 0.01, float, False))
-        data.append(("align_prop_steps", 20, int, False))
-        data.append(("align_prop_truncate_steps", 0.5, float, False))
-        data.append(("align_prop_cfg_scale", 7.0, float, False))
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))

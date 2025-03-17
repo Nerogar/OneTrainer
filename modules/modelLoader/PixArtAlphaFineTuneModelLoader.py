@@ -44,6 +44,6 @@ class PixArtAlphaFineTuneModelLoader(
         model.model_spec = self._load_default_model_spec(model_type)
 
         base_model_loader.load(model, model_type, model_names, weight_dtypes)
-        embedding_loader.load_multiple(model, model_names)
+        embedding_loader.load(model, model_names.base_model, model_names)
 
         return model
