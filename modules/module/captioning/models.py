@@ -5,9 +5,7 @@ from collections.abc import Callable
 from .sample import CaptionSample
 from .utils import get_sample_filenames, is_empty_caption
 
-# Create logger for this module
 logger = logging.getLogger(__name__)
-
 
 class BaseImageCaptionModel(ABC):
     @abstractmethod

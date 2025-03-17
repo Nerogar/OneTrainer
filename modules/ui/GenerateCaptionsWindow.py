@@ -1,5 +1,7 @@
-from tkinter import filedialog
-from typing import Any
+import logging
+import os
+from tkinter import filedialog, messagebox
+from typing import Any, Dict, Literal, TypedDict, Optional
 
 from modules.module.captioning.utils import (
     filter_blacklisted_tags,
@@ -8,8 +10,27 @@ from modules.module.captioning.utils import (
 
 import customtkinter as ctk
 
+logger = logging.getLogger(__name__)
+
+class GridOptions(TypedDict, total=False):
+    """TypedDict for grid layout options."""
+    row: int
+    column: int
+    sticky: str
+    padx: tuple[int, int] | int
+    pady: int | tuple[int, int]
+    columnspan: int
+    rowspan: int
 
 class GenerateCaptionsWindow(ctk.CTkToplevel):
+    # Standard UI configuration constants
+    LABEL_GRID: GridOptions = {"sticky": "w", "padx": (10, 5), "pady": 5}
+    WIDGET_GRID: GridOptions = {"sticky": "ew", "padx": (5, 10), "pady": 5}
+    EXPLANATION_FONT: tuple = ("", 12)
+    EXPLANATION_WRAPLENGTH: int = 330
+    DEFAULT_PADX: tuple[int, int] = (10, 10)
+    DEFAULT_PADY: int = 5
+
     def __init__(
         self,
         parent: Any,
@@ -66,31 +87,32 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.basic_options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.caption_options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.threshold_frame = ctk.CTkFrame(self.main_frame)
-        self.moondream_options_frame = ctk.CTkFrame(self.main_frame)  # New frame for Moondream options
+        self.moondream_options_frame = ctk.CTkFrame(self.main_frame)
         self.additional_options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.progress_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.buttons_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
 
-        self.basic_options_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=5)
-        self.caption_options_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
-        self.additional_options_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
-        self.progress_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=5)
-        self.buttons_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
-
-        for frame in [
+        # Configure frame layouts using standard options
+        frames = [
             self.basic_options_frame,
             self.caption_options_frame,
-            self.moondream_options_frame,
             self.additional_options_frame,
             self.progress_frame,
             self.buttons_frame,
-        ]:
-            self._configure_frame(frame)
+        ]
+
+        for i, frame in enumerate(frames):
+            frame.grid(row=i, column=0, columnspan=2, sticky="ew", pady=self.DEFAULT_PADY)
+            self._configure_standard_frame(frame)
+
+        # Configure special frames
+        self._configure_standard_frame(self.threshold_frame)
+        self._configure_standard_frame(self.moondream_options_frame)
 
         self._create_basic_options(path)
         self._create_caption_configuration()
         self._create_threshold_configuration()
-        self._create_moondream_configuration()  # New method for Moondream options
+        self._create_moondream_configuration()
         self._create_additional_options(include_subdirectories)
         self._create_progress_indicators()
         self._create_action_buttons()
@@ -98,9 +120,14 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.config_state["model_var"].trace_add("write", lambda *args: self._update_model_specific_options())
         self._update_model_specific_options()
 
-    def _configure_frame(self, frame: ctk.CTkFrame) -> None:
+    def _configure_standard_frame(self, frame: ctk.CTkFrame) -> None:
+        """Configure a frame with standard column weights."""
         frame.grid_columnconfigure(0, weight=0, minsize=120)
         frame.grid_columnconfigure(1, weight=1)
+
+    def _configure_frame(self, frame: ctk.CTkFrame) -> None:
+        """Legacy method maintained for backward compatibility."""
+        self._configure_standard_frame(frame)
 
     def _create_labeled_widget(
         self,
@@ -108,14 +135,60 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         label_text: str,
         widget: Any,
         row: int,
-        widget_options: dict[str, Any] | None = None,
+        widget_options: Optional[GridOptions] = None,
+        label_options: Optional[GridOptions] = None,
     ) -> None:
+        """Create a labeled widget with standard grid options."""
+        # Start with default options
+        label_grid = self.LABEL_GRID.copy()
+        label_grid["row"] = row
+        label_grid["column"] = 0
+
+        # Override with custom options if provided
+        if label_options:
+            label_grid.update(label_options)
+
+        # Create and place the label
         label = ctk.CTkLabel(parent, text=label_text, anchor="w")
-        label.grid(row=row, column=0, sticky="w", padx=(10, 5), pady=5)
-        options = {"row": row, "column": 1, "sticky": "ew", "padx": (5, 10), "pady": 5}
+        label.grid(**label_grid)
+
+        # Start with default widget options
+        widget_grid = self.WIDGET_GRID.copy()
+        widget_grid["row"] = row
+        widget_grid["column"] = 1
+
+        # Override with custom options if provided
         if widget_options:
-            options.update(widget_options)
-        widget.grid(**options)
+            widget_grid.update(widget_options)
+
+        # Place the widget
+        widget.grid(**widget_grid)
+
+    def _create_explanation_label(
+        self,
+        parent: ctk.CTkFrame,
+        text: str,
+        row: int,
+        columnspan: int = 2,
+        wraplength: Optional[int] = None,
+    ) -> ctk.CTkLabel:
+        """Create a standardized explanation label."""
+        label = ctk.CTkLabel(
+            parent,
+            text=text,
+            font=self.EXPLANATION_FONT,
+            wraplength=wraplength or self.EXPLANATION_WRAPLENGTH,
+            justify="left",
+        )
+        label.grid(
+            row=row,
+            column=0,
+            columnspan=columnspan,
+            sticky="w",
+            padx=self.DEFAULT_PADX[0],
+            pady=self.DEFAULT_PADY
+        )
+        return label
 
     def _create_basic_options(self, path: str) -> None:
         self.model_dropdown = ctk.CTkOptionMenu(
@@ -127,12 +200,15 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         )
         self._create_labeled_widget(self.basic_options_frame, "Model", self.model_dropdown, row=0)
 
+        # Path selection with browse button
         path_frame = ctk.CTkFrame(self.basic_options_frame, fg_color="transparent")
-        path_frame.grid(row=1, column=1, sticky="ew", padx=(5, 10), pady=5)
+        path_frame.grid(row=1, column=1, **self.WIDGET_GRID)
         path_frame.grid_columnconfigure(0, weight=1)
+
         self.path_entry = ctk.CTkEntry(path_frame)
         self.path_entry.insert(0, path)
         self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
         self.path_button = ctk.CTkButton(
             path_frame,
             width=30,
@@ -140,9 +216,12 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             command=lambda: self._browse(entry_box=self.path_entry, directory=True),
         )
         self.path_button.grid(row=0, column=1, sticky="e")
-        path_label = ctk.CTkLabel(self.basic_options_frame, text="Folder", anchor="w")
-        path_label.grid(row=1, column=0, sticky="w", padx=(10, 5), pady=5)
 
+        # Path label
+        path_label = ctk.CTkLabel(self.basic_options_frame, text="Folder", anchor="w")
+        path_label.grid(row=1, column=0, **self.LABEL_GRID)
+
+        # Mode dropdown
         self.mode_dropdown = ctk.CTkOptionMenu(
             self.basic_options_frame,
             variable=self.config_state["mode_var"],
@@ -162,11 +241,14 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.postfix_entry = ctk.CTkEntry(self.caption_options_frame)
         self._create_labeled_widget(self.caption_options_frame, "Caption Suffix", self.postfix_entry, row=2)
 
+        # Blacklist with browse button
         blacklist_frame = ctk.CTkFrame(self.caption_options_frame, fg_color="transparent")
-        blacklist_frame.grid(row=3, column=1, sticky="ew", padx=(5, 10), pady=5)
+        blacklist_frame.grid(row=3, column=1, **self.WIDGET_GRID)
         blacklist_frame.grid_columnconfigure(0, weight=1)
+
         self.blacklist_entry = ctk.CTkEntry(blacklist_frame)
         self.blacklist_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
         self.blacklist_button = ctk.CTkButton(
             blacklist_frame,
             width=30,
@@ -177,39 +259,39 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             ),
         )
         self.blacklist_button.grid(row=0, column=1, sticky="e")
-        blacklist_label = ctk.CTkLabel(self.caption_options_frame, text="Blacklist", anchor="w")
-        blacklist_label.grid(row=3, column=0, sticky="w", padx=(10, 5), pady=5)
 
+        # Blacklist label
+        blacklist_label = ctk.CTkLabel(self.caption_options_frame, text="Blacklist", anchor="w")
+        blacklist_label.grid(row=3, column=0, **self.LABEL_GRID)
+
+        # Regex checkbox
         self.regex_enabled_var = ctk.BooleanVar(self, False)
         self.regex_enabled_checkbox = ctk.CTkCheckBox(
             self.caption_options_frame,
             text="Enable regex matching for blacklist",
             variable=self.regex_enabled_var,
         )
-        self.regex_enabled_checkbox.grid(row=4, column=1, sticky="w", padx=(5, 10), pady=5)
+        self.regex_enabled_checkbox.grid(row=4, column=1, sticky="w", **self.WIDGET_GRID)
 
-        help_text = ("Enter tags to blacklist, separated by commas. You can also specify a .txt or .csv file path.")
-        self.blacklist_help_label = ctk.CTkLabel(
-            self.caption_options_frame,
-            text=help_text,
-            font=("", 12),
-            wraplength=350,
-            justify="left",
-        )
-        self.blacklist_help_label.grid(row=5, column=0, columnspan=2, sticky="w", padx=10, pady=5)
+        # Help text
+        help_text = "Enter tags to blacklist, separated by commas. You can also specify a .txt or .csv file path."
+        self._create_explanation_label(self.caption_options_frame, help_text, row=5)
 
     def _create_threshold_configuration(self) -> None:
         self.threshold_frame.grid_columnconfigure(0, weight=0, minsize=120)
         self.threshold_frame.grid_columnconfigure(1, weight=1, minsize=60)
         self.threshold_frame.grid_columnconfigure(2, weight=0)
 
+        # General threshold controls
         self.general_threshold_label = ctk.CTkLabel(self.threshold_frame, text="General Tag Threshold", anchor="w")
-        self.general_threshold_label.grid(row=0, column=0, sticky="w", padx=(10, 5), pady=5)
+        self.general_threshold_label.grid(row=0, column=0, **self.LABEL_GRID)
+
         self.general_threshold_var = ctk.StringVar(self, "0.35")
         self.general_threshold_entry = ctk.CTkEntry(
             self.threshold_frame, width=70, textvariable=self.general_threshold_var
         )
         self.general_threshold_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+
         self.general_mcut_var = ctk.BooleanVar(self, False)
         self.general_mcut_checkbox = ctk.CTkCheckBox(
             self.threshold_frame,
@@ -219,15 +301,18 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         )
         self.general_mcut_checkbox.grid(row=0, column=2, sticky="w", padx=5, pady=5)
 
+        # Character threshold controls
         self.character_threshold_label = ctk.CTkLabel(
             self.threshold_frame, text="Character Tag Threshold", anchor="w"
         )
-        self.character_threshold_label.grid(row=1, column=0, sticky="w", padx=(10, 5), pady=5)
+        self.character_threshold_label.grid(row=1, column=0, **self.LABEL_GRID)
+
         self.character_threshold_var = ctk.StringVar(self, "0.85")
         self.character_threshold_entry = ctk.CTkEntry(
             self.threshold_frame, width=70, textvariable=self.character_threshold_var
         )
         self.character_threshold_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+
         self.character_mcut_var = ctk.BooleanVar(self, False)
         self.character_mcut_checkbox = ctk.CTkCheckBox(
             self.threshold_frame,
@@ -237,29 +322,22 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         )
         self.character_mcut_checkbox.grid(row=1, column=2, sticky="w", padx=5, pady=5)
 
+        # Explanation text
         explanation = (
             "MCut automatically determines optimal thresholds by finding the largest gap between adjacent "
             "label relevance scores. Enabling it disables the threshold inputs."
         )
-        self.mcut_explanation_label = ctk.CTkLabel(
-            self.threshold_frame,
-            text=explanation,
-            font=("", 12),
-            wraplength=330,
-            justify="left",
-        )
-        self.mcut_explanation_label.grid(row=2, column=0, columnspan=3, sticky="w", padx=10, pady=10)
+        self._create_explanation_label(self.threshold_frame, explanation, row=2, columnspan=3)
+
         self._update_threshold_states()
 
     def _create_moondream_configuration(self) -> None:
         """Create configuration options specific to Moondream2 model"""
-        self.moondream_options_frame.grid_columnconfigure(0, weight=0, minsize=120)
-        self.moondream_options_frame.grid_columnconfigure(1, weight=1)
-
+        # Caption length dropdown
         self.caption_length_label = ctk.CTkLabel(
             self.moondream_options_frame, text="Caption Length", anchor="w"
         )
-        self.caption_length_label.grid(row=0, column=0, sticky="w", padx=(10, 5), pady=5)
+        self.caption_length_label.grid(row=0, column=0, **self.LABEL_GRID)
 
         self.caption_length_dropdown = ctk.CTkOptionMenu(
             self.moondream_options_frame,
@@ -268,19 +346,11 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             dynamic_resizing=False,
             width=120,
         )
-        self.caption_length_dropdown.grid(row=0, column=1, sticky="w", padx=(5, 10), pady=5)
+        self.caption_length_dropdown.grid(row=0, column=1, **self.WIDGET_GRID)
 
-        explanation = (
-            "Choose 'short' for a brief description or 'normal' for a more detailed caption."
-        )
-        self.caption_length_explanation = ctk.CTkLabel(
-            self.moondream_options_frame,
-            text=explanation,
-            font=("", 12),
-            wraplength=330,
-            justify="left",
-        )
-        self.caption_length_explanation.grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=10)
+        # Explanation text
+        explanation = "Choose 'short' for a brief description or 'normal' for a more detailed caption."
+        self._create_explanation_label(self.moondream_options_frame, explanation, row=1)
 
     def _create_additional_options(self, include_subdirectories: bool) -> None:
         self.include_subdirectories_label = ctk.CTkLabel(
@@ -324,6 +394,18 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             entry_box.insert(0, selected)
         self.focus_set()
 
+    def _is_wd_model(self, model_name: str) -> bool:
+        """Check if the model is a WD (WD14/SwinV2/EVA02) model."""
+        return any(name in model_name for name in ["WD SwinV2", "WD EVA02", "WD14 VIT"]) or "WD" in model_name
+
+    def _is_moondream_model(self, model_name: str) -> bool:
+        """Check if the model is a Moondream model."""
+        return "MOONDREAM" in model_name.upper()
+
+    def _is_eva02_model(self, model_name: str) -> bool:
+        """Check if the model is specifically an EVA02 model."""
+        return "EVA02" in model_name
+
     def _update_model_specific_options(self, *args: Any) -> None:
         """Update the visibility of model-specific option frames based on selected model"""
         model = self.config_state["model_var"].get()
@@ -331,9 +413,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         moondream_height = 110  # Height of the Moondream options frame
 
         # Determine which frames should be visible
-        is_supported_wd_model = any(name in model for name in ["WD SwinV2", "WD EVA02", "WD14 VIT"])
-        # Fix the model detection to handle both cases
-        is_moondream_model = "MOONDREAM" in model.upper()
+        is_supported_wd_model = self._is_wd_model(model)
+        is_moondream_model = self._is_moondream_model(model)
 
         # Get current window dimensions
         geometry = self.geometry().split("+")[0]
@@ -389,7 +470,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             self.general_threshold_label.configure(text_color=("gray", "gray"))
         else:
             model = self.config_state["model_var"].get()
-            self.general_threshold_var.set("0.5" if "EVA02" in model else "0.35")
+            self.general_threshold_var.set("0.5" if self._is_eva02_model(model) else "0.35")
             self.general_threshold_entry.configure(state="normal", placeholder_text="")
             self.general_threshold_label.configure(text_color=("black", "white"))
         if self.character_mcut_var.get():
@@ -408,60 +489,108 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.progress.update()
 
     def create_captions(self) -> None:
+        """Create captions with input validation."""
+        # Validate model selection
         model_name = self.config_state["model_var"].get()
+        if not model_name:
+            self._show_error("No model selected", "Please select a captioning model.")
+            return
+
+        # Validate path exists
+        path = self.path_entry.get().strip()
+        if not path or not os.path.exists(path) or not os.path.isdir(path):
+            self._show_error("Invalid path", "The specified folder does not exist.")
+            return
 
         # Model-specific kwargs initialization
         model_kwargs: dict[str, Any] = {}
 
-        # Set model-specific parameters based on model type
-        if "WD" in model_name:
+        # Set model-specific parameters based on model type with validation
+        if self._is_wd_model(model_name):
             try:
-                min_general = 0.0 if self.general_mcut_var.get() else float(self.general_threshold_var.get())
+                # Validate general threshold
+                general_threshold_str = self.general_threshold_var.get()
+                if not self.general_mcut_var.get() and not self._validate_float_range(general_threshold_str, 0, 1):
+                    self._show_error(
+                        "Invalid general threshold",
+                        "General threshold must be a number between 0 and 1."
+                    )
+                    return
+                min_general = 0.0 if self.general_mcut_var.get() else float(general_threshold_str)
+
+                # Validate character threshold
+                character_threshold_str = self.character_threshold_var.get()
+                if not self.character_mcut_var.get() and not self._validate_float_range(character_threshold_str, 0, 1):
+                    self._show_error(
+                        "Invalid character threshold",
+                        "Character threshold must be a number between 0 and 1."
+                    )
+                    return
+                min_character = 0.15 if self.character_mcut_var.get() else float(character_threshold_str)
+
                 model_kwargs = {
                     "use_mcut_general": self.general_mcut_var.get(),
                     "use_mcut_character": self.character_mcut_var.get(),
                     "min_general_threshold": min_general,
-                    "min_character_threshold": 0.15,
+                    "min_character_threshold": min_character,
                 }
-            except ValueError:
-                print("Invalid threshold value, using defaults")
-                model_kwargs = {
-                    "use_mcut_general": self.general_mcut_var.get(),
-                    "use_mcut_character": self.character_mcut_var.get(),
-                }
-        elif "MOONDREAM" in model_name.upper():
+            except ValueError as e:
+                logger.warning(f"Invalid threshold value: {e}")
+                self._show_error("Invalid threshold", f"Could not parse threshold value: {e}")
+                return
+        elif self._is_moondream_model(model_name):
+            caption_length = self.config_state["caption_length_var"].get()
+            # Validate caption length
+            if caption_length not in self.config_state["caption_lengths"]:
+                self._show_error(
+                    "Invalid caption length",
+                    f"Caption length must be one of: {', '.join(self.config_state['caption_lengths'])}"
+                )
+                return
+
             model_kwargs = {
-                "caption_length": self.config_state["caption_length_var"].get(),
-                "stream": False  # Always use non-streaming mode for batch processing
+                "caption_length": caption_length,
+                "stream": True
             }
 
         # Load or initialize the appropriate model
-        if "WD" in model_name:
-            self.parent.model_manager.captioning_model = None
-            self.parent.model_manager.current_captioning_model_name = None
-            model_class = self.parent.model_manager._captioning_registry[model_name]
-            captioning_model = model_class(
-                self.parent.model_manager.device,
-                self.parent.model_manager.precision,
-                model_name=model_name,
-                **model_kwargs,
-            )
-            self.parent.model_manager.captioning_model = captioning_model
-            self.parent.model_manager.current_captioning_model_name = model_name
-        else:
-            # For other models including Moondream2
-            captioning_model = self.parent.model_manager.load_captioning_model(model_name, **model_kwargs)
+        try:
+            if self._is_wd_model(model_name):
+                self.parent.model_manager.captioning_model = None
+                self.parent.model_manager.current_captioning_model_name = None
+                model_class = self.parent.model_manager._captioning_registry[model_name]
+                captioning_model = model_class(
+                    self.parent.model_manager.device,
+                    self.parent.model_manager.precision,
+                    model_name=model_name,
+                    **model_kwargs,
+                )
+                self.parent.model_manager.captioning_model = captioning_model
+                self.parent.model_manager.current_captioning_model_name = model_name
+            else:
+                # For other models including Moondream2
+                captioning_model = self.parent.model_manager.load_captioning_model(model_name, **model_kwargs)
+        except Exception as e:
+            logger.error(f"Failed to load model {model_name}: {e}")
+            self._show_error("Model loading error", f"Failed to load model {model_name}: {str(e)}")
+            return
 
         if captioning_model is None:
-            print(f"Failed to load model: {model_name}")
+            logger.error(f"Failed to load model: {model_name}")
+            self._show_error("Model error", f"Failed to load model: {model_name}")
             return
 
         # Get the blacklist once at the beginning to avoid caching issues
         blacklist_text = self.blacklist_entry.get().strip()
         blacklist_tags = []
         if blacklist_text:
-            blacklist_tags = get_blacklist_tags(blacklist_text, model_name)
-            print(f"Loaded blacklist tags: {blacklist_tags}")
+            try:
+                blacklist_tags = get_blacklist_tags(blacklist_text, model_name)
+                logger.info(f"Loaded blacklist tags: {blacklist_tags}")
+            except Exception as e:
+                logger.error(f"Failed to load blacklist tags: {e}")
+                self._show_error("Blacklist error", f"Failed to load blacklist tags: {str(e)}")
+                return
 
         # Store the original generate_caption method
         original_generate_caption = captioning_model.generate_caption
@@ -474,17 +603,21 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 model_name,
                 self.regex_enabled_var.get()
             )
-            print(f"Original caption: {caption}", flush=True)
-            print(f"Filtered caption: {filtered_caption}", flush=True)
+            logger.debug(f"Original caption: {caption}")
+            logger.debug(f"Filtered caption: {filtered_caption}")
             return filtered_caption
 
         # Replace generate_caption with our wrapper
         captioning_model.generate_caption = generate_caption_with_blacklist
 
+        # Disable the button while processing
+        self.create_captions_button.configure(state="disabled", text="Processing...")
+        self.create_captions_button.update()
+
         mode = self.config_state["mode_mapping"][self.config_state["mode_var"].get()]
         try:
             captioning_model.caption_folder(
-                sample_dir=self.path_entry.get(),
+                sample_dir=path,
                 initial_caption=self.caption_entry.get(),
                 caption_prefix=self.prefix_entry.get(),
                 caption_postfix=self.postfix_entry.get(),
@@ -492,10 +625,38 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 progress_callback=self.set_progress,
                 include_subdirectories=self.include_subdirectories_var.get(),
             )
+            # Show success message
+            self._show_info("Process complete", "Caption generation completed successfully.")
+
+        except Exception as e:
+            logger.error(f"Error during caption generation: {e}")
+            self._show_error("Caption generation error", f"Error during processing: {str(e)}")
+
         finally:
             # Restore the original generate_caption method
             captioning_model.generate_caption = original_generate_caption
+            # Re-enable the button
+            self.create_captions_button.configure(state="normal", text="Create Captions")
+            self.create_captions_button.update()
 
         if hasattr(self.parent, "image_handler") and hasattr(self.parent.image_handler, "load_image_data"):
             self.parent.image_handler.load_image_data()
             self.parent.refresh_ui()
+
+    def _validate_float_range(self, value: str, min_val: float, max_val: float) -> bool:
+        """Validate if a string represents a float within the specified range."""
+        try:
+            float_val = float(value)
+            return min_val <= float_val <= max_val
+        except ValueError:
+            return False
+
+    def _show_error(self, title: str, message: str) -> None:
+        """Display an error dialog using CTk."""
+        messagebox.showerror(title, message)
+        self.focus_set()
+
+    def _show_info(self, title: str, message: str) -> None:
+        """Display an information dialog using CTk."""
+        messagebox.showinfo(title, message)
+        self.focus_set()
