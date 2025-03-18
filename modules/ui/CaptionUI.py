@@ -49,7 +49,7 @@ MAX_VISIBLE_FILES: int = 50
 IMAGE_PADDING: int = 20
 DEFAULT_IMAGE_WIDTH: int = 800
 DEFAULT_IMAGE_HEIGHT: int = 600
-CANVAS_BACKGROUND_COLOR: tuple[int, int, int] = (32, 32, 32)
+
 MIN_BRUSH_SIZE: float = 0.0025
 MAX_BRUSH_SIZE: float = 0.5
 BRUSH_SIZE_CHANGE_FACTOR: float = 1.25
@@ -60,9 +60,38 @@ BRUSH_SIZE_THRESHOLD: float = 0.05
 MIN_CONTAINER_SIZE: int = 10
 BRACKET_BRUSH_SIZE_STEP: float = 0.01
 
+# Theme colors
+THEME_COLORS = {
+    "dark": {
+        "canvas_bg": (32, 32, 32),  # CANVAS_BACKGROUND_COLOR
+        "main_frame_bg": "#242424",
+        "tools_frame_bg": "#333333",
+        "caption_frame_bg": "#333333",
+        "selected_file_bg": "#454545",
+        "selected_file_text": "#5AD9ED",
+        "transparent": "transparent"
+    },
+    "light": {
+        "canvas_bg": (223, 223, 223),  # Light equivalent of dark canvas
+        "main_frame_bg": "#e0e0e0",   # Light equivalent of #242424
+        "tools_frame_bg": "#cccccc",  # Light equivalent of #333333
+        "caption_frame_bg": "#cccccc", # Same as tools frame
+        "selected_file_bg": "#bababa", # Light equivalent of #454545
+        "selected_file_text": "#0056aa", # Darker blue for better contrast
+        "transparent": "transparent"
+    }
+}
+
+CANVAS_BACKGROUND_COLOR: tuple[int, int, int] = THEME_COLORS["dark"]["canvas_bg"]
+
 RGBColor: TypeAlias = tuple[int, int, int]
 ImageCoordinates: TypeAlias = tuple[int, int, int, int]
 
+def get_theme_color(color_name: str) -> str | tuple[int, int, int]:
+    """Get the appropriate color based on current theme."""
+    appearance_mode = ctk.get_appearance_mode().lower()
+    theme = "dark" if appearance_mode == "dark" else "light"
+    return THEME_COLORS[theme][color_name]
 
 
 def scan_for_supported_images(
@@ -122,7 +151,7 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
 
 class CaptionUI(ctk.CTkToplevel):
     WINDOW_WIDTH: int = 1018
-    WINDOW_HEIGHT: int = 768
+    WINDOW_HEIGHT: int = 604
     FILE_LIST_WIDTH: int = 250
     MASK_MIN_OPACITY: float = 0.3
     DEFAULT_BRUSH_SIZE: float = 0.01
@@ -176,12 +205,9 @@ class CaptionUI(ctk.CTkToplevel):
         self.resizable(True, True)
         self.wait_visibility()
         self.focus_set()
-        self.lift()  # Raise window to the top
-        self.grab_set()  # Make this window modal
+        self.lift()
 
-        # Schedule releasing topmost attribute after window is fully shown
-        self.attributes("-topmost", True)
-        self.after(100, lambda: self.attributes("-topmost", False))
+        self.after(100, lambda: self._maintain_focus())
 
         self.help_text: str = (
                 "Keyboard shortcuts:\n\n"
@@ -199,6 +225,11 @@ class CaptionUI(ctk.CTkToplevel):
                 "Right click: Remove from mask\n"
                 "Mouse wheel: Adjust brush size"
             )
+
+    def _maintain_focus(self) -> None:
+        """Ensure window stays visible and focused."""
+        self.deiconify()  # Ensure window is not minimized
+        self.focus_force()  # Force focus to the window
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
