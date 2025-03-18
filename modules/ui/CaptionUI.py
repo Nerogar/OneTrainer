@@ -851,7 +851,7 @@ class ImageHandler:
 
     def _blend_mask_with_image(self, image: Image.Image, mask: Image.Image) -> Image.Image:
         """Blend a mask with an image according to mask opacity settings."""
-        # Convert to numpy arrays for processing
+
         np_image = np.array(image, dtype=np.float32) / 255.0
         np_mask = np.array(mask, dtype=np.float32) / 255.0
 
@@ -965,7 +965,7 @@ class ImageHandler:
                 not path.stem.endswith("-masklabel"))
 
 class MaskEditor:
-    DEFAULT_BRUSH_SIZE: float = 0.02
+    DEFAULT_BRUSH_SIZE: float = 0.03
 
     def __init__(self, parent: CaptionUI) -> None:
         self.parent: CaptionUI = parent

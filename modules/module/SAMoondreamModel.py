@@ -11,6 +11,7 @@ from modules.module.BaseImageMaskModel import (
 )
 from modules.module.captioning.sample import CaptionSample
 from modules.module.Moondream2Model import Moondream2Model
+from modules.util.path_util import supported_image_extensions
 
 import torch
 
@@ -20,7 +21,6 @@ from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from scipy import ndimage
 
-# Create logger for this module
 logger = logging.getLogger(__name__)
 
 
@@ -110,13 +110,11 @@ class ObjectDetector:
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        # Create caption sample for Moondream2
+        # Create caption sample
         caption_sample = CaptionSample(image_path)
 
-        # Load image
         image = Image.open(image_path)
 
-        # Get image dimensions and numpy array
         img_width, img_height = image.size
         np_image = np.array(image)
 
@@ -360,7 +358,7 @@ class MaskUtility:
         min_size_ratio: float = 0.01,
         min_size_abs: int = 10,
     ) -> np.ndarray:
-        """Optimized version to remove small disconnected regions."""
+        """Remove small disconnected regions."""
         # Early exit for empty masks
         if not np.any(mask):
             return mask
@@ -391,7 +389,7 @@ class MaskUtility:
         mask: np.ndarray,
         fill_holes: bool = True,
         smooth: bool = True,
-        smooth_pixels: int = 0,  # Add this parameter
+        smooth_pixels: int = 0,
         dilate_pixels: int | None = None,
         area: int | None = None,
         remove_small: bool = True,
@@ -510,8 +508,8 @@ class ImageUtility:
         """Find all image files in the given directory, excluding mask files."""
         directory = Path(directory) if isinstance(directory, str) else directory
 
-        # Common image extensions
-        image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"]
+        # Use supported image extensions from path_util
+        image_extensions = supported_image_extensions()
 
         # Use a set of canonical paths to track unique files
         seen_canonical_paths = set()
@@ -541,7 +539,7 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         device: torch.device,
         dtype: torch.dtype,
         sam2_model_size: str = "large",  # "tiny", "small", "base-plus", or "large"
-        moondream_model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4",
+        moondream_model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4", #DO NOT CHANGE.
     ):
         """
         Initialize the MoondreamSAM mask model using SAM2 from Hugging Face.
@@ -607,13 +605,12 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
             smooth_pixels (int): Pixels for smoothing the mask
             expand_pixels (int): Pixels to expand the mask
         """
-        # Create a mask sample
         mask_sample = MaskSample(filename, self.device)
 
         logger.info(f"Processing {filename}")
         logger.info(f"Mask will be saved to: {mask_sample.mask_filename}")
 
-        # Skip if mode is fill and mask already exists
+        # Skip if mode is 'fill' (dont confuse with paintbucket tool) and mask already exists
         if mode == 'fill' and os.path.exists(mask_sample.mask_filename):
             logger.info(f"Skipping {filename} as mask already exists")
             return
@@ -621,7 +618,6 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         # Ensure models are loaded
         self._load_models()
 
-        # Load image
         image = mask_sample.get_image()
         logger.info(f"Image loaded, size: {image.size}")
 
@@ -631,12 +627,11 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         for prompt in prompts:
             logger.info(f"Processing prompt: '{prompt}' for {filename}")
 
-            # Detect objects using Moondream2
             try:
                 np_image, detected_objects, img_dimensions = self.detector.detect(
                     image_path=filename,
                     prompt=prompt,
-                    max_objects=5  # Limit to 5 objects per prompt
+                    max_objects=10  # Limited to at most 10 objects per prompt as I cant imagine scenarios where you need more
                 )
 
                 if np_image is None or not detected_objects:
@@ -674,7 +669,6 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
             logger.info(f"No masks generated for {filename} with prompts {prompts}")
             return
         else:
-            # Print some stats about the combined mask
             mask_stats = {
                 "min": combined_mask.min().item(),
                 "max": combined_mask.max().item(),
