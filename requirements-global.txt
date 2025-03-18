@@ -8,6 +8,8 @@ huggingface-hub==0.28.1
 scipy==1.15.1; sys_platform != 'win32'
 matplotlib==3.10.0
 av==14.1.0 # using an older version. only update once torchvision has been updated as well.
+imagesize==1.4.1
+pillow-jxl-plugin==1.3.2
 
 # pytorch
 accelerate==1.3.0

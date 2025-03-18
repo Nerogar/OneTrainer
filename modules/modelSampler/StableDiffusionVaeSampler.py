@@ -12,6 +12,7 @@ from modules.util.enum.VideoFormat import VideoFormat
 import torch
 from torchvision.transforms import transforms
 
+import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 
 

@@ -17,6 +17,7 @@ import torch
 
 import cv2
 import numpy as np
+import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from scipy import ndimage

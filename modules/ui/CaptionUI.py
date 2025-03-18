@@ -24,6 +24,7 @@ from modules.module.Moondream2Model import Moondream2Model
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
 from modules.module.SAMoondreamModel import MoondreamSAMMaskModel
+from modules.ui.FileOperationsWindow import FileOperationsWindow
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
@@ -38,6 +39,7 @@ import torch
 import customtkinter as ctk
 import cv2
 import numpy as np
+import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from customtkinter import ThemeManager
 from PIL import Image, ImageDraw, ImageTk
 
@@ -65,24 +67,29 @@ THEME_COLORS = {
     "dark": {
         "canvas_bg": (32, 32, 32),  # CANVAS_BACKGROUND_COLOR
         "main_frame_bg": "#242424",
+        "image_container_bg": "#242424",
         "tools_frame_bg": "#333333",
         "caption_frame_bg": "#333333",
         "selected_file_bg": "#454545",
         "selected_file_text": "#5AD9ED",
-        "transparent": "transparent"
+        "transparent": "transparent",
+        "file_text": "white",
     },
     "light": {
-        "canvas_bg": (223, 223, 223),  # Light equivalent of dark canvas
-        "main_frame_bg": "#e0e0e0",   # Light equivalent of #242424
-        "tools_frame_bg": "#cccccc",  # Light equivalent of #333333
-        "caption_frame_bg": "#cccccc", # Same as tools frame
-        "selected_file_bg": "#bababa", # Light equivalent of #454545
-        "selected_file_text": "#0056aa", # Darker blue for better contrast
-        "transparent": "transparent"
+        "canvas_bg": "#EBEBEB",
+        "main_frame_bg": "#EBEBEB",
+        "image_container_bg": "#DBDBDB",
+        "tools_frame_bg": "#cccccc",
+        "caption_frame_bg": "#cccccc",
+        "selected_file_bg": "#bababa",
+        "selected_file_text": "#0056aa",
+        "transparent": "transparent",
+        "file_text": "#2d2d2d",
     }
 }
 
 CANVAS_BACKGROUND_COLOR: tuple[int, int, int] = THEME_COLORS["dark"]["canvas_bg"]
+
 
 RGBColor: TypeAlias = tuple[int, int, int]
 ImageCoordinates: TypeAlias = tuple[int, int, int, int]
@@ -93,6 +100,16 @@ def get_theme_color(color_name: str) -> str | tuple[int, int, int]:
     theme = "dark" if appearance_mode == "dark" else "light"
     return THEME_COLORS[theme][color_name]
 
+def get_themed_icon(icon_name: str, size: tuple[int, int]) -> ImageTk.PhotoImage:
+    """Get an icon with theme-specific variant if available."""
+    appearance_mode = ctk.get_appearance_mode().lower()
+    if appearance_mode == "light" and icon_name == "folder-tree":
+        # Try loading the dark variant for better contrast in light mode
+        try:
+            return load_icon(f"{icon_name}_dark", size)
+        except (FileNotFoundError, OSError, ValueError):
+            pass
+    return load_icon(icon_name, size)
 
 def scan_for_supported_images(
     directory: Path,
@@ -165,6 +182,7 @@ class CaptionUI(ctk.CTkToplevel):
         **kwargs,
     ) -> None:
         super().__init__(parent, *args, **kwargs)
+        self.parent = parent  # Add this line - explicit parent reference
         self.dir: str | None = initial_dir
         self.config_ui_data: dict = {
             "include_subdirectories": include_subdirectories
@@ -203,11 +221,17 @@ class CaptionUI(ctk.CTkToplevel):
         self.title("Dataset Tools")
         self.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
         self.resizable(True, True)
+
+        self.transient(self.parent)
+
+        self.attributes("-topmost", True)
+
         self.wait_visibility()
-        self.focus_set()
+        self.grab_set()
+        self.focus_force()
         self.lift()
 
-        self.after(100, lambda: self._maintain_focus())
+        self.after(300, lambda: self._ensure_robust_focus())
 
         self.help_text: str = (
                 "Keyboard shortcuts:\n\n"
@@ -226,10 +250,30 @@ class CaptionUI(ctk.CTkToplevel):
                 "Mouse wheel: Adjust brush size"
             )
 
-    def _maintain_focus(self) -> None:
-        """Ensure window stays visible and focused."""
-        self.deiconify()  # Ensure window is not minimized
-        self.focus_force()  # Force focus to the window
+    def _ensure_robust_focus(self) -> None:
+        """Ensure window maintains focus without preventing normal operation."""
+        if not self.winfo_exists():
+            return
+
+        # Remove topmost attribute to allow normal window behavior
+        self.attributes("-topmost", False)
+
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+        # Single, less aggressive follow-up
+        self.after(200, self._apply_gentle_focus)
+
+    def _apply_gentle_focus(self) -> None:
+        """Apply a gentle focus strategy that respects user actions."""
+        try:
+            if not self.focus_displayof() and self.winfo_exists():
+                self.lift()
+                self.focus_force()
+        except (tk.TclError, RuntimeError, AttributeError):
+            # Handle cases where the window or widgets might no longer exist
+            pass
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
@@ -287,16 +331,15 @@ class CaptionUI(ctk.CTkToplevel):
             "auto-caption",
             "Generate captions automatically",
         )
-        if platform.system() == "Windows":
-            self._create_icon_button(
-                top_frame,
-                0,
-                3,
-                "Explorer",
-                self.file_manager.open_in_explorer,
-                "explorer",
-                "Open in File Explorer",
-            )
+        self._create_icon_button(
+            top_frame,
+            0,
+            3,
+            "Browse",
+            self.file_manager.open_in_explorer,
+            "explorer",
+            "Open in File Browser",
+        )
         components.switch(
             top_frame,
             0,
@@ -306,11 +349,20 @@ class CaptionUI(ctk.CTkToplevel):
             text="Include Subdirs",
             tooltip="Include subdirectories when loading images",
         )
-        top_frame.grid_columnconfigure(5, weight=1)
         self._create_icon_button(
             top_frame,
             0,
-            6,
+            5,
+            "File Tools",
+            self._open_file_tools,
+            "file-cog",
+            "Open file operations tools",
+        )
+        top_frame.grid_columnconfigure(6, weight=1)  # Move the weight to column 6
+        self._create_icon_button(
+            top_frame,
+            0,
+            7,  # Adjust Help button to column 7
             "Help",
             self._show_help,
             "help",
@@ -319,7 +371,7 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_main_content(self) -> None:
         """Create the main content area."""
-        main_frame = ctk.CTkFrame(self, fg_color="#242424")
+        main_frame = ctk.CTkFrame(self, fg_color=get_theme_color("main_frame_bg"))
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=10)
         main_frame.grid_columnconfigure(0, weight=0)
         main_frame.grid_columnconfigure(1, weight=1)
@@ -349,7 +401,7 @@ class CaptionUI(ctk.CTkToplevel):
             row=0, column=0, sticky="ew", padx=2, pady=(2, 4)
         )
         header_frame.grid_columnconfigure(1, weight=1)
-        folder_icon = load_icon("folder-tree", (20, 20))
+        folder_icon = get_themed_icon("folder-tree", (20, 20))
         ctk.CTkLabel(header_frame, text="", image=folder_icon).grid(
             row=0, column=0, padx=(5, 3), pady=5
         )
@@ -366,7 +418,7 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_editor_panel(self, parent: ctk.CTkFrame) -> None:
         """Create the editor panel with tools, image container, and caption area."""
-        editor_frame = ctk.CTkFrame(parent, fg_color="#242424")
+        editor_frame = ctk.CTkFrame(parent, fg_color=get_theme_color("main_frame_bg"))
         editor_frame.grid(row=0, column=1, sticky="nsew")
         editor_frame.grid_columnconfigure(0, weight=1)
         editor_frame.grid_rowconfigure(0, weight=0)
@@ -378,7 +430,7 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_tools_bar(self, parent: ctk.CTkFrame) -> None:
         """Create the tools bar for mask editing."""
-        tools_frame = ctk.CTkFrame(parent, fg_color="#333333")
+        tools_frame = ctk.CTkFrame(parent, fg_color=get_theme_color("tools_frame_bg"))
         tools_frame.grid(row=0, column=0, sticky="new")
         # Update the column count for the added button
         for i in range(10):
@@ -466,13 +518,13 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_image_container(self, parent: ctk.CTkFrame) -> None:
         """Create the image display container."""
-        self.image_container = ctk.CTkFrame(parent, fg_color="#242424")
+        self.image_container = ctk.CTkFrame(parent, fg_color=get_theme_color("image_container_bg"))
         self.image_container.grid(row=1, column=0, sticky="nsew")
         self.image_container.grid_columnconfigure(0, weight=1)
         self.image_container.grid_rowconfigure(0, weight=1)
         self.image_container.grid_propagate(False)
         placeholder: Image.Image = Image.new(
-            "RGB", (DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT), CANVAS_BACKGROUND_COLOR
+            "RGB", (DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT), get_theme_color("canvas_bg")
         )
         self.image_tk: ImageTk.PhotoImage = ImageTk.PhotoImage(placeholder)
         self.image_label = ctk.CTkLabel(
@@ -497,7 +549,7 @@ class CaptionUI(ctk.CTkToplevel):
         )
         # Add binding for middle mouse button for reset
         self.image_label.bind("<Button-2>", self._handle_middle_click)
-        # Remove the keyboard bindings from the image label since we're using global bindings now
+
         # Make the label focusable for click interactions
         if "!label" in self.image_label.children:
             self.image_label.children["!label"].configure(takefocus=1)
@@ -520,7 +572,7 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_caption_area(self, parent: ctk.CTkFrame) -> None:
         """Create the caption area for editing."""
-        caption_frame = ctk.CTkFrame(parent, fg_color="#333333")
+        caption_frame = ctk.CTkFrame(parent, fg_color=get_theme_color("caption_frame_bg"))
         caption_frame.grid(row=2, column=0, sticky="sew")
         caption_frame.grid_columnconfigure(0, weight=0)
         caption_frame.grid_columnconfigure(1, weight=1)
@@ -617,7 +669,7 @@ class CaptionUI(ctk.CTkToplevel):
             row=0, column=0, sticky="ew", padx=2, pady=(2, 4)
         )
         header_frame.grid_columnconfigure(1, weight=1)
-        folder_icon = load_icon("folder-tree", (20, 20))
+        folder_icon = get_themed_icon("folder-tree", (20, 20))
         ctk.CTkLabel(header_frame, text="", image=folder_icon).grid(
             row=0, column=0, padx=(5, 3), pady=5
         )
@@ -668,6 +720,7 @@ class CaptionUI(ctk.CTkToplevel):
                 text=safe_filename,
                 wraplength=self.FILE_LIST_WIDTH - 20,
                 font=("Segoe UI", 11),
+                text_color=get_theme_color("file_text")
             )
             label.bind(
                 "<Button-1>",
@@ -729,7 +782,7 @@ class CaptionUI(ctk.CTkToplevel):
         else:
             width, height = DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT
         empty_image: Image.Image = Image.new(
-            "RGB", (width, height), CANVAS_BACKGROUND_COLOR
+            "RGB", (width, height), get_theme_color("canvas_bg")
         )
         self.image_tk = ImageTk.PhotoImage(empty_image)
         self.image_label.configure(image=self.image_tk)
@@ -749,6 +802,8 @@ class CaptionUI(ctk.CTkToplevel):
                 self.config_ui_data["include_subdirectories"],
             )
             self.wait_window(dialog)
+            self.after(100, self._ensure_robust_focus)
+
             if 0 <= self.current_image_index < len(self.image_rel_paths):
                 self.navigation_manager.switch_to_image(
                     self.current_image_index
@@ -763,10 +818,38 @@ class CaptionUI(ctk.CTkToplevel):
                 self.config_ui_data["include_subdirectories"],
             )
             self.wait_window(dialog)
+            self.after(100, self._ensure_robust_focus)
+
             if 0 <= self.current_image_index < len(self.image_rel_paths):
                 self.navigation_manager.switch_to_image(
                     self.current_image_index
                 )
+
+    def _open_file_tools(self) -> None:
+        """Open the file tools window with robust focus management."""
+
+
+        # Create child window with proper parent relationship
+        file_ops_window = FileOperationsWindow(self, self.dir)
+
+        # Use callback for focus restoration after window closes
+        self.wait_window(file_ops_window)
+        self.after(100, self._ensure_robust_focus)
+
+        # Continue with UI refresh
+        if 0 <= self.current_image_index < len(self.image_rel_paths):
+            self.navigation_manager.switch_to_image(self.current_image_index)
+
+    def _post_dialog_focus_restore(self, previous_focus):
+        """Restore focus after a dialog closes"""
+        try:
+            self.focus_force()
+            self.lift()
+            if previous_focus and previous_focus.winfo_exists():
+                previous_focus.focus_set()
+        except (tk.TclError, RuntimeError, AttributeError):
+            # Handle cases where the window or widgets might no longer exist
+            pass
 
     def _show_help(self) -> None:
         """Show help text (currently printed to console)."""
@@ -847,7 +930,7 @@ class ImageHandler:
         container_height = self.parent.image_container.winfo_height()
 
         # Create a blank canvas for the final image
-        canvas = Image.new("RGB", (container_width, container_height), CANVAS_BACKGROUND_COLOR)
+        canvas = Image.new("RGB", (container_width, container_height), get_theme_color("image_container_bg"))
 
         # Get resized image
         resized_image = self._resize_image(display_width, display_height)
@@ -1444,8 +1527,8 @@ class NavigationManager:
         self.parent.current_image_index = index
         if 0 <= index < len(self.parent.image_labels):
             self.parent.image_labels[index].configure(
-                text_color="#5AD9ED",
-                fg_color="#454545",
+                text_color=get_theme_color("selected_file_text"),
+                fg_color=get_theme_color("selected_file_bg"),
                 corner_radius=6,
             )
             self.parent.image_handler.load_image_data()
@@ -1761,7 +1844,16 @@ class FileManager:
 
     def open_directory(self) -> None:
         """Open a directory selection dialog."""
+        # Release grab and topmost to allow dialog to work properly
+        self.parent.grab_release()
+        self.parent.attributes("-topmost", False)
+
         new_dir: str = filedialog.askdirectory()
+
+        # Restore focus after dialog closes
+        self.parent.lift()
+        self.parent.focus_force()
+
         if new_dir:
             self.parent.dir = new_dir
             self.load_directory()
@@ -1810,7 +1902,7 @@ class FileManager:
             self.parent.clear_ui()
 
         # Regain focus after directory is loaded
-        self.parent.focus_set()
+        self._ensure_parent_focus()
         self.parent.lift()
 
         # Temporarily set topmost to ensure focus, then remove it
@@ -1818,6 +1910,10 @@ class FileManager:
         self.parent.after(
             100, lambda: self.parent.attributes("-topmost", False)
         )
+
+    def _ensure_parent_focus(self) -> None:
+        """Robust focus handling for parent window."""
+        self.parent._ensure_robust_focus()
 
 
 class CaptionManager:
