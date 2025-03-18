@@ -3,13 +3,23 @@ OneTrainer File Operations Window
 
 This module defines a CTkToplevel window for performing common batch operations on files
 such as renaming, resizing, and format conversion.
+
+Note on _verify_single_image:
+  The image is opened twice because Pillow's .verify() invalidates the image object.
+  Therefore, a second open (and .load()) is required to perform additional operations.
 """
 
+import collections
 import contextlib
 import logging
 import os
+import threading
+import time
 import tkinter as tk
+from collections.abc import Callable  # Updated import
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from queue import Queue
 from tkinter import filedialog
 
 from modules.util import path_util
@@ -23,16 +33,57 @@ from PIL import Image
 
 # Set up module logger
 logger = logging.getLogger(__name__)
-
-# Configure logger to show only the message (no timestamp, filename, or line number)
 for handler in logging.root.handlers:
     handler.setFormatter(logging.Formatter('%(message)s'))
 
-class FileOperationsWindow(ctk.CTkToplevel):
-    """Window for batch file operations such as renaming, resizing, and format conversion."""
+# --- Constants ---
+# Progress increments for sequential renaming and other operations
+PROGRESS_INITIAL: float = 0.05
+PROGRESS_RENAME_TEMP_PHASE_START: float = 0.15
+PROGRESS_RENAME_TEMP_PHASE_RANGE: float = 0.3
+PROGRESS_RENAME_EXEC_PHASE_START: float = 0.45
+PROGRESS_RENAME_EXEC_PHASE_RANGE: float = 0.1
+PROGRESS_RENAME_FINAL_PHASE_START: float = 0.55
+PROGRESS_RENAME_FINAL_PHASE_RANGE: float = 0.4
+PROGRESS_RENAME_FINAL_EXEC_PHASE_START: float = 0.95
+PROGRESS_RENAME_FINAL_EXEC_PHASE_RANGE: float = 0.05
 
+# Megapixel threshold (in pixels) for resizing images
+MEGAPIXEL_THRESHOLD: int = 4_194_304
+
+
+class ProgressThrottler:
+    """Helper class to throttle progress updates to the UI."""
+    def __init__(self, update_func: Callable[[float, str], None], min_interval: float = 0.1) -> None:
+        self.update_func = update_func
+        self.min_interval = min_interval
+        self.last_update_time = 0.0
+        self.last_progress = 0.0
+        self.last_message = ""
+        self.lock = threading.Lock()
+
+    def update(self, progress: float, message: str | None = None) -> bool:
+        current_time = time.time()
+        with self.lock:
+            force_update = (message is not None and message != self.last_message or
+                            abs(progress - self.last_progress) >= 0.01)
+            if force_update or (current_time - self.last_update_time) >= self.min_interval:
+                self.last_update_time = current_time
+                self.last_progress = progress
+                if message is not None:
+                    self.last_message = message
+                return True
+        return False
+
+    def __call__(self, progress: float, message: str | None = None) -> None:
+        if self.update(progress, message):
+            self.update_func(progress, message or self.last_message)
+
+
+class FileOperationsWindow(ctk.CTkToplevel):
     WINDOW_WIDTH: int = 440
     WINDOW_HEIGHT: int = 600
+    MAX_WORKERS: int = max(4, os.cpu_count() or 4)  # Use at least 4 workers
 
     def __init__(
         self,
@@ -41,196 +92,169 @@ class FileOperationsWindow(ctk.CTkToplevel):
         *args,
         **kwargs
     ) -> None:
-        """Initialize the FileOperationsWindow.
-
-        Args:
-            parent: The parent window
-            initial_dir: Initial directory path
-        """
+        """Initialize the FileOperationsWindow."""
         super().__init__(parent, *args, **kwargs)
         self.parent = parent
         self.dir_path = initial_dir or ""
-
-        # UI state for checkboxes and dropdowns
         self.config_data = {
             "verify_images": False,
             "sequential_rename": False,
-            "process_alpha": False,  # New option for alpha processing
-            "alpha_bg_color": "#FFFFFF",  # Default background color
+            "process_alpha": False,
+            "alpha_bg_color": "#FFFFFF",
             "resize_large_images": False,
             "optimization_type": "None"
         }
         self.config_state = UIState(self, self.config_data)
 
+        # Initialize thread pool and messaging
+        self.executor = ThreadPoolExecutor(max_workers=self.MAX_WORKERS)
+        self.message_queue: Queue = Queue()
+        self.processing_active: bool = False
+        self.cancel_requested: bool = False
+
         self._setup_window()
         self._create_layout()
 
-        # If directory provided, update the path display
         if initial_dir:
             self.dir_path_var.set(initial_dir)
 
+        # Start processing UI messages from worker threads
+        self.after(100, self._process_message_queue)
+
     def _setup_window(self) -> None:
-        """Set up window properties."""
+        """Configure window properties and initialize variables."""
         self.title("File Operations")
         self.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
         self.resizable(True, True)
-
-        # Make this window transient to the parent
         self.transient(self.parent)
-
-        # Set this window to be on top until fully initialized
         self.attributes("-topmost", True)
-
-        # Wait for window to be visible before setting focus
         self.wait_visibility()
-
-        # Grab and force focus
         self.grab_set()
         self.focus_force()
         self.lift()
+        self.after(300, self._ensure_focus)
 
-        # After a short delay, remove topmost but maintain focus
-        self.after(300, lambda: self._ensure_focus())
-
-        # Variables
         self.dir_path_var = ctk.StringVar(value=self.dir_path)
         self.status_var = ctk.StringVar(value="Ready")
         self.progress_var = ctk.DoubleVar(value=0)
 
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self) -> None:
+        """Handle window close: cancel ongoing operations and clean up."""
+        if self.processing_active:
+            self.cancel_requested = True
+            self._log("Cancelling operations, please wait...")
+            self.after(100, self._check_cancel_complete)
+        else:
+            self._cleanup()
+            self.destroy()
+
+    def _check_cancel_complete(self) -> None:
+        """Check if cancel completed, then destroy window."""
+        if not self.processing_active:
+            self._cleanup()
+            self.destroy()
+        else:
+            self.after(100, self._check_cancel_complete)
+
+    def _cleanup(self) -> None:
+        """Clean up resources before destroying window."""
+        try:
+            self.executor.shutdown(wait=False)
+        except Exception as e:
+            logger.error(f"Error shutting down thread pool: {e}")
+
     def _ensure_focus(self) -> None:
-        """Ensure window stays focused and visible."""
-        self.attributes("-topmost", False)  # Remove topmost attribute
+        """Ensure the window remains focused."""
+        self.attributes("-topmost", False)
         self.focus_force()
         self.lift()
-
-        # Schedule periodic focus check for the first few seconds
-        # This helps with scenarios where OS or other apps might steal focus
         for delay in [500, 1000, 2000]:
-            self.after(delay, lambda: self._check_and_restore_focus())
+            self.after(delay, self._check_and_restore_focus)
 
     def _check_and_restore_focus(self) -> None:
-        """Check if window has focus, restore if needed."""
+        """Restore focus if lost."""
         try:
             if not self.focus_displayof():
                 self.lift()
                 self.focus_force()
         except (tk.TclError, RuntimeError, AttributeError):
-            # Ignore errors if window is destroyed
             pass
 
-    def _add_dropdown_tooltip(self, dropdown_widget, tooltip_text):
-        """Add a tooltip to a dropdown widget that properly handles hover events."""
+    def _add_dropdown_tooltip(self, widget: tk.Widget, tooltip_text: str) -> object:
+        """Attach a tooltip to a widget (or update it if already present)."""
         from modules.util.ui.ToolTip import ToolTip
 
-        # First, remove any existing tooltip that might be attached to this widget
-        if hasattr(self, '_tooltip_registry') and dropdown_widget in self._tooltip_registry:
-            # Remove the old tooltip from our objects list
-            old_tooltip = self._tooltip_registry[dropdown_widget]
-            if hasattr(self, '_tooltip_objects') and old_tooltip in self._tooltip_objects:
+        if hasattr(self, "_tooltip_registry") and widget in self._tooltip_registry:
+            old_tooltip = self._tooltip_registry[widget]
+            if hasattr(self, "_tooltip_objects") and old_tooltip in self._tooltip_objects:
                 self._tooltip_objects.remove(old_tooltip)
-
-            # Unbind tooltip events
-            dropdown_widget.unbind("<Enter>")
-            dropdown_widget.unbind("<Leave>")
-            dropdown_widget.unbind("<ButtonPress>")
-
-        # Create tooltip directly using the ToolTip class
-        tooltip = ToolTip(dropdown_widget, text=tooltip_text, wide=True)
-
-        # Store the tooltip objects by widget reference
-        if not hasattr(self, '_tooltip_objects'):
-            self._tooltip_objects = []
-        if not hasattr(self, '_tooltip_registry'):
-            self._tooltip_registry = {}
-
+            widget.unbind("<Enter>")
+            widget.unbind("<Leave>")
+            widget.unbind("<ButtonPress>")
+        tooltip = ToolTip(widget, text=tooltip_text, wide=True)
+        self._tooltip_objects = getattr(self, "_tooltip_objects", [])
+        self._tooltip_registry = getattr(self, "_tooltip_registry", {})
         self._tooltip_objects.append(tooltip)
-        self._tooltip_registry[dropdown_widget] = tooltip
-
+        self._tooltip_registry[widget] = tooltip
         return tooltip
 
-    def _update_optimization_tooltip(self, value, dropdown, tooltips):
-        """Update the tooltip for the dropdown based on the selected value."""
+    def _update_optimization_tooltip(self, value: str, dropdown: tk.Widget, tooltips: dict) -> None:
+        """Update dropdown tooltip based on the selected optimization option."""
         tooltip_text = tooltips.get(value, "Select the type of image optimization to apply")
-
-        # First remove any existing tooltip
         for child in dropdown.winfo_children():
             if isinstance(child, ctk.CTkToplevel):
                 child.destroy()
-
-        # Apply tooltip directly using our custom method
         self._add_dropdown_tooltip(dropdown, tooltip_text)
 
     def _create_layout(self) -> None:
-        """Create the main UI layout."""
+        """Build the window layout."""
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)  # Status area can expand
-
+        self.grid_rowconfigure(2, weight=1)
         self._create_directory_frame()
         self._create_options_frame()
         self._create_status_frame()
         self._create_action_frame()
 
     def _create_directory_frame(self) -> None:
-        """Create the directory selection area."""
+        """Create the directory selection UI."""
         dir_frame = ctk.CTkFrame(self)
         dir_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
         dir_frame.grid_columnconfigure(0, weight=1)
-
-        # Directory path label
-        ctk.CTkLabel(
-            dir_frame,
-            text="Directory:",
-            anchor="w"
-        ).grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
-        # Directory selection area
+        ctk.CTkLabel(dir_frame, text="Directory:", anchor="w").grid(
+            row=0, column=0, padx=5, pady=5, sticky="w"
+        )
         path_frame = ctk.CTkFrame(dir_frame)
         path_frame.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
         path_frame.grid_columnconfigure(0, weight=1)
-
-        # Path entry and browse button
-        self.path_entry = ctk.CTkEntry(
-            path_frame,
-            textvariable=self.dir_path_var
-        )
+        self.path_entry = ctk.CTkEntry(path_frame, textvariable=self.dir_path_var)
         self.path_entry.grid(row=0, column=0, padx=(5, 2), pady=5, sticky="ew")
-
         ctk.CTkButton(
-            path_frame,
-            text="Browse...",
-            width=100,
-            command=self._browse_directory
+            path_frame, text="Browse...", width=100, command=self._browse_directory
         ).grid(row=0, column=1, padx=(2, 5), pady=5)
 
     def _create_options_frame(self) -> None:
-        """Create checkboxes and dropdowns for file operations."""
+        """Create options (checkboxes and dropdowns) for file operations."""
         options_frame = ctk.CTkFrame(self)
         options_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
         options_frame.grid_columnconfigure(0, weight=1)
-
-        # Operations header
         ctk.CTkLabel(
             options_frame,
             text="File Operations:",
             anchor="w",
             font=("Segoe UI", 12, "bold")
         ).grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
-        # Checkboxes for operations
         operations = [
             ("Verify Images for Corruption", "verify_images",
              "Check all images for corruption or format errors"),
-
             ("Sequential Renaming (1.txt, 2.txt, etc.)", "sequential_rename",
-            "Rename all files sequentially by file type"),
-
+             "Rename all files sequentially by file type"),
             ("Process Images with Transparency", "process_alpha",
-            "Replace transparent areas with a solid background color"),
-
+             "Replace transparent areas with a solid background color"),
             ("Resize Images Above 4MP", "resize_large_images",
-            "Optimally resize images larger than 4 megapixels")
+             "Optimally resize images larger than 4 megapixels")
         ]
-
         for i, (text, key, tooltip) in enumerate(operations):
             checkbox = ctk.CTkCheckBox(
                 options_frame,
@@ -240,23 +264,15 @@ class FileOperationsWindow(ctk.CTkToplevel):
                 offvalue=False
             )
             checkbox.grid(row=i + 1, column=0, padx=5, pady=2, sticky="w")
-
             if tooltip:
-                # Use our custom tooltip method instead of components.add_tooltip
                 self._add_dropdown_tooltip(checkbox, tooltip)
 
-        # Add color input for alpha processing
         alpha_row = len(operations) + 1
         color_frame = ctk.CTkFrame(options_frame)
         color_frame.grid(row=alpha_row, column=0, padx=5, pady=(2, 5), sticky="w")
-
-        # Color input label and field
         ctk.CTkLabel(
-            color_frame,
-            text="Alpha Background Color:",
-            anchor="w"
+            color_frame, text="Alpha Background Color:", anchor="w"
         ).grid(row=0, column=0, padx=5, pady=2, sticky="w")
-
         color_entry = ctk.CTkEntry(
             color_frame,
             width=100,
@@ -264,42 +280,29 @@ class FileOperationsWindow(ctk.CTkToplevel):
             placeholder_text="#FFFFFF"
         )
         color_entry.grid(row=0, column=1, padx=5, pady=2, sticky="w")
-
         self._add_dropdown_tooltip(
             color_entry,
             "Enter color name (e.g., 'white', 'black'), hex code (e.g., '#FFFFFF'), or 'random'/-1 for random color"
         )
 
-        # Add the optimization type dropdown
         current_row = alpha_row + 1
-
-        # Label for optimization dropdown
         opt_label = ctk.CTkLabel(
-            options_frame,
-            text="Image Optimization Type:",
-            anchor="w"
+            options_frame, text="Image Optimization Type:", anchor="w"
         )
         opt_label.grid(row=current_row, column=0, padx=5, pady=(10, 2), sticky="w")
-
-        # Dropdown for optimization type
         optimization_options = [
             "None",
             "Optimize PNGs",
             "Convert to WebP",
             "Convert to JPEG XL"
         ]
-
-        # Add tooltips for optimization types
         opt_tooltips = {
             "None": "No image optimization will be applied",
             "Optimize PNGs": "Optimize PNGs using PyOxiPNG (level 5, fix_errors=True)",
             "Convert to WebP": "Re-encode all images to WebP format at 90% quality",
             "Convert to JPEG XL": "Encode images as JPEG XL at 90% quality or losslessly for JPEGs"
         }
-
-        # Create variable for the dropdown and set up callback for tooltip updates
         opt_var = self.config_state.get_var("optimization_type")
-
         opt_dropdown = ctk.CTkOptionMenu(
             options_frame,
             variable=opt_var,
@@ -309,47 +312,33 @@ class FileOperationsWindow(ctk.CTkToplevel):
             command=lambda value: self._update_optimization_tooltip(value, opt_dropdown, opt_tooltips)
         )
         opt_dropdown.grid(row=current_row + 1, column=0, padx=5, pady=(0, 5), sticky="w")
-
         self._add_dropdown_tooltip(
             opt_dropdown,
             opt_tooltips.get(opt_var.get(), "Select the type of image optimization to apply")
         )
         self._add_dropdown_tooltip(opt_label, "Choose one optimization method for your images")
-
-        # Force initial tooltip update
         self.after(100, lambda: self._update_optimization_tooltip(opt_var.get(), opt_dropdown, opt_tooltips))
 
     def _create_status_frame(self) -> None:
-        """Create area for status messages and progress bar."""
+        """Create the status and progress UI."""
         status_frame = ctk.CTkFrame(self)
         status_frame.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
         status_frame.grid_columnconfigure(0, weight=1)
         status_frame.grid_rowconfigure(1, weight=1)
-
-        # Status label
-        ctk.CTkLabel(
-            status_frame,
-            textvariable=self.status_var,
-            anchor="w"
-        ).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-
-        # Progress bar
+        ctk.CTkLabel(status_frame, textvariable=self.status_var, anchor="w"
+                     ).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
         self.progress_bar = ctk.CTkProgressBar(status_frame)
         self.progress_bar.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
         self.progress_bar.set(0)
-
-        # Log output area
         self.log_text = ctk.CTkTextbox(status_frame, height=150)
         self.log_text.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
         self.log_text.configure(state="disabled")
 
     def _create_action_frame(self) -> None:
-        """Create buttons for actions."""
+        """Create the action buttons."""
         action_frame = ctk.CTkFrame(self)
         action_frame.grid(row=3, column=0, padx=10, pady=(5, 10), sticky="ew")
         action_frame.grid_columnconfigure(1, weight=1)
-
-        # Process button
         ctk.CTkButton(
             action_frame,
             text="Process Files",
@@ -357,8 +346,6 @@ class FileOperationsWindow(ctk.CTkToplevel):
             fg_color="#28a745",
             hover_color="#218838"
         ).grid(row=0, column=0, padx=(5, 2), pady=10)
-
-        # Close button
         ctk.CTkButton(
             action_frame,
             text="Close",
@@ -366,7 +353,7 @@ class FileOperationsWindow(ctk.CTkToplevel):
         ).grid(row=0, column=2, padx=(2, 5), pady=10)
 
     def _browse_directory(self) -> None:
-        """Open directory browser dialog."""
+        """Open a directory selection dialog."""
         directory = filedialog.askdirectory(
             initialdir=self.dir_path_var.get() or os.path.expanduser("~")
         )
@@ -376,742 +363,656 @@ class FileOperationsWindow(ctk.CTkToplevel):
             self._log(f"Directory selected: {directory}")
 
     def _log(self, message: str) -> None:
-        """Add message to the log text area."""
-        self.log_text.configure(state="normal")
-        self.log_text.insert("end", message + "\n")
-        self.log_text.see("end")
-        self.log_text.configure(state="disabled")
-        logger.info(message)
+        """Queue a log message to be processed on the main thread."""
+        self.message_queue.put(("log", message))
 
-    def _update_status(self, message: str, progress: float = None) -> None:
-        """Update status message and progress bar."""
-        self.status_var.set(message)
-        if progress is not None:
-            self.progress_bar.set(progress)
-        self.update()
+    def _update_status(self, message: str, progress: float | None = None) -> None:
+        """Queue a status update to be processed on the main thread."""
+        self.message_queue.put(("status", message, progress))
+
+    def _process_message_queue(self) -> None:
+            """Process messages from worker threads."""
+            try:
+                if not self.winfo_exists():
+                    return
+                while not self.message_queue.empty():
+                    action, *args = self.message_queue.get_nowait()
+                    if action == "log":
+                        self._log_main_thread(args[0])
+                    elif action == "status":
+                        self._update_status_main_thread(args[0], args[1] if len(args) > 1 else None)
+                    elif action == "operation_complete":
+                        self._log_main_thread(f"Completed: {args[0]}")
+                    self.message_queue.task_done()
+            except tk.TclError:
+                return
+            except Exception as e:
+                logger.error(f"Error processing message queue: {e}")
+            finally:
+                with contextlib.suppress(tk.TclError):
+                    self.after(50, self._process_message_queue)
+
+    def _log_main_thread(self, message: str) -> None:
+        """Thread-safe log update on the main thread."""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.insert("end", message + "\n")
+            self.log_text.see("end")
+            self.log_text.configure(state="disabled")
+            logger.info(message)
+        except tk.TclError:
+            pass
+
+    def _update_status_main_thread(self, message: str, progress: float | None = None) -> None:
+        """Thread-safe status update on the main thread."""
+        try:
+            self.status_var.set(message)
+            if progress is not None:
+                self.progress_bar.set(progress)
+            self.update_idletasks()
+        except tk.TclError:
+            pass
+
+    def _update_progress(self, idx: int, total: int, message: str,
+                         progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+        """Helper to update progress."""
+        progress = (idx + 1) / total
+        if progress_callback:
+            progress_callback(progress)
+        else:
+            self._update_status(message, progress)
 
     def _process_files(self) -> None:
-            """Process files with selected operations."""
-            parent_window = self.parent
-            directory = self.dir_path_var.get()
-            if not directory:
-                self._log("Error: No directory selected")
-                return
+        """Determine which file operations are selected and execute them in order."""
+        directory = self.dir_path_var.get()
+        if not directory:
+            self._log("Error: No directory selected")
+            return
+        if not os.path.isdir(directory):
+            self._log(f"Error: {directory} is not a valid directory")
+            return
+        try:
+            path = Path(directory)
+            files = [f for f in path.iterdir() if f.is_file()]
+            self._log(f"Found {len(files)} files in {directory}")
+        except Exception as e:
+            self._log(f"Error scanning directory: {e}")
+            return
+        if not (self.config_data["verify_images"] or
+                self.config_data["sequential_rename"] or
+                self.config_data["process_alpha"] or
+                self.config_data["resize_large_images"] or
+                self.config_data["optimization_type"] != "None"):
+            self._log("No operations selected")
+            return
+        self._disable_ui()
+        self.processing_active = True
+        self.cancel_requested = False
+        self.executor.submit(self._run_operations, files)
 
-            if not os.path.isdir(directory):
-                self._log(f"Error: {directory} is not a valid directory")
-                return
+    def _disable_ui(self) -> None:
+        """Disable UI elements during processing."""
+        for widget in self.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton | ctk.CTkCheckBox| ctk.CTkOptionMenu):
+                        child.configure(state="disabled")
 
-            # Get list of files
+    def _enable_ui(self) -> None:
+        """Re-enable UI elements after processing."""
+        for widget in self.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton | ctk.CTkCheckBox| ctk.CTkOptionMenu):
+                        child.configure(state="normal")
+
+    def _run_operations(self, files: list[Path]) -> None:
+            """Run all selected operations in a background thread."""
             try:
-                path = Path(directory)
-                files = [f for f in path.iterdir() if f.is_file()]
-                self._log(f"Found {len(files)} files in {directory}")
-            except Exception as e:
-                self._log(f"Error scanning directory: {e}")
-                return
-
-            # Check if any operation is selected
-            if not (self.config_data["verify_images"] or
-                    self.config_data["sequential_rename"] or
-                    self.config_data["process_alpha"] or  # New option
-                    self.config_data["resize_large_images"] or
-                    self.config_data["optimization_type"] != "None"):
-                self._log("No operations selected")
-                return
-
-            # Execute selected operations in the specified order
-            operations = []
-
-            # Run verification first if selected
-            if self.config_data["verify_images"]:
-                operations.append(("Image verification", self._verify_images))
-
-            if self.config_data["sequential_rename"]:
-                operations.append(("Sequential renaming", self._rename_files_sequentially))
-
-            # Add new alpha channel processing step
-            if self.config_data["process_alpha"]:
-                operations.append(("Processing transparent images", self._process_alpha_images))
-
-            if self.config_data["resize_large_images"]:
-                operations.append(("Resizing large images", self._resize_large_images))
-
-            # Add optimization operation based on dropdown selection
-            optimization_type = self.config_data["optimization_type"]
-            if optimization_type == "Optimize PNGs":
-                operations.append(("Optimizing PNGs", self._optimize_pngs))
-            elif optimization_type == "Convert to WebP":
-                operations.append(("Converting to WebP", self._convert_to_webp))
-            elif optimization_type == "Convert to JPEG XL":
-                operations.append(("Converting to JPEG XL", self._convert_to_jpegxl))
-
-            # Track if any operations were actually performed
-            operations_performed = False
-
-            # Setup progress tracking for overall operations
-            total_operations = len(operations)
-            operation_weight = 1.0 / total_operations if total_operations > 0 else 1.0
-
-            # Process each operation
-            for i, (name, operation) in enumerate(operations):
-                base_progress = i * operation_weight
-
-                # Define a progress callback for the current operation
-                # Fix B023 by binding loop variables as default arguments
-                def update_progress(step_progress, _base=base_progress, _name=name):
-                    # Calculate overall progress: base + (current operation's progress * weight)
-                    overall_progress = _base + (step_progress * operation_weight)
-                    self._update_status(f"Processing: {_name}... ({int(step_progress * 100)}%)", overall_progress)
-
-                self._update_status(f"Starting: {name}...", base_progress)
-                try:
-                    # If the operation is renaming, we need to update the files list
-                    if name == "Sequential renaming":
-                        files = operation(files, progress_callback=update_progress) or files
-                    else:
-                        operation(files, progress_callback=update_progress)
-                    self._log(f"Completed: {name}")
-                    operations_performed = True
-                except Exception as e:
-                    self._log(f"Error during {name.lower()}: {e}")
-
-            self._update_status("Processing complete", 1.0)
-
-            # If any operations were performed, refresh the parent window's file list
-            if operations_performed and hasattr(parent_window, 'file_manager') and hasattr(parent_window.file_manager, 'load_directory'):
+                operations: list[tuple[str, Callable[[list[Path], Callable[[float, str | None], None] | None], list[Path] | None]]] = []
+                if self.config_data["verify_images"]:
+                    operations.append(("Image verification", self._verify_images))
+                if self.config_data["sequential_rename"]:
+                    operations.append(("Sequential renaming", self._rename_files_sequentially))
+                if self.config_data["process_alpha"]:
+                    operations.append(("Processing transparent images", self._process_alpha_images))
+                if self.config_data["resize_large_images"]:
+                    operations.append(("Resizing large images", self._resize_large_images))
+                opt = self.config_data["optimization_type"]
+                if opt == "Optimize PNGs":
+                    operations.append(("Optimizing PNGs", self._optimize_pngs))
+                elif opt == "Convert to WebP":
+                    operations.append(("Converting to WebP", self._convert_to_webp))
+                elif opt == "Convert to JPEG XL":
+                    operations.append(("Converting to JPEG XL", self._convert_to_jpegxl))
+                operations_performed = False
+                total_ops = len(operations)
+                op_weight = 1.0 / total_ops if total_ops > 0 else 1.0
+                for i, (name, op) in enumerate(operations):
+                    if self.cancel_requested:
+                        self._log(f"Operation '{name}' cancelled")
+                        break
+                    base_progress = i * op_weight
+                    def update_progress_fn(step_progress: float, msg: str | None = None, _base_progress=base_progress, _name=name) -> None:
+                        overall = _base_progress + (step_progress * op_weight)
+                        msg = msg or f"Processing: {_name}... ({int(step_progress * 100)}%)"
+                        self._update_status(msg, overall)
+                    throttled_progress = ProgressThrottler(update_progress_fn)
+                    self._update_status(f"Starting: {name}...", base_progress)
                     try:
-                        self._log("Reloading file list in parent window...")
-                        parent_window.file_manager.load_directory()
-
-                        # Use robust focus handling
-                        self.lift()
-                        self.focus_force()
-
-                        # Ensure window stays focused
-                        self.after(100, self._ensure_focus)
+                        if name == "Sequential renaming":
+                            files = op(files, progress_callback=throttled_progress) or files
+                        else:
+                            op(files, progress_callback=throttled_progress)
+                        if not self.cancel_requested:
+                            self.message_queue.put(("operation_complete", name))
+                            operations_performed = True
                     except Exception as e:
-                        self._log(f"Note: Could not refresh parent window's file list: {e}")
+                        self._log(f"Error during {name.lower()}: {e}")
+                if not self.cancel_requested:
+                    self._update_status("Processing complete", 1.0)
+                    if operations_performed and hasattr(self.parent, 'file_manager') and hasattr(self.parent.file_manager, 'load_directory'):
+                        try:
+                            self._log("Reloading file list in parent window...")
+                            self.after(0, self.parent.file_manager.load_directory)
+                        except Exception as e:
+                            self._log(f"Note: Could not refresh parent window's file list: {e}")
+                else:
+                    self._update_status("Processing cancelled", 0.0)
+            finally:
+                self.after(0, self._enable_ui)
+                self.processing_active = False
 
-    def _process_alpha_images(self, files: list[Path], progress_callback=None) -> None:
-        """Process images with alpha channels by replacing transparency with a solid color."""
+    def _verify_single_image(self, file: Path) -> tuple[bool, str, bool]:
+        """
+        Verify a single image file for corruption.
+
+        Note: The image is opened twice because Pillow's .verify() invalidates the image object.
+        """
+        try:
+            with Image.open(file) as img:
+                img.verify()
+            with Image.open(file) as img:
+                img.load()
+                if hasattr(img, "getpixel"):
+                    img.getpixel((0, 0))
+            return True, "", False
+        except Exception as e:
+            return False, str(e), True
+
+    def _verify_images(self, files: list[Path],
+                       progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+        """Verify images for corruption using parallel processing."""
+        self._log("Starting image verification process...")
+        image_files = [f for f in files if path_util.is_supported_image_extension(f.suffix)]
+        if not image_files:
+            self._log("No image files found to verify")
+            return
+        self._log(f"Found {len(image_files)} images to verify")
+        results = {"valid": 0, "corrupted": 0, "error_files": []}
+        results_lock = threading.Lock()
+        total_files = len(image_files)
+        processed_count = [0]
+        def process_image(idx_file: tuple[int, Path]) -> None:
+            idx, file = idx_file
+            if self.cancel_requested:
+                return
+            try:
+                valid, error_msg, _ = self._verify_single_image(file)
+                with results_lock:
+                    processed_count[0] += 1
+                    progress = processed_count[0] / total_files
+                    if progress_callback:
+                        progress_callback(progress, f"Verifying image: {file.name}")
+                    if valid:
+                        results["valid"] += 1
+                        log_msg = f"✓ {file.name} is valid"
+                    else:
+                        results["corrupted"] += 1
+                        results["error_files"].append((file.name, error_msg))
+                        log_msg = f"✗ {file.name} is CORRUPTED: {error_msg}"
+                    self._log(log_msg)
+            except Exception as e:
+                with results_lock:
+                    processed_count[0] += 1
+                    results["corrupted"] += 1
+                    results["error_files"].append((file.name, str(e)))
+                    self._log(f"! Error verifying {file.name}: {e}")
+                    if progress_callback:
+                        progress_callback(processed_count[0] / total_files)
+        try:
+            with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+                list(executor.map(process_image, enumerate(image_files)))
+            if results["corrupted"] == 0:
+                self._log(f"✓ Image verification complete: All {results['valid']} images are valid")
+            else:
+                self._log(f"⚠ Image verification complete: {results['valid']} valid, {results['corrupted']} corrupted/problematic")
+                self._log("Problematic files:")
+                error_types = {}
+                for name, error in results["error_files"]:
+                    self._log(f"  - {name}: {error}")
+                    etype = error.split(":")[0] if ":" in error else error
+                    error_types[etype] = error_types.get(etype, 0) + 1
+                self._log("Error breakdown:")
+                for etype, count in error_types.items():
+                    self._log(f"  - {etype}: {count} files")
+        except Exception as e:
+            self._log(f"Error during parallel image verification: {e}")
+
+    def _convert_image_format(self,
+                              files: list[Path],
+                              target_format: str,
+                              skip_extensions: set,
+                              format_options: dict,
+                              progress_callback: Callable[[float, str | None], None] | None = None
+                              ) -> None:
+        """Generic image conversion function for multiple formats."""
+        self._log(f"Starting conversion to {target_format} format...")
+        format_ext = format_options.get('format_ext', '.unknown')
+        pil_format = format_options.get('pil_format', '')
+        lossless_extensions = format_options.get('lossless_extensions', set())
+        is_lossless_check = format_options.get('is_lossless_check', lambda file, img: False)
+        quality = format_options.get('quality', 90)
+        image_files = [
+            f for f in files
+            if path_util.is_supported_image_extension(f.suffix) and f.suffix.lower() not in skip_extensions
+        ]
+        if not image_files:
+            self._log(f"No suitable image files found to convert to {target_format}")
+            return
+        self._log(f"Found {len(image_files)} images to convert to {target_format}")
+        results = {"success": 0, "skipped": 0, "errors": 0, "total_bytes_saved": 0}
+        results_lock = threading.Lock()
+        total_files = len(image_files)
+        processed_count = [0]
+        def process_image(idx_file: tuple[int, Path]) -> None:
+            idx, file = idx_file
+            if self.cancel_requested:
+                return
+            try:
+                original_size = file.stat().st_size
+                new_path = file.with_suffix(format_ext)
+                with results_lock:
+                    processed_count[0] += 1
+                    if progress_callback:
+                        progress_callback(processed_count[0] / total_files,
+                                          f"Converting to {target_format}: {file.name}")
+                with Image.open(file) as img:
+                    is_lossless = file.suffix.lower() in lossless_extensions
+                    is_lossless = is_lossless_check(file, img) or is_lossless
+                    save_kwargs = {"quality": quality}
+                    if is_lossless:
+                        save_kwargs["lossless"] = True
+                        self._log(f"Converting {file.name} to {target_format} using lossless encoding")
+                    else:
+                        self._log(f"Converting {file.name} to {target_format} using {quality}% quality")
+                    save_kwargs.update(format_options.get('save_kwargs', {}))
+                    img.save(new_path, pil_format, **save_kwargs)
+                if new_path.exists():
+                    new_size = new_path.stat().st_size
+                    bytes_saved = original_size - new_size
+                    percent_saved = (bytes_saved / original_size) * 100 if original_size > 0 else 0
+                    if new_size < original_size:
+                        file.unlink()
+                        self._log(f"Converted {file.name} to {target_format}: "
+                                  f"{bytes_saved:,} bytes saved ({percent_saved:.1f}%)")
+                        with results_lock:
+                            results["success"] += 1
+                            results["total_bytes_saved"] += bytes_saved
+                    else:
+                        new_path.unlink()
+                        self._log(f"Skipped {file.name}: {target_format} version would be "
+                                  f"larger by {-bytes_saved:,} bytes")
+                        with results_lock:
+                            results["skipped"] += 1
+            except Exception as e:
+                self._log(f"Error converting {file.name} to {target_format}: {e}")
+                if 'new_path' in locals() and new_path.exists():
+                    with contextlib.suppress(FileNotFoundError, PermissionError):
+                        new_path.unlink()
+                with results_lock:
+                    results["errors"] += 1
+                    processed_count[0] += 1
+                    if progress_callback:
+                        progress_callback(processed_count[0] / total_files)
+        try:
+            with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+                list(executor.map(process_image, enumerate(image_files)))
+            if results["success"] > 0:
+                avg_saving = results["total_bytes_saved"] / results["success"]
+                self._log(f"Completed {target_format} conversion: "
+                          f"{results['success']} of {total_files} images converted")
+                self._log(f"Total bytes saved: {results['total_bytes_saved']:,} "
+                          f"(avg: {avg_saving:,.1f} per file)")
+                if results["skipped"] > 0:
+                    self._log(f"Skipped {results['skipped']} images where "
+                              f"{target_format} would be larger")
+            else:
+                self._log(f"{target_format} conversion completed with 0 successful conversions")
+            if results["errors"] > 0:
+                self._log(f"Encountered {results['errors']} errors during conversion")
+        except Exception as e:
+            self._log(f"Error during parallel {target_format} conversion: {e}")
+
+    def _convert_to_webp(self, files: list[Path],
+                         progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+        """Convert images to WebP format using the generic converter."""
+        format_options = {
+            'format_ext': '.webp',
+            'pil_format': 'WEBP',
+            'lossless_extensions': {'.png', '.tiff', '.tif', '.bmp'},
+            'is_lossless_check': lambda file, img: False,
+            'quality': 90
+        }
+        skip_extensions = {'.webp', '.jxl', '.avif'}
+        self._convert_image_format(
+            files,
+            "WebP",
+            skip_extensions,
+            format_options,
+            progress_callback
+        )
+
+    def _convert_to_jpegxl(self, files: list[Path],
+                           progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+        """Convert images to JPEG XL format using the generic converter."""
+        format_options = {
+            'format_ext': '.jxl',
+            'pil_format': 'JXL',
+            'lossless_extensions': set(),
+            'is_lossless_check': lambda file, img: file.suffix.lower() in {".jpg", ".jpeg"},
+            'quality': 90
+        }
+        skip_extensions = {'.jxl'}
+        self._convert_image_format(
+            files,
+            "JPEG XL",
+            skip_extensions,
+            format_options,
+            progress_callback
+        )
+
+    def _rename_files_sequentially(self, files: list[Path],
+                                   progress_callback: Callable[[float, str | None], None] | None = None
+                                   ) -> list[Path]:
+            """Rename files sequentially using a transactional approach for error resilience."""
+            import uuid
+            self._log("Starting sequential file renaming...")
+            sorted_files = sorted(files, key=lambda x: x.name)
+            total_files = len(sorted_files)
+            if progress_callback:
+                progress_callback(PROGRESS_INITIAL)
+            needs_renaming = False
+            used_indices = set()
+            expected_index = 1
+            for i, file in enumerate(sorted_files):
+                if progress_callback and i % 10 == 0:
+                    progress_callback(PROGRESS_INITIAL + (i / total_files * 0.1))
+                if not file.stem.isdigit():
+                    self._log(f"Non-numeric filename found: {file.name}. Renaming needed.")
+                    needs_renaming = True
+                    break
+                current_index = int(file.stem)
+                if current_index in used_indices or current_index != expected_index:
+                    self._log(f"Issue with {file.name}: expected {expected_index}, got {current_index}. Renaming needed.")
+                    needs_renaming = True
+                    break
+                used_indices.add(current_index)
+                expected_index += 1
+            if not needs_renaming:
+                self._log("Files are already sequentially named. No renaming needed.")
+                if progress_callback:
+                    progress_callback(1.0)
+                return sorted_files
+            unique_id = uuid.uuid4().hex
+            rename_map = collections.OrderedDict()
+            final_files: list[Path] = []
+            try:
+                self._log("Creating temporary filenames to avoid conflicts...")
+                for i, file in enumerate(sorted_files):
+                    if progress_callback:
+                        progress_callback(PROGRESS_RENAME_TEMP_PHASE_START + (i / total_files * PROGRESS_RENAME_TEMP_PHASE_RANGE))
+                    ext = file.suffix.lower()
+                    temp_name = file.parent / f"temp_{unique_id}_{i}{ext}"
+                    rename_map[file] = temp_name
+                temp_files: list[Path] = []
+                for i, (source, target) in enumerate(rename_map.items()):
+                    if progress_callback:
+                        progress_callback(PROGRESS_RENAME_EXEC_PHASE_START + (i / total_files * PROGRESS_RENAME_EXEC_PHASE_RANGE))
+                    try:
+                        source.rename(target)
+                        temp_files.append(target)
+                    except Exception as e:
+                        self._log(f"Error in temporary rename {source.name} → {target.name}: {e}")
+
+                        # Define safe rollback function to avoid try-except in loop
+                        def safe_rollback(orig_file: Path, temp_file: Path) -> None:
+                            """Safely roll back a rename operation."""
+                            try:
+                                if temp_file.exists():
+                                    self._log(f"Rolling back: {temp_file.name} → {orig_file.name}")
+                                    temp_file.rename(orig_file)
+                            except Exception as rollback_error:
+                                self._log(f"Error rolling back rename: {rollback_error}")
+
+                        # Use the helper function without try-except in the loop
+                        for original, temp in list(rename_map.items())[:i]:
+                            safe_rollback(original, temp)
+
+                        self._log("Sequential rename failed, original filenames restored")
+                        if progress_callback:
+                            progress_callback(1.0)
+                        return sorted_files
+
+                self._log("Creating final sequential filenames...")
+                final_rename_map = {}
+                temp_files.sort(key=lambda x: x.name)
+                for i, temp_file in enumerate(temp_files):
+                    if progress_callback:
+                        progress_callback(PROGRESS_RENAME_FINAL_PHASE_START + (i / len(temp_files) * PROGRESS_RENAME_FINAL_PHASE_RANGE))
+                    ext = temp_file.suffix.lower()
+                    new_name = temp_file.parent / f"{i + 1}{ext}"
+                    final_rename_map[temp_file] = new_name
+
+                # Define a helper function for safe renaming to avoid try-except in loop
+                def safe_rename(source: Path, target: Path) -> Path:
+                    """Safely rename a file, returning the new path on success or original path on failure."""
+                    try:
+                        source.rename(target)
+                        self._log(f"Final rename: {source.name} → {target.name}")
+                        return target
+                    except Exception as e:
+                        self._log(f"Error in final rename {source.name} → {target.name}: {e}")
+                        return source
+
+                # Process all renames in batches without try-except in the loop
+                batch_size = 20  # Reasonable batch size
+                for i in range(0, len(temp_files), batch_size):
+                    batch_items = list(final_rename_map.items())[i:i+batch_size]
+                    if progress_callback:
+                        progress = PROGRESS_RENAME_FINAL_EXEC_PHASE_START + (i / len(temp_files) * PROGRESS_RENAME_FINAL_EXEC_PHASE_RANGE)
+                        progress_callback(progress)
+
+                    # Process each item in the batch without try-except in the loop
+                    for source, target in batch_items:
+                        final_files.append(safe_rename(source, target))
+
+                if progress_callback:
+                    progress_callback(1.0)
+                self._log(f"Sequential renaming complete: {len(final_files)} files renamed")
+                return final_files
+            except Exception as e:
+                self._log(f"Unexpected error during sequential renaming: {e}")
+                if progress_callback:
+                    progress_callback(1.0)
+                return sorted_files
+
+    def _resize_large_images(self, files: list[Path],
+                             progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+        """Resize images larger than the defined threshold using parallel processing."""
+        self._log("Starting resizing of large images...")
+        image_files = [f for f in files if path_util.is_supported_image_extension(f.suffix)]
+        self._log(f"Found {len(image_files)} image files to check")
+        results = {"resized": 0, "skipped": 0, "errors": 0}
+        results_lock = threading.Lock()
+        total_files = len(image_files)
+        processed_count = [0]
+        def process_image(idx_file: tuple[int, Path]) -> None:
+            idx, file = idx_file
+            if self.cancel_requested:
+                return
+            try:
+                width, height = imagesize.get(file)
+                total_pixels = width * height
+                with results_lock:
+                    processed_count[0] += 1
+                    if progress_callback:
+                        progress_callback(processed_count[0] / total_files, f"Analyzing image: {file.name}")
+                if total_pixels > MEGAPIXEL_THRESHOLD:
+                    scale_factor = (MEGAPIXEL_THRESHOLD / total_pixels) ** 0.5
+                    new_width, new_height = int(width * scale_factor), int(height * scale_factor)
+                    self._log(
+                        f"Resizing {file.name} from {width}x{height} "
+                        f"({total_pixels/1_000_000:.2f}MP) to {new_width}x{new_height} "
+                        f"({MEGAPIXEL_THRESHOLD/1_000_000:.2f}MP)"
+                    )
+                    try:
+                        with Image.open(file) as img:
+                            resized_img = img.resize((new_width, new_height), Image.LANCZOS)
+                            resized_img.save(file, quality=95)
+                        with results_lock:
+                            results["resized"] += 1
+                    except Exception as e:
+                        self._log(f"Error resizing {file.name}: {e}")
+                        with results_lock:
+                            results["errors"] += 1
+                else:
+                    with results_lock:
+                        results["skipped"] += 1
+            except Exception as e:
+                self._log(f"Error getting dimensions for {file.name}: {e}")
+                with results_lock:
+                    results["errors"] += 1
+                    processed_count[0] += 1
+                    if progress_callback:
+                        progress_callback(processed_count[0] / total_files)
+        try:
+            with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+                list(executor.map(process_image, enumerate(image_files)))
+            self._log(f"Completed resizing: {results['resized']} images resized, {results['skipped']} skipped, {results['errors']} errors")
+        except Exception as e:
+            self._log(f"Error during parallel image resizing: {e}")
+
+    def _process_alpha_images(self, files: list[Path],
+                              progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+        """Replace image transparency with a solid background color using parallel processing."""
+        image_files = [f for f in files if path_util.is_supported_image_extension(f.suffix)]
+        if not image_files:
+            self._log("No image files found")
+            return
         self._log("Processing transparent images...")
         bg_color = self.config_data["alpha_bg_color"].strip().lower()
-
-        # Handle random color option
-        if bg_color == "-1" or bg_color == "random":
+        if bg_color in ("-1", "random"):
             import random
-            # Generate random RGB values
-            r = random.randint(0, 255)
-            g = random.randint(0, 255)
-            b = random.randint(0, 255)
+            r, g, b = random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
             bg_color_tuple = (r, g, b)
-            hex_color = f"#{r:02x}{g:02x}{b:02x}"
-            self._log(f"Using random background color: {hex_color} (RGB: {bg_color_tuple})")
+            self._log(f"Using random background color: #{r:02x}{g:02x}{b:02x} (RGB: {bg_color_tuple})")
         else:
-            # Validate color input
             try:
-                if bg_color.startswith('#') and len(bg_color) == 7:  # #RRGGBB format
+                if bg_color.startswith("#") and len(bg_color) == 7:
                     bg_color_tuple = tuple(int(bg_color[i:i+2], 16) for i in (1, 3, 5))
                 else:
-                    # Validate color name by creating a test image
                     img = Image.new("RGB", (1, 1), bg_color)
                     bg_color_tuple = img.getpixel((0, 0))
                 self._log(f"Using background color: {bg_color} (RGB: {bg_color_tuple})")
             except Exception as e:
                 self._log(f"Invalid color '{bg_color}': {e}. Using white instead.")
                 bg_color_tuple = (255, 255, 255)
-
-        # Find and process images
-        image_files = [f for f in files if path_util.is_supported_image_extension(f.suffix)]
-        if not image_files:
-            self._log("No image files found")
-            return
-
-        processed, skipped = 0, 0
-        total = len(image_files)
-
-        for idx, file in enumerate(image_files):
+        results = {"processed": 0, "skipped": 0, "errors": 0}
+        results_lock = threading.Lock()
+        total_files = len(image_files)
+        processed_count = [0]
+        def process_image(idx_file: tuple[int, Path]) -> None:
+            idx, file = idx_file
+            if self.cancel_requested:
+                return
             try:
-                # Update progress
-                if progress_callback:
-                    progress_callback((idx + 1) / total)
-                else:
-                    self._update_status(f"Processing: {file.name}", (idx + 1) / total)
-
-                # Process the image
                 with Image.open(file) as img:
-                    # Skip if not RGBA or LA mode
-                    if img.mode not in ('RGBA', 'LA'):
-                        skipped += 1
-                        continue
-
-                    # Check for actual transparency
-                    has_transparency = False
-                    if img.mode == 'RGBA':
-                        has_transparency = any(a < 255 for _, _, _, a in img.getdata())
-                    else:  # LA mode
-                        has_transparency = any(a < 255 for _, a in img.getdata())
-
+                    if img.mode not in ("RGBA", "LA"):
+                        with results_lock:
+                            results["skipped"] += 1
+                            processed_count[0] += 1
+                            if progress_callback:
+                                progress_callback(processed_count[0] / total_files, f"Processing: {file.name}")
+                        return
+                    has_transparency = (
+                        any(a < 255 for a in img.getdata())
+                        if img.mode == "LA"
+                        else any(p[3] < 255 for p in img.getdata())
+                    )
                     if not has_transparency:
-                        skipped += 1
-                        continue
-
-                    # Replace transparency with background color
-                    background = Image.new('RGB', img.size, bg_color_tuple)
+                        with results_lock:
+                            results["skipped"] += 1
+                            processed_count[0] += 1
+                            if progress_callback:
+                                progress_callback(processed_count[0] / total_files)
+                        return
+                    background = Image.new("RGB", img.size, bg_color_tuple)
                     background.paste(img, (0, 0), img)
                     background.save(file)
-                    processed += 1
-
+                    with results_lock:
+                        results["processed"] += 1
+                        processed_count[0] += 1
+                        if progress_callback:
+                            progress_callback(processed_count[0] / total_files)
             except Exception as e:
                 self._log(f"Error processing {file.name}: {e}")
-
-        self._log(f"Transparency processing complete: {processed} processed, {skipped} skipped")
-
-    def _verify_single_image(self, file: Path) -> tuple[bool, str, bool]:
-        """Verify a single image file for corruption.
-
-        Returns:
-            tuple: (is_valid, error_message, is_format_error)
-            is_format_error distinguishes between format-specific and general errors
-        """
+                with results_lock:
+                    results["errors"] += 1
+                    processed_count[0] += 1
+                    if progress_callback:
+                        progress_callback(processed_count[0] / total_files)
         try:
-            # First try to open the image to detect basic format issues
-            with Image.open(file) as img:
-                # Verify checks structural integrity but doesn't decode fully
-                img.verify()
-
-            # If verify passed, also try to load a small part to detect pixel-level corruption
-            # This is more thorough as verify() only checks headers and structure
-            with Image.open(file) as img:
-                # Load just a small part of the image to check data integrity
-                # This forces PIL to actually decode some image data
-                img.load()
-                # Try to access pixel data from a small region
-                if hasattr(img, 'getpixel'):
-                    img.getpixel((0, 0))
-
-            return True, "", False
+            with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+                list(executor.map(process_image, enumerate(image_files)))
+            self._log(f"Transparency processing complete: {results['processed']} processed, {results['skipped']} skipped, {results['errors']} errors")
         except Exception as e:
-            return False, str(e), True
+            self._log(f"Error during parallel transparency processing: {e}")
 
-    def _verify_images(self, files: list[Path], progress_callback=None) -> None:
-        """Verify images for corruption using PIL's verify method."""
-        self._log("Starting image verification process...")
-
-        # Find all image files
-        image_files = [
-            f for f in files
-            if path_util.is_supported_image_extension(f.suffix)
-        ]
-
-        if not image_files:
-            self._log("No image files found to verify")
-            return
-
-        self._log(f"Found {len(image_files)} images to verify")
-
-        # Track verification statistics
-        valid_count = 0
-        corrupted_count = 0
-        error_files = []
-
-        # Process each image file
-        total_files = len(image_files)
-        for idx, file in enumerate(image_files):
-            # Update progress
-            if progress_callback:
-                progress_callback((idx + 1) / total_files)
-            else:
-                progress = (idx + 1) / total_files
-                self._update_status(f"Verifying image: {file.name}", progress)
-
-            try:
-                # Use helper function to verify the image
-                is_valid, error_msg, is_format_error = self._verify_single_image(file)
-
-                if is_valid:
-                    self._log(f"✓ {file.name} is valid")
-                    valid_count += 1
-                else:
-                    # Format-specific error from verification
-                    self._log(f"✗ {file.name} is CORRUPTED: {error_msg}")
-                    corrupted_count += 1
-                    error_files.append((file.name, error_msg))
-
-            except Exception as e:
-                # General error (e.g. file not found)
-                self._log(f"! Error verifying {file.name}: {e}")
-                corrupted_count += 1
-                error_files.append((file.name, str(e)))
-
-        # Log summary
-        if corrupted_count == 0:
-            self._log(f"✓ Image verification complete: All {valid_count} images are valid")
-        else:
-            self._log(f"⚠ Image verification complete: {valid_count} valid, {corrupted_count} corrupted/problematic")
-            self._log("Problematic files:")
-            for name, error in error_files:
-                self._log(f"  - {name}: {error}")
-
-            # Group errors by type for better analysis
-            error_types = {}
-            for _, error in error_files:
-                error_type = error.split(':')[0] if ':' in error else error
-                if error_type not in error_types:
-                    error_types[error_type] = 0
-                error_types[error_type] += 1
-
-            self._log("Error breakdown:")
-            for error_type, count in error_types.items():
-                self._log(f"  - {error_type}: {count} files")
-
-    def _rename_files_sequentially(self, files: list[Path], progress_callback=None) -> list[Path]:
-        """Rename files sequentially regardless of extension, ensuring unique numbers."""
-        import uuid  # Add this at the top of the file if not already imported
-
-        self._log("Starting sequential file renaming...")
-
-        # Sort all files to ensure consistent ordering
-        sorted_files = sorted(files, key=lambda x: x.name)
-        total_files = len(sorted_files)
-
-        # Update initial progress
-        if progress_callback:
-            progress_callback(0.05)  # Starting progress
-
-        # Check if files are already sequentially named
-        needs_renaming = False
-
-        # Track used indices to ensure no duplicates across different extensions
-        used_indices = set()
-        expected_index = 1
-
-        # First check - each file should have a numeric name starting from 1 with no gaps or duplicates
-        for i, file in enumerate(sorted_files):
-            # Update progress during check phase (use 10% of total progress)
-            if progress_callback and i % 10 == 0:
-                progress_callback(0.05 + (i / total_files * 0.1))
-
-            # If filename is not a digit, renaming is needed
-            if not file.stem.isdigit():
-                self._log(f"Non-numeric filename found: {file.name}. Renaming needed.")
-                needs_renaming = True
-                break
-
-            # Get current index
-            current_index = int(file.stem)
-
-            # Check for duplicates across extensions
-            if current_index in used_indices:
-                self._log(f"Duplicate number found: {current_index}. Renaming needed.")
-                needs_renaming = True
-                break
-
-            # Check for proper sequence
-            if current_index != expected_index:
-                self._log(f"Gap in sequence found: expected {expected_index} but found {current_index}. Renaming needed.")
-                needs_renaming = True
-                break
-
-            # Mark index as used
-            used_indices.add(current_index)
-            expected_index += 1
-
-        # If everything is already well-ordered, don't rename
-        if not needs_renaming:
-            self._log("Files are already properly sequentially named from 1 without gaps or duplicates. No renaming needed.")
-            if progress_callback:
-                progress_callback(1.0)  # Complete
-            return sorted_files
-
-        # If we need to rename, use a two-pass approach
-        renamed_files = []
-
-        # STEP 1: Give all files temporary unique names using UUID to avoid conflicts
-        temp_files = []
-        for i, file in enumerate(sorted_files):
-            # Update progress for first pass (use 40% of total progress)
-            if progress_callback:
-                progress_callback(0.15 + (i / total_files * 0.4))
-            else:
-                self._update_status(f"Renaming (pass 1/2): {file.name}", (i + 1) / total_files * 0.5)
-
-            ext = file.suffix.lower()
-            # Create a temporary name with UUID (using uuid4 for better uniqueness)
-            temp_name = file.parent / f"temp_{uuid.uuid4().hex}{ext}"
-
-            try:
-                file.rename(temp_name)
-                temp_files.append(temp_name)
-            except Exception as e:
-                self._log(f"Error in temporary rename {file.name}: {e}")
-                temp_files.append(file)  # Keep original if rename fails
-
-        # STEP 2: Rename files sequentially across all extensions
-        # Sort temp files to maintain original order as much as possible
-        temp_files.sort(key=lambda x: x.name)
-        next_index = 1
-
-        for i, temp_file in enumerate(temp_files):
-            # Update progress for second pass (use 45% of total progress)
-            if progress_callback:
-                progress_callback(0.55 + (i / len(temp_files) * 0.45))
-            else:
-                self._update_status(f"Renaming (pass 2/2): {temp_file.name}", 0.5 + (i + 1) / len(temp_files) * 0.5)
-
-            ext = temp_file.suffix.lower()
-            new_name = temp_file.parent / f"{next_index}{ext}"
-
-            try:
-                temp_file.rename(new_name)
-                self._log(f"Final rename: {temp_file.name} → {new_name.name}")
-                renamed_files.append(new_name)
-                next_index += 1
-            except Exception as e:
-                self._log(f"Error in final rename {temp_file.name}: {e}")
-                renamed_files.append(temp_file)
-
-        # Final progress update
-        if progress_callback:
-            progress_callback(1.0)
-
-        self._log(f"Sequential renaming complete: {len(renamed_files)} files renamed")
-        return renamed_files
-
-    def _resize_large_images(self, files: list[Path], progress_callback=None) -> None:
-        """Resize images larger than 4MP (4 million pixels)."""
-        self._log("Starting resizing of large images...")
-
-        MAX_MEGAPIXELS = 4_194_304
-
-        # Find image files
-        image_files = [
-            f for f in files
-            if path_util.is_supported_image_extension(f.suffix)
-        ]
-
-        self._log(f"Found {len(image_files)} image files to check")
-        resized_count = 0
-
-        # Process each image file
-        total_files = len(image_files)
-        for idx, file in enumerate(image_files):
-            # Update progress using callback if available
-            if progress_callback:
-                progress_callback((idx + 1) / total_files)
-            else:
-                progress = (idx + 1) / total_files
-                self._update_status(f"Analyzing image: {file.name}", progress)
-
-            # Use imagesize to check dimensions (much faster than opening with PIL)
-            try:
-                width, height = imagesize.get(file)
-                total_pixels = width * height
-            except Exception as e:
-                self._log(f"Error getting dimensions for {file.name}: {e}")
-                continue
-
-            # Check if image is larger than 4MP
-            if total_pixels > MAX_MEGAPIXELS:
-                # Update status to show we're actually resizing
-                if not progress_callback:
-                    self._update_status(f"Resizing image: {file.name}", (idx + 1) / total_files)
-
-                # Calculate the scaling factor to get to 4MP
-                scale_factor = (MAX_MEGAPIXELS / total_pixels) ** 0.5
-
-                # Calculate new dimensions
-                new_width = int(width * scale_factor)
-                new_height = int(height * scale_factor)
-
-                self._log(f"Resizing {file.name} from {width}x{height} ({total_pixels/1_000_000:.2f}MP) to {new_width}x{new_height} ({MAX_MEGAPIXELS/1_000_000:.2f}MP)")
-
-                # Now open with PIL to perform the resize
-                try:
-                    with Image.open(file) as img:
-                        # Perform the resize with high quality
-                        resized_img = img.resize((new_width, new_height), Image.LANCZOS)
-                        # Save with original format and metadata
-                        resized_img.save(file, quality=95)
-                    resized_count += 1
-                except Exception as e:
-                    self._log(f"Error resizing {file.name}: {e}")
-            else:
-                self._log(f"Skipping {file.name}: already under 4MP ({total_pixels/1_000_000:.2f}MP)")
-
-        self._log(f"Completed resizing: {resized_count} images were resized to 4MP")
-
-    def _optimize_pngs(self, files: list[Path], progress_callback=None) -> None:
+    def _optimize_pngs(self, files: list[Path],
+                         progress_callback: Callable[[float, str | None], None] | None = None) -> None:
         """Optimize PNG files using oxipng."""
         self._log("Starting PNG optimization...")
-
-        # Find PNG files
         png_files = [f for f in files if f.suffix.lower() == ".png"]
-
         if not png_files:
             self._log("No PNG files found to optimize")
             return
-
         self._log(f"Found {len(png_files)} PNG files to optimize")
-
-        # Track successful optimizations
         success_count = 0
         total_bytes_saved = 0
-
-        # For each PNG file, optimize it
         total_files = len(png_files)
         for idx, file in enumerate(png_files):
-            # Update progress using callback if available
-            if progress_callback:
-                progress_callback((idx + 1) / total_files)
-            else:
-                progress = (idx + 1) / total_files
-                self._update_status(f"Optimizing PNG: {file.name}", progress)
-
-            # Get original file size - might fail if file doesn't exist
+            self._update_progress(idx, total_files, f"Optimizing PNG: {file.name}", progress_callback)
             try:
                 original_size = file.stat().st_size
             except Exception as e:
                 self._log(f"Error getting original size for {file.name}: {e}")
                 continue
-
-            # Optimize the PNG file - most likely to fail
             try:
-                self._log(f"Optimizing {file.name} with oxipng level 5, fix_errors=True")
                 oxipng.optimize(file, level=5, fix_errors=True)
             except Exception as e:
                 self._log(f"Error optimizing {file.name}: {e}")
                 continue
-
-            # Get new file size and calculate savings
             try:
                 new_size = file.stat().st_size
                 bytes_saved = original_size - new_size
-                percent_saved = (bytes_saved / original_size) * 100 if original_size > 0 else 0
-
-                # Log result
-                self._log(f"Optimized {file.name}: {bytes_saved:,} bytes saved ({percent_saved:.1f}%)")
-
                 success_count += 1
                 total_bytes_saved += bytes_saved
             except Exception as e:
-                self._log(f"Error calculating optimization results for {file.name}: {e}")
-
-        # Log summary
-        if success_count > 0:
+                self._log(f"Error calculating results for {file.name}: {e}")
+        if success_count:
             avg_saving = total_bytes_saved / success_count
-            self._log(f"Completed optimization: {success_count} of {total_files} PNG files optimized")
-            self._log(f"Total bytes saved: {total_bytes_saved:,} (average: {avg_saving:,.1f} per file)")
+            self._log(f"Completed optimization: {success_count} of {total_files} PNGs optimized")
+            self._log(f"Total bytes saved: {total_bytes_saved:,} (avg: {avg_saving:,.1f} per file)")
         else:
             self._log("PNG optimization completed with 0 successful optimizations")
-
-    def _convert_to_webp(self, files: list[Path], progress_callback=None) -> None:
-        """Convert images to WebP format with optimized settings.
-
-        - PNG, TIFF, and BMP files are converted using lossless WebP format
-        - Other formats use lossy compression at 90% quality
-        - Original files are only replaced if the WebP version is smaller
-        """
-        self._log("Starting conversion to WebP format...")
-
-        # Find suitable image files (exclude WebP, JPEG XL, AVIF)
-        skip_extensions = ['.webp', '.jxl', '.avif']
-        image_files = [
-            f for f in files
-            if path_util.is_supported_image_extension(f.suffix) and
-            f.suffix.lower() not in skip_extensions
-        ]
-
-        if not image_files:
-            self._log("No suitable image files found to convert")
-            return
-
-        self._log(f"Found {len(image_files)} images to convert to WebP")
-
-        # Track conversion statistics
-        success_count = 0
-        total_bytes_saved = 0
-        skipped_count = 0
-
-        # Define which formats should use lossless encoding
-        lossless_extensions = ['.png', '.tiff', '.tif', '.bmp']
-
-        # Process each image file
-        total_files = len(image_files)
-        for idx, file in enumerate(image_files):
-            # Update progress (outside try-except)
-            if progress_callback:
-                progress_callback((idx + 1) / total_files)
-            else:
-                progress = (idx + 1) / total_files
-                self._update_status(f"Converting to WebP: {file.name}", progress)
-
-            # Skip files that don't exist or can't be accessed
-            try:
-                original_size = file.stat().st_size
-                webp_path = file.with_suffix('.webp')
-            except Exception as e:
-                self._log(f"Error accessing {file.name}: {e}")
-                continue
-
-            # Process the image conversion
-            try:
-                with Image.open(file) as img:
-                    # Determine if this is a format that should use lossless encoding
-                    is_lossless_candidate = file.suffix.lower() in lossless_extensions
-
-                    # Convert to RGB if the image is in RGBA mode and has no transparency
-                    if img.mode == 'RGBA':
-                        # Check if the image has any transparency
-                        if not any(px[3] < 255 for px in img.getdata()):
-                            img = img.convert('RGB')
-                            is_lossless_candidate = False  # Treat as RGB image now
-
-                    # Log conversion info with encoding method
-                    if is_lossless_candidate:
-                        self._log(f"Converting {file.name} to WebP using lossless encoding")
-                        img.save(webp_path, 'WEBP', lossless=True)
-                    else:
-                        self._log(f"Converting {file.name} to WebP using 90% quality")
-                        img.save(webp_path, 'WEBP', quality=90)
-            except Exception as e:
-                self._log(f"Error converting {file.name} to WebP: {e}")
-                # Try to clean up partial WebP file if it exists
-                if webp_path.exists():
-                    # Use contextlib.suppress instead of try-except-pass
-                    with contextlib.suppress(FileNotFoundError, PermissionError):
-                        webp_path.unlink()
-                continue
-
-            # Handle file operations separately
-            try:
-                if webp_path.exists():
-                    # Get new file size and calculate savings
-                    new_size = webp_path.stat().st_size
-                    bytes_saved = original_size - new_size
-                    percent_saved = (bytes_saved / original_size) * 100 if original_size > 0 else 0
-
-                    # Only delete original if the WebP file is smaller
-                    if new_size < original_size:
-                        file.unlink()
-                        self._log(f"Converted {file.name} to WebP: {bytes_saved:,} bytes saved ({percent_saved:.1f}%)")
-                        success_count += 1
-                        total_bytes_saved += bytes_saved
-                    else:
-                        # WebP is larger, so keep original and delete WebP
-                        webp_path.unlink()
-                        self._log(f"Skipped {file.name}: WebP version would be larger by {-bytes_saved:,} bytes")
-                        skipped_count += 1
-            except Exception as e:
-                self._log(f"Error finalizing conversion for {file.name}: {e}")
-
-        # Log summary
-        if success_count > 0:
-            avg_saving = total_bytes_saved / success_count
-            self._log(f"Completed WebP conversion: {success_count} of {total_files} images converted")
-            self._log(f"Total bytes saved: {total_bytes_saved:,} (average: {avg_saving:,.1f} per file)")
-            if skipped_count > 0:
-                self._log(f"Skipped {skipped_count} images where WebP would be larger")
-        else:
-            self._log("WebP conversion completed with 0 successful conversions")
-
-    def _convert_to_jpegxl(self, files: list[Path], progress_callback=None) -> None:
-        """Convert images to JPEG XL format.
-
-        - JPEG/JPG files are converted losslessly (perfect quality preservation)
-        - Other formats use lossy compression at 90% quality
-        - Original files are only replaced if the JXL version is smaller
-        """
-        self._log("Starting conversion to JPEG XL format...")
-
-        # Find suitable image files (excluding JXL files)
-        image_files = [
-            f for f in files
-            if path_util.is_supported_image_extension(f.suffix) and
-            f.suffix.lower() != '.jxl'
-        ]
-
-        if not image_files:
-            self._log("No image files found to convert to JPEG XL")
-            return
-
-        self._log(f"Found {len(image_files)} images to convert to JPEG XL")
-
-        # Track conversion statistics
-        success_count = 0
-        total_bytes_saved = 0
-        skipped_count = 0
-
-        # Process each image file
-        total_files = len(image_files)
-        for idx, file in enumerate(image_files):
-            # Update progress (outside try-except)
-            if progress_callback:
-                progress_callback((idx + 1) / total_files)
-            else:
-                progress = (idx + 1) / total_files
-                self._update_status(f"Converting to JPEG XL: {file.name}", progress)
-
-            # Skip files that don't exist or can't be accessed
-            try:
-                original_size = file.stat().st_size
-                jxl_path = file.with_suffix('.jxl')
-            except Exception as e:
-                self._log(f"Error accessing {file.name}: {e}")
-                continue
-
-            # Process the image conversion
-            try:
-                # Determine if this is a JPEG file (for lossless transcoding)
-                is_jpeg = file.suffix.lower() in ['.jpg', '.jpeg']
-
-                # Open the image with PIL
-                with Image.open(file) as img:
-                    if is_jpeg:
-                        # Use lossless transcoding for JPEG files
-                        self._log(f"Converting {file.name} to JPEG XL using lossless encoding")
-                        img.save(jxl_path, 'JXL', lossless=True)
-                    else:
-                        # Use lossy encoding at 90% quality for other formats
-                        self._log(f"Converting {file.name} to JPEG XL using lossy compression (90% quality)")
-                        img.save(jxl_path, 'JXL', quality=90)
-            except Exception as e:
-                self._log(f"Error converting {file.name} to JPEG XL: {e}")
-                # Try to clean up partial JXL file if it exists
-                if jxl_path.exists():
-                    with contextlib.suppress(FileNotFoundError, PermissionError):
-                        jxl_path.unlink()
-                continue
-
-            # Handle file operations separately
-            try:
-                if jxl_path.exists():
-                    # Get new file size and calculate savings
-                    new_size = jxl_path.stat().st_size
-                    bytes_saved = original_size - new_size
-                    percent_saved = (bytes_saved / original_size) * 100 if original_size > 0 else 0
-
-                    # Only delete original if the JXL file is smaller
-                    if new_size < original_size:
-                        file.unlink()
-                        self._log(f"Converted {file.name} to JPEG XL: {bytes_saved:,} bytes saved ({percent_saved:.1f}%)")
-                        success_count += 1
-                        total_bytes_saved += bytes_saved
-                    else:
-                        # JXL is larger, so keep original and delete JXL
-                        jxl_path.unlink()
-                        self._log(f"Skipped {file.name}: JPEG XL version would be larger by {-bytes_saved:,} bytes")
-                        skipped_count += 1
-            except Exception as e:
-                self._log(f"Error finalizing conversion for {file.name}: {e}")
-
-        # Log summary
-        if success_count > 0:
-            avg_saving = total_bytes_saved / success_count
-            self._log(f"Completed JPEG XL conversion: {success_count} of {total_files} images converted")
-            self._log(f"Total bytes saved: {total_bytes_saved:,} (average: {avg_saving:,.1f} per file)")
-            if skipped_count > 0:
-                self._log(f"Skipped {skipped_count} images where JPEG XL would be larger")
-        else:
-            self._log("JPEG XL conversion completed with 0 successful conversions")
