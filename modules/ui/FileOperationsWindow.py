@@ -600,12 +600,12 @@ class FileOperationsWindow(ctk.CTkToplevel):
             self._log(f"Error during parallel image verification: {e}")
 
     def _convert_image_format(self,
-                              files: list[Path],
-                              target_format: str,
-                              skip_extensions: set,
-                              format_options: dict,
-                              progress_callback: Callable[[float, str | None], None] | None = None
-                              ) -> None:
+                            files: list[Path],
+                            target_format: str,
+                            skip_extensions: set,
+                            format_options: dict,
+                            progress_callback: Callable[[float, str | None], None] | None = None
+                            ) -> None:
         """Generic image conversion function for multiple formats."""
         self._log(f"Starting conversion to {target_format} format...")
         format_ext = format_options.get('format_ext', '.unknown')
@@ -613,13 +613,19 @@ class FileOperationsWindow(ctk.CTkToplevel):
         lossless_extensions = format_options.get('lossless_extensions', set())
         is_lossless_check = format_options.get('is_lossless_check', lambda file, img: False)
         quality = format_options.get('quality', 90)
+
+        # Filter files to exclude masks (identified by '-' in filename)
         image_files = [
             f for f in files
-            if path_util.is_supported_image_extension(f.suffix) and f.suffix.lower() not in skip_extensions
+            if path_util.is_supported_image_extension(f.suffix) and
+            f.suffix.lower() not in skip_extensions and
+            '-' not in f.stem  # Skip mask files
         ]
+
         if not image_files:
             self._log(f"No suitable image files found to convert to {target_format}")
             return
+
         self._log(f"Found {len(image_files)} images to convert to {target_format}")
         results = {"success": 0, "skipped": 0, "errors": 0, "total_bytes_saved": 0}
         results_lock = threading.Lock()
@@ -738,14 +744,50 @@ class FileOperationsWindow(ctk.CTkToplevel):
             """Rename files sequentially using a transactional approach for error resilience."""
             import uuid
             self._log("Starting sequential file renaming...")
-            sorted_files = sorted(files, key=lambda x: x.name)
-            total_files = len(sorted_files)
+
+            # Group files into image files and their associated files (captions, masks)
+            image_files = [f for f in files if path_util.is_supported_image_extension(f.suffix)]
+            other_files = [f for f in files if not path_util.is_supported_image_extension(f.suffix)]
+
+            # Create mappings for caption files and mask files
+            file_groups = {}
+
+            # Identify all caption files (same name as image but with .txt extension)
+            for file in other_files:
+                if file.suffix.lower() == '.txt':
+                    # Find the corresponding image file (any supported extension)
+                    for img_file in image_files:
+                        if img_file.stem == file.stem:
+                            if img_file not in file_groups:
+                                file_groups[img_file] = {'caption': None, 'masks': []}
+                            file_groups[img_file]['caption'] = file
+                            break
+
+            # Identify mask files (filename-masklabel.png format)
+            for file in files:
+                if file.stem.endswith("-masklabel"):
+                    base_name = file.stem[:-len("-masklabel")]
+                    for img_file in image_files:
+                        if img_file.stem == base_name:
+                            if img_file not in file_groups:
+                                file_groups[img_file] = {'caption': None, 'masks': []}
+                            file_groups[img_file]['masks'].append((file, "masklabel"))
+                            break
+
+            self._log(f"Found {len(image_files)} image files and {len(file_groups)} file groups")
+
+            # Sort image files for sequential naming
+            sorted_img_files = sorted(image_files, key=lambda x: x.name)
+            total_files = len(sorted_img_files)
+
             if progress_callback:
                 progress_callback(PROGRESS_INITIAL)
+
+            # Check if renaming is actually needed
             needs_renaming = False
             used_indices = set()
             expected_index = 1
-            for i, file in enumerate(sorted_files):
+            for i, file in enumerate(sorted_img_files):
                 if progress_callback and i % 10 == 0:
                     progress_callback(PROGRESS_INITIAL + (i / total_files * 0.1))
                 if not file.stem.isdigit():
@@ -759,26 +801,53 @@ class FileOperationsWindow(ctk.CTkToplevel):
                     break
                 used_indices.add(current_index)
                 expected_index += 1
+
             if not needs_renaming:
                 self._log("Files are already sequentially named. No renaming needed.")
                 if progress_callback:
                     progress_callback(1.0)
-                return sorted_files
+                return sorted_img_files
+
+            # Begin renaming process
             unique_id = uuid.uuid4().hex
             rename_map = collections.OrderedDict()
             final_files: list[Path] = []
+            files_to_process = []  # Will contain all files that need renaming
+
             try:
                 self._log("Creating temporary filenames to avoid conflicts...")
-                for i, file in enumerate(sorted_files):
+
+                # First create temporary names for all image files
+                for i, file in enumerate(sorted_img_files):
                     if progress_callback:
-                        progress_callback(PROGRESS_RENAME_TEMP_PHASE_START + (i / total_files * PROGRESS_RENAME_TEMP_PHASE_RANGE))
+                        progress_callback(PROGRESS_RENAME_TEMP_PHASE_START +
+                                         (i / total_files * PROGRESS_RENAME_TEMP_PHASE_RANGE * 0.5))
                     ext = file.suffix.lower()
                     temp_name = file.parent / f"temp_{unique_id}_{i}{ext}"
                     rename_map[file] = temp_name
-                temp_files: list[Path] = []
+                    files_to_process.append(file)
+
+                    # Add related files to the rename map
+                    if file in file_groups:
+                        group = file_groups[file]
+                        # Caption file
+                        if group['caption']:
+                            caption_temp = file.parent / f"temp_{unique_id}_{i}.txt"
+                            rename_map[group['caption']] = caption_temp
+                            files_to_process.append(group['caption'])
+
+                        # Mask files
+                        for mask_file, mask_label in group['masks']:
+                            mask_temp = file.parent / f"temp_{unique_id}_{i}-{mask_label}{mask_file.suffix}"
+                            rename_map[mask_file] = mask_temp
+                            files_to_process.append(mask_file)
+
+                # Rename all files to temporary names
+                temp_files = []
                 for i, (source, target) in enumerate(rename_map.items()):
                     if progress_callback:
-                        progress_callback(PROGRESS_RENAME_EXEC_PHASE_START + (i / total_files * PROGRESS_RENAME_EXEC_PHASE_RANGE))
+                        progress_callback(PROGRESS_RENAME_EXEC_PHASE_START +
+                                        (i / len(files_to_process) * PROGRESS_RENAME_EXEC_PHASE_RANGE))
                     try:
                         source.rename(target)
                         temp_files.append(target)
@@ -795,57 +864,85 @@ class FileOperationsWindow(ctk.CTkToplevel):
                             except Exception as rollback_error:
                                 self._log(f"Error rolling back rename: {rollback_error}")
 
-                        # Use the helper function without try-except in the loop
-                        for original, temp in list(rename_map.items())[:i]:
-                            safe_rollback(original, temp)
+                        # Roll back all previous renames
+                        for original, temp in list(rename_map.items())[:rename_map.items().index((source, target))]:
+                            if temp in temp_files:  # Only rollback successful renames
+                                safe_rollback(original, temp)
+                                temp_files.remove(temp)
 
                         self._log("Sequential rename failed, original filenames restored")
                         if progress_callback:
                             progress_callback(1.0)
-                        return sorted_files
+                        return sorted_img_files
 
+                # Create mapping for final names
                 self._log("Creating final sequential filenames...")
                 final_rename_map = {}
-                temp_files.sort(key=lambda x: x.name)
-                for i, temp_file in enumerate(temp_files):
-                    if progress_callback:
-                        progress_callback(PROGRESS_RENAME_FINAL_PHASE_START + (i / len(temp_files) * PROGRESS_RENAME_FINAL_PHASE_RANGE))
-                    ext = temp_file.suffix.lower()
-                    new_name = temp_file.parent / f"{i + 1}{ext}"
-                    final_rename_map[temp_file] = new_name
 
-                # Define a helper function for safe renaming to avoid try-except in loop
-                def safe_rename(source: Path, target: Path) -> Path:
-                    """Safely rename a file, returning the new path on success or original path on failure."""
-                    try:
-                        source.rename(target)
-                        self._log(f"Final rename: {source.name} → {target.name}")
-                        return target
-                    except Exception as e:
-                        self._log(f"Error in final rename {source.name} → {target.name}: {e}")
-                        return source
+                # Group temporary files by their base name (to keep track of related files)
+                temp_file_groups = {}
+                for temp_file in temp_files:
+                    # Extract the index part from temp_{unique_id}_{index}
+                    if "temp_" + unique_id + "_" in temp_file.stem:
+                        parts = temp_file.stem.split("_")
+                        if len(parts) >= 3:
+                            index_part = parts[2]
+                            # Handle mask files
+                            if '-' in index_part:
+                                index_part = index_part.split('-')[0]
+                            if index_part.isdigit():
+                                if index_part not in temp_file_groups:
+                                    temp_file_groups[index_part] = []
+                                temp_file_groups[index_part].append(temp_file)
 
-                # Process all renames in batches without try-except in the loop
-                batch_size = 20  # Reasonable batch size
-                for i in range(0, len(temp_files), batch_size):
-                    batch_items = list(final_rename_map.items())[i:i+batch_size]
+                # Sort the indices
+                sorted_indices = sorted(temp_file_groups.keys(), key=int)
+
+                # Create final names based on sorted indices
+                for i, idx in enumerate(sorted_indices):
+                    group_files = temp_file_groups[idx]
+                    seq_num = i + 1  # Start from 1
+
+                    for temp_file in group_files:
+                        # Determine if this is a main image, caption, or mask file
+                        if '-' in temp_file.stem:
+                            # This is a mask file
+                            base, mask_label = temp_file.stem.rsplit('-', 1)
+                            final_name = temp_file.parent / f"{seq_num}-{mask_label}{temp_file.suffix}"
+                        elif temp_file.suffix.lower() == '.txt':
+                            # This is a caption file
+                            final_name = temp_file.parent / f"{seq_num}.txt"
+                        else:
+                            # This is a main image file
+                            final_name = temp_file.parent / f"{seq_num}{temp_file.suffix}"
+
+                        final_rename_map[temp_file] = final_name
+
+                # Execute final renames
+                for i, (source, target) in enumerate(final_rename_map.items()):
                     if progress_callback:
                         progress = PROGRESS_RENAME_FINAL_EXEC_PHASE_START + (i / len(temp_files) * PROGRESS_RENAME_FINAL_EXEC_PHASE_RANGE)
                         progress_callback(progress)
 
-                    # Process each item in the batch without try-except in the loop
-                    for source, target in batch_items:
-                        final_files.append(safe_rename(source, target))
+                    try:
+                        source.rename(target)
+                        # Only add the main image files to final_files
+                        if path_util.is_supported_image_extension(target.suffix) and '-' not in target.stem:
+                            final_files.append(target)
+                        self._log(f"Final rename: {source.name} → {target.name}")
+                    except Exception as e:
+                        self._log(f"Error in final rename {source.name} → {target.name}: {e}")
 
                 if progress_callback:
                     progress_callback(1.0)
-                self._log(f"Sequential renaming complete: {len(final_files)} files renamed")
+                self._log(f"Sequential renaming complete: {len(final_files)} image files renamed with their associated files")
                 return final_files
+
             except Exception as e:
                 self._log(f"Unexpected error during sequential renaming: {e}")
                 if progress_callback:
                     progress_callback(1.0)
-                return sorted_files
+                return sorted_img_files
 
     def _resize_large_images(self, files: list[Path],
                              progress_callback: Callable[[float, str | None], None] | None = None) -> None:
@@ -904,13 +1001,19 @@ class FileOperationsWindow(ctk.CTkToplevel):
             self._log(f"Error during parallel image resizing: {e}")
 
     def _process_alpha_images(self, files: list[Path],
-                              progress_callback: Callable[[float, str | None], None] | None = None) -> None:
+                             progress_callback: Callable[[float, str | None], None] | None = None) -> None:
         """Replace image transparency with a solid background color using parallel processing."""
-        image_files = [f for f in files if path_util.is_supported_image_extension(f.suffix)]
+        # Filter to exclude mask files
+        image_files = [
+            f for f in files
+            if path_util.is_supported_image_extension(f.suffix) and not f.stem.endswith("-masklabel")
+        ]
+
         if not image_files:
             self._log("No image files found")
             return
-        self._log("Processing transparent images...")
+
+        self._log("Processing transparent images (excluding mask files)...")
         bg_color = self.config_data["alpha_bg_color"].strip().lower()
         if bg_color in ("-1", "random"):
             import random
