@@ -8,6 +8,7 @@ or manually caption and mask images from a loaded directory.
 import contextlib
 import logging
 import platform
+import re
 import subprocess
 import tkinter as tk
 from collections.abc import Callable
@@ -111,6 +112,14 @@ def get_themed_icon(icon_name: str, size: tuple[int, int]) -> ImageTk.PhotoImage
             pass
     return load_icon(icon_name, size)
 
+def natural_sort_key(s):
+    """Sort strings with embedded numbers in natural order."""
+    # Split the input string into text and numeric parts
+    def convert(text):
+        return int(text) if text.isdigit() else text.lower()
+    return [convert(c) for c in re.split(r'(\d+)', s)]
+
+
 def scan_for_supported_images(
     directory: Path,
     include_subdirs: bool,
@@ -129,7 +138,8 @@ def scan_for_supported_images(
             for p in directory.iterdir()
             if p.is_file() and is_supported(p)
         ]
-    return sorted(results)
+    # Use natural sorting instead of lexicographical sorting
+    return sorted(results, key=natural_sort_key)
 
 def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
     """Get platform-specific cursor representation."""
@@ -579,7 +589,7 @@ class CaptionUI(ctk.CTkToplevel):
         caption_frame.grid_columnconfigure(0, weight=0)
         caption_frame.grid_columnconfigure(1, weight=1)
         self.caption_line_values: list[str] = [
-            f"Line {i}" for i in range(1, 6)
+            f"Caption {i}" for i in range(1, 6)
         ]
         self.caption_line_var = ctk.StringVar(
             value=self.caption_line_values[0]
@@ -601,7 +611,7 @@ class CaptionUI(ctk.CTkToplevel):
     def _on_caption_focus_out(self, event: tk.Event | None = None) -> None:
         """Store caption value when focus changes."""
         current_text: str = self.caption_entry.get()
-        self.caption_lines[self.current_caption_line] = current_text  # Fixed: removed self.parent reference
+        self.caption_lines[self.current_caption_line] = current_text
 
     def _bind_key_events(self, component: ctk.CTkBaseClass) -> None:
         """Bind common key events to the given component."""
@@ -1868,34 +1878,20 @@ class FileManager:
         dir_path = Path(self.parent.dir)
         self.parent.folder_name_label.configure(text=dir_path.name)
 
-        include_subdirs = self.parent.config_ui_data[
-            "include_subdirectories"
-        ]
+        include_subdirs = self.parent.config_ui_data["include_subdirectories"]
 
         # For huge directories, show immediate feedback that loading is happening
         if include_subdirs:
-            logger.info(
-                f"Scanning directory {dir_path} (including subdirectories)"
-            )
+            logger.info(f"Scanning directory {dir_path} (including subdirectories)")
         else:
             logger.info(f"Scanning directory {dir_path}")
 
-        # Use pathlib for scanning directories
-        if not include_subdirs and platform.system() == "Windows":
-            # Fast path for non-recursive Windows scanning
-            self.parent.image_rel_paths = []
-            is_supported = self.parent.image_handler.is_supported_image
-            for entry in dir_path.iterdir():
-                if entry.is_file() and is_supported(entry.name):
-                    self.parent.image_rel_paths.append(entry.name)
-            self.parent.image_rel_paths.sort()
-        else:
-            # Fall back to the existing scan function for recursive or non-Windows
-            self.parent.image_rel_paths = scan_for_supported_images(
-                str(dir_path),
-                include_subdirs,
-                self.parent.image_handler.is_supported_image,
-            )
+        # Use scan_for_supported_images for all platforms - no need for special cases
+        self.parent.image_rel_paths = scan_for_supported_images(
+            str(dir_path),
+            include_subdirs,
+            self.parent.image_handler.is_supported_image,
+        )
 
         self.parent._update_file_list()
         if self.parent.image_rel_paths:
