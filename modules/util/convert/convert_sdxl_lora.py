@@ -1,13 +1,13 @@
-from modules.util.convert.convert_lora_util import LoraConversionKeySet, combine
+from modules.util.convert.convert_lora_util import LoraConversionKeySet
 
 
 def __map_unet_resnet_block(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "emb_layers.1"), combine(key_prefix.diffusers_prefix, "time_emb_proj"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "in_layers.2"), combine(key_prefix.diffusers_prefix, "conv1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "out_layers.3"), combine(key_prefix.diffusers_prefix, "conv2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "skip_connection"), combine(key_prefix.diffusers_prefix, "conv_shortcut"))]
+    keys += [LoraConversionKeySet("emb_layers.1", "time_emb_proj", parent=key_prefix)]
+    keys += [LoraConversionKeySet("in_layers.2", "conv1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("out_layers.3", "conv2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("skip_connection", "conv_shortcut", parent=key_prefix)]
 
     return keys
 
@@ -15,20 +15,20 @@ def __map_unet_resnet_block(key_prefix: LoraConversionKeySet) -> list[LoraConver
 def __map_unet_down_blocks(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "1.0"), combine(key_prefix.diffusers_prefix, "0.resnets.0")))
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "2.0"), combine(key_prefix.diffusers_prefix, "0.resnets.1")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "3.0.op"), combine(key_prefix.diffusers_prefix, "0.downsamplers.0.conv"))]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("1.0", "0.resnets.0", parent=key_prefix))
+    keys += __map_unet_resnet_block(LoraConversionKeySet("2.0", "0.resnets.1", parent=key_prefix))
+    keys += [LoraConversionKeySet("3.0.op", "0.downsamplers.0.conv", parent=key_prefix)]
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "4.0"), combine(key_prefix.diffusers_prefix, "1.resnets.0")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "4.1"), combine(key_prefix.diffusers_prefix, "1.attentions.0"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "5.0"), combine(key_prefix.diffusers_prefix, "1.resnets.1")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "5.1"), combine(key_prefix.diffusers_prefix, "1.attentions.1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "6.0.op"), combine(key_prefix.diffusers_prefix, "1.downsamplers.0.conv"))]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("4.0", "1.resnets.0", parent=key_prefix))
+    keys += [LoraConversionKeySet("4.1", "1.attentions.0", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("5.0", "1.resnets.1", parent=key_prefix))
+    keys += [LoraConversionKeySet("5.1", "1.attentions.1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("6.0.op", "1.downsamplers.0.conv", parent=key_prefix)]
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "7.0"), combine(key_prefix.diffusers_prefix, "2.resnets.0")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "7.1"), combine(key_prefix.diffusers_prefix, "2.attentions.0"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "8.0"), combine(key_prefix.diffusers_prefix, "2.resnets.1")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "8.1"), combine(key_prefix.diffusers_prefix, "2.attentions.1"))]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("7.0", "2.resnets.0", parent=key_prefix))
+    keys += [LoraConversionKeySet("7.1", "2.attentions.0", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("8.0", "2.resnets.1", parent=key_prefix))
+    keys += [LoraConversionKeySet("8.1", "2.attentions.1", parent=key_prefix)]
 
     return keys
 
@@ -36,9 +36,9 @@ def __map_unet_down_blocks(key_prefix: LoraConversionKeySet) -> list[LoraConvers
 def __map_unet_mid_block(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "0"), combine(key_prefix.diffusers_prefix, "resnets.0")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "1"), combine(key_prefix.diffusers_prefix, "attentions.0"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "2"), combine(key_prefix.diffusers_prefix, "resnets.1")))
+    keys += __map_unet_resnet_block(LoraConversionKeySet("0", "resnets.0", parent=key_prefix))
+    keys += [LoraConversionKeySet("1", "attentions.0", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("2", "resnets.1", parent=key_prefix))
 
     return keys
 
@@ -46,25 +46,25 @@ def __map_unet_mid_block(key_prefix: LoraConversionKeySet) -> list[LoraConversio
 def __map_unet_up_block(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "0.0"), combine(key_prefix.diffusers_prefix, "0.resnets.0")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "0.1"), combine(key_prefix.diffusers_prefix, "0.attentions.0"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "1.0"), combine(key_prefix.diffusers_prefix, "0.resnets.1")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "1.1"), combine(key_prefix.diffusers_prefix, "0.attentions.1"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "2.0"), combine(key_prefix.diffusers_prefix, "0.resnets.2")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "2.1"), combine(key_prefix.diffusers_prefix, "0.attentions.2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "2.2.conv"), combine(key_prefix.diffusers_prefix, "0.upsamplers.0.conv"))]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("0.0", "0.resnets.0", parent=key_prefix))
+    keys += [LoraConversionKeySet("0.1", "0.attentions.0", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("1.0", "0.resnets.1", parent=key_prefix))
+    keys += [LoraConversionKeySet("1.1", "0.attentions.1", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("2.0", "0.resnets.2", parent=key_prefix))
+    keys += [LoraConversionKeySet("2.1", "0.attentions.2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("2.2.conv", "0.upsamplers.0.conv", parent=key_prefix)]
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "3.0"), combine(key_prefix.diffusers_prefix, "1.resnets.0")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "3.1"), combine(key_prefix.diffusers_prefix, "1.attentions.0"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "4.0"), combine(key_prefix.diffusers_prefix, "1.resnets.1")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "4.1"), combine(key_prefix.diffusers_prefix, "1.attentions.1"))]
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "5.0"), combine(key_prefix.diffusers_prefix, "1.resnets.2")))
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "5.1"), combine(key_prefix.diffusers_prefix, "1.attentions.2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "5.2.conv"), combine(key_prefix.diffusers_prefix, "1.upsamplers.0.conv"))]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("3.0", "1.resnets.0", parent=key_prefix))
+    keys += [LoraConversionKeySet("3.1", "1.attentions.0", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("4.0", "1.resnets.1", parent=key_prefix))
+    keys += [LoraConversionKeySet("4.1", "1.attentions.1", parent=key_prefix)]
+    keys += __map_unet_resnet_block(LoraConversionKeySet("5.0", "1.resnets.2", parent=key_prefix))
+    keys += [LoraConversionKeySet("5.1", "1.attentions.2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("5.2.conv", "1.upsamplers.0.conv", parent=key_prefix)]
 
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "6.0"), combine(key_prefix.diffusers_prefix, "2.resnets.0")))
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "7.0"), combine(key_prefix.diffusers_prefix, "2.resnets.1")))
-    keys += __map_unet_resnet_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "8.0"), combine(key_prefix.diffusers_prefix, "2.resnets.2")))
+    keys += __map_unet_resnet_block(LoraConversionKeySet("6.0", "2.resnets.0", parent=key_prefix))
+    keys += __map_unet_resnet_block(LoraConversionKeySet("7.0", "2.resnets.1", parent=key_prefix))
+    keys += __map_unet_resnet_block(LoraConversionKeySet("8.0", "2.resnets.2", parent=key_prefix))
 
     return keys
 
@@ -72,20 +72,20 @@ def __map_unet_up_block(key_prefix: LoraConversionKeySet) -> list[LoraConversion
 def __map_unet(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "input_blocks.0.0"), combine(key_prefix.diffusers_prefix, "conv_in"))]
+    keys += [LoraConversionKeySet("input_blocks.0.0", "conv_in", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "time_embed.0"), combine(key_prefix.diffusers_prefix, "time_embedding.linear_1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "time_embed.2"), combine(key_prefix.diffusers_prefix, "time_embedding.linear_2"))]
+    keys += [LoraConversionKeySet("time_embed.0", "time_embedding.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("time_embed.2", "time_embedding.linear_2", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "label_emb.0.0"), combine(key_prefix.diffusers_prefix, "add_embedding.linear_1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "label_emb.0.2"), combine(key_prefix.diffusers_prefix, "add_embedding.linear_2"))]
+    keys += [LoraConversionKeySet("label_emb.0.0", "add_embedding.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("label_emb.0.2", "add_embedding.linear_2", parent=key_prefix)]
 
-    keys += __map_unet_down_blocks(LoraConversionKeySet(combine(key_prefix.omi_prefix, "input_blocks"), combine(key_prefix.diffusers_prefix, "down_blocks")))
-    keys += __map_unet_mid_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "middle_block"), combine(key_prefix.diffusers_prefix, "mid_block")))
-    keys += __map_unet_up_block(LoraConversionKeySet(combine(key_prefix.omi_prefix, "output_blocks"), combine(key_prefix.diffusers_prefix, "up_blocks")))
+    keys += __map_unet_down_blocks(LoraConversionKeySet("input_blocks", "down_blocks", parent=key_prefix))
+    keys += __map_unet_mid_block(LoraConversionKeySet("middle_block", "mid_block", parent=key_prefix))
+    keys += __map_unet_up_block(LoraConversionKeySet("output_blocks", "up_blocks", parent=key_prefix))
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "out.0"), combine(key_prefix.diffusers_prefix, "conv_norm_out"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "out.2"), combine(key_prefix.diffusers_prefix, "conv_out"))]
+    keys += [LoraConversionKeySet("out.0", "conv_norm_out", parent=key_prefix)]
+    keys += [LoraConversionKeySet("out.2", "conv_out", parent=key_prefix)]
 
     return keys
 
@@ -93,7 +93,7 @@ def __map_unet(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
 def __map_text_encoder_1(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, ""), combine(key_prefix.diffusers_prefix, ""))]
+    keys += [LoraConversionKeySet("", "", parent=key_prefix)]
 
     return keys
 
@@ -101,7 +101,7 @@ def __map_text_encoder_1(key_prefix: LoraConversionKeySet) -> list[LoraConversio
 def __map_text_encoder_2(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, ""), combine(key_prefix.diffusers_prefix, ""))]
+    keys += [LoraConversionKeySet("", "", parent=key_prefix)]
 
     return keys
 

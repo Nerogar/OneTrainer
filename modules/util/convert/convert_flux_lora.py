@@ -1,26 +1,26 @@
-from modules.util.convert.convert_lora_util import LoraConversionKeySet, combine, map_prefix_range
+from modules.util.convert.convert_lora_util import LoraConversionKeySet, map_prefix_range
 
 
 def __map_double_transformer_block(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_attn.qkv.0"), combine(key_prefix.diffusers_prefix, "attn.to_q"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_attn.qkv.1"), combine(key_prefix.diffusers_prefix, "attn.to_k"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_attn.qkv.2"), combine(key_prefix.diffusers_prefix, "attn.to_v"))]
+    keys += [LoraConversionKeySet("img_attn.qkv.0", "attn.to_q", parent=key_prefix)]
+    keys += [LoraConversionKeySet("img_attn.qkv.1", "attn.to_k", parent=key_prefix)]
+    keys += [LoraConversionKeySet("img_attn.qkv.2", "attn.to_v", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_attn.qkv.0"), combine(key_prefix.diffusers_prefix, "attn.add_q_proj"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_attn.qkv.1"), combine(key_prefix.diffusers_prefix, "attn.add_k_proj"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_attn.qkv.2"), combine(key_prefix.diffusers_prefix, "attn.add_v_proj"))]
+    keys += [LoraConversionKeySet("txt_attn.qkv.0", "attn.add_q_proj", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_attn.qkv.1", "attn.add_k_proj", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_attn.qkv.2", "attn.add_v_proj", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_attn.proj"), combine(key_prefix.diffusers_prefix, "attn.to_out.0"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_mlp.0"), combine(key_prefix.diffusers_prefix, "ff.net.0.proj"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_mlp.2"), combine(key_prefix.diffusers_prefix, "ff.net.2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_mod.lin"), combine(key_prefix.diffusers_prefix, "norm1.linear"))]
+    keys += [LoraConversionKeySet("img_attn.proj", "attn.to_out.0", parent=key_prefix)]
+    keys += [LoraConversionKeySet("img_mlp.0", "ff.net.0.proj", parent=key_prefix)]
+    keys += [LoraConversionKeySet("img_mlp.2", "ff.net.2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("img_mod.lin", "norm1.linear", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_attn.proj"), combine(key_prefix.diffusers_prefix, "attn.to_add_out"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_mlp.0"), combine(key_prefix.diffusers_prefix, "ff_context.net.0.proj"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_mlp.2"), combine(key_prefix.diffusers_prefix, "ff_context.net.2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_mod.lin"), combine(key_prefix.diffusers_prefix, "norm1_context.linear"))]
+    keys += [LoraConversionKeySet("txt_attn.proj", "attn.to_add_out", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_mlp.0", "ff_context.net.0.proj", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_mlp.2", "ff_context.net.2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_mod.lin", "norm1_context.linear", parent=key_prefix)]
 
     return keys
 
@@ -28,13 +28,13 @@ def __map_double_transformer_block(key_prefix: LoraConversionKeySet) -> list[Lor
 def __map_single_transformer_block(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "linear1.0"), combine(key_prefix.diffusers_prefix, "attn.to_q"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "linear1.1"), combine(key_prefix.diffusers_prefix, "attn.to_k"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "linear1.2"), combine(key_prefix.diffusers_prefix, "attn.to_v"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "linear1.3"), combine(key_prefix.diffusers_prefix, "proj_mlp"))]
+    keys += [LoraConversionKeySet("linear1.0", "attn.to_q", parent=key_prefix)]
+    keys += [LoraConversionKeySet("linear1.1", "attn.to_k", parent=key_prefix)]
+    keys += [LoraConversionKeySet("linear1.2", "attn.to_v", parent=key_prefix)]
+    keys += [LoraConversionKeySet("linear1.3", "proj_mlp", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "linear2"), combine(key_prefix.diffusers_prefix, "proj_out"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "modulation.lin"), combine(key_prefix.diffusers_prefix, "norm.linear"))]
+    keys += [LoraConversionKeySet("linear2", "proj_out", parent=key_prefix)]
+    keys += [LoraConversionKeySet("modulation.lin", "norm.linear", parent=key_prefix)]
 
     return keys
 
@@ -42,21 +42,21 @@ def __map_single_transformer_block(key_prefix: LoraConversionKeySet) -> list[Lor
 def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "txt_in"), combine(key_prefix.diffusers_prefix, "context_embedder"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "final_layer.adaLN_modulation.1"), combine(key_prefix.diffusers_prefix, "norm_out.linear"), swap_chunks=True)]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "final_layer.linear"), combine(key_prefix.diffusers_prefix, "proj_out"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "guidance_in.in_layer"), combine(key_prefix.diffusers_prefix, "time_text_embed.guidance_embedder.linear_1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "guidance_in.out_layer"), combine(key_prefix.diffusers_prefix, "time_text_embed.guidance_embedder.linear_2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "vector_in.in_layer"), combine(key_prefix.diffusers_prefix, "time_text_embed.text_embedder.linear_1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "vector_in.out_layer"), combine(key_prefix.diffusers_prefix, "time_text_embed.text_embedder.linear_2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "time_in.in_layer"), combine(key_prefix.diffusers_prefix, "time_text_embed.timestep_embedder.linear_1"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "time_in.out_layer"), combine(key_prefix.diffusers_prefix, "time_text_embed.timestep_embedder.linear_2"))]
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, "img_in.proj"), combine(key_prefix.diffusers_prefix, "x_embedder"))]
+    keys += [LoraConversionKeySet("txt_in", "context_embedder", parent=key_prefix)]
+    keys += [LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)]
+    keys += [LoraConversionKeySet("final_layer.linear", "proj_out", parent=key_prefix)]
+    keys += [LoraConversionKeySet("guidance_in.in_layer", "time_text_embed.guidance_embedder.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("guidance_in.out_layer", "time_text_embed.guidance_embedder.linear_2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("vector_in.in_layer", "time_text_embed.text_embedder.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("vector_in.out_layer", "time_text_embed.text_embedder.linear_2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("time_in.in_layer", "time_text_embed.timestep_embedder.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("time_in.out_layer", "time_text_embed.timestep_embedder.linear_2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("img_in.proj", "x_embedder", parent=key_prefix)]
 
-    for k in map_prefix_range(combine(key_prefix.omi_prefix, "double_blocks"), combine(key_prefix.diffusers_prefix, "transformer_blocks")):
+    for k in map_prefix_range("double_blocks", "transformer_blocks", parent=key_prefix):
         keys += __map_double_transformer_block(k)
 
-    for k in map_prefix_range(combine(key_prefix.omi_prefix, "single_blocks"), combine(key_prefix.diffusers_prefix, "single_transformer_blocks")):
+    for k in map_prefix_range("single_blocks", "single_transformer_blocks", parent=key_prefix):
         keys += __map_single_transformer_block(k)
 
     return keys
@@ -65,7 +65,7 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
 def __map_clip(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, ""), combine(key_prefix.diffusers_prefix, ""))]
+    keys += [LoraConversionKeySet("", "", parent=key_prefix)]
 
     return keys
 
@@ -73,7 +73,7 @@ def __map_clip(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
 def __map_t5(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet(combine(key_prefix.omi_prefix, ""), combine(key_prefix.diffusers_prefix, ""))]
+    keys += [LoraConversionKeySet("", "", parent=key_prefix)]
 
     return keys
 
