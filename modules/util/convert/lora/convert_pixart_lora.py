@@ -59,7 +59,7 @@ def convert_pixart_lora_key_sets() -> list[LoraConversionKeySet]:
     keys = []
 
     keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
-    keys += __map_transformer(LoraConversionKeySet("lora_transformer", "lora_transformer"))
-    keys += __map_t5(LoraConversionKeySet("lora_t5", "lora_te"))
+    keys += __map_transformer(LoraConversionKeySet("transformer", "lora_transformer"))
+    keys += __map_t5(LoraConversionKeySet("t5", "lora_te"))
 
     return keys

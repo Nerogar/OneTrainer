@@ -2,8 +2,8 @@ import os
 import traceback
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
-from modules.util.convert.convert_hunyuan_video_lora import convert_hunyuan_video_lora_key_sets
 from modules.util.convert.convert_lora_util import convert_to_diffusers
+from modules.util.convert.lora.convert_hunyuan_video_lora import convert_hunyuan_video_lora_key_sets
 from modules.util.ModelNames import ModelNames
 
 import torch

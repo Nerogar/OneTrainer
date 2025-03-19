@@ -58,9 +58,9 @@ def convert_sd3_lora_key_sets() -> list[LoraConversionKeySet]:
     keys = []
 
     keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
-    keys += __map_transformer(LoraConversionKeySet("lora_transformer", "lora_transformer"))
-    keys += [LoraConversionKeySet("lora_clip_l", "lora_te1")]
-    keys += [LoraConversionKeySet("lora_clip_g", "lora_te2")]
-    keys += [LoraConversionKeySet("lora_t5", "lora_te3")]
+    keys += __map_transformer(LoraConversionKeySet("transformer", "lora_transformer"))
+    keys += [LoraConversionKeySet("clip_l", "lora_te1")]
+    keys += [LoraConversionKeySet("clip_g", "lora_te2")]
+    keys += [LoraConversionKeySet("t5", "lora_te3")]
 
     return keys

@@ -3,7 +3,7 @@ import traceback
 
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.util.convert.convert_lora_util import convert_to_diffusers
-from modules.util.convert.convert_sd3_lora import convert_sd3_lora_key_sets
+from modules.util.convert.lora.convert_sd3_lora import convert_sd3_lora_key_sets
 from modules.util.ModelNames import ModelNames
 
 import torch

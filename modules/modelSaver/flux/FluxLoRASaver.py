@@ -3,8 +3,8 @@ from pathlib import Path
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
-from modules.util.convert.convert_flux_lora import convert_flux_lora_key_sets
 from modules.util.convert.convert_lora_util import convert_to_legacy_diffusers, convert_to_omi
+from modules.util.convert.lora.convert_flux_lora import convert_flux_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch

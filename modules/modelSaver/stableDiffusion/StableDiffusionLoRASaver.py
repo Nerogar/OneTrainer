@@ -4,7 +4,7 @@ from pathlib import Path
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert.convert_lora_util import convert_to_legacy_diffusers, convert_to_omi
-from modules.util.convert.convert_sd_lora import convert_sd_lora_key_sets
+from modules.util.convert.lora.convert_sd_lora import convert_sd_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
