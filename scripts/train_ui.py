@@ -1,4 +1,9 @@
+import logging
+
 from util.import_util import script_imports
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 script_imports()
 

@@ -25,6 +25,7 @@ from modules.module.Moondream2Model import Moondream2Model
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
 from modules.module.SAMoondreamModel import MoondreamSAMMaskModel
+from modules.ui.BulkCaptionEditWindow import BulkCaptionEditWindow
 from modules.ui.FileOperationsWindow import FileOperationsWindow
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
@@ -44,14 +45,13 @@ import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from customtkinter import ThemeManager
 from PIL import Image, ImageDraw, ImageTk
 
-# Set up module logger
 logger = logging.getLogger(__name__)
 
-# Module Constants
+
 MAX_VISIBLE_FILES: int = 50
 IMAGE_PADDING: int = 20
-DEFAULT_IMAGE_WIDTH: int = 800
-DEFAULT_IMAGE_HEIGHT: int = 600
+DEFAULT_IMAGE_WIDTH: int = 1600
+DEFAULT_IMAGE_HEIGHT: int = 1200
 
 MIN_BRUSH_SIZE: float = 0.0025
 MAX_BRUSH_SIZE: float = 0.5
@@ -63,10 +63,16 @@ BRUSH_SIZE_THRESHOLD: float = 0.05
 MIN_CONTAINER_SIZE: int = 10
 BRACKET_BRUSH_SIZE_STEP: float = 0.01
 
-# Theme colors
+WINDOW_WIDTH: int = 1280
+WINDOW_HEIGHT: int = 640
+FILE_LIST_WIDTH: int = 300
+MASK_MIN_OPACITY: float = 0.3
+DEFAULT_BRUSH_SIZE: float = 0.03
+
+
 THEME_COLORS = {
     "dark": {
-        "canvas_bg": (32, 32, 32),  # CANVAS_BACKGROUND_COLOR
+        "canvas_bg": (32, 32, 32),
         "main_frame_bg": "#242424",
         "image_container_bg": "#242424",
         "tools_frame_bg": "#333333",
@@ -177,11 +183,7 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
 
 
 class CaptionUI(ctk.CTkToplevel):
-    WINDOW_WIDTH: int = 1280
-    WINDOW_HEIGHT: int = 640
-    FILE_LIST_WIDTH: int = 300
-    MASK_MIN_OPACITY: float = 0.3
-    DEFAULT_BRUSH_SIZE: float = 0.01
+
 
     def __init__(
         self,
@@ -191,28 +193,29 @@ class CaptionUI(ctk.CTkToplevel):
         *args,
         **kwargs,
     ) -> None:
+        logger.debug("CaptionUI __init__ started. Parent: %s", parent)
         super().__init__(parent, *args, **kwargs)
-        self.parent = parent  # Add this line - explicit parent reference
+        self.attributes("-topmost", True)
+
+        # Set up explicit parent reference for proper stacking behavior
+        self.parent = parent
         self.dir: str | None = initial_dir
-        self.config_ui_data: dict = {
-            "include_subdirectories": include_subdirectories
-        }
+        self.config_ui_data: dict = {"include_subdirectories": include_subdirectories}
         self.config_ui_state: UIState = UIState(self, self.config_ui_data)
 
+        # Initialize other attributes and managers
         self.image_rel_paths: list[str] = []
         self.current_image_index: int = -1
         self.pil_image: Image.Image | None = None
         self.pil_mask: Image.Image | None = None
         self.image_width: int = 0
         self.image_height: int = 0
-
         self.caption_lines: list[str] = []
         self.current_caption_line: int = 0
 
         self.masking_model = None
         self.captioning_model = None
 
-        # Instantiate managers and handlers.
         self.mask_editor = MaskEditor(self)
         self.model_manager = ModelManager()
         self.navigation_manager = NavigationManager(self)
@@ -221,29 +224,22 @@ class CaptionUI(ctk.CTkToplevel):
         self.image_handler = ImageHandler(self)
 
         self._setup_window()
+
         self._create_layout()
 
         if initial_dir:
+            logger.debug("Loading initial directory: %s", initial_dir)
             self.file_manager.load_directory()
 
     def _setup_window(self) -> None:
-        """Set up window properties."""
+        """Configure the window's basic properties."""
         self.title("Dataset Tools")
-        self.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
+        self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.resizable(True, True)
-
-        # Allow window operations (minimize, maximize) to work properly
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
-        # Instead of grab_set(), use a gentler focus approach
-        self.attributes("-topmost", True)
-        self.wait_visibility()
-        self.focus_force()
-        self.lift()
-
-        # Remove topmost after a short delay
-        self.after(300, lambda: self.attributes("-topmost", False))
-        self.after(400, self.focus_force)
+        # After a short delay, remove the topmost attribute so the window behaves normally.
+        self.after(200, lambda: self.attributes("-topmost", False))
 
         self.help_text: str = (
                 "Keyboard shortcuts:\n\n"
@@ -261,31 +257,6 @@ class CaptionUI(ctk.CTkToplevel):
                 "Right click: Remove from mask\n"
                 "Mouse wheel: Adjust brush size"
             )
-
-    def _ensure_robust_focus(self) -> None:
-        """Ensure window maintains focus without preventing normal operation."""
-        if not self.winfo_exists():
-            return
-
-        # Remove topmost attribute to allow normal window behavior
-        self.attributes("-topmost", False)
-
-        self.deiconify()
-        self.lift()
-        self.focus_force()
-
-        # Single, less aggressive follow-up
-        self.after(200, self._apply_gentle_focus)
-
-    def _apply_gentle_focus(self) -> None:
-        """Apply a gentle focus strategy that respects user actions."""
-        try:
-            if not self.focus_displayof() and self.winfo_exists():
-                self.lift()
-                self.focus_force()
-        except (tk.TclError, RuntimeError, AttributeError):
-            # Handle cases where the window or widgets might no longer exist
-            pass
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
@@ -365,7 +336,7 @@ class CaptionUI(ctk.CTkToplevel):
             top_frame,
             0,
             5,
-            "File Tools",
+            "Image Tools",
             self._open_file_tools,
             "file-cog",
             "Open file operations tools",
@@ -374,16 +345,16 @@ class CaptionUI(ctk.CTkToplevel):
             top_frame,
             0,
             6,
-            "Bulk Caption",
+            "Bulk Caption Edit",
             self._open_bulk_caption_edit,
-            "bulk",  # Use appropriate icon
-            "Edit multiple captions at once"
+            "bulk",
+            "Apply bulk transformations to captions at once"
         )
-        top_frame.grid_columnconfigure(7, weight=1)  # Move the weight to column 7
+        top_frame.grid_columnconfigure(7, weight=1)
         self._create_icon_button(
             top_frame,
             0,
-            8,  # Adjust Help button to column 8
+            8,
             "Help",
             self._show_help,
             "help",
@@ -426,7 +397,7 @@ class CaptionUI(ctk.CTkToplevel):
             text="No folder selected",
             anchor="w",
             font=("Segoe UI", 12, "bold"),
-            wraplength=self.FILE_LIST_WIDTH - 35,
+            wraplength=FILE_LIST_WIDTH - 35,
         )
         self.folder_name_label.grid(
             row=0, column=1, sticky="ew", padx=0, pady=5
@@ -487,7 +458,7 @@ class CaptionUI(ctk.CTkToplevel):
         # 4. Create scrollable file list
         self.file_list = ctk.CTkScrollableFrame(
             file_area_frame,
-            width=self.FILE_LIST_WIDTH,
+            width=FILE_LIST_WIDTH,
             scrollbar_fg_color="transparent",
             scrollbar_button_hover_color="grey75",
             scrollbar_button_color="grey50",
@@ -521,7 +492,7 @@ class CaptionUI(ctk.CTkToplevel):
         label = ctk.CTkLabel(
             self.file_list,
             text=safe_filename,
-            wraplength=self.FILE_LIST_WIDTH - 20,
+            wraplength=FILE_LIST_WIDTH - 20,
             font=("Segoe UI", 11),
             text_color=get_theme_color("file_text")
         )
@@ -973,7 +944,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.caption_line_var.set(self.caption_line_values[0])
 
     def _open_caption_window(self) -> None:
-        """Open the auto-caption generation window."""
+        """Open the auto-caption generation window as a modal dialog."""
         if self.dir:
             dialog = GenerateCaptionsWindow(
                 self,
@@ -981,15 +952,11 @@ class CaptionUI(ctk.CTkToplevel):
                 self.config_ui_data["include_subdirectories"],
             )
             self.wait_window(dialog)
-            self.after(100, self._ensure_robust_focus)
-
             if 0 <= self.current_image_index < len(self.image_rel_paths):
-                self.navigation_manager.switch_to_image(
-                    self.current_image_index
-                )
+                self.navigation_manager.switch_to_image(self.current_image_index)
 
     def _open_mask_window(self) -> None:
-        """Open the auto-mask generation window."""
+        """Open the auto-mask generation window as a modal dialog."""
         if self.dir:
             dialog = GenerateMasksWindow(
                 self,
@@ -997,44 +964,27 @@ class CaptionUI(ctk.CTkToplevel):
                 self.config_ui_data["include_subdirectories"],
             )
             self.wait_window(dialog)
-            self.after(100, self._ensure_robust_focus)
-
             if 0 <= self.current_image_index < len(self.image_rel_paths):
-                self.navigation_manager.switch_to_image(
-                    self.current_image_index
-                )
+                self.navigation_manager.switch_to_image(self.current_image_index)
 
     def _open_file_tools(self) -> None:
-        """Open the file tools window with robust focus management."""
-
-
-        # Create child window with proper parent relationship
+        """Open the file tools window as a modal dialog."""
         file_ops_window = FileOperationsWindow(self, self.dir)
-
-        # Use callback for focus restoration after window closes
         self.wait_window(file_ops_window)
-        self.after(100, self._ensure_robust_focus)
-
-        # Continue with UI refresh
         if 0 <= self.current_image_index < len(self.image_rel_paths):
             self.navigation_manager.switch_to_image(self.current_image_index)
 
     def _open_bulk_caption_edit(self) -> None:
-        """Open the bulk caption edit window."""
+        """Open the bulk caption edit window as a modal dialog."""
         if self.dir:
-            from modules.ui.BulkCaptionEdit import BulkCaptionEditWindow
             dialog = BulkCaptionEditWindow(
                 self,
                 self.dir,
                 self.config_ui_data["include_subdirectories"],
             )
             self.wait_window(dialog)
-            self.after(100, self._ensure_robust_focus)
-
             if 0 <= self.current_image_index < len(self.image_rel_paths):
-                self.navigation_manager.switch_to_image(
-                    self.current_image_index
-                )
+                self.navigation_manager.switch_to_image(self.current_image_index)
 
     def _post_dialog_focus_restore(self, previous_focus):
         """Restore focus after a dialog closes"""
@@ -1174,7 +1124,7 @@ class ImageHandler:
 
     def _adjust_mask_opacity(self, np_mask: np.ndarray) -> np.ndarray:
         """Adjust mask opacity to ensure visibility."""
-        min_opacity = self.parent.MASK_MIN_OPACITY
+        min_opacity = MASK_MIN_OPACITY
 
         if np.min(np_mask) == 0:
             # Ensure completely masked areas have minimum opacity
@@ -1276,13 +1226,12 @@ class ImageHandler:
 
 
 class MaskEditor:
-    DEFAULT_BRUSH_SIZE: float = 0.03
 
     def __init__(self, parent: CaptionUI) -> None:
         self.parent: CaptionUI = parent
         self.mask_draw_x: float = 0.0
         self.mask_draw_y: float = 0.0
-        self.mask_draw_radius: float = self.DEFAULT_BRUSH_SIZE
+        self.mask_draw_radius: float = DEFAULT_BRUSH_SIZE
         self.mask_editing_mode: EditMode = EditMode.DRAW
         self.display_only_mask: bool = False
         self.mask_history: list[Image.Image] = []
@@ -2140,7 +2089,6 @@ class FileManager:
             self.parent.clear_ui()
 
         # Regain focus after directory is loaded
-        self._ensure_parent_focus()
         self.parent.lift()
 
         # Temporarily set topmost to ensure focus, then remove it
@@ -2149,9 +2097,6 @@ class FileManager:
             100, lambda: self.parent.attributes("-topmost", False)
         )
 
-    def _ensure_parent_focus(self) -> None:
-        """Robust focus handling for parent window."""
-        self.parent._ensure_robust_focus()
 
 
 class CaptionManager:
