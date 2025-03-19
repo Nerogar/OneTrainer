@@ -119,7 +119,6 @@ def natural_sort_key(s):
         return int(text) if text.isdigit() else text.lower()
     return [convert(c) for c in re.split(r'(\d+)', s)]
 
-
 def scan_for_supported_images(
     directory: Path,
     include_subdirs: bool,
@@ -371,11 +370,20 @@ class CaptionUI(ctk.CTkToplevel):
             "file-cog",
             "Open file operations tools",
         )
-        top_frame.grid_columnconfigure(6, weight=1)  # Move the weight to column 6
         self._create_icon_button(
             top_frame,
             0,
-            7,  # Adjust Help button to column 7
+            6,
+            "Bulk Caption",
+            self._open_bulk_caption_edit,
+            "bulk",  # Use appropriate icon
+            "Edit multiple captions at once"
+        )
+        top_frame.grid_columnconfigure(7, weight=1)  # Move the weight to column 7
+        self._create_icon_button(
+            top_frame,
+            0,
+            8,  # Adjust Help button to column 8
             "Help",
             self._show_help,
             "help",
@@ -679,7 +687,6 @@ class CaptionUI(ctk.CTkToplevel):
         except Exception as e:
             self._file_list_scrollbar.grid()
             logger.debug(f"Note: Could not adjust scrollbar visibility: {e}")
-
 
     def _restore_scroll_position(self, position: float) -> None:
         """Restore scroll position after updating file list."""
@@ -1011,6 +1018,23 @@ class CaptionUI(ctk.CTkToplevel):
         # Continue with UI refresh
         if 0 <= self.current_image_index < len(self.image_rel_paths):
             self.navigation_manager.switch_to_image(self.current_image_index)
+
+    def _open_bulk_caption_edit(self) -> None:
+        """Open the bulk caption edit window."""
+        if self.dir:
+            from modules.ui.BulkCaptionEdit import BulkCaptionEditWindow
+            dialog = BulkCaptionEditWindow(
+                self,
+                self.dir,
+                self.config_ui_data["include_subdirectories"],
+            )
+            self.wait_window(dialog)
+            self.after(100, self._ensure_robust_focus)
+
+            if 0 <= self.current_image_index < len(self.image_rel_paths):
+                self.navigation_manager.switch_to_image(
+                    self.current_image_index
+                )
 
     def _post_dialog_focus_restore(self, previous_focus):
         """Restore focus after a dialog closes"""
