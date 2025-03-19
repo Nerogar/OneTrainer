@@ -222,16 +222,18 @@ class CaptionUI(ctk.CTkToplevel):
         self.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
         self.resizable(True, True)
 
-        self.transient(self.parent)
+        # Allow window operations (minimize, maximize) to work properly
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
 
+        # Instead of grab_set(), use a gentler focus approach
         self.attributes("-topmost", True)
-
         self.wait_visibility()
-        self.grab_set()
         self.focus_force()
         self.lift()
 
-        self.after(300, lambda: self._ensure_robust_focus())
+        # Remove topmost after a short delay
+        self.after(300, lambda: self.attributes("-topmost", False))
+        self.after(400, self.focus_force)
 
         self.help_text: str = (
                 "Keyboard shortcuts:\n\n"

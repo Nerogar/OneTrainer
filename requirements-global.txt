@@ -52,10 +52,9 @@ fabric==3.2.2
 psutil==6.1.1
 requests==2.32.3
 
-# captioning (moondream2)
+# dataset tools
 einops==0.8.1
 pyvips==2.2.3
 pyvips-binary==8.16.0
-
-# SAM2 for segmentation masks to combine with moondream2
 -e git+https://github.com/facebookresearch/sam2.git@main#egg=sam-2
+pyoxipng==9.1.0
