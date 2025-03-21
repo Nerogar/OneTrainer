@@ -1,3 +1,4 @@
+import logging
 import os
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
@@ -12,6 +13,8 @@ from torchvision.transforms import transforms
 import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class MaskSample:
@@ -117,7 +120,7 @@ class MaskSample:
 
 class BaseImageMaskModel(metaclass=ABCMeta):
     @staticmethod
-    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False) -> list[str]:
+    def __get_sample_filenames(sample_dir: str, include_subdirectories: bool = False, single_file: str = None) -> list[str]:
         sample_dir = Path(sample_dir)
 
         def __is_supported_image_extension(path: Path) -> bool:
@@ -125,7 +128,39 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
 
         recursive_prefix = "" if not include_subdirectories else "**/"
-        return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
+        all_files = [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
+
+        # Filter to a single file if specified
+        if single_file:
+            single_file_path = Path(single_file)
+            # Normalize paths for comparison
+            sample_dir_str = str(sample_dir)
+            logger.info(f"Filtering for single file: {single_file}")
+
+            # Try multiple matching strategies
+            filtered_files = []
+            for file_path in all_files:
+                # 1. Direct match with the full path
+                if file_path.endswith(str(single_file)):
+                    filtered_files.append(file_path)
+                    logger.info(f"Found matching file: {file_path}")
+                    break
+
+                # 2. Match by comparing the base filename
+                if Path(file_path).name == single_file_path.name:
+                    # For files with same name, check if relative path components match
+                    rel_path = Path(file_path).relative_to(sample_dir) if sample_dir_str in file_path else Path(file_path).name
+                    if str(rel_path) == str(single_file) or single_file_path.name == Path(file_path).name:
+                        filtered_files.append(file_path)
+                        logger.info(f"Found matching file by name: {file_path}")
+                        break
+
+            if not filtered_files:
+                logger.warning(f"No matching file found for {single_file} among {len(all_files)} files")
+
+            return filtered_files
+
+        return all_files
 
     @abstractmethod
     def mask_image(
@@ -211,6 +246,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
             include_subdirectories: bool = False,
+            single_file: str = None,
     ):
         """
         Masks all samples in a folder
@@ -231,9 +267,14 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
             include_subdirectories (`bool`): whether to include subdirectories when processing samples
+            single_file (`str`, optional): if provided, only process this specific file
         """
+        # Pass the single_file parameter to the get_sample_filenames method
+        filenames = self.__get_sample_filenames(sample_dir, include_subdirectories, single_file)
 
-        filenames = self.__get_sample_filenames(sample_dir, include_subdirectories)
+        if single_file and filenames:
+            logger.info(f"Processing single file {single_file}, found {len(filenames)} matching files")
+
         self.mask_images(
             filenames=filenames,
             prompts=prompts,

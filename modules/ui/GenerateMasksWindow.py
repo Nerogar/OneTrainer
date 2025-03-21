@@ -1,3 +1,4 @@
+import logging
 import threading
 from tkinter import END, filedialog, messagebox
 
@@ -5,6 +6,7 @@ from modules.util.ui.ToolTip import ToolTip
 
 import customtkinter as ctk
 
+logger = logging.getLogger(__name__)
 
 class GenerateMasksWindow(ctk.CTkToplevel):
     def __init__(
@@ -43,6 +45,9 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             ]
             self.mode_var = ctk.StringVar(self, "Create if absent")
 
+            # Add preview mode toggle
+            self.preview_mode_var = ctk.BooleanVar(self, False)
+
             # Set up the UI
             self._create_layout(path, include_subdirectories)
 
@@ -68,6 +73,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self._create_path_selection(path)
         self._create_mask_options()
         self._create_subdirectory_option(include_subdirectories)
+        self._create_preview_option()
         self._create_progress_indicators()
         self._create_action_buttons()
 
@@ -139,15 +145,23 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
         self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
+    def _create_preview_option(self):
+        """Create a toggle for preview mode (only process current image)"""
+        self.preview_mode_label = ctk.CTkLabel(self.frame, text="Preview", width=100)
+        self.preview_mode_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
+        self.preview_mode_switch = ctk.CTkSwitch(self.frame, text="", variable=self.preview_mode_var)
+        self.preview_mode_switch.grid(row=9, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(self.preview_mode_switch, "Masks only the current image to more quickly get feedback")
+
     def _create_progress_indicators(self):
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
+        self.progress_label.grid(row=10, column=0, sticky="w", padx=5, pady=5)
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=9, column=1, sticky="w", padx=5, pady=5)
+        self.progress.grid(row=10, column=1, sticky="w", padx=5, pady=5)
 
     def _create_action_buttons(self):
         self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
-        self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_masks_button.grid(row=11, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
     def browse_for_path(self, entry_box):
         # get the path from the user
@@ -228,17 +242,48 @@ class GenerateMasksWindow(ctk.CTkToplevel):
                 "Blend with existing": "blend",
             }[self.mode_var.get()]
 
-            masking_model.mask_folder(
-                sample_dir=self.path_entry.get(),
-                prompts=[prompt],
-                mode=mode,
-                alpha=alpha,
-                threshold=threshold,
-                smooth_pixels=smooth_pixels,
-                expand_pixels=expand_pixels,
-                progress_callback=self.set_progress,
-                include_subdirectories=self.include_subdirectories_var.get(),
-            )
+            # Check if preview mode is enabled
+            if self.preview_mode_var.get() and hasattr(self.parent, "current_image_index"):
+                # Get the current image path from parent window
+                if (hasattr(self.parent, "image_rel_paths") and
+                    0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+
+                    # Get the full path to the current image
+                    current_image_rel_path = self.parent.image_rel_paths[self.parent.current_image_index]
+                    logger.info(f"Preview mode: Processing only image {current_image_rel_path}")
+
+                    # Process just this single image
+                    # We'll pass the sample_dir as the parent directory, but also pass the full relative path
+                    # for precise filtering
+                    masking_model.mask_folder(
+                        sample_dir=self.parent.dir,
+                        prompts=[prompt],
+                        mode=mode,
+                        alpha=alpha,
+                        threshold=threshold,
+                        smooth_pixels=smooth_pixels,
+                        expand_pixels=expand_pixels,
+                        progress_callback=self.set_progress,
+                        include_subdirectories=True,  # Ensure we can find the file in subdirectories
+                        single_file=current_image_rel_path  # Pass the relative path, not just the filename
+                    )
+                else:
+                    messagebox.showwarning("Preview Error", "No current image is selected")
+                    self.after(100, lambda: self.create_masks_button.configure(state="normal", text="Create Masks"))
+                    return
+            else:
+                # Normal folder processing
+                masking_model.mask_folder(
+                    sample_dir=self.path_entry.get(),
+                    prompts=[prompt],
+                    mode=mode,
+                    alpha=alpha,
+                    threshold=threshold,
+                    smooth_pixels=smooth_pixels,
+                    expand_pixels=expand_pixels,
+                    progress_callback=self.set_progress,
+                    include_subdirectories=self.include_subdirectories_var.get(),
+                )
 
             # Use after to safely update UI from the main thread
             self.after(100, self._update_ui_after_processing)

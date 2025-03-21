@@ -243,7 +243,7 @@ class CaptionUI(ctk.CTkToplevel):
 
         self.help_text: str = (
                 "Keyboard shortcuts:\n\n"
-                "Left/Right arrows: Navigate between images\n"
+                "⬅️➡️: Navigate between images\n"
                 "Tab: Switch between caption lines\n"
                 "Return or Ctrl+S: Save changes\n"
                 "Ctrl+M: Toggle mask display\n"
@@ -256,6 +256,7 @@ class CaptionUI(ctk.CTkToplevel):
                 "Left click: Add to mask\n"
                 "Right click: Remove from mask\n"
                 "Mouse wheel: Adjust brush size"
+                "Middle mouse click: Reset image (clear caption and mask, save to commit change)\n"
             )
 
     def _create_layout(self) -> None:
