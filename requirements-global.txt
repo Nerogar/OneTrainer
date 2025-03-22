@@ -2,6 +2,7 @@
 numpy==2.2.2
 opencv-python==4.11.0.86
 pillow==11.1.0
+imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.28.1
