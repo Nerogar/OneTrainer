@@ -10,6 +10,7 @@ from modules.util.optimizer_util import (
     update_optimizer_config,
 )
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 
@@ -34,6 +35,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.title("Optimizer Settings")
         self.geometry("800x500")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -53,6 +55,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
+        self.after(150, lambda: set_window_icon(self))
 
     def main_frame(self, master):
         # Optimizer

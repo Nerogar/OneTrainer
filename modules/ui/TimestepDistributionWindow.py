@@ -1,9 +1,12 @@
 import random
 
-from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupNoiseMixin import (
+    ModelSetupNoiseMixin,
+)
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import torch
@@ -85,6 +88,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         self.geometry("900x600")
         self.resizable(True, True)
         self.wait_visibility()
+        set_window_icon(self)
         self.grab_set()
         self.focus_set()
 
@@ -98,6 +102,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         frame.grid(row=0, column=0, sticky='nsew')
 
         components.button(self, 1, 0, "ok", self.__ok)
+        self.after(150, lambda: set_window_icon(self))
 
     def __content_frame(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
