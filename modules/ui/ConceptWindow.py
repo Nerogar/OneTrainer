@@ -25,6 +25,7 @@ import torch
 from torchvision.transforms import functional
 
 import customtkinter as ctk
+import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 
 

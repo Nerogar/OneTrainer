@@ -10,6 +10,7 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
+import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 
 

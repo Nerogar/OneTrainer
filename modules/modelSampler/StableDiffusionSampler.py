@@ -17,6 +17,7 @@ import torch
 from torch import nn
 from torchvision.transforms import transforms
 
+import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 from tqdm import tqdm
 
