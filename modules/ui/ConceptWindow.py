@@ -481,7 +481,7 @@ class ConceptWindow(ctk.CTkToplevel):
         background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
         text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
         background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
-        text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
+        self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2))
@@ -491,14 +491,14 @@ class ConceptWindow(ctk.CTkToplevel):
 
         self.bucket_fig.set_facecolor(background_color)
         self.bucket_ax.set_facecolor(background_color)
-        self.bucket_ax.spines['bottom'].set_color(text_color)
-        self.bucket_ax.spines['left'].set_color(text_color)
+        self.bucket_ax.spines['bottom'].set_color(self.text_color)
+        self.bucket_ax.spines['left'].set_color(self.text_color)
         self.bucket_ax.spines['top'].set_visible(False)
-        self.bucket_ax.spines['right'].set_color(text_color)
-        self.bucket_ax.tick_params(axis='x', colors=text_color, which="both")
-        self.bucket_ax.tick_params(axis='y', colors=text_color, which="both")
-        self.bucket_ax.xaxis.label.set_color(text_color)
-        self.bucket_ax.yaxis.label.set_color(text_color)
+        self.bucket_ax.spines['right'].set_color(self.text_color)
+        self.bucket_ax.tick_params(axis='x', colors=self.text_color, which="both")
+        self.bucket_ax.tick_params(axis='y', colors=self.text_color, which="both")
+        self.bucket_ax.xaxis.label.set_color(self.text_color)
+        self.bucket_ax.yaxis.label.set_color(self.text_color)
 
         #refresh stats - must be after all labels are defined or will give error
         components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__get_concept_stats_threaded(False, 9999),
@@ -743,7 +743,7 @@ class ConceptWindow(ctk.CTkToplevel):
         aspects = [str(x) for x in list(aspect_buckets.keys())]
         counts = list(aspect_buckets.values())
         b = self.bucket_ax.bar(aspects, counts)
-        self.bucket_ax.bar_label(b)
+        self.bucket_ax.bar_label(b, color=self.text_color)
         self.canvas.draw()
 
     def __get_concept_stats(self, advanced_checks : bool, waittime : float):
