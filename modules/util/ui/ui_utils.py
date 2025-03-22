@@ -48,9 +48,7 @@ def bind_mousewheel(
         widget.bind("<Button-4>", process_mousewheel)
         widget.bind("<Button-5>", process_mousewheel)
 
-WindowType = tk.Tk | tk.Toplevel | CTk | CTkToplevel | Any
-
-def set_window_icon(window: WindowType | Any) -> None:
+def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
     """Set the application window icon based on the current platform
 
     Args:
