@@ -16,7 +16,7 @@ from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.torch_util import default_device
 from modules.util.ui import components
-from modules.util.ui.ui_utils import bind_mousewheel
+from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
 from modules.util.ui.UIState import UIState
 
 import torch
@@ -49,6 +49,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.title("OneTrainer")
         self.geometry("1280x980")
         self.resizable(False, False)
+        set_window_icon(self)
         self.wait_visibility()
         self.focus_set()
 
@@ -108,6 +109,7 @@ Mouse wheel: increase or decrease brush size"""
         self.content_column(self.bottom_frame)
 
         self.load_directory()
+        self.after(150, lambda: set_window_icon(self))
 
     def top_bar(self, master):
         top_frame = ctk.CTkFrame(master)

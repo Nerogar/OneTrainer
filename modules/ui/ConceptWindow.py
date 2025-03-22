@@ -9,6 +9,7 @@ from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 from scripts import concept_stats
 
@@ -16,14 +17,18 @@ from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.PipelineModule import PipelineModule
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
-from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
+from mgds.pipelineModules.RandomCircularMaskShrink import (
+    RandomCircularMaskShrink,
+)
 from mgds.pipelineModules.RandomContrast import RandomContrast
 from mgds.pipelineModules.RandomFlip import RandomFlip
 from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
-from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
+from mgds.pipelineModuleTypes.RandomAccessPipelineModule import (
+    RandomAccessPipelineModule,
+)
 
 import torch
 from torchvision.transforms import functional
@@ -78,6 +83,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.title("Concept")
         self.geometry("800x700")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -97,6 +103,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.__auto_update_concept_stats()
 
         components.button(self, 1, 0, "ok", self.__ok)
+        self.after(150, lambda: set_window_icon(self))
 
     def __general_tab(self, master, concept: ConceptConfig):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")

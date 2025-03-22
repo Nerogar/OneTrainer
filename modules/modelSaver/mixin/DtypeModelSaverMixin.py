@@ -16,6 +16,9 @@ import safetensors.torch as safetensors
 
 
 class DtypeModelSaverMixin:
+    def __init__(self):
+        super().__init__()
+
     def _convert_state_dict_dtype(
             self,
             state_dict: dict,

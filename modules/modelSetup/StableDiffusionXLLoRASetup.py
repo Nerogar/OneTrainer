@@ -52,16 +52,16 @@ class StableDiffusionXLLoRASetup(
                 learning_rate=config.text_encoder_2.learning_rate,
             ))
 
-        if config.train_any_embedding():
+        if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding:
                 self._add_embedding_param_groups(
-                    model.embedding_wrapper_1, parameter_group_collection, config.embedding_learning_rate,
+                    model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                     "embeddings_1"
                 )
 
             if config.text_encoder_2.train_embedding:
                 self._add_embedding_param_groups(
-                    model.embedding_wrapper_2, parameter_group_collection, config.embedding_learning_rate,
+                    model.all_text_encoder_2_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                     "embeddings_2"
                 )
 
@@ -79,6 +79,7 @@ class StableDiffusionXLLoRASetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
+        self._setup_embeddings_requires_grad(model, config)
         model.text_encoder_1.requires_grad_(False)
         model.text_encoder_2.requires_grad_(False)
         model.unet.requires_grad_(False)
@@ -88,21 +89,6 @@ class StableDiffusionXLLoRASetup(
             train_text_encoder_1 = config.text_encoder.train and \
                                    not self.stop_text_encoder_training_elapsed(config, model.train_progress)
             model.text_encoder_1_lora.requires_grad_(train_text_encoder_1)
-
-        for i, embedding in enumerate(model.additional_embeddings):
-            embedding_config = config.additional_embeddings[i]
-
-            train_embedding_1 = \
-                embedding_config.train \
-                and config.text_encoder.train_embedding \
-                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.text_encoder_1_vector.requires_grad_(train_embedding_1)
-
-            train_embedding_2 = \
-                embedding_config.train \
-                and config.text_encoder_2.train_embedding \
-                and not self.stop_additional_embedding_training_elapsed(embedding_config, model.train_progress, i)
-            embedding.text_encoder_2_vector.requires_grad_(train_embedding_2)
 
         if model.text_encoder_2_lora is not None:
             train_text_encoder_2 = config.text_encoder_2.train and \
@@ -165,7 +151,7 @@ class StableDiffusionXLLoRASetup(
 
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
-        self._setup_additional_embeddings(model, config)
+        self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         self.__setup_requires_grad(model, config)
 
@@ -176,14 +162,12 @@ class StableDiffusionXLLoRASetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = config.align_prop or not config.latent_caching
+        vae_on_train_device = not config.latent_caching
         text_encoder_1_on_train_device = \
             config.train_text_encoder_or_embedding()\
-            or config.align_prop \
             or not config.latent_caching
         text_encoder_2_on_train_device = \
             config.train_text_encoder_2_or_embedding() \
-            or config.align_prop \
             or not config.latent_caching
 
         model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
@@ -215,6 +199,8 @@ class StableDiffusionXLLoRASetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
+            self._normalize_output_embeddings(model.all_text_encoder_1_embeddings())
+            self._normalize_output_embeddings(model.all_text_encoder_2_embeddings())
             model.embedding_wrapper_1.normalize_embeddings()
             model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)

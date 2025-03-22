@@ -556,6 +556,8 @@ class LayerOffloadConductor:
     __is_forward_pass: bool
     __keep_graph: bool
 
+    __is_active: bool
+
     def __init__(
             self,
             module: nn.Module,
@@ -602,6 +604,8 @@ class LayerOffloadConductor:
         self.__is_forward_pass = False
         self.__keep_graph = False
 
+        self.__is_active = False
+
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
 
@@ -628,6 +632,8 @@ class LayerOffloadConductor:
                 for module in layer.modules():
                     offload_quantized(module, self.__temp_device, allocator=clone_tensor_allocator)
                 self.__layer_device_map[layer_index] = None
+
+            self.__is_active = False
 
         elif device_equals(device, self.__train_device):
             log("to train device")
@@ -662,6 +668,8 @@ class LayerOffloadConductor:
                         event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
                         self.__layer_train_event_map[layer_index] = event
 
+            self.__is_active = True
+
         torch_gc()
 
     def add_layer(self, layer: nn.Module, included_offload_param_indices: list[int] = None):
@@ -676,10 +684,11 @@ class LayerOffloadConductor:
         self.__layer_activations_included_offload_param_indices_map.append(included_offload_param_indices)
 
     def start_forward(self, keep_graph: bool):
-        log()
-        log()
-        log()
         log("starting forward")
+
+        if not self.__is_active:
+            return
+
         if self.__async_transfer:
             self.__layer_transfer_stream.wait_stream(self.__train_stream)
         self.__wait_all_layer_transfers()
@@ -691,6 +700,9 @@ class LayerOffloadConductor:
     def before_layer(self, layer_index: int, call_index: int, activations: Any) -> Any:
         log()
         log(f"before layer {layer_index}, {call_index}")
+
+        if not self.__is_active:
+            return activations
 
         self.__call_index_layer_index_map[call_index] = layer_index
 
@@ -748,6 +760,9 @@ class LayerOffloadConductor:
 
     def after_layer(self, layer_index: int, call_index: int, activations: Any):
         log(f"after layer {layer_index}, {call_index}")
+
+        if not self.__is_active:
+            return
 
         # record stream
         if self.__async_transfer:

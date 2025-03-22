@@ -44,20 +44,20 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
         return self.mapper(self.backbone(x))
 
 
-class WuerstchenModelEmbedding(BaseModelEmbedding):
+class WuerstchenModelEmbedding:
     def __init__(
             self,
             uuid: str,
-            prior_text_encoder_vector: Tensor,
+            prior_text_encoder_vector: Tensor | None,
             placeholder: str,
+            is_output_embedding: bool,
     ):
-        super().__init__(
+        self.prior_text_encoder_embedding = BaseModelEmbedding(
             uuid=uuid,
-            token_count=prior_text_encoder_vector.shape[0],
             placeholder=placeholder,
+            vector=prior_text_encoder_vector,
+            is_output_embedding=is_output_embedding,
         )
-
-        self.prior_text_encoder_vector = prior_text_encoder_vector
 
 
 class WuerstchenModel(BaseModel):
@@ -80,9 +80,7 @@ class WuerstchenModel(BaseModel):
 
     # persistent embedding training data
     embedding: WuerstchenModelEmbedding | None
-    embedding_state: Tensor | None
     additional_embeddings: list[WuerstchenModelEmbedding] | None
-    additional_embedding_states: list[Tensor | None]
     prior_embedding_wrapper: AdditionalEmbeddingWrapper | None
 
     # persistent lora training data
@@ -118,14 +116,20 @@ class WuerstchenModel(BaseModel):
         self.effnet_encoder_train_dtype = DataType.FLOAT_32
 
         self.embedding = None
-        self.embedding_state = None
         self.additional_embeddings = []
-        self.additional_embedding_states = []
         self.prior_embedding_wrapper = None
 
         self.prior_text_encoder_lora = None
         self.prior_prior_lora = None
         self.lora_state_dict = None
+
+    def all_embeddings(self) -> list[WuerstchenModelEmbedding]:
+        return self.additional_embeddings \
+               + ([self.embedding] if self.embedding is not None else [])
+
+    def all_prior_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.prior_text_encoder_embedding] if self.embedding is not None else [])
 
     def decoder_text_encoder_to(self, device: torch.device):
         self.decoder_text_encoder.to(device=device)
@@ -196,13 +200,13 @@ class WuerstchenModel(BaseModel):
             )
         raise NotImplementedError
 
-    def add_embeddings_to_prompt(self, prompt: str) -> str:
-        return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
+    def add_prior_text_encoder_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_prior_text_encoder_embeddings(), prompt)
 
     def encode_text(
             self,
             train_device: torch.device,
-            batch_size: int,
+            batch_size: int = 1,
             rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
@@ -214,7 +218,7 @@ class WuerstchenModel(BaseModel):
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             tokenizer_output = self.prior_tokenizer(
-                text,
+                self.add_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
@@ -242,6 +246,13 @@ class WuerstchenModel(BaseModel):
         else:
             if self.model_type.is_stable_cascade():
                 pooled_text_encoder_output = pooled_text_encoder_output.unsqueeze(1)
+
+        text_encoder_output = self._apply_output_embeddings(
+            self.all_prior_text_encoder_embeddings(),
+            self.prior_tokenizer,
+            tokens,
+            text_encoder_output,
+        )
 
         # apply dropout
         if text_encoder_dropout_probability is not None:

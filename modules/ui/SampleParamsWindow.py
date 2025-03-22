@@ -1,6 +1,7 @@
 from modules.ui.SampleFrame import SampleFrame
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -17,6 +18,7 @@ class SampleParamsWindow(ctk.CTkToplevel):
         self.geometry("800x500")
         self.resizable(True, True)
         self.wait_visibility()
+        self.wait_visibility()
         self.grab_set()
         self.focus_set()
 
@@ -28,6 +30,7 @@ class SampleParamsWindow(ctk.CTkToplevel):
         frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         components.button(self, 1, 0, "ok", self.__ok)
+        self.after(150, lambda: set_window_icon(self))
 
     def __ok(self):
         self.destroy()

@@ -6,7 +6,7 @@ from transformers import CLIPTextModel, CLIPTextModelWithProjection
 def encode_clip(
         text_encoder: CLIPTextModel | CLIPTextModelWithProjection,
         tokens: Tensor | None = None,
-        default_layer: int = 0,
+        default_layer: int = -1,
         layer_skip: int = 0,
         add_output: bool = True,
         text_encoder_output: Tensor | None = None,
