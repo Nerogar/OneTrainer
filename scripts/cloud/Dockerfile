@@ -12,6 +12,7 @@ WORKDIR /
 RUN git clone https://github.com/Nerogar/OneTrainer
 RUN cd OneTrainer \
  && export OT_PLATFORM_REQUIREMENTS=requirements-cuda.txt \
+ && export OT_LAZY_UPDATES=true \
  && ./install.sh \
  && pip cache purge \
  && rm -r ~/.cache/pip
