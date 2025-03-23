@@ -65,6 +65,7 @@ def map_prefix_range(
 def __convert(
         state_dict: dict[str, Tensor],
         key_sets: list[LoraConversionKeySet],
+        source: str,
         target: str,
 ) -> dict[str, Tensor]:
     out_states = {}
@@ -72,22 +73,15 @@ def __convert(
     # TODO: maybe replace with a non O(n^2) algorithm
     for key_set in key_sets:
         for key, tensor in state_dict.items():
-            source = None
             in_prefix = ''
             out_prefix = ''
 
-            if key.startswith(key_set.omi_prefix):
-                source = 'omi'
+            if source == 'omi':
                 in_prefix = key_set.omi_prefix
-            elif key.startswith(key_set.diffusers_prefix):
-                source = 'diffusers'
+            elif source == 'diffusers':
                 in_prefix = key_set.diffusers_prefix
-            elif key.startswith(key_set.legacy_diffusers_prefix):
-                source = 'legacy_diffusers'
+            elif source == 'legacy_diffusers':
                 in_prefix = key_set.legacy_diffusers_prefix
-
-            if source is None:
-                continue
 
             if target == 'omi':
                 out_prefix = key_set.omi_prefix
@@ -95,6 +89,9 @@ def __convert(
                 out_prefix = key_set.diffusers_prefix
             elif target == 'legacy_diffusers':
                 out_prefix = key_set.legacy_diffusers_prefix
+
+            if not key.startswith(in_prefix):
+                continue
 
             if key_set.filter_is_last is not None:
                 next_prefix = None
@@ -121,22 +118,52 @@ def __convert(
     return out_states
 
 
+def __detect_source(
+        state_dict: dict[str, Tensor],
+        key_sets: list[LoraConversionKeySet],
+) -> str:
+    omi_count = 0
+    diffusers_count = 0
+    legacy_diffusers_count = 0
+
+    for key_set in key_sets:
+        for key in state_dict:
+            if key.startswith(key_set.omi_prefix):
+                omi_count += 1
+            elif key.startswith(key_set.diffusers_prefix):
+                diffusers_count += 1
+            elif key.startswith(key_set.legacy_diffusers_prefix):
+                legacy_diffusers_count += 1
+
+    if omi_count > diffusers_count and omi_count > legacy_diffusers_count:
+        return 'omi'
+    if diffusers_count > omi_count and diffusers_count > legacy_diffusers_count:
+        return 'diffusers'
+    if legacy_diffusers_count > omi_count and legacy_diffusers_count > diffusers_count:
+        return 'legacy_diffusers'
+
+    return ''
+
+
 def convert_to_omi(
         state_dict: dict[str, Tensor],
         key_sets: list[LoraConversionKeySet],
 ) -> dict[str, Tensor]:
-    return __convert(state_dict, key_sets, 'omi')
+    source = __detect_source(state_dict, key_sets)
+    return __convert(state_dict, key_sets, source, 'omi')
 
 
 def convert_to_diffusers(
         state_dict: dict[str, Tensor],
         key_sets: list[LoraConversionKeySet],
 ) -> dict[str, Tensor]:
-    return __convert(state_dict, key_sets, 'diffusers')
+    source = __detect_source(state_dict, key_sets)
+    return __convert(state_dict, key_sets, source, 'diffusers')
 
 
 def convert_to_legacy_diffusers(
         state_dict: dict[str, Tensor],
         key_sets: list[LoraConversionKeySet],
 ) -> dict[str, Tensor]:
-    return __convert(state_dict, key_sets, 'legacy_diffusers')
+    source = __detect_source(state_dict, key_sets)
+    return __convert(state_dict, key_sets, source, 'legacy_diffusers')
