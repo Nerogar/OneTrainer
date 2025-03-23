@@ -21,7 +21,7 @@ class LoraConversionKeySet:
         else:
             self.omi_prefix = omi_prefix
             self.diffusers_prefix = diffusers_prefix
-        self.legacy_diffusers_prefix = diffusers_prefix.replace('.', '_')
+        self.legacy_diffusers_prefix = self.diffusers_prefix.replace('.', '_')
 
         self.swap_chunks = swap_chunks
         self.filter_is_last = filter_is_last
@@ -29,7 +29,8 @@ class LoraConversionKeySet:
 
         self.next_omi_prefix = next_omi_prefix
         self.next_diffusers_prefix = next_diffusers_prefix
-        self.next_legacy_diffusers_prefix = next_diffusers_prefix.replace('.', '_')
+        self.next_legacy_diffusers_prefix = next_diffusers_prefix.replace('.', '_') \
+            if next_diffusers_prefix is not None else None
 
         if next_omi_prefix is None and parent is not None:
             self.next_omi_prefix = parent.next_omi_prefix
