@@ -16,7 +16,12 @@ RUN cd OneTrainer \
  && pip cache purge \
  && rm -r ~/.cache/pip
 RUN apt-get update --yes \
- && apt-get install --yes --no-install-recommends joe less gh \
+ && apt-get install --yes --no-install-recommends \
+      joe \
+	  less \
+	  gh \
+	  iputils-ping \
+	  nano \
  && apt-get autoremove -y \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
