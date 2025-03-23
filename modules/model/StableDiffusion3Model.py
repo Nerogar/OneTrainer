@@ -33,12 +33,6 @@ class StableDiffusion3ModelEmbedding:
             placeholder: str,
             is_output_embedding: bool,
     ):
-        super().__init__(
-            uuid=uuid,
-            token_count=text_encoder_1_vector.shape[0],
-            placeholder=placeholder,
-        )
-
         self.text_encoder_1_embedding = BaseModelEmbedding(
             uuid=uuid,
             placeholder=placeholder,
