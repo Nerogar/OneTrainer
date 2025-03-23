@@ -1,6 +1,9 @@
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
+from modules.util.enum.GradientCheckpointingMethod import (
+    GradientCheckpointingMethod,
+)
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -24,6 +27,7 @@ class OffloadingWindow(ctk.CTkToplevel):
         self.title("Offloading")
         self.geometry("800x400")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -38,6 +42,7 @@ class OffloadingWindow(ctk.CTkToplevel):
         frame.grid(row=0, column=0, sticky='nsew')
 
         components.button(self, 1, 0, "ok", self.__ok)
+        self.after(150, lambda: set_window_icon(self))
 
     def __content_frame(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")

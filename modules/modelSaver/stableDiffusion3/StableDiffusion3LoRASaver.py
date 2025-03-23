@@ -37,7 +37,7 @@ class StableDiffusion3LoRASaver(
 
         if model.additional_embeddings and model.train_config.bundle_additional_embeddings:
             for embedding in model.additional_embeddings:
-                placeholder = embedding.text_encoder_embedding.placeholder
+                placeholder = embedding.text_encoder_1_embedding.placeholder
 
                 if embedding.text_encoder_1_embedding.vector is not None:
                     state_dict[f"bundle_emb.{placeholder}.clip_l"] = embedding.text_encoder_1_embedding.vector

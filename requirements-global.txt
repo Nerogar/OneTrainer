@@ -2,6 +2,7 @@
 numpy==2.2.2
 opencv-python==4.11.0.86
 pillow==11.1.0
+imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.28.1
@@ -27,7 +28,7 @@ pooch==1.8.2
 open-clip-torch==2.30.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@42c7ca0#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@2c67a5a#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
