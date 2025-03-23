@@ -49,7 +49,7 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
     keys += [LoraConversionKeySet("y_embedder.mlp.2", "time_text_embed.text_embedder.linear_2", parent=key_prefix)]
 
     for k in map_prefix_range("joint_blocks", "transformer_blocks", parent=key_prefix):
-        keys |= __map_transformer_block(k)
+        keys += __map_transformer_block(k)
 
     return keys
 

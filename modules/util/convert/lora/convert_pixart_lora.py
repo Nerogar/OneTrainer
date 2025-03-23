@@ -40,7 +40,7 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
     keys += [LoraConversionKeySet("t_block.1", "adaln_single.linear", parent=key_prefix)]
 
     for k in map_prefix_range("blocks", "transformer_blocks", parent=key_prefix):
-        keys |= __map_transformer_attention_block(k)
+        keys += __map_transformer_attention_block(k)
 
     keys += [LoraConversionKeySet("final_layer.linear", "proj_out", parent=key_prefix)]
 
