@@ -115,8 +115,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             for f in full_filenames:
                 state_dict |= load_file(f)
 
-        if hasattr(sub_module, '_convert_deprecated_attention_blocks'):
-            sub_module._convert_deprecated_attention_blocks(state_dict)
+        if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
+            sub_module._fix_state_dict_keys_on_load(state_dict)
 
         for key, value in state_dict.items():
             module = sub_module
