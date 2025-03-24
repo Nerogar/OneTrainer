@@ -1,3 +1,7 @@
+import math
+import os
+import pathlib
+import random
 import subprocess
 from tkinter import filedialog
 
@@ -5,6 +9,8 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
+import cv2
+import scenedetect
 
 
 class VideoToolUI(ctk.CTkToplevel):
@@ -43,36 +49,51 @@ class VideoToolUI(ctk.CTkToplevel):
         frame.grid_columnconfigure(2, weight=0)
         frame.grid_columnconfigure(3, weight=1)
 
-        # input directory
-        components.label(frame, 0, 0, "Input",
-                         tooltip="Path to folder or single video file to process")
-        components.dir_entry(frame, 0, 1, self.video_ui_state, "input")
+        # single video
+        components.label(frame, 0, 0, "Single Video",
+                         tooltip="Link to video to process.")
+        self.clip_single_entry = ctk.CTkEntry(frame, width=190)
+        self.clip_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.clip_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.clip_single_entry, [("Video file",".*")]))
+        self.clip_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
+        components.button(frame, 0, 2, "Extract Single", command=lambda:self.__extract_clips(False))
 
-        # include subdirectories
-        components.label(frame, 1, 0, "Include Subdirectories",
-                         tooltip="Includes videos from subdirectories")
-        components.switch(frame, 1, 1, self.video_ui_state, "include_subdirectories")
+        # directory of videos
+        components.label(frame, 1, 0, "Directory",
+                         tooltip="Path to directory with multiple videos to process")
+        self.clip_list_entry = ctk.CTkEntry(frame, width=190)
+        self.clip_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        self.clip_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.clip_list_entry))
+        self.clip_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
+        components.button(frame, 1, 2, "Extract Directory", command=lambda:self.__extract_clips(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
-                         tooltip="Path to folder where clips will be saved")
-        components.dir_entry(frame, 2, 1, self.video_ui_state, "video_output")
+                         tooltip="Path to folder where extracted clips will be saved.")
+        self.clip_output_entry = ctk.CTkEntry(frame, width=190)
+        self.clip_output_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.clip_output_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.clip_output_entry))
+        self.clip_output_button.grid(row=2, column=1, sticky="e", padx=5, pady=5)
 
         # split at cuts
+        self.split_at_cuts = ctk.BooleanVar(self, False)
         components.label(frame, 3, 0, "Split at Cuts",
                          tooltip="If enabled, detect cuts in the input video and split at those points. Otherwise will split at random.")
-        components.switch(frame, 3, 1, self.video_ui_state, "cut_split_enabled")
+        self.split_cuts_entry = ctk.CTkSwitch(frame, variable=self.split_at_cuts, text="")
+        self.split_cuts_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
         # maximum length
         components.label(frame, 4, 0, "Maximum Length",
                          tooltip="Maximum length in seconds for saved clips, larger clips will be broken into multiple small clips.")
-        components.entry(frame, 4, 1, self.video_ui_state, "maximum_length")
+        self.clip_length_entry = ctk.CTkEntry(frame, width=220)
+        self.clip_length_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.clip_length_entry.insert(0, "2")
 
-        # prompt source
-        components.label(frame, 5, 0, "Object Filter",
-                         tooltip="Detect general features using Haar-Cascade classifier, and choose how to deal with clips where it is detected")
-        components.options(frame, 5, 1, ["NONE", "FACE", "EYE", "BODY"], self.video_ui_state, "filter_object")
-        components.options(frame, 5, 2, ["INCLUDE", "EXCLUDE", "SUBFOLDER"], self.video_ui_state, "filter_behavior")
+        # object filter
+        # components.label(frame, 5, 0, "Object Filter",
+        #                  tooltip="Detect general features using Haar-Cascade classifier, and choose how to deal with clips where it is detected")
+        # components.options(frame, 5, 1, ["NONE", "FACE", "EYE", "BODY"], self.video_ui_state, "filter_object")
+        # components.options(frame, 5, 2, ["INCLUDE", "EXCLUDE", "SUBFOLDER"], self.video_ui_state, "filter_behavior")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -84,36 +105,51 @@ class VideoToolUI(ctk.CTkToplevel):
         frame.grid_columnconfigure(2, weight=0)
         frame.grid_columnconfigure(3, weight=1)
 
-        # input directory
-        components.label(frame, 0, 0, "Input",
-                         tooltip="Path to folder or single video file to process")
-        components.dir_entry(frame, 0, 1, self.video_ui_state, "input")
+        # single video
+        components.label(frame, 0, 0, "Single Video",
+                         tooltip="Link to video to process.")
+        self.image_single_entry = ctk.CTkEntry(frame, width=190)
+        self.image_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.image_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.image_single_entry, [("Video file",".*")]))
+        self.image_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
+        components.button(frame, 0, 2, "Extract Single", command=lambda:self.__extract_images(False))
 
-        # include subdirectories
-        components.label(frame, 1, 0, "Include Subdirectories",
-                         tooltip="Includes videos from subdirectories")
-        components.switch(frame, 1, 1, self.video_ui_state, "include_subdirectories")
+        # directory of videos
+        components.label(frame, 1, 0, "Directory",
+                         tooltip="Path to directory with multiple videos to process")
+        self.image_list_entry = ctk.CTkEntry(frame, width=190)
+        self.image_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        self.image_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.image_list_entry))
+        self.image_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
+        components.button(frame, 1, 2, "Extract Directory", command=lambda:self.__extract_images(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
-                         tooltip="Path to folder where images will be saved")
-        components.dir_entry(frame, 2, 1, self.video_ui_state, "image_output")
+                         tooltip="Path to folder where extracted images will be saved.")
+        self.image_output_entry = ctk.CTkEntry(frame, width=190)
+        self.image_output_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.image_output_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.image_output_entry))
+        self.image_output_button.grid(row=2, column=1, sticky="e", padx=5, pady=5)
 
         # image capture rate
         components.label(frame, 3, 0, "Images/sec",
                          tooltip="Number of images to capture per second of video. Images will be taken at semi-random frames around the specified frequency")
-        components.entry(frame, 3, 1, self.video_ui_state, "image_rate")
+        self.capture_rate_entry = ctk.CTkEntry(frame, width=220)
+        self.capture_rate_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        self.capture_rate_entry.insert(0, "2")
 
-        # maximum length
+        # blur removal
         components.label(frame, 4, 0, "Blur Removal",
-                         tooltip="Threshold for removal of blurry images, relative to all others. For example at 0.4, the blurriest 40%% of the final images captured will be deleted.")
-        components.entry(frame, 4, 1, self.video_ui_state, "blur_threshold")
+                         tooltip="Threshold for removal of blurry images, relative to all others. For example at 0.2, the blurriest 20%% of the final images captured will be deleted.")
+        self.blur_threshold_entry = ctk.CTkEntry(frame, width=220)
+        self.blur_threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.blur_threshold_entry.insert(0, "0.2")
 
-        # prompt source
-        components.label(frame, 5, 0, "Object Filter",
-                         tooltip="Detect general features using Haar-Cascade classifier, and choose how to deal with clips where it is detected")
-        components.options(frame, 5, 1, ["NONE", "FACE", "EYE", "BODY"], self.video_ui_state, "filter_object")
-        components.options(frame, 5, 2, ["INCLUDE", "EXCLUDE", "SUBFOLDER"], self.video_ui_state, "filter_behavior")
+        # object filter
+        # components.label(frame, 5, 0, "Object Filter",
+        #                  tooltip="Detect general features using Haar-Cascade classifier, and choose how to deal with clips where it is detected")
+        # components.options(frame, 5, 1, ["NONE", "FACE", "EYE", "BODY"], self.video_ui_state, "filter_object")
+        # components.options(frame, 5, 2, ["INCLUDE", "EXCLUDE", "SUBFOLDER"], self.video_ui_state, "filter_behavior")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -129,14 +165,16 @@ class VideoToolUI(ctk.CTkToplevel):
                          tooltip="Link to video/playlist to download. Uses yt-dlp, supports youtube, twitch, instagram, and many other sites.")
         self.download_link_entry = ctk.CTkEntry(frame, width=220)
         self.download_link_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        components.button(frame, 0, 3, "Download Link", command=lambda: self.__download_video(False))
 
         # link list
         components.label(frame, 1, 0, "Link List",
                          tooltip="Path to txt file with list of links separated by newlines.")
         self.download_list_entry = ctk.CTkEntry(frame, width=190)
         self.download_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.download_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.download_list_entry))
+        self.download_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.download_list_entry, [("Text file", ".txt")]))
         self.download_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
+        components.button(frame, 1, 3, "Download List", command=lambda: self.__download_video(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
@@ -151,12 +189,6 @@ class VideoToolUI(ctk.CTkToplevel):
                          tooltip="Any additional arguments to pass to yt-dlp, for example '--restrict-filenames --force-overwrite'")
         self.download_args_entry = ctk.CTkTextbox(frame, width=220, height=90, border_width=2)
         self.download_args_entry.grid(row=3, column=1, rowspan=2, sticky="w", padx=5, pady=5)
-
-        # download link
-        components.button(frame, 0, 3, "Download Link", command=lambda: self.__download_video(False))
-
-        # download lst
-        components.button(frame, 1, 3, "Download List", command=lambda: self.__download_video(True))
 
         # current status
         self.download_label = ctk.CTkLabel(frame, text="Status:")
@@ -177,9 +209,9 @@ class VideoToolUI(ctk.CTkToplevel):
         entry_box.insert(0, path)
         self.focus_set()
 
-    def __browse_for_file(self, entry_box):
+    def __browse_for_file(self, entry_box, type):
         # get the path from the user
-        path = filedialog.askopenfilename(filetypes=[("Text file", ".txt")])
+        path = filedialog.askopenfilename(filetypes=type)
         # set the path to the entry box
         # delete entry box text
         entry_box.focus_set()
@@ -187,15 +219,136 @@ class VideoToolUI(ctk.CTkToplevel):
         entry_box.insert(0, path)
         self.focus_set()
 
+    def __extract_clips(self, batch_mode : bool):
+        if not batch_mode:
+            path = pathlib.Path(self.clip_single_entry.get())
+            if path.is_file():
+                vid = cv2.VideoCapture(path)
+                if vid.isOpened() and vid.read()[0]:    #check if valid video
+                    input_videos = [path]
+                vid.release()
+        elif batch_mode:
+            input_videos = []
+            for path in pathlib.Path(self.clip_list_entry.get()).glob("**/*.*"):    #check directory and subdirectories
+                if path.is_file():
+                    vid = cv2.VideoCapture(path)
+                    if vid.isOpened() and vid.read()[0]:    #check if valid video
+                        input_videos += [path]
+                    vid.release()
+            print(f'Found {len(input_videos)} videos to process')
+
+        for video_path in input_videos:
+            video = cv2.VideoCapture(video_path)
+            fps = video.get(cv2.CAP_PROP_FPS)
+            max_length_frames = int(self.clip_length_entry.get()) * fps    #convert max length from seconds to frames
+            min_length = int(0.25*fps)    #minimum clip length of 1/4 second
+
+            if self.split_at_cuts.get():
+                timecode_list = scenedetect.detect(str(video_path), scenedetect.AdaptiveDetector()) #detect scene transitions
+                scene_list = [(x[0].get_frames(), x[1].get_frames()) for x in timecode_list]
+                if len(scene_list) == 0:
+                    scene_list = [(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]     #use start/end frames if no scenes detected
+            else:
+                scene_list = [(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]  #default if not using cuts, start and end of entire video
+
+            scene_list_split = []
+            for scene in scene_list:
+                length = scene[1]-scene[0]
+                if length > max_length_frames:  #check for any scenes longer than max length
+                    n = math.ceil(length/max_length_frames) #divide into n new scenes
+                    new_length = int(length/n)
+                    new_splits = range(scene[0], scene[1]+min_length, new_length)   #divide clip into closest chunks to max_length
+                    for i, _n in enumerate(new_splits[:-1]):
+                        if new_splits[i+1] - new_splits[i] > min_length:
+                            scene_list_split += [(new_splits[i], new_splits[i+1])]
+                else:
+                    if length > (min_length+2):
+                        scene_list_split += [(scene[0]+1, scene[1]-1)]      #trim first and last frame from detected scenes to avoid transition artifacts
+
+            print(f'Video "{video_path}" being split into {len(scene_list_split)} clips...')
+
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            basename, ext = os.path.splitext(os.path.basename(video_path))
+            size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+            for scene in scene_list_split:
+                writer = cv2.VideoWriter(f'{self.clip_output_entry.get()}{os.sep}{basename}_{scene[0]}-{scene[1]}.avi',fourcc,fps,size)
+                video.set(cv2.CAP_PROP_POS_FRAMES, scene[0])
+                frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
+                success, frame = video.read()
+                while success and (frame_number < scene[1]):
+                    writer.write(frame)
+                    success, frame = video.read()
+                    frame_number += 1
+                writer.release()
+
+            video.release()
+        print("All videos complete")
+
+    def __extract_images(self, batch_mode : bool):
+        if not batch_mode:
+            path = pathlib.Path(self.image_single_entry.get())
+            if path.is_file():
+                vid = cv2.VideoCapture(path)
+                if vid.isOpened() and vid.read()[0]:    #check if valid video
+                    input_videos = [path]
+                vid.release()
+        elif batch_mode:
+            input_videos = []
+            for path in pathlib.Path(self.image_list_entry.get()).glob("**/*.*"):   #check directory and subdirectories
+                if path.is_file():
+                    vid = cv2.VideoCapture(path)
+                    if vid.isOpened() and vid.read()[0]:    #check if valid video
+                        input_videos += [path]
+                    vid.release()
+            print(f'Found {len(input_videos)} videos to process')
+
+        for video_path in input_videos:
+            video = cv2.VideoCapture(video_path)
+            fps = video.get(cv2.CAP_PROP_FPS)
+            image_rate = int(fps / float(self.capture_rate_entry.get()))   #convert capture rate from seconds to frames
+            frame_range = range(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)), image_rate)
+            frame_list = []
+
+            for n in frame_range:
+                frame = abs(int(random.triangular(n-(image_rate/2), n+(image_rate/2))))     #random triangular distribution around center
+                frame_list += [min(frame, int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]
+
+            print(f'Video "{video_path}" will be split into {len(frame_list)} images...')
+
+            basename, ext = os.path.splitext(os.path.basename(video_path))
+            output_list = []
+            for f in frame_list:
+                video.set(cv2.CAP_PROP_POS_FRAMES, f)
+                success, frame = video.read()
+                if success:
+                    frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    frame_sharpness = cv2.Laplacian(frame_grayscale, cv2.CV_64F).var()  #get sharpness of greyscale pic
+                    output_list += [(f, frame_sharpness)]
+
+            output_list_sorted = sorted(output_list, key=lambda x: x[1])
+            cutoff = int(float(self.blur_threshold_entry.get())*len(output_list_sorted))
+            output_list_cut = output_list_sorted[cutoff:-1]     #drop the lowest sharpness values
+            print(f'{cutoff} blurriest images have been dropped')
+
+            for f in output_list_cut:
+                filename = f'{self.image_output_entry.get()}{os.sep}{basename}_{f[0]}.jpg'
+                video.set(cv2.CAP_PROP_POS_FRAMES, f[0])
+                success, frame = video.read()
+                if success:
+                    cv2.imwrite(filename, frame)    #save images
+
+            video.release()
+        print("All videos complete")
+
     def __download_video(self, batch_mode : bool):
         if not batch_mode:
             ydl_urls = [self.download_link_entry.get()]
         elif batch_mode:
             with open(self.download_list_entry.get()) as file:
                 ydl_urls = file.readlines()
-        ydl_output = "-o %(title)s.%(ext)s"
+        ydl_output = '-o "%(title)s.%(ext)s"'
         ydl_path = '-P ' + self.download_output_entry.get()
-        ydl_args = self.download_args_entry.get("0.0", ctk.END).split()
+        ydl_args = self.download_args_entry.get("0.0", ctk.END).split()     #split into list
 
         error_count = 0
         for index, url in enumerate(ydl_urls, start=1):
