@@ -6,7 +6,6 @@ import subprocess
 from tkinter import filedialog
 
 from modules.util.ui import components
-from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 import cv2
@@ -17,12 +16,9 @@ class VideoToolUI(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
-            video_ui_state: UIState,
             *args, **kwargs,
     ):
         ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-
-        self.video_ui_state = video_ui_state
 
         self.title("Video Tools")
         self.geometry("600x600")
@@ -220,15 +216,28 @@ class VideoToolUI(ctk.CTkToplevel):
         self.focus_set()
 
     def __extract_clips(self, batch_mode : bool):
+        if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
+            print("Invalid output directory!")
+            return
+
         if not batch_mode:
             path = pathlib.Path(self.clip_single_entry.get())
             if path.is_file():
                 vid = cv2.VideoCapture(path)
                 if vid.isOpened() and vid.read()[0]:    #check if valid video
                     input_videos = [path]
-                vid.release()
+                    vid.release()
+                else:
+                    print("Invalid video file!")
+                    return
+            else:
+                print("No file specified, or invalid file path!")
+                return
         elif batch_mode:
             input_videos = []
+            if not pathlib.Path(self.clip_list_entry.get()).is_dir() or self.clip_list_entry.get() == "":
+                print("Invalid input directory!")
+                return
             for path in pathlib.Path(self.clip_list_entry.get()).glob("**/*.*"):    #check directory and subdirectories
                 if path.is_file():
                     vid = cv2.VideoCapture(path)
@@ -285,15 +294,28 @@ class VideoToolUI(ctk.CTkToplevel):
         print("All videos complete")
 
     def __extract_images(self, batch_mode : bool):
+        if not pathlib.Path(self.image_output_entry.get()).is_dir() or self.image_output_entry.get() == "":
+            print("Invalid output directory!")
+            return
+
         if not batch_mode:
             path = pathlib.Path(self.image_single_entry.get())
             if path.is_file():
                 vid = cv2.VideoCapture(path)
                 if vid.isOpened() and vid.read()[0]:    #check if valid video
                     input_videos = [path]
-                vid.release()
+                    vid.release()
+                else:
+                    print("Invalid video file!")
+                    return
+            else:
+                print("No file specified, or invalid file path!")
+                return
         elif batch_mode:
             input_videos = []
+            if not pathlib.Path(self.image_list_entry.get()).is_dir() or self.image_list_entry.get() == "":
+                print("Invalid input directory!")
+                return
             for path in pathlib.Path(self.image_list_entry.get()).glob("**/*.*"):   #check directory and subdirectories
                 if path.is_file():
                     vid = cv2.VideoCapture(path)
@@ -341,20 +363,29 @@ class VideoToolUI(ctk.CTkToplevel):
         print("All videos complete")
 
     def __download_video(self, batch_mode : bool):
+        if not pathlib.Path(self.download_output_entry.get()).is_dir() or self.download_output_entry.get() == "":
+            print("Invalid output directory!")
+            return
+
         if not batch_mode:
             ydl_urls = [self.download_link_entry.get()]
         elif batch_mode:
-            with open(self.download_list_entry.get()) as file:
-                ydl_urls = file.readlines()
-        ydl_output = '-o "%(title)s.%(ext)s"'
-        ydl_path = '-P ' + self.download_output_entry.get()
+            ydl_path = pathlib.Path(self.download_list_entry.get())
+            if ydl_path.is_file() and ydl_path.suffix.lower() == ".txt":
+                with open(ydl_path) as file:
+                    ydl_urls = file.readlines()
+            else:
+                print("Invalid link list!")
+                return
+        ydl_filename = '-o "%(title)s.%(ext)s"'
+        ydl_outpath = '-P ' + self.download_output_entry.get()
         ydl_args = self.download_args_entry.get("0.0", ctk.END).split()     #split into list
 
         error_count = 0
         for index, url in enumerate(ydl_urls, start=1):
             try:
                 self.download_status.configure(text=f"Download {index}/{len(ydl_urls)} running...")
-                subprocess.run(["yt-dlp", ydl_output, ydl_path, url] + ydl_args)
+                subprocess.run(["yt-dlp", ydl_filename, ydl_outpath, url] + ydl_args)
                 self.download_status.configure(text=f"Download {index}/{len(ydl_urls)} complete!")
             except subprocess.CalledProcessError as e:  # noqa: PERF203
                 self.download_status.configure(text=f"Download {index}/{len(ydl_urls)} error: {e}")

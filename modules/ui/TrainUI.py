@@ -24,7 +24,6 @@ from modules.ui.VideoToolUI import VideoToolUI
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.config.VideoToolConfig import VideoToolConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
@@ -62,8 +61,6 @@ class TrainUI(ctk.CTk):
 
         self.train_config = TrainConfig.default_values()
         self.ui_state = UIState(self, self.train_config)
-        self.videotoolconfig = VideoToolConfig.default_values()
-        self.video_ui_state = UIState(self, self.videotoolconfig)
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -547,7 +544,7 @@ class TrainUI(ctk.CTk):
         self.wait_window(window)
 
     def open_video_tool(self):
-        window = VideoToolUI(self, self.video_ui_state)
+        window = VideoToolUI(self)
         self.wait_window(window)
 
     def open_convert_model_tool(self):
