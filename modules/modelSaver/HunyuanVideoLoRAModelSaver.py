@@ -1,3 +1,4 @@
+
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.hunyuanVideo.HunyuanVideoEmbeddingSaver import HunyuanVideoEmbeddingSaver
@@ -13,6 +14,8 @@ class HunyuanVideoLoRAModelSaver(
     BaseModelSaver,
     InternalModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def save(
             self,
@@ -26,7 +29,7 @@ class HunyuanVideoLoRAModelSaver(
         embedding_model_saver = HunyuanVideoEmbeddingSaver()
 
         lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
-        if not model.train_config.bundle_additional_embeddings:
+        if not model.train_config.bundle_additional_embeddings or output_model_format == ModelFormat.INTERNAL:
             embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
 
         if output_model_format == ModelFormat.INTERNAL:

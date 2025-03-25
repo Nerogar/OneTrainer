@@ -13,6 +13,8 @@ class StableDiffusionXLLoRAModelSaver(
     BaseModelSaver,
     InternalModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def save(
             self,
@@ -26,7 +28,7 @@ class StableDiffusionXLLoRAModelSaver(
         embedding_model_saver = StableDiffusionXLEmbeddingSaver()
 
         lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
-        if not model.train_config.bundle_additional_embeddings:
+        if not model.train_config.bundle_additional_embeddings or output_model_format == ModelFormat.INTERNAL:
             embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
 
         if output_model_format == ModelFormat.INTERNAL:

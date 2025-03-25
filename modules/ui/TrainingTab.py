@@ -3,8 +3,6 @@ from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.AlignPropLoss import AlignPropLoss
-from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -86,7 +84,6 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -101,7 +98,6 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -115,7 +111,6 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -140,7 +135,6 @@ class TrainingTab:
         self.__create_prior_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2, supports_vb_loss=True)
 
@@ -154,7 +148,6 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2)
 
-        self.__create_align_prop_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
 
@@ -261,13 +254,6 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
         row = 0
 
-        # attention mechanism
-        components.label(frame, row, 0, "Attention",
-                         tooltip="The attention mechanism used during training. This has a big effect on speed and memory consumption")
-        components.options(frame, row, 1, [str(x) for x in list(AttentionMechanism)], self.ui_state,
-                           "attention_mechanism")
-        row += 1
-
         # ema
         components.label(frame, row, 0, "EMA",
                          tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
@@ -342,46 +328,6 @@ class TrainingTab:
         components.label(frame, row, 0, "Force Circular Padding",
                          tooltip="Enables circular padding for all conv layers to better train seamless images")
         components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
-
-    def __create_align_prop_frame(self, master, row):
-        frame = ctk.CTkFrame(master=master, corner_radius=5)
-        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-
-        # align prop
-        components.label(frame, 0, 0, "AlignProp",
-                         tooltip="Enables AlignProp training")
-        components.switch(frame, 0, 1, self.ui_state, "align_prop")
-
-        # align prop probability
-        components.label(frame, 1, 0, "AlignProp Probability",
-                         tooltip="When AlignProp is enabled, specifies the number of training steps done using AlignProp calculations")
-        components.entry(frame, 1, 1, self.ui_state, "align_prop_probability")
-
-        # align prop loss
-        components.label(frame, 2, 0, "AlignProp Loss",
-                         tooltip="Specifies the loss function used for AlignProp calculations")
-        components.options(frame, 2, 1, [str(x) for x in list(AlignPropLoss)], self.ui_state, "align_prop_loss")
-
-        # align prop weight
-        components.label(frame, 3, 0, "AlignProp Weight",
-                         tooltip="A weight multiplier for the AlignProp loss")
-        components.entry(frame, 3, 1, self.ui_state, "align_prop_weight")
-
-        # align prop steps
-        components.label(frame, 4, 0, "AlignProp Steps",
-                         tooltip="Number of inference steps for each AlignProp step")
-        components.entry(frame, 4, 1, self.ui_state, "align_prop_steps")
-
-        # align prop truncate steps
-        components.label(frame, 5, 0, "AlignProp Truncate Steps",
-                         tooltip="Fraction of steps to randomly truncate when using AlignProp. This is needed to increase model diversity.")
-        components.entry(frame, 5, 1, self.ui_state, "align_prop_truncate_steps")
-
-        # align prop truncate steps
-        components.label(frame, 6, 0, "AlignProp CFG Scale",
-                         tooltip="CFG Scale for inference steps of AlignProp calculations")
-        components.entry(frame, 6, 1, self.ui_state, "align_prop_cfg_scale")
 
     def __create_text_encoder_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
