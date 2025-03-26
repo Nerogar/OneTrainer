@@ -68,10 +68,8 @@ class StableDiffusion3Model(BaseModel):
     transformer: SD3Transformer2DModel | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     text_encoder_3_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     text_encoder_3_train_dtype: DataType
 
     text_encoder_3_offload_conductor: LayerOffloadConductor | None
@@ -112,10 +110,8 @@ class StableDiffusion3Model(BaseModel):
         self.vae = None
         self.transformer = None
 
-        self.autocast_context = nullcontext()
         self.text_encoder_3_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_3_offload_conductor = None

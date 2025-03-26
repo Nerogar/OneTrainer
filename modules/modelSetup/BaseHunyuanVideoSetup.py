@@ -95,6 +95,7 @@ class BaseHunyuanVideoSetup(
             if embedding_state is None:
                 with model.autocast_context:
                     embedding_state_1 = self._create_new_embedding(
+                        model,
                         embedding_config,
                         model.tokenizer_1,
                         model.text_encoder_1,
@@ -105,6 +106,7 @@ class BaseHunyuanVideoSetup(
                     )
 
                     embedding_state_2 = self._create_new_embedding(
+                        model,
                         embedding_config,
                         model.tokenizer_2,
                         model.text_encoder_2,
