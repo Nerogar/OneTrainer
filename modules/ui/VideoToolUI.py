@@ -1,8 +1,10 @@
+import concurrent.futures
 import math
 import os
 import pathlib
 import random
 import subprocess
+import webbrowser
 from tkinter import filedialog
 
 from modules.util.ui import components
@@ -52,16 +54,16 @@ class VideoToolUI(ctk.CTkToplevel):
         self.clip_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.clip_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.clip_single_entry, [("Video file",".*")]))
         self.clip_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 0, 2, "Extract Single", command=lambda:self.__extract_clips(False))
+        components.button(frame, 0, 2, "Extract Single", command=lambda:self.__extract_clips_multi(False))
 
         # directory of videos
         components.label(frame, 1, 0, "Directory",
-                         tooltip="Path to directory with multiple videos to process")
+                         tooltip="Path to directory with multiple videos to process, including in subdirectories.")
         self.clip_list_entry = ctk.CTkEntry(frame, width=190)
         self.clip_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.clip_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.clip_list_entry))
         self.clip_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 1, 2, "Extract Directory", command=lambda:self.__extract_clips(True))
+        components.button(frame, 1, 2, "Extract Directory", command=lambda:self.__extract_clips_multi(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
@@ -79,11 +81,11 @@ class VideoToolUI(ctk.CTkToplevel):
         self.split_cuts_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
         # maximum length
-        components.label(frame, 4, 0, "Maximum Length",
+        components.label(frame, 4, 0, "Max Length (s)",
                          tooltip="Maximum length in seconds for saved clips, larger clips will be broken into multiple small clips.")
         self.clip_length_entry = ctk.CTkEntry(frame, width=220)
         self.clip_length_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
-        self.clip_length_entry.insert(0, "2")
+        self.clip_length_entry.insert(0, "3")
 
         # object filter
         # components.label(frame, 5, 0, "Object Filter",
@@ -112,7 +114,7 @@ class VideoToolUI(ctk.CTkToplevel):
 
         # directory of videos
         components.label(frame, 1, 0, "Directory",
-                         tooltip="Path to directory with multiple videos to process")
+                         tooltip="Path to directory with multiple videos to process, including in subdirectories.")
         self.image_list_entry = ctk.CTkEntry(frame, width=190)
         self.image_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.image_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.image_list_entry))
@@ -129,14 +131,14 @@ class VideoToolUI(ctk.CTkToplevel):
 
         # image capture rate
         components.label(frame, 3, 0, "Images/sec",
-                         tooltip="Number of images to capture per second of video. Images will be taken at semi-random frames around the specified frequency")
+                         tooltip="Number of images to capture per second of video. Images will be taken at semi-random frames around the specified frequency.")
         self.capture_rate_entry = ctk.CTkEntry(frame, width=220)
         self.capture_rate_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
-        self.capture_rate_entry.insert(0, "2")
+        self.capture_rate_entry.insert(0, "0.5")
 
         # blur removal
         components.label(frame, 4, 0, "Blur Removal",
-                         tooltip="Threshold for removal of blurry images, relative to all others. For example at 0.2, the blurriest 20%% of the final images captured will be deleted.")
+                         tooltip="Threshold for removal of blurry images, relative to all others. For example at 0.2, the blurriest 20%% of the final selected frames will not be saved.")
         self.blur_threshold_entry = ctk.CTkEntry(frame, width=220)
         self.blur_threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
         self.blur_threshold_entry.insert(0, "0.2")
@@ -161,7 +163,7 @@ class VideoToolUI(ctk.CTkToplevel):
                          tooltip="Link to video/playlist to download. Uses yt-dlp, supports youtube, twitch, instagram, and many other sites.")
         self.download_link_entry = ctk.CTkEntry(frame, width=220)
         self.download_link_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        components.button(frame, 0, 3, "Download Link", command=lambda: self.__download_video(False))
+        components.button(frame, 0, 2, "Download Link", command=lambda: self.__download_multi(False))
 
         # link list
         components.label(frame, 1, 0, "Link List",
@@ -170,7 +172,7 @@ class VideoToolUI(ctk.CTkToplevel):
         self.download_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.download_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.download_list_entry, [("Text file", ".txt")]))
         self.download_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 1, 3, "Download List", command=lambda: self.__download_video(True))
+        components.button(frame, 1, 2, "Download List", command=lambda: self.__download_multi(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
@@ -182,15 +184,17 @@ class VideoToolUI(ctk.CTkToplevel):
 
         # additional args
         components.label(frame, 3, 0, "Additional Args",
-                         tooltip="Any additional arguments to pass to yt-dlp, for example '--restrict-filenames --force-overwrite'")
+                         tooltip="Any additional arguments to pass to yt-dlp, for example '--restrict-filenames --force-overwrite'. Default args will hide most terminal outputs.")
         self.download_args_entry = ctk.CTkTextbox(frame, width=220, height=90, border_width=2)
         self.download_args_entry.grid(row=3, column=1, rowspan=2, sticky="w", padx=5, pady=5)
+        self.download_args_entry.insert(index="1.0", text="--quiet --no-warnings --progress")
+        components.button(frame, 3, 2, "yt-dlp info", command=lambda: webbrowser.open("https://github.com/yt-dlp/yt-dlp?tab=readme-ov-file#usage-and-options", new=0, autoraise=False))
 
         # current status
-        self.download_label = ctk.CTkLabel(frame, text="Status:")
-        self.download_label.grid(row=5,column=0)
-        self.download_status = ctk.CTkLabel(frame, text="-")
-        self.download_status.grid(row=5,column=1)
+        # self.download_label = ctk.CTkLabel(frame, text="Status:")
+        # self.download_label.grid(row=5,column=0)
+        # self.download_status = ctk.CTkLabel(frame, text="-")
+        # self.download_status.grid(row=5,column=1)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -215,154 +219,157 @@ class VideoToolUI(ctk.CTkToplevel):
         entry_box.insert(0, path)
         self.focus_set()
 
-    def __extract_clips(self, batch_mode : bool):
-        if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
-            print("Invalid output directory!")
-            return
-
+    def __get_vid_paths(self, batch_mode, input_path_single, input_path_dir):
+        input_videos = []
         if not batch_mode:
-            path = pathlib.Path(self.clip_single_entry.get())
+            path = pathlib.Path(input_path_single)
             if path.is_file():
                 vid = cv2.VideoCapture(path)
                 if vid.isOpened() and vid.read()[0]:    #check if valid video
                     input_videos = [path]
                     vid.release()
+                    return input_videos
                 else:
                     print("Invalid video file!")
-                    return
+                    return []
             else:
                 print("No file specified, or invalid file path!")
-                return
-        elif batch_mode:
+                return []
+        else:
             input_videos = []
-            if not pathlib.Path(self.clip_list_entry.get()).is_dir() or self.clip_list_entry.get() == "":
+            if not pathlib.Path(input_path_dir).is_dir() or input_path_dir == "":
                 print("Invalid input directory!")
-                return
-            for path in pathlib.Path(self.clip_list_entry.get()).glob("**/*.*"):    #check directory and subdirectories
+                return []
+            for path in pathlib.Path(input_path_dir).glob("**/*.*"):    #check directory and subdirectories
                 if path.is_file():
                     vid = cv2.VideoCapture(path)
                     if vid.isOpened() and vid.read()[0]:    #check if valid video
                         input_videos += [path]
                     vid.release()
             print(f'Found {len(input_videos)} videos to process')
+            return input_videos
 
-        for video_path in input_videos:
-            video = cv2.VideoCapture(video_path)
-            fps = video.get(cv2.CAP_PROP_FPS)
-            max_length_frames = int(self.clip_length_entry.get()) * fps    #convert max length from seconds to frames
-            min_length = int(0.25*fps)    #minimum clip length of 1/4 second
+    def __extract_clips_multi(self, batch_mode : bool):
+        if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
+            print("Invalid output directory!")
+            return
 
-            if self.split_at_cuts.get():
-                timecode_list = scenedetect.detect(str(video_path), scenedetect.AdaptiveDetector()) #detect scene transitions
-                scene_list = [(x[0].get_frames(), x[1].get_frames()) for x in timecode_list]
-                if len(scene_list) == 0:
-                    scene_list = [(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]     #use start/end frames if no scenes detected
-            else:
-                scene_list = [(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]  #default if not using cuts, start and end of entire video
+        input_videos = self.__get_vid_paths(batch_mode, self.clip_single_entry.get(), self.clip_list_entry.get())
+        if len(input_videos) == 0:
+            return
 
-            scene_list_split = []
-            for scene in scene_list:
-                length = scene[1]-scene[0]
-                if length > max_length_frames:  #check for any scenes longer than max length
-                    n = math.ceil(length/max_length_frames) #divide into n new scenes
-                    new_length = int(length/n)
-                    new_splits = range(scene[0], scene[1]+min_length, new_length)   #divide clip into closest chunks to max_length
-                    for i, _n in enumerate(new_splits[:-1]):
-                        if new_splits[i+1] - new_splits[i] > min_length:
-                            scene_list_split += [(new_splits[i], new_splits[i+1])]
-                else:
-                    if length > (min_length+2):
-                        scene_list_split += [(scene[0]+1, scene[1]-1)]      #trim first and last frame from detected scenes to avoid transition artifacts
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for video_path in input_videos:
+                executor.submit(self.__extract_clips, str(video_path), self.clip_length_entry.get(), self.split_at_cuts.get(), self.clip_output_entry.get())
 
-            print(f'Video "{video_path}" being split into {len(scene_list_split)} clips...')
-
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            basename, ext = os.path.splitext(os.path.basename(video_path))
-            size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-            for scene in scene_list_split:
-                writer = cv2.VideoWriter(f'{self.clip_output_entry.get()}{os.sep}{basename}_{scene[0]}-{scene[1]}.avi',fourcc,fps,size)
-                video.set(cv2.CAP_PROP_POS_FRAMES, scene[0])
-                frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
-                success, frame = video.read()
-                while success and (frame_number < scene[1]):
-                    writer.write(frame)
-                    success, frame = video.read()
-                    frame_number += 1
-                writer.release()
-
-            video.release()
         print("All videos complete")
+
+    def __extract_clips(self, video_path, max_length, split_at_cuts, output_dir):
+        video = cv2.VideoCapture(video_path)
+        print(video_path)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        max_length_frames = int(max_length) * fps    #convert max length from seconds to frames
+        min_length = int(0.25*fps)    #minimum clip length of 1/4 second
+
+        if split_at_cuts:
+            timecode_list = scenedetect.detect(str(video_path), scenedetect.AdaptiveDetector()) #detect scene transitions
+            scene_list = [(x[0].get_frames(), x[1].get_frames()) for x in timecode_list]
+            if len(scene_list) == 0:
+                scene_list = [(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]     #use start/end frames if no scenes detected
+        else:
+            scene_list = [(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]  #default if not using cuts, start and end of entire video
+
+        scene_list_split = []
+        for scene in scene_list:
+            length = scene[1]-scene[0]
+            if length > max_length_frames:  #check for any scenes longer than max length
+                n = math.ceil(length/max_length_frames) #divide into n new scenes
+                new_length = int(length/n)
+                new_splits = range(scene[0], scene[1]+min_length, new_length)   #divide clip into closest chunks to max_length
+                for i, _n in enumerate(new_splits[:-1]):
+                    if new_splits[i+1] - new_splits[i] > min_length:
+                        scene_list_split += [(new_splits[i], new_splits[i+1])]
+            else:
+                if length > (min_length+2):
+                    scene_list_split += [(scene[0]+1, scene[1]-1)]      #trim first and last frame from detected scenes to avoid transition artifacts
+
+        print(f'Video "{os.path.basename(video_path)}" being split into {len(scene_list_split)} clips...')
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            for scene in scene_list_split:
+                executor.submit(self.__save_clip, scene, video_path, output_dir)
+
+        video.release()
+
+    def __save_clip(self, scene, video_path, output_dir):
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        basename, ext = os.path.splitext(os.path.basename(video_path))
+        video = cv2.VideoCapture(video_path)
+        size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        fps = video.get(cv2.CAP_PROP_FPS)
+        writer = cv2.VideoWriter(f'{output_dir}{os.sep}{basename}_{scene[0]}-{scene[1]}.avi',fourcc,fps,size)
+        video.set(cv2.CAP_PROP_POS_FRAMES, scene[0])
+        frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
+        success, frame = video.read()
+        while success and (frame_number < scene[1]):
+            writer.write(frame)
+            success, frame = video.read()
+            frame_number += 1
+        writer.release()
+        video.release()
 
     def __extract_images(self, batch_mode : bool):
         if not pathlib.Path(self.image_output_entry.get()).is_dir() or self.image_output_entry.get() == "":
             print("Invalid output directory!")
             return
 
-        if not batch_mode:
-            path = pathlib.Path(self.image_single_entry.get())
-            if path.is_file():
-                vid = cv2.VideoCapture(path)
-                if vid.isOpened() and vid.read()[0]:    #check if valid video
-                    input_videos = [path]
-                    vid.release()
-                else:
-                    print("Invalid video file!")
-                    return
-            else:
-                print("No file specified, or invalid file path!")
-                return
-        elif batch_mode:
-            input_videos = []
-            if not pathlib.Path(self.image_list_entry.get()).is_dir() or self.image_list_entry.get() == "":
-                print("Invalid input directory!")
-                return
-            for path in pathlib.Path(self.image_list_entry.get()).glob("**/*.*"):   #check directory and subdirectories
-                if path.is_file():
-                    vid = cv2.VideoCapture(path)
-                    if vid.isOpened() and vid.read()[0]:    #check if valid video
-                        input_videos += [path]
-                    vid.release()
-            print(f'Found {len(input_videos)} videos to process')
+        input_videos = self.__get_vid_paths(batch_mode, self.image_single_entry.get(), self.image_list_entry.get())
+        if len(input_videos) == 0:
+            return
 
-        for video_path in input_videos:
-            video = cv2.VideoCapture(video_path)
-            fps = video.get(cv2.CAP_PROP_FPS)
-            image_rate = int(fps / float(self.capture_rate_entry.get()))   #convert capture rate from seconds to frames
-            frame_range = range(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)), image_rate)
-            frame_list = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for video_path in input_videos:
+                executor.submit(self.__save_frames, video_path, self.capture_rate_entry.get(), self.blur_threshold_entry.get(), self.image_output_entry.get())
 
-            for n in frame_range:
-                frame = abs(int(random.triangular(n-(image_rate/2), n+(image_rate/2))))     #random triangular distribution around center
-                frame_list += [min(frame, int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]
-
-            print(f'Video "{video_path}" will be split into {len(frame_list)} images...')
-
-            basename, ext = os.path.splitext(os.path.basename(video_path))
-            output_list = []
-            for f in frame_list:
-                video.set(cv2.CAP_PROP_POS_FRAMES, f)
-                success, frame = video.read()
-                if success:
-                    frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    frame_sharpness = cv2.Laplacian(frame_grayscale, cv2.CV_64F).var()  #get sharpness of greyscale pic
-                    output_list += [(f, frame_sharpness)]
-
-            output_list_sorted = sorted(output_list, key=lambda x: x[1])
-            cutoff = int(float(self.blur_threshold_entry.get())*len(output_list_sorted))
-            output_list_cut = output_list_sorted[cutoff:-1]     #drop the lowest sharpness values
-            print(f'{cutoff} blurriest images have been dropped')
-
-            for f in output_list_cut:
-                filename = f'{self.image_output_entry.get()}{os.sep}{basename}_{f[0]}.jpg'
-                video.set(cv2.CAP_PROP_POS_FRAMES, f[0])
-                success, frame = video.read()
-                if success:
-                    cv2.imwrite(filename, frame)    #save images
-
-            video.release()
         print("All videos complete")
 
-    def __download_video(self, batch_mode : bool):
+    def __save_frames(self, video_path, capture_rate, blur_threshold, output_path):
+        video = cv2.VideoCapture(video_path)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        image_rate = int(fps / float(capture_rate))   #convert capture rate from seconds to frames
+        frame_range = range(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)), image_rate)
+        frame_list = []
+
+        for n in frame_range:
+            frame = abs(int(random.triangular(n-(image_rate/2), n+(image_rate/2))))     #random triangular distribution around center
+            frame_list += [min(frame, int(video.get(cv2.CAP_PROP_FRAME_COUNT)))]
+
+        print(f'Video "{os.path.basename(video_path)}" will be split into {len(frame_list)} images...')
+
+        output_list = []
+        for f in frame_list:
+            video.set(cv2.CAP_PROP_POS_FRAMES, f)
+            success, frame = video.read()
+            if success:
+                frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frame_sharpness = cv2.Laplacian(frame_grayscale, cv2.CV_64F).var()  #get sharpness of greyscale pic
+                output_list += [(f, frame_sharpness)]
+
+        output_list_sorted = sorted(output_list, key=lambda x: x[1])
+        cutoff = int(float(blur_threshold)*len(output_list_sorted))
+        output_list_cut = output_list_sorted[cutoff:-1]     #drop the lowest sharpness values
+        print(f'{cutoff} blurriest images have been dropped from {os.path.basename(video_path)}')
+
+        basename, ext = os.path.splitext(os.path.basename(video_path))
+        for f in output_list_cut:
+            filename = f'{output_path}{os.sep}{basename}_{f[0]}.jpg'
+            video.set(cv2.CAP_PROP_POS_FRAMES, f[0])
+            success, frame = video.read()
+            if success:
+                cv2.imwrite(filename, frame)    #save images
+        video.release()
+
+    def __download_multi(self, batch_mode : bool):
         if not pathlib.Path(self.download_output_entry.get()).is_dir() or self.download_output_entry.get() == "":
             print("Invalid output directory!")
             return
@@ -377,19 +384,18 @@ class VideoToolUI(ctk.CTkToplevel):
             else:
                 print("Invalid link list!")
                 return
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for url in ydl_urls:
+                executor.submit(self.__download_video, url.strip(), self.download_output_entry.get(), self.download_args_entry.get("0.0", ctk.END))
+
+        print(f'Completed {len(ydl_urls)} downloads.')
+
+    def __download_video(self, url, output_dir, output_args):
         ydl_filename = '-o "%(title)s.%(ext)s"'
-        ydl_outpath = '-P ' + self.download_output_entry.get()
-        ydl_args = self.download_args_entry.get("0.0", ctk.END).split()     #split into list
+        ydl_outpath = '-P ' + output_dir
+        ydl_args = output_args.split()     #split into list
 
-        error_count = 0
-        for index, url in enumerate(ydl_urls, start=1):
-            try:
-                self.download_status.configure(text=f"Download {index}/{len(ydl_urls)} running...")
-                subprocess.run(["yt-dlp", ydl_filename, ydl_outpath, url] + ydl_args)
-                self.download_status.configure(text=f"Download {index}/{len(ydl_urls)} complete!")
-            except subprocess.CalledProcessError as e:  # noqa: PERF203
-                self.download_status.configure(text=f"Download {index}/{len(ydl_urls)} error: {e}")
-                error_count += 1
-                continue
-
-        self.download_status.configure(text=f"{len(ydl_urls)} downloads complete, {error_count} errors")
+        print(f'Downloading {url}...')
+        subprocess.run(["yt-dlp", ydl_filename, ydl_outpath, url] + ydl_args)
+        print(f'Download {url} done!')
