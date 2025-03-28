@@ -10,6 +10,7 @@ from modules.util.optimizer_util import (
     update_optimizer_config,
 )
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 
@@ -34,6 +35,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.title("Optimizer Settings")
         self.geometry("800x500")
         self.resizable(True, True)
+        set_window_icon(self)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -53,6 +55,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
+        self.after(150, lambda: set_window_icon(self))
 
     def main_frame(self, master):
         # Optimizer
@@ -122,7 +125,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'nesterov': {'title': 'Nesterov', 'tooltip': 'Whether to enable Nesterov optimizer_momentum.', 'type': 'bool'},
             'no_prox': {'title': 'No Prox', 'tooltip': 'Whether to use proximity updates or not.', 'type': 'bool'},
             'optim_bits': {'title': 'Optim Bits', 'tooltip': 'Number of bits used for optimization.', 'type': 'int'},
-            'percentile_clipping': {'title': 'Percentile Clipping', 'tooltip': 'Gradient clipping based on percentile values.', 'type': 'float'},
+            'percentile_clipping': {'title': 'Percentile Clipping', 'tooltip': 'Gradient clipping based on percentile values.', 'type': 'int'},
             'relative_step': {'title': 'Relative Step', 'tooltip': 'Whether to use a relative step size.', 'type': 'bool'},
             'safeguard_warmup': {'title': 'Safeguard Warmup', 'tooltip': 'Avoid issues during warm-up stage.', 'type': 'bool'},
             'scale_parameter': {'title': 'Scale Parameter', 'tooltip': 'Whether to scale the parameter or not.', 'type': 'bool'},

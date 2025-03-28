@@ -1,4 +1,3 @@
-from contextlib import nullcontext
 from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
@@ -8,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
     rescale_noise_scheduler_to_zero_terminal_snr,
 )
-from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 
 import torch
@@ -52,11 +50,6 @@ class StableDiffusionModel(BaseModel):
     image_depth_processor: DPTImageProcessor | None
     depth_estimator: DPTForDepthEstimation | None
 
-    # autocast context
-    autocast_context: torch.autocast | nullcontext
-
-    train_dtype: DataType
-
     # persistent embedding training data
     embedding: StableDiffusionModelEmbedding | None
     additional_embeddings: list[StableDiffusionModelEmbedding] | None
@@ -85,10 +78,6 @@ class StableDiffusionModel(BaseModel):
         self.unet = None
         self.image_depth_processor = None
         self.depth_estimator = None
-
-        self.autocast_context = nullcontext()
-
-        self.train_dtype = DataType.FLOAT_32
 
         self.embedding = None
         self.additional_embeddings = []

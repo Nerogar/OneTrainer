@@ -4,7 +4,7 @@ import traceback
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import PhotoImage, filedialog
 
 from modules.trainer.CloudTrainer import CloudTrainer
 from modules.trainer.GenericTrainer import GenericTrainer
@@ -52,6 +52,15 @@ class TrainUI(ctk.CTk):
         super().__init__()
 
         self.title("OneTrainer")
+        try:
+            # Windows attempt
+            self.iconbitmap("resources/icons/icon.ico")
+        except Exception as e:
+            print("Error using iconbitmap:", e)
+
+        # Load a PNG icon to set the global icon for future toplevels apparently
+        self._icon_photo = PhotoImage(file="resources/icons/icon.png")
+        self.wm_iconphoto(True, self._icon_photo)
         self.geometry("1100x740")
 
         # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration

@@ -85,6 +85,7 @@ class BaseStableDiffusionXLSetup(
             embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
                 embedding_state_1 = self._create_new_embedding(
+                    model,
                     embedding_config,
                     model.tokenizer_1,
                     model.text_encoder_1,
@@ -95,6 +96,7 @@ class BaseStableDiffusionXLSetup(
                 )
 
                 embedding_state_2 = self._create_new_embedding(
+                    model,
                     embedding_config,
                     model.tokenizer_2,
                     model.text_encoder_2,
