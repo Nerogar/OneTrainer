@@ -15,7 +15,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             path (`str`): the path to the folder
             parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
         """
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
         self.parent = parent
 
         if path is None:

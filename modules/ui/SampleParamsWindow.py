@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 class SampleParamsWindow(ctk.CTkToplevel):
     def __init__(self, parent, sample: SampleConfig, ui_state: UIState, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.sample = sample
         self.ui_state = ui_state
