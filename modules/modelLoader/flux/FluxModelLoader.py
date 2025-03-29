@@ -7,6 +7,8 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
+import torch
+
 from diffusers import (
     AutoencoderKL,
     FlowMatchEulerDiscreteScheduler,
@@ -114,7 +116,8 @@ class FluxModelLoader(
         if transformer_model_name:
             transformer = FluxTransformer2DModel.from_single_file(
                 transformer_model_name,
-                torch_dtype = weight_dtypes.prior.torch_dtype(),
+                #avoid loading the transformer in float32:
+                torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
                 transformer, weight_dtypes.prior, weight_dtypes.train_dtype
@@ -162,14 +165,11 @@ class FluxModelLoader(
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
     ):
-        if transformer_model_name:
-            transformer = FluxTransformer2DModel.from_single_file(
-                transformer_model_name,
-                torch_dtype = weight_dtypes.prior.torch_dtype(),
-            )
-        else:
-            transformer=None
-
+        transformer = FluxTransformer2DModel.from_single_file(
+            #always load transformer separately even though FluxPipeLine.from_single_file() could load it, to avoid loading in float32:
+            transformer_model_name if transformer_model_name else base_model_name,
+            torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
+        )
         pipeline = FluxPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
             safety_checker=None,
