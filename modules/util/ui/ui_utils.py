@@ -91,7 +91,7 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
                         except Exception as e:
                             print(f"Failed to set Linux window icon: {e}")
 
-                    window.after(300, set_icon)
+                    window.after(100, set_icon)
 
         elif system == "Darwin":  # macOS
             # macOS uses app bundles for icons, Tkinter support is limited
