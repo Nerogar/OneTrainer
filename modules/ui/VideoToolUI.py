@@ -38,18 +38,16 @@ class VideoToolUI(ctk.CTkToplevel):
         self.image_extract_tab = self.__image_extract_tab(tabview.add("extract images"))
         self.video_download_tab = self.__video_download_tab(tabview.add("download"))
 
-        #components.button(self, 1, 0, "ok", self.__ok)
-
     def __clip_extract_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure(0, weight=0, minsize=120)
+        frame.grid_columnconfigure(1, weight=0, minsize=200)
         frame.grid_columnconfigure(2, weight=0)
         frame.grid_columnconfigure(3, weight=1)
 
         # single video
         components.label(frame, 0, 0, "Single Video",
-                         tooltip="Link to video to process.")
+                         tooltip="Link to single video file to process.")
         self.clip_single_entry = ctk.CTkEntry(frame, width=190)
         self.clip_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.clip_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.clip_single_entry, [("Video file",".*")]))
@@ -76,7 +74,7 @@ class VideoToolUI(ctk.CTkToplevel):
         # split at cuts
         self.split_at_cuts = ctk.BooleanVar(self, False)
         components.label(frame, 3, 0, "Split at Cuts",
-                         tooltip="If enabled, detect cuts in the input video and split at those points. Otherwise will split at random.")
+                         tooltip="If enabled, detect cuts in the input video and split at those points. Otherwise will split at any point, and clips may contain cuts.")
         self.split_cuts_entry = ctk.CTkSwitch(frame, variable=self.split_at_cuts, text="")
         self.split_cuts_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
@@ -98,14 +96,14 @@ class VideoToolUI(ctk.CTkToplevel):
 
     def __image_extract_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure(0, weight=0, minsize=120)
+        frame.grid_columnconfigure(1, weight=0, minsize=200)
         frame.grid_columnconfigure(2, weight=0)
         frame.grid_columnconfigure(3, weight=1)
 
         # single video
         components.label(frame, 0, 0, "Single Video",
-                         tooltip="Link to video to process.")
+                         tooltip="Link to single video file to process.")
         self.image_single_entry = ctk.CTkEntry(frame, width=190)
         self.image_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.image_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.image_single_entry, [("Video file",".*")]))
@@ -154,9 +152,10 @@ class VideoToolUI(ctk.CTkToplevel):
 
     def __video_download_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, minsize=250, weight=0)
-        frame.grid_columnconfigure(2, weight=1)
+        frame.grid_columnconfigure(0, weight=0, minsize=120)
+        frame.grid_columnconfigure(1, weight=0, minsize=200)
+        frame.grid_columnconfigure(2, weight=0)
+        frame.grid_columnconfigure(3, weight=1)
 
         # link
         components.label(frame, 0, 0, "Single Link",
@@ -219,7 +218,7 @@ class VideoToolUI(ctk.CTkToplevel):
         entry_box.insert(0, path)
         self.focus_set()
 
-    def __get_vid_paths(self, batch_mode, input_path_single, input_path_dir):
+    def __get_vid_paths(self, batch_mode : bool, input_path_single : str, input_path_dir : str):
         input_videos = []
         if not batch_mode:
             path = pathlib.Path(input_path_single)
@@ -255,21 +254,20 @@ class VideoToolUI(ctk.CTkToplevel):
             return
 
         input_videos = self.__get_vid_paths(batch_mode, self.clip_single_entry.get(), self.clip_list_entry.get())
-        if len(input_videos) == 0:
+        if len(input_videos) == 0:  #exit if no paths found
             return
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for video_path in input_videos:
-                executor.submit(self.__extract_clips, str(video_path), self.clip_length_entry.get(), self.split_at_cuts.get(), self.clip_output_entry.get())
+                executor.submit(self.__extract_clips, str(video_path), float(self.clip_length_entry.get()), self.split_at_cuts.get(), self.clip_output_entry.get())
 
         print("All videos complete")
 
-    def __extract_clips(self, video_path, max_length, split_at_cuts, output_dir):
+    def __extract_clips(self, video_path : str, max_length : float, split_at_cuts : bool, output_dir : str):
         video = cv2.VideoCapture(video_path)
-        print(video_path)
         fps = video.get(cv2.CAP_PROP_FPS)
-        max_length_frames = int(max_length) * fps    #convert max length from seconds to frames
-        min_length = int(0.25*fps)    #minimum clip length of 1/4 second
+        max_length_frames = max_length * fps    #convert max length from seconds to frames
+        min_length_frames = int(0.25*fps)    #minimum clip length of 1/4 second
 
         if split_at_cuts:
             timecode_list = scenedetect.detect(str(video_path), scenedetect.AdaptiveDetector()) #detect scene transitions
@@ -285,12 +283,12 @@ class VideoToolUI(ctk.CTkToplevel):
             if length > max_length_frames:  #check for any scenes longer than max length
                 n = math.ceil(length/max_length_frames) #divide into n new scenes
                 new_length = int(length/n)
-                new_splits = range(scene[0], scene[1]+min_length, new_length)   #divide clip into closest chunks to max_length
+                new_splits = range(scene[0], scene[1]+min_length_frames, new_length)   #divide clip into closest chunks to max_length
                 for i, _n in enumerate(new_splits[:-1]):
-                    if new_splits[i+1] - new_splits[i] > min_length:
+                    if new_splits[i+1] - new_splits[i] > min_length_frames:
                         scene_list_split += [(new_splits[i], new_splits[i+1])]
             else:
-                if length > (min_length+2):
+                if length > (min_length_frames+2):
                     scene_list_split += [(scene[0]+1, scene[1]-1)]      #trim first and last frame from detected scenes to avoid transition artifacts
 
         print(f'Video "{os.path.basename(video_path)}" being split into {len(scene_list_split)} clips...')
@@ -301,7 +299,7 @@ class VideoToolUI(ctk.CTkToplevel):
 
         video.release()
 
-    def __save_clip(self, scene, video_path, output_dir):
+    def __save_clip(self, scene : tuple[int, int], video_path : str, output_dir : str):
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
         basename, ext = os.path.splitext(os.path.basename(video_path))
         video = cv2.VideoCapture(video_path)
@@ -311,7 +309,7 @@ class VideoToolUI(ctk.CTkToplevel):
         video.set(cv2.CAP_PROP_POS_FRAMES, scene[0])
         frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
         success, frame = video.read()
-        while success and (frame_number < scene[1]):
+        while success and (frame_number < scene[1]):    #loop through frames within each scene
             writer.write(frame)
             success, frame = video.read()
             frame_number += 1
@@ -324,19 +322,19 @@ class VideoToolUI(ctk.CTkToplevel):
             return
 
         input_videos = self.__get_vid_paths(batch_mode, self.image_single_entry.get(), self.image_list_entry.get())
-        if len(input_videos) == 0:
+        if len(input_videos) == 0:  #exit if no paths found
             return
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for video_path in input_videos:
-                executor.submit(self.__save_frames, video_path, self.capture_rate_entry.get(), self.blur_threshold_entry.get(), self.image_output_entry.get())
+                executor.submit(self.__save_frames, video_path, float(self.capture_rate_entry.get()), float(self.blur_threshold_entry.get()), self.image_output_entry.get())
 
         print("All videos complete")
 
-    def __save_frames(self, video_path, capture_rate, blur_threshold, output_path):
+    def __save_frames(self, video_path : str, capture_rate : float, blur_threshold : float, output_path : str):
         video = cv2.VideoCapture(video_path)
         fps = video.get(cv2.CAP_PROP_FPS)
-        image_rate = int(fps / float(capture_rate))   #convert capture rate from seconds to frames
+        image_rate = int(fps / capture_rate)   #convert capture rate from seconds to frames
         frame_range = range(0,int(video.get(cv2.CAP_PROP_FRAME_COUNT)), image_rate)
         frame_list = []
 
@@ -356,7 +354,7 @@ class VideoToolUI(ctk.CTkToplevel):
                 output_list += [(f, frame_sharpness)]
 
         output_list_sorted = sorted(output_list, key=lambda x: x[1])
-        cutoff = int(float(blur_threshold)*len(output_list_sorted))
+        cutoff = int(blur_threshold*len(output_list_sorted))     #calculate cutoff as portion of total frames
         output_list_cut = output_list_sorted[cutoff:-1]     #drop the lowest sharpness values
         print(f'{cutoff} blurriest images have been dropped from {os.path.basename(video_path)}')
 
@@ -391,10 +389,10 @@ class VideoToolUI(ctk.CTkToplevel):
 
         print(f'Completed {len(ydl_urls)} downloads.')
 
-    def __download_video(self, url, output_dir, output_args):
-        ydl_filename = '-o "%(title)s.%(ext)s"'
+    def __download_video(self, url : str, output_dir : str, output_args : str):
+        ydl_filename = '-o%(title)s.%(ext)s'
         ydl_outpath = '-P ' + output_dir
-        ydl_args = output_args.split()     #split into list
+        ydl_args = output_args.split()     #split args into list
 
         print(f'Downloading {url}...')
         subprocess.run(["yt-dlp", ydl_filename, ydl_outpath, url] + ydl_args)
