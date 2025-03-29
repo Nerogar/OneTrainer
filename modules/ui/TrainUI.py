@@ -1,12 +1,10 @@
 import json
-import os
-import platform
 import threading
 import traceback
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
-from tkinter import PhotoImage, filedialog
+from tkinter import filedialog
 
 from modules.trainer.CloudTrainer import CloudTrainer
 from modules.trainer.GenericTrainer import GenericTrainer

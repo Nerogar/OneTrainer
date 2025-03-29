@@ -1,7 +1,6 @@
 import contextlib
 import copy
 import os
-import platform
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import (
