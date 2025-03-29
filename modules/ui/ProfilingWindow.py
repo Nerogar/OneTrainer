@@ -15,7 +15,6 @@ class ProfilingWindow(ctk.CTkToplevel):
         self.title("Profiling")
         self.geometry("512x512")
         self.resizable(True, True)
-        set_window_icon(self)
         self.wait_visibility()
         self.focus_set()
 

@@ -1,5 +1,7 @@
+import contextlib
 import copy
 import os
+import platform
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import (
@@ -35,38 +37,33 @@ class SampleWindow(ctk.CTkToplevel):
             commands: TrainCommands | None = None,
             *args, **kwargs
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
+
+        self.title("Sample")
+        self.geometry("1200x800")
+        self.resizable(True, True)
 
         if train_config is not None:
             self.initial_train_config = TrainConfig.default_values().from_dict(train_config.to_dict())
-
             # remove some settings to speed up model loading for sampling
             self.initial_train_config.optimizer.optimizer = None
             self.initial_train_config.ema = EMAMode.OFF
         else:
             self.initial_train_config = None
+
         self.current_train_config = train_config
         self.callbacks = callbacks
         self.commands = commands
+        self.sample = SampleConfig.default_values()
+        self.ui_state = UIState(self, self.sample)
 
         use_external_model = self.initial_train_config is None
-
         if use_external_model:
             self.callbacks.set_on_sample_custom(self.__update_preview)
             self.callbacks.set_on_update_sample_custom_progress(self.__update_progress)
         else:
             self.model = None
             self.model_sampler = None
-
-        self.sample = SampleConfig.default_values()
-        self.ui_state = UIState(self, self.sample)
-
-        self.title("Sample")
-        self.geometry("1200x800")
-        self.resizable(True, True)
-        set_window_icon(self)
-        self.wait_visibility()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -92,7 +89,10 @@ class SampleWindow(ctk.CTkToplevel):
 
         self.progress = components.progress(self, 2, 0)
         components.button(self, 3, 0, "sample", self.__sample)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.focus_set()
+        self.after(300, lambda: set_window_icon(self))
 
     def __load_model(self) -> BaseModel:
         model_loader = create.create_model_loader(
@@ -197,3 +197,20 @@ class SampleWindow(ctk.CTkToplevel):
                 on_sample=self.__update_preview,
                 on_update_progress=self.__update_progress,
             )
+
+    def destroy(self):
+        """Safely destroy the window"""
+        try:
+            # Clear icon reference before destruction
+            if hasattr(self, "_icon_image_ref"):
+                del self._icon_image_ref
+
+            # Remove any pending after callbacks
+            for after_id in self.tk.call('after', 'info'):
+                with contextlib.suppress(Exception):
+                    self.after_cancel(after_id)
+
+            # Call parent destroy
+            super().destroy()
+        except Exception as e:
+            print(f"Error destroying window: {e}")

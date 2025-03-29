@@ -77,32 +77,29 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
             ui_state: UIState,
             *args, **kwargs,
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-
-        self.config = config
-        self.ui_state = ui_state
-
-        self.image_preview_file_index = 0
+        super().__init__(parent, *args, **kwargs)
 
         self.title("Timestep Distribution")
         self.geometry("900x600")
         self.resizable(True, True)
-        self.wait_visibility()
-        set_window_icon(self)
-        self.grab_set()
-        self.focus_set()
+
+        self.config = config
+        self.ui_state = ui_state
+        self.image_preview_file_index = 0
+        self.ax = None
+        self.canvas = None
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.ax = None
-        self.canvas = None
-
         frame = self.__content_frame(self)
         frame.grid(row=0, column=0, sticky='nsew')
-
         components.button(self, 1, 0, "ok", self.__ok)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.after(300, lambda: set_window_icon(self))
+        self.grab_set()
+        self.focus_set()
 
     def __content_frame(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
