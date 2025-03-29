@@ -97,7 +97,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         components.button(self, 1, 0, "ok", self.__ok)
 
         self.wait_visibility()
-        self.after(300, lambda: set_window_icon(self))
+        self.after(200, lambda: set_window_icon(self))
         self.grab_set()
         self.focus_set()
 

@@ -103,7 +103,7 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
-        self.after(300, lambda: set_window_icon(self))
+        self.after(200, lambda: set_window_icon(self))
 
 
     def main_frame(self, master):
