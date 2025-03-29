@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 class SampleParamsWindow(ctk.CTkToplevel):
     def __init__(self, parent, sample: SampleConfig, ui_state: UIState, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.sample = sample
         self.ui_state = ui_state
@@ -17,10 +17,6 @@ class SampleParamsWindow(ctk.CTkToplevel):
         self.title("Sample")
         self.geometry("800x500")
         self.resizable(True, True)
-        self.wait_visibility()
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=0)
@@ -30,7 +26,12 @@ class SampleParamsWindow(ctk.CTkToplevel):
         frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         components.button(self, 1, 0, "ok", self.__ok)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def __ok(self):
         self.destroy()

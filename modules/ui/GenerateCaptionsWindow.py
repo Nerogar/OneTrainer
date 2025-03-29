@@ -15,24 +15,20 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             path (`str`): the path to the folder
             parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
         """
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
         self.parent = parent
 
         if path is None:
             path = ""
 
-        self.title("Batch generate captions")
-        self.geometry("360x360")
-        self.resizable(True, True)
-        set_window_icon(self)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-
         self.mode_var = ctk.StringVar(self, "Create if absent")
         self.modes = ["Replace all captions", "Create if absent", "Add as new line"]
         self.model_var = ctk.StringVar(self, "Blip")
         self.models = ["Blip", "Blip2", "WD14 VIT v2"]
+
+        self.title("Batch generate captions")
+        self.geometry("360x360")
+        self.resizable(True, True)
 
         self.frame = ctk.CTkFrame(self, width=600, height=300)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -85,7 +81,12 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.create_captions_button.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def browse_for_path(self, entry_box):
         # get the path from the user

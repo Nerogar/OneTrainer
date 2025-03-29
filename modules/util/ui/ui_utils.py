@@ -54,39 +54,48 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
     Args:
         window: The window object (Tk, Toplevel, CTk, CTkToplevel) to set the icon for
     """
-    # Check if window is a valid window object that can have an icon
-    if (
-        not hasattr(window, "winfo_toplevel")
-        and not hasattr(window, "iconbitmap")
-        and not hasattr(window, "iconphoto")
-    ):
-        # Not a window that can have icons
+    # Early exit if not a valid window
+    if not hasattr(window, "wm_title"):
         return
 
+    # Get icon paths based on platform
     icon_dir = Path("resources/icons")
+    system = platform.system()
 
     try:
-        if platform.system() == "Windows":
+        # Check if it's a root window or toplevel window
+        is_root_window = isinstance(window, (tk.Tk | CTk))
+
+        if system == "Windows":
+            # Windows - use .ico file
             ico_path = icon_dir / "icon.ico"
             if ico_path.exists():
-                # For windows, use the toplevel window if this is a frame
-                if hasattr(window, "winfo_toplevel") and not hasattr(
-                    window, "iconbitmap"
-                ):
-                    window = window.winfo_toplevel()
-                window.iconbitmap(str(ico_path))
-        elif platform.system() == "Linux":
+                window.wm_iconbitmap(str(ico_path))
+
+        elif system == "Linux":
+            # Linux - use .png with PhotoImage
             png_path = icon_dir / "icon.png"
             if png_path.exists():
-                icon_img = tk.PhotoImage(file=str(png_path))
-                # For Linux, use the toplevel window if this is a frame
-                if hasattr(window, "winfo_toplevel") and not hasattr(
-                    window, "iconphoto"
-                ):
-                    window = window.winfo_toplevel()
-                window.iconphoto(True, icon_img)
-        elif platform.system() == "Darwin":  # macOS
-            # macOS is a rabbit hole sadly for icons, so we'll just pass
+                if is_root_window:
+                    # For root windows - set immediately
+                    window._icon_image_ref = tk.PhotoImage(file=str(png_path))
+                    window.iconphoto(False, window._icon_image_ref)
+                else:
+                    # For toplevels - use delayed setting
+                    window.wm_iconbitmap() # Clear any existing icon
+
+                    def set_icon():
+                        try:
+                            window._icon_image_ref = tk.PhotoImage(file=str(png_path))
+                            window.iconphoto(False, window._icon_image_ref)
+                        except Exception as e:
+                            print(f"Failed to set Linux window icon: {e}")
+
+                    window.after(100, set_icon) # Delay on linux as found less reliable
+
+        elif system == "Darwin":  # macOS
+            # macOS uses app bundles for icons, Tkinter support is limited
             pass
+
     except Exception as e:
         print(f"Failed to set window icon: {e}")
