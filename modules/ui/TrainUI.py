@@ -4,7 +4,7 @@ import traceback
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import PhotoImage, filedialog
 
 from modules.trainer.CloudTrainer import CloudTrainer
 from modules.trainer.GenericTrainer import GenericTrainer
@@ -36,6 +36,7 @@ from modules.zluda import ZLUDA
 import torch
 
 import customtkinter as ctk
+from customtkinter import AppearanceModeTracker
 
 
 class TrainUI(ctk.CTk):
@@ -51,9 +52,19 @@ class TrainUI(ctk.CTk):
         super().__init__()
 
         self.title("OneTrainer")
+        try:
+            # Windows attempt
+            self.iconbitmap("resources/icons/icon.ico")
+        except Exception as e:
+            print("Error using iconbitmap:", e)
+
+        # Load a PNG icon to set the global icon for future toplevels apparently
+        self._icon_photo = PhotoImage(file="resources/icons/icon.png")
+        self.wm_iconphoto(True, self._icon_photo)
         self.geometry("1100x740")
 
-        ctk.set_appearance_mode("System")
+        # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration
+        ctk.set_appearance_mode("Light" if AppearanceModeTracker.detect_appearance_mode() == 0 else "Dark")
         ctk.set_default_color_theme("blue")
 
         self.train_config = TrainConfig.default_values()
@@ -86,8 +97,11 @@ class TrainUI(ctk.CTk):
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
 
-    def close(self):
+        self.protocol("WM_DELETE_WINDOW", self.__close)
+
+    def __close(self):
         self.top_bar_component.save_default()
+        self.quit()
 
     def top_bar(self, master):
         return TopBar(
@@ -441,6 +455,11 @@ class TrainUI(ctk.CTk):
         components.label(frame, 4, 0, "Placeholder",
                          tooltip="The placeholder used when using the embedding in a prompt")
         components.entry(frame, 4, 1, self.ui_state, "embedding.placeholder")
+
+        # output embedding
+        components.label(frame, 5, 0, "Output embedding",
+                         tooltip="Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage.")
+        components.switch(frame, 5, 1, self.ui_state, "embedding.is_output_embedding")
 
         frame.pack(fill="both", expand=1)
         return frame

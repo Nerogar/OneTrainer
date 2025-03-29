@@ -15,6 +15,8 @@ from safetensors.torch import save_file
 class WuerstchenModelSaver(
     DtypeModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def __save_diffusers(
             self,

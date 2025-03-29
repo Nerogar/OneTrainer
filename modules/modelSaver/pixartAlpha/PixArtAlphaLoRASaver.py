@@ -14,6 +14,8 @@ from safetensors.torch import save_file
 class PixArtAlphaLoRASaver(
     DtypeModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def __get_state_dict(
             self,
@@ -29,7 +31,12 @@ class PixArtAlphaLoRASaver(
 
         if model.additional_embeddings and model.train_config.bundle_additional_embeddings:
             for embedding in model.additional_embeddings:
-                state_dict[f"bundle_emb.{embedding.placeholder}.t5"] = embedding.text_encoder_vector
+                placeholder = embedding.text_encoder_embedding.placeholder
+
+                if embedding.text_encoder_embedding.vector is not None:
+                    state_dict[f"bundle_emb.{placeholder}.t5"] = embedding.text_encoder_embedding.vector
+                if embedding.text_encoder_embedding.output_vector is not None:
+                    state_dict[f"bundle_emb.{placeholder}.t5_out"] = embedding.text_encoder_embedding.output_vector
 
         return state_dict
 

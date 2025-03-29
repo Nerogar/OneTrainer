@@ -1,85 +1,36 @@
 import os.path
-from pathlib import Path
+from copy import copy
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel, PixArtAlphaModelEmbedding
+from modules.modelSaver.mixin.EmbeddingSaverMixin import EmbeddingSaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.path_util import safe_filename
 
 import torch
 from torch import Tensor
 
-from safetensors.torch import save_file
 
+class PixArtAlphaEmbeddingSaver(
+    EmbeddingSaverMixin
+):
+    def __init__(self):
+        super().__init__()
 
-class PixArtAlphaEmbeddingSaver:
-
-    def __save_ckpt(
+    def _to_state_dict(
             self,
             embedding: PixArtAlphaModelEmbedding | None,
-            embedding_state: Tensor | None,
-            destination: str,
+            embedding_state_dict: dict[str, Tensor] | None,
             dtype: torch.dtype | None,
     ):
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        state_dict = copy(embedding_state_dict) if embedding_state_dict is not None else {}
 
-        if embedding is None:
-            prior_text_encoder_vector_cpu = embedding_state
-        else:
-            prior_text_encoder_vector_cpu = embedding.text_encoder_vector.to(device="cpu", dtype=dtype)
+        if embedding is not None:
+            if embedding.text_encoder_embedding.vector is not None:
+                state_dict["t5"] = embedding.text_encoder_embedding.vector.to(device="cpu", dtype=dtype)
+            if embedding.text_encoder_embedding.output_vector is not None:
+                state_dict["t5_out"] = embedding.text_encoder_embedding.output_vector.to(device="cpu", dtype=dtype)
 
-        torch.save(
-            {
-                "t5": prior_text_encoder_vector_cpu,
-            },
-            destination
-        )
-
-    def __save_safetensors(
-            self,
-            embedding: PixArtAlphaModelEmbedding | None,
-            embedding_state: Tensor | None,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-
-        if embedding is None:
-            prior_text_encoder_vector_cpu = embedding_state
-        else:
-            prior_text_encoder_vector_cpu = embedding.text_encoder_vector.to(device="cpu", dtype=dtype)
-
-        save_file(
-            {
-                "t5": prior_text_encoder_vector_cpu,
-            },
-            destination
-        )
-
-    def __save_internal(
-            self,
-            embedding: PixArtAlphaModelEmbedding | None,
-            embedding_state: Tensor | None,
-            destination: str,
-            save_single: bool,
-    ):
-        if save_single:
-            safetensors_embedding_name = os.path.join(
-                destination,
-                "embedding",
-                "embedding.safetensors",
-            )
-        else:
-            safetensors_embedding_name = os.path.join(
-                destination,
-                "additional_embeddings",
-                f"{embedding.uuid}.safetensors",
-            )
-        self.__save_safetensors(
-            embedding,
-            embedding_state,
-            safetensors_embedding_name,
-            None,
-        )
+        return state_dict
 
     def save_single(
             self,
@@ -88,32 +39,35 @@ class PixArtAlphaEmbeddingSaver:
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
+        embedding_uuid = list(model.embedding_state_dicts.keys())[0] if model.embedding is None \
+            else model.embedding.text_encoder_embedding.uuid
+
         embedding = model.embedding
-        embedding_state = model.embedding_state
+        embedding_state = list(model.embedding_state_dicts.values())[0]
 
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
             case ModelFormat.CKPT:
-                self.__save_ckpt(
-                    embedding,
-                    embedding_state,
-                    os.path.join(output_model_destination),
-                    dtype,
-                )
-            case ModelFormat.SAFETENSORS:
-                self.__save_safetensors(
-                    embedding,
-                    embedding_state,
-                    os.path.join(output_model_destination),
-                    dtype,
-                )
-            case ModelFormat.INTERNAL:
-                self.__save_internal(
+                self._save_ckpt(
                     embedding,
                     embedding_state,
                     output_model_destination,
-                    True,
+                    dtype,
+                )
+            case ModelFormat.SAFETENSORS:
+                self._save_safetensors(
+                    embedding,
+                    embedding_state,
+                    output_model_destination,
+                    dtype,
+                )
+            case ModelFormat.INTERNAL:
+                self._save_internal(
+                    embedding,
+                    embedding_state,
+                    embedding_uuid,
+                    output_model_destination,
                 )
 
     def save_multiple(
@@ -123,33 +77,45 @@ class PixArtAlphaEmbeddingSaver:
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        for i in range(max(len(model.additional_embeddings), len(model.additional_embedding_states))):
-            embedding = model.additional_embeddings[i] if i < len(model.additional_embeddings) else None
-            embedding_state = \
-                model.additional_embedding_states[i] if i < len(model.additional_embedding_states) else None
-            embedding_name = safe_filename(embedding.placeholder, allow_spaces=False, max_length=None)
+        embedding_uuids = set(model.embedding_state_dicts.keys() \
+                              | {x.text_encoder_embedding.uuid for x in model.additional_embeddings})
+
+        if model.embedding is not None:
+            embedding_uuids.discard(model.embedding.text_encoder_embedding.uuid)
+
+        embeddings = {x.text_encoder_embedding.uuid: x for x in model.additional_embeddings}
+
+        for embedding_uuid in embedding_uuids:
+            embedding = embeddings.get(embedding_uuid)
+            embedding_state = model.embedding_state_dicts.get(embedding_uuid, None)
+
+            if embedding is None and embedding_state is None:
+                continue
+
+            embedding_name = safe_filename(embedding.text_encoder_embedding.placeholder,
+                                           allow_spaces=False, max_length=None)
 
             match output_model_format:
                 case ModelFormat.DIFFUSERS:
                     raise NotImplementedError
                 case ModelFormat.CKPT:
-                    self.__save_ckpt(
+                    self._save_ckpt(
                         embedding,
                         embedding_state,
                         os.path.join(f"{output_model_destination}_embeddings", f"{embedding_name}.pt"),
                         dtype,
                     )
                 case ModelFormat.SAFETENSORS:
-                    self.__save_safetensors(
+                    self._save_safetensors(
                         embedding,
                         embedding_state,
                         os.path.join(f"{output_model_destination}_embeddings", f"{embedding_name}.safetensors"),
                         dtype,
                     )
                 case ModelFormat.INTERNAL:
-                    self.__save_internal(
+                    self._save_internal(
                         embedding,
                         embedding_state,
+                        embedding_uuid,
                         output_model_destination,
-                        False,
                     )

@@ -42,34 +42,6 @@ class BaseSanaSetup(
             model: SanaModel,
             config: TrainConfig,
     ):
-        # if config.attention_mechanism == AttentionMechanism.DEFAULT:
-        #     for child_module in model.transformer.modules():
-        #         if isinstance(child_module, Attention):
-        #             child_module.set_processor(AttnProcessor())
-        # elif config.attention_mechanism == AttentionMechanism.XFORMERS and is_xformers_available():
-        #     try:
-        #         for child_module in model.transformer.modules():
-        #             if isinstance(child_module, Attention):
-        #                 child_module.set_processor(XFormersAttnProcessor())
-        #         model.vae.enable_xformers_memory_efficient_attention()
-        #     except Exception as e:
-        #         print(
-        #             "Could not enable memory efficient attention. Make sure xformers is installed"
-        #             f" correctly and a GPU is available: {e}"
-        #         )
-        # elif config.attention_mechanism == AttentionMechanism.SDP:
-        #     for child_module in model.transformer.modules():
-        #         if isinstance(child_module, Attention):
-        #             child_module.set_processor(AttnProcessor2_0())
-        #
-        #     if is_xformers_available():
-        #         try:
-        #             model.vae.enable_xformers_memory_efficient_attention()
-        #         except Exception as e:
-        #             print(
-        #                 "Could not enable memory efficient attention. Make sure xformers is installed"
-        #                 f" correctly and a GPU is available: {e}"
-        #             )
 
         if config.gradient_checkpointing.enabled():
             # model.vae.enable_gradient_checkpointing()
@@ -118,21 +90,27 @@ class BaseSanaSetup(
         quantize_layers(model.vae, self.train_device, model.train_dtype)
         quantize_layers(model.transformer, self.train_device, model.train_dtype)
 
-    def _setup_additional_embeddings(
+    def _setup_embeddings(
             self,
             model: SanaModel,
             config: TrainConfig,
     ):
-        model.additional_embeddings = []
-        for i, embedding_config in enumerate(config.additional_embeddings):
-            embedding_state = model.additional_embedding_states[i]
+        additional_embeddings = []
+        for embedding_config in config.all_embedding_configs():
+            embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
                 embedding_state = self._create_new_embedding(
+                    model,
+                    embedding_config,
                     model.tokenizer,
                     model.text_encoder,
-                    config.additional_embeddings[i].initial_embedding_text,
-                    config.additional_embeddings[i].token_count,
+                    lambda text: model.encode_text(
+                        text=text,
+                        train_device=self.temp_device,
+                    )[0][0][1:],
                 )
+            else:
+                embedding_state = embedding_state.get("gemma_out", embedding_state.get("gemma", None))
 
             embedding_state = embedding_state.to(
                 dtype=model.text_encoder.get_input_embeddings().weight.dtype,
@@ -140,36 +118,19 @@ class BaseSanaSetup(
             ).detach()
 
             embedding = SanaModelEmbedding(
-                embedding_config.uuid, embedding_state, embedding_config.placeholder,
+                embedding_config.uuid,
+                embedding_state,
+                embedding_config.placeholder,
+                embedding_config.is_output_embedding,
             )
-            model.additional_embeddings.append(embedding)
-            self._add_embedding_to_tokenizer(model.tokenizer, embedding.text_tokens)
+            if embedding_config.uuid == config.embedding.uuid:
+                model.embedding = embedding
+            else:
+                additional_embeddings.append(embedding)
 
-    def _setup_embedding(
-            self,
-            model: SanaModel,
-            config: TrainConfig,
-    ):
-        model.embedding = None
+        model.additional_embeddings = additional_embeddings
 
-        embedding_state = model.embedding_state
-        if embedding_state is None:
-            embedding_state = self._create_new_embedding(
-                model.tokenizer,
-                model.text_encoder,
-                config.embedding.initial_embedding_text,
-                config.embedding.token_count,
-            )
-
-        embedding_state = embedding_state.to(
-            dtype=model.text_encoder.get_input_embeddings().weight.dtype,
-            device=self.train_device,
-        ).detach()
-
-        model.embedding = SanaModelEmbedding(
-            config.embedding.uuid, embedding_state, config.embedding.placeholder,
-        )
-        self._add_embedding_to_tokenizer(model.tokenizer, model.embedding.text_tokens)
+        self._add_embeddings_to_tokenizer(model.tokenizer, model.all_text_encoder_embeddings())
 
     def _setup_embedding_wrapper(
             self,
@@ -179,14 +140,21 @@ class BaseSanaSetup(
         model.embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer,
             orig_module=model.text_encoder.embed_tokens,
-            additional_embeddings=[embedding.text_encoder_vector for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.text_encoder_vector]),
-            additional_embedding_placeholders=[embedding.placeholder for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.placeholder]),
-            additional_embedding_names=[embedding.uuid for embedding in model.additional_embeddings]
-                                  + ([] if model.embedding is None else [model.embedding.uuid]),
+            embeddings=model.all_text_encoder_embeddings(),
         )
         model.embedding_wrapper.hook_to_module()
+
+    def _setup_embeddings_requires_grad(
+            self,
+            model: SanaModel,
+            config: TrainConfig,
+    ):
+        for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
+                                               config.all_embedding_configs(), strict=True):
+            train_embedding = \
+                embedding_config.train \
+                and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+            embedding.requires_grad_(train_embedding)
 
     def predict(
             self,
@@ -202,8 +170,6 @@ class BaseSanaSetup(
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
-
-            is_align_prop_step = config.align_prop and (rand.random() < config.align_prop_probability)
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
@@ -274,73 +240,56 @@ class BaseSanaSetup(
                         train_progress.global_step,
                     )
 
-                    if is_align_prop_step:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noise
+                    self._save_image(
+                        self._project_latent_to_image(latent_noise),
+                        config.debug_dir + "/training_batches",
+                        "1-noise",
+                        train_progress.global_step,
+                    )
 
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-image",
-                            model.train_progress.global_step,
-                        )
-                    else:
-                        # noise
-                        self._save_image(
-                            self._project_latent_to_image(latent_noise),
-                            config.debug_dir + "/training_batches",
-                            "1-noise",
-                            train_progress.global_step,
-                        )
+                    # noisy image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_noisy_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "2-noisy_image",
+                        train_progress.global_step,
+                    )
 
-                        # noisy image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_noisy_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "2-noisy_image",
-                            train_progress.global_step,
-                        )
+                    # predicted flow
+                    self._save_image(
+                        self._project_latent_to_image(predicted_flow),
+                        config.debug_dir + "/training_batches",
+                        "3-predicted_flow",
+                        train_progress.global_step,
+                    )
 
-                        # predicted flow
-                        self._save_image(
-                            self._project_latent_to_image(predicted_flow),
-                            config.debug_dir + "/training_batches",
-                            "3-predicted_flow",
-                            train_progress.global_step,
-                        )
+                    # flow
+                    flow = latent_noise - scaled_latent_image
+                    self._save_image(
+                        self._project_latent_to_image(flow),
+                        config.debug_dir + "/training_batches",
+                        "4-flow",
+                        train_progress.global_step,
+                    )
 
-                        # flow
-                        flow = latent_noise - scaled_latent_image
-                        self._save_image(
-                            self._project_latent_to_image(flow),
-                            config.debug_dir + "/training_batches",
-                            "4-flow",
-                            train_progress.global_step,
-                        )
+                    predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
 
-                        predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
+                    # predicted image
+                    self._save_image(
+                        self._project_latent_to_image(predicted_scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "5-predicted_image",
+                        train_progress.global_step,
+                    )
 
-                        # predicted image
-                        self._save_image(
-                            self._project_latent_to_image(predicted_scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "5-predicted_image",
-                            train_progress.global_step,
-                        )
-
-                        # image
-                        self._save_image(
-                            self._project_latent_to_image(scaled_latent_image),
-                            config.debug_dir + "/training_batches",
-                            "6-image",
-                            model.train_progress.global_step,
-                        )
+                    # image
+                    self._save_image(
+                        self._project_latent_to_image(scaled_latent_image),
+                        config.debug_dir + "/training_batches",
+                        "6-image",
+                        model.train_progress.global_step,
+                    )
 
         return model_output_data
 
