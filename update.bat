@@ -39,16 +39,15 @@ if not defined tracking_info (
         set "tracking_remote=%%a"
         set "tracking_branch=%%b"
     )
-
     echo Tracking: !tracking_info!
 
-    REM Get remote URL
-    FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" config --get remote.!tracking_remote!.url`) DO (
+    set "temp_tracking_remote=%tracking_remote%"
+
+    FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" config --get remote/%temp_tracking_remote%.url`) DO (
         set "remote_url=%%F"
     )
-    echo Remote !tracking_remote!: !remote_url!
+    echo Remote %temp_tracking_remote%: !remote_url!
 
-    REM Check if official repo (fix indentation)
     set "is_official_repo="
     echo !remote_url! | findstr /i "Nerogar/OneTrainer" >nul && set "is_official_repo=1"
 

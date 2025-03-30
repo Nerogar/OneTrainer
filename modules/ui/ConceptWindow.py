@@ -71,22 +71,18 @@ class ConceptWindow(ctk.CTkToplevel):
             text_ui_state: UIState,
             *args, **kwargs,
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.concept = concept
         self.ui_state = ui_state
         self.image_ui_state = image_ui_state
         self.text_ui_state = text_ui_state
-
         self.image_preview_file_index = 0
+
 
         self.title("Concept")
         self.geometry("800x700")
         self.resizable(True, True)
-        set_window_icon(self)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -99,11 +95,15 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
-        #automatically get concept stats if required, or read from concept config
         self.__auto_update_concept_stats()
 
         components.button(self, 1, 0, "ok", self.__ok)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def __general_tab(self, master, concept: ConceptConfig):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")

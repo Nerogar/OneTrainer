@@ -75,7 +75,7 @@ class KvWidget(ctk.CTkFrame):
 
 class SchedulerParamsWindow(ctk.CTkToplevel):
     def __init__(self, parent, train_config: TrainConfig, ui_state, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.parent = parent
         self.train_config = train_config
@@ -84,10 +84,6 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.title("Learning Rate Scheduler Settings")
         self.geometry("800x400")
         self.resizable(True, True)
-        set_window_icon(self)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=0)
@@ -97,12 +93,18 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.frame.grid_columnconfigure(0, weight=0)
         self.frame.grid_columnconfigure(1, weight=1)
+
         self.expand_frame = ctk.CTkFrame(self.frame, bg_color="transparent")
         self.expand_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def main_frame(self, master):
         if self.train_config.learning_rate_scheduler is LearningRateScheduler.CUSTOM:
