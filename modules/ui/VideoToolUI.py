@@ -4,6 +4,7 @@ import os
 import pathlib
 import random
 import subprocess
+import threading
 import webbrowser
 from tkinter import filedialog
 
@@ -52,7 +53,7 @@ class VideoToolUI(ctk.CTkToplevel):
         self.clip_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.clip_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.clip_single_entry, [("Video file",".*")]))
         self.clip_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 0, 2, "Extract Single", command=lambda:self.__extract_clips_multi(False))
+        components.button(frame, 0, 2, "Extract Single", command=lambda: self.__extract_clips_button(False))
 
         # directory of videos
         components.label(frame, 1, 0, "Directory",
@@ -61,7 +62,7 @@ class VideoToolUI(ctk.CTkToplevel):
         self.clip_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.clip_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.clip_list_entry))
         self.clip_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 1, 2, "Extract Directory", command=lambda:self.__extract_clips_multi(True))
+        components.button(frame, 1, 2, "Extract Directory", command=lambda: self.__extract_clips_button(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
@@ -108,7 +109,7 @@ class VideoToolUI(ctk.CTkToplevel):
         self.image_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.image_single_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.image_single_entry, [("Video file",".*")]))
         self.image_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 0, 2, "Extract Single", command=lambda:self.__extract_images(False))
+        components.button(frame, 0, 2, "Extract Single", command=lambda: self.__extract_images_button(False))
 
         # directory of videos
         components.label(frame, 1, 0, "Directory",
@@ -117,7 +118,7 @@ class VideoToolUI(ctk.CTkToplevel):
         self.image_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.image_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.image_list_entry))
         self.image_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 1, 2, "Extract Directory", command=lambda:self.__extract_images(True))
+        components.button(frame, 1, 2, "Extract Directory", command=lambda: self.__extract_images_button(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
@@ -162,7 +163,7 @@ class VideoToolUI(ctk.CTkToplevel):
                          tooltip="Link to video/playlist to download. Uses yt-dlp, supports youtube, twitch, instagram, and many other sites.")
         self.download_link_entry = ctk.CTkEntry(frame, width=220)
         self.download_link_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        components.button(frame, 0, 2, "Download Link", command=lambda: self.__download_multi(False))
+        components.button(frame, 0, 2, "Download Link", command=lambda: self.__download_button(False))
 
         # link list
         components.label(frame, 1, 0, "Link List",
@@ -171,7 +172,7 @@ class VideoToolUI(ctk.CTkToplevel):
         self.download_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
         self.download_list_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_file(self.download_list_entry, [("Text file", ".txt")]))
         self.download_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 1, 2, "Download List", command=lambda: self.__download_multi(True))
+        components.button(frame, 1, 2, "Download List", command=lambda: self.__download_button(True))
 
         # output directory
         components.label(frame, 2, 0, "Output",
@@ -248,6 +249,11 @@ class VideoToolUI(ctk.CTkToplevel):
             print(f'Found {len(input_videos)} videos to process')
             return input_videos
 
+    def __extract_clips_button(self, batch_mode : bool):
+        t = threading.Thread(target = self.__extract_clips_multi, args = [batch_mode])
+        t.daemon = True
+        t.start()
+
     def __extract_clips_multi(self, batch_mode : bool):
         if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
             print("Invalid output directory!")
@@ -261,7 +267,7 @@ class VideoToolUI(ctk.CTkToplevel):
             for video_path in input_videos:
                 executor.submit(self.__extract_clips, str(video_path), float(self.clip_length_entry.get()), self.split_at_cuts.get(), self.clip_output_entry.get())
 
-        print("All videos complete")
+        print("Scene extraction from all videos complete")
 
     def __extract_clips(self, video_path : str, max_length : float, split_at_cuts : bool, output_dir : str):
         video = cv2.VideoCapture(video_path)
@@ -316,7 +322,12 @@ class VideoToolUI(ctk.CTkToplevel):
         writer.release()
         video.release()
 
-    def __extract_images(self, batch_mode : bool):
+    def __extract_images_button(self, batch_mode : bool):
+        t = threading.Thread(target = self.__extract_images_multi, args = [batch_mode])
+        t.daemon = True
+        t.start()
+
+    def __extract_images_multi(self, batch_mode : bool):
         if not pathlib.Path(self.image_output_entry.get()).is_dir() or self.image_output_entry.get() == "":
             print("Invalid output directory!")
             return
@@ -329,7 +340,7 @@ class VideoToolUI(ctk.CTkToplevel):
             for video_path in input_videos:
                 executor.submit(self.__save_frames, video_path, float(self.capture_rate_entry.get()), float(self.blur_threshold_entry.get()), self.image_output_entry.get())
 
-        print("All videos complete")
+        print("Image extraction from all videos complete")
 
     def __save_frames(self, video_path : str, capture_rate : float, blur_threshold : float, output_path : str):
         video = cv2.VideoCapture(video_path)
@@ -366,6 +377,11 @@ class VideoToolUI(ctk.CTkToplevel):
             if success:
                 cv2.imwrite(filename, frame)    #save images
         video.release()
+
+    def __download_button(self, batch_mode : bool):
+        t = threading.Thread(target = self.__download_multi, args = [batch_mode])
+        t.daemon = True
+        t.start()
 
     def __download_multi(self, batch_mode : bool):
         if not pathlib.Path(self.download_output_entry.get()).is_dir() or self.download_output_entry.get() == "":
