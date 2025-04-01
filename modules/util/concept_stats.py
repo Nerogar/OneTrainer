@@ -7,7 +7,7 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 
 import cv2
 import imagesize
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
@@ -122,6 +122,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                         raise ValueError
                 except ValueError:     #use PIL if not supported by imagesize
                     img = Image.open(path)
+                    img = ImageOps.exif_transpose(img)
                     width, height = img.size
                     img.close()
                 pixels = width*height

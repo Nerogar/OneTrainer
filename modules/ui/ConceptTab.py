@@ -10,7 +10,7 @@ from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 class ConceptTab(ConfigList):
@@ -132,6 +132,7 @@ class ConceptWidget(ctk.CTkFrame):
                     break
 
         image = Image.open(preview_path)
+        image = ImageOps.exif_transpose(image)
         size = min(image.width, image.height)
         image = image.crop((
             (image.width - size) // 2,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from modules.util import path_util
 
-from PIL import Image
+from PIL import Image, ImageOps
 from tqdm import tqdm
 
 
@@ -24,6 +24,7 @@ class CaptionSample:
     def get_image(self) -> Image:
         if self.image is None:
             self.image = Image.open(self.image_filename).convert('RGB')
+            self.image = ImageOps.exif_transpose(self.image)
             self.height = self.image.height
             self.width = self.image.width
 

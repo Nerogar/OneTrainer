@@ -17,7 +17,7 @@ import torch
 from torch import nn
 from torchvision.transforms import transforms
 
-from PIL import Image
+from PIL import Image, ImageOps
 from tqdm import tqdm
 
 
@@ -255,6 +255,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                     ])
 
                     image = Image.open(base_image_path).convert("RGB")
+                    # Apply EXIF orientation if present
+                    image = ImageOps.exif_transpose(image)
                     image = t(image).to(
                         dtype=self.model.vae_train_dtype.torch_dtype(),
                         device=self.train_device,

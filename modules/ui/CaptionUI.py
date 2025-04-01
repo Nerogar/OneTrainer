@@ -25,7 +25,7 @@ import customtkinter as ctk
 import cv2
 import numpy as np
 from customtkinter import ScalingTracker, ThemeManager
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 
 class CaptionUI(ctk.CTkToplevel):
@@ -253,7 +253,8 @@ class CaptionUI(ctk.CTkToplevel):
             image_name = os.path.join(self.dir, image_name)
 
         try:
-            return Image.open(image_name).convert('RGB')
+            img = Image.open(image_name).convert('RGB')
+            return ImageOps.exif_transpose(img)
         except Exception:
             print(f'Could not open image {image_name}')
 

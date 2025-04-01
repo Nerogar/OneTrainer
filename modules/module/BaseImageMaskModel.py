@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 from torchvision.transforms import transforms
 
-from PIL import Image
+from PIL import Image, ImageOps
 from tqdm import tqdm
 
 
@@ -36,6 +36,7 @@ class MaskSample:
     def get_image(self) -> Image:
         if self.image is None:
             self.image = Image.open(self.image_filename).convert('RGB')
+            self.image = ImageOps.exif_transpose(self.image)
             self.height = self.image.height
             self.width = self.image.width
 

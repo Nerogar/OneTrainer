@@ -36,7 +36,7 @@ import customtkinter as ctk
 from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 class InputPipelineModule(
@@ -551,6 +551,7 @@ class ConceptWindow(ctk.CTkToplevel):
                         break
 
         image = Image.open(preview_image_path).convert("RGB")
+        image = ImageOps.exif_transpose(image)
         image_tensor = functional.to_tensor(image)
 
         splitext = os.path.splitext(preview_image_path)
