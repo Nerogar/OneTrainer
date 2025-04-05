@@ -61,7 +61,7 @@ class FluxModelLoader(
         if include_text_encoder_1:
             transformers_sub.append("text_encoder")
         if include_text_encoder_2:
-            diffusers_sub.append("text_encoder_2")
+            transformers_sub.append("text_encoder_2")
         if not vae_model_name:
             diffusers_sub.append("vae")
 
