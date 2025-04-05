@@ -21,13 +21,13 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             is_validation: bool = False,
     ):
         if config.concepts is not None:
-            concepts = [concept.to_dict() for concept in config.concepts]
+            concepts = [concept.to_dict() for concept in config.concepts if concept.validation_concept == is_validation]
         else:
             with open(config.concept_file_name, 'r') as f:
                 concepts_source = json.load(f)
             concepts = []
             for concept in concepts_source:
-                if not config.validation or is_validation == concept['validation_concept']:
+                if is_validation == concept['validation_concept']:
                     concepts.append(ConceptConfig.default_values().from_dict(concept).to_dict())
 
         settings = {
