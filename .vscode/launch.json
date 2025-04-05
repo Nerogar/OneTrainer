@@ -6,14 +6,21 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/train_ui.py",
-            "cwd": "${workspaceFolder}" 
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "CaptionUI",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/caption_ui.py",
-            "cwd": "${workspaceFolder}" 
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "ConvertModelUI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/convert_model_ui.py",
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
