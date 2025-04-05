@@ -57,7 +57,7 @@ class FluxModelLoader(
         diffusers_sub = []
         transformers_sub = []
         if not transformer_model_name:
-            diffusers_sub.apprent("transformer")
+            diffusers_sub.append("transformer")
         if include_text_encoder_1:
             transformers_sub.append("text_encoder")
         if include_text_encoder_2:
