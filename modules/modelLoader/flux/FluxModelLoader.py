@@ -7,6 +7,8 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
+import torch
+
 from diffusers import (
     AutoencoderKL,
     FlowMatchEulerDiscreteScheduler,
@@ -28,13 +30,14 @@ class FluxModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            transformer_model_name: str,
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model, model_type, weight_dtypes, base_model_name, vae_model_name,
+                model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name,
                 include_text_encoder_1, include_text_encoder_2,
             )
         else:
@@ -46,6 +49,7 @@ class FluxModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            transformer_model_name: str,
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
@@ -124,13 +128,23 @@ class FluxModelLoader(
                 "vae",
             )
 
-        transformer = self._load_diffusers_sub_module(
-            FluxTransformer2DModel,
-            weight_dtypes.prior,
-            weight_dtypes.train_dtype,
-            base_model_name,
-            "transformer",
-        )
+        if transformer_model_name:
+            transformer = FluxTransformer2DModel.from_single_file(
+                transformer_model_name,
+                #avoid loading the transformer in float32:
+                torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
+            )
+            transformer = self._convert_diffusers_sub_module_to_dtype(
+                transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+            )
+        else:
+            transformer = self._load_diffusers_sub_module(
+                FluxTransformer2DModel,
+                weight_dtypes.prior,
+                weight_dtypes.train_dtype,
+                base_model_name,
+                "transformer",
+            )
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
@@ -161,13 +175,20 @@ class FluxModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            transformer_model_name: str,
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
     ):
+        transformer = FluxTransformer2DModel.from_single_file(
+            #always load transformer separately even though FluxPipeLine.from_single_file() could load it, to avoid loading in float32:
+            transformer_model_name if transformer_model_name else base_model_name,
+            torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
+        )
         pipeline = FluxPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
             safety_checker=None,
+            transformer=transformer,
         )
 
         if include_text_encoder_2:
@@ -233,7 +254,7 @@ class FluxModelLoader(
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
             )
             return
@@ -242,7 +263,7 @@ class FluxModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
             )
             return
@@ -251,7 +272,7 @@ class FluxModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
             )
             return
