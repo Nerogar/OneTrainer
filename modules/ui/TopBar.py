@@ -15,7 +15,6 @@ from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
-from atomicwrites import atomic_write
 
 
 class TopBar:
@@ -166,14 +165,17 @@ class TopBar:
         name = path_util.safe_filename(name)
         path = path_util.canonical_join("training_presets", f"{name}.json")
 
-        with atomic_write(path, overwrite=True) as f:
+        #avoid corrupting #.json if OneTrainer is interrupted:
+        with open(path+".write", "w") as f:
             json.dump(self.train_config.to_settings_dict(secrets=False), f, indent=4)
+        os.rename(path+".write", path)
 
         return path
 
     def __save_secrets(self, path) -> str:
-        with atomic_write(path, overwrite=True) as f:
+        with open(path+".write", "w") as f:
             json.dump(self.train_config.secrets.to_dict(), f, indent=4)
+        os.rename(path+".write", path)
         return path
 
     def open_wiki(self):
