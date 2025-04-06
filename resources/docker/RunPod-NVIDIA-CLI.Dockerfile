@@ -1,5 +1,5 @@
 #To build, run
-#    docker build -t <image-name> .
+#    docker build -t <image-name> . -f RunPod-NVIDIA-CLI.Dockerfile
 #    docker tag <image-name> <dockerhub-username>/<repository-name>:<tag>
 #    docker push <dockerhub-username>/<repository-name>:<tag>
 
@@ -29,5 +29,5 @@ RUN apt-get update --yes \
 RUN pip install nvitop \
  && pip cache purge \
  && rm -rf ~/.cache/pip
-COPY start.sh.patch /start.sh.patch
+COPY RunPod-NVIDIA-CLI-start.sh.patch /start.sh.patch
 RUN patch /start.sh < /start.sh.patch
