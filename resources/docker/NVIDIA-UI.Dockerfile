@@ -1,4 +1,4 @@
-Note: as of April 2025, this Dockerfile is outdated and requires adjustments
+# Note: as of April 2025, this Dockerfile is outdated and requires adjustments
 
 # Inspiration for setup @ https://dev.to/ordigital/nvidia-525-cuda-118-python-310-pytorch-gpu-docker-image-1l4a
 FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
