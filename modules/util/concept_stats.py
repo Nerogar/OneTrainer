@@ -1,9 +1,4 @@
-from util.import_util import script_imports
-
-script_imports()
-
 import os
-import time
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -207,22 +202,5 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
         #check for number of "orphaned" mask/caption files as the difference between the total count and the count of image/mask or image/caption pairs
         stats_dict["unpaired_masks"] = stats_dict["mask_count"]-stats_dict["paired_masks"]
         stats_dict["unpaired_captions"] = stats_dict["caption_count"]-stats_dict["paired_captions"]
-
-    return stats_dict
-
-#loop through all subfolders of top-level path
-def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, waittime : float):
-    stats_dict = init_concept_stats(conceptconfig, advanced_checks)
-    start_time = time.perf_counter()
-    subfolders = [conceptconfig.path]
-    for dir in subfolders:
-        stats_dict = folder_scan(dir, stats_dict, advanced_checks)
-        stats_dict["processing_time"] = time.perf_counter() - start_time
-        subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
-
-        if (time.perf_counter() - start_time) > waittime:
-            stats_dict = init_concept_stats(conceptconfig, advanced_checks)
-            stats_dict["processing_time"] = time.perf_counter() - start_time
-            return stats_dict
 
     return stats_dict
