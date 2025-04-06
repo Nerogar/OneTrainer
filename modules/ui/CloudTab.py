@@ -159,44 +159,37 @@ class CloudTab:
                          tooltip="Set the minimum download speed of the cloud in Mbps.")
         components.entry(self.frame, 6, 5, self.ui_state, "cloud.min_download")
 
-        components.label(self.frame, 7, 4, "Jupyter password",
-                         tooltip="Jupyter password. This value is stored separately, not saved to your configuration file. ")
-        components.entry(self.frame, 7, 5, self.ui_state, "secrets.cloud.jupyter_password")
-
-        components.label(self.frame, 9, 4, "Action on finish",
+        components.label(self.frame, 8, 4, "Action on finish",
                          tooltip="What to do when training finishes and the data has been fully downloaded: Stop or delete the cloud, or do nothing.")
-        components.options_kv(self.frame, 9, 5, [
+        components.options_kv(self.frame, 8, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_finish")
 
-        components.label(self.frame, 10, 4, "Action on error",
+        components.label(self.frame, 9, 4, "Action on error",
                          tooltip="What to do if training stops due to an error: Stop or delete the cloud, or do nothing. Data may be lost.")
-        components.options_kv(self.frame, 10, 5, [
+        components.options_kv(self.frame, 9, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_error")
 
-        components.label(self.frame, 11, 4, "Action on detached finish",
+        components.label(self.frame, 10, 4, "Action on detached finish",
                          tooltip="What to do when training finishes, but the client has been detached and cannot download data. Data may be lost.")
-        components.options_kv(self.frame, 11, 5, [
+        components.options_kv(self.frame, 10, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_detached_finish")
 
-        components.label(self.frame, 12, 4, "Action on detached error",
+        components.label(self.frame, 11, 4, "Action on detached error",
                          tooltip="What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost.")
-        components.options_kv(self.frame, 12, 5, [
+        components.options_kv(self.frame, 11, 5, [
             ("None", CloudAction.NONE),
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], self.ui_state, "cloud.on_detached_error")
-
-
-
 
         self.frame.pack(fill="both", expand=1)
 
