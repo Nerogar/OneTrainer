@@ -23,10 +23,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             ui_state,
             *args, **kwargs,
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.parent = parent
-
         self.train_config = train_config
         self.ui_state = ui_state
         self.optimizer_ui_state = ui_state.get_var("optimizer")
@@ -35,10 +34,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.title("Optimizer Settings")
         self.geometry("800x500")
         self.resizable(True, True)
-        set_window_icon(self)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=0)
@@ -55,7 +50,12 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def main_frame(self, master):
         # Optimizer
