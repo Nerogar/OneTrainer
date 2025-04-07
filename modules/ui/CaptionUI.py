@@ -14,11 +14,11 @@ from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
+from modules.util.image_util import load_image
 from modules.util.torch_util import default_device
 from modules.util.ui import components
 from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
 from modules.util.ui.UIState import UIState
-from modules.util.image_util import load_image
 
 import torch
 
@@ -26,7 +26,7 @@ import customtkinter as ctk
 import cv2
 import numpy as np
 from customtkinter import ScalingTracker, ThemeManager
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 
 
 class CaptionUI(ctk.CTkToplevel):

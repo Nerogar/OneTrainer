@@ -6,4 +6,4 @@ def load_image(path: str, convert_mode: str = 'RGB') -> Image.Image:
     image = ImageOps.exif_transpose(image)
     if convert_mode:
         image = image.convert(convert_mode)
-    return image 
+    return image

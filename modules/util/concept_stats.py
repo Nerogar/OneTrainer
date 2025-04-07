@@ -2,14 +2,12 @@ import os
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.image_util import load_image
 
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
 
 import cv2
 import imagesize
-from PIL import Image, ImageOps
-
-from modules.util.image_util import load_image
 
 
 def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
