@@ -9,7 +9,7 @@ huggingface-hub==0.28.1
 scipy==1.15.1; sys_platform != 'win32'
 matplotlib==3.10.0
 av==14.1.0 # using an older version. only update once torchvision has been updated as well.
-yt-dlp==2025.02.19
+yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
 
 # pytorch

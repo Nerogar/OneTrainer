@@ -479,7 +479,7 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the captioning tool")
         components.button(frame, 0, 1, "Open", self.open_dataset_tool)
 
-        # dataset
+        # video tools
         components.label(frame, 1, 0, "Video Tools",
                          tooltip="Open the video tools")
         components.button(frame, 1, 1, "Open", self.open_video_tool)
