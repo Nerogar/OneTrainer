@@ -130,7 +130,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             ) * noise_scheduler.init_noise_sigma
 
             added_cond_kwargs = {
-                "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
+                "text_embeds": torch.concat([negative_pooled_text_encoder_2_output, pooled_text_encoder_2_output], dim=0),
                 "time_ids": torch.concat([add_time_ids] * 2, dim=0),
             }
 
@@ -376,7 +376,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 latent_image = latent_image * noise_scheduler.init_noise_sigma
 
             added_cond_kwargs = {
-                "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
+                "text_embeds": torch.concat([negative_pooled_text_encoder_2_output, pooled_text_encoder_2_output], dim=0),
                 "time_ids": torch.concat([add_time_ids] * 2, dim=0),
             }
 

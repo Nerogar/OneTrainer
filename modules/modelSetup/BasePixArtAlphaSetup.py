@@ -90,6 +90,7 @@ class BasePixArtAlphaSetup(
             if embedding_state is None:
                 with model.autocast_context:
                     embedding_state = self._create_new_embedding(
+                        model,
                         embedding_config,
                         model.tokenizer,
                         model.text_encoder,

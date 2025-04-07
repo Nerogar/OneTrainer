@@ -72,10 +72,8 @@ class HunyuanVideoModel(BaseModel):
     orig_tokenizer_2: CLIPTokenizer | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     transformer_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     transformer_train_dtype: DataType
 
     text_encoder_1_offload_conductor: LayerOffloadConductor | None
@@ -115,10 +113,8 @@ class HunyuanVideoModel(BaseModel):
         self.orig_tokenizer_1 = None
         self.orig_tokenizer_2 = None
 
-        self.autocast_context = nullcontext()
         self.transformer_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.transformer_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_1_offload_conductor = None

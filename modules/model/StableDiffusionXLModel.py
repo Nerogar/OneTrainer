@@ -53,10 +53,8 @@ class StableDiffusionXLModel(BaseModel):
     unet: UNet2DConditionModel | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     vae_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     vae_train_dtype: DataType
 
     # persistent embedding training data
@@ -90,10 +88,8 @@ class StableDiffusionXLModel(BaseModel):
         self.vae = None
         self.unet = None
 
-        self.autocast_context = nullcontext()
         self.vae_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.vae_train_dtype = DataType.FLOAT_32
 
         self.embedding = None

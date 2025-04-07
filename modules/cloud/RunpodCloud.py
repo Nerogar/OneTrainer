@@ -1,3 +1,4 @@
+import secrets as pysecrets
 import time
 
 from modules.cloud.LinuxCloud import LinuxCloud
@@ -76,7 +77,7 @@ class RunpodCloud(LinuxCloud):
             container_disk_in_gb=10,
             volume_mount_path="/workspace",
             min_download=config.min_download,
-            env={"JUPYTER_PASSWORD": secrets.jupyter_password},
+            env={"JUPYTER_PASSWORD": pysecrets.token_urlsafe(16)},
         )
         secrets.id=pod['id']
 
