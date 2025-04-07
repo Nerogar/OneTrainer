@@ -9,6 +9,8 @@ import cv2
 import imagesize
 from PIL import Image, ImageOps
 
+from modules.util.image_util import load_image
+
 
 def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
     stats_dict = {
@@ -121,8 +123,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                     if width == -1:     #if imagesize doesn't recognize format it returns (-1, -1)
                         raise ValueError
                 except ValueError:     #use PIL if not supported by imagesize
-                    img = Image.open(path)
-                    img = ImageOps.exif_transpose(img)
+                    img = load_image(path.path)
                     width, height = img.size
                     img.close()
                 pixels = width*height

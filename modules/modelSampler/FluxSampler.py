@@ -20,6 +20,8 @@ from torchvision.transforms import transforms
 from PIL import Image, ImageOps
 from tqdm import tqdm
 
+from modules.util.image_util import load_image
+
 
 class FluxSampler(BaseModelSampler):
     def __init__(
@@ -264,14 +266,13 @@ class FluxSampler(BaseModelSampler):
                     ),
                 ])
 
-                image = Image.open(base_image_path).convert("RGB")
-                image = ImageOps.exif_transpose(image)
+                image = load_image(base_image_path, convert_mode="RGB")
                 image = t(image).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
                 )
 
-                mask = Image.open(mask_image_path).convert("L")
+                mask = load_image(mask_image_path, convert_mode='L')
                 mask = t(mask).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
