@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
 REM Avoid footgun by explictly navigating to the directory containing the batch file
@@ -24,6 +25,40 @@ for /f "delims=" %%p in ('where %PYTHON% 2^>nul ^| findstr /v /i "WindowsApps"')
     goto :found_valid_python
 )
 
+REM Fallback: Check specifically if Windows Store Python exists
+set "WINDOWS_STORE_PYTHON="
+for /f "delims=" %%p in ('where %PYTHON% 2^>nul ^| findstr /i "WindowsApps"') do (
+    set "WINDOWS_STORE_PYTHON=%%p"
+    goto :windows_store_warning
+)
+goto :no_python_found
+
+:windows_store_warning
+echo.
+echo ⚠️ [33m WINDOWS STORE PYTHON DETECTED[0m ⚠️
+echo.
+echo Windows Store Python has a known history of causing insidious issues with virtual environments due to how
+echo Microsoft sandboxes it.
+echo.
+echo We strongly recommend installing Python directly from[36m https://www.python.org[0m instead.
+echo.
+echo Support for Windows Store Python is provided AS IS.
+echo.
+echo -------------------------------------------------
+echo.
+set "USE_WINDOWS_STORE="
+set /p USE_WINDOWS_STORE=Do you want to continue with Windows Store Python anyway? (y/n):
+if /i "%USE_WINDOWS_STORE%"=="y" (
+    set "REAL_PYTHON=%WINDOWS_STORE_PYTHON%"
+    echo Using Windows Store Python: %WINDOWS_STORE_PYTHON%
+    goto :found_valid_python
+)
+echo You chose not to use Windows Store Python.
+goto :no_python_found
+
+:no_python_found
+echo Error: Python was not found in your PATH. It is likely that you have not installed Python yet.
+goto :wrong_python_version
 
 :found_valid_python
 if "%REAL_PYTHON%"=="" (
