@@ -17,6 +17,7 @@ class NamedParameterGroup:
     ):
         self.unique_name = unique_name
         self.display_name = display_name if display_name is not None else unique_name
+        assert len(parameters) != 0, f'Parameter group cannot be empty: {repr(parameters)}'
         self.parameters = list(parameters)
         self.learning_rate = learning_rate
 
