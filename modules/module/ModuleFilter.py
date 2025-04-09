@@ -67,7 +67,6 @@ def tests():
     assert not f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v')
     assert f.was_used()
 
-    # layer lora_unet_down_blocks_2_attentions_0_transformer_blocks_4_attn2_to_v.lora_down.weight has norm 2.558
     f = ModuleFilter('down_blocks.2.attentions.0.transformer_blocks.[468].attn2.to_v')
     assert not f.matches('down_blocks.2.attentions.0.transformer_blocks.5.attn2.to_v')
     assert not f.was_used()
@@ -77,7 +76,7 @@ def tests():
     try:
         f = ModuleFilter('invalid_regex_(foo|bar')
         f.matches('raises_error')
-        assert False, 'should have raised an error'
+        raise AssertionError('The line above should have raised an error')
     except re.error:
         pass
 
