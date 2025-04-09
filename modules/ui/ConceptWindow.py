@@ -8,6 +8,7 @@ import time
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
@@ -36,7 +37,7 @@ import customtkinter as ctk
 from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from PIL import Image, ImageOps
+from PIL import Image
 
 
 class InputPipelineModule(
@@ -550,8 +551,7 @@ class ConceptWindow(ctk.CTkToplevel):
                     if file_index == self.image_preview_file_index:
                         break
 
-        image = Image.open(preview_image_path).convert("RGB")
-        image = ImageOps.exif_transpose(image)
+        image = load_image(preview_image_path, 'RGB')
         image_tensor = functional.to_tensor(image)
 
         splitext = os.path.splitext(preview_image_path)
