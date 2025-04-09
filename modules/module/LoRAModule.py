@@ -7,6 +7,7 @@ from typing import Any
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
+from modules.module.ModuleFilter import ModuleFilter
 
 import torch
 import torch.nn.functional as F
@@ -410,6 +411,7 @@ class LoRAModuleWrapper:
     orig_module: nn.Module
     rank: int
     alpha: float
+    module_filters: list[ModuleFilter]
 
     lora_modules: dict[str, PeftBase]
 
@@ -425,7 +427,8 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        self.module_filter = [x.strip() for x in module_filter] if module_filter is not None else []
+        self.module_filters = [ModuleFilter(pattern) for pattern in module_filter] if module_filter is not None else []
+
         weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
             if weight_decompose:
@@ -454,9 +457,14 @@ class LoRAModuleWrapper:
 
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
-                if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
-                    if isinstance(child_module, Linear | Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
+                if not isinstance(child_module, Linear | Conv2d):
+                    continue
+
+                if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
+                    lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
+
+            for module_filter in self.module_filters:
+                assert (module_filter.was_used()), f'Custom layer filters: no modules were matched by the custom filter {repr(module_filter)}'
 
         return lora_modules
 
@@ -566,3 +574,4 @@ class LoRAModuleWrapper:
             raise ValueError("Dropout probability must be in [0, 1]")
         for module in self.lora_modules.values():
             module.dropout.p = dropout_probability
+
