@@ -295,7 +295,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_adopt": False,
         "use_focus": False,
         "stochastic_rounding": True,
-    },    
+    },
     Optimizer.DADAPT_ADA_GRAD: {
         "momentum": 0,
         "log_every": 0,
