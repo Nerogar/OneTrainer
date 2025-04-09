@@ -149,7 +149,14 @@ class LoraTab:
             master, 6, 2, self.ui_state, "lora_layers",
             tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions are supported. Any model layer with a matching name will be trained"
         )
-        self.prior_custom = self.train_config.lora_layers or LoraTab.DEFAULT_CUSTOM_PATTERN
+
+        # avoid storing e.g. 'attn' or '' into self.prior_custom when a non-custom layer
+        # was chosen and the UI was then closed.
+        if self.train_config.lora_layers and self.train_config.lora_layer_preset == "custom":
+            self.prior_custom = self.train_config.lora_layers
+        else:
+            self.prior_custom = LoraTab.DEFAULT_CUSTOM_PATTERN
+
         self.layer_entry.grid(row=6, column=2, columnspan=3, sticky="ew")
         # Some configs will come with the lora_layer_preset unset or wrong for
         # the new model, so let's set it now to a reasonable default so it hits
