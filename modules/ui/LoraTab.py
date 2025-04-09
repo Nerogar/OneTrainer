@@ -18,6 +18,8 @@ import customtkinter as ctk
 
 
 class LoraTab:
+    # example showing how to use the custom layer filter input
+    DEFAULT_CUSTOM_PATTERN = "up_blocks.0.attentions.[01], (up|down)_blocks.0.resnets, down_blocks.2.attentions.*"
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super().__init__()
@@ -145,9 +147,9 @@ class LoraTab:
 
         self.layer_entry = components.entry(
             master, 6, 2, self.ui_state, "lora_layers",
-            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to"
+            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions are supported. Any model layer with a matching name will be trained"
         )
-        self.prior_custom = self.train_config.lora_layers or ""
+        self.prior_custom = self.train_config.lora_layers or LoraTab.DEFAULT_CUSTOM_PATTERN
         self.layer_entry.grid(row=6, column=2, columnspan=3, sticky="ew")
         # Some configs will come with the lora_layer_preset unset or wrong for
         # the new model, so let's set it now to a reasonable default so it hits
