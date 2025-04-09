@@ -14,6 +14,7 @@ from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
+from modules.util.image_util import load_image
 from modules.util.torch_util import default_device
 from modules.util.ui import components
 from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
@@ -253,7 +254,7 @@ class CaptionUI(ctk.CTkToplevel):
             image_name = os.path.join(self.dir, image_name)
 
         try:
-            return Image.open(image_name).convert('RGB')
+            return load_image(image_name, convert_mode="RGB")
         except Exception:
             print(f'Could not open image {image_name}')
 
@@ -264,7 +265,7 @@ class CaptionUI(ctk.CTkToplevel):
             mask_name = os.path.join(self.dir, mask_name)
 
             try:
-                return Image.open(mask_name).convert('RGB')
+                return load_image(mask_name, convert_mode='RGB')
             except Exception:
                 return None
         else:

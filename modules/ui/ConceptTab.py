@@ -6,6 +6,7 @@ from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -131,7 +132,7 @@ class ConceptWidget(ctk.CTkFrame):
                     preview_path = path_util.canonical_join(self.concept.path, path)
                     break
 
-        image = Image.open(preview_path)
+        image = load_image(preview_path, convert_mode="RGB")
         size = min(image.width, image.height)
         image = image.crop((
             (image.width - size) // 2,

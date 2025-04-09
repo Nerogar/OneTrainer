@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from modules.util import path_util
+from modules.util.image_util import load_image
 
 from PIL import Image
 from tqdm import tqdm
@@ -23,7 +24,7 @@ class CaptionSample:
 
     def get_image(self) -> Image:
         if self.image is None:
-            self.image = Image.open(self.image_filename).convert('RGB')
+            self.image = load_image(self.image_filename, 'RGB')
             self.height = self.image.height
             self.width = self.image.width
 
