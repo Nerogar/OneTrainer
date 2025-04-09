@@ -78,7 +78,7 @@ def tests():
         f = ModuleFilter('invalid_regex_(foo|bar')
         f.matches('raises_error')
         assert False, 'should have raised an error'
-    except re.PatternError:
+    except re.error:
         pass
 
     f = ModuleFilter('up_bl..ks')
