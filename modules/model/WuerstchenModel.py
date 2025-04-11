@@ -218,7 +218,7 @@ class WuerstchenModel(BaseModel):
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             tokenizer_output = self.prior_tokenizer(
-                self.add_text_encoder_embeddings_to_prompt(text),
+                self.add_prior_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
