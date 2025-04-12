@@ -24,24 +24,26 @@ class LoRALoaderMixin(metaclass=ABCMeta):
             model: BaseModel,
             lora_name: str,
     ):
-        key_sets = self._get_convert_key_sets(model)
+        state_dict = load_file(lora_name)
 
+        key_sets = self._get_convert_key_sets(model)
         if key_sets is not None:
-            model.lora_state_dict = convert_to_diffusers(load_file(lora_name), key_sets)
-        else:
-            model.lora_state_dict = load_file(lora_name)
+            state_dict = convert_to_diffusers(state_dict, key_sets)
+
+        model.lora_state_dict = state_dict
 
     def __load_ckpt(
             self,
             model: BaseModel,
             lora_name: str,
     ):
-        key_sets = self._get_convert_key_sets(model)
+        state_dict = torch.load(lora_name, weights_only=True)
 
+        key_sets = self._get_convert_key_sets(model)
         if key_sets is not None:
-            model.lora_state_dict = convert_to_diffusers(torch.load(lora_name, weights_only=True), key_sets)
-        else:
-            model.lora_state_dict = torch.load(lora_name, weights_only=True)
+            state_dict = convert_to_diffusers(state_dict, key_sets)
+
+        model.lora_state_dict = state_dict
 
     def __load_internal(
             self,
