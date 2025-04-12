@@ -73,6 +73,7 @@ class ModelTab:
                 TrainingMethod.FINE_TUNE,
                 TrainingMethod.FINE_TUNE_VAE,
             ],
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_3_ui(self):
@@ -90,6 +91,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_flux_ui(self):
@@ -123,6 +125,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_wuerstchen_ui(self):
@@ -141,6 +144,7 @@ class ModelTab:
             allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
                               or self.train_config.model_type.is_stable_cascade(),
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_pixart_alpha_ui(self):
@@ -156,6 +160,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_sana_ui(self):
@@ -171,6 +176,7 @@ class ModelTab:
             row,
             allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_hunyuan_video_ui(self):
@@ -417,8 +423,8 @@ class ModelTab:
             formats.append(("Safetensors", ModelFormat.SAFETENSORS))
         if allow_diffusers:
             formats.append(("Diffusers", ModelFormat.DIFFUSERS))
-        if allow_legacy_safetensors:
-            formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
+        # if allow_legacy_safetensors:
+        #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
 
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")

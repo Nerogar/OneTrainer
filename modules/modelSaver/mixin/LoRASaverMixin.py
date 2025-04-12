@@ -83,8 +83,11 @@ class LoRASaverMixin(
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
             case ModelFormat.SAFETENSORS:
-                self.__save_safetensors(model, output_model_destination, dtype)
-            case ModelFormat.LEGACY_SAFETENSORS:
                 self.__save_legacy_safetensors(model, output_model_destination, dtype)
+            # TODO: activate these cases again and remove the previous one
+            # case ModelFormat.SAFETENSORS:
+            #     self.__save_safetensors(model, output_model_destination, dtype)
+            # case ModelFormat.LEGACY_SAFETENSORS:
+            #     self.__save_legacy_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
