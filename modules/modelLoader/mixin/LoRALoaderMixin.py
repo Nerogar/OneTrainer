@@ -1,13 +1,9 @@
 import os
 import traceback
+from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
-from modules.model.WuerstchenModel import WuerstchenModel
-from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
-from modules.util.convert.convert_lora_util import LoraConversionKeySet
-from modules.util.convert.convert_stable_cascade_lora_ckpt_to_diffusers import (
-    convert_stable_cascade_lora_ckpt_to_diffusers,
-)
+from modules.util.convert.convert_lora_util import LoraConversionKeySet, convert_to_diffusers
 from modules.util.ModelNames import ModelNames
 
 import torch
@@ -15,36 +11,41 @@ import torch
 from safetensors.torch import load_file
 
 
-class WuerstchenLoRALoader(
-    LoRALoaderMixin
-):
+class LoRALoaderMixin(metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
+    @abstractmethod
     def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None  # TODO: rewrite convert_stable_cascade_lora_ckpt_to_diffusers to use the new conversion keys
+        pass
 
     def __load_safetensors(
             self,
-            model: WuerstchenModel,
+            model: BaseModel,
             lora_name: str,
     ):
-        model.lora_state_dict = load_file(lora_name)
-        if model.model_type.is_stable_cascade():
-            model.lora_state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(model.lora_state_dict)
+        key_sets = self._get_convert_key_sets(model)
+
+        if key_sets is not None:
+            model.lora_state_dict = convert_to_diffusers(load_file(lora_name), key_sets)
+        else:
+            model.lora_state_dict = load_file(lora_name)
 
     def __load_ckpt(
             self,
-            model: WuerstchenModel,
+            model: BaseModel,
             lora_name: str,
     ):
-        model.lora_state_dict = torch.load(lora_name, weights_only=True)
-        if model.model_type.is_stable_cascade():
-            model.lora_state_dict = convert_stable_cascade_lora_ckpt_to_diffusers(model.lora_state_dict)
+        key_sets = self._get_convert_key_sets(model)
+
+        if key_sets is not None:
+            model.lora_state_dict = convert_to_diffusers(torch.load(lora_name, weights_only=True), key_sets)
+        else:
+            model.lora_state_dict = torch.load(lora_name, weights_only=True)
 
     def __load_internal(
             self,
-            model: WuerstchenModel,
+            model: BaseModel,
             lora_name: str,
     ):
         if os.path.exists(os.path.join(lora_name, "meta.json")):
@@ -54,9 +55,9 @@ class WuerstchenLoRALoader(
         else:
             raise Exception("not an internal model")
 
-    def load(
+    def _load(
             self,
-            model: WuerstchenModel,
+            model: BaseModel,
             model_names: ModelNames,
     ):
         stacktraces = []
