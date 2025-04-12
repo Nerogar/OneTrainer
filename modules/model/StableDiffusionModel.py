@@ -194,7 +194,7 @@ class StableDiffusionModel(BaseModel):
                 self.add_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=self.text_encoder.config.max_position_embeddings,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
