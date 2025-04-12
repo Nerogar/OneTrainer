@@ -9,6 +9,7 @@ class LoraConversionKeySet:
             self,
             omi_prefix: str,
             diffusers_prefix: str,
+            legacy_diffusers_prefix: str | None = None,
             parent: Self | None = None,
             swap_chunks: bool = False,
             filter_is_last: bool | None = None,
@@ -21,7 +22,13 @@ class LoraConversionKeySet:
         else:
             self.omi_prefix = omi_prefix
             self.diffusers_prefix = diffusers_prefix
-        self.legacy_diffusers_prefix = self.diffusers_prefix.replace('.', '_')
+
+        if legacy_diffusers_prefix is None:
+            self.legacy_diffusers_prefix = self.diffusers_prefix.replace('.', '_')
+        elif parent is not None:
+            self.legacy_diffusers_prefix = combine(parent.legacy_diffusers_prefix, legacy_diffusers_prefix).replace('.', '_')
+        else:
+            self.legacy_diffusers_prefix = legacy_diffusers_prefix
 
         self.swap_chunks = swap_chunks
         self.filter_is_last = filter_is_last
@@ -71,8 +78,8 @@ def __convert(
     out_states = {}
 
     # TODO: maybe replace with a non O(n^2) algorithm
-    for key_set in key_sets:
-        for key, tensor in state_dict.items():
+    for key, tensor in state_dict.items():
+        for key_set in key_sets:
             in_prefix = ''
             out_prefix = ''
 
@@ -115,6 +122,8 @@ def __convert(
 
             out_states[out_prefix + name] = tensor
 
+            break  # only map the first matching key set
+
     return out_states
 
 
@@ -126,8 +135,8 @@ def __detect_source(
     diffusers_count = 0
     legacy_diffusers_count = 0
 
-    for key_set in key_sets:
-        for key in state_dict:
+    for key in state_dict:
+        for key_set in key_sets:
             if key.startswith(key_set.omi_prefix):
                 omi_count += 1
             elif key.startswith(key_set.diffusers_prefix):

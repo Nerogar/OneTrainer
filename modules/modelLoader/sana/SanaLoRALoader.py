@@ -12,7 +12,7 @@ class SanaLoRALoader(
         super().__init__()
 
     def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None
+        return None  # TODO: not yet implemented
 
     def load(
             self,
