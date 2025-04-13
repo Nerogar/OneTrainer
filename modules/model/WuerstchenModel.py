@@ -74,9 +74,11 @@ class WuerstchenModel(BaseModel):
     prior_prior: WuerstchenPrior | StableCascadeUNet | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
+    prior_autocast_context: torch.autocast | nullcontext
+    effnet_encoder_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
+    prior_train_dtype: DataType
+    effnet_encoder_train_dtype: DataType
 
     # persistent embedding training data
     embedding: WuerstchenModelEmbedding | None
@@ -107,11 +109,9 @@ class WuerstchenModel(BaseModel):
         self.prior_noise_scheduler = None
         self.prior_prior = None
 
-        self.autocast_context = nullcontext()
         self.prior_autocast_context = nullcontext()
         self.effnet_encoder_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.prior_train_dtype = DataType.FLOAT_32
         self.effnet_encoder_train_dtype = DataType.FLOAT_32
 
@@ -218,7 +218,7 @@ class WuerstchenModel(BaseModel):
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             tokenizer_output = self.prior_tokenizer(
-                self.add_text_encoder_embeddings_to_prompt(text),
+                self.add_prior_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,

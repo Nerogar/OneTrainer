@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
+from contextlib import nullcontext
 from uuid import uuid4
 
 from modules.module.EMAModule import EMAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
@@ -71,6 +73,8 @@ class BaseModel(metaclass=ABCMeta):
     model_spec: ModelSpec | None
     train_config: TrainConfig | None
     embedding_state_dicts: dict[str, dict[str, Tensor]] | None
+    autocast_context: torch.autocast | nullcontext
+    train_dtype: DataType
 
     def __init__(
             self,
@@ -86,6 +90,8 @@ class BaseModel(metaclass=ABCMeta):
         self.model_spec = None
         self.train_config = None
         self.embedding_state_dicts = {}
+        self.autocast_context = nullcontext()
+        self.train_dtype = DataType.FLOAT_32
 
     @abstractmethod
     def to(self, device: torch.device):

@@ -14,7 +14,7 @@ class StringInputDialog(ctk.CTkToplevel):
             validate_callback: Callable[[str], bool] = None,
             *args, **kwargs
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
         self.parent = parent
 
         self.callback = callback

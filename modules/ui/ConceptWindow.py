@@ -5,13 +5,13 @@ import pathlib
 import random
 import time
 
-from modules.util import path_util
+from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
-from scripts import concept_stats
 
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
@@ -71,22 +71,18 @@ class ConceptWindow(ctk.CTkToplevel):
             text_ui_state: UIState,
             *args, **kwargs,
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.concept = concept
         self.ui_state = ui_state
         self.image_ui_state = image_ui_state
         self.text_ui_state = text_ui_state
-
         self.image_preview_file_index = 0
+
 
         self.title("Concept")
         self.geometry("800x700")
         self.resizable(True, True)
-        set_window_icon(self)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -99,11 +95,15 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
-        #automatically get concept stats if required, or read from concept config
         self.__auto_update_concept_stats()
 
         components.button(self, 1, 0, "ok", self.__ok)
-        self.after(150, lambda: set_window_icon(self))
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def __general_tab(self, master, concept: ConceptConfig):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -551,7 +551,7 @@ class ConceptWindow(ctk.CTkToplevel):
                     if file_index == self.image_preview_file_index:
                         break
 
-        image = Image.open(preview_image_path).convert("RGB")
+        image = load_image(preview_image_path, 'RGB')
         image_tensor = functional.to_tensor(image)
 
         splitext = os.path.splitext(preview_image_path)
@@ -753,16 +753,16 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.bar_label(b, color=self.text_color)
         self.canvas.draw()
 
-    def __get_concept_stats(self, advanced_checks : bool, waittime : float):
+    def __get_concept_stats(self, advanced_checks: bool, waittime: float):
         start_time = time.perf_counter()
         last_update = time.perf_counter()
         subfolders = [self.concept.path]
         stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
-        for dir in subfolders:
-            stats_dict = concept_stats.folder_scan(dir, stats_dict, advanced_checks, self.concept)
+        for path in subfolders:
+            stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept)
             stats_dict["processing_time"] = time.perf_counter() - start_time
             if self.concept.include_subdirectories:     #add all subfolders of current directory to for loop
-                subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
+                subfolders.extend([f for f in os.scandir(path) if f.is_dir()])
             self.concept.concept_stats = stats_dict
             #cancel and set init stats if longer than waiting time or cancel flag set
             if (time.perf_counter() - start_time) > waittime or self.cancel_scan_flag.is_set():

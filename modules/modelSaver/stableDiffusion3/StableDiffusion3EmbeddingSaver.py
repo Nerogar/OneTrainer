@@ -81,6 +81,9 @@ class StableDiffusion3EmbeddingSaver(
         embedding_uuids = set(model.embedding_state_dicts.keys() \
                               | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
 
+        if model.embedding is not None:
+            embedding_uuids.discard(model.embedding.text_encoder_1_embedding.uuid)
+
         embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.additional_embeddings}
 
         for embedding_uuid in embedding_uuids:

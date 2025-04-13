@@ -9,13 +9,12 @@ from scalene import scalene_profiler
 
 class ProfilingWindow(ctk.CTkToplevel):
     def __init__(self, parent, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
         self.parent = parent
 
         self.title("Profiling")
         self.geometry("512x512")
         self.resizable(True, True)
-        set_window_icon(self)
         self.wait_visibility()
         self.focus_set()
 

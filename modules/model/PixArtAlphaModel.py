@@ -48,10 +48,8 @@ class PixArtAlphaModel(BaseModel):
     transformer: Transformer2DModel | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     text_encoder_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     text_encoder_train_dtype: DataType
 
     text_encoder_offload_conductor: LayerOffloadConductor | None
@@ -81,10 +79,8 @@ class PixArtAlphaModel(BaseModel):
         self.vae = None
         self.transformer = None
 
-        self.autocast_context = nullcontext()
         self.text_encoder_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_offload_conductor = None
