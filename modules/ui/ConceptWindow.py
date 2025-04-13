@@ -94,9 +94,9 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
-        #automatic concept scan disabled as it's causing some problems on large data sets in single folders
-        #self.scan_thread = threading.Thread(target=self.__auto_update_concept_stats, daemon=True)
-        #self.scan_thread.start()
+        #automatic concept scan
+        self.scan_thread = threading.Thread(target=self.__auto_update_concept_stats, daemon=True)
+        self.scan_thread.start()
 
         components.button(self, 1, 0, "ok", self.__ok)
 
@@ -761,8 +761,7 @@ class ConceptWindow(ctk.CTkToplevel):
         start_time = time.perf_counter()
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
-        self.refresh_basic_stats_button.configure(state="disabled")
-        self.refresh_advanced_stats_button.configure(state="disabled")
+        self.concept_stats_tab.after(0, self.__disable_scan_buttons)
         subfolders = [self.concept.path]
 
         stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
@@ -778,30 +777,33 @@ class ConceptWindow(ctk.CTkToplevel):
                 stats_dict["processing_time"] = time.perf_counter() - start_time
                 self.concept.concept_stats = stats_dict
                 self.cancel_scan_flag.clear()
-                self.refresh_basic_stats_button.configure(state="normal")
-                self.refresh_advanced_stats_button.configure(state="normal")
+                self.concept_stats_tab.after(0, self.__enable_scan_buttons)
                 break
             #update GUI approx every half second
             if time.perf_counter() > (last_update + 0.5):
                 last_update = time.perf_counter()
-                self.__update_concept_stats()
-                self.concept_stats_tab.update()
+                self.concept_stats_tab.after(0, self.__update_concept_stats)
+                # self.__update_concept_stats()
+                # self.concept_stats_tab.update()
 
         self.cancel_scan_flag.clear()
-        self.refresh_basic_stats_button.configure(state="normal")
-        self.refresh_advanced_stats_button.configure(state="normal")
-        self.__update_concept_stats()
+        self.concept_stats_tab.after(0, self.__enable_scan_buttons)
+        self.concept_stats_tab.after(0, self.__update_concept_stats)
 
     def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
         self.scan_thread = threading.Thread(target=self.__get_concept_stats, args=[advanced_checks, waittime], daemon=True)
         self.scan_thread.start()
 
+    def __disable_scan_buttons(self):
+        self.refresh_basic_stats_button.configure(state="disabled")
+        self.refresh_advanced_stats_button.configure(state="disabled")
+
+    def __enable_scan_buttons(self):
+        self.refresh_basic_stats_button.configure(state="normal")
+        self.refresh_advanced_stats_button.configure(state="normal")
+
     def __cancel_concept_stats(self):
         self.cancel_scan_flag.set()
-
-    def __cancel_concept_stats_threaded(self):
-        self.cancel_thread = threading.Thread(target=self.__cancel_concept_stats, daemon=True)
-        self.cancel_thread.start()
 
     def __auto_update_concept_stats(self):
         try:
