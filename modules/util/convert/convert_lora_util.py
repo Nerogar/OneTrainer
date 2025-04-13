@@ -77,6 +77,9 @@ def __convert(
 ) -> dict[str, Tensor]:
     out_states = {}
 
+    if source == target:
+        return dict(state_dict)
+
     # TODO: maybe replace with a non O(n^2) algorithm
     for key, tensor in state_dict.items():
         for key_set in key_sets:
