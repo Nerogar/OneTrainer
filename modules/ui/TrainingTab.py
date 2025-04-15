@@ -311,6 +311,13 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, "enable_autocast_cache")
         row += 1
 
+        # --- SageAttention Start ---
+        components.label(frame, row, 0, "SageAttention",
+                         tooltip="Enable SageAttention optimization (experimental, requires installation). Replaces the standard attention mechanism.")
+        components.switch(frame, row, 1, self.ui_state, "sage_attention")
+        row += 1
+        # --- SageAttention End ---
+
         # resolution
         components.label(frame, row, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")

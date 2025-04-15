@@ -18,6 +18,7 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
+from modules.util.sageattention_processor import SAGE_ATTENTION_AVAILABLE, SageAttentionProcessor
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -74,6 +75,22 @@ class BaseStableDiffusionXLSetup(
         quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
         quantize_layers(model.vae, self.train_device, model.vae_train_dtype)
         quantize_layers(model.unet, self.train_device, model.train_dtype)
+
+        # --- Set Attention Processor for SageAttention Start ---
+        if SAGE_ATTENTION_AVAILABLE and getattr(config, 'sage_attention', False):
+            if hasattr(model, 'unet') and model.unet is not None:
+                print("Setting SageAttentionProcessor for UNet in BaseStableDiffusionXLSetup...")
+                try:
+                    sage_processor = SageAttentionProcessor()
+                    model.unet.set_attn_processor(sage_processor)
+                    print("Successfully set SageAttentionProcessor for UNet.")
+                except Exception as e:
+                    print(f"Failed to set SageAttentionProcessor in BaseStableDiffusionXLSetup: {e}")
+            else:
+                print("UNet not found in model, cannot set SageAttentionProcessor.")
+        elif not SAGE_ATTENTION_AVAILABLE and getattr(config, 'sage_attention', False):
+            print("Warning: sage_attention is enabled in config, but SageAttentionProcessor is not available (sageattention library likely not installed).")
+        # --- Set Attention Processor for SageAttention End ---
 
     def _setup_embeddings(
             self,
