@@ -6,7 +6,6 @@
 #    Diffusion Transformer" (https://arxiv.org/pdf/2501.18427v3)
 #
 
-import math
 
 from modules.util.bf16_stochastic_rounding import add_stochastic_
 from modules.util.torch_util import torch_gc
@@ -319,4 +318,3 @@ class CAME8bit(torch.optim.Optimizer):
 
         # Not sure if this is GC is needed, but the reference implementation had one
         torch_gc()
-
