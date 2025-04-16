@@ -17,19 +17,27 @@ from diffusers import (
     AutoencoderKL,
     DiffusionPipeline,
     FlowMatchEulerDiscreteScheduler,
-    SD3Transformer2DModel,
-    StableDiffusion3Pipeline,
+    HiDreamImagePipeline,
+    HiDreamImageTransformer2DModel,
 )
-from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import (
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    LlamaForCausalLM,
+    LlamaTokenizerFast,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 
 
-class StableDiffusion3ModelEmbedding:
+class HiDreamModelEmbedding:
     def __init__(
             self,
             uuid: str,
             text_encoder_1_vector: Tensor | None,
             text_encoder_2_vector: Tensor | None,
             text_encoder_3_vector: Tensor | None,
+            text_encoder_4_vector: Tensor | None,
             placeholder: str,
             is_output_embedding: bool,
     ):
@@ -37,14 +45,14 @@ class StableDiffusion3ModelEmbedding:
             uuid=uuid,
             placeholder=placeholder,
             vector=text_encoder_1_vector,
-            is_output_embedding=is_output_embedding,
+            is_output_embedding=False,
         )
 
         self.text_encoder_2_embedding = BaseModelEmbedding(
             uuid=uuid,
             placeholder=placeholder,
             vector=text_encoder_2_vector,
-            is_output_embedding=is_output_embedding,
+            is_output_embedding=False,
         )
 
         self.text_encoder_3_embedding = BaseModelEmbedding(
@@ -54,18 +62,33 @@ class StableDiffusion3ModelEmbedding:
             is_output_embedding=is_output_embedding,
         )
 
+        self.text_encoder_4_embedding = BaseModelEmbedding(
+            uuid=uuid,
+            placeholder=placeholder,
+            vector=text_encoder_4_vector,
+            is_output_embedding=is_output_embedding,
+        )
 
-class StableDiffusion3Model(BaseModel):
+
+class HiDreamModel(BaseModel):
     # base model data
     tokenizer_1: CLIPTokenizer | None
     tokenizer_2: CLIPTokenizer | None
     tokenizer_3: T5Tokenizer | None
+    tokenizer_4: LlamaTokenizerFast | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder_1: CLIPTextModelWithProjection | None
     text_encoder_2: CLIPTextModelWithProjection | None
     text_encoder_3: T5EncoderModel | None
+    text_encoder_4: LlamaForCausalLM | None
     vae: AutoencoderKL | None
-    transformer: SD3Transformer2DModel | None
+    transformer: HiDreamImageTransformer2DModel | None
+
+    # original copies of base model data
+    orig_tokenizer_1: CLIPTokenizer | None
+    orig_tokenizer_2: CLIPTokenizer | None
+    orig_tokenizer_3: T5Tokenizer | None
+    orig_tokenizer_4: LlamaTokenizerFast | None
 
     # autocast context
     text_encoder_3_autocast_context: torch.autocast | nullcontext
@@ -73,19 +96,22 @@ class StableDiffusion3Model(BaseModel):
     text_encoder_3_train_dtype: DataType
 
     text_encoder_3_offload_conductor: LayerOffloadConductor | None
+    text_encoder_4_offload_conductor: LayerOffloadConductor | None
     transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
-    embedding: StableDiffusion3ModelEmbedding | None
-    additional_embeddings: list[StableDiffusion3ModelEmbedding] | None
+    embedding: HiDreamModelEmbedding | None
+    additional_embeddings: list[HiDreamModelEmbedding] | None
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
     embedding_wrapper_3: AdditionalEmbeddingWrapper | None
+    embedding_wrapper_4: AdditionalEmbeddingWrapper | None
 
     # persistent lora training data
     text_encoder_1_lora: LoRAModuleWrapper | None
     text_encoder_2_lora: LoRAModuleWrapper | None
     text_encoder_3_lora: LoRAModuleWrapper | None
+    text_encoder_4_lora: LoRAModuleWrapper | None
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
@@ -100,18 +126,26 @@ class StableDiffusion3Model(BaseModel):
         self.tokenizer_1 = None
         self.tokenizer_2 = None
         self.tokenizer_3 = None
+        self.tokenizer_4 = None
         self.noise_scheduler = None
         self.text_encoder_1 = None
         self.text_encoder_2 = None
         self.text_encoder_3 = None
+        self.text_encoder_4 = None
         self.vae = None
         self.transformer = None
+
+        self.orig_tokenizer_1 = None
+        self.orig_tokenizer_2 = None
+        self.orig_tokenizer_3 = None
+        self.orig_tokenizer_4 = None
 
         self.text_encoder_3_autocast_context = nullcontext()
 
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_3_offload_conductor = None
+        self.text_encoder_4_offload_conductor = None
         self.transformer_offload_conductor = None
 
         self.embedding = None
@@ -119,14 +153,16 @@ class StableDiffusion3Model(BaseModel):
         self.embedding_wrapper_1 = None
         self.embedding_wrapper_2 = None
         self.embedding_wrapper_3 = None
+        self.embedding_wrapper_4 = None
 
         self.text_encoder_1_lora = None
         self.text_encoder_2_lora = None
         self.text_encoder_3_lora = None
+        self.text_encoder_4_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
 
-    def all_embeddings(self) -> list[StableDiffusion3ModelEmbedding]:
+    def all_embeddings(self) -> list[HiDreamModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
 
@@ -142,6 +178,10 @@ class StableDiffusion3Model(BaseModel):
         return [embedding.text_encoder_3_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_3_embedding] if self.embedding is not None else [])
 
+    def all_text_encoder_4_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_4_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_4_embedding] if self.embedding is not None else [])
+
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
@@ -149,6 +189,7 @@ class StableDiffusion3Model(BaseModel):
         self.text_encoder_1_to(device=device)
         self.text_encoder_2_to(device=device)
         self.text_encoder_3_to(device=device)
+        self.text_encoder_4_to(device=device)
 
     def text_encoder_1_to(self, device: torch.device):
         if self.text_encoder_1 is not None:
@@ -175,6 +216,17 @@ class StableDiffusion3Model(BaseModel):
         if self.text_encoder_3_lora is not None:
             self.text_encoder_3_lora.to(device)
 
+    def text_encoder_4_to(self, device: torch.device):
+        if self.text_encoder_4 is not None:
+            if self.text_encoder_4_offload_conductor is not None and \
+                    self.text_encoder_4_offload_conductor.layer_offload_activated():
+                self.text_encoder_4_offload_conductor.to(device)
+            else:
+                self.text_encoder_4.to(device=device)
+
+        if self.text_encoder_4_lora is not None:
+            self.text_encoder_4_lora.to(device)
+
     def transformer_to(self, device: torch.device):
         if self.transformer_offload_conductor is not None and \
                 self.transformer_offload_conductor.layer_offload_activated():
@@ -198,10 +250,12 @@ class StableDiffusion3Model(BaseModel):
             self.text_encoder_2.eval()
         if self.text_encoder_3 is not None:
             self.text_encoder_3.eval()
+        if self.text_encoder_4 is not None:
+            self.text_encoder_4.eval()
         self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
-        return StableDiffusion3Pipeline(
+        return HiDreamImagePipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
@@ -211,6 +265,8 @@ class StableDiffusion3Model(BaseModel):
             tokenizer_2=self.tokenizer_2,
             text_encoder_3=self.text_encoder_3,
             tokenizer_3=self.tokenizer_3,
+            text_encoder_4=self.text_encoder_4,
+            tokenizer_4=self.tokenizer_4,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
@@ -221,6 +277,9 @@ class StableDiffusion3Model(BaseModel):
 
     def add_text_encoder_3_embeddings_to_prompt(self, prompt: str) -> str:
         return self._add_embeddings_to_prompt(self.all_text_encoder_3_embeddings(), prompt)
+
+    def add_text_encoder_4_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_4_embeddings(), prompt)
 
     def encode_text(
             self,
@@ -406,7 +465,9 @@ class StableDiffusion3Model(BaseModel):
                 device=train_device)).float()
             text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
 
-        return text_encoder_1_output, text_encoder_2_output, text_encoder_3_output, pooled_text_encoder_1_output, pooled_text_encoder_2_output
+        text_encoder_4_output = None # TODO
+
+        return pooled_text_encoder_1_output, pooled_text_encoder_2_output, text_encoder_3_output, text_encoder_4_output
 
     def combine_text_encoder_output(
             self,

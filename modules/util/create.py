@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
+from modules.dataLoader.HiDreamBaseDataLoader import HiDreamBaseDataLoader
 from modules.dataLoader.HunyuanVideoBaseDataLoader import HunyuanVideoBaseDataLoader
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
 from modules.dataLoader.SanaBaseDataLoader import SanaBaseDataLoader
@@ -17,6 +18,9 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.FluxEmbeddingModelLoader import FluxEmbeddingModelLoader
 from modules.modelLoader.FluxFineTuneModelLoader import FluxFineTuneModelLoader
 from modules.modelLoader.FluxLoRAModelLoader import FluxLoRAModelLoader
+from modules.modelLoader.HiDreamEmbeddingModelLoader import HiDreamEmbeddingModelLoader
+from modules.modelLoader.HiDreamFineTuneModelLoader import HiDreamFineTuneModelLoader
+from modules.modelLoader.HiDreamLoRAModelLoader import HiDreamLoRAModelLoader
 from modules.modelLoader.HunyuanVideoEmbeddingModelLoader import HunyuanVideoEmbeddingModelLoader
 from modules.modelLoader.HunyuanVideoFineTuneModelLoader import HunyuanVideoFineTuneModelLoader
 from modules.modelLoader.HunyuanVideoLoRAModelLoader import HunyuanVideoLoRAModelLoader
@@ -77,6 +81,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.FluxEmbeddingSetup import FluxEmbeddingSetup
 from modules.modelSetup.FluxFineTuneSetup import FluxFineTuneSetup
 from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
+from modules.modelSetup.HiDreamLoRASetup import HiDreamLoRASetup
 from modules.modelSetup.HunyuanVideoEmbeddingSetup import HunyuanVideoEmbeddingSetup
 from modules.modelSetup.HunyuanVideoFineTuneSetup import HunyuanVideoFineTuneSetup
 from modules.modelSetup.HunyuanVideoLoRASetup import HunyuanVideoLoRASetup
@@ -158,6 +163,8 @@ def create_model_loader(
                 return SanaFineTuneModelLoader()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoFineTuneModelLoader()
+            if model_type.is_hi_dream():
+                return HiDreamFineTuneModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
@@ -178,6 +185,8 @@ def create_model_loader(
                 return SanaLoRAModelLoader()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoLoRAModelLoader()
+            if model_type.is_hi_dream():
+                return HiDreamLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -195,6 +204,8 @@ def create_model_loader(
                 return SanaEmbeddingModelLoader()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoEmbeddingModelLoader()
+            if model_type.is_hi_dream():
+                return HiDreamEmbeddingModelLoader()
 
     return None
 
@@ -307,6 +318,8 @@ def create_model_setup(
                 return SanaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_hi_dream():
+                return HiDreamLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -394,6 +407,8 @@ def create_data_loader(
                 return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_hi_dream():
+                return HiDreamBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress, is_validation)

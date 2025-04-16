@@ -76,9 +76,6 @@ class FluxModel(BaseModel):
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
-    sd_config: dict | None
-    sd_config_filename: str | None
-
     def __init__(
             self,
             model_type: ModelType,
