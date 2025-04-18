@@ -290,22 +290,21 @@ class HiDreamModel(BaseModel):
             tokens_1: Tensor = None,
             tokens_2: Tensor = None,
             tokens_3: Tensor = None,
-            tokens_mask_1: Tensor = None,
-            tokens_mask_2: Tensor = None,
+            tokens_4: Tensor = None,
             tokens_mask_3: Tensor = None,
-            text_encoder_1_layer_skip: int = 0,
-            text_encoder_2_layer_skip: int = 0,
+            tokens_mask_4: Tensor = None,
             text_encoder_3_layer_skip: int = 0,
+            text_encoder_4_layer_skip: int = 0,
             text_encoder_1_dropout_probability: float | None = None,
             text_encoder_2_dropout_probability: float | None = None,
             text_encoder_3_dropout_probability: float | None = None,
+            text_encoder_4_dropout_probability: float | None = None,
             apply_attention_mask: bool = False,
-            text_encoder_1_output: Tensor = None,
             pooled_text_encoder_1_output: Tensor = None,
-            text_encoder_2_output: Tensor = None,
             pooled_text_encoder_2_output: Tensor = None,
             text_encoder_3_output: Tensor = None,
-    ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+            text_encoder_4_output: Tensor = None,
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         # tokenize prompt
         if tokens_1 is None and text is not None and self.tokenizer_1 is not None:
             tokenizer_output = self.tokenizer_1(
@@ -316,7 +315,6 @@ class HiDreamModel(BaseModel):
                 return_tensors="pt",
             )
             tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
-            tokens_mask_1 = tokenizer_output.attention_mask.to(self.text_encoder_1.device)
 
         if tokens_2 is None and text is not None and self.tokenizer_2 is not None:
             tokenizer_output = self.tokenizer_2(
@@ -327,7 +325,6 @@ class HiDreamModel(BaseModel):
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
-            tokens_mask_2 = tokenizer_output.attention_mask.to(self.text_encoder_2.device)
 
         if tokens_3 is None and text is not None and self.tokenizer_3 is not None:
             tokenizer_output = self.tokenizer_3(
@@ -340,58 +337,43 @@ class HiDreamModel(BaseModel):
             tokens_3 = tokenizer_output.input_ids.to(self.text_encoder_3.device)
             tokens_mask_3 = tokenizer_output.attention_mask.to(self.text_encoder_3.device)
 
-        text_encoder_1_output, pooled_text_encoder_1_output = encode_clip(
+        if tokens_4 is None and text is not None and self.tokenizer_4 is not None:
+            tokenizer_output = self.tokenizer_4(
+                self.add_text_encoder_4_embeddings_to_prompt(text),
+                padding='max_length',
+                truncation=True,
+                max_length=77,
+                return_tensors="pt",
+            )
+            tokens_4 = tokenizer_output.input_ids.to(self.text_encoder_4.device)
+            tokens_mask_4 = tokenizer_output.attention_mask.to(self.text_encoder_4.device)
+
+        _, pooled_text_encoder_1_output = encode_clip(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
-            default_layer=-2,
-            layer_skip=text_encoder_1_layer_skip,
-            text_encoder_output=text_encoder_1_output,
+            add_output=False,
             add_pooled_output=True,
             pooled_text_encoder_output=pooled_text_encoder_1_output,
-            use_attention_mask=False,
             add_layer_norm=False,
         )
-        if text_encoder_1_output is None or pooled_text_encoder_1_output is None:
+        if pooled_text_encoder_1_output is None:
             pooled_text_encoder_1_output = torch.zeros(
                 size=(batch_size, 768),
                 device=train_device,
                 dtype=self.train_dtype.torch_dtype(),
             )
-            text_encoder_1_output = torch.zeros(
-                size=(batch_size, 77, 768),
-                device=train_device,
-                dtype=self.train_dtype.torch_dtype(),
-            )
-            tokens_mask_1 = torch.zeros(
-                size=(batch_size, 1),
-                device=train_device,
-                dtype=self.train_dtype.torch_dtype(),
-            )
 
-        text_encoder_2_output, pooled_text_encoder_2_output = encode_clip(
+        _, pooled_text_encoder_2_output = encode_clip(
             text_encoder=self.text_encoder_2,
             tokens=tokens_2,
-            default_layer=-2,
-            layer_skip=text_encoder_2_layer_skip,
-            text_encoder_output=text_encoder_2_output,
+            add_output=False,
             add_pooled_output=True,
             pooled_text_encoder_output=pooled_text_encoder_2_output,
-            use_attention_mask=False,
             add_layer_norm=False,
         )
-        if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
+        if pooled_text_encoder_2_output is None:
             pooled_text_encoder_2_output = torch.zeros(
                 size=(batch_size, 1280),
-                device=train_device,
-                dtype=self.train_dtype.torch_dtype(),
-            )
-            text_encoder_2_output = torch.zeros(
-                size=(batch_size, 77, 1280),
-                device=train_device,
-                dtype=self.train_dtype.torch_dtype(),
-            )
-            tokens_mask_2 = torch.zeros(
-                size=(batch_size, 1),
                 device=train_device,
                 dtype=self.train_dtype.torch_dtype(),
             )
@@ -405,6 +387,7 @@ class HiDreamModel(BaseModel):
                 text_encoder_output=text_encoder_3_output,
                 use_attention_mask=False,
                 attention_mask=tokens_mask_3,
+                add_layer_norm=False,
             )
             if text_encoder_3_output is None:
                 text_encoder_3_output = torch.zeros(
@@ -418,24 +401,18 @@ class HiDreamModel(BaseModel):
                     dtype=self.train_dtype.torch_dtype(),
                 )
 
+        text_encoder_4_output = self.text_encoder_4(
+            tokens_4,
+            attention_mask=tokens_mask_4,
+            output_hidden_states=True,
+            output_attentions=True,
+        )
+        text_encoder_4_output = text_encoder_4_output.hidden_states[1:]
+        text_encoder_4_output = torch.stack(text_encoder_4_output, dim=0)
+
         if apply_attention_mask:
-            text_encoder_1_output = text_encoder_1_output * tokens_mask_1[:, :, None]
-            text_encoder_2_output = text_encoder_2_output * tokens_mask_2[:, :, None]
             text_encoder_3_output = text_encoder_3_output * tokens_mask_3[:, :, None]
-
-        text_encoder_1_output = self._apply_output_embeddings(
-            self.all_text_encoder_1_embeddings(),
-            self.tokenizer_1,
-            tokens_1,
-            text_encoder_1_output,
-        )
-
-        text_encoder_2_output = self._apply_output_embeddings(
-            self.all_text_encoder_2_embeddings(),
-            self.tokenizer_2,
-            tokens_2,
-            text_encoder_2_output,
-        )
+            # text_encoder_4_output = text_encoder_4_output * tokens_mask_4[:, :, None]
 
         text_encoder_3_output = self._apply_output_embeddings(
             self.all_text_encoder_3_embeddings(),
@@ -444,19 +421,24 @@ class HiDreamModel(BaseModel):
             text_encoder_3_output,
         )
 
+        # text_encoder_4_output = self._apply_output_embeddings(
+        #     self.all_text_encoder_4_embeddings(),
+        #     self.tokenizer_4,
+        #     tokens_4,
+        #     text_encoder_4_output,
+        # )
+
         # apply dropout
         if text_encoder_1_dropout_probability is not None:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
             pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
         if text_encoder_2_dropout_probability is not None:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
             pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
 
         if text_encoder_3_dropout_probability is not None:
@@ -465,27 +447,24 @@ class HiDreamModel(BaseModel):
                 device=train_device)).float()
             text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
 
-        text_encoder_4_output = None # TODO
+        if text_encoder_4_dropout_probability is not None:
+            dropout_text_encoder_4_mask = (torch.tensor(
+                [rand.random() > text_encoder_4_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
+            text_encoder_3_output = text_encoder_4_output * dropout_text_encoder_4_mask[:, None, None]
 
         return pooled_text_encoder_1_output, pooled_text_encoder_2_output, text_encoder_3_output, text_encoder_4_output
 
     def combine_text_encoder_output(
             self,
-            text_encoder_1_output: Tensor,
-            text_encoder_2_output: Tensor,
-            text_encoder_3_output: Tensor,
             pooled_text_encoder_1_output: Tensor,
             pooled_text_encoder_2_output: Tensor,
-    ) -> tuple[Tensor, Tensor]:
-        prompt_embedding = torch.concat(
-            [text_encoder_1_output, text_encoder_2_output], dim=-1
-        )
-        prompt_embedding = torch.nn.functional.pad(
-            prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
-        )
-        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2) \
-            .to(dtype=self.train_dtype.torch_dtype())
-        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
+            text_encoder_3_output: Tensor,
+            text_encoder_4_output: Tensor,
+    ) -> tuple[Tensor, Tensor, Tensor]:
+        text_encoder_3_output = text_encoder_3_output.to(dtype=self.text_encoder_3_train_dtype.torch_dtype())
+        text_encoder_4_output = text_encoder_4_output.to(dtype=self.train_dtype.torch_dtype())
+        pooled_text_encoder_output = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
             .to(dtype=self.train_dtype.torch_dtype())
 
-        return prompt_embedding, pooled_prompt_embedding
+        return text_encoder_3_output, text_encoder_4_output, pooled_text_encoder_output

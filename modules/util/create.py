@@ -44,6 +44,7 @@ from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTune
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.FluxSampler import FluxSampler
+from modules.modelSampler.HiDreamSampler import HiDreamSampler
 from modules.modelSampler.HunyuanVideoSampler import HunyuanVideoSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
 from modules.modelSampler.SanaSampler import SanaSampler
@@ -366,6 +367,8 @@ def create_model_sampler(
                 return SanaSampler(train_device, temp_device, model, model_type)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoSampler(train_device, temp_device, model, model_type)
+            if model_type.is_hi_dream():
+                return HiDreamSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
