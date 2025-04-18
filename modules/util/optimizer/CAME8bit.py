@@ -32,7 +32,7 @@ class CAME8bit(torch.optim.Optimizer):
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
         stochastic_rounding: utilize stochastic rounding with BF16 on non-8bit params (default: False)
         min_8bit_size (int) The minimum size of a tensor before it is eligible to be quantized (default: 16384)
-        quant_block_size (int) The amount of values to quantize into a single block (default: 2000)
+        quant_block_size (int) The amount of values to quantize into a single block (default: 2048)
     """
 
     def __init__(
@@ -102,12 +102,15 @@ class CAME8bit(torch.optim.Optimizer):
         # are to each other, the higher precisision our data is. The value of
         # `quant_block_size` should balance space-savings and data precision.
 
+        if params.numel() <= 1:
+            return params
+
         data_chunk_list = params.split(quant_block_size)
         quantized_values: list = [None] * len(data_chunk_list)
         for index, data_chunk in enumerate(data_chunk_list, start=0):
             max_value = data_chunk.max()
             min_value = data_chunk.min()
-            normalize_scale = (max_value - min_value) / 255
+            normalize_scale = (max_value - min_value) / 255.0
 
             values = ((data_chunk - min_value) / normalize_scale).round().byte()
 
