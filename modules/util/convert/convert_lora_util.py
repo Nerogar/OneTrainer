@@ -44,6 +44,34 @@ class LoraConversionKeySet:
             self.next_diffusers_prefix = parent.diffusers_prefix
             self.next_legacy_diffusers_prefix = parent.next_legacy_diffusers_prefix
 
+    def __get_omi(self, in_prefix: str, key: str) -> str:
+        return self.omi_prefix + key.removeprefix(in_prefix)
+
+    def __get_diffusers(self, in_prefix: str, key: str) -> str:
+        return self.diffusers_prefix + key.removeprefix(in_prefix)
+
+    def __get_legacy_diffusers(self, in_prefix: str, key: str) -> str:
+        key = self.legacy_diffusers_prefix + key.removeprefix(in_prefix)
+
+        suffix = key[key.rfind('.'):]
+        if suffix != '.alpha':  # .alpha is the only key with a single . in the suffix
+            suffix = key[key.removesuffix(suffix).rfind('.'):]
+        key = key.removesuffix(suffix)
+
+        return key.replace('.', '_') + suffix
+
+    def get_key(self, in_prefix: str, key: str, target: str) -> str:
+        if target == 'omi':
+            return self.__get_omi(in_prefix, key)
+        elif target == 'diffusers':
+            return self.__get_diffusers(in_prefix, key)
+        elif target == 'legacy_diffusers':
+            return self.__get_legacy_diffusers(in_prefix, key)
+        return key
+
+    def __str__(self) -> str:
+        return f"omi: {self.omi_prefix}, diffusers: {self.diffusers_prefix}, legacy: {self.legacy_diffusers_prefix}"
+
 
 def combine(left: str, right: str) -> str:
     if left == "":
@@ -84,7 +112,6 @@ def __convert(
     for key, tensor in state_dict.items():
         for key_set in key_sets:
             in_prefix = ''
-            out_prefix = ''
 
             if source == 'omi':
                 in_prefix = key_set.omi_prefix
@@ -92,13 +119,6 @@ def __convert(
                 in_prefix = key_set.diffusers_prefix
             elif source == 'legacy_diffusers':
                 in_prefix = key_set.legacy_diffusers_prefix
-
-            if target == 'omi':
-                out_prefix = key_set.omi_prefix
-            elif target == 'diffusers':
-                out_prefix = key_set.diffusers_prefix
-            elif target == 'legacy_diffusers':
-                out_prefix = key_set.legacy_diffusers_prefix
 
             if not key.startswith(in_prefix):
                 continue
@@ -116,14 +136,14 @@ def __convert(
                 if key_set.filter_is_last != is_last:
                     continue
 
-            name = key.removeprefix(in_prefix)
+            name = key_set.get_key(in_prefix, key, target)
 
             can_swap_chunks = target == 'omi' or source == 'omi'
             if key_set.swap_chunks and name.endswith('.lora_up.weight') and can_swap_chunks:
                 chunk_0, chunk_1 = tensor.chunk(2, dim=0)
                 tensor = torch.cat([chunk_1, chunk_0], dim=0)
 
-            out_states[out_prefix + name] = tensor
+            out_states[name] = tensor
 
             break  # only map the first matching key set
 
