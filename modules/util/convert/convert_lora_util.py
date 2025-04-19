@@ -54,7 +54,7 @@ class LoraConversionKeySet:
         key = self.legacy_diffusers_prefix + key.removeprefix(in_prefix)
 
         suffix = key[key.rfind('.'):]
-        if suffix != '.alpha':  # .alpha is the only key with a single . in the suffix
+        if suffix not in ['.alpha', '.dora_scale']:  # some keys only have a single . in the suffix
             suffix = key[key.removesuffix(suffix).rfind('.'):]
         key = key.removesuffix(suffix)
 
