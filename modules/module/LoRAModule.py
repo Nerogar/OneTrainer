@@ -122,7 +122,7 @@ class PeftBase(nn.Module):
     def extract_from_module(self, base_module: nn.Module):
         pass
 
-    def create_layer(self) -> tuple[nn.Module, nn.Module]:
+    def create_layer(self, device: torch.device) -> tuple[nn.Module, nn.Module]:
         """Generic helper function for creating a PEFT layer, like LoRA.
 
         Creates down/up layer modules for the given layer type in the
@@ -131,7 +131,6 @@ class PeftBase(nn.Module):
         Does not perform initialization, as that usually depends on the PEFT
         method.
         """
-        device = self.orig_module.weight.device
         match self.orig_module:
             case nn.Linear():
                 in_features = self.orig_module.in_features
@@ -221,35 +220,34 @@ class LoHaModule(PeftBase):
     hada_w2_a: Tensor | None
     hada_w2_b: Tensor | None
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, device: torch.device, generator: torch.Generator):
         super().__init__(prefix, orig_module)
         self.rank = rank
         self.dropout = Dropout(0)
-        self.register_buffer("alpha", torch.tensor(alpha))
+        self.register_buffer("alpha", torch.tensor(alpha, device=device))
         self.hada_w1_a = None
         self.hada_w1_b = None
         self.hada_w2_a = None
         self.hada_w2_b = None
 
         if orig_module is not None:
-            self.initialize_weights()
-            self.alpha = self.alpha.to(orig_module.weight.device)
+            self.initialize_weights(device, generator)
         self.alpha.requires_grad_(False)
 
-    def initialize_weights(self):
+    def initialize_weights(self, device: torch.device, generator: torch.Generator):
         self._initialized = True
 
-        hada_w1_b, hada_w1_a = self.create_layer()
-        hada_w2_b, hada_w2_a = self.create_layer()
+        hada_w1_b, hada_w1_a = self.create_layer(device=device)
+        hada_w2_b, hada_w2_a = self.create_layer(device=device)
         self.hada_w1_a = hada_w1_a.weight
         self.hada_w1_b = hada_w1_b.weight
         self.hada_w2_a = hada_w2_a.weight
         self.hada_w2_b = hada_w2_b.weight
 
-        nn.init.normal_(self.hada_w1_a, std=0.1)
-        nn.init.normal_(self.hada_w1_b, std=1)
+        nn.init.normal_(self.hada_w1_a, std=0.1, generator=generator)
+        nn.init.normal_(self.hada_w1_b, std=1, generator=generator)
         nn.init.constant_(self.hada_w2_a, 0)
-        nn.init.normal_(self.hada_w2_b, std=1)
+        nn.init.normal_(self.hada_w2_b, std=1, generator=generator)
 
     def check_initialized(self):
         super().check_initialized()
@@ -291,24 +289,23 @@ class LoRAModule(PeftBase):
     # optional members. This is because these members might not exist at
     # construction, but definitely exist by the time those methods are called.
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, device: torch.device, generator: torch.Generator):
         super().__init__(prefix, orig_module)
 
         self.rank = rank
         self.dropout = Dropout(0)
-        self.register_buffer("alpha", torch.tensor(alpha))
+        self.register_buffer("alpha", torch.tensor(alpha, device=device))
         self.lora_down = None
         self.lora_up = None
 
         if orig_module is not None:
-            self.initialize_weights()
-            self.alpha = self.alpha.to(orig_module.weight.device)
+            self.initialize_weights(device, generator)
         self.alpha.requires_grad_(False)
 
-    def initialize_weights(self):
+    def initialize_weights(self, device: torch.device, generator: torch.Generator):
         self._initialized = True
-        self.lora_down, self.lora_up = self.create_layer()
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
+        self.lora_down, self.lora_up = self.create_layer(device=device)
+        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5), generator=generator)
         nn.init.zeros_(self.lora_up.weight)
 
     def check_initialized(self):
@@ -344,13 +341,13 @@ class DoRAModule(LoRAModule):
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
         self.norm_epsilon = kwargs.pop('norm_epsilon', False)
-        self.train_device = kwargs.pop('train_device')
+        self.train_device = kwargs.get('device')
         super().__init__(*args, **kwargs)
 
-    def initialize_weights(self):
-        super().initialize_weights()
+    def initialize_weights(self, device: torch.device, generator: torch.Generator):
+        super().initialize_weights(device, generator)
 
-        orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        orig_weight = get_unquantized_weight(self.orig_module, torch.float, device)
 
         # Thanks to KohakuBlueLeaf once again for figuring out the shape
         # wrangling that works for both Linear and Convolutional layers. If you
@@ -362,7 +359,7 @@ class DoRAModule(LoRAModule):
                 dim=1, keepdim=True)
             .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
             .transpose(1, 0)
-            .to(device=self.orig_module.weight.device)
+            .to(device=device)
         )
 
         del orig_weight
@@ -434,7 +431,6 @@ class LoRAModuleWrapper:
                 self.additional_args = [self.rank, self.alpha]
                 self.additional_kwargs = {
                     'norm_epsilon': config.lora_decompose_norm_epsilon,
-                    'train_device': torch.device(config.train_device),
                 }
             else:
                 self.klass = LoRAModule
@@ -447,16 +443,19 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
 
-        self.lora_modules = self.__create_modules(orig_module)
+        self.lora_modules = self.__create_modules(orig_module, device=torch.device(config.train_device))
 
-    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, PeftBase]:
+    def __create_modules(self, orig_module: nn.Module | None, device: torch.device) -> dict[str, PeftBase]:
         lora_modules = {}
+
+        generator = torch.Generator(device=device)
+        generator.manual_seed(0)
 
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
                     if isinstance(child_module, Linear | Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                        lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs, device=device, generator=generator)
 
         return lora_modules
 
