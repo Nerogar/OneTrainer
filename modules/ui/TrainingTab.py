@@ -183,7 +183,7 @@ class TrainingTab:
         self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 3, i=3, supports_include=True)
-        self.__create_text_encoder_n_frame(column_0, 4, i=4, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 4, i=4, supports_include=True, supports_layer_skip=False)
         self.__create_embedding_frame(column_0, 5)
 
         self.__create_base2_frame(column_1, 0, video_training_enabled=True)
@@ -377,7 +377,14 @@ class TrainingTab:
                          tooltip="The number of additional clip layers to skip. 0 = the model default")
         components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
 
-    def __create_text_encoder_n_frame(self, master, row, i: int, supports_include: bool = False):
+    def __create_text_encoder_n_frame(
+            self,
+            master,
+            row: int,
+            i: int,
+            supports_include: bool = False,
+            supports_layer_skip: bool = True,
+    ):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -423,11 +430,12 @@ class TrainingTab:
         components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}.learning_rate")
         row += 1
 
-        # text encoder layer skip (clip skip)
-        components.label(frame, row, 0, f"Text Encoder {i} Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
-        components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_layer_skip")
-        row += 1
+        if supports_layer_skip:
+            # text encoder layer skip (clip skip)
+            components.label(frame, row, 0, f"Text Encoder {i} Clip Skip",
+                             tooltip="The number of additional clip layers to skip. 0 = the model default")
+            components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_layer_skip")
+            row += 1
 
     def __create_embedding_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

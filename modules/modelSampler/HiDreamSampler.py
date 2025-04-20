@@ -59,7 +59,6 @@ class HiDreamSampler(BaseModelSampler):
             noise_scheduler: NoiseScheduler,
             cfg_rescale: float = 0.7,
             text_encoder_3_layer_skip: int = 0,
-            text_encoder_4_layer_skip: int = 0,
             force_last_timestep: bool = False,
             prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
@@ -87,7 +86,6 @@ class HiDreamSampler(BaseModelSampler):
                         text=prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                        text_encoder_4_layer_skip=text_encoder_4_layer_skip,
                         apply_attention_mask=prior_attention_mask,
                     ))
 
@@ -97,7 +95,6 @@ class HiDreamSampler(BaseModelSampler):
                         text=negative_prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                        text_encoder_4_layer_skip=text_encoder_4_layer_skip,
                         apply_attention_mask=prior_attention_mask,
                     ))
 
@@ -143,18 +140,19 @@ class HiDreamSampler(BaseModelSampler):
                 latent_model_input = torch.cat([latent_image] * 2)
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
 
-                # predict the noise residual
-                noise_pred = transformer(
-                    hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
-                    timesteps=expanded_timestep,
-                    encoder_hidden_states_t5=combined_text_encoder_3_prompt_embedding \
-                        .to(dtype=self.model.train_dtype.torch_dtype()),
-                    encoder_hidden_states_llama3=combined_text_encoder_4_prompt_embedding \
-                        .to(dtype=self.model.train_dtype.torch_dtype()),
-                    pooled_embeds=combined_pooled_prompt_embedding \
-                        .to(dtype=self.model.train_dtype.torch_dtype()),
-                    return_dict=False # TODO: pass true, then use .sample from the output
-                )[0]
+                with self.model.transformer_autocast_context:
+                    # predict the noise residual
+                    noise_pred = transformer(
+                        hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
+                        timesteps=expanded_timestep,
+                        encoder_hidden_states_t5=combined_text_encoder_3_prompt_embedding \
+                            .to(dtype=self.model.train_dtype.torch_dtype()),
+                        encoder_hidden_states_llama3=combined_text_encoder_4_prompt_embedding \
+                            .to(dtype=self.model.train_dtype.torch_dtype()),
+                        pooled_embeds=combined_pooled_prompt_embedding \
+                            .to(dtype=self.model.train_dtype.torch_dtype()),
+                        return_dict=True
+                    ).sample
                 noise_pred = -noise_pred
 
                 # cfg
@@ -219,7 +217,6 @@ class HiDreamSampler(BaseModelSampler):
             noise_scheduler=sample_config.noise_scheduler,
             cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
             text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
-            text_encoder_4_layer_skip=sample_config.text_encoder_4_layer_skip,
             force_last_timestep=sample_config.force_last_timestep,
             prior_attention_mask=sample_config.prior_attention_mask,
             on_update_progress=on_update_progress,

@@ -92,8 +92,10 @@ class HiDreamModel(BaseModel):
 
     # autocast context
     text_encoder_3_autocast_context: torch.autocast | nullcontext
+    transformer_autocast_context: torch.autocast | nullcontext
 
     text_encoder_3_train_dtype: DataType
+    transformer_train_dtype: DataType
 
     text_encoder_3_offload_conductor: LayerOffloadConductor | None
     text_encoder_4_offload_conductor: LayerOffloadConductor | None
@@ -141,8 +143,10 @@ class HiDreamModel(BaseModel):
         self.orig_tokenizer_4 = None
 
         self.text_encoder_3_autocast_context = nullcontext()
+        self.transformer_autocast_context = nullcontext()
 
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
+        self.transformer_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_3_offload_conductor = None
         self.text_encoder_4_offload_conductor = None
@@ -294,7 +298,6 @@ class HiDreamModel(BaseModel):
             tokens_mask_3: Tensor = None,
             tokens_mask_4: Tensor = None,
             text_encoder_3_layer_skip: int = 0,
-            text_encoder_4_layer_skip: int = 0,
             text_encoder_1_dropout_probability: float | None = None,
             text_encoder_2_dropout_probability: float | None = None,
             text_encoder_3_dropout_probability: float | None = None,
@@ -408,11 +411,10 @@ class HiDreamModel(BaseModel):
             output_attentions=True,
         )
         text_encoder_4_output = text_encoder_4_output.hidden_states[1:]
-        text_encoder_4_output = torch.stack(text_encoder_4_output, dim=0)
 
         if apply_attention_mask:
             text_encoder_3_output = text_encoder_3_output * tokens_mask_3[:, :, None]
-            # text_encoder_4_output = text_encoder_4_output * tokens_mask_4[:, :, None]
+            text_encoder_4_output = [t  * tokens_mask_4[:, :, None] for t in text_encoder_4_output]
 
         text_encoder_3_output = self._apply_output_embeddings(
             self.all_text_encoder_3_embeddings(),
@@ -421,6 +423,7 @@ class HiDreamModel(BaseModel):
             text_encoder_3_output,
         )
 
+        # TODO: think about a solution for output embeddings for this
         # text_encoder_4_output = self._apply_output_embeddings(
         #     self.all_text_encoder_4_embeddings(),
         #     self.tokenizer_4,
@@ -447,11 +450,12 @@ class HiDreamModel(BaseModel):
                 device=train_device)).float()
             text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
 
+        text_encoder_4_output = torch.stack(text_encoder_4_output, dim=0)
         if text_encoder_4_dropout_probability is not None:
             dropout_text_encoder_4_mask = (torch.tensor(
                 [rand.random() > text_encoder_4_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
-            text_encoder_3_output = text_encoder_4_output * dropout_text_encoder_4_mask[:, None, None]
+            text_encoder_4_output = text_encoder_4_output * dropout_text_encoder_4_mask[:, None, None]
 
         return pooled_text_encoder_1_output, pooled_text_encoder_2_output, text_encoder_3_output, text_encoder_4_output
 
@@ -462,9 +466,5 @@ class HiDreamModel(BaseModel):
             text_encoder_3_output: Tensor,
             text_encoder_4_output: Tensor,
     ) -> tuple[Tensor, Tensor, Tensor]:
-        text_encoder_3_output = text_encoder_3_output.to(dtype=self.text_encoder_3_train_dtype.torch_dtype())
-        text_encoder_4_output = text_encoder_4_output.to(dtype=self.train_dtype.torch_dtype())
-        pooled_text_encoder_output = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
-            .to(dtype=self.train_dtype.torch_dtype())
-
+        pooled_text_encoder_output = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
         return text_encoder_3_output, text_encoder_4_output, pooled_text_encoder_output
