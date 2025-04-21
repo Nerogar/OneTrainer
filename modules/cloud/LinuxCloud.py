@@ -46,6 +46,7 @@ class LinuxCloud(BaseCloud):
         try:
             self.connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
             self.connection.open()
+            self.connection.transport.set_keepalive(30)
 
             self.callback_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
 

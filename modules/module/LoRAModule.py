@@ -26,7 +26,7 @@ class PeftBase(nn.Module):
 
     def __init__(self, prefix: str, orig_module: nn.Module | None):
         super().__init__()
-        self.prefix = prefix.replace('.', '_') + '.'
+        self.prefix = prefix + '.'
         self._orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = {}
@@ -456,7 +456,7 @@ class LoRAModuleWrapper:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
                     if isinstance(child_module, Linear | Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
+                        lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
 
         return lora_modules
 

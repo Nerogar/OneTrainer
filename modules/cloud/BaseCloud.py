@@ -19,7 +19,7 @@ class BaseCloud(metaclass=ABCMeta):
     def setup(self):
         self._connect()
 
-        if self.config.cloud.install_onetrainer or self.config.cloud.update_onetrainer:
+        if (self.config.cloud.install_onetrainer or self.config.cloud.update_onetrainer) and not self.can_reattach():
             self._install_onetrainer(update=self.config.cloud.update_onetrainer)
 
         if self.config.cloud.tensorboard_tunnel:

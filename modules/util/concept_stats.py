@@ -1,18 +1,13 @@
-from util.import_util import script_imports
-
-script_imports()
-
 import os
-import time
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.image_util import load_image
 
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
 
 import cv2
 import imagesize
-from PIL import Image
 
 
 def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
@@ -126,7 +121,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                     if width == -1:     #if imagesize doesn't recognize format it returns (-1, -1)
                         raise ValueError
                 except ValueError:     #use PIL if not supported by imagesize
-                    img = Image.open(path)
+                    img = load_image(path.path)
                     width, height = img.size
                     img.close()
                 pixels = width*height
@@ -158,9 +153,9 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                             char_count = len(caption)
                             word_count = len(caption.split())
                             if char_count > stats_dict["max_caption_length"][0]:
-                                stats_dict["max_caption_length"] = [char_count, os.path.relpath(path, dir), word_count]
+                                stats_dict["max_caption_length"] = [char_count, os.path.relpath(path, conceptconfig.path), word_count]
                             if char_count < stats_dict["min_caption_length"][0]:
-                                stats_dict["min_caption_length"] = [char_count, os.path.relpath(path, dir), word_count]
+                                stats_dict["min_caption_length"] = [char_count, os.path.relpath(path, conceptconfig.path), word_count]
                             stats_dict["avg_caption_length"][0] += (char_count - stats_dict["avg_caption_length"][0])/(stats_dict["image_count"] + stats_dict["video_count"])
                             stats_dict["avg_caption_length"][1] += (word_count - stats_dict["avg_caption_length"][1])/(stats_dict["image_count"] + stats_dict["video_count"])
 
@@ -177,21 +172,21 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 stats_dict["aspect_buckets"][nearest_aspect] += 1
 
                 if pixels > stats_dict["max_pixels"][0]:
-                    stats_dict["max_pixels"] = [pixels, os.path.relpath(path, dir), f'{width}w x {height}h']
+                    stats_dict["max_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}w x {height}h']
                 if pixels < stats_dict["min_pixels"][0]:
-                    stats_dict["min_pixels"] = [pixels, os.path.relpath(path, dir), f'{width}w x {height}h']
+                    stats_dict["min_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}w x {height}h']
                 stats_dict["avg_pixels"] += (pixels - stats_dict["avg_pixels"])/(stats_dict["image_count"] + stats_dict["video_count"])
 
                 if length > stats_dict["max_length"][0]:
-                    stats_dict["max_length"] = [length, os.path.relpath(path, dir)]
+                    stats_dict["max_length"] = [length, os.path.relpath(path, conceptconfig.path)]
                 if length < stats_dict["min_length"][0]:
-                    stats_dict["min_length"] = [length, os.path.relpath(path, dir)]
+                    stats_dict["min_length"] = [length, os.path.relpath(path, conceptconfig.path)]
                 stats_dict["avg_length"] += (length - stats_dict["avg_length"])/stats_dict["video_count"]
 
                 if fps > stats_dict["max_fps"][0]:
-                    stats_dict["max_fps"] = [fps, os.path.relpath(path, dir)]
+                    stats_dict["max_fps"] = [fps, os.path.relpath(path, conceptconfig.path)]
                 if fps < stats_dict["min_fps"][0]:
-                    stats_dict["min_fps"] = [fps, os.path.relpath(path, dir)]
+                    stats_dict["min_fps"] = [fps, os.path.relpath(path, conceptconfig.path)]
                 stats_dict["avg_fps"] += (fps - stats_dict["avg_fps"])/stats_dict["video_count"]
 
         elif path.name.endswith("-masklabel.png"):
@@ -207,22 +202,5 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
         #check for number of "orphaned" mask/caption files as the difference between the total count and the count of image/mask or image/caption pairs
         stats_dict["unpaired_masks"] = stats_dict["mask_count"]-stats_dict["paired_masks"]
         stats_dict["unpaired_captions"] = stats_dict["caption_count"]-stats_dict["paired_captions"]
-
-    return stats_dict
-
-#loop through all subfolders of top-level path
-def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, waittime : float):
-    stats_dict = init_concept_stats(conceptconfig, advanced_checks)
-    start_time = time.perf_counter()
-    subfolders = [conceptconfig.path]
-    for dir in subfolders:
-        stats_dict = folder_scan(dir, stats_dict, advanced_checks)
-        stats_dict["processing_time"] = time.perf_counter() - start_time
-        subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
-
-        if (time.perf_counter() - start_time) > waittime:
-            stats_dict = init_concept_stats(conceptconfig, advanced_checks)
-            stats_dict["processing_time"] = time.perf_counter() - start_time
-            return stats_dict
 
     return stats_dict

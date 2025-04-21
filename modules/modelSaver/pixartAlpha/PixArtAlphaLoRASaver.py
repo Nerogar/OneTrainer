@@ -1,23 +1,24 @@
-import os.path
-from pathlib import Path
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
-from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
+from modules.util.convert.convert_lora_util import LoraConversionKeySet
+from modules.util.convert.lora.convert_pixart_lora import convert_pixart_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
 
-from safetensors.torch import save_file
-
 
 class PixArtAlphaLoRASaver(
-    DtypeModelSaverMixin,
+    LoRASaverMixin,
 ):
     def __init__(self):
         super().__init__()
 
-    def __get_state_dict(
+    def _get_convert_key_sets(self, model: PixArtAlphaModel) -> list[LoraConversionKeySet] | None:
+        return convert_pixart_lora_key_sets()
+
+    def _get_state_dict(
             self,
             model: PixArtAlphaModel,
     ) -> dict[str, Tensor]:
@@ -40,52 +41,11 @@ class PixArtAlphaLoRASaver(
 
         return state_dict
 
-    def __save_ckpt(
-            self,
-            model: PixArtAlphaModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
-
-    def __save_safetensors(
-            self,
-            model: PixArtAlphaModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
-
-    def __save_internal(
-            self,
-            model: PixArtAlphaModel,
-            destination: str,
-    ):
-        os.makedirs(destination, exist_ok=True)
-
-        self.__save_safetensors(model, os.path.join(destination, "lora", "lora.safetensors"), None)
-
     def save(
             self,
             model: PixArtAlphaModel,
             output_model_format: ModelFormat,
             output_model_destination: str,
-            dtype: torch.dtype,
+            dtype: torch.dtype | None,
     ):
-        match output_model_format:
-            case ModelFormat.DIFFUSERS:
-                raise NotImplementedError
-            case ModelFormat.CKPT:
-                self.__save_ckpt(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
-                self.__save_safetensors(model, output_model_destination, dtype)
-            case ModelFormat.INTERNAL:
-                self.__save_internal(model, output_model_destination)
+        self._save(model, output_model_format, output_model_destination, dtype)

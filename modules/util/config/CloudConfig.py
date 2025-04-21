@@ -8,7 +8,6 @@ from modules.util.enum.CloudType import CloudType
 
 class CloudSecretsConfig(BaseConfig):
     api_key: str
-    jupyter_password: str
     host: str
     port: int
     user: str
@@ -23,7 +22,6 @@ class CloudSecretsConfig(BaseConfig):
 
         data.append(("api_key", "", str, False))
         data.append(("id", "", str, False))
-        data.append(("jupyter_password", "", str, False))
         data.append(("host", "", str, False))
         data.append(("port", 0, str, False))
         data.append(("user", "root", str, False))

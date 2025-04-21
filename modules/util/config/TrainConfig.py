@@ -94,6 +94,19 @@ class TrainOptimizerConfig(BaseConfig):
     adam_debias: bool
     slice_p: int
     cautious: bool
+    weight_decay_by_lr: True
+    prodigy_steps: 0
+    use_speed: False
+    split_groups: True
+    split_groups_mean: True
+    factored: True
+    factored_fp32: True
+    use_stableadamw: True
+    use_muon_pp: False
+    use_cautious: False
+    use_grams: False
+    use_adopt: False
+    use_focus: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -164,6 +177,19 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("adam_debias", False, bool, False))
         data.append(("slice_p", None, int, True))
         data.append(("cautious", False, bool, False))
+        data.append(("weight_decay_by_lr", True, bool, False))
+        data.append(("prodigy_steps", None, int, True))
+        data.append(("use_speed", False, bool, False))
+        data.append(("split_groups", True, bool, False))
+        data.append(("split_groups_mean", True, bool, False))
+        data.append(("factored", True, bool, False))
+        data.append(("factored_fp32", True, bool, False))
+        data.append(("use_stableadamw", True, bool, False))
+        data.append(("use_muon_pp", False, bool, False))
+        data.append(("use_cautious", False, bool, False))
+        data.append(("use_grams", False, bool, False))
+        data.append(("use_adopt", False, bool, False))
+        data.append(("use_focus", False, bool, False))
 
         return TrainOptimizerConfig(data)
 

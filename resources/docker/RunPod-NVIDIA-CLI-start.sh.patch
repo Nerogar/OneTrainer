@@ -1,0 +1,8 @@
+83a84,88
+> link_onetrainer() {
+>     if [[ ! -f /workspace/OneTrainer ]]; then
+>         ln -snf /OneTrainer /workspace/OneTrainer
+>     fi
+> }
+93a100
+> link_onetrainer
