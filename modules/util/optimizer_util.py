@@ -271,7 +271,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fsdp_in_use": False,
         "slice_p": 11,
     },
-        Optimizer.PRODIGY_PLUS_SCHEDULE_FREE: {
+    Optimizer.PRODIGY_PLUS_SCHEDULE_FREE: {
         "beta1": 0.9,
         "beta2": 0.99,
         "beta3": None,
