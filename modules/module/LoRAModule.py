@@ -111,7 +111,7 @@ class PeftBase(nn.Module):
         return super().load_state_dict(state_dict, strict, assign)
 
     @abstractmethod
-    def initialize_weights(self):
+    def initialize_weights(self, device: torch.device, generator: torch.Generator):
         pass
 
     @abstractmethod
@@ -187,7 +187,7 @@ class PeftBase(nn.Module):
                     raise RuntimeError("A state dict must be loaded before one can be returned.")
                 return self._state_dict
 
-            def initialize_weights(self):
+            def initialize_weights(self, device: torch.device, generator: torch.Generator):
                 raise NotImplementedError("Should never be called on a dummy module.")
 
             def hook_to_module(self):
@@ -220,7 +220,15 @@ class LoHaModule(PeftBase):
     hada_w2_a: Tensor | None
     hada_w2_b: Tensor | None
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, device: torch.device, generator: torch.Generator):
+    def __init__(
+            self,
+            prefix: str,
+            orig_module: nn.Module | None,
+            rank: int,
+            alpha: float,
+            device: torch.device,
+            generator: torch.Generator,
+    ):
         super().__init__(prefix, orig_module)
         self.rank = rank
         self.dropout = Dropout(0)
@@ -289,7 +297,15 @@ class LoRAModule(PeftBase):
     # optional members. This is because these members might not exist at
     # construction, but definitely exist by the time those methods are called.
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, device: torch.device, generator: torch.Generator):
+    def __init__(
+            self,
+            prefix: str,
+            orig_module: nn.Module | None,
+            rank: int,
+            alpha: float,
+            device: torch.device,
+            generator: torch.Generator,
+    ):
         super().__init__(prefix, orig_module)
 
         self.rank = rank
@@ -455,7 +471,8 @@ class LoRAModuleWrapper:
             for name, child_module in orig_module.named_modules():
                 if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
                     if isinstance(child_module, Linear | Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs, device=device, generator=generator)
+                        lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args,
+                                                        **self.additional_kwargs, device=device, generator=generator)
 
         return lora_modules
 
