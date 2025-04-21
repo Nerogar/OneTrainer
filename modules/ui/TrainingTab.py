@@ -187,7 +187,7 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 5)
 
         self.__create_base2_frame(column_1, 0, video_training_enabled=True)
-        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
+        self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)

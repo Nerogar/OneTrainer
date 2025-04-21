@@ -20,7 +20,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             source_tensor: Tensor,
             config: TrainConfig,
             generator: Generator
-    ):
+    ) -> Tensor:
         noise = torch.randn(
             source_tensor.shape,
             generator=generator,

@@ -404,13 +404,14 @@ class HiDreamModel(BaseModel):
                     dtype=self.train_dtype.torch_dtype(),
                 )
 
-        text_encoder_4_output = self.text_encoder_4(
-            tokens_4,
-            attention_mask=tokens_mask_4,
-            output_hidden_states=True,
-            output_attentions=True,
-        )
-        text_encoder_4_output = text_encoder_4_output.hidden_states[1:]
+        if text_encoder_4_output is None and tokens_4 is not None:
+            text_encoder_4_output = self.text_encoder_4(
+                tokens_4,
+                attention_mask=tokens_mask_4,
+                output_hidden_states=True,
+                output_attentions=True,
+            )
+            text_encoder_4_output = text_encoder_4_output.hidden_states[1:]
 
         if apply_attention_mask:
             text_encoder_3_output = text_encoder_3_output * tokens_mask_3[:, :, None]
@@ -468,3 +469,50 @@ class HiDreamModel(BaseModel):
     ) -> tuple[Tensor, Tensor, Tensor]:
         pooled_text_encoder_output = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
         return text_encoder_3_output, text_encoder_4_output, pooled_text_encoder_output
+
+    def prepare_latent_image_ids(
+            self,
+            batch_size: int,
+            height: int,
+            width: int,
+            device: torch.device,
+            dtype: torch.dtype,
+    ) -> tuple[Tensor, Tensor, Tensor]:
+        latents_mask = torch.ones(size=(batch_size, (height // 2) * (width // 2)), device=device, dtype=dtype)
+
+        img_sizes = torch.tensor([height // 2, width // 2], dtype=torch.int64, device=device).reshape(-1)
+        img_sizes = img_sizes.unsqueeze(0).repeat(batch_size, 1)
+
+        img_ids = torch.zeros(height // 2, width // 2, 3)
+        img_ids[..., 1] = img_ids[..., 1] + torch.arange(height // 2)[:, None]
+        img_ids[..., 2] = img_ids[..., 2] + torch.arange(width // 2)[None, :]
+        img_ids = img_ids.reshape((height // 2) * (width // 2), -1).to(device=device, dtype=dtype)
+        img_ids = img_ids.unsqueeze(0).repeat(batch_size, 1, 1)
+
+        return latents_mask, img_sizes, img_ids
+
+    def pack_latents(
+            self,
+            latents: Tensor,
+            batch_size: int,
+            num_channels_latents: int,
+            height: int,
+            width: int,
+    ) -> Tensor:
+        latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)
+        latents = latents.permute(0, 2, 4, 3, 5, 1)
+        latents = latents.reshape(batch_size, (height // 2) * (width // 2), num_channels_latents * 4)
+
+        return latents
+
+    def unpatchify_latents(self, latents, height, width):
+        batch_size, channels, num_patches, patch_size2 = latents.shape
+
+        height = height // 2
+        width = width // 2
+
+        latents = latents.view(batch_size, channels, height, width, 2, 2)
+        latents = latents.permute(0, 1, 2, 4, 3, 5)
+        latents = latents.reshape(batch_size, channels, height * 2, width * 2)
+
+        return latents

@@ -143,14 +143,14 @@ class HiDreamSampler(BaseModelSampler):
                 with self.model.transformer_autocast_context:
                     # predict the noise residual
                     noise_pred = transformer(
-                        hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
+                        hidden_states=latent_model_input.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
                         timesteps=expanded_timestep,
                         encoder_hidden_states_t5=combined_text_encoder_3_prompt_embedding \
-                            .to(dtype=self.model.train_dtype.torch_dtype()),
+                            .to(dtype=self.model.transformer_train_dtype.torch_dtype()),
                         encoder_hidden_states_llama3=combined_text_encoder_4_prompt_embedding \
-                            .to(dtype=self.model.train_dtype.torch_dtype()),
+                            .to(dtype=self.model.transformer_train_dtype.torch_dtype()),
                         pooled_embeds=combined_pooled_prompt_embedding \
-                            .to(dtype=self.model.train_dtype.torch_dtype()),
+                            .to(dtype=self.model.transformer_train_dtype.torch_dtype()),
                         return_dict=True
                     ).sample
                 noise_pred = -noise_pred

@@ -296,23 +296,32 @@ class BaseHiDreamSetup(
             vae_scaling_factor = model.vae.config['scaling_factor']
             vae_shift_factor = model.vae.config['shift_factor']
 
-            text_encoder_output, pooled_text_encoder_output = model.encode_text(
-                train_device=self.train_device,
-                batch_size=batch['latent_image'].shape[0],
-                rand=rand,
-                tokens_1=batch.get("tokens_1"),
-                tokens_2=batch.get("tokens_2"),
-                tokens_mask_2=batch.get("tokens_mask_2"),
-                text_encoder_1_layer_skip=config.text_encoder_layer_skip,
-                text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
-                    if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
-                text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
-                    if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
-                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
-                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
-                apply_attention_mask=config.prior.attention_mask,
-            )
+            text_encoder_3_output, text_encoder_4_output, pooled_text_encoder_output = model.combine_text_encoder_output(
+                *model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch['latent_image'].shape[0],
+                    rand=rand,
+                    tokens_1=batch.get("tokens_1"),
+                    tokens_2=batch.get("tokens_2"),
+                    tokens_3=batch.get("tokens_3"),
+                    tokens_4=batch.get("tokens_4"),
+                    tokens_mask_3=batch.get("tokens_mask_3"),
+                    tokens_mask_4=batch.get("tokens_mask_4"),
+                    text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
+                    pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
+                        if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                    pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
+                        if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
+                    text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
+                        if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
+                    text_encoder_4_output=batch['text_encoder_4_hidden_state'] \
+                        if 'text_encoder_4_hidden_state' in batch and not config.train_text_encoder_4_or_embedding() else None,
+                    text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
+                    text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
+                    text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability,
+                    text_encoder_4_dropout_probability=config.text_encoder_4.dropout_probability,
+                    apply_attention_mask=config.prior.attention_mask,
+                ))
 
             latent_image = batch['latent_image']
             scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
@@ -348,24 +357,6 @@ class BaseHiDreamSetup(
             else:
                 latent_input = scaled_noisy_latent_image
 
-            if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([config.prior.guidance_scale], device=self.train_device)
-                guidance = guidance.expand(latent_input.shape[0])
-            else:
-                guidance = None
-
-            text_ids = torch.zeros(
-                size=(text_encoder_output.shape[1], 3),
-                device=self.train_device,
-            )
-
-            image_ids = model.prepare_latent_image_ids(
-                latent_input.shape[2],
-                latent_input.shape[3],
-                self.train_device,
-                model.train_dtype.torch_dtype()
-            )
-
             packed_latent_input = model.pack_latents(
                 latent_input,
                 latent_input.shape[0],
@@ -374,23 +365,28 @@ class BaseHiDreamSetup(
                 latent_input.shape[3],
             )
 
-            packed_predicted_flow = model.transformer(
-                hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep / 1000,
-                guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
-                pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
-                img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
-                joint_attention_kwargs=None,
-                return_dict=True
-            ).sample
-
-            predicted_flow = model.unpack_latents(
-                packed_predicted_flow,
+            packed_latent_input_mask, img_sizes, latent_image_ids = model.prepare_latent_image_ids(
+                latent_input.shape[0],
                 latent_input.shape[2],
                 latent_input.shape[3],
+                self.train_device,
+                model.transformer_train_dtype.torch_dtype(),
             )
+
+            with model.transformer_autocast_context:
+                predicted_flow = model.transformer(
+                    hidden_states=packed_latent_input.to(dtype=model.transformer_train_dtype.torch_dtype()),
+                    timesteps=timestep,
+                    encoder_hidden_states_t5=text_encoder_3_output.to(dtype=model.transformer_train_dtype.torch_dtype()),
+                    encoder_hidden_states_llama3=text_encoder_4_output.to(dtype=model.transformer_train_dtype.torch_dtype()),
+                    pooled_embeds=pooled_text_encoder_output.to(dtype=model.transformer_train_dtype.torch_dtype()),
+                    hidden_states_masks=packed_latent_input_mask,
+                    img_sizes=img_sizes,
+                    img_ids=latent_image_ids,
+                    return_dict=True
+                ).sample
+            predicted_flow = -predicted_flow
+            predicted_flow = model.unpatchify_latents(predicted_flow, latent_input.shape[-2], latent_input.shape[-1])
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
