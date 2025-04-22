@@ -139,7 +139,8 @@ class LinuxCloud(BaseCloud):
             self.__trail_detached_trainer()
             return
 
-        cmd="export PYTHONUNBUFFERED=1 \
+        cmd="export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin \
+             && export PYTHONUNBUFFERED=1 \
              && export OT_LAZY_UPDATES=true"
 
         if self.config.secrets.huggingface_token != "":
