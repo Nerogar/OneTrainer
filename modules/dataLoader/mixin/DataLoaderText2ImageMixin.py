@@ -55,16 +55,19 @@ class DataLoaderText2ImageMixin:
         collect_paths = CollectPaths(
             concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
             path_out_name='image_path', concept_out_name='concept',
-            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
+            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel','-condlabel']
         )
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
+        cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
         modules = [collect_paths, sample_prompt_path]
 
         if config.masked_training:
             modules.append(mask_path)
+        if config.custom_conditioning_image:
+            modules.append(cond_path)
 
         return modules
 
@@ -81,6 +84,10 @@ class DataLoaderText2ImageMixin:
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1)
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, supported_extensions={".png"}, dtype=train_dtype.torch_dtype())
         mask_to_video = ImageToVideo(in_name='mask', out_name='mask')
+
+        load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='conditioning_image', range_min=0, range_max=1,
+                               supported_extensions=path_util.supported_image_extensions(),
+                               dtype=train_dtype.torch_dtype())
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -104,6 +111,9 @@ class DataLoaderText2ImageMixin:
             modules.append(load_mask)
         elif config.model_type.has_mask_input():
             modules.append(generate_mask)
+
+        if config.custom_conditioning_image:
+            modules.append(load_cond_image)
 
         if allow_video:
             modules.append(mask_to_video)
@@ -171,6 +181,9 @@ class DataLoaderText2ImageMixin:
         if config.model_type.has_depth_input():
             inputs.append('depth')
 
+        if config.custom_conditioning_image:
+            inputs.append('conditioning_image')
+
         scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
 
         modules = [scale_crop]
@@ -218,7 +231,7 @@ class DataLoaderText2ImageMixin:
 
         modules = []
 
-        if config.model_type.has_conditioning_image_input():
+        if config.model_type.has_conditioning_image_input() and config.custom_conditioning_image == False:
             modules.append(conditioning_image)
 
         return modules

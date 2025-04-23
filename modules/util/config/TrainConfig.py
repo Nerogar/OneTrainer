@@ -388,6 +388,9 @@ class TrainConfig(BaseConfig):
     unmasked_weight: float
     normalize_masked_area_loss: bool
 
+    # custom conditioning image
+    custom_conditioning_image: bool
+
     # embedding
     embedding_learning_rate: float
     preserve_embedding_norm: bool
@@ -907,6 +910,7 @@ class TrainConfig(BaseConfig):
         data.append(("unmasked_probability", 0.1, float, False))
         data.append(("unmasked_weight", 0.1, float, False))
         data.append(("normalize_masked_area_loss", False, bool, False))
+        data.append(("custom_conditioning_image", False, bool, False))
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))

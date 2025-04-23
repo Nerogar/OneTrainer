@@ -377,7 +377,7 @@ class ConceptWindow(ctk.CTkToplevel):
         #basic img/vid stats - count of each type in the concept
         #the \n at the start of the label gives it better vertical spacing with other rows
         self.image_count_label = components.label(frame, 3, 0, "\nTotal Images", pad=0,
-                         tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png'")
+                         tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png and -condlabel.png'")
         self.image_count_label.configure(font=ctk.CTkFont(underline=True))
         self.image_count_preview = components.label(frame, 4, 0, pad=0, text="-")
         self.video_count_label = components.label(frame, 3, 1, "\nTotal Videos", pad=0,
@@ -545,7 +545,7 @@ class ConceptWindow(ctk.CTkToplevel):
             for path in pathlib.Path(self.concept.path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
-                        and not path.name.endswith("-masklabel.png"):
+                        and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
                     preview_image_path = path_util.canonical_join(self.concept.path, path)
                     file_index += 1
                     if file_index == self.image_preview_file_index:

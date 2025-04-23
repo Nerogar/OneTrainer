@@ -682,6 +682,11 @@ class TrainingTab:
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
 
+        # use custom conditioning image
+        components.label(frame, 4, 0, "Custom Conditioning Image",
+                         tooltip="When custom conditioning image is enabled, will use png postfix with -condlabel instead of automatically generated.It's suitable for special scenarios, such as object removal, allowing the model to learn a certain behavior concept")
+        components.switch(frame, 4, 1, self.ui_state, "custom_conditioning_image")
+
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
