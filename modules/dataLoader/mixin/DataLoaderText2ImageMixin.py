@@ -231,7 +231,7 @@ class DataLoaderText2ImageMixin:
 
         modules = []
 
-        if config.model_type.has_conditioning_image_input() and config.custom_conditioning_image == False:
+        if config.model_type.has_conditioning_image_input() and not config.custom_conditioning_image:
             modules.append(conditioning_image)
 
         return modules
