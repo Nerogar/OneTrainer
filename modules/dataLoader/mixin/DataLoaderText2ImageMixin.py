@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable
 
+import modules.util.multi_gpu_util as multi
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
@@ -11,6 +12,7 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
+from mgds.pipelineModules.DistributedSampler import DistributedSampler
 from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
@@ -242,11 +244,13 @@ class DataLoaderText2ImageMixin:
             before_cache_fun=before_cache_image_fun,
         )
 
+        world_size = multi.world_size() if config.multi_gpu else 1  #world_size can be 1 for validation dataloader, even if multi.world_size() returns > 1
         if config.latent_caching:
-            batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+            batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
         else:
-            batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
+            batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
 
+        distributed_sampler = DistributedSampler(names=sort_names, local_batch_size=config.batch_size, world_size=world_size, rank = multi.rank())
         output = OutputPipelineModule(names=output_names)
 
         modules = []
@@ -255,6 +259,8 @@ class DataLoaderText2ImageMixin:
             modules.append(mask_remove)
 
         modules.append(batch_sorting)
+        if world_size > 1:
+            modules.append(distributed_sampler)
 
         modules.append(output)
 

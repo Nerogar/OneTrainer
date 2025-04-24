@@ -1,3 +1,4 @@
+import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
@@ -59,7 +60,10 @@ def init_model_parameters(
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
-    model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    if multi.is_master():
+        model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    else:
+        model.ema = None
     model.ema_state_dict = None
 
     model.param_group_mapping = parameters.unique_name_mapping
