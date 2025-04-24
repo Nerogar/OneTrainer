@@ -31,7 +31,9 @@ class MultiTrainer(BaseTrainer):
                     "especially for full finetuning.\n")
 
     @staticmethod #must be static and not use __ prefix, otherwise the pickling done by torch.multiprocessing fails
-    def _train_process(spawn_rank: int, world_size: int, config_dict: dict, devices: list[torch.device], callbacks: TrainCallbacks):
+    def _train_process(spawn_rank: int, world_size: int, config_dict: dict, devices: list[torch.device], callbacks: TrainCallbacks=None):
+        if callbacks is None:
+            callbacks = TrainCallbacks()
         rank = spawn_rank + 1
         config = TrainConfig.default_values().from_dict(config_dict)
         device = torch.device(devices[rank]) if devices else torch.device(config.train_device, rank)
@@ -64,7 +66,7 @@ class MultiTrainer(BaseTrainer):
             devices = [torch.device(self.config.train_device, int(d)) for d in devices]
             world_size = len(devices)
 
-        workers = torch.multiprocessing.spawn(MultiTrainer._train_process, args=(world_size, config_dict, devices, TrainCallbacks()), nprocs=world_size - 1, join=False)
+        workers = torch.multiprocessing.spawn(MultiTrainer._train_process, args=(world_size, config_dict, devices), nprocs=world_size - 1, join=False)
 
         multi.set_global_commands(self.commands)
         MultiTrainer._train_process(-1, world_size, config_dict, devices, callbacks=self.callbacks) #main process is rank #0
