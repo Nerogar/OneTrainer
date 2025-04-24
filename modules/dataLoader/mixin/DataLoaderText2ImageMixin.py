@@ -250,7 +250,7 @@ class DataLoaderText2ImageMixin:
         else:
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
 
-        distributed_sampler = DistributedSampler(names=sort_names, local_batch_size=config.batch_size, world_size=world_size, rank = multi.rank())
+        distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
         output = OutputPipelineModule(names=output_names)
 
         modules = []
