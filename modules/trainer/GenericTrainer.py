@@ -14,7 +14,7 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import batch_util, create, path_util
+from modules.util import create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
@@ -670,10 +670,8 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    prior_pred_indices = batch_util.get_indices(
-                        batch, self.config.batch_size,
-                        lambda i, sample: sample['training_target'][i] == str(TrainingTarget.PRIOR_PREDICTION),
-                    )
+                    prior_pred_indices = [i for i in range(self.config.batch_size)
+                                          if batch['training_target'][i] == str(TrainingTarget.PRIOR_PREDICTION)]
                     if len(prior_pred_indices) > 0:
                         with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
                             #do NOT create a subbatch using the indices, even though it would be more efficient:
