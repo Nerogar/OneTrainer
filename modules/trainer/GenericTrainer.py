@@ -669,9 +669,23 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                    print("\nprompt: ",batch['prompt'][0])
+                    if batch['prompt'][0] == "":
+                        with torch.no_grad():
+                            self.model.transformer_lora.remove_hook_from_module()
+                            regmodel_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                            self.model.transformer_lora.hook_to_module()
+                        
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        model_output_data['target']=regmodel_output_data['predicted']
+                        loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
+                        loss *= 1.0
+                        print("\nregmodel loss:",loss)
+                    else:
 
-                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+
+                        loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
                     loss = loss / self.config.gradient_accumulation_steps
                     if scaler:
