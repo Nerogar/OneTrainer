@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "Flux.1-fill-dev/embedding",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "FluxDev Fill 1.0 Embedding"
+}

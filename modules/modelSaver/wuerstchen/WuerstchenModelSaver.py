@@ -15,6 +15,8 @@ from safetensors.torch import save_file
 class WuerstchenModelSaver(
     DtypeModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def __save_diffusers(
             self,
@@ -84,8 +86,6 @@ class WuerstchenModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.CKPT:
-                raise NotImplementedError
             case ModelFormat.SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:

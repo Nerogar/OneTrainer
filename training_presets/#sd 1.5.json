@@ -1,5 +1,5 @@
 {
-    "base_model_name": "runwayml/stable-diffusion-v1-5",
+    "base_model_name": "stable-diffusion-v1-5/stable-diffusion-v1-5",
     "batch_size": 4,
     "model_type": "STABLE_DIFFUSION_15",
     "output_model_destination": "models/model.safetensors",

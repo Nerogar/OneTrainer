@@ -16,6 +16,9 @@ import safetensors.torch as safetensors
 
 
 class DtypeModelSaverMixin:
+    def __init__(self):
+        super().__init__()
+
     def _convert_state_dict_dtype(
             self,
             state_dict: dict,
@@ -65,9 +68,9 @@ class DtypeModelSaverMixin:
         model_spec = copy.deepcopy(model.model_spec) if model.model_spec is not None else ModelSpec()
 
         if model.train_config is not None and model.train_config.include_train_config == ConfigPart.SETTINGS:
-            config = json.dumps(model.train_config.to_dict())
+            config = json.dumps(model.train_config.to_settings_dict(secrets=False))
         elif model.train_config is not None and model.train_config.include_train_config == ConfigPart.ALL:
-            config = json.dumps(model.train_config.to_pack_dict())
+            config = json.dumps(model.train_config.to_pack_dict(secrets=False))
         else:
             config = None
 

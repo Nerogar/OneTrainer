@@ -24,6 +24,8 @@ class FluxEmbeddingModelLoader(
         match model_type:
             case ModelType.FLUX_DEV_1:
                 return "resources/sd_model_spec/flux_dev_1.0-embedding.json"
+            case ModelType.FLUX_FILL_DEV_1:
+                return "resources/sd_model_spec/flux_dev_fill_1.0-embedding.json"
             case _:
                 return None
 
@@ -42,7 +44,6 @@ class FluxEmbeddingModelLoader(
 
         if model_names.base_model is not None:
             base_model_loader.load(model, model_type, model_names, weight_dtypes)
-        embedding_loader.load_multiple(model, model_names)
-        embedding_loader.load_single(model, model_names)
+        embedding_loader.load(model, model_names.embedding.model_name, model_names)
 
         return model

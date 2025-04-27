@@ -14,9 +14,10 @@ from modules.module.WDModel import WDModel
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
+from modules.util.image_util import load_image
 from modules.util.torch_util import default_device
 from modules.util.ui import components
-from modules.util.ui.ui_utils import bind_mousewheel
+from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
 from modules.util.ui.UIState import UIState
 
 import torch
@@ -36,60 +37,33 @@ class CaptionUI(ctk.CTkToplevel):
             initial_include_subdirectories: bool,
             *args,
             **kwargs,
-    ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+    ) -> None:
+        super().__init__(parent, *args, **kwargs)
+
 
         self.dir = initial_dir
-        self.config_ui_data = {
-            "include_subdirectories": initial_include_subdirectories
-        }
+        self.config_ui_data = {"include_subdirectories": initial_include_subdirectories}
         self.config_ui_state = UIState(self, self.config_ui_data)
         self.image_size = 850
-
-        self.title("OneTrainer")
-        self.geometry("1280x980")
-        self.resizable(False, False)
-        self.wait_visibility()
-        self.focus_set()
-
         self.help_text = """
-Keyboard shortcuts when focusing on the prompt input field:
-Up arrow: previous image
-Down arrow: next image
-Return: save
-Ctrl+M: only show the mask
-Ctrl+D: draw mask editing mode
-Ctrl+F: fill mask editing mode
+    Keyboard shortcuts when focusing on the prompt input field:
+    Up arrow: previous image
+    Down arrow: next image
+    Return: save
+    Ctrl+M: only show the mask
+    Ctrl+D: draw mask editing mode
+    Ctrl+F: fill mask editing mode
 
-When editing masks:
-Left click: add mask
-Right click: remove mask
-Mouse wheel: increase or decrease brush size"""
-
+    When editing masks:
+    Left click: add mask
+    Right click: remove mask
+    Mouse wheel: increase or decrease brush size"""
         self.masking_model = None
         self.captioning_model = None
-
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
-        # relative path from self.dir to each image
         self.image_rel_paths = []
         self.current_image_index = -1
-
-        self.top_bar(self)
-
-        self.bottom_frame = ctk.CTkFrame(self)
-        self.bottom_frame.grid(row=1, column=0, sticky="nsew")
-
-        self.bottom_frame.grid_rowconfigure(0, weight=1)
-        self.bottom_frame.grid_columnconfigure(0, weight=0)
-        self.bottom_frame.grid_columnconfigure(1, weight=1)
-
         self.file_list = None
         self.image_labels = []
-        self.file_list_column(self.bottom_frame)
-
         self.pil_image = None
         self.image_width = 0
         self.image_height = 0
@@ -105,9 +79,33 @@ Mouse wheel: increase or decrease brush size"""
         self.mask_editing_alpha = None
         self.prompt_var = None
         self.prompt_component = None
-        self.content_column(self.bottom_frame)
 
+
+        self.title("OneTrainer")
+        self.geometry("1280x980")
+        self.resizable(False, False)
+
+
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+
+        self.top_bar(self)
+
+        self.bottom_frame = ctk.CTkFrame(self)
+        self.bottom_frame.grid(row=1, column=0, sticky="nsew")
+        self.bottom_frame.grid_rowconfigure(0, weight=1)
+        self.bottom_frame.grid_columnconfigure(0, weight=0)
+        self.bottom_frame.grid_columnconfigure(1, weight=1)
+
+        self.file_list_column(self.bottom_frame)
+        self.content_column(self.bottom_frame)
         self.load_directory()
+
+        self.wait_visibility()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
 
     def top_bar(self, master):
         top_frame = ctk.CTkFrame(master)
@@ -256,7 +254,7 @@ Mouse wheel: increase or decrease brush size"""
             image_name = os.path.join(self.dir, image_name)
 
         try:
-            return Image.open(image_name).convert('RGB')
+            return load_image(image_name, convert_mode="RGB")
         except Exception:
             print(f'Could not open image {image_name}')
 
@@ -267,7 +265,7 @@ Mouse wheel: increase or decrease brush size"""
             mask_name = os.path.join(self.dir, mask_name)
 
             try:
-                return Image.open(mask_name).convert('RGB')
+                return load_image(mask_name, convert_mode='RGB')
             except Exception:
                 return None
         else:

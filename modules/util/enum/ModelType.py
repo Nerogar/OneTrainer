@@ -24,6 +24,11 @@ class ModelType(Enum):
     PIXART_SIGMA = 'PIXART_SIGMA'
 
     FLUX_DEV_1 = 'FLUX_DEV_1'
+    FLUX_FILL_DEV_1 = 'FLUX_FILL_DEV_1'
+
+    SANA = 'SANA'
+
+    HUNYUAN_VIDEO = 'HUNYUAN_VIDEO'
 
     def __str__(self):
         return self.value
@@ -64,17 +69,26 @@ class ModelType(Enum):
         return self == ModelType.PIXART_SIGMA
 
     def is_flux(self):
-        return self == ModelType.FLUX_DEV_1
+        return self == ModelType.FLUX_DEV_1 \
+            or self == ModelType.FLUX_FILL_DEV_1
+
+    def is_sana(self):
+        return self == ModelType.SANA
+
+    def is_hunyuan_video(self):
+        return self == ModelType.HUNYUAN_VIDEO
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
-            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
+            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING \
+            or self == ModelType.FLUX_FILL_DEV_1
 
     def has_conditioning_image_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
-            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
+            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING \
+            or self == ModelType.FLUX_FILL_DEV_1
 
     def has_depth_input(self):
         return self == ModelType.STABLE_DIFFUSION_20_DEPTH
@@ -82,7 +96,8 @@ class ModelType(Enum):
     def has_multiple_text_encoders(self):
         return self.is_stable_diffusion_3() \
             or self.is_stable_diffusion_xl() \
-            or self.is_flux()
+            or self.is_flux() \
+            or self.is_hunyuan_video()
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \

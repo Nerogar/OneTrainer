@@ -14,6 +14,7 @@ from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeT5Text import EncodeT5Text
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -72,12 +73,13 @@ class PixArtAlphaBaseDataLoader(
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
+        add_embeddings_to_prompt = MapData(in_name='prompt', out_name='prompt', map_fn=model.add_text_encoder_embeddings_to_prompt)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=max_token_length)
         encode_prompt = EncodeT5Text(tokens_in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_autocast_context], dtype=model.text_encoder_train_dtype.torch_dtype())
 
-        modules = [rescale_image, encode_image, image_sample, tokenize_prompt]
+        modules = [rescale_image, encode_image, image_sample, add_embeddings_to_prompt, tokenize_prompt]
 
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
@@ -87,7 +89,7 @@ class PixArtAlphaBaseDataLoader(
             modules.append(encode_conditioning_image)
             modules.append(conditioning_image_sample)
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
 
         return modules
@@ -105,7 +107,7 @@ class PixArtAlphaBaseDataLoader(
 
         text_split_names = ['tokens', 'tokens_mask', 'text_encoder_hidden_state']
 
-        sort_names = text_split_names + image_aggregate_names + image_split_names +[
+        sort_names = text_split_names + image_aggregate_names + image_split_names + [
             'prompt', 'concept'
         ]
 
@@ -137,7 +139,7 @@ class PixArtAlphaBaseDataLoader(
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if not config.text_encoder.train and not config.train_any_embedding():
+            if not config.train_text_encoder_or_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -148,7 +150,12 @@ class PixArtAlphaBaseDataLoader(
         return modules
 
     def _output_modules(self, config: TrainConfig, model: PixArtAlphaModel):
-        output_names = ['latent_image', 'tokens', 'tokens_mask', 'image_path', 'prompt']
+        output_names = [
+            'image_path', 'latent_image',
+            'prompt',
+            'tokens',
+            'tokens_mask',
+        ]
 
         if config.masked_training or config.model_type.has_mask_input():
             output_names.append('latent_mask')
@@ -156,7 +163,7 @@ class PixArtAlphaBaseDataLoader(
         if config.model_type.has_conditioning_image_input():
             output_names.append('latent_conditioning_image')
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
         sort_names = output_names + ['concept']
@@ -181,7 +188,7 @@ class PixArtAlphaBaseDataLoader(
             before_cache_image_fun=before_cache_image_fun,
             use_conditioning_image=True,
             vae=model.vae,
-            autocast_context=model.autocast_context,
+            autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
 
@@ -231,7 +238,7 @@ class PixArtAlphaBaseDataLoader(
             is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config)
-        load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt)
+        load_input = self._load_input_modules(config, model.train_dtype)
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, 16)
         crop_modules = self._crop_modules(config)

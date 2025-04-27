@@ -81,11 +81,9 @@ class BaseConfig:
                             old_value = \
                                 getattr(self, name) if hasattr(self, name) and getattr(self, name) is not None else []
                             value = []
-                            for i in range(max(len(old_value), len(data[name]))):
+                            for i in range(len(data[name])):
                                 if i < len(old_value) and i < len(data[name]):
                                     value.append(old_value[i].from_dict(data[name][i]))
-                                elif i < len(old_value):
-                                    value.append(old_value[i])
                                 else:
                                     value.append(list_type.default_values().from_dict(data[name][i]))
                         else:

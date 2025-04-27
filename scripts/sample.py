@@ -5,6 +5,8 @@ script_imports()
 from modules.util import create
 from modules.util.args.SampleArgs import SampleArgs
 from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import ModelNames
@@ -16,9 +18,12 @@ def main():
     device = default_device
 
     training_method = TrainingMethod.FINE_TUNE
+    train_config = TrainConfig.default_values()
+    train_config.optimizer.optimizer = None
+    train_config.ema = EMAMode.OFF
 
     model_loader = create.create_model_loader(args.model_type, training_method=training_method)
-    create.create_model_setup(args.model_type, device, device, training_method=training_method)
+    model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
 
     print("Loading model " + args.base_model_name)
     model = model_loader.load(
@@ -26,9 +31,13 @@ def main():
         model_names=ModelNames(base_model=args.base_model_name),
         weight_dtypes=args.weight_dtypes(),
     )
+    model.train_config = train_config
+
+    model_setup.setup_model(model, train_config)
 
     model.to(device)
     model.eval()
+    model.train_dtype = args.weight_dtype
 
     model_sampler = create.create_model_sampler(
         train_device=device,
@@ -39,7 +48,7 @@ def main():
 
     print("Sampling " + args.destination)
     model_sampler.sample(
-        sample_params=SampleConfig.default_values().from_dict(
+        sample_config=SampleConfig.default_values().from_dict(
             {
                 "prompt": args.prompt,
                 "negative_prompt": args.negative_prompt,

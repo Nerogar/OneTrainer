@@ -8,6 +8,8 @@ import torch
 
 
 class InternalModelSaverMixin(metaclass=ABCMeta):
+    def __init__(self):
+        super().__init__()
 
     def _save_internal_data(
             self,
