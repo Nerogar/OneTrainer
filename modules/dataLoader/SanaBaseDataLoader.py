@@ -161,6 +161,7 @@ class SanaBaseDataLoader(
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+        output_names = output_names + [('concept.training_target', 'training_target')]
 
         # add for calculating loss per concept
         if config.validation:

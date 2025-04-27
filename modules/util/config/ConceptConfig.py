@@ -3,6 +3,7 @@ from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.enum.TrainingTarget import TrainingTarget
 
 
 class ConceptImageConfig(BaseConfig):
@@ -135,6 +136,7 @@ class ConceptConfig(BaseConfig):
     text_variations: int
     repeats: float
     loss_weight: float
+    training_target: TrainingTarget
     concept_stats: dict
 
     image: ConceptImageConfig
@@ -183,6 +185,7 @@ class ConceptConfig(BaseConfig):
         data.append(("balancing", 1.0, float, False))
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
+        data.append(("training_target", TrainingTarget.SAMPLE, TrainingTarget, False))
         data.append(("concept_stats", {}, dict, False))
 
         return ConceptConfig(data)

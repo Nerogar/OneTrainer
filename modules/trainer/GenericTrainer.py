@@ -14,7 +14,7 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import create, path_util
+from modules.util import batch_util, create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
@@ -24,6 +24,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.enum.TrainingTarget import TrainingTarget
 from modules.util.memory_util import TorchMemoryRecorder
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -669,23 +670,18 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    print("\nprompt: ",batch['prompt'][0])
-                    if batch['prompt'][0] == "":
-                        with torch.no_grad():
-                            self.model.transformer_lora.remove_hook_from_module()
-                            regmodel_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                            self.model.transformer_lora.hook_to_module()
-                        
+                    prior_pred_indices = batch_util.get_indices(batch, lambda sample: sample['training_target'] == str(TrainingTarget.PRIOR_PREDICTION), device=train_device)
+                    if prior_pred_indices.numel() > 0:
+                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                            #do NOT create a subbatch using the indices, even though it would be more efficient:
+                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
+                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        model_output_data['target']=regmodel_output_data['predicted']
-                        loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
-                        loss *= 1.0
-                        print("\nregmodel loss:",loss)
+                        model_output_data['target'][prior_pred_indices]=prior_model_output_data['predicted'][prior_pred_indices]
                     else:
-
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
-                        loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
+                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
                     loss = loss / self.config.gradient_accumulation_steps
                     if scaler:

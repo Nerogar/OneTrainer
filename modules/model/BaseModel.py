@@ -136,3 +136,7 @@ class BaseModel(metaclass=ABCMeta):
                 text_encoder_output[idx_0, idx_2] = embedding.output_vector[idx_1]
 
         return text_encoder_output
+
+    @abstractmethod
+    def adapters(self):
+        pass

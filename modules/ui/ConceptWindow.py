@@ -8,6 +8,7 @@ import time
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.enum.TrainingTarget import TrainingTarget
 from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
@@ -175,6 +176,15 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 9, 0, "Loss Weight",
                          tooltip="The loss multiplyer for this concept.")
         components.entry(frame, 9, 1, self.ui_state, "loss_weight")
+
+        # training target
+        components.label(frame, 10, 0, "Training Target",
+                         tooltip="SAMPLE: Default finetuning with the sample as training target\n"
+                                 "PRIOR_PREDICTION: The sample is used to make a prediction using the model as it was before training. This prediction is then used as the training target "
+                                 "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
+                                 "Only implemented for LoRA.",
+                         wide_tooltip=True)
+        components.options(frame, 10, 1, [str(x) for x in list(TrainingTarget)], self.ui_state, "training_target")
 
         frame.pack(fill="both", expand=1)
         return frame
