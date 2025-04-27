@@ -3,6 +3,7 @@ from contextlib import nullcontext
 from uuid import uuid4
 
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
@@ -101,6 +102,10 @@ class BaseModel(metaclass=ABCMeta):
     def eval(self):
         pass
 
+    @abstractmethod
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        pass
+
     @staticmethod
     def _add_embeddings_to_prompt(
             additional_embeddings: list[BaseModelEmbedding],
@@ -136,7 +141,3 @@ class BaseModel(metaclass=ABCMeta):
                 text_encoder_output[idx_0, idx_2] = embedding.output_vector[idx_1]
 
         return text_encoder_output
-
-    @abstractmethod
-    def adapters(self):
-        pass

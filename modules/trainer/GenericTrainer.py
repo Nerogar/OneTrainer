@@ -670,14 +670,17 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    prior_pred_indices = batch_util.get_indices(batch, lambda sample: sample['training_target'] == str(TrainingTarget.PRIOR_PREDICTION), device=train_device)
-                    if prior_pred_indices.numel() > 0:
+                    prior_pred_indices = batch_util.get_indices(
+                        batch, self.config.batch_size,
+                        lambda i, sample: sample['training_target'][i] == str(TrainingTarget.PRIOR_PREDICTION),
+                    )
+                    if len(prior_pred_indices) > 0:
                         with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
                             #do NOT create a subbatch using the indices, even though it would be more efficient:
                             #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
                             prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        model_output_data['target'][prior_pred_indices]=prior_model_output_data['predicted'][prior_pred_indices]
+                        model_output_data['target'][prior_pred_indices] = prior_model_output_data['predicted'][prior_pred_indices]
                     else:
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 

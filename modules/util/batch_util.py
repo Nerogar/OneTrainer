@@ -1,10 +1,14 @@
+from collections.abc import Callable
+
 import torch
 
 
-def get_indices(batch: dict, predicate, device: torch.device, base_element:str = 'image_path'):
-    int_indices = [i for i in range(len(batch[base_element]))
-                   if predicate({k: v[i] for k, v in batch.items()})]
-    return torch.tensor(int_indices, dtype=torch.long, device=device)
+def get_indices(
+        batch: dict,
+        batch_size: int,
+        predicate: Callable[[int, dict], bool],
+) -> list[int]:
+    return [i for i in range(batch_size) if predicate(i, batch)]
 
 def subbatch(batch: dict, indices: list[int], device: torch.device):
     return {
