@@ -36,7 +36,7 @@ class ConceptTab(ConfigList):
         return ConceptConfig.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
+        return ConceptWindow(self.master, self.train_config, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
 
 
 class ConceptWidget(ctk.CTkFrame):
@@ -124,12 +124,13 @@ class ConceptWidget(ctk.CTkFrame):
         preview_path = "resources/icons/icon.png"
         glob_pattern = "**/*.*" if self.concept.include_subdirectories else "*.*"
 
-        if os.path.isdir(self.concept.path):
-            for path in pathlib.Path(self.concept.path).glob(glob_pattern):
+        concept_path = ConceptWindow.get_concept_path(self.concept.path)
+        if concept_path:
+            for path in pathlib.Path(concept_path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png"):
-                    preview_path = path_util.canonical_join(self.concept.path, path)
+                    preview_path = path_util.canonical_join(concept_path, path)
                     break
 
         image = load_image(preview_path, convert_mode="RGBA")
