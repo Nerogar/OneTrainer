@@ -112,6 +112,9 @@ class LoraTab:
             components.label(master, 2, 3, "Use Norm Espilon (DoRA Only)",
                              tooltip="Add an epsilon to the norm divison calculation in DoRA. Can aid in training stability, and also acts as regularization.")
             components.switch(master, 2, 4, self.ui_state, "lora_decompose_norm_epsilon")
+            components.label(master, 3, 3, "Apply on output axis (DoRA Only)",
+                             tooltip="Apply the weight decomposition on the output axis instead of the input axis.")
+            components.switch(master, 3, 4, self.ui_state, "lora_decompose_output_axis")
 
         # lora rank
         components.label(master, 2, 0, f"{name} alpha",
