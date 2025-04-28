@@ -1,6 +1,7 @@
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
 from modules.util.convert.convert_lora_util import LoraConversionKeySet
+from modules.util.convert.lora.convert_hdiream_lora import convert_hidream_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
@@ -14,7 +15,7 @@ class HiDreamLoRASaver(
         super().__init__()
 
     def _get_convert_key_sets(self, model: HiDreamModel) -> list[LoraConversionKeySet] | None:
-        return None  # TODO: add mapping
+        return convert_hidream_lora_key_sets()
 
     def _get_state_dict(
             self,
