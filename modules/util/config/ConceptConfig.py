@@ -3,7 +3,7 @@ from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
-from modules.util.enum.TrainingTarget import TrainingTarget
+from modules.util.enum.ConceptType import ConceptType
 
 
 class ConceptImageConfig(BaseConfig):
@@ -130,13 +130,12 @@ class ConceptConfig(BaseConfig):
     path: str
     seed: int
     enabled: bool
-    validation_concept: bool
+    type: ConceptType
     include_subdirectories: bool
     image_variations: int
     text_variations: int
     repeats: float
     loss_weight: float
-    training_target: TrainingTarget
     concept_stats: dict
 
     image: ConceptImageConfig
@@ -145,9 +144,10 @@ class ConceptConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=1,
+            config_version=2,
             config_migrations={
                 0: self.__migration_0,
+                1: self.__migration_1,
             }
         )
 
@@ -156,6 +156,16 @@ class ConceptConfig(BaseConfig):
         for key, value in data.items():
             if key == 'repeats':
                 migrated_data['balancing'] = value
+            else:
+                migrated_data[key] = value
+
+        return migrated_data
+
+    def __migration_1(self, data: dict) -> dict:
+        migrated_data = {}
+        for key, value in data.items():
+            if key == 'validation_concept':
+                migrated_data['type'] = ConceptType.VALIDATION if value else ConceptType.STANDARD
             else:
                 migrated_data[key] = value
 
@@ -178,14 +188,13 @@ class ConceptConfig(BaseConfig):
         data.append(("path", "", str, False))
         data.append(("seed", random.randint(-(1 << 30), 1 << 30), int, False))
         data.append(("enabled", True, bool, False))
-        data.append(("validation_concept", False, bool, False))
+        data.append(("type", ConceptType.STANDARD, ConceptType, False))
         data.append(("include_subdirectories", False, bool, False))
         data.append(("image_variations", 1, int, False))
         data.append(("text_variations", 1, int, False))
         data.append(("balancing", 1.0, float, False))
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
-        data.append(("training_target", TrainingTarget.SAMPLE, TrainingTarget, False))
         data.append(("concept_stats", {}, dict, False))
 
         return ConceptConfig(data)

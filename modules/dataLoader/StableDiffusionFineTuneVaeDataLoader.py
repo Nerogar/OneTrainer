@@ -238,7 +238,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
-        output_names = output_names + [('concept.training_target', 'training_target')]
+        output_names = output_names + [('concept.type', 'concept_type')]
 
         # add for calculating loss per concept
         if config.validation:

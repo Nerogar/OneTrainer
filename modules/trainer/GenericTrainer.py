@@ -20,11 +20,11 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.enum.TrainingTarget import TrainingTarget
 from modules.util.memory_util import TorchMemoryRecorder
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -671,7 +671,7 @@ class GenericTrainer(BaseTrainer):
 
                 with TorchMemoryRecorder(enabled=False):
                     prior_pred_indices = [i for i in range(self.config.batch_size)
-                                          if batch['training_target'][i] == str(TrainingTarget.PRIOR_PREDICTION)]
+                                          if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
                     if len(prior_pred_indices) > 0:
                         with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
                             #do NOT create a subbatch using the indices, even though it would be more efficient:

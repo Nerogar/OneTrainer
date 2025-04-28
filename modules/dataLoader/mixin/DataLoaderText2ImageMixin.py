@@ -237,7 +237,7 @@ class DataLoaderText2ImageMixin:
 
         output_names = output_names + [
             ('concept.loss_weight', 'loss_weight'),
-            ('concept.training_target', 'training_target'),
+            ('concept.type', 'concept_type'),
         ]
 
         if config.validation:
