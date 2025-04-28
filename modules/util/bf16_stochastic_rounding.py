@@ -3,9 +3,10 @@ from torch import Tensor
 
 generator = None
 
-def init_stochastic_rounding():
+def set_seed(seed: int, device: torch.device):
     global generator
-    generator = None
+    generator = torch.Generator(device=device)
+    generator.manual_seed(seed)
 
 def copy_stochastic_(target: Tensor, source: Tensor):
     """
@@ -17,9 +18,6 @@ def copy_stochastic_(target: Tensor, source: Tensor):
     """
 
     global generator
-    if generator is None:
-        generator = torch.Generator(device = source.device)
-        generator.manual_seed(0)
 
     # create a random 16 bit integer
     result = torch.randint(

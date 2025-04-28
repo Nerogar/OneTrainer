@@ -100,7 +100,6 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
-from modules.util.bf16_stochastic_rounding import init_stochastic_rounding
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -419,9 +418,6 @@ def create_optimizer(
             raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
-
-    if optimizer_config.stochastic_rounding:
-        init_stochastic_rounding()
 
     match config.optimizer.optimizer:
 

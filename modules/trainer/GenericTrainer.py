@@ -7,6 +7,7 @@ import traceback
 from collections.abc import Callable
 from pathlib import Path
 
+import modules.util.bf16_stochastic_rounding as bf16_stochastic_rounding
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -669,6 +670,9 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
+                    batch_seed = train_progress.global_step
+                    bf16_stochastic_rounding.set_seed(batch_seed) #TODO also pass to model_setup as seed
+
                     model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
