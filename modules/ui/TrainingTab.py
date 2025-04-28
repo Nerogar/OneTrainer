@@ -228,8 +228,8 @@ class TrainingTab:
         components.entry(frame, 6, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(frame, 7, 0, "Batch Size",
-                         tooltip="The batch size of one training step")
+        components.label(frame, 7, 0, "Local Batch Size",
+                         tooltip="The batch size of one training step. If you use multiple GPUs, this is the batch size of each GPU (local batch size).")
         components.entry(frame, 7, 1, self.ui_state, "batch_size")
 
         # accumulation steps

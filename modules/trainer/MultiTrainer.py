@@ -1,4 +1,5 @@
 
+import datetime
 import os
 import subprocess
 import traceback
@@ -38,10 +39,16 @@ class MultiTrainer(BaseTrainer):
         config = TrainConfig.default_values().from_dict(config_dict)
         device = torch.device(devices[rank]) if devices else torch.device(config.train_device, rank)
 
-        torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device)
+        #set timeout to 24 hours, because caching is only done on 1 GPU and can take a significant time for large datasets.
+        #The other GPU processes have to wait without timing out:
+        timeout = datetime.timedelta(hours=24)
+
+        torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device, timeout=timeout)
         torch.cuda.set_device(device.index)
-        print(f"GPU #{multi.rank()}  device: {device} ({torch.cuda.get_device_name()})  "
-              f"backend: {torch.distributed.get_backend()}  world size: {torch.distributed.get_world_size()}")
+
+        for _ in multi.sequential(): #use barrier synchronisation now already, to discover NCCL communication issues early
+            print(f"GPU #{multi.rank()}  device: {device} ({torch.cuda.get_device_name()})  "
+                  f"backend: {torch.distributed.get_backend()}  world size: {torch.distributed.get_world_size()}")
 
         trainer = GenericTrainer(config, callbacks, TrainCommands())
         try:
