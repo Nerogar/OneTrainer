@@ -359,6 +359,7 @@ class DoRAModule(LoRAModule):
         self.dora_scale = None
         self.norm_epsilon = kwargs.pop('norm_epsilon', False)
         self.decompose_output_axis = kwargs.pop('decompose_output_axis', False)
+        self.train_device = kwargs.get('device')
         super().__init__(*args, **kwargs)
 
     def initialize_weights(self, device: torch.device, generator: torch.Generator):
