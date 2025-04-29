@@ -258,19 +258,19 @@ class HiDreamModel(BaseModel):
             self.text_encoder_4.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_modules: bool) -> DiffusionPipeline:
         return HiDreamImagePipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_modules else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_modules else self.tokenizer_2,
             text_encoder_3=self.text_encoder_3,
-            tokenizer_3=self.tokenizer_3,
+            tokenizer_3=self.orig_tokenizer_3 if use_original_modules else self.tokenizer_3,
             text_encoder_4=self.text_encoder_4,
-            tokenizer_4=self.tokenizer_4,
+            tokenizer_4=self.orig_tokenizer_4 if use_original_modules else self.tokenizer_4,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:

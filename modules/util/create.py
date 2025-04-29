@@ -57,6 +57,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.FluxEmbeddingModelSaver import FluxEmbeddingModelSaver
 from modules.modelSaver.FluxFineTuneModelSaver import FluxFineTuneModelSaver
 from modules.modelSaver.FluxLoRAModelSaver import FluxLoRAModelSaver
+from modules.modelSaver.HiDreamEmbeddingModelSaver import HiDreamEmbeddingModelSaver
 from modules.modelSaver.HiDreamLoRAModelSaver import HiDreamLoRAModelSaver
 from modules.modelSaver.HunyuanVideoEmbeddingModelSaver import HunyuanVideoEmbeddingModelSaver
 from modules.modelSaver.HunyuanVideoFineTuneModelSaver import HunyuanVideoFineTuneModelSaver
@@ -273,6 +274,8 @@ def create_model_saver(
                 return SanaEmbeddingModelSaver()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoEmbeddingModelSaver()
+            if model_type.is_hi_dream():
+                return HiDreamEmbeddingModelSaver()
 
     return None
 
