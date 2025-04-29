@@ -552,7 +552,7 @@ class ConceptWindow(ctk.CTkToplevel):
         try:
             #don't donwload, only check if available locally:
             return huggingface_hub.snapshot_download(repo_id=path, repo_type="dataset", local_files_only=True)
-        except huggingface_hub.errors.LocalEntryNotFoundError:
+        except Exception:
             return None
 
     def __download_dataset(self):
