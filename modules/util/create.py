@@ -84,6 +84,8 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.FluxEmbeddingSetup import FluxEmbeddingSetup
 from modules.modelSetup.FluxFineTuneSetup import FluxFineTuneSetup
 from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
+from modules.modelSetup.HiDreamEmbeddingSetup import HiDreamEmbeddingSetup
+from modules.modelSetup.HiDreamFineTuneSetup import HiDreamFineTuneSetup
 from modules.modelSetup.HiDreamLoRASetup import HiDreamLoRASetup
 from modules.modelSetup.HunyuanVideoEmbeddingSetup import HunyuanVideoEmbeddingSetup
 from modules.modelSetup.HunyuanVideoFineTuneSetup import HunyuanVideoFineTuneSetup
@@ -305,6 +307,8 @@ def create_model_setup(
                 return SanaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_hi_dream():
+                return HiDreamFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -344,6 +348,8 @@ def create_model_setup(
                 return SanaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_hi_dream():
+                return HiDreamEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
 
