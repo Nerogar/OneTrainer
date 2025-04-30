@@ -192,10 +192,8 @@ class BaseModelSetup(
 
     @contextmanager
     def prior_model(self, model: BaseModel, config: TrainConfig):
-        if (config.training_method is not TrainingMethod.LORA
-            or config.train_any_embedding()
-            or config.train_any_output_embedding()):
-            raise NotImplementedError("Prior model is only available with LoRA training and if no embeddings are trained")
+        if config.training_method is not TrainingMethod.LORA:
+            raise NotImplementedError("Prior model is only available with LoRA training")
 
         for adapter in model.adapters():
             adapter.remove_hook_from_module()
