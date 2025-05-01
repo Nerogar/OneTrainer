@@ -207,7 +207,10 @@ class HiDreamBaseDataLoader(
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding():
+            if not config.train_text_encoder_or_embedding() \
+                    or not config.train_text_encoder_2_or_embedding() \
+                    or not config.train_text_encoder_3_or_embedding() \
+                    or not config.train_text_encoder_4_or_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
