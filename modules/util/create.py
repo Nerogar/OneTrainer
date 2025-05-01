@@ -880,6 +880,36 @@ def create_optimizer(
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
             )
 
+        # PRODIGY_PLUS_SCHEDULE_FREE Optimizer
+        case Optimizer.PRODIGY_PLUS_SCHEDULE_FREE:
+            from prodigyplus.prodigy_plus_schedulefree import ProdigyPlusScheduleFree
+            optimizer = ProdigyPlusScheduleFree(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                weight_decay_by_lr=optimizer_config.weight_decay_by_lr if optimizer_config.weight_decay_by_lr is not None else True,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
+                prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
+                use_speed=optimizer_config.use_speed if optimizer_config.use_speed is not None else False,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                split_groups=optimizer_config.split_groups if optimizer_config.split_groups is not None else True,
+                split_groups_mean=optimizer_config.split_groups_mean if optimizer_config.split_groups_mean is not None else True,
+                factored=optimizer_config.factored if optimizer_config.factored is not None else True,
+                factored_fp32=optimizer_config.factored_fp32 if optimizer_config.factored_fp32 is not None else True,
+                fused_back_pass=optimizer_config.fused_back_pass if optimizer_config.fused_back_pass is not None else False,
+                use_stableadamw=optimizer_config.use_stableadamw if optimizer_config.use_stableadamw is not None else True,
+                use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_adopt=optimizer_config.use_adopt if optimizer_config.use_adopt is not None else False,
+                use_focus=optimizer_config.use_focus if optimizer_config.use_focus is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
+            )
+
         # ADAFactor Optimizer
         case Optimizer.ADAFACTOR:
             from transformers.optimization import Adafactor
