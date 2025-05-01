@@ -314,7 +314,7 @@ class HiDreamModel(BaseModel):
                 self.add_text_encoder_1_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=128,
                 return_tensors="pt",
             )
             tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
@@ -324,7 +324,7 @@ class HiDreamModel(BaseModel):
                 self.add_text_encoder_2_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=128,
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
@@ -334,7 +334,7 @@ class HiDreamModel(BaseModel):
                 self.add_text_encoder_3_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=128,
                 return_tensors="pt",
             )
             tokens_3 = tokenizer_output.input_ids.to(self.text_encoder_3.device)
@@ -345,7 +345,7 @@ class HiDreamModel(BaseModel):
                 self.add_text_encoder_4_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=128,
                 return_tensors="pt",
             )
             tokens_4 = tokenizer_output.input_ids.to(self.text_encoder_4.device)
@@ -394,7 +394,7 @@ class HiDreamModel(BaseModel):
             )
             if text_encoder_3_output is None:
                 text_encoder_3_output = torch.zeros(
-                    size=(batch_size, 77, self.transformer.config.joint_attention_dim),
+                    size=(batch_size, 128, self.transformer.config.joint_attention_dim),
                     device=train_device,
                     dtype=self.train_dtype.torch_dtype(),
                 )
