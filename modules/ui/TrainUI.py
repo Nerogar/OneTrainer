@@ -214,6 +214,9 @@ class TrainUI(ctk.CTk):
         components.label(frame, 8, 0, "Validation",
                          tooltip="Enable validation steps and add new graph in tensorboard")
         components.switch(frame, 8, 1, self.ui_state, "validation")
+        components.label(frame, 8, 2, "Validation Timesteps",
+                         tooltip="Comma-separated list of timesteps that are used for validation, between 0 and 999. High values determine the image composition, low values the details.")
+        components.entry(frame, 8, 3, self.ui_state, "validation_timesteps")
 
         components.label(frame, 9, 0, "Validate after",
                          tooltip="The interval used when validate training")

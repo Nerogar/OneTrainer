@@ -67,8 +67,7 @@ class BaseModelSetup(
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
-            *,
-            deterministic: bool = False,
+            seed: int,
     ) -> dict:
         pass
 
@@ -80,6 +79,16 @@ class BaseModelSetup(
             data: dict,
             config: TrainConfig,
     ) -> Tensor:
+        pass
+
+    @abstractmethod
+    def calculate_validation_losses(
+            self,
+            model: BaseModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ) -> dict:
         pass
 
     @abstractmethod
