@@ -65,4 +65,4 @@ class HiDreamLoRASaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        self._save(model, output_model_format, output_model_destination, dtype)
+        self._save(model, output_model_format, output_model_destination, dtype, enable_omi_format=True)
