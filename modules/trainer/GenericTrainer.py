@@ -20,6 +20,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
@@ -669,7 +670,17 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                    prior_pred_indices = [i for i in range(self.config.batch_size)
+                                          if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
+                    if len(prior_pred_indices) > 0:
+                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                            #do NOT create a subbatch using the indices, even though it would be more efficient:
+                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
+                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        model_output_data['target'][prior_pred_indices] = prior_model_output_data['predicted'][prior_pred_indices]
+                    else:
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
