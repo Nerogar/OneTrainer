@@ -8,6 +8,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_clip_encoder_layers,
@@ -26,6 +27,7 @@ from torch import Tensor
 
 
 class BaseFluxSetup(
+    ModelSetupText2ImageMixin,
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
@@ -196,14 +198,14 @@ class BaseFluxSetup(
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
+            seed: int,
             *,
-            deterministic: bool = False,
+            timestep: Tensor = None,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step
             generator = torch.Generator(device=config.train_device)
-            generator.manual_seed(batch_seed)
-            rand = Random(batch_seed)
+            generator.manual_seed(seed)
+            rand = Random(seed)
 
             vae_scaling_factor = model.vae.config['scaling_factor']
             vae_shift_factor = model.vae.config['shift_factor']
@@ -236,15 +238,16 @@ class BaseFluxSetup(
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config['num_train_timesteps'],
-                deterministic,
-                generator,
-                scaled_latent_image.shape[0],
-                config,
-                latent_height=scaled_latent_image.shape[-2],
-                latent_width=scaled_latent_image.shape[-1],
-            )
+            if not timestep:
+                timestep = self._get_timestep_discrete(
+                    model.noise_scheduler.config['num_train_timesteps'],
+                    False,
+                    generator,
+                    scaled_latent_image.shape[0],
+                    config,
+                    latent_height=scaled_latent_image.shape[-2],
+                    latent_width=scaled_latent_image.shape[-1],
+                )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
                 scaled_latent_image,
