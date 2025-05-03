@@ -46,9 +46,15 @@ class MultiTrainer(BaseTrainer):
         torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device, timeout=timeout)
         torch.cuda.set_device(device.index)
 
-        for _ in multi.sequential(): #use barrier synchronisation now already, to discover NCCL communication issues early
+        #use barrier synchronisation now already, to discover NCCL communication issues early:
+        if multi.is_master():
+            print("Synchronizing GPUs. If this stalls, this likely means that your NCCL installation is broken:")
+        for _ in multi.sequential():
             print(f"GPU #{multi.rank()}  device: {device} ({torch.cuda.get_device_name()})  "
                   f"backend: {torch.distributed.get_backend()}  world size: {torch.distributed.get_world_size()}")
+        if multi.is_master():
+            print("GPUs synchronized.")
+
 
         trainer = GenericTrainer(config, callbacks, TrainCommands())
         try:
