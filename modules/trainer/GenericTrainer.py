@@ -789,8 +789,8 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
-        elif self.model is not None:
-            self.model.to(self.temp_device)
+
+        self.model.to(self.temp_device)
 
         self.tensorboard.close()
 
