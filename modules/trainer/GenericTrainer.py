@@ -678,7 +678,9 @@ class GenericTrainer(BaseTrainer):
                             #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
                             prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        model_output_data['target'][prior_pred_indices] = prior_model_output_data['predicted'][prior_pred_indices]
+                        prior_model_prediction = prior_model_output_data['predicted'][prior_pred_indices] \
+                            .to(dtype=model_output_data['target'].dtype)
+                        model_output_data['target'][prior_pred_indices] = prior_model_prediction
                     else:
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
