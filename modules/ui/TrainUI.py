@@ -6,8 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog
 
-from modules.trainer.CloudTrainer import CloudTrainer
-from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.CloudTab import CloudTab
@@ -21,6 +19,7 @@ from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
 from modules.ui.VideoToolUI import VideoToolUI
+from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -33,7 +32,6 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
-from modules.zluda import ZLUDA
 
 import torch
 
@@ -175,9 +173,9 @@ class TrainUI(ctk.CTk):
         components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
-        components.label(frame, 1, 0, "Cache Directory",
+        components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.dir_entry(frame, 1, 1, self.ui_state, "cache_dir")
+        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir")
 
         # continue from previous backup
         components.label(frame, 2, 0, "Continue from last backup",
@@ -185,18 +183,18 @@ class TrainUI(ctk.CTk):
         components.switch(frame, 2, 1, self.ui_state, "continue_last_backup")
 
         # only cache
-        components.label(frame, 3, 0, "Only Cache",
+        components.label(frame, 2, 2, "Only Cache",
                          tooltip="Only populate the cache, without any training")
-        components.switch(frame, 3, 1, self.ui_state, "only_cache")
+        components.switch(frame, 2, 3, self.ui_state, "only_cache")
 
         # debug
         components.label(frame, 4, 0, "Debug mode",
                          tooltip="Save debug information during the training into the debug directory")
         components.switch(frame, 4, 1, self.ui_state, "debug_mode")
 
-        components.label(frame, 5, 0, "Debug Directory",
+        components.label(frame, 4, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(frame, 5, 1, self.ui_state, "debug_dir")
+        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir")
 
         # tensorboard
         components.label(frame, 6, 0, "Tensorboard",
@@ -215,9 +213,9 @@ class TrainUI(ctk.CTk):
                          tooltip="Enable validation steps and add new graph in tensorboard")
         components.switch(frame, 8, 1, self.ui_state, "validation")
 
-        components.label(frame, 9, 0, "Validate after",
+        components.label(frame, 8, 2, "Validate after",
                          tooltip="The interval used when validate training")
-        components.time_entry(frame, 9, 1, self.ui_state, "validate_after", "validate_after_unit")
+        components.time_entry(frame, 8, 3, self.ui_state, "validate_after", "validate_after_unit")
 
         # device
         components.label(frame, 10, 0, "Dataloader Threads",
@@ -225,12 +223,33 @@ class TrainUI(ctk.CTk):
         components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
 
         components.label(frame, 11, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
+                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
         components.entry(frame, 11, 1, self.ui_state, "train_device")
 
-        components.label(frame, 12, 0, "Temp Device",
+        components.label(frame, 12, 0, "Multi-GPU",
+                         tooltip="Enable multi-GPU training")
+        components.switch(frame, 12, 1, self.ui_state, "multi_gpu")
+        components.label(frame, 12, 2, "Device Indexes",
+                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
+        components.entry(frame, 12, 3, self.ui_state, "device_indexes")
+
+        components.label(frame, 13, 0, "Sequential model setup",
+                         tooltip="Multi-GPU: If enabled, loading and setting up the model is done for each GPU one after the other. This is slower, but can reduce peak RAM usage.")
+        components.switch(frame, 13, 1, self.ui_state, "sequential_model_setup")
+        components.label(frame, 13, 2, "Fused Gradient Reduce",
+                         tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
+        components.switch(frame, 13, 3, self.ui_state, "fused_gradient_reduce")
+
+        components.label(frame, 14, 0, "Async Gradient Reduce",
+                         tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
+        components.switch(frame, 14, 1, self.ui_state, "async_gradient_reduce")
+        components.label(frame, 14, 2, "Buffer size (MB)",
+                         tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
+        components.entry(frame, 14, 3, self.ui_state, "async_gradient_reduce_buffer")
+
+        components.label(frame, 15, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 12, 1, self.ui_state, "temp_device")
+        components.entry(frame, 15, 1, self.ui_state, "temp_device")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -591,12 +610,7 @@ class TrainUI(ctk.CTk):
             on_update_status=self.on_update_status,
         )
 
-        if self.train_config.cloud.enabled:
-            trainer = CloudTrainer(self.train_config, self.training_callbacks, self.training_commands, reattach=self.cloud_tab.reattach)
-        else:
-            ZLUDA.initialize_devices(self.train_config)
-            trainer = GenericTrainer(self.train_config, self.training_callbacks, self.training_commands)
-
+        trainer = create.create_trainer(self.train_config, self.training_callbacks, self.training_commands, reattach=self.cloud_tab.reattach)
         try:
             trainer.start()
             if self.train_config.cloud.enabled:

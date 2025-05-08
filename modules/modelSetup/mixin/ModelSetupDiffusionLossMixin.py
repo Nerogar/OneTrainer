@@ -3,7 +3,6 @@ from collections.abc import Callable
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
-from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.loss.masked_loss import masked_losses
 from modules.util.loss.vb_loss import vb_losses
@@ -223,13 +222,6 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             alphas_cumprod_fun: Callable[[Tensor, int], Tensor] | None = None,
     ) -> Tensor:
         loss_weight = batch['loss_weight']
-        batch_size_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] \
-                else config.batch_size
-        gradient_accumulation_steps_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
-                else config.gradient_accumulation_steps
-
         if self.__coefficients is None and betas is not None:
             self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
 
@@ -244,7 +236,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 losses = self.__unmasked_losses(batch, data, config)
 
         # Scale Losses by Batch and/or GA (if enabled)
-        losses = losses * batch_size_scale * gradient_accumulation_steps_scale
+        losses = losses * config.loss_scaler.get_scale(batch_size=config.batch_size, accumulation_steps=config.gradient_accumulation_steps)
 
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
@@ -270,13 +262,6 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             sigmas: Tensor | None = None,
     ) -> Tensor:
         loss_weight = batch['loss_weight']
-        batch_size_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] \
-                else config.batch_size
-        gradient_accumulation_steps_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
-                else config.gradient_accumulation_steps
-
         if self.__sigmas is None and sigmas is not None:
             num_timesteps = sigmas.shape[0]
             all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=sigmas.device)
@@ -291,7 +276,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 losses = self.__unmasked_losses(batch, data, config)
 
         # Scale Losses by Batch and/or GA (if enabled)
-        losses = losses * batch_size_scale * gradient_accumulation_steps_scale
+        losses = losses * config.loss_scaler.get_scale(config.batch_size, config.gradient_accumulation_steps)
 
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
