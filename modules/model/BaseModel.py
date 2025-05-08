@@ -3,6 +3,7 @@ from contextlib import nullcontext
 from uuid import uuid4
 
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
@@ -99,6 +100,10 @@ class BaseModel(metaclass=ABCMeta):
 
     @abstractmethod
     def eval(self):
+        pass
+
+    @abstractmethod
+    def adapters(self) -> list[LoRAModuleWrapper]:
         pass
 
     @staticmethod

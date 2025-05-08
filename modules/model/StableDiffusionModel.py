@@ -90,6 +90,12 @@ class StableDiffusionModel(BaseModel):
         self.sd_config = None
         self.sd_config_filename = None
 
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_lora,
+            self.unet_lora,
+        ] if a is not None]
+
     def all_embeddings(self) -> list[StableDiffusionModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
