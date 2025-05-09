@@ -8,6 +8,7 @@ import time
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
@@ -121,10 +122,15 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Enable or disable this concept")
         components.switch(frame, 1, 1, self.ui_state, "enabled")
 
-        # validation_concept
-        components.label(frame, 2, 0, "Validation concept",
-                         tooltip="Use concept for validation instead of training")
-        components.switch(frame, 2, 1, self.ui_state, "validation_concept")
+        # concept type
+        components.label(frame, 2, 0, "Concept Type",
+                         tooltip="STANDARD: Standard finetuning with the sample as training target\n"
+                                 "VALIDATION: Use concept for validation instead of training\n"
+                                 "PRIOR_PREDICTION: Use the sample to make a prediction using the model as it was before training. This prediction is then used as the training target "
+                                 "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
+                                 "Only implemented for LoRA.",
+                         wide_tooltip=True)
+        components.options(frame, 2, 1, [str(x) for x in list(ConceptType)], self.ui_state, "type")
 
         # path
         components.label(frame, 3, 0, "Path",

@@ -132,7 +132,7 @@ class ConceptWidget(ctk.CTkFrame):
                     preview_path = path_util.canonical_join(self.concept.path, path)
                     break
 
-        image = load_image(preview_path, convert_mode="RGB")
+        image = load_image(preview_path, convert_mode="RGBA")
         size = min(image.width, image.height)
         image = image.crop((
             (image.width - size) // 2,

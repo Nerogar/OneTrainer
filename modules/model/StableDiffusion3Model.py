@@ -129,6 +129,14 @@ class StableDiffusion3Model(BaseModel):
         self.transformer_lora = None
         self.lora_state_dict = None
 
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_1_lora,
+            self.text_encoder_2_lora,
+            self.text_encoder_3_lora,
+            self.transformer_lora,
+        ] if a is not None]
+
     def all_embeddings(self) -> list[StableDiffusion3ModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
