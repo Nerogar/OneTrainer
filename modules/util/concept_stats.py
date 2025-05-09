@@ -1,4 +1,7 @@
+import concurrent.futures
 import os
+import threading
+import time
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -10,7 +13,7 @@ import cv2
 import imagesize
 
 
-def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
+def init_concept_stats(advanced_checks : bool):
     stats_dict = {
                 "file_size" : 0,
                 "image_count" : 0,
@@ -23,6 +26,7 @@ def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
                 "paired_masks" : "-",
                 "unpaired_masks" : "-",
                 "caption_count" : 0,
+                "subcaption_count" : 0,
                 "paired_captions" : "-",
                 "unpaired_captions" : "-",
                 "processing_time" : 0,
@@ -39,12 +43,9 @@ def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
                 "max_caption_length" : "-",
                 "min_caption_length" : "-",
                 "avg_caption_length" : "-",
-                "aspect_buckets" : {}
+                "aspect_buckets" : {},
+                "force_cancelled" : False
             }
-
-    #break and return defaults if no path or nonexistent path
-    if not os.path.isdir(conceptconfig.path):
-        return stats_dict
 
     #advanced stats default to "-" above if not measured, but need to be initialized to specific values if they are
     if advanced_checks:
@@ -82,14 +83,24 @@ def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
 
     return stats_dict
 
-def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : ConceptConfig):
+def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : ConceptConfig, start_time : float, wait_time : float, cancel_scan_flag : threading.Event):
+    #break and return defaults if no path or nonexistent path
+    if not os.path.isdir(dir):
+        stats_dict["force_cancelled"] = True
+        return stats_dict
     img_extensions_list = path_util.SUPPORTED_IMAGE_EXTENSIONS
     vid_extensions_list = path_util.SUPPORTED_VIDEO_EXTENSIONS
-    aspect_ratio_list = list(stats_dict["aspect_buckets"].keys())
-    file_list = [f for f in os.scandir(dir) if f.is_file()]
-    file_list_str = [x.path for x in file_list]     #seems faster to check list of strings for matching files than list of path objects
+    file_list = [f for f in os.scandir(dir) if f.is_file()]     #this may take time on large directories
+    if advanced_checks:
+        aspect_ratio_list = list(stats_dict["aspect_buckets"].keys())
+        file_list_str = [x.path for x in file_list]     #seems faster to check list of strings for matching files than list of path objects
+    stats_dict["directory_count"] += 1
 
     for path in file_list:
+        stats_dict["processing_time"] = time.perf_counter() - start_time
+        if time.perf_counter() - start_time > wait_time or cancel_scan_flag.is_set():
+            stats_dict["force_cancelled"] = True
+            return stats_dict
         basename, extension = os.path.splitext(path)
         if extension.lower() in img_extensions_list and not path.name.endswith("-masklabel.png"):
             stats_dict["image_count"] += 1
@@ -106,6 +117,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                         captionlist = captionfile.read().splitlines()
                         #get character/word count of captions, split by newlines in each text file
                         for caption in captionlist:
+                            stats_dict["subcaption_count"] += 1     #each line in one file
                             char_count = len(caption)
                             word_count = len(caption.split())
                             if char_count > stats_dict["max_caption_length"][0]:
@@ -150,6 +162,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                         captionlist = captionfile.read().splitlines()
                         #get character/word count of captions, split by newlines in each text file
                         for caption in captionlist:
+                            stats_dict["subcaption_count"] += 1     #each line in one file
                             char_count = len(caption)
                             word_count = len(caption.split())
                             if char_count > stats_dict["max_caption_length"][0]:
@@ -197,10 +210,90 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
             stats_dict["file_size"] += path.stat().st_size
 
     #update every directory loop
-    stats_dict["directory_count"] += 1
     if advanced_checks:
         #check for number of "orphaned" mask/caption files as the difference between the total count and the count of image/mask or image/caption pairs
         stats_dict["unpaired_masks"] = stats_dict["mask_count"]-stats_dict["paired_masks"]
         stats_dict["unpaired_captions"] = stats_dict["caption_count"]-stats_dict["paired_captions"]
 
     return stats_dict
+
+def combine_stats_dicts(input_dicts : list[dict], advanced_checks : bool):
+    final_dict = init_concept_stats(advanced_checks)
+
+    for dict in input_dicts:
+        if dict["force_cancelled"]:
+            final_dict["force_cancelled"] = True
+            continue
+        for key in dict:
+            if key in ["file_size", "image_count", "video_count",
+                "mask_count", "caption_count", "directory_count"] or advanced_checks and key in ["image_with_mask_count", "image_with_caption_count", "video_with_mask_count", "subcaption_count",
+                "video_with_caption_count", "paired_masks", "unpaired_masks", "paired_captions", "unpaired_captions"]:
+                final_dict[key] += dict[key]
+            elif advanced_checks and key in ["aspect_buckets"]:
+                for subkey in dict[key]:
+                    final_dict[key][subkey] += dict[key][subkey]
+            elif advanced_checks and key in ["max_pixels", "max_length", "max_fps", "max_caption_length"]:
+                if dict[key][0] > final_dict[key][0]:
+                    final_dict[key] = dict[key]
+            elif advanced_checks and key in ["min_pixels", "min_length", "min_fps", "min_caption_length"]:
+                if dict[key][0] < final_dict[key][0]:
+                    final_dict[key] = dict[key]
+            elif advanced_checks and key in ["avg_pixels"]:
+                final_dict[key] += dict[key] * (dict["image_count"] + dict["video_count"])
+            elif advanced_checks and key in ["avg_fps", "avg_length"]:
+                final_dict[key] += dict[key] * dict["video_count"]
+            elif advanced_checks and key in ["avg_caption_length"]:
+                final_dict[key][0] += dict[key][0] * dict["subcaption_count"]
+                final_dict[key][1] += dict[key][1] * dict["subcaption_count"]
+
+    if advanced_checks:
+        try:
+            final_dict["avg_pixels"] = final_dict["avg_pixels"] / (final_dict["image_count"] + final_dict["video_count"])
+        except ZeroDivisionError:
+            final_dict["avg_pixels"] = 0
+        try:
+            final_dict["avg_caption_length"][0] = final_dict["avg_caption_length"][0] / final_dict["subcaption_count"]
+            final_dict["avg_caption_length"][1] = final_dict["avg_caption_length"][1] / final_dict["subcaption_count"]
+        except ZeroDivisionError:
+            final_dict["avg_caption_length"][0] = 0
+            final_dict["avg_caption_length"][1] = 0
+        try:
+            final_dict["avg_fps"] = final_dict["avg_fps"] / final_dict["video_count"]
+            final_dict["avg_length"] = final_dict["avg_length"] / final_dict["video_count"]
+        except ZeroDivisionError:
+            final_dict["avg_fps"] = 0
+            final_dict["avg_length"] = 0
+
+    return final_dict
+
+#loop through all subfolders of top-level path
+def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, wait_time : float):
+    stats_dict = init_concept_stats(advanced_checks)
+    start_time = time.perf_counter()
+    subfolders = [conceptconfig.path]
+    cancel_scan_flag = threading.Event()
+    cancel_scan_flag.clear()
+
+    for dir in subfolders:
+        stats_dict = folder_scan(dir, stats_dict, advanced_checks, start_time, wait_time, cancel_scan_flag)
+        subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
+
+    return stats_dict
+
+#loop through all subfolders of top-level path, uses concurrent.futures to process multiple directories in parallel
+def subfolder_scan_threaded(conceptconfig : ConceptConfig, advanced_checks : bool, wait_time : float):
+    start_time = time.perf_counter()
+    subfolders = [conceptconfig.path]
+    cancel_scan_flag = threading.Event()
+    cancel_scan_flag.clear()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        stats_futures = []
+        for dir in subfolders:
+            stats_futures += [executor.submit(folder_scan, dir, init_concept_stats(advanced_checks), advanced_checks, start_time, wait_time, cancel_scan_flag)]
+            subfolders.extend([f.path for f in os.scandir(dir) if f.is_dir()])
+        stats_results = [f.result() for f in stats_futures]
+
+    final_stats = combine_stats_dicts(stats_results, conceptconfig, advanced_checks)
+    final_stats["processing_time"] = time.perf_counter() - start_time
+    return final_stats

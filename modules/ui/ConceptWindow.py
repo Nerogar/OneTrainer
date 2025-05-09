@@ -390,7 +390,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.mask_count_label.configure(font=ctk.CTkFont(underline=True))
         self.mask_count_preview = components.label(frame, 4, 2, pad=0, text="-")
         self.caption_count_label = components.label(frame, 3, 3, "\nTotal Captions", pad=0,
-                         tooltip="Total number of caption files, any .txt file")
+                         tooltip="Total number of caption files, any .txt file. With advanced scan, includes the total number of captions on separate lines across all files in parentheses.")
         self.caption_count_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_count_preview = components.label(frame, 4, 3, pad=0, text="-")
 
@@ -674,7 +674,10 @@ class ConceptWindow(ctk.CTkToplevel):
         self.mask_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_masks"])
 
         #caption count
-        self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
+        if self.concept.concept_stats["subcaption_count"] > 0:
+            self.caption_count_preview.configure(text=f'{self.concept.concept_stats["caption_count"]} ({self.concept.concept_stats["subcaption_count"]})')
+        else:
+            self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
         self.caption_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_captions"])
 
         #resolution info
@@ -754,7 +757,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.bar_label(b, color=self.text_color)
         self.canvas.draw()
 
-    def __get_concept_stats(self, advanced_checks: bool, waittime: float):
+    def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
         if not os.path.isdir(self.concept.path):
             print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
             return
@@ -764,27 +767,18 @@ class ConceptWindow(ctk.CTkToplevel):
         self.concept_stats_tab.after(0, self.__disable_scan_buttons)
         subfolders = [self.concept.path]
 
-        stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
+        stats_dict = concept_stats.init_concept_stats(advanced_checks)
         for path in subfolders:
-            stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept)
-            stats_dict["processing_time"] = time.perf_counter() - start_time
-            if self.concept.include_subdirectories:     #add all subfolders of current directory to for loop
+            if self.cancel_scan_flag.is_set() or time.perf_counter() - start_time > wait_time:
+                break
+            stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept, start_time, wait_time, self.cancel_scan_flag)
+            if self.concept.include_subdirectories and not self.cancel_scan_flag.is_set():     #add all subfolders of current directory to for loop
                 subfolders.extend([f for f in os.scandir(path) if f.is_dir()])
             self.concept.concept_stats = stats_dict
-            #cancel and set init stats if longer than waiting time or cancel flag set
-            if (time.perf_counter() - start_time) > waittime or self.cancel_scan_flag.is_set():
-                stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
-                stats_dict["processing_time"] = time.perf_counter() - start_time
-                self.concept.concept_stats = stats_dict
-                self.cancel_scan_flag.clear()
-                self.concept_stats_tab.after(0, self.__enable_scan_buttons)
-                break
             #update GUI approx every half second
             if time.perf_counter() > (last_update + 0.5):
                 last_update = time.perf_counter()
                 self.concept_stats_tab.after(0, self.__update_concept_stats)
-                # self.__update_concept_stats()
-                # self.concept_stats_tab.update()
 
         self.cancel_scan_flag.clear()
         self.concept_stats_tab.after(0, self.__enable_scan_buttons)
