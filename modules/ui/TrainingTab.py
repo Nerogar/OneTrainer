@@ -609,6 +609,11 @@ class TrainingTab:
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
 
+        # masked prior preservation
+        components.label(frame, 4, 0, "Masked Prior Preservation Weight",
+                         tooltip="Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight.")
+        components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight")
+
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
