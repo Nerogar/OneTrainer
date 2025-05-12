@@ -615,9 +615,9 @@ class TrainingTab:
         components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight")
 
         # use custom conditioning image
-        components.label(frame, 4, 0, "Custom Conditioning Image",
+        components.label(frame, 5, 0, "Custom Conditioning Image",
                          tooltip="When custom conditioning image is enabled, will use png postfix with -condlabel instead of automatically generated.It's suitable for special scenarios, such as object removal, allowing the model to learn a certain behavior concept")
-        components.switch(frame, 4, 1, self.ui_state, "custom_conditioning_image")
+        components.switch(frame, 5, 1, self.ui_state, "custom_conditioning_image")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
