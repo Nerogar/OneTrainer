@@ -30,6 +30,8 @@ class ModelType(Enum):
 
     HUNYUAN_VIDEO = 'HUNYUAN_VIDEO'
 
+    HI_DREAM_FULL = 'HI_DREAM_FULL'
+
     def __str__(self):
         return self.value
 
@@ -78,6 +80,9 @@ class ModelType(Enum):
     def is_hunyuan_video(self):
         return self == ModelType.HUNYUAN_VIDEO
 
+    def is_hi_dream(self):
+        return self == ModelType.HI_DREAM_FULL
+
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
@@ -97,7 +102,8 @@ class ModelType(Enum):
         return self.is_stable_diffusion_3() \
             or self.is_stable_diffusion_xl() \
             or self.is_flux() \
-            or self.is_hunyuan_video()
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream() \
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \

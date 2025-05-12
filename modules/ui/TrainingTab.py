@@ -74,6 +74,8 @@ class TrainingTab:
             self.__setup_sana_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hunyuan_video():
             self.__setup_hunyuan_video_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_hi_dream():
+            self.__setup_hi_dream_ui(column_0, column_1, column_2)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -89,9 +91,9 @@ class TrainingTab:
 
     def __setup_stable_diffusion_3_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
-        self.__create_text_encoder_1_frame(column_0, 1, supports_include=True)
-        self.__create_text_encoder_2_frame(column_0, 2, supports_include=True)
-        self.__create_text_encoder_3_frame(column_0, 3, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 3, i=3, supports_include=True)
         self.__create_embedding_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0)
@@ -103,8 +105,8 @@ class TrainingTab:
 
     def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
-        self.__create_text_encoder_1_frame(column_0, 1)
-        self.__create_text_encoder_2_frame(column_0, 2)
+        self.__create_text_encoder_n_frame(column_0, 1, i=1)
+        self.__create_text_encoder_n_frame(column_0, 2, i=2)
         self.__create_embedding_frame(column_0, 3)
 
         self.__create_base2_frame(column_1, 0)
@@ -140,8 +142,8 @@ class TrainingTab:
 
     def __setup_flux_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
-        self.__create_text_encoder_1_frame(column_0, 1, supports_include=True)
-        self.__create_text_encoder_2_frame(column_0, 2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True)
         self.__create_embedding_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0)
@@ -165,12 +167,27 @@ class TrainingTab:
 
     def __setup_hunyuan_video_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
-        self.__create_text_encoder_1_frame(column_0, 1, supports_include=True)
-        self.__create_text_encoder_2_frame(column_0, 2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True)
         self.__create_embedding_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
+        self.__create_noise_frame(column_1, 2)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+
+    def __setup_hi_dream_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 3, i=3, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 4, i=4, supports_include=True, supports_layer_skip=False)
+        self.__create_embedding_frame(column_0, 5)
+
+        self.__create_base2_frame(column_1, 0, video_training_enabled=True)
+        self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)
@@ -360,155 +377,65 @@ class TrainingTab:
                          tooltip="The number of additional clip layers to skip. 0 = the model default")
         components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
 
-    def __create_text_encoder_1_frame(self, master, row, supports_include: bool = False):
+    def __create_text_encoder_n_frame(
+            self,
+            master,
+            row: int,
+            i: int,
+            supports_include: bool = False,
+            supports_layer_skip: bool = True,
+    ):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
         row = 0
 
+        suffix = f"_{i}" if i > 1 else ""
+
         if supports_include:
             # include text encoder
-            components.label(frame, row, 0, "Include Text Encoder 1",
-                             tooltip="Includes text encoder 1 in the training run")
-            components.switch(frame, row, 1, self.ui_state, "text_encoder.include")
+            components.label(frame, row, 0, f"Include Text Encoder {i}",
+                             tooltip=f"Includes text encoder {i} in the training run")
+            components.switch(frame, row, 1, self.ui_state, f"text_encoder{suffix}.include")
             row += 1
 
         # train text encoder
-        components.label(frame, row, 0, "Train Text Encoder 1",
-                         tooltip="Enables training the text encoder 1 model")
-        components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
+        components.label(frame, row, 0, f"Train Text Encoder {i}",
+                         tooltip=f"Enables training the text encoder {i} model")
+        components.switch(frame, row, 1, self.ui_state, f"text_encoder{suffix}.train")
         row += 1
 
         # train text encoder embedding
-        components.label(frame, row, 0, "Train Text Encoder 1 Embedding",
-                         tooltip="Enables training embeddings for the text encoder 1 model")
-        components.switch(frame, row, 1, self.ui_state, "text_encoder.train_embedding")
+        components.label(frame, row, 0, f"Train Text Encoder {i} Embedding",
+                         tooltip=f"Enables training embeddings for the text encoder {i} model")
+        components.switch(frame, row, 1, self.ui_state, f"text_encoder{suffix}.train_embedding")
         row += 1
 
         # dropout
         components.label(frame, row, 0, "Dropout Probability",
-                         tooltip="The Probability for dropping the text encoder 1 conditioning")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+                         tooltip=f"The Probability for dropping the text encoder {i} conditioning")
+        components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}.dropout_probability")
         row += 1
 
         # train text encoder epochs
         components.label(frame, row, 0, "Stop Training After",
-                         tooltip="When to stop training the text encoder 1")
-        components.time_entry(frame, row, 1, self.ui_state, "text_encoder.stop_training_after",
-                              "text_encoder.stop_training_after_unit", supports_time_units=False)
+                         tooltip=f"When to stop training the text encoder {i}")
+        components.time_entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}.stop_training_after",
+                              f"text_encoder{suffix}.stop_training_after_unit", supports_time_units=False)
         row += 1
 
         # text encoder learning rate
-        components.label(frame, row, 0, "Text Encoder 1 Learning Rate",
-                         tooltip="The learning rate of the text encoder 1. Overrides the base learning rate")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder.learning_rate")
+        components.label(frame, row, 0, f"Text Encoder {i} Learning Rate",
+                         tooltip=f"The learning rate of the text encoder {i}. Overrides the base learning rate")
+        components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}.learning_rate")
         row += 1
 
-        # text encoder layer skip (clip skip)
-        components.label(frame, row, 0, "Text Encoder 1 Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_layer_skip")
-        row += 1
-
-    def __create_text_encoder_2_frame(self, master, row, supports_include: bool = False):
-        frame = ctk.CTkFrame(master=master, corner_radius=5)
-        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-        row = 0
-
-        if supports_include:
-            # include text encoder
-            components.label(frame, row, 0, "Include Text Encoder 2",
-                             tooltip="Includes text encoder 2 in the training run")
-            components.switch(frame, row, 1, self.ui_state, "text_encoder_2.include")
+        if supports_layer_skip:
+            # text encoder layer skip (clip skip)
+            components.label(frame, row, 0, f"Text Encoder {i} Clip Skip",
+                             tooltip="The number of additional clip layers to skip. 0 = the model default")
+            components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_layer_skip")
             row += 1
-
-        # train text encoder
-        components.label(frame, row, 0, "Train Text Encoder 2",
-                         tooltip="Enables training the text encoder 2 model")
-        components.switch(frame, row, 1, self.ui_state, "text_encoder_2.train")
-        row += 1
-
-        # train text encoder embedding
-        components.label(frame, row, 0, "Train Text Encoder 2 Embedding",
-                         tooltip="Enables training embeddings for the text encoder 2 model")
-        components.switch(frame, row, 1, self.ui_state, "text_encoder_2.train_embedding")
-        row += 1
-
-        # dropout
-        components.label(frame, row, 0, "Dropout Probability",
-                         tooltip="The Probability for dropping the text encoder 2 conditioning")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_2.dropout_probability")
-        row += 1
-
-        # train text encoder epochs
-        components.label(frame, row, 0, "Stop Training After",
-                         tooltip="When to stop training the text encoder 2")
-        components.time_entry(frame, row, 1, self.ui_state, "text_encoder_2.stop_training_after",
-                              "text_encoder_2.stop_training_after_unit", supports_time_units=False)
-        row += 1
-
-        # text encoder learning rate
-        components.label(frame, row, 0, "Text Encoder 2 Learning Rate",
-                         tooltip="The learning rate of the text encoder 2. Overrides the base learning rate")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_2.learning_rate")
-        row += 1
-
-        # text encoder layer skip (clip skip)
-        components.label(frame, row, 0, "Text Encoder 2 Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_2_layer_skip")
-        row += 1
-
-    def __create_text_encoder_3_frame(self, master, row, supports_include: bool = False):
-        frame = ctk.CTkFrame(master=master, corner_radius=5)
-        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-        row = 0
-
-        if supports_include:
-            # include text encoder
-            components.label(frame, row, 0, "Include Text Encoder 3",
-                             tooltip="Includes text encoder 3 in the training run")
-            components.switch(frame, row, 1, self.ui_state, "text_encoder_3.include")
-            row += 1
-
-        # train text encoder
-        components.label(frame, row, 0, "Train Text Encoder 3",
-                         tooltip="Enables training the text encoder 3 model")
-        components.switch(frame, row, 1, self.ui_state, "text_encoder_3.train")
-        row += 1
-
-        # train text encoder embedding
-        components.label(frame, row, 0, "Train Text Encoder 3 Embedding",
-                         tooltip="Enables training embeddings for the text encoder 3 model")
-        components.switch(frame, row, 1, self.ui_state, "text_encoder_3.train_embedding")
-        row += 1
-
-        # dropout
-        components.label(frame, row, 0, "Dropout Probability",
-                         tooltip="The Probability for dropping the text encoder 3 conditioning")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_3.dropout_probability")
-        row += 1
-
-        # train text encoder epochs
-        components.label(frame, row, 0, "Stop Training After",
-                         tooltip="When to stop training the text encoder 3")
-        components.time_entry(frame, row, 1, self.ui_state, "text_encoder_3.stop_training_after",
-                              "text_encoder_3.stop_training_after_unit", supports_time_units=False)
-        row += 1
-
-        # text encoder learning rate
-        components.label(frame, row, 0, "Text Encoder 3 Learning Rate",
-                         tooltip="The learning rate of the text encoder 3. Overrides the base learning rate")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_3.learning_rate")
-        row += 1
-
-        # text encoder layer skip (clip skip)
-        components.label(frame, row, 0, "Text Encoder 3 Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder_3_layer_skip")
-        row += 1
 
     def __create_embedding_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -681,6 +608,11 @@ class TrainingTab:
         components.label(frame, 3, 0, "Normalize Masked Area Loss",
                          tooltip="When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region")
         components.switch(frame, 3, 1, self.ui_state, "normalize_masked_area_loss")
+
+        # masked prior preservation
+        components.label(frame, 4, 0, "Masked Prior Preservation Weight",
+                         tooltip="Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight.")
+        components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

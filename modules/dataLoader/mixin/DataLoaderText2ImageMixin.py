@@ -225,8 +225,7 @@ class DataLoaderText2ImageMixin:
 
     def _output_modules_from_out_names(
             self,
-            output_names: list[str],
-            sort_names: list[str],
+            output_names: list[str | tuple[str, str]],
             config: TrainConfig,
             before_cache_image_fun: Callable[[], None] | None = None,
             use_conditioning_image: bool = False,
@@ -234,6 +233,18 @@ class DataLoaderText2ImageMixin:
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
+        sort_names = output_names + ['concept']
+
+        output_names = output_names + [
+            ('concept.loss_weight', 'loss_weight'),
+            ('concept.type', 'concept_type'),
+        ]
+
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
+            output_names.append(('concept.seed', 'concept_seed'))
+
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image' if use_conditioning_image else None,
             replace_probability=config.unmasked_probability, vae=vae,

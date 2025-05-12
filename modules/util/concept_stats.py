@@ -2,12 +2,12 @@ import os
 
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.image_util import load_image
 
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
 
 import cv2
 import imagesize
-from PIL import Image
 
 
 def init_concept_stats(conceptconfig : ConceptConfig, advanced_checks : bool):
@@ -121,7 +121,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                     if width == -1:     #if imagesize doesn't recognize format it returns (-1, -1)
                         raise ValueError
                 except ValueError:     #use PIL if not supported by imagesize
-                    img = Image.open(path)
+                    img = load_image(path.path)
                     width, height = img.size
                     img.close()
                 pixels = width*height

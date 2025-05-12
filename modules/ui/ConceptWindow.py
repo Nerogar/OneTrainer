@@ -1,13 +1,15 @@
 import math
-import multiprocessing
 import os
 import pathlib
 import random
+import threading
 import time
 
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
+from modules.util.enum.ConceptType import ConceptType
+from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
@@ -78,7 +80,6 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
         self.image_preview_file_index = 0
 
-
         self.title("Concept")
         self.geometry("800x700")
         self.resizable(True, True)
@@ -94,7 +95,9 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
-        self.__auto_update_concept_stats()
+        #automatic concept scan
+        self.scan_thread = threading.Thread(target=self.__auto_update_concept_stats, daemon=True)
+        self.scan_thread.start()
 
         components.button(self, 1, 0, "ok", self.__ok)
 
@@ -119,10 +122,15 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Enable or disable this concept")
         components.switch(frame, 1, 1, self.ui_state, "enabled")
 
-        # validation_concept
-        components.label(frame, 2, 0, "Validation concept",
-                         tooltip="Use concept for validation instead of training")
-        components.switch(frame, 2, 1, self.ui_state, "validation_concept")
+        # concept type
+        components.label(frame, 2, 0, "Concept Type",
+                         tooltip="STANDARD: Standard finetuning with the sample as training target\n"
+                                 "VALIDATION: Use concept for validation instead of training\n"
+                                 "PRIOR_PREDICTION: Use the sample to make a prediction using the model as it was before training. This prediction is then used as the training target "
+                                 "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
+                                 "Only implemented for LoRA.",
+                         wide_tooltip=True)
+        components.options(frame, 2, 1, [str(x) for x in list(ConceptType)], self.ui_state, "type")
 
         # path
         components.label(frame, 3, 0, "Path",
@@ -359,7 +367,7 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(2, weight=0, minsize=150)
         frame.grid_columnconfigure(3, weight=0, minsize=150)
 
-        self.cancel_scan_flag = multiprocessing.Event()
+        self.cancel_scan_flag = threading.Event()
 
         #file size
         self.file_size_label = components.label(frame, 1, 0, "Total Size", pad=0,
@@ -507,11 +515,11 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.yaxis.label.set_color(self.text_color)
 
         #refresh stats - must be after all labels are defined or will give error
-        components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__get_concept_stats_threaded(False, 9999),
+        self.refresh_basic_stats_button = components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__get_concept_stats_threaded(False, 9999),
                           tooltip="Reload basic statistics for the concept directory")
-        components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: [self.__get_concept_stats_threaded(False, 9999), self.__get_concept_stats(True, 9999)],
+        self.refresh_advanced_stats_button = components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: self.__get_concept_stats_threaded(True, 9999),
                           tooltip="Reload advanced statistics for the concept directory")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
-        components.button(master=frame, row=0, column=2, text="Abort Scan", command=lambda: self.__cancel_concept_stats(),
+        self.cancel_stats_button = components.button(master=frame, row=0, column=2, text="Abort Scan", command=lambda: self.__cancel_concept_stats(),
                           tooltip="Stop the currently running scan if it's taking a long time - advanced scan will be slow on large folders and on HDDs")
         self.processing_time = components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
 
@@ -550,7 +558,7 @@ class ConceptWindow(ctk.CTkToplevel):
                     if file_index == self.image_preview_file_index:
                         break
 
-        image = Image.open(preview_image_path).convert("RGB")
+        image = load_image(preview_image_path, 'RGB')
         image_tensor = functional.to_tensor(image)
 
         splitext = os.path.splitext(preview_image_path)
@@ -753,9 +761,15 @@ class ConceptWindow(ctk.CTkToplevel):
         self.canvas.draw()
 
     def __get_concept_stats(self, advanced_checks: bool, waittime: float):
+        if not os.path.isdir(self.concept.path):
+            print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
+            return
         start_time = time.perf_counter()
         last_update = time.perf_counter()
+        self.cancel_scan_flag.clear()
+        self.concept_stats_tab.after(0, self.__disable_scan_buttons)
         subfolders = [self.concept.path]
+
         stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
         for path in subfolders:
             stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept)
@@ -769,18 +783,30 @@ class ConceptWindow(ctk.CTkToplevel):
                 stats_dict["processing_time"] = time.perf_counter() - start_time
                 self.concept.concept_stats = stats_dict
                 self.cancel_scan_flag.clear()
+                self.concept_stats_tab.after(0, self.__enable_scan_buttons)
                 break
             #update GUI approx every half second
             if time.perf_counter() > (last_update + 0.5):
                 last_update = time.perf_counter()
-                self.__update_concept_stats()
-                self.concept_stats_tab.update()
+                self.concept_stats_tab.after(0, self.__update_concept_stats)
+                # self.__update_concept_stats()
+                # self.concept_stats_tab.update()
 
-        self.__update_concept_stats()
+        self.cancel_scan_flag.clear()
+        self.concept_stats_tab.after(0, self.__enable_scan_buttons)
+        self.concept_stats_tab.after(0, self.__update_concept_stats)
 
     def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
-        self.p = multiprocessing.Process(target=self.__get_concept_stats(advanced_checks, waittime), daemon=True)
-        self.p.start()
+        self.scan_thread = threading.Thread(target=self.__get_concept_stats, args=[advanced_checks, waittime], daemon=True)
+        self.scan_thread.start()
+
+    def __disable_scan_buttons(self):
+        self.refresh_basic_stats_button.configure(state="disabled")
+        self.refresh_advanced_stats_button.configure(state="disabled")
+
+    def __enable_scan_buttons(self):
+        self.refresh_basic_stats_button.configure(state="normal")
+        self.refresh_advanced_stats_button.configure(state="normal")
 
     def __cancel_concept_stats(self):
         self.cancel_scan_flag.set()
@@ -788,15 +814,13 @@ class ConceptWindow(ctk.CTkToplevel):
     def __auto_update_concept_stats(self):
         try:
             self.__update_concept_stats()      #load stats from config if available, else raises KeyError
-            if self.concept.concept_stats["image_count"] == 0:  #force rescan if zero images
+            if self.concept.concept_stats["file_size"] == 0:  #force rescan if empty
                 raise KeyError
         except KeyError:
-            try:
-                self.__get_concept_stats_threaded(False, 2)    #force rescan if config is empty, timeout of 2 sec
+            if os.path.isdir(self.concept.path):
+                self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
                 if self.concept.concept_stats["processing_time"] < 0.1:
-                    self.__get_concept_stats_threaded(True, 2)    #do advanced scan automatically if basic took <0.1s
-            except FileNotFoundError:              #avoid error when loading concept window without config path defined
-                pass
+                    self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
 
     def __ok(self):
         self.destroy()

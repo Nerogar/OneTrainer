@@ -7,6 +7,7 @@ from abc import ABCMeta, abstractmethod
 from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.path_util import write_json_atomic
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -207,11 +208,10 @@ class ConfigList(metaclass=ABCMeta):
                 if not os.path.exists(self.config_dir):
                     os.mkdir(self.config_dir)
 
-                with open(getattr(self.train_config, self.attr_name), "w") as f:
-                    json.dump(
-                        [element.to_dict() for element in self.current_config],
-                        f, indent=4
-                    )
+                write_json_atomic(
+                    getattr(self.train_config, self.attr_name),
+                    [element.to_dict() for element in self.current_config]
+                )
 
     def __open_element_window(self, i, ui_state):
         window = self.open_element_window(i, ui_state)

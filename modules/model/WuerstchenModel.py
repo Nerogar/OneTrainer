@@ -123,6 +123,12 @@ class WuerstchenModel(BaseModel):
         self.prior_prior_lora = None
         self.lora_state_dict = None
 
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.prior_text_encoder_lora,
+            self.prior_prior_lora,
+        ] if a is not None]
+
     def all_embeddings(self) -> list[WuerstchenModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
@@ -218,7 +224,7 @@ class WuerstchenModel(BaseModel):
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             tokenizer_output = self.prior_tokenizer(
-                self.add_text_encoder_embeddings_to_prompt(text),
+                self.add_prior_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,

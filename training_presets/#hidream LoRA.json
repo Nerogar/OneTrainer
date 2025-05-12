@@ -1,0 +1,31 @@
+{
+    "backup_after": 10,
+    "base_model_name": "HiDream-ai/HiDream-I1-Full",
+    "batch_size": 4,
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.5,
+    "dataloader_threads": 1,
+    "learning_rate": 0.0003,
+    "model_type": "HI_DREAM_FULL",
+    "output_model_destination": "models/lora.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "512",
+    "timestep_distribution": "LOGIT_NORMAL",
+    "dynamic_timestep_shifting": false,
+    "train_dtype": "BFLOAT_16",
+    "training_method": "LORA",
+    "weight_dtype": "FLOAT_8",
+    "text_encoder": {
+        "train": false
+    },
+    "text_encoder_2": {
+        "train": false
+    },
+    "text_encoder_3": {
+        "train": false
+    },
+    "text_encoder_4": {
+        "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+        "train": false
+    }
+}
