@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from modules.modelSetup.FluxLoRASetup import PRESETS as flux_presets
+from modules.modelSetup.HiDreamLoRASetup import PRESETS as hidream_presets
 from modules.modelSetup.HunyuanVideoLoRASetup import PRESETS as hunyuan_video_presets
 from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
 from modules.modelSetup.SanaLoRASetup import PRESETS as sana_presets
@@ -58,6 +59,8 @@ class LoraTab:
             self.presets = sana_presets
         elif self.train_config.model_type.is_hunyuan_video():
             self.presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_hi_dream():
+            self.presets = hidream_presets
         else:
             self.presets = {"full": []}
         self.presets_list = list(self.presets.keys()) + ["custom"]

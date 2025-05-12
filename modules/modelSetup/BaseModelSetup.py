@@ -1,7 +1,9 @@
 from abc import ABCMeta, abstractmethod
+from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
@@ -176,6 +178,18 @@ class BaseModelSetup(
             train_progress,
         )
 
+    def stop_text_encoder_4_training_elapsed(
+            self,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_text_encoder_4_training",
+            config.text_encoder_4.stop_training_after,
+            config.text_encoder_4.stop_training_after_unit,
+            train_progress,
+        )
+
     def stop_embedding_training_elapsed(
             self,
             config: TrainEmbeddingConfig,
@@ -187,3 +201,16 @@ class BaseModelSetup(
             config.stop_training_after_unit,
             train_progress,
         )
+
+    @contextmanager
+    def prior_model(self, model: BaseModel, config: TrainConfig):
+        if config.training_method is not TrainingMethod.LORA:
+            raise NotImplementedError("Prior model is only available with LoRA training")
+
+        for adapter in model.adapters():
+            adapter.remove_hook_from_module()
+        try:
+            yield
+        finally:
+            for adapter in model.adapters():
+                adapter.hook_to_module()

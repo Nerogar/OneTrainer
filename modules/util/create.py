@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
+from modules.dataLoader.HiDreamBaseDataLoader import HiDreamBaseDataLoader
 from modules.dataLoader.HunyuanVideoBaseDataLoader import HunyuanVideoBaseDataLoader
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
 from modules.dataLoader.SanaBaseDataLoader import SanaBaseDataLoader
@@ -17,6 +18,9 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.FluxEmbeddingModelLoader import FluxEmbeddingModelLoader
 from modules.modelLoader.FluxFineTuneModelLoader import FluxFineTuneModelLoader
 from modules.modelLoader.FluxLoRAModelLoader import FluxLoRAModelLoader
+from modules.modelLoader.HiDreamEmbeddingModelLoader import HiDreamEmbeddingModelLoader
+from modules.modelLoader.HiDreamFineTuneModelLoader import HiDreamFineTuneModelLoader
+from modules.modelLoader.HiDreamLoRAModelLoader import HiDreamLoRAModelLoader
 from modules.modelLoader.HunyuanVideoEmbeddingModelLoader import HunyuanVideoEmbeddingModelLoader
 from modules.modelLoader.HunyuanVideoFineTuneModelLoader import HunyuanVideoFineTuneModelLoader
 from modules.modelLoader.HunyuanVideoLoRAModelLoader import HunyuanVideoLoRAModelLoader
@@ -40,6 +44,7 @@ from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTune
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.FluxSampler import FluxSampler
+from modules.modelSampler.HiDreamSampler import HiDreamSampler
 from modules.modelSampler.HunyuanVideoSampler import HunyuanVideoSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
 from modules.modelSampler.SanaSampler import SanaSampler
@@ -52,6 +57,8 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.FluxEmbeddingModelSaver import FluxEmbeddingModelSaver
 from modules.modelSaver.FluxFineTuneModelSaver import FluxFineTuneModelSaver
 from modules.modelSaver.FluxLoRAModelSaver import FluxLoRAModelSaver
+from modules.modelSaver.HiDreamEmbeddingModelSaver import HiDreamEmbeddingModelSaver
+from modules.modelSaver.HiDreamLoRAModelSaver import HiDreamLoRAModelSaver
 from modules.modelSaver.HunyuanVideoEmbeddingModelSaver import HunyuanVideoEmbeddingModelSaver
 from modules.modelSaver.HunyuanVideoFineTuneModelSaver import HunyuanVideoFineTuneModelSaver
 from modules.modelSaver.HunyuanVideoLoRAModelSaver import HunyuanVideoLoRAModelSaver
@@ -77,6 +84,9 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.FluxEmbeddingSetup import FluxEmbeddingSetup
 from modules.modelSetup.FluxFineTuneSetup import FluxFineTuneSetup
 from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
+from modules.modelSetup.HiDreamEmbeddingSetup import HiDreamEmbeddingSetup
+from modules.modelSetup.HiDreamFineTuneSetup import HiDreamFineTuneSetup
+from modules.modelSetup.HiDreamLoRASetup import HiDreamLoRASetup
 from modules.modelSetup.HunyuanVideoEmbeddingSetup import HunyuanVideoEmbeddingSetup
 from modules.modelSetup.HunyuanVideoFineTuneSetup import HunyuanVideoFineTuneSetup
 from modules.modelSetup.HunyuanVideoLoRASetup import HunyuanVideoLoRASetup
@@ -158,6 +168,8 @@ def create_model_loader(
                 return SanaFineTuneModelLoader()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoFineTuneModelLoader()
+            if model_type.is_hi_dream():
+                return HiDreamFineTuneModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
@@ -178,6 +190,8 @@ def create_model_loader(
                 return SanaLoRAModelLoader()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoLoRAModelLoader()
+            if model_type.is_hi_dream():
+                return HiDreamLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -195,6 +209,8 @@ def create_model_loader(
                 return SanaEmbeddingModelLoader()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoEmbeddingModelLoader()
+            if model_type.is_hi_dream():
+                return HiDreamEmbeddingModelLoader()
 
     return None
 
@@ -241,6 +257,8 @@ def create_model_saver(
                 return SanaLoRAModelSaver()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoLoRAModelSaver()
+            if model_type.is_hi_dream():
+                return HiDreamLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -258,6 +276,8 @@ def create_model_saver(
                 return SanaEmbeddingModelSaver()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoEmbeddingModelSaver()
+            if model_type.is_hi_dream():
+                return HiDreamEmbeddingModelSaver()
 
     return None
 
@@ -287,6 +307,8 @@ def create_model_setup(
                 return SanaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_hi_dream():
+                return HiDreamFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -307,6 +329,8 @@ def create_model_setup(
                 return SanaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_hi_dream():
+                return HiDreamLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -324,6 +348,8 @@ def create_model_setup(
                 return SanaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_hi_dream():
+                return HiDreamEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
 
@@ -353,6 +379,8 @@ def create_model_sampler(
                 return SanaSampler(train_device, temp_device, model, model_type)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoSampler(train_device, temp_device, model, model_type)
+            if model_type.is_hi_dream():
+                return HiDreamSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)
@@ -394,6 +422,8 @@ def create_data_loader(
                 return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_hunyuan_video():
                 return HunyuanVideoBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_hi_dream():
+                return HiDreamBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress, is_validation)

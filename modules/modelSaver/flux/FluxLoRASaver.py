@@ -1,11 +1,12 @@
 from modules.model.FluxModel import FluxModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.convert_lora_util import LoraConversionKeySet
-from modules.util.convert.lora.convert_flux_lora import convert_flux_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
+
+from omi_model_standards.convert.lora.convert_flux_lora import convert_flux_lora_key_sets
+from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
 class FluxLoRASaver(
