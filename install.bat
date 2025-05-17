@@ -24,14 +24,14 @@ rem --- Helpers ---
 
 :warn_store
   echo.
-  echo %YEL% ?? WARNING: Windows Store Python detected ?? RESET%
+  echo %YEL% ?? WARNING: Windows Store Python detected ?? %RESET%
   echo Windows Store Python has a known history of causing insidious issues with virtual environments due to how
   echo Microsoft sandboxes it.
   echo.
   echo We strongly recommend installing Python directly from[36m https://www.python.org[0m instead.
   echo.
   echo Support for Windows Store Python is provided AS IS.
-  >nul set /p "ans=Proceed anyway? (y/N): "
+  set /p "ans=Proceed anyway? (y/n): "   >nul
   if /i "!ans!"=="y" exit /b 0
   exit /b 1
 
@@ -46,19 +46,17 @@ rem --- Helpers ---
 :run_or_die
   echo %~1
   cmd /c "%~1" || call :die "%~2"
-  exit /b 1
+  exit /b 0
 
 rem --- Main ---
 :main
 rem 1) Check Python Launcher for available versions
-for /f "tokens=1,2 delims= " %%A in ('where py 2^>nul') do (
-  for /f "tokens=*" %%V in ('py --list ^| findstr /c:"-V:"') do (
-    rem parse version…
+for /f "tokens=*" %%V in ('py --list ^| findstr /c:"-V:"') do (
+    rem parse version
     py -%%V "%VERSION_FILE%" %MIN_PY% %MAX_PY% >nul 2>&1 && (
-      set "PYTHON=py -%%V"
-      goto :py_ok
+    set "PYTHON=py -%%V"
+    goto :py_ok
     )
-  )
 )
 
 rem 2) Try non-Store python next
@@ -102,7 +100,7 @@ call :run_or_die "%PYTHON% -m pip install -r requirements.txt" "Dependencies ins
 rem 6) Check CUDA
 %PYTHON% -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)"
 if errorlevel 1 (
-  >nul set /p "ans=CUDA not found. AMD GPU? (y/N): "
+  set /p "ans=CUDA not found. AMD GPU? (y/n): " >nul
   if /i "!ans!"=="y" (
     call :run_or_die "%PYTHON% scripts\install_zluda.py" "ZLUDA install failed"
   ) else (
