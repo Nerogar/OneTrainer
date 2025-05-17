@@ -1,4 +1,6 @@
-@echo off & setlocal EnableDelayedExpansion
+@echo off
+chcp 65001 >nul
+setlocal EnableDelayedExpansion
 
 rem --- Color codes ---
 set "RED=[31m" & set "YEL=[33m" & set "GRN=[92m" & set "CYAN=[36m" & set "RESET=[0m"
@@ -21,7 +23,14 @@ rem --- Helpers ---
   exit /b 1
 
 :warn_store
-  echo.& echo %YEL%WARNING: Windows Store Python detected ...%RESET%
+  echo.
+  echo %YEL% ?? WARNING: Windows Store Python detected ?? RESET%
+  echo Windows Store Python has a known history of causing insidious issues with virtual environments due to how
+  echo Microsoft sandboxes it.
+  echo.
+  echo We strongly recommend installing Python directly from[36m https://www.python.org[0m instead.
+  echo.
+  echo Support for Windows Store Python is provided AS IS.
   >nul set /p "ans=Proceed anyway? (y/N): "
   if /i "!ans!"=="y" exit /b 0
   exit /b 1
