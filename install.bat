@@ -20,6 +20,7 @@ rem --- Helpers ---
   echo %RED%ERROR:%RESET% %~1&
   echo
   pause
+  popd
   exit /b 1
 
 :warn_store
@@ -112,4 +113,5 @@ echo.
 echo %GRN%**** Install successful! ****%RESET%
 echo.
 pause
+popd
 exit /b 0
