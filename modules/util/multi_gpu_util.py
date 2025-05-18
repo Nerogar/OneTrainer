@@ -1,6 +1,8 @@
 from collections import deque
 
+from modules.util.bf16_stochastic_rounding import copy_stochastic_
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 
 import torch
 
@@ -58,7 +60,7 @@ async_deque = deque()
 in_transfer = 0
 
 
-def reduce_grads_mean(params: list[torch.Tensor], after_reduce=None, async_op: bool=False, max_buffer: int=0):
+def reduce_grads_mean(params: list[torch.Tensor], precision: GradientReducePrecision, after_reduce=None, async_op: bool=False, max_buffer: int=0):
     assert not async_op or max_buffer > 0
     if not is_enabled() and after_reduce is None:
         return
@@ -68,35 +70,54 @@ def reduce_grads_mean(params: list[torch.Tensor], after_reduce=None, async_op: b
                 if async_op:
                     global async_deque
                     global in_transfer
-                    size = param.grad.numel() * param.grad.element_size()
-                    complete_previous_async_ops(next_size=size, max_buffer=max_buffer)
-                    work = torch.distributed.all_reduce(param.grad, op=torch.distributed.ReduceOp.SUM, async_op=True)
-                    async_deque.append((work, param, after_reduce))
+                    grad = param.grad.to(precision.torch_dtype(param.grad.dtype))
+
+                    size = grad.numel() * grad.element_size()
+                    complete_previous_async_ops(precision, next_size=size, max_buffer=max_buffer)
+
+                    work = torch.distributed.all_reduce(grad, op=torch.distributed.ReduceOp.SUM, async_op=True)
+                    async_deque.append((work, param, grad, after_reduce))
+
                     in_transfer += size
                 else:
-                    torch.distributed.all_reduce(param.grad, op=torch.distributed.ReduceOp.SUM, async_op=False)
-                    param.grad /= world_size() #TODO stochastic rounding?
+                    grad = param.grad.to(precision.torch_dtype(param.grad.dtype))
+                    torch.distributed.all_reduce(grad, op=torch.distributed.ReduceOp.SUM, async_op=False)
+
+                    grad = grad.to(torch.float32) if precision.stochastic_rounding(param.grad.dtype) else grad
+                    grad /= world_size()
+                    if precision.stochastic_rounding(param.grad.dtype):
+                        copy_stochastic_(param.grad, grad)
+                    else:
+                        param.grad = grad.to(param.grad.dtype)
+
                     if after_reduce is not None:
                         after_reduce(param)
             elif after_reduce is not None:
                 after_reduce(param)
 
-def complete_previous_async_ops(next_size: int=0, max_buffer: int=0):
+def complete_previous_async_ops(precision: GradientReducePrecision, next_size: int=0, max_buffer: int=0):
     global async_deque
     global in_transfer
     while async_deque and (
         in_transfer + next_size > max_buffer
         or async_deque[0][0].is_completed()
     ):
-        work, param, after_reduce = async_deque.popleft()
+        work, param, grad, after_reduce = async_deque.popleft()
         work.wait()
-        in_transfer -= param.grad.numel() * param.grad.element_size()
-        param.grad /= world_size() #TODO stochastic rounding?
+        in_transfer -= grad.numel() * grad.element_size()
+
+        grad = grad.to(torch.float32) if precision.stochastic_rounding(param.grad.dtype) else grad
+        grad /= world_size()
+        if precision.stochastic_rounding(param.grad.dtype):
+            copy_stochastic_(param.grad, grad)
+        else:
+            param.grad = grad.to(param.grad.dtype)
+
         if after_reduce is not None:
             after_reduce(param)
 
-def finish_async():
-    complete_previous_async_ops(max_buffer=0)
+def finish_async(precision: GradientReducePrecision):
+    complete_previous_async_ops(precision, max_buffer=0)
 
 
 

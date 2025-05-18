@@ -573,6 +573,7 @@ class GenericTrainer(BaseTrainer):
                             if fused_reduce:
                                 multi.reduce_grads_mean(
                                     [tensor],
+                                    self.config.gradient_reduce_precision,
                                     after_reduce=__optimizer_step if fused_optimizer_step else None,
                                     async_op=self.config.async_gradient_reduce,
                                     max_buffer=self.config.async_gradient_reduce_buffer * 1024 * 1024,
@@ -734,9 +735,9 @@ class GenericTrainer(BaseTrainer):
 
                     if self.__is_update_step(train_progress):
                         if self.config.fused_gradient_reduce:
-                            multi.finish_async()
+                            multi.finish_async(self.config.gradient_reduce_precision)
                         else:
-                            multi.reduce_grads_mean(self.model.parameters.parameters())
+                            multi.reduce_grads_mean(self.model.parameters.parameters(), self.config.gradient_reduce_precision)
 
                         if scaler and self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
                             scaler.step_after_unscale_parameter_(self.model.optimizer)

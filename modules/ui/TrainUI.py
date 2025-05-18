@@ -24,6 +24,7 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -236,20 +237,30 @@ class TrainUI(ctk.CTk):
         components.label(frame, 13, 0, "Sequential model setup",
                          tooltip="Multi-GPU: If enabled, loading and setting up the model is done for each GPU one after the other. This is slower, but can reduce peak RAM usage.")
         components.switch(frame, 13, 1, self.ui_state, "sequential_model_setup")
-        components.label(frame, 13, 2, "Fused Gradient Reduce",
+
+        components.label(frame, 14, 0, "Gradient Reduce Precision",
+                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise\n"
+                                 "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
+                                 "FLOAT_32: Reduce gradients in float32\n"
+                                 "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
+                         wide_tooltip=True)
+        components.options(frame, 14, 1, [str(x) for x in list(GradientReducePrecision)], self.ui_state,
+                           "gradient_reduce_precision")
+
+        components.label(frame, 14, 2, "Fused Gradient Reduce",
                          tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
-        components.switch(frame, 13, 3, self.ui_state, "fused_gradient_reduce")
+        components.switch(frame, 14, 3, self.ui_state, "fused_gradient_reduce")
 
-        components.label(frame, 14, 0, "Async Gradient Reduce",
+        components.label(frame, 15, 0, "Async Gradient Reduce",
                          tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
-        components.switch(frame, 14, 1, self.ui_state, "async_gradient_reduce")
-        components.label(frame, 14, 2, "Buffer size (MB)",
+        components.switch(frame, 15, 1, self.ui_state, "async_gradient_reduce")
+        components.label(frame, 15, 2, "Buffer size (MB)",
                          tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
-        components.entry(frame, 14, 3, self.ui_state, "async_gradient_reduce_buffer")
+        components.entry(frame, 15, 3, self.ui_state, "async_gradient_reduce_buffer")
 
-        components.label(frame, 15, 0, "Temp Device",
+        components.label(frame, 16, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 15, 1, self.ui_state, "temp_device")
+        components.entry(frame, 16, 1, self.ui_state, "temp_device")
 
         frame.pack(fill="both", expand=1)
         return frame
