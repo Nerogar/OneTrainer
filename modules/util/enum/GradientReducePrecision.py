@@ -22,7 +22,7 @@ class GradientReducePrecision(Enum):
             case _:
                 raise ValueError
 
-    def stochastic_rounding(self, weight_dtype: torch.dtype) -> torch.dtype:
+    def stochastic_rounding(self, weight_dtype: torch.dtype) -> bool:
         match self:
             case GradientReducePrecision.WEIGHT_DTYPE:
                 return False

@@ -239,7 +239,7 @@ class TrainUI(ctk.CTk):
         components.switch(frame, 13, 1, self.ui_state, "sequential_model_setup")
 
         components.label(frame, 14, 0, "Gradient Reduce Precision",
-                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise\n"
+                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
                                  "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
                                  "FLOAT_32: Reduce gradients in float32\n"
                                  "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
