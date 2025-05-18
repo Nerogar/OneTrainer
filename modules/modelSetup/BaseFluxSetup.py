@@ -236,9 +236,6 @@ class BaseFluxSetup(
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            temperature = 1.5
-            latent_noise *= temperature ** 0.5
-
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
@@ -307,7 +304,7 @@ class BaseFluxSetup(
                 latent_input.shape[3],
             )
 
-            flow = latent_noise / (temperature ** 0.5) - scaled_latent_image
+            flow = latent_noise - scaled_latent_image
             model_output_data = {
                 'loss_type': 'target',
                 'timestep': timestep,
