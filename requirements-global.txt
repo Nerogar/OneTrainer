@@ -41,7 +41,7 @@ lion-pytorch==0.2.3 # lion optimizer
 prodigyopt==1.1.2 # prodigy optimizer
 schedulefree==1.4.0 # schedule-free optimizers
 pytorch_optimizer==3.4.0 # pytorch optimizers
-prodigy-plus-schedule-free==2.0.0rc1 # Prodigy Plus Optimzer
+prodigy-plus-schedule-free==2.0.0rc1 # Prodigy plus optimizer
 
 # Profiling
 scalene==1.5.51
