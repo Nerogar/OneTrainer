@@ -380,8 +380,14 @@ class VideoToolUI(ctk.CTkToplevel):
                 else:
                     output_directory = self.clip_output_entry.get()
 
-                executor.submit(self.__extract_clips,
-                                str(video_path), str(self.clip_time_start_entry.get()), str(self.clip_time_end_entry.get()), float(self.clip_length_entry.get()), self.split_at_cuts.get(), float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
+                if batch_mode:
+                    executor.submit(self.__extract_clips,
+                                str(video_path), str(self.clip_time_start_entry.get()), str(self.clip_time_end_entry.get()), float(self.clip_length_entry.get()), self.split_at_cuts.get(),
+                                float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
+                else:
+                    executor.submit(self.__extract_clips,
+                                str(video_path), "00:00:00", "99:99:99", float(self.clip_length_entry.get()), self.split_at_cuts.get(),
+                                float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
 
         print("Clip extraction from all videos complete")
 
@@ -478,8 +484,14 @@ class VideoToolUI(ctk.CTkToplevel):
                 else:
                     output_directory = self.image_output_entry.get()
 
-                executor.submit(self.__save_frames,
-                                video_path, str(self.image_time_start_entry.get()), str(self.image_time_end_entry.get()), float(self.capture_rate_entry.get()), float(self.blur_threshold_entry.get()), float(self.image_crop_entry.get()), output_directory)
+                if batch_mode:
+                    executor.submit(self.__save_frames,
+                                video_path, str(self.image_time_start_entry.get()), str(self.image_time_end_entry.get()), float(self.capture_rate_entry.get()),
+                                float(self.blur_threshold_entry.get()), float(self.image_crop_entry.get()), output_directory)
+                else:
+                    executor.submit(self.__save_frames,
+                                video_path, "00:00:00", "99:99:99", float(self.capture_rate_entry.get()),
+                                float(self.blur_threshold_entry.get()), float(self.image_crop_entry.get()), output_directory)
 
         print("Image extraction from all videos complete")
 
