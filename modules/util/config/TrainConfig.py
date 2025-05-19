@@ -101,12 +101,14 @@ class TrainOptimizerConfig(BaseConfig):
     split_groups_mean: True
     factored: True
     factored_fp32: True
-    use_stableadamw: True
-    use_muon_pp: False
+    use_stableadamw: True                
     use_cautious: False
     use_grams: False
     use_adopt: False
     use_focus: False
+    d_limiter: True
+    use_schedulefree: True
+    use_orthograd: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -185,11 +187,13 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("factored", True, bool, False))
         data.append(("factored_fp32", True, bool, False))
         data.append(("use_stableadamw", True, bool, False))
-        data.append(("use_muon_pp", False, bool, False))
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
         data.append(("use_focus", False, bool, False))
+        data.append(("d_limiter", True, bool, True))
+        data.append(("use_schedulefree", True, bool, True))
+        data.append(("use_orthograd", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
