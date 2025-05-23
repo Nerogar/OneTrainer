@@ -1,3 +1,4 @@
+import fractions
 import math
 import os
 import pathlib
@@ -482,7 +483,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         #aspect bucket info
         self.aspect_bucket_label = components.label(frame, 17, 0, "\nAspect Bucketing", pad=0,
-                         tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (1:4 extremely wide) to 4 (4:1 extremely tall). \
+                         tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (4:1 extremely wide) to 4 (1:4 extremely tall). \
                             Images which don't match a bucket exactly are cropped to the nearest one.")
         self.aspect_bucket_label.configure(font=ctk.CTkFont(underline=True))
         self.small_bucket_label = components.label(frame, 17, 1, "\nSmallest Buckets", pad=0,
@@ -498,10 +499,11 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
-        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2))
+        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
         self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
         self.bucket_fig.tight_layout()
+        self.bucket_fig.subplots_adjust(bottom=0.15)
 
         self.bucket_fig.set_facecolor(background_color)
         self.bucket_ax.set_facecolor(background_color)
@@ -758,10 +760,20 @@ class ConceptWindow(ctk.CTkToplevel):
 
         self.bucket_ax.cla()
         aspects = [str(x) for x in list(aspect_buckets.keys())]
+        aspect_ratios = [self.decimal_to_aspect_ratio(x) for x in list(aspect_buckets.keys())]
         counts = list(aspect_buckets.values())
-        b = self.bucket_ax.bar(aspects, counts)
+        b = self.bucket_ax.bar(aspect_ratios, counts)
         self.bucket_ax.bar_label(b, color=self.text_color)
+        sec = self.bucket_ax.secondary_xaxis(location=-0.1)
+        sec.spines["bottom"].set_linewidth(0)
+        sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["Wide", "Square", "Tall"])
+        sec.tick_params('x', length=0)
         self.canvas.draw()
+
+    def decimal_to_aspect_ratio(self, value : float):
+        aspect_fraction = fractions.Fraction(value).limit_denominator(16)
+        aspect_string = f'{aspect_fraction.denominator}:{aspect_fraction.numerator}'
+        return aspect_string
 
     def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
         if not os.path.isdir(self.concept.path):
