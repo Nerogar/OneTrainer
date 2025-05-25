@@ -21,12 +21,12 @@ def upcast_stochastic_(t: torch.Tensor) -> torch.Tensor:
 
 class AdaCoordDoWG(torch.optim.Optimizer):
     def __init__(self, params, eps=1e-8, weight_decay=0.0, stochastic_rounding=False):
-        defaults = dict(
-            epsilon=eps,
-            weight_decay=weight_decay,
-            stochastic_rounding=stochastic_rounding,
-        )
-        super(AdaCoordDoWG, self).__init__(params, defaults)
+        defaults = {
+            "epsilon": eps,
+            "weight_decay": weight_decay,
+            "stochastic_rounding": stochastic_rounding,
+        }
+        super().__init__(params, defaults)
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -52,15 +52,9 @@ class AdaCoordDoWG(torch.optim.Optimizer):
 
                 vt_sqrt = vt.sqrt().add_(epsilon)
 
-                if group["stochastic_rounding"]:
-                    denom = upcast_stochastic_(vt_sqrt)
-                else:
-                    denom = vt_sqrt.to(dtype=torch.float32)
+                denom = upcast_stochastic_(vt_sqrt) if group["stochastic_rounding"] else vt_sqrt.to(dtype=torch.float32)
 
-                if group["stochastic_rounding"]:
-                    grad_float = upcast_stochastic_(grad)
-                else:
-                    grad_float = grad.to(dtype=torch.float32)
+                grad_float = upcast_stochastic_(grad) if group["stochastic_rounding"] else grad.to(dtype=torch.float32)
 
                 gt_hat = grad_float * epsilon
 
