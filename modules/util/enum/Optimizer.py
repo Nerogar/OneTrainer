@@ -66,6 +66,9 @@ class Optimizer(Enum):
     AIDA = 'AIDA'
     YOGI = 'YOGI'
 
+    # Community optimizers
+    ADA_COORD_DOWG = 'ADA_COORD_DOWG'
+
     @property
     def is_adaptive(self):
         return self in [

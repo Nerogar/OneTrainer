@@ -1034,6 +1034,16 @@ def create_optimizer(
                 initial_accumulator=optimizer_config.initial_accumulator if optimizer_config.initial_accumulator is not None else 1e-6,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-3,
             )
+        
+        # Adaptive Coordinate DoWG Optimizer
+        case Optimizer.ADA_COORD_DOWG:
+            from modules.util.optimizer.ada_coord_dowg import AdaCoordDoWG
+            optimizer = AdaCoordDoWG(
+                params=parameters,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else False,
+            )
 
     if state_dict is not None and optimizer is not None:
         if 'param_group_mapping' not in state_dict:
