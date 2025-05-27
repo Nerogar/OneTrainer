@@ -3,6 +3,7 @@ from abc import ABCMeta
 
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.MGDS import MGDS
@@ -20,18 +21,20 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
-        if config.concepts is not None:
-            concepts = [concept.to_dict() for concept in config.concepts]
-        else:
+        concepts = config.concepts
+        if concepts is None:
             with open(config.concept_file_name, 'r') as f:
-                concepts_source = json.load(f)
-            concepts = []
-            for concept in concepts_source:
-                if not config.validation or is_validation == concept['validation_concept']:
-                    concepts.append(ConceptConfig.default_values().from_dict(concept).to_dict())
+                concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
+
+        # choose all validation concepts, or none of them, depending on is_validation
+        concepts = [concept for concept in concepts if (ConceptType(concept.type) == ConceptType.VALIDATION) == is_validation]
+
+        # convert before passing to MGDS
+        concepts = [c.to_dict() for c in concepts]
 
         settings = {
             "target_resolution": config.resolution,
+            "target_frames": config.frames,
         }
 
         # Just defaults for now.

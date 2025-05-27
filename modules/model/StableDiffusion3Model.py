@@ -23,24 +23,36 @@ from diffusers import (
 from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 
-class StableDiffusion3ModelEmbedding(BaseModelEmbedding):
+class StableDiffusion3ModelEmbedding:
     def __init__(
             self,
             uuid: str,
-            text_encoder_1_vector: Tensor,
-            text_encoder_2_vector: Tensor,
-            text_encoder_3_vector: Tensor,
+            text_encoder_1_vector: Tensor | None,
+            text_encoder_2_vector: Tensor | None,
+            text_encoder_3_vector: Tensor | None,
             placeholder: str,
+            is_output_embedding: bool,
     ):
-        super().__init__(
+        self.text_encoder_1_embedding = BaseModelEmbedding(
             uuid=uuid,
-            token_count=text_encoder_1_vector.shape[0],
             placeholder=placeholder,
+            vector=text_encoder_1_vector,
+            is_output_embedding=is_output_embedding,
         )
 
-        self.text_encoder_1_vector = text_encoder_1_vector
-        self.text_encoder_2_vector = text_encoder_2_vector
-        self.text_encoder_3_vector = text_encoder_3_vector
+        self.text_encoder_2_embedding = BaseModelEmbedding(
+            uuid=uuid,
+            placeholder=placeholder,
+            vector=text_encoder_2_vector,
+            is_output_embedding=is_output_embedding,
+        )
+
+        self.text_encoder_3_embedding = BaseModelEmbedding(
+            uuid=uuid,
+            placeholder=placeholder,
+            vector=text_encoder_3_vector,
+            is_output_embedding=is_output_embedding,
+        )
 
 
 class StableDiffusion3Model(BaseModel):
@@ -56,10 +68,8 @@ class StableDiffusion3Model(BaseModel):
     transformer: SD3Transformer2DModel | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     text_encoder_3_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     text_encoder_3_train_dtype: DataType
 
     text_encoder_3_offload_conductor: LayerOffloadConductor | None
@@ -67,9 +77,7 @@ class StableDiffusion3Model(BaseModel):
 
     # persistent embedding training data
     embedding: StableDiffusion3ModelEmbedding | None
-    embedding_state: tuple[Tensor, Tensor, Tensor] | None
     additional_embeddings: list[StableDiffusion3ModelEmbedding] | None
-    additional_embedding_states: list[tuple[Tensor, Tensor, Tensor] | None]
     embedding_wrapper_1: AdditionalEmbeddingWrapper | None
     embedding_wrapper_2: AdditionalEmbeddingWrapper | None
     embedding_wrapper_3: AdditionalEmbeddingWrapper | None
@@ -80,9 +88,6 @@ class StableDiffusion3Model(BaseModel):
     text_encoder_3_lora: LoRAModuleWrapper | None
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
-
-    sd_config: dict | None
-    sd_config_filename: str | None
 
     def __init__(
             self,
@@ -102,19 +107,15 @@ class StableDiffusion3Model(BaseModel):
         self.vae = None
         self.transformer = None
 
-        self.autocast_context = nullcontext()
         self.text_encoder_3_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_3_offload_conductor = None
         self.transformer_offload_conductor = None
 
         self.embedding = None
-        self.embedding_state = None
         self.additional_embeddings = []
-        self.additional_embedding_states = []
         self.embedding_wrapper_1 = None
         self.embedding_wrapper_2 = None
         self.embedding_wrapper_3 = None
@@ -124,6 +125,30 @@ class StableDiffusion3Model(BaseModel):
         self.text_encoder_3_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
+
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_1_lora,
+            self.text_encoder_2_lora,
+            self.text_encoder_3_lora,
+            self.transformer_lora,
+        ] if a is not None]
+
+    def all_embeddings(self) -> list[StableDiffusion3ModelEmbedding]:
+        return self.additional_embeddings \
+               + ([self.embedding] if self.embedding is not None else [])
+
+    def all_text_encoder_1_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_1_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_1_embedding] if self.embedding is not None else [])
+
+    def all_text_encoder_2_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_2_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_2_embedding] if self.embedding is not None else [])
+
+    def all_text_encoder_3_embeddings(self) -> list[BaseModelEmbedding]:
+        return [embedding.text_encoder_3_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_3_embedding] if self.embedding is not None else [])
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -196,13 +221,19 @@ class StableDiffusion3Model(BaseModel):
             tokenizer_3=self.tokenizer_3,
         )
 
-    def add_embeddings_to_prompt(self, prompt: str) -> str:
-        return self._add_embeddings_to_prompt(self.additional_embeddings, self.embedding, prompt)
+    def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_1_embeddings(), prompt)
+
+    def add_text_encoder_2_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_2_embeddings(), prompt)
+
+    def add_text_encoder_3_embeddings_to_prompt(self, prompt: str) -> str:
+        return self._add_embeddings_to_prompt(self.all_text_encoder_3_embeddings(), prompt)
 
     def encode_text(
             self,
             train_device: torch.device,
-            batch_size: int,
+            batch_size: int = 1,
             rand: Random | None = None,
             text: str = None,
             tokens_1: Tensor = None,
@@ -223,11 +254,11 @@ class StableDiffusion3Model(BaseModel):
             text_encoder_2_output: Tensor = None,
             pooled_text_encoder_2_output: Tensor = None,
             text_encoder_3_output: Tensor = None,
-    ) -> tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         # tokenize prompt
         if tokens_1 is None and text is not None and self.tokenizer_1 is not None:
             tokenizer_output = self.tokenizer_1(
-                text,
+                self.add_text_encoder_1_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
@@ -238,7 +269,7 @@ class StableDiffusion3Model(BaseModel):
 
         if tokens_2 is None and text is not None and self.tokenizer_2 is not None:
             tokenizer_output = self.tokenizer_2(
-                text,
+                self.add_text_encoder_2_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
@@ -249,7 +280,7 @@ class StableDiffusion3Model(BaseModel):
 
         if tokens_3 is None and text is not None and self.tokenizer_3 is not None:
             tokenizer_output = self.tokenizer_3(
-                text,
+                self.add_text_encoder_3_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
                 max_length=77,
@@ -341,6 +372,27 @@ class StableDiffusion3Model(BaseModel):
             text_encoder_2_output = text_encoder_2_output * tokens_mask_2[:, :, None]
             text_encoder_3_output = text_encoder_3_output * tokens_mask_3[:, :, None]
 
+        text_encoder_1_output = self._apply_output_embeddings(
+            self.all_text_encoder_1_embeddings(),
+            self.tokenizer_1,
+            tokens_1,
+            text_encoder_1_output,
+        )
+
+        text_encoder_2_output = self._apply_output_embeddings(
+            self.all_text_encoder_2_embeddings(),
+            self.tokenizer_2,
+            tokens_2,
+            text_encoder_2_output,
+        )
+
+        text_encoder_3_output = self._apply_output_embeddings(
+            self.all_text_encoder_3_embeddings(),
+            self.tokenizer_3,
+            tokens_3,
+            text_encoder_3_output,
+        )
+
         # apply dropout
         if text_encoder_1_dropout_probability is not None:
             dropout_text_encoder_1_mask = (torch.tensor(
@@ -362,16 +414,23 @@ class StableDiffusion3Model(BaseModel):
                 device=train_device)).float()
             text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
 
-        # build the conditioning tensor
+        return text_encoder_1_output, text_encoder_2_output, text_encoder_3_output, pooled_text_encoder_1_output, pooled_text_encoder_2_output
+
+    def combine_text_encoder_output(
+            self,
+            text_encoder_1_output: Tensor,
+            text_encoder_2_output: Tensor,
+            text_encoder_3_output: Tensor,
+            pooled_text_encoder_1_output: Tensor,
+            pooled_text_encoder_2_output: Tensor,
+    ) -> tuple[Tensor, Tensor]:
         prompt_embedding = torch.concat(
             [text_encoder_1_output, text_encoder_2_output], dim=-1
         )
         prompt_embedding = torch.nn.functional.pad(
             prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
         )
-        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2) \
-            .to(dtype=self.train_dtype.torch_dtype())
-        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
-            .to(dtype=self.train_dtype.torch_dtype())
+        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
+        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
 
         return prompt_embedding, pooled_prompt_embedding

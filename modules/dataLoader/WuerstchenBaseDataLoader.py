@@ -13,6 +13,7 @@ from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeClipText import EncodeClipText
+from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.NormalizeImageChannels import NormalizeImageChannels
 from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.SaveText import SaveText
@@ -64,6 +65,7 @@ class WuerstchenBaseDataLoader(
         normalize_image = NormalizeImageChannels(image_in_name='image', image_out_name='image', mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
         encode_image = EncodeWuerstchenEffnet(in_name='image', out_name='latent_image', effnet_encoder=model.effnet_encoder, autocast_contexts=[model.autocast_context, model.effnet_encoder_autocast_context], dtype=model.effnet_encoder_train_dtype.torch_dtype())
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.75 * 0.03125) # *0.75 / 32.0
+        add_embeddings_to_prompt = MapData(in_name='prompt', out_name='prompt', map_fn=model.add_prior_text_encoder_embeddings_to_prompt)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.prior_tokenizer, max_token_length=model.prior_tokenizer.model_max_length)
         if model.model_type.is_wuerstchen_v2():
             encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True, text_encoder=model.prior_text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
@@ -72,13 +74,13 @@ class WuerstchenBaseDataLoader(
 
         modules = [
             downscale_image, normalize_image, encode_image,
-            tokenize_prompt,
+            add_embeddings_to_prompt, tokenize_prompt,
         ]
 
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
 
         return modules
@@ -130,7 +132,7 @@ class WuerstchenBaseDataLoader(
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if not config.text_encoder.train and not config.train_any_embedding():
+            if not config.train_text_encoder_or_embedding():
                 modules.append(text_disk_cache)
                 sort_names = [x for x in sort_names if x not in text_split_names]
 
@@ -143,27 +145,20 @@ class WuerstchenBaseDataLoader(
     def _output_modules(self, config: TrainConfig, model: WuerstchenModel):
         output_names = [
             'image_path', 'latent_image',
-            'tokens', 'tokens_mask',
+            'prompt',
+            'tokens',
+            'tokens_mask',
             'original_resolution', 'crop_resolution', 'crop_offset',
         ]
 
         if config.masked_training or config.model_type.has_mask_input():
             output_names.append('latent_mask')
 
-        if not config.text_encoder.train and not config.train_any_embedding():
+        if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
             if model.model_type.is_stable_cascade():
                 output_names.append('pooled_text_encoder_output')
-
-        sort_names = output_names + ['concept']
-        output_names = output_names + [('concept.loss_weight', 'loss_weight')]
-
-        # add for calculating loss per concept
-        if config.validation:
-            output_names.append(('concept.name', 'concept_name'))
-            output_names.append(('concept.path', 'concept_path'))
-            output_names.append(('concept.seed', 'concept_seed'))
 
         def before_cache_image_fun():
             model.to(self.temp_device)
@@ -173,7 +168,6 @@ class WuerstchenBaseDataLoader(
 
         return self._output_modules_from_out_names(
             output_names=output_names,
-            sort_names=sort_names,
             config=config,
             before_cache_image_fun=before_cache_image_fun,
             autocast_context=[model.autocast_context],
@@ -212,7 +206,7 @@ class WuerstchenBaseDataLoader(
             is_validation: bool = False,
     ):
         enumerate_input = self._enumerate_input_modules(config)
-        load_input = self._load_input_modules(config, model.train_dtype, model.add_embeddings_to_prompt)
+        load_input = self._load_input_modules(config, model.train_dtype)
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, 128)
         crop_modules = self._crop_modules(config)

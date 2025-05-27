@@ -4,6 +4,7 @@ from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
+from modules.util.torch_util import add_dummy_grad_fn_, has_grad_fn
 
 import torch
 from torch import nn
@@ -12,6 +13,10 @@ from torch.utils.checkpoint import checkpoint
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
+from diffusers.models.transformers.transformer_hidream_image import (
+    HiDreamImageSingleTransformerBlock,
+    HiDreamImageTransformerBlock,
+)
 from diffusers.models.transformers.transformer_hunyuan_video import (
     HunyuanVideoIndividualTokenRefinerBlock,
     HunyuanVideoSingleTransformerBlock,
@@ -89,11 +94,14 @@ def create_checkpointed_forward(
             args = bound_conductor.before_layer(bound_layer_index, call_id, args)
             output = orig_forward(*args)
             bound_conductor.after_layer(bound_layer_index, call_id, args)
+
+            # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
+            if torch.is_grad_enabled() and not has_grad_fn(output):
+                output = add_dummy_grad_fn_(output)
+
             return output
 
         def custom_forward(
-                # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-                dummy: torch.Tensor,
                 call_index: int,
                 *args,
         ):
@@ -126,7 +134,7 @@ def create_checkpointed_forward(
                 )
             else:
                 args = __kwargs_to_args(orig_forward, args, kwargs)
-                return custom_forward(None, call_id, *args)
+                return custom_forward(call_id, *args)
     else:
         def custom_forward(
                 # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
@@ -379,6 +387,33 @@ def enable_checkpointing_for_hunyuan_video_transformer(
 
     for child_module in orig_module.modules():
         if isinstance(child_module, HunyuanVideoSingleTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    return conductor
+
+def enable_checkpointing_for_hi_dream_transformer(
+        orig_module: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    conductor = LayerOffloadConductor(orig_module, config)
+
+    layer_index = 0
+    for child_module in orig_module.modules():
+        if isinstance(child_module, HiDreamImageTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states", "encoder_hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    for child_module in orig_module.modules():
+        if isinstance(child_module, HiDreamImageSingleTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
                 ["hidden_states"],

@@ -11,13 +11,13 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.image_util import load_image
 from modules.util.torch_util import torch_gc
 
 import torch
 from torch import nn
 from torchvision.transforms import transforms
 
-from PIL import Image
 from tqdm import tqdm
 
 
@@ -41,7 +41,7 @@ class FluxSampler(BaseModelSampler):
             base_seq_len: int = 256,
             max_seq_len: int = 4096,
             base_shift: float = 0.5,
-            max_shift: float = 1.16,
+            max_shift: float = 1.15,
     ):
         m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
         b = base_shift - m * base_seq_len
@@ -87,7 +87,6 @@ class FluxSampler(BaseModelSampler):
             prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
                 apply_attention_mask=prior_attention_mask,
@@ -265,13 +264,13 @@ class FluxSampler(BaseModelSampler):
                     ),
                 ])
 
-                image = Image.open(base_image_path).convert("RGB")
+                image = load_image(base_image_path, convert_mode="RGB")
                 image = t(image).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
                 )
 
-                mask = Image.open(mask_image_path).convert("L")
+                mask = load_image(mask_image_path, convert_mode='L')
                 mask = t(mask).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
@@ -351,7 +350,6 @@ class FluxSampler(BaseModelSampler):
             prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
                 apply_attention_mask=prior_attention_mask,
@@ -481,13 +479,10 @@ class FluxSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
-        negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
-
         if self.model_type.has_conditioning_image_input():
             sampler_output = self.__sample_inpainting(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=sample_config.prompt,
+                negative_prompt=sample_config.negative_prompt,
                 height=self.quantize_resolution(sample_config.height, 64),
                 width=self.quantize_resolution(sample_config.width, 64),
                 seed=sample_config.seed,
@@ -507,8 +502,8 @@ class FluxSampler(BaseModelSampler):
             )
         else:
             sampler_output = self.__sample_base(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=sample_config.prompt,
+                negative_prompt=sample_config.negative_prompt,
                 height=self.quantize_resolution(sample_config.height, 64),
                 width=self.quantize_resolution(sample_config.width, 64),
                 seed=sample_config.seed,

@@ -68,14 +68,12 @@ class PixArtAlphaSampler(BaseModelSampler):
             prompt_embedding, tokens_attention_mask = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
             negative_prompt_embedding, negative_tokens_attention_mask = self.model.encode_text(
                 text=negative_prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
@@ -191,12 +189,9 @@ class PixArtAlphaSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
-        negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
-
         sampler_output = self.__sample_base(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
+            prompt=sample_config.prompt,
+            negative_prompt=sample_config.negative_prompt,
             height=self.quantize_resolution(sample_config.height, 16),
             width=self.quantize_resolution(sample_config.width, 16),
             seed=sample_config.seed,

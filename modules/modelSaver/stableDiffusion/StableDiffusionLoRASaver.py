@@ -1,21 +1,24 @@
-import os.path
-from pathlib import Path
-
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
 
-from safetensors.torch import save_file
+from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
+from omi_model_standards.convert.lora.convert_sd_lora import convert_sd_lora_key_sets
 
 
 class StableDiffusionLoRASaver(
-    DtypeModelSaverMixin,
+    LoRASaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
-    def __get_state_dict(
+    def _get_convert_key_sets(self, model: StableDiffusionModel) -> list[LoraConversionKeySet] | None:
+        return convert_sd_lora_key_sets()
+
+    def _get_state_dict(
             self,
             model: StableDiffusionModel,
     ) -> dict[str, Tensor]:
@@ -29,42 +32,14 @@ class StableDiffusionLoRASaver(
 
         if model.additional_embeddings and model.train_config.bundle_additional_embeddings:
             for embedding in model.additional_embeddings:
-                state_dict[f"bundle_emb.{embedding.placeholder}.string_to_param.*"] = embedding.text_encoder_vector
+                placeholder = embedding.text_encoder_embedding.placeholder
+
+                if embedding.text_encoder_embedding.vector is not None:
+                    state_dict[f"bundle_emb.{placeholder}.clip_l"] = embedding.text_encoder_embedding.vector
+                if embedding.text_encoder_embedding.output_vector is not None:
+                    state_dict[f"bundle_emb.{placeholder}.clip_l_out"] = embedding.text_encoder_embedding.output_vector
 
         return state_dict
-
-    def __save_ckpt(
-            self,
-            model: StableDiffusionModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
-
-    def __save_safetensors(
-            self,
-            model: StableDiffusionModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
-
-    def __save_internal(
-            self,
-            model: StableDiffusionModel,
-            destination: str,
-    ):
-        os.makedirs(destination, exist_ok=True)
-
-        self.__save_safetensors(model, os.path.join(destination, "lora", "lora.safetensors"), None)
 
     def save(
             self,
@@ -73,12 +48,4 @@ class StableDiffusionLoRASaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        match output_model_format:
-            case ModelFormat.DIFFUSERS:
-                raise NotImplementedError
-            case ModelFormat.CKPT:
-                self.__save_ckpt(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
-                self.__save_safetensors(model, output_model_destination, dtype)
-            case ModelFormat.INTERNAL:
-                self.__save_internal(model, output_model_destination)
+        self._save(model, output_model_format, output_model_destination, dtype)

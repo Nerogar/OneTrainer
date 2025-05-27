@@ -11,13 +11,13 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.image_util import load_image
 from modules.util.torch_util import torch_gc
 
 import torch
 from torch import nn
 from torchvision.transforms import transforms
 
-from PIL import Image
 from tqdm import tqdm
 
 
@@ -71,13 +71,11 @@ class StableDiffusionSampler(BaseModelSampler):
             prompt_embedding = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
             negative_prompt_embedding = self.model.encode_text(
                 text=negative_prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
@@ -225,13 +223,13 @@ class StableDiffusionSampler(BaseModelSampler):
                     ),
                 ])
 
-                image = Image.open(base_image_path).convert("RGB")
+                image = load_image(base_image_path, convert_mode="RGB")
                 image = t(image).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
                 )
 
-                mask = Image.open(mask_image_path).convert("L")
+                mask = load_image(mask_image_path, convert_mode='L')
                 mask = t(mask).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
@@ -278,13 +276,11 @@ class StableDiffusionSampler(BaseModelSampler):
             prompt_embedding = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
             negative_prompt_embedding = self.model.encode_text(
                 text=negative_prompt,
                 train_device=self.train_device,
-                batch_size=1,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
@@ -387,13 +383,10 @@ class StableDiffusionSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        prompt = self.model.add_embeddings_to_prompt(sample_config.prompt)
-        negative_prompt = self.model.add_embeddings_to_prompt(sample_config.negative_prompt)
-
         if self.model_type.has_conditioning_image_input():
             sampler_output = self.__sample_inpainting(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=sample_config.prompt,
+                negative_prompt=sample_config.negative_prompt,
                 height=self.quantize_resolution(sample_config.height, 8),
                 width=self.quantize_resolution(sample_config.width, 8),
                 seed=sample_config.seed,
@@ -411,8 +404,8 @@ class StableDiffusionSampler(BaseModelSampler):
             )
         else:
             sampler_output = self.__sample_base(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
+                prompt=sample_config.prompt,
+                negative_prompt=sample_config.negative_prompt,
                 height=self.quantize_resolution(sample_config.height, 8),
                 width=self.quantize_resolution(sample_config.width, 8),
                 seed=sample_config.seed,

@@ -12,6 +12,8 @@ import torch
 class SanaModelSaver(
     DtypeModelSaverMixin,
 ):
+    def __init__(self):
+        super().__init__()
 
     def __save_diffusers(
             self,
@@ -42,14 +44,6 @@ class SanaModelSaver(
         if dtype is not None:
             del save_pipeline
 
-    def __save_ckpt(
-            self,
-            model: SanaModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        raise NotImplementedError
-
     def __save_safetensors(
             self,
             model: SanaModel,
@@ -75,8 +69,6 @@ class SanaModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.CKPT:
-                self.__save_ckpt(model, output_model_destination, dtype)
             case ModelFormat.SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:

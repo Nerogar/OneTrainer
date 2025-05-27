@@ -1,4 +1,6 @@
+import json
 import os.path
+from typing import Any
 
 
 def safe_filename(
@@ -26,7 +28,15 @@ def canonical_join(base_path: str, *paths: str):
     return joined.replace('\\', '/')
 
 
+def write_json_atomic(path: str, obj: Any):
+    with open(path + ".write", "w") as f:
+        json.dump(obj, f, indent=4)
+    os.replace(path + ".write", path)
+
+
 SUPPORTED_IMAGE_EXTENSIONS = {'.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp'}
+SUPPORTED_VIDEO_EXTENSIONS = {'.webm', '.mkv', '.flv', '.avi', '.mov', '.wmv', '.mp4', '.mpeg', '.m4v'}
+
 
 def supported_image_extensions() -> set[str]:
     return SUPPORTED_IMAGE_EXTENSIONS
@@ -34,3 +44,11 @@ def supported_image_extensions() -> set[str]:
 
 def is_supported_image_extension(extension: str) -> bool:
     return extension.lower() in SUPPORTED_IMAGE_EXTENSIONS
+
+
+def supported_video_extensions() -> set[str]:
+    return SUPPORTED_VIDEO_EXTENSIONS
+
+
+def is_supported_video_extension(extension: str) -> bool:
+    return extension.lower() in SUPPORTED_VIDEO_EXTENSIONS

@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import os
@@ -19,6 +20,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
@@ -36,6 +38,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
 import huggingface_hub
+from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
 
@@ -62,7 +65,7 @@ class GenericTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, get_string_timestamp()))
+        self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
         if config.tensorboard:
             super()._start_tensorboard()
 
@@ -106,10 +109,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
-            huggingface_hub.login(
-                token = self.config.secrets.huggingface_token,
-                new_session = False,
-            )
+            with contextlib.suppress(ConnectionError):
+                huggingface_hub.login(
+                    token = self.config.secrets.huggingface_token,
+                    new_session = False,
+                )
 
         self.callbacks.on_update_status("loading the model")
         self.model = self.model_loader.load(
@@ -217,7 +221,7 @@ class GenericTrainer(BaseTrainer):
 
                     sample_path = os.path.join(
                         sample_dir,
-                        f"{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                        f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
                     )
 
                     def on_sample_default(sampler_output: ModelSamplerOutput):
@@ -493,7 +497,9 @@ class GenericTrainer(BaseTrainer):
         torch_gc()
 
     def __needs_sample(self, train_progress: TrainProgress):
-        return self.repeating_action_needed(
+        return self.single_action_elapsed(
+            "sample_skip_first", self.config.sample_skip_first, self.config.sample_after_unit, train_progress
+        ) and self.repeating_action_needed(
             "sample", self.config.sample_after, self.config.sample_after_unit, train_progress
         )
 
@@ -581,6 +587,7 @@ class GenericTrainer(BaseTrainer):
         lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
+        ema_loss_steps = 0
         for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -663,7 +670,22 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                    prior_pred_indices = [i for i in range(self.config.batch_size)
+                                          if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
+                    if len(prior_pred_indices) > 0 \
+                            or (self.config.masked_training
+                                and self.config.masked_prior_preservation_weight > 0
+                                and self.config.training_method == TrainingMethod.LORA):
+                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                            #do NOT create a subbatch using the indices, even though it would be more efficient:
+                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
+                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
+                        model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                        model_output_data['prior_target'] = prior_model_prediction
+                    else:
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
@@ -701,7 +723,9 @@ class GenericTrainer(BaseTrainer):
 
                         self.tensorboard.add_scalar("loss/train_step", accumulated_loss, train_progress.global_step)
                         ema_loss = ema_loss or accumulated_loss
-                        ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
+                        ema_loss_steps += 1
+                        ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
+                        ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss * (1 - ema_loss_decay))
                         step_tqdm.set_postfix({
                             'loss': accumulated_loss,
                             'smooth loss': ema_loss,
@@ -754,18 +778,24 @@ class GenericTrainer(BaseTrainer):
 
             if self.model.ema:
                 self.model.ema.copy_ema_to(self.parameters, store_temp=False)
-
-            print("Saving " + self.config.output_model_destination)
+            if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
+                save_path = os.path.join(
+                    self.config.output_model_destination,
+                    f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.config.output_model_format.file_extension()}"
+                )
+            else:
+                save_path = self.config.output_model_destination
+            print("Saving " + save_path)
 
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,
                 output_model_format=self.config.output_model_format,
-                output_model_destination=self.config.output_model_destination,
+                output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
-        elif self.model is not None:
-            self.model.to(self.temp_device)
+
+        self.model.to(self.temp_device)
 
         self.tensorboard.close()
 

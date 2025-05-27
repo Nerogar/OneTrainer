@@ -6,7 +6,7 @@ from transformers import T5EncoderModel
 def encode_t5(
         text_encoder: T5EncoderModel,
         tokens: Tensor | None = None,
-        default_layer: int = 0,
+        default_layer: int = -1,
         layer_skip: int = 0,
         text_encoder_output: Tensor | None = None,
         use_attention_mask: bool = True,

@@ -52,6 +52,7 @@ class Optimizer(Enum):
 
     # Prodigy
     PRODIGY = 'PRODIGY'
+    PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
 
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
@@ -63,6 +64,7 @@ class Optimizer(Enum):
     ADABELIEF = 'ADABELIEF'
     TIGER = 'TIGER'
     AIDA = 'AIDA'
+    YOGI = 'YOGI'
 
     @property
     def is_adaptive(self):
@@ -73,6 +75,7 @@ class Optimizer(Enum):
             self.DADAPT_ADA_GRAD,
             self.DADAPT_LION,
             self.PRODIGY,
+            self.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
     @property
@@ -80,6 +83,7 @@ class Optimizer(Enum):
         return self in [
             self.SCHEDULE_FREE_ADAMW,
             self.SCHEDULE_FREE_SGD,
+            self.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
     def supports_fused_back_pass(self):
@@ -88,6 +92,7 @@ class Optimizer(Enum):
             Optimizer.CAME,
             Optimizer.ADAM,
             Optimizer.ADAMW,
+            Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

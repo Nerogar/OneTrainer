@@ -1,14 +1,11 @@
 from abc import ABCMeta
 from collections.abc import Callable
 
-from modules.module.AestheticScoreModel import AestheticScoreModel
-from modules.module.HPSv2ScoreModel import HPSv2ScoreModel
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
-from modules.util.enum.AlignPropLoss import AlignPropLoss
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
-from modules.util.loss.masked_loss import masked_losses
+from modules.util.loss.masked_loss import masked_losses, masked_losses_with_prior
 from modules.util.loss.vb_loss import vb_losses
 
 import torch
@@ -23,47 +20,15 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
     def __init__(self):
         super().__init__()
-        self.__align_prop_loss_fn = None
         self.__coefficients = None
         self.__alphas_cumprod_fun = None
         self.__sigmas = None
-
-    def __align_prop_losses(
-            self,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
-            train_device: torch.device,
-    ):
-        if self.__align_prop_loss_fn is None:
-            dtype = data['predicted'].dtype
-
-            match config.align_prop_loss:
-                case AlignPropLoss.HPS:
-                    self.__align_prop_loss_fn = HPSv2ScoreModel(dtype)
-                case AlignPropLoss.AESTHETIC:
-                    self.__align_prop_loss_fn = AestheticScoreModel()
-
-            self.__align_prop_loss_fn.to(device=train_device, dtype=dtype)
-            self.__align_prop_loss_fn.requires_grad_(False)
-            self.__align_prop_loss_fn.eval()
-
-        losses = 0
-
-        match config.align_prop_loss:
-            case AlignPropLoss.HPS:
-                with torch.autocast(device_type=train_device.type, dtype=data['predicted'].dtype):
-                    losses = self.__align_prop_loss_fn(data['predicted'], batch['prompt'], train_device)
-            case AlignPropLoss.AESTHETIC:
-                losses = self.__align_prop_loss_fn(data['predicted'])
-
-        return losses * config.align_prop_weight
 
     def __log_cosh_loss(
             self,
             pred: torch.Tensor,
             target: torch.Tensor,
-    ):
+    ) -> Tensor:
         diff = pred - target
         loss = diff + torch.nn.functional.softplus(-2.0*diff) - torch.log(torch.full(size=diff.size(), fill_value=2.0, dtype=torch.float32, device=diff.device))
         return loss
@@ -73,47 +38,64 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             batch: dict,
             data: dict,
             config: TrainConfig,
-    ):
+    ) -> Tensor:
         losses = 0
 
         mean_dim = list(range(1, data['predicted'].ndim))
 
         # MSE/L2 Loss
         if config.mse_strength != 0:
-            losses += masked_losses(
+            losses += masked_losses_with_prior(
                 losses=F.mse_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32),
                     reduction='none'
                 ),
+                prior_losses=F.mse_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    reduction='none'
+                ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.mse_strength
 
         # MAE/L1 Loss
         if config.mae_strength != 0:
-            losses += masked_losses(
+            losses += masked_losses_with_prior(
                 losses=F.l1_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32),
                     reduction='none'
                 ),
+                prior_losses=F.l1_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    reduction='none'
+                ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.mae_strength
 
         # log-cosh Loss
         if config.log_cosh_strength != 0:
-            losses += masked_losses(
+            losses += masked_losses_with_prior(
                 losses=self.__log_cosh_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32)
                 ),
+                prior_losses=self.__log_cosh_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32)
+                ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.log_cosh_strength
 
         # VB loss
@@ -139,7 +121,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             batch: dict,
             data: dict,
             config: TrainConfig,
-    ):
+    ) -> Tensor:
         losses = 0
 
         mean_dim = list(range(1, data['predicted'].ndim))
@@ -185,7 +167,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         return losses
 
-    def __snr(self, timesteps: Tensor, device: torch.device):
+    def __snr(self, timesteps: Tensor, device: torch.device) -> Tensor:
         if self.__coefficients:
             all_snr = (self.__coefficients.sqrt_alphas_cumprod /
                        self.__coefficients.sqrt_one_minus_alphas_cumprod) ** 2
@@ -270,9 +252,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         self.__alphas_cumprod_fun = alphas_cumprod_fun
 
-        if data['loss_type'] == 'align_prop':
-            losses = self.__align_prop_losses(batch, data, config, train_device)
-        else:
+        if data['loss_type'] == 'target':
             # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
             #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
             if config.masked_training and not config.model_type.has_conditioning_image_input():
@@ -286,7 +266,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         # Apply timestep based loss weighting.
-        if 'timestep' in data and data['loss_type'] != 'align_prop':
+        if 'timestep' in data:
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
                 case LossWeight.MIN_SNR_GAMMA:
@@ -319,9 +299,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=sigmas.device)
             self.__sigmas = all_timesteps / num_timesteps
 
-        if data['loss_type'] == 'align_prop':
-            losses = self.__align_prop_losses(batch, data, config, train_device)
-        else:
+        if data['loss_type'] == 'target':
             # TODO: don't disable masked loss functions when has_conditioning_image_input is true.
             #  This breaks if only the VAE is trained, but was loaded from an inpainting checkpoint
             if config.masked_training and not config.model_type.has_conditioning_image_input():
@@ -335,7 +313,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
 
         # Apply timestep based loss weighting.
-        if 'timestep' in data and data['loss_type'] != 'align_prop':
+        if 'timestep' in data:
             match config.loss_weight_fn:
                 case LossWeight.SIGMA:
                     losses *= self.__sigma_loss_weight(data['timestep'], losses.device)

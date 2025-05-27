@@ -11,6 +11,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.torch_util import torch_gc
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -18,28 +19,31 @@ import customtkinter as ctk
 
 class ConvertModelUI(ctk.CTkToplevel):
     def __init__(self, parent, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
         self.parent = parent
+
+        self.parent = parent
+        self.convert_model_args = ConvertModelArgs.default_values()
+        self.ui_state = UIState(self, self.convert_model_args)
+        self.button = None
+
 
         self.title("Convert models")
         self.geometry("550x350")
         self.resizable(True, True)
-        self.wait_visibility()
-        self.focus_set()
-
-        self.convert_model_args = ConvertModelArgs.default_values()
-        self.ui_state = UIState(self, self.convert_model_args)
 
         self.frame = ctk.CTkFrame(self, width=600, height=300)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
         self.frame.grid_columnconfigure(0, weight=0)
         self.frame.grid_columnconfigure(1, weight=1)
 
-        self.button = None
         self.main_frame(self.frame)
-
         self.frame.pack(fill="both", expand=True)
+
+        self.wait_visibility()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def main_frame(self, master):
         # model type
@@ -96,7 +100,6 @@ class ConvertModelUI(ctk.CTkToplevel):
         components.options_kv(master, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
-            ("Checkpoint", ModelFormat.CKPT),
         ], self.ui_state, "output_model_format")
 
         # output model destination

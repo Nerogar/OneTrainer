@@ -9,7 +9,7 @@ Place the images you want to train on in any directory you want. For best result
 image. There are two options:
 
 1. For each image, add a .txt file with the same name in the same directory. The text file should contain the prompt to
-   train on.
+   train on. i.e image1.jpg and image1.txt
 2. Rename all images with the prompt you want to train on.
 
 ### Presets

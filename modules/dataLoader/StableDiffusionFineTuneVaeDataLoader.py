@@ -89,9 +89,9 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         supported_extensions = path_util.supported_image_extensions()
 
         collect_paths = CollectPaths(
-            concept_in_name='concept', path_in_name='path', path_out_name='image_path',
-            concept_out_name='concept', extensions=supported_extensions, include_postfix=None,
-            exclude_postfix=['-masklabel'], include_subdirectories_in_name='concept.include_subdirectories'
+            concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
+            path_out_name='image_path', concept_out_name='concept',
+            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
         )
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
@@ -104,8 +104,8 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         return modules
 
     def __load_input_modules(self, config: TrainConfig) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='latent_mask', range_min=0, range_max=1, channels=1)
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0, supported_extensions=path_util.supported_image_extensions())
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='latent_mask', range_min=0, range_max=1, channels=1, supported_extensions=path_util.supported_image_extensions())
 
         modules = [load_image]
 
@@ -125,7 +125,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         modules = []
 
-        if config.masked_training and config.random_rotate_and_crop:
+        if config.masked_training:
             modules.append(random_mask_rotate_crop)
 
         return modules
@@ -138,6 +138,8 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_frames_in_name='settings.target_frames',
+            frame_dim_enabled=False,
             target_resolutions_override_in_name='concept.image.resolution_override',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
@@ -238,6 +240,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+        output_names = output_names + [('concept.type', 'concept_type')]
 
         # add for calculating loss per concept
         if config.validation:

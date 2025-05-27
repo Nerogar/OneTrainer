@@ -6,8 +6,9 @@ import sys
 
 
 def exit_err(msg):
-    print("Error: " + msg)
-    exit(1)
+    sys.stderr.write("Error: " + msg + "\n")
+    sys.stderr.flush()
+    sys.exit(1)
 
 
 def str_to_tuple(data):
@@ -20,9 +21,8 @@ def tuple_to_str(data):
 
 def exit_wrong_version(msg, min_ver, too_high_ver):
     exit_err(
-        "Your Python version is {}: {}. Must be >= {} and < {}.".format(
-            msg, sys.version, tuple_to_str(min_ver), tuple_to_str(too_high_ver)
-        )
+        "Your Python version is %s: %s. Must be >= %s and < %s."
+        % (msg, sys.version, tuple_to_str(min_ver), tuple_to_str(too_high_ver))
     )
 
 
@@ -31,6 +31,10 @@ if len(sys.argv) < 3:
 
 min_ver = str_to_tuple(sys.argv[1])
 too_high_ver = str_to_tuple(sys.argv[2])
+
+# Specifically exclude Python 3.11.0 as Scalene does NOT support it https://pypi.org/project/scalene/
+if sys.version_info[:3] == (3, 11, 0):
+    exit_err("Python 3.11.0 specifically is not supported (due to Scalene). Please use a different Python version.")
 
 if sys.version_info < min_ver:
     exit_wrong_version("too low", min_ver, too_high_ver)

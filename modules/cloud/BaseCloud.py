@@ -19,7 +19,7 @@ class BaseCloud(metaclass=ABCMeta):
     def setup(self):
         self._connect()
 
-        if self.config.cloud.install_onetrainer or self.config.cloud.update_onetrainer:
+        if (self.config.cloud.install_onetrainer or self.config.cloud.update_onetrainer) and not self.can_reattach():
             self._install_onetrainer(update=self.config.cloud.update_onetrainer)
 
         if self.config.cloud.tensorboard_tunnel:
@@ -41,6 +41,8 @@ class BaseCloud(metaclass=ABCMeta):
 
         if hasattr(self.config,"local_base_model_name"):
             self.file_sync.sync_up(local=Path(self.config.local_base_model_name),remote=Path(self.config.base_model_name))
+        if hasattr(self.config.prior,"local_model_name"):
+            self.file_sync.sync_up(local=Path(self.config.prior.local_model_name),remote=Path(self.config.prior.model_name))
         if hasattr(self.config,"local_lora_model_name"):
             self.file_sync.sync_up(local=Path(self.config.local_lora_model_name),remote=Path(self.config.lora_model_name))
 
