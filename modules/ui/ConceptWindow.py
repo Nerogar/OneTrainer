@@ -11,6 +11,8 @@ from modules.util.ui.UIState import UIState
 from mgds.LoadingPipeline import LoadingPipeline
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.PipelineModule import PipelineModule
+from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
+from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
@@ -19,6 +21,7 @@ from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
+from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModuleTypes.RandomAccessPipelineModule import RandomAccessPipelineModule
 
 import torch
@@ -67,6 +70,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
 
         self.image_preview_file_index = 0
+        self.preview_augmentations = ctk.BooleanVar(self, True)
 
         self.title("Concept")
         self.geometry("800x700")
@@ -247,23 +251,25 @@ class ConceptWindow(ctk.CTkToplevel):
 
         # refresh preview
         update_button_frame = ctk.CTkFrame(master=frame, corner_radius=0, fg_color="transparent")
-        update_button_frame.grid(row=6, column=4, sticky="nsew")
+        update_button_frame.grid(row=6, column=4, rowspan=6, sticky="nsew")
         update_button_frame.grid_columnconfigure(1, weight=1)
 
         prev_preview_button = components.button(update_button_frame, 0, 0, "<", command=self.__prev_image_preview)
         components.button(update_button_frame, 0, 1, "Update Preview", command=self.__update_image_preview)
         next_preview_button = components.button(update_button_frame, 0, 2, ">", command=self.__next_image_preview)
+        preview_augmentations_switch = ctk.CTkSwitch(update_button_frame, text="Show Augmentations", variable=self.preview_augmentations, command=self.__update_image_preview)
+        preview_augmentations_switch.grid(row=1, column=0, columnspan=3, padx=5, pady=5)
 
         prev_preview_button.configure(width=40)
         next_preview_button.configure(width=40)
 
         #caption and filename preview
-        self.filename_preview = ctk.CTkLabel(master=frame, text=filename_preview, width=300, anchor="nw", justify="left", padx=10, wraplength=280)
-        self.filename_preview.grid(row=7, column=4)
-        self.caption_preview = ctk.CTkTextbox(master=frame, width = 300, height = 150, wrap="word", border_width=2)
+        self.filename_preview = ctk.CTkLabel(master=update_button_frame, text=filename_preview, width=300, anchor="nw", justify="left", padx=10, wraplength=280)
+        self.filename_preview.grid(row=2, column=0, columnspan=3)
+        self.caption_preview = ctk.CTkTextbox(master=update_button_frame, width = 300, height = 150, wrap="word", border_width=2)
         self.caption_preview.insert(index="1.0", text=caption_preview)
         self.caption_preview.configure(state="disabled")
-        self.caption_preview.grid(row=8, column=4, rowspan = 4)
+        self.caption_preview.grid(row=3, column=0, columnspan=3, rowspan=3)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -381,70 +387,6 @@ class ConceptWindow(ctk.CTkToplevel):
         else:
             mask_tensor = torch.ones((1, image_tensor.shape[1], image_tensor.shape[2]))
 
-        input_module = InputPipelineModule({
-            'true': True,
-            'image': image_tensor,
-            'mask': mask_tensor,
-            'enable_random_flip': self.concept.image.enable_random_flip,
-            'enable_fixed_flip': self.concept.image.enable_fixed_flip,
-            'enable_random_rotate': self.concept.image.enable_random_rotate,
-            'enable_fixed_rotate': self.concept.image.enable_fixed_rotate,
-            'random_rotate_max_angle': self.concept.image.random_rotate_max_angle,
-            'enable_random_brightness': self.concept.image.enable_random_brightness,
-            'enable_fixed_brightness': self.concept.image.enable_fixed_brightness,
-            'random_brightness_max_strength': self.concept.image.random_brightness_max_strength,
-            'enable_random_contrast': self.concept.image.enable_random_contrast,
-            'enable_fixed_contrast': self.concept.image.enable_fixed_contrast,
-            'random_contrast_max_strength': self.concept.image.random_contrast_max_strength,
-            'enable_random_saturation': self.concept.image.enable_random_saturation,
-            'enable_fixed_saturation': self.concept.image.enable_fixed_saturation,
-            'random_saturation_max_strength': self.concept.image.random_saturation_max_strength,
-            'enable_random_hue': self.concept.image.enable_random_hue,
-            'enable_fixed_hue': self.concept.image.enable_fixed_hue,
-            'random_hue_max_strength': self.concept.image.random_hue_max_strength,
-            'enable_random_circular_mask_shrink': self.concept.image.enable_random_circular_mask_shrink,
-            'enable_random_mask_rotate_crop': self.concept.image.enable_random_mask_rotate_crop,
-        })
-
-        circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='enable_random_circular_mask_shrink')
-        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=['image'], min_size=512, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='enable_random_mask_rotate_crop')
-        random_flip = RandomFlip(names=['image', 'mask'], enabled_in_name='enable_random_flip', fixed_enabled_in_name='enable_fixed_flip')
-        random_rotate = RandomRotate(names=['image', 'mask'], enabled_in_name='enable_random_rotate', fixed_enabled_in_name='enable_fixed_rotate', max_angle_in_name='random_rotate_max_angle')
-        random_brightness = RandomBrightness(names=['image'], enabled_in_name='enable_random_brightness', fixed_enabled_in_name='enable_fixed_brightness', max_strength_in_name='random_brightness_max_strength')
-        random_contrast = RandomContrast(names=['image'], enabled_in_name='enable_random_contrast', fixed_enabled_in_name='enable_fixed_contrast', max_strength_in_name='random_contrast_max_strength')
-        random_saturation = RandomSaturation(names=['image'], enabled_in_name='enable_random_saturation', fixed_enabled_in_name='enable_fixed_saturation', max_strength_in_name='random_saturation_max_strength')
-        random_hue = RandomHue(names=['image'], enabled_in_name='enable_random_hue', fixed_enabled_in_name='enable_fixed_hue', max_strength_in_name='random_hue_max_strength')
-        output_module = OutputPipelineModule(['image', 'mask'])
-
-        modules = [
-            input_module,
-            circular_mask_shrink,
-            random_mask_rotate_crop,
-            random_flip,
-            random_rotate,
-            random_brightness,
-            random_contrast,
-            random_saturation,
-            random_hue,
-            output_module,
-        ]
-
-        pipeline = LoadingPipeline(
-            device=torch.device('cpu'),
-            modules=modules,
-            batch_size=1,
-            seed=random.randint(0, 2**30),
-            state=None,
-            initial_epoch=0,
-            initial_index=0,
-        )
-
-        data = pipeline.__next__()
-        image_tensor = data['image']
-        mask_tensor = data['mask']
-        #display filename and first line of base caption from prompt source
-        #will try to change to preview caption with text variations at some point
-        filename_output = os.path.basename(preview_image_path)
         try:
             if self.concept.text.prompt_source == "sample":
                 with open(splitext[0] + ".txt") as prompt_file:
@@ -456,6 +398,97 @@ class ConceptWindow(ctk.CTkToplevel):
                     prompt_output = prompt_file.readline()
         except FileNotFoundError:
             prompt_output = "No caption found."
+
+        modules = []
+        if self.preview_augmentations.get():
+            input_module = InputPipelineModule({
+                'true': True,
+                'image': image_tensor,
+                'mask': mask_tensor,
+                'enable_random_flip': self.concept.image.enable_random_flip,
+                'enable_fixed_flip': self.concept.image.enable_fixed_flip,
+                'enable_random_rotate': self.concept.image.enable_random_rotate,
+                'enable_fixed_rotate': self.concept.image.enable_fixed_rotate,
+                'random_rotate_max_angle': self.concept.image.random_rotate_max_angle,
+                'enable_random_brightness': self.concept.image.enable_random_brightness,
+                'enable_fixed_brightness': self.concept.image.enable_fixed_brightness,
+                'random_brightness_max_strength': self.concept.image.random_brightness_max_strength,
+                'enable_random_contrast': self.concept.image.enable_random_contrast,
+                'enable_fixed_contrast': self.concept.image.enable_fixed_contrast,
+                'random_contrast_max_strength': self.concept.image.random_contrast_max_strength,
+                'enable_random_saturation': self.concept.image.enable_random_saturation,
+                'enable_fixed_saturation': self.concept.image.enable_fixed_saturation,
+                'random_saturation_max_strength': self.concept.image.random_saturation_max_strength,
+                'enable_random_hue': self.concept.image.enable_random_hue,
+                'enable_fixed_hue': self.concept.image.enable_fixed_hue,
+                'random_hue_max_strength': self.concept.image.random_hue_max_strength,
+                'enable_random_circular_mask_shrink': self.concept.image.enable_random_circular_mask_shrink,
+                'enable_random_mask_rotate_crop': self.concept.image.enable_random_mask_rotate_crop,
+
+                'prompt' : prompt_output,
+                'tag_dropout_enable' : self.concept.text.tag_dropout_enable,
+                'tag_dropout_probability' : self.concept.text.tag_dropout_probability,
+                'tag_dropout_mode' : self.concept.text.tag_dropout_mode,
+                'tag_dropout_special_tags' : self.concept.text.tag_dropout_special_tags,
+                'tag_dropout_special_tags_mode' : self.concept.text.tag_dropout_special_tags_mode,
+                'tag_delimiter' : self.concept.text.tag_delimiter,
+                'keep_tags_count' : self.concept.text.keep_tags_count,
+                'tag_dropout_special_tags_regex' : self.concept.text.tag_dropout_special_tags_regex,
+                'caps_randomize_enable' : self.concept.text.caps_randomize_enable,
+                'caps_randomize_probability' : self.concept.text.caps_randomize_probability,
+                'caps_randomize_mode' : self.concept.text.caps_randomize_mode,
+                'caps_randomize_lowercase' : self.concept.text.caps_randomize_lowercase,
+                'enable_tag_shuffling' : self.concept.text.enable_tag_shuffling,
+            })
+
+            circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='enable_random_circular_mask_shrink')
+            random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=['image'], min_size=512, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='enable_random_mask_rotate_crop')
+            random_flip = RandomFlip(names=['image', 'mask'], enabled_in_name='enable_random_flip', fixed_enabled_in_name='enable_fixed_flip')
+            random_rotate = RandomRotate(names=['image', 'mask'], enabled_in_name='enable_random_rotate', fixed_enabled_in_name='enable_fixed_rotate', max_angle_in_name='random_rotate_max_angle')
+            random_brightness = RandomBrightness(names=['image'], enabled_in_name='enable_random_brightness', fixed_enabled_in_name='enable_fixed_brightness', max_strength_in_name='random_brightness_max_strength')
+            random_contrast = RandomContrast(names=['image'], enabled_in_name='enable_random_contrast', fixed_enabled_in_name='enable_fixed_contrast', max_strength_in_name='random_contrast_max_strength')
+            random_saturation = RandomSaturation(names=['image'], enabled_in_name='enable_random_saturation', fixed_enabled_in_name='enable_fixed_saturation', max_strength_in_name='random_saturation_max_strength')
+            random_hue = RandomHue(names=['image'], enabled_in_name='enable_random_hue', fixed_enabled_in_name='enable_fixed_hue', max_strength_in_name='random_hue_max_strength')
+            drop_tags = DropTags(text_in_name='prompt', enabled_in_name='tag_dropout_enable', probability_in_name='tag_dropout_probability', dropout_mode_in_name='tag_dropout_mode',
+                                special_tags_in_name='tag_dropout_special_tags', special_tag_mode_in_name='tag_dropout_special_tags_mode', delimiter_in_name='tag_delimiter',
+                                keep_tags_count_in_name='keep_tags_count', text_out_name='prompt', regex_enabled_in_name='tag_dropout_special_tags_regex')
+            caps_randomize = CapitalizeTags(text_in_name='prompt', enabled_in_name='caps_randomize_enable', probability_in_name='caps_randomize_probability',
+                                            capitalize_mode_in_name='caps_randomize_mode', delimiter_in_name='tag_delimiter', convert_lowercase_in_name='caps_randomize_lowercase', text_out_name='prompt')
+            shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='enable_tag_shuffling', delimiter_in_name='tag_delimiter', keep_tags_count_in_name='keep_tags_count', text_out_name='prompt')
+            output_module = OutputPipelineModule(['image', 'mask', 'prompt'])
+
+            modules = [
+                input_module,
+                circular_mask_shrink,
+                random_mask_rotate_crop,
+                random_flip,
+                random_rotate,
+                random_brightness,
+                random_contrast,
+                random_saturation,
+                random_hue,
+                drop_tags,
+                caps_randomize,
+                shuffle_tags,
+                output_module,
+            ]
+
+            pipeline = LoadingPipeline(
+                device=torch.device('cpu'),
+                modules=modules,
+                batch_size=1,
+                seed=random.randint(0, 2**30),
+                state=None,
+                initial_epoch=0,
+                initial_index=0,
+            )
+
+            data = pipeline.__next__()
+            image_tensor = data['image']
+            mask_tensor = data['mask']
+            prompt_output = data['prompt']
+
+        filename_output = os.path.basename(preview_image_path)
 
         mask_tensor = torch.clamp(mask_tensor, 0.3, 1)
         image_tensor = image_tensor * mask_tensor
