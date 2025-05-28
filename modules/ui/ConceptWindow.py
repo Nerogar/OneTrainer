@@ -581,12 +581,20 @@ class ConceptWindow(ctk.CTkToplevel):
         try:
             if self.concept.text.prompt_source == "sample":
                 with open(splitext[0] + ".txt") as prompt_file:
-                    prompt_output = prompt_file.readline()
+                    if self.preview_augmentations.get():
+                        prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
+                        prompt_output = random.choice(prompt_list)
+                    else:
+                        prompt_output = prompt_file.read()
             elif self.concept.text.prompt_source == "filename":
                 prompt_output = os.path.splitext(os.path.basename(preview_image_path))[0]
             elif self.concept.text.prompt_source == "concept":
                 with open(self.concept.text.prompt_path) as prompt_file:
-                    prompt_output = prompt_file.readline()
+                    if self.preview_augmentations.get():
+                        prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
+                        prompt_output = random.choice(prompt_list)
+                    else:
+                        prompt_output = prompt_file.read()
         except FileNotFoundError:
             prompt_output = "No caption found."
 
