@@ -26,7 +26,7 @@ class CAME(torch.optim.Optimizer):
         update, square gradient and instability (default: (0.9, 0.999, 0.9999)))
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
         stochastic_rounding: utilize stochastic rounding with BF16 (default: False)
-        cautious: use cautious masking (default: False)
+        use_cautious: use cautious masking (default: False)
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class CAME(torch.optim.Optimizer):
         betas=(0.9, 0.999, 0.9999),
         weight_decay=0.0,
         stochastic_rounding=False,
-        cautious=False,
+        use_cautious=False,
     ):
         assert lr > 0.
         assert all(0. <= beta <= 1. for beta in betas)
@@ -51,7 +51,7 @@ class CAME(torch.optim.Optimizer):
             "weight_decay": weight_decay,
         }
         self.stochastic_rounding = stochastic_rounding
-        self.cautious = cautious
+        self.use_cautious = use_cautious
         super().__init__(params, defaults)
 
     @property
@@ -165,7 +165,7 @@ class CAME(torch.optim.Optimizer):
         else:
             update = exp_avg.clone()
 
-        if self.cautious:
+        if self.use_cautious:
             mask = (update * grad > 0).to(grad.dtype)
             mask.div_(mask.mean().clamp_(min=1e-3))
             update = update * mask
