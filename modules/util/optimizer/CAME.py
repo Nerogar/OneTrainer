@@ -2,6 +2,7 @@
 # Copied and modified from the original CAME implementation (https://github.com/yangluo7/CAME)
 #
 # Implements stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192)
+# Implements cautious masking from "Cautious Optimizers: Improving Training with One Line of Code" (https://arxiv.org/abs/2411.16085)
 #
 
 from modules.util.bf16_stochastic_rounding import add_stochastic_
