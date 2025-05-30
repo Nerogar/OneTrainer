@@ -948,7 +948,7 @@ def create_optimizer(
                        optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                cautious=optimizer_config.cautious,
+                use_cautious=optimizer_config.use_cautious,
             )
 
         # ADABELIEF Optimizer
