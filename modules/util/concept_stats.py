@@ -91,7 +91,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
 
     for path in file_list:
         basename, extension = os.path.splitext(path)
-        if extension.lower() in img_extensions_list and not path.name.endswith("-masklabel.png"):
+        if extension.lower() in img_extensions_list and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
             stats_dict["image_count"] += 1
             stats_dict["file_size"] += path.stat().st_size
             if advanced_checks:
