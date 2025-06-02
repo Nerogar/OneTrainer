@@ -20,7 +20,7 @@ from diffusers import (
     HunyuanVideoPipeline,
     HunyuanVideoTransformer3DModel,
 )
-from transformers import CLIPTextModel, CLIPTokenizer, LlamaModel, LlamaTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, LlamaModel, LlamaTokenizerFast
 
 DEFAULT_PROMPT_TEMPLATE = (
     "<|start_header_id|>system<|end_header_id|>\n\nDescribe the video by detailing the following aspects: "
@@ -59,7 +59,7 @@ class HunyuanVideoModelEmbedding:
 
 class HunyuanVideoModel(BaseModel):
     # base model data
-    tokenizer_1: LlamaTokenizer | None
+    tokenizer_1: LlamaTokenizerFast | None
     tokenizer_2: CLIPTokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder_1: LlamaModel | None
@@ -68,7 +68,7 @@ class HunyuanVideoModel(BaseModel):
     transformer: HunyuanVideoTransformer3DModel | None
 
     # original copies of base model data
-    orig_tokenizer_1: LlamaTokenizer | None
+    orig_tokenizer_1: LlamaTokenizerFast | None
     orig_tokenizer_2: CLIPTokenizer | None
 
     # autocast context
@@ -90,9 +90,6 @@ class HunyuanVideoModel(BaseModel):
     text_encoder_2_lora: LoRAModuleWrapper | None
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
-
-    sd_config: dict | None
-    sd_config_filename: str | None
 
     def __init__(
             self,

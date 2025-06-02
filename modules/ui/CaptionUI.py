@@ -225,7 +225,7 @@ class CaptionUI(ctk.CTkToplevel):
     def scan_directory(self, include_subdirectories: bool = False):
         def __is_supported_image_extension(filename):
             name, ext = os.path.splitext(filename)
-            return path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel")
+            return path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel") and not name.endswith("-condlabel")
 
         self.image_rel_paths = []
 

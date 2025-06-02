@@ -13,6 +13,10 @@ from torch.utils.checkpoint import checkpoint
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
+from diffusers.models.transformers.transformer_hidream_image import (
+    HiDreamImageSingleTransformerBlock,
+    HiDreamImageTransformerBlock,
+)
 from diffusers.models.transformers.transformer_hunyuan_video import (
     HunyuanVideoIndividualTokenRefinerBlock,
     HunyuanVideoSingleTransformerBlock,
@@ -383,6 +387,33 @@ def enable_checkpointing_for_hunyuan_video_transformer(
 
     for child_module in orig_module.modules():
         if isinstance(child_module, HunyuanVideoSingleTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    return conductor
+
+def enable_checkpointing_for_hi_dream_transformer(
+        orig_module: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    conductor = LayerOffloadConductor(orig_module, config)
+
+    layer_index = 0
+    for child_module in orig_module.modules():
+        if isinstance(child_module, HiDreamImageTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states", "encoder_hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    for child_module in orig_module.modules():
+        if isinstance(child_module, HiDreamImageSingleTransformerBlock):
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
                 ["hidden_states"],
