@@ -26,14 +26,14 @@ omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # model conversion
--e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@16e78ee#egg=omi_model_standards
+-e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@4ad235c#egg=omi_model_standards
 
 # other models
 pooch==1.8.2
 open-clip-torch==2.30.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@ecc1c76#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@11ff4aa#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers

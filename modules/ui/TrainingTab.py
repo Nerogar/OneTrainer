@@ -614,6 +614,11 @@ class TrainingTab:
                          tooltip="Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight.")
         components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight")
 
+        # use custom conditioning image
+        components.label(frame, 5, 0, "Custom Conditioning Image",
+                         tooltip="When custom conditioning image is enabled, will use png postfix with -condlabel instead of automatically generated.It's suitable for special scenarios, such as object removal, allowing the model to learn a certain behavior concept")
+        components.switch(frame, 5, 1, self.ui_state, "custom_conditioning_image")
+
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
