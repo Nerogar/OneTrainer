@@ -442,4 +442,9 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "initial_accumulator": 1e-6,
         "eps": 1e-3,
     },
+    Optimizer.ADA_COORD_DOWG: {
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "stochastic_rounding": False,
+    },
 }
