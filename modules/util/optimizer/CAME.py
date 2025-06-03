@@ -169,7 +169,7 @@ class CAME(torch.optim.Optimizer):
         if self.use_cautious:
             mask = (update * grad > 0).to(grad.dtype)
             mask.div_(mask.mean().clamp_(min=1e-3))
-            update = update * mask
+            update.mul_(mask)
 
         if group["weight_decay"] != 0:
             if p.dtype == torch.bfloat16 and self.stochastic_rounding:
