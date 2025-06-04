@@ -1,5 +1,5 @@
-from modules.module.captioning.models import BaseImageCaptionModel
-from modules.module.captioning.sample import CaptionSample
+from modules.module.captioning.BaseImageCaptionModel import BaseImageCaptionModel
+from modules.module.captioning.CaptionSample import CaptionSample
 
 import torch
 

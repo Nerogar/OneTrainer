@@ -28,7 +28,6 @@ from modules.util.ui.UIState import UIState
 import customtkinter as ctk
 import imagesize
 import oxipng
-import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 
 # Set up module logger
@@ -250,7 +249,7 @@ class FileOperationsWindow(ctk.CTkToplevel):
              "Check all images for corruption or format errors"),
             ("Sequential Renaming (1.txt, 2.txt, etc.)", "sequential_rename",
              "Rename all files sequentially by file type"),
-            ("Process Images with Transparency", "process_alpha",
+            ("Replace Transperancy with Color", "process_alpha",
              "Replace transparent areas with a solid background color"),
             ("Resize Images Above 4MP", "resize_large_images",
              "Optimally resize images larger than 4 megapixels")

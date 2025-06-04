@@ -10,7 +10,6 @@ import torch
 from torch import Tensor
 from torchvision.transforms import transforms
 
-import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
 from tqdm import tqdm
 
@@ -116,6 +115,12 @@ class MaskSample:
             mask = self.mask_tensor.cpu().squeeze()
             mask = self.tensor2Image(mask).convert('RGB')
             mask.save(self.mask_filename)
+
+    def exists(self, mode: str) -> bool:
+        """
+        Return True if mode is 'fill' (dont confuse with paintbucket tool) and mask already exists
+        """
+        return mode == 'fill' and os.path.exists(self.mask_filename)
 
 
 class BaseImageMaskModel(metaclass=ABCMeta):
@@ -269,7 +274,6 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             include_subdirectories (`bool`): whether to include subdirectories when processing samples
             single_file (`str`, optional): if provided, only process this specific file
         """
-        # Pass the single_file parameter to the get_sample_filenames method
         filenames = self.__get_sample_filenames(sample_dir, include_subdirectories, single_file)
 
         if single_file and filenames:

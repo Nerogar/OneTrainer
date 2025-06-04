@@ -291,34 +291,30 @@ class GenericTrainer(BaseTrainer):
                 except (FileNotFoundError, json.JSONDecodeError, OSError, PermissionError) as e:
                     print(f"Error loading sample definition file {self.config.sample_definition_file_name}: {str(e)}")
                     print("Skipping sampling and continuing with training...")
-                    # Restore the model to training state and return early
-                    self.model_setup.setup_train_device(self.model, self.config)
-                    if self.config.optimizer.optimizer.is_schedule_free:
-                        torch.clear_autocast_cache()
-                        self.model.optimizer.train()
-                    return
+                    sample_params_list = [] # Ensure it's an empty list to skip sampling logic
 
-        if self.model.ema:
-            self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+        if sample_params_list: # Check if there are samples to process
+            if self.model.ema:
+                self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
-        self.__sample_loop(
-            train_progress=train_progress,
-            train_device=train_device,
-            sample_config_list=sample_params_list,
-            is_custom_sample=is_custom_sample,
-        )
-
-        if self.model.ema:
-            self.model.ema.copy_temp_to(self.parameters)
-
-        # ema-less sampling, if an ema model exists
-        if self.model.ema and not is_custom_sample and self.config.non_ema_sampling:
             self.__sample_loop(
                 train_progress=train_progress,
                 train_device=train_device,
                 sample_config_list=sample_params_list,
-                folder_postfix=" - no-ema",
+                is_custom_sample=is_custom_sample,
             )
+
+            if self.model.ema:
+                self.model.ema.copy_temp_to(self.parameters)
+
+            # ema-less sampling, if an ema model exists
+            if self.model.ema and not is_custom_sample and self.config.non_ema_sampling:
+                self.__sample_loop(
+                    train_progress=train_progress,
+                    train_device=train_device,
+                    sample_config_list=sample_params_list,
+                    folder_postfix=" - no-ema",
+                )
 
         self.model_setup.setup_train_device(self.model, self.config)
         # Special case for schedule-free optimizers.

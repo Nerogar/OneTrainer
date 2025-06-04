@@ -4,7 +4,7 @@ import threading
 from tkinter import TclError, filedialog, messagebox
 from typing import Any, TypedDict
 
-from modules.module.captioning.utils import (
+from modules.module.captioning.captioning_util import (
     filter_blacklisted_tags,
     get_blacklist_tags,
 )

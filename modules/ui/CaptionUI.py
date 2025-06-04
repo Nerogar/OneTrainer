@@ -5,7 +5,7 @@ This module defines a CTkToplevel window for image editing with the capbility to
 or manually caption and mask images from a loaded directory.
 """
 
-import contextlib
+import contextlib  # noqa: I001
 import logging
 import platform
 import re
@@ -14,17 +14,18 @@ import tkinter as tk
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import TypeAlias
 
+from modules.module.BaseImageMaskModel import BaseImageMaskModel
 from modules.module.Blip2Model import Blip2Model
-from modules.module.BooruModels import BooruModels
+from modules.module.BaseBooruModel import WDBooruModel, JoyTagBooruModel  # Updated import
 from modules.module.ClipSegModel import ClipSegModel
 from modules.module.MaskByColor import MaskByColor
-from modules.module.Moondream2Model import Moondream2Model
+from modules.module.MoondreamModel import MoondreamModel
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
-from modules.module.SAMoondreamModel import MoondreamSAMMaskModel
+from modules.module.SAMdreamMaskModel import SAMdreamMaskModel
 from modules.ui.BulkCaptionEditWindow import BulkCaptionEditWindow
 from modules.ui.FileOperationsWindow import FileOperationsWindow
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
@@ -41,7 +42,7 @@ import torch
 import customtkinter as ctk
 import cv2
 import numpy as np
-import pillow_jxl  # noqa: F401  # Needed for plugin registration
+
 from customtkinter import ThemeManager
 from PIL import Image, ImageDraw, ImageTk
 
@@ -884,6 +885,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.bind("<bracketright>", self.mask_editor.stepped_increase_brush_size)
         self.bind("<Control-z>", self.mask_editor.undo_mask_edit)
         self.bind("<Control-y>", self.mask_editor.redo_mask_edit)
+        self.bind("<Control-Delete>", self.file_manager.delete_current_image_file)
 
         # Add support for removing focus from entry fields when clicking elsewhere
         self.bind_all("<Button-1>", self._clear_focus, add="+")
@@ -1761,12 +1763,12 @@ class ModelManager:
 
         # Model registries for better extensibility
         self._captioning_registry = {
-            "Moondream 2": Moondream2Model,
+            "Moondream 2": MoondreamModel,
             "Blip2": Blip2Model, #TODO Replace with blip 3 when it comes out.
-            "WD14 VIT v2": BooruModels,
-            "WD EVA02-Large Tagger v3": BooruModels,
-            "WD SwinV2 Tagger v3": BooruModels,
-            "JoyTag": BooruModels,
+            "WD14 VIT v2": WDBooruModel,
+            "WD EVA02-Large Tagger v3": WDBooruModel,
+            "WD SwinV2 Tagger v3": WDBooruModel,
+            "JoyTag": JoyTagBooruModel,
         }
 
         self._masking_registry = {
@@ -1774,7 +1776,7 @@ class ModelManager:
             "Rembg": RembgModel,
             "Rembg-Human": RembgHumanModel,
             "Hex Color": MaskByColor,
-            "SAMoondream": MoondreamSAMMaskModel,
+            "SAMoondream": SAMdreamMaskModel,
         }
 
         self.masking_model = None
@@ -1792,7 +1794,7 @@ class ModelManager:
 
     def load_masking_model(
             self, model: str
-        ) -> ClipSegModel | RembgModel | RembgHumanModel | MaskByColor | MoondreamSAMMaskModel | None:
+        ) -> BaseImageMaskModel | None:
             """Load the specified masking model, unloading any captioning model."""
             self.captioning_model = None
             self.current_captioning_model_name = None
@@ -1832,7 +1834,7 @@ class ModelManager:
 
     def load_captioning_model(
         self, model: str, **kwargs
-    ) -> Blip2Model | BooruModels | Moondream2Model | None:
+    ) -> Blip2Model | WDBooruModel | JoyTagBooruModel | MoondreamModel | None:
         """Load the specified captioning model, unloading any masking model."""
         self.masking_model = None
         self.current_masking_model_name = None
@@ -1856,11 +1858,17 @@ class ModelManager:
         ):
             logger.info(f"Loading {model} model, this may take a while")
 
-            # For BooruModels, pass the model name
-            if model_class == BooruModels:
-                logger.debug(f"Creating BooruModels with model_name='{model}'")
+            # For WDBooruModel, pass the model name
+            if model_class == WDBooruModel:
+                logger.debug(f"Creating WDBooruModel with model_name='{model}'")
                 self.captioning_model = model_class(
                     self.device, self.precision, model_name=model, **kwargs
+                )
+            elif model_class == JoyTagBooruModel:
+                logger.debug(f"Creating JoyTagBooruModel with model_name='{model}'")
+                # JoyTagBooruModel's __init__ handles the model_name internally.
+                self.captioning_model = model_class(
+                    self.device, self.precision, **kwargs
                 )
             else:
                 logger.debug(f"Creating {model} with kwargs: {kwargs}")
@@ -1879,7 +1887,7 @@ class ModelManager:
 
     def get_captioning_model(
         self,
-    ) -> Blip2Model | BooruModels | None:
+    ) -> Blip2Model | WDBooruModel | JoyTagBooruModel | MoondreamModel | None:
         return self.captioning_model
 
 
@@ -1889,6 +1897,94 @@ class FileManager:
         self._last_saved_caption = {}  # Simple cache to track saved content
         self._mask_modified = {}  # Track if mask has been modified
         self._reset_pending = {}  # Track images with pending reset
+
+    def delete_current_image_file(self, event: tk.Event | None = None) -> str | None:
+        """Delete the current image, its caption, and mask from the file system after confirmation."""
+        if not self.parent.dir or not (
+            0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)
+        ):
+            return "break" if event else None
+
+        current_image_relative_path = self.parent.image_rel_paths[self.parent.current_image_index]
+        image_path = Path(self.parent.dir) / current_image_relative_path
+        image_name = Path(current_image_relative_path).name # Get filename for message
+
+        # Confirmation dialog
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to permanently delete '{image_name}' "
+            "and its associated caption and mask files?",
+            parent=self.parent
+        )
+
+        if not confirm:
+            return "break" if event else None
+
+        try:
+            # Define paths for associated files
+            caption_path = image_path.with_suffix(".txt")
+            mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
+
+            # Delete files if they exist
+            if image_path.exists():
+                image_path.unlink()
+                logger.info(f"Deleted image file: {image_path}")
+            if caption_path.exists():
+                caption_path.unlink()
+                logger.info(f"Deleted caption file: {caption_path}")
+            if mask_path.exists():
+                mask_path.unlink()
+                logger.info(f"Deleted mask file: {mask_path}")
+
+            # Clean up caches
+            image_key = str(image_path) # Use absolute path as key if that's consistent
+            if image_key in self._last_saved_caption:
+                del self._last_saved_caption[image_key]
+            if image_key in self._mask_modified:
+                del self._mask_modified[image_key]
+            if image_key in self._reset_pending:
+                del self._reset_pending[image_key]
+
+            # Remove from internal lists
+            deleted_item_original_index = self.parent.current_image_index
+            self.parent.image_rel_paths.pop(deleted_item_original_index)
+
+            # Re-apply filters and update the file list display
+            # This will also call _update_file_list_display
+            self.parent._apply_filters()
+
+            # Navigate to a new image or clear UI
+            if not self.parent.image_rel_paths:  # No images left at all
+                self.parent.current_image_index = -1
+                self.parent.clear_ui()
+                self.parent.folder_name_label.configure(
+                    text=f"{Path(self.parent.dir)} (No images)" if self.parent.dir else "No folder selected"
+                )
+            elif not self.parent.filtered_image_paths: # No images left after filtering
+                self.parent.current_image_index = -1 # Or set to first of image_rel_paths if desired
+                self.parent.clear_ui()
+                self.parent.folder_name_label.configure(
+                    text=f"{Path(self.parent.dir)} (No matching images)"
+                )
+            else:
+                # Select the image at the same index, or the last one if the deleted image was last
+                new_navigation_index = min(deleted_item_original_index, len(self.parent.image_rel_paths) - 1)
+                if new_navigation_index < 0 and self.parent.image_rel_paths: # Should only happen if list became empty and handled above
+                    new_navigation_index = 0
+
+                if new_navigation_index >= 0:
+                     # switch_to_image expects an index for the main image_rel_paths list
+                    self.parent.navigation_manager.switch_to_image(new_navigation_index)
+                else: # Fallback if somehow new_navigation_index is invalid but lists are not empty
+                    self.parent.current_image_index = -1
+                    self.parent.clear_ui()
+
+
+        except Exception as e:
+            logger.error(f"Error deleting file {image_path}: {e}")
+            messagebox.showerror("Error", f"Could not delete file(s): {e}", parent=self.parent)
+
+        return "break" if event else None
 
     def reset_current_image(self) -> None:
         """Reset the current image by clearing caption and mask (preview only until saved)."""
@@ -2097,6 +2193,7 @@ class FileManager:
         self.parent.after(
             100, lambda: self.parent.attributes("-topmost", False)
         )
+
 
 
 

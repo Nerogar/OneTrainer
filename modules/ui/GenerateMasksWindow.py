@@ -27,7 +27,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
                 path = ""
 
             # Setup window properties
-            self._setup_window("Batch generate masks", "360x440")
+            self._setup_window("Batch generate masks", "360x470")
 
             # Get available models dynamically
             self.models = self.parent.model_manager.get_available_masking_models()
@@ -146,8 +146,8 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
     def _create_preview_option(self):
-        """Create a toggle for preview mode (only process current image)"""
-        self.preview_mode_label = ctk.CTkLabel(self.frame, text="Preview", width=100)
+        """Create a toggle for test mode (only process current image)"""
+        self.preview_mode_label = ctk.CTkLabel(self.frame, text="Test Run", width=100)
         self.preview_mode_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
         self.preview_mode_switch = ctk.CTkSwitch(self.frame, text="", variable=self.preview_mode_var)
         self.preview_mode_switch.grid(row=9, column=1, sticky="w", padx=5, pady=5)
@@ -229,9 +229,9 @@ class GenerateMasksWindow(ctk.CTkToplevel):
                 print(f"Failed to load masking model: {self.model_var.get()}")
                 return
 
-            # Set model_manager reference if this is a MoondreamSAMMaskModel
+            # Set model_manager reference if this is a SAMdreamMaskModel
             if hasattr(masking_model, "__class__") and hasattr(masking_model.__class__, "__name__"):
-                if masking_model.__class__.__name__ == "MoondreamSAMMaskModel":
+                if masking_model.__class__.__name__ == "SAMdreamMaskModel":
                     masking_model.model_manager = self.parent.model_manager
 
             mode = {

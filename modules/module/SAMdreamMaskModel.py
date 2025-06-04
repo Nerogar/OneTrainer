@@ -1,35 +1,42 @@
 import gc
 import logging
-import os
 from contextlib import nullcontext
 from functools import partial
 from pathlib import Path
+from typing import Any, Protocol, Self
 
 from modules.module.BaseImageMaskModel import (
     BaseImageMaskModel,
     MaskSample,
 )
-from modules.module.captioning.sample import CaptionSample
-from modules.module.Moondream2Model import Moondream2Model
+from modules.module.captioning.CaptionSample import CaptionSample
+from modules.module.MoondreamModel import MoondreamModel
 from modules.util.path_util import supported_image_extensions
 
 import torch
 
 import cv2
 import numpy as np
-import pillow_jxl  # noqa: F401  # Needed for plugin registration
 from PIL import Image
-from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+try:
+    from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+    SAM2_AVAILABLE = True
+except ImportError:
+    SAM2_AVAILABLE = False
+    print("SAM2 import not supported like due to AMD GPU or CPU only")
 from scipy import ndimage
 
 logger = logging.getLogger(__name__)
 
 
-class ModelCache:
+class SAMdreamModelCache:
+    # Cache for SAM and Moondream models to avoid reloading them multiple times
     def __init__(self):
         self.models = {}
 
-    def get(self, model_type, use_cuda):
+    def get(self, model_type: str, use_cuda: bool) -> Any | None:
         """Get a model from cache or return None"""
         key = f"{model_type}_{use_cuda}"
         if key in self.models:
@@ -37,13 +44,13 @@ class ModelCache:
             return self.models[key]
         return None
 
-    def put(self, model_type, model, use_cuda):
+    def put(self, model_type: str, model: Any, use_cuda: bool) -> Any:
         """Store a model in the cache"""
         key = f"{model_type}_{use_cuda}"
         self.models[key] = model
         return model
 
-    def remove(self, model_type, use_cuda):
+    def remove(self, model_type: str, use_cuda: bool) -> None:
         """Remove a model from cache and free memory"""
         key = f"{model_type}_{use_cuda}"
         if key in self.models:
@@ -54,30 +61,54 @@ class ModelCache:
                 torch.cuda.empty_cache()
 
 
-MODEL_CACHE = ModelCache()
+MODEL_CACHE = SAMdreamModelCache()
 
 
-class ObjectDetector:
+class ModelManagerProtocol(Protocol):
+    """Protocol defining the interface for model managers."""
+
+    captioning_model: MoondreamModel | None
+
+
+class ModelCacheProtocol(Protocol):
+    """Protocol defining the interface for model caches."""
+
+    def get(self, model_type: str, use_cuda: bool) -> Any | None: ...
+    def put(self, model_type: str, model: Any, use_cuda: bool) -> Any: ...
+    def remove(self, model_type: str, use_cuda: bool) -> None: ...
+
+
+class Moondream:
     """Handles object detection with Moondream model"""
 
-    def __init__(self, device: torch.device, dtype: torch.dtype, model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4"):
+    def __init__(
+        self,
+        device: torch.device,
+        dtype: torch.dtype,
+        model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4",
+    ):
         self.device = device
         self.dtype = dtype
         self.use_cuda = device.type == "cuda"
         self.model_revision = model_revision
-        self.model = None
+        self.model: MoondreamModel | None = None
 
-    def load(self, cache=True, model_manager=None):
+    def load(
+        self,
+        cache: bool = True,
+        model_manager: ModelManagerProtocol | None = None,
+    ) -> Self:
         """Load Moondream2 model with optional caching."""
-        # First, check if the parent model manager already has a loaded captioning model
         if model_manager is not None:
-            if (hasattr(model_manager, 'captioning_model') and
-                model_manager.captioning_model is not None and
-                hasattr(model_manager.captioning_model, '__class__') and
-                model_manager.captioning_model.__class__.__name__ == 'Moondream2Model'):
-
-                logger.info("Reusing existing Moondream2 captioning model from model manager")
-                self.model = model_manager.captioning_model
+            # Direct access through the protocol, no hasattr needed
+            captioning_model = model_manager.captioning_model
+            if captioning_model is not None and isinstance(
+                captioning_model, MoondreamModel
+            ):
+                logger.info(
+                    "Reusing existing Moondream2 captioning model from model manager"
+                )
+                self.model = captioning_model
                 return self
 
         # Then check local cache
@@ -88,7 +119,7 @@ class ObjectDetector:
                 return self
 
         logger.info("Loading Moondream model...")
-        self.model = Moondream2Model(
+        self.model = MoondreamModel(
             device=self.device,
             dtype=self.dtype,
             model_revision=self.model_revision,
@@ -100,29 +131,33 @@ class ObjectDetector:
 
         return self
 
-    def unload(self):
+    def unload(self) -> None:
         """Unload model and free memory"""
         if self.model:
             MODEL_CACHE.remove("moondream", self.use_cuda)
             self.model = None
 
-    def detect(self, image_path: str, prompt: str, max_objects=5):
+    def detect(
+        self, mask_sample: MaskSample, prompt: str, max_objects: int = 5
+    ) -> tuple[np.ndarray | None, list[dict[str, Any]], tuple[int, int]]:
         """Detect objects in an image using Moondream2."""
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        # Create caption sample
-        caption_sample = CaptionSample(image_path)
-
-        image = Image.open(image_path)
-
+        # Get image from MaskSample
+        image = mask_sample.get_image()
         img_width, img_height = image.size
         np_image = np.array(image)
 
-        # Detect objects using Moondream2
-        detection_results = self.model.generate_detection(caption_sample, prompt)
+        # Create caption sample from filename
+        caption_sample = CaptionSample(mask_sample.image_filename)
 
-        if not detection_results or 'objects' not in detection_results:
+        # Detect objects using Moondream2
+        detection_results = self.model.generate_detection(
+            caption_sample, prompt
+        )
+
+        if not detection_results or "objects" not in detection_results:
             logger.info(f"No objects detected for prompt: '{prompt}'")
             return None, [], (0, 0)
 
@@ -134,11 +169,14 @@ class ObjectDetector:
 
         # Convert box format if needed
         for obj in objects:
-            if 'box' in obj and len(obj['box']) == 4:
-                x_min, y_min, x_max, y_max = obj['box']
+            if "box" in obj and len(obj["box"]) == 4:
+                x_min, y_min, x_max, y_max = obj["box"]
 
-                # Add normalized coordinates for compatibility with segmenter
-                if all(0 <= coord <= 1 for coord in [x_min, y_min, x_max, y_max]):
+                # Add normalized coordinates for compatibility with SAM
+                if all(
+                    0 <= coord <= 1
+                    for coord in [x_min, y_min, x_max, y_max]
+                ):
                     obj["x_min"] = x_min
                     obj["y_min"] = y_min
                     obj["x_max"] = x_max
@@ -152,7 +190,8 @@ class ObjectDetector:
 
         # Filter objects with valid coordinates
         filtered_objects = [
-            obj for obj in objects
+            obj
+            for obj in objects
             if all(k in obj for k in ["x_min", "y_min", "x_max", "y_max"])
         ]
 
@@ -163,26 +202,36 @@ class ObjectDetector:
         return np_image, filtered_objects, (img_width, img_height)
 
 
-class Segmenter:
-    """Handles segmentation with SAM2 model"""
+class SAM:
+    """Handles segmentation with SAM2.1 model"""
 
-    def __init__(self, device: torch.device, sam2_model_name: str):
+    def __init__(
+        self,
+        device: torch.device,
+        sam2_model_name: str,
+        model_cache: ModelCacheProtocol = MODEL_CACHE,
+    ):
         self.device = device
         self.use_cuda = device.type == "cuda"
         self.sam2_model_name = sam2_model_name
-        self.predictor = None
+        self.predictor: SAM2ImagePredictor | None = None
+        self.model_cache = model_cache
 
-    def load(self, cache=True):
+    def load(self, cache: bool = True) -> Self:
         """Load SAM2 model with optional caching."""
         if cache:
-            cached_model = MODEL_CACHE.get("sam", self.use_cuda)
-            if cached_model is not None:
-                self.predictor = cached_model
+            cached_predictor = self.model_cache.get("sam", self.use_cuda)
+            if cached_predictor is not None and isinstance(
+                cached_predictor, SAM2ImagePredictor
+            ):
+                self.predictor = cached_predictor
                 return self
 
         logger.info(f"Loading SAM2 model '{self.sam2_model_name}'...")
         try:
-            self.predictor = SAM2ImagePredictor.from_pretrained(self.sam2_model_name)
+            self.predictor = SAM2ImagePredictor.from_pretrained(
+                self.sam2_model_name
+            )
             if self.use_cuda:
                 self.predictor.model.to(device=self.device)
                 logger.info("SAM2 model loaded on CUDA")
@@ -190,12 +239,12 @@ class Segmenter:
             logger.error(f"Error loading SAM2 model: {str(e)}")
             raise
 
-        if cache:
-            MODEL_CACHE.put("sam", self.predictor, self.use_cuda)
+        if cache and self.predictor is not None:
+            self.model_cache.put("sam", self.predictor, self.use_cuda)
 
         return self
 
-    def unload(self):
+    def unload(self) -> None:
         """Unload model and free memory"""
         if self.predictor:
             MODEL_CACHE.remove("sam", self.use_cuda)
@@ -203,14 +252,14 @@ class Segmenter:
 
     def segment(
         self,
-        np_image,
-        detected_objects,
-        image_dimensions,
+        np_image: np.ndarray,
+        detected_objects: list[dict[str, Any]],
+        image_dimensions: tuple[int, int],
         threshold: float = 0.3,
         smooth_pixels: int = 5,
         expand_pixels: int = 10,
         min_region_size: int = 32,
-    ):
+    ) -> tuple[list[list[int]], list[torch.Tensor]]:
         """Segment detected objects using SAM2."""
         if not self.predictor:
             raise RuntimeError("Model not loaded. Call load() first.")
@@ -269,16 +318,24 @@ class Segmenter:
         dtype = torch.float16 if self.use_cuda else torch.float32
 
         # Move tensors to device immediately to reduce memory transfers
-        box_tensor = torch.tensor(box_prompts, dtype=dtype, device=self.device)
-        point_tensor = torch.tensor(point_prompts, dtype=dtype, device=self.device)
-        label_tensor = torch.tensor(point_labels, dtype=torch.int, device=self.device)
+        box_tensor = torch.tensor(
+            box_prompts, dtype=dtype, device=self.device
+        )
+        point_tensor = torch.tensor(
+            point_prompts, dtype=dtype, device=self.device
+        )
+        label_tensor = torch.tensor(
+            point_labels, dtype=torch.int, device=self.device
+        )
 
         # Pre-calculate adaptive min sizes for all objects
-        adaptive_min_sizes = [max(min_region_size, int(area * 0.0001)) for area in areas]
+        adaptive_min_sizes = [
+            max(min_region_size, int(area * 0.0001)) for area in areas
+        ]
 
         # Create reusable mask refinement function
         refine_partial = partial(
-            MaskUtility.refine_mask,
+            SAMdreamMaskUtility.refine_mask,
             fill_holes=True,
             smooth=True,
             smooth_pixels=smooth_pixels,
@@ -291,19 +348,28 @@ class Segmenter:
 
         try:
             with torch.inference_mode():
-                context_manager = torch.amp.autocast(self.device.type) if self.use_cuda else nullcontext()
+                context_manager = (
+                    torch.amp.autocast(self.device.type)
+                    if self.use_cuda
+                    else nullcontext()
+                )
 
                 with context_manager:
-                   # Process each object individually - this is the most reliable approach
+                    # Process each object individually - this is the most reliable approach
                     for i in range(num_objects):
                         # Prepare tensors for this object
-                        box_slice = box_tensor[i:i+1]
-                        point_slice = point_tensor[i:i+1]
-                        label_slice = label_tensor[i:i+1]
+                        box_slice = box_tensor[i : i + 1]
+                        point_slice = point_tensor[i : i + 1]
+                        label_slice = label_tensor[i : i + 1]
 
                         # Skip invalid tensors early without try-except
-                        if box_slice.numel() == 0 or point_slice.numel() == 0:
-                            logger.warning(f"Skipping object {i+1}/{num_objects}: Invalid input tensors")
+                        if (
+                            box_slice.numel() == 0
+                            or point_slice.numel() == 0
+                        ):
+                            logger.warning(
+                                f"Skipping object {i+1}/{num_objects}: Invalid input tensors"
+                            )
                             continue
 
                         # Pre-declare variables outside try block
@@ -318,11 +384,17 @@ class Segmenter:
                                 multimask_output=True,
                             )
                         except Exception as e:
-                            logger.error(f"Error predicting mask for object {i+1}/{num_objects}: {e}")
+                            logger.error(
+                                f"Error predicting mask for object {i+1}/{num_objects}: {e}"
+                            )
                             continue
 
                         # Process results outside the try block when possible
-                        best_idx = torch.argmax(scores).item() if torch.is_tensor(scores) else np.argmax(scores)
+                        best_idx = (
+                            torch.argmax(scores).item()
+                            if torch.is_tensor(scores)
+                            else np.argmax(scores)
+                        )
                         best_mask = masks[best_idx]
 
                         if torch.is_tensor(best_mask):
@@ -335,11 +407,19 @@ class Segmenter:
                             area=areas[i],
                             min_size_abs=adaptive_min_sizes[i],
                             dilate_pixels=expand_pixels,
-                            smooth_pixels=smooth_pixels
+                            smooth_pixels=smooth_pixels,
                         )
 
                         # Convert to tensor for compatibility with existing code
-                        mask_tensor = torch.from_numpy(refined_mask.astype(np.float32)).float().unsqueeze(0).unsqueeze(0).to(self.device)
+                        mask_tensor = (
+                            torch.from_numpy(
+                                refined_mask.astype(np.float32)
+                            )
+                            .float()
+                            .unsqueeze(0)
+                            .unsqueeze(0)
+                            .to(self.device)
+                        )
                         refined_masks.append(mask_tensor)
 
                         # Force garbage collection every few objects when using CUDA
@@ -352,7 +432,7 @@ class Segmenter:
         return boxes_px, refined_masks
 
 
-class MaskUtility:
+class SAMdreamMaskUtility:
     @staticmethod
     def remove_small_regions(
         mask: np.ndarray,
@@ -370,13 +450,17 @@ class MaskUtility:
             return mask
 
         # Compute component sizes efficiently
-        indices, counts = np.unique(labeled_mask[labeled_mask > 0], return_counts=True)
+        indices, counts = np.unique(
+            labeled_mask[labeled_mask > 0], return_counts=True
+        )
 
         if len(counts) == 0:
             return mask
 
         largest_component_size = counts.max()
-        min_size = max(min_size_abs, int(largest_component_size * min_size_ratio))
+        min_size = max(
+            min_size_abs, int(largest_component_size * min_size_ratio)
+        )
 
         # Create a LUT for fast relabeling
         keep_label = np.zeros(num_features + 1, dtype=bool)
@@ -409,7 +493,7 @@ class MaskUtility:
             mask_bin = np.logical_or(mask_bin, neighbors >= 3)
 
         if remove_small:
-            mask_bin = MaskUtility.remove_small_regions(
+            mask_bin = SAMdreamMaskUtility.remove_small_regions(
                 mask_bin, min_size_ratio, min_size_abs
             )
 
@@ -419,10 +503,14 @@ class MaskUtility:
                 # Convert smooth_pixels to sigma value (divide by a scaling factor)
                 # Values 1-10 map to sigma range of approximately 0.2-2.0
                 sigma = smooth_pixels / 5.0
-                mask_float = ndimage.gaussian_filter(mask_bin.astype(float), sigma=sigma)
+                mask_float = ndimage.gaussian_filter(
+                    mask_bin.astype(float), sigma=sigma
+                )
             else:
                 # Use default built-in smoothing
-                mask_float = ndimage.gaussian_filter(mask_bin.astype(float), sigma=0.7)
+                mask_float = ndimage.gaussian_filter(
+                    mask_bin.astype(float), sigma=0.7
+                )
 
             mask_bin = mask_float > 0.3
 
@@ -432,12 +520,15 @@ class MaskUtility:
             dilate_pixels = 4
 
         if dilate_pixels > 0:
-            y, x = np.ogrid[-dilate_pixels:dilate_pixels+1, -dilate_pixels:dilate_pixels+1]
+            y, x = np.ogrid[
+                -dilate_pixels : dilate_pixels + 1,
+                -dilate_pixels : dilate_pixels + 1,
+            ]
             disk = x * x + y * y <= dilate_pixels * dilate_pixels
             mask_bin = ndimage.binary_dilation(mask_bin, structure=disk)
 
         if remove_small:
-            mask_bin = MaskUtility.remove_small_regions(
+            mask_bin = SAMdreamMaskUtility.remove_small_regions(
                 mask_bin, min_size_ratio, min_size_abs
             )
 
@@ -469,7 +560,9 @@ class MaskUtility:
         return binary_mask
 
     @staticmethod
-    def combine_tensor_masks(masks: list[torch.Tensor], shape: tuple[int, int] | None = None) -> torch.Tensor | None:
+    def combine_tensor_masks(
+        masks: list[torch.Tensor], shape: tuple[int, int] | None = None
+    ) -> torch.Tensor | None:
         """
         Combine multiple tensor masks into a single mask.
 
@@ -507,7 +600,9 @@ class ImageUtility:
     @staticmethod
     def find_images(directory: str | Path) -> list[Path]:
         """Find all image files in the given directory, excluding mask files."""
-        directory = Path(directory) if isinstance(directory, str) else directory
+        directory = (
+            Path(directory) if isinstance(directory, str) else directory
+        )
 
         # Use supported image extensions from path_util
         image_extensions = supported_image_extensions()
@@ -534,13 +629,13 @@ class ImageUtility:
         return sorted_images
 
 
-class MoondreamSAMMaskModel(BaseImageMaskModel):
+class SAMdreamMaskModel(BaseImageMaskModel):
     def __init__(
         self,
         device: torch.device,
         dtype: torch.dtype,
         sam2_model_size: str = "large",  # "tiny", "small", "base-plus", or "large"
-        moondream_model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4", #DO NOT CHANGE.
+        moondream_model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4",  # DO NOT CHANGE.
     ):
         """
         Initialize the MoondreamSAM mask model using SAM2 from Hugging Face.
@@ -554,46 +649,44 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         self.device = device
         self.dtype = dtype
         self.use_cuda = device.type == "cuda"
-        self.model_manager = None  # Will be set when loaded through model_manager
+        self.captioning_model: MoondreamModel | None = None
 
         # Map model size to proper HF model name
         self.sam2_model_map = {
             "tiny": "facebook/sam2-hiera-tiny",
             "small": "facebook/sam2-hiera-small",
             "base-plus": "facebook/sam2-hiera-base-plus",
-            "large": "facebook/sam2-hiera-large"
+            "large": "facebook/sam2-hiera-large",
         }
 
-        self.sam2_model_name = self.sam2_model_map.get(sam2_model_size, "facebook/sam2-hiera-large")
+        self.sam2_model_name = self.sam2_model_map.get(
+            sam2_model_size, "facebook/sam2-hiera-large"
+        )
         self.moondream_model_revision = moondream_model_revision
 
-        # Initialize components using enhanced implementation
-        self.detector = ObjectDetector(
+        self.detector = Moondream(
             device=device,
             dtype=dtype,
-            model_revision=moondream_model_revision
+            model_revision=moondream_model_revision,
         )
 
-        self.segmenter = Segmenter(
-            device=device,
-            sam2_model_name=self.sam2_model_name
-        )
+        self.SAM = SAM(device=device, sam2_model_name=self.sam2_model_name)
 
-    def _load_models(self):
+    def _load_models(self) -> None:
         """Load both Moondream2 and SAM2 models."""
         self.detector.load(model_manager=self.model_manager)
-        self.segmenter.load()
+        self.SAM.load()
 
     def mask_image(
         self,
         filename: str,
         prompts: list[str],
-        mode: str = 'fill',
+        mode: str = "fill",
         alpha: float = 1.0,
         threshold: float = 0.3,
         smooth_pixels: int = 5,
-        expand_pixels: int = 10
-    ):
+        expand_pixels: int = 10,
+    ) -> None:
         """
         Masks a sample based on detected objects and SAM2 segmentation.
 
@@ -611,16 +704,12 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
         logger.info(f"Processing {filename}")
         logger.info(f"Mask will be saved to: {mask_sample.mask_filename}")
 
-        # Skip if mode is 'fill' (dont confuse with paintbucket tool) and mask already exists
-        if mode == 'fill' and os.path.exists(mask_sample.mask_filename):
+        if mask_sample.exists(mode):
             logger.info(f"Skipping {filename} as mask already exists")
             return
 
         # Ensure models are loaded
         self._load_models()
-
-        image = mask_sample.get_image()
-        logger.info(f"Image loaded, size: {image.size}")
 
         # Process each prompt for detection
         combined_mask = None
@@ -629,52 +718,71 @@ class MoondreamSAMMaskModel(BaseImageMaskModel):
             logger.info(f"Processing prompt: '{prompt}' for {filename}")
 
             try:
-                np_image, detected_objects, img_dimensions = self.detector.detect(
-                    image_path=filename,
-                    prompt=prompt,
-                    max_objects=10  # Limited to at most 10 objects per prompt as I cant imagine scenarios where you need more
+                np_image, detected_objects, img_dimensions = (
+                    self.detector.detect(
+                        mask_sample=mask_sample, # Changed from image_path=filename
+                        prompt=prompt,
+                        max_objects=10,  # Limited to at most 10 objects per prompt as I cant imagine scenarios where you need more
+                    )
                 )
 
                 if np_image is None or not detected_objects:
-                    logger.info(f"No objects detected for prompt: '{prompt}'")
+                    logger.info(
+                        f"No objects detected for prompt: '{prompt}'"
+                    )
                     continue
 
-                logger.info(f"Detected {len(detected_objects)} objects for prompt: '{prompt}'")
+                logger.info(
+                    f"Detected {len(detected_objects)} objects for prompt: '{prompt}'"
+                )
 
-                _, object_masks = self.segmenter.segment(
+                _, object_masks = self.SAM.segment(
                     np_image=np_image,
                     detected_objects=detected_objects,
                     image_dimensions=img_dimensions,
                     threshold=threshold,
                     smooth_pixels=smooth_pixels,
-                    expand_pixels=expand_pixels
+                    expand_pixels=expand_pixels,
                 )
 
                 if not object_masks:
-                    logger.info(f"No valid masks generated for prompt: '{prompt}'")
+                    logger.info(
+                        f"No valid masks generated for prompt: '{prompt}'"
+                    )
                     continue
 
                 # Combine masks for this prompt
-                prompt_mask = MaskUtility.combine_tensor_masks(object_masks)
+                prompt_mask = SAMdreamMaskUtility.combine_tensor_masks(
+                    object_masks
+                )
 
                 # Add to combined mask across all prompts
-                combined_mask = prompt_mask if combined_mask is None else torch.max(combined_mask, prompt_mask)
+                combined_mask = (
+                    prompt_mask
+                    if combined_mask is None
+                    else torch.max(combined_mask, prompt_mask)
+                )
 
             except Exception as e:
-                logger.error(f"Error processing prompt '{prompt}': {str(e)}")
+                logger.error(
+                    f"Error processing prompt '{prompt}': {str(e)}"
+                )
                 import traceback
+
                 traceback.print_exc()
 
         # If no masks were created, return
         if combined_mask is None:
-            logger.info(f"No masks generated for {filename} with prompts {prompts}")
+            logger.info(
+                f"No masks generated for {filename} with prompts {prompts}"
+            )
             return
         else:
             mask_stats = {
                 "min": combined_mask.min().item(),
                 "max": combined_mask.max().item(),
                 "mean": combined_mask.mean().item(),
-                "shape": list(combined_mask.shape)
+                "shape": list(combined_mask.shape),
             }
             logger.debug(f"Final mask stats: {mask_stats}")
 

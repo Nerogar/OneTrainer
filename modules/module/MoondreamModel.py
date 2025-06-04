@@ -1,8 +1,8 @@
 import logging
 import traceback
 
-from modules.module.captioning.models import BaseImageCaptionModel
-from modules.module.captioning.sample import CaptionSample
+from modules.module.captioning.BaseImageCaptionModel import BaseImageCaptionModel
+from modules.module.captioning.CaptionSample import CaptionSample
 
 import torch
 
@@ -12,7 +12,7 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-class Moondream2Model(BaseImageCaptionModel):
+class MoondreamModel(BaseImageCaptionModel):
     def __init__(
         self,
         device: torch.device,
@@ -52,7 +52,7 @@ class Moondream2Model(BaseImageCaptionModel):
         """Helper method to get the image from the caption sample."""
         try:
             image = caption_sample.get_image()
-            logger.debug("Moondream2Model: Acquired image")
+            logger.debug("MoondreamModel: Acquired image")
             return image
         except Exception:
             logger.exception("ERROR in model.caption")
@@ -78,13 +78,13 @@ class Moondream2Model(BaseImageCaptionModel):
                     length=self.caption_length,
                     stream=self.stream
                 )
-                logger.debug(f"Moondream2Model.generate_caption: model.caption result: {result}")
+                logger.debug(f"MoondreamModel.generate_caption: model.caption result: {result}")
                 generated_caption = result.get("caption", "")
-                logger.debug(f"Moondream2Model.generate_caption: Received raw caption: {generated_caption}")
+                logger.debug(f"MoondreamModel.generate_caption: Received raw caption: {generated_caption}")
 
                 if self.stream and not isinstance(generated_caption, str):
                     generated_caption = ''.join(generated_caption)
-                    logger.debug(f"Moondream2Model.generate_caption: Assembled streaming caption: {generated_caption}")
+                    logger.debug(f"MoondreamModel.generate_caption: Assembled streaming caption: {generated_caption}")
 
                 if initial:
                     generated_caption = f"{initial} {generated_caption}".strip()
@@ -96,7 +96,7 @@ class Moondream2Model(BaseImageCaptionModel):
                 if caption_postfix:
                     generated_caption = f"{generated_caption}{caption_postfix}"
 
-                logger.debug(f"Moondream2Model.generate_caption: Final generated caption: {generated_caption}")
+                logger.debug(f"MoondreamModel.generate_caption: Final generated caption: {generated_caption}")
                 return generated_caption
         except Exception as e:
             logger.error(f"ERROR in model.caption: {str(e)}")

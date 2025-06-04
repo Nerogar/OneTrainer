@@ -4,6 +4,8 @@ def script_imports(allow_zluda: bool = True):
     import sys
     from pathlib import Path
 
+    import pillow_jxl  # noqa: F401  # Needed for plugin registration
+
     # Filter out the Triton warning on startup.
     # xformers is not installed anymore, but might still exist for some installations.
     logging \

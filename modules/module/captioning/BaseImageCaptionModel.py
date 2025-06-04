@@ -2,8 +2,8 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from .sample import CaptionSample
-from .utils import get_sample_filenames, is_empty_caption
+from .captioning_util import get_sample_filenames, is_empty_caption
+from .CaptionSample import CaptionSample
 
 logger = logging.getLogger(__name__)
 
