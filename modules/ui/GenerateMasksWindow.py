@@ -28,7 +28,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
                 path = ""
 
             # Setup window properties
-            self._setup_window("Batch generate masks", "360x470")
+            self._setup_window("Batch generate masks", "360x480")
 
             # Get available models dynamically
             self.models = self.parent.model_manager.get_available_masking_models()
@@ -59,6 +59,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
 
     def _create_layout(self, path, include_subdirectories):
         # Create frame
@@ -162,13 +163,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
     def _create_action_buttons(self):
         self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
-        self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-
-        self.frame.pack(fill="both", expand=True)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
+        self.create_masks_button.grid(row=11, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
     def browse_for_path(self, entry_box):
         # get the path from the user

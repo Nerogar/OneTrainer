@@ -47,7 +47,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self._threshold_visible: bool = False
         self._moondream_options_visible: bool = False
 
-        self._setup_window("Batch generate captions", "380x540")
+        self._setup_window("Batch generate captions", "380x505")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
