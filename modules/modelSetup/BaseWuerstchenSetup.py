@@ -110,6 +110,7 @@ class BaseWuerstchenSetup(
             embedding_state = model.embedding_state_dicts.get(embedding_config.uuid, None)
             if embedding_state is None:
                 embedding_state = self._create_new_embedding(
+                    model,
                     embedding_config,
                     model.prior_tokenizer,
                     model.prior_text_encoder,

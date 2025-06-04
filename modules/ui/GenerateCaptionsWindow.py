@@ -8,6 +8,7 @@ from modules.module.captioning.captioning_util import (
     filter_blacklisted_tags,
     get_blacklist_tags,
 )
+from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 
@@ -80,6 +81,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
 
     def _create_layout(self, path: str, include_subdirectories: bool) -> None:
         self.main_frame = ctk.CTkFrame(self)

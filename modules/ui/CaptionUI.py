@@ -33,10 +33,9 @@ from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.torch_util import default_device
 from modules.util.ui import components
-from modules.util.ui.icons import load_icon
 from modules.util.ui.ui_utils import bind_mousewheel
 from modules.util.ui.UIState import UIState
-
+from modules.util.ui.icons import load_icon
 import torch
 
 import customtkinter as ctk

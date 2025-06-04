@@ -20,6 +20,7 @@ from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
+from modules.ui.VideoToolUI import VideoToolUI
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -30,6 +31,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 from modules.zluda import ZLUDA
 
@@ -53,6 +55,8 @@ class TrainUI(ctk.CTk):
 
         self.title("OneTrainer")
         self.geometry("1100x740")
+
+        self.after(100, lambda: self._set_icon())
 
         # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration
         ctk.set_appearance_mode("Light" if AppearanceModeTracker.detect_appearance_mode() == 0 else "Dark")
@@ -103,6 +107,10 @@ class TrainUI(ctk.CTk):
             self.change_training_method,
             self.load_preset,
         )
+
+    def _set_icon(self):
+        """Set the window icon safely after window is ready"""
+        set_window_icon(self)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
@@ -471,19 +479,24 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the captioning tool")
         components.button(frame, 0, 1, "Open", self.open_dataset_tool)
 
+        # video tools
+        components.label(frame, 1, 0, "Video Tools",
+                         tooltip="Open the video tools")
+        components.button(frame, 1, 1, "Open", self.open_video_tool)
+
         # convert model
-        components.label(frame, 1, 0, "Convert Model Tools",
+        components.label(frame, 2, 0, "Convert Model Tools",
                          tooltip="Open the model conversion tool")
-        components.button(frame, 1, 1, "Open", self.open_convert_model_tool)
+        components.button(frame, 2, 1, "Open", self.open_convert_model_tool)
 
         # sample
-        components.label(frame, 2, 0, "Sampling Tool",
+        components.label(frame, 3, 0, "Sampling Tool",
                          tooltip="Open the model sampling tool")
-        components.button(frame, 2, 1, "Open", self.open_sampling_tool)
+        components.button(frame, 3, 1, "Open", self.open_sampling_tool)
 
-        components.label(frame, 3, 0, "Profiling Tool",
+        components.label(frame, 4, 0, "Profiling Tool",
                          tooltip="Open the profiling tools.")
-        components.button(frame, 3, 1, "Open", self.open_profiling_tool)
+        components.button(frame, 4, 1, "Open", self.open_profiling_tool)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -535,6 +548,10 @@ class TrainUI(ctk.CTk):
 
     def open_dataset_tool(self):
         window = CaptionUI(self, None, False)
+        self.wait_window(window)
+
+    def open_video_tool(self):
+        window = VideoToolUI(self)
         self.wait_window(window)
 
     def open_convert_model_tool(self):

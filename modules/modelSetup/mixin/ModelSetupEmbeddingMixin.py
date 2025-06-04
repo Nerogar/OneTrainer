@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from collections.abc import Callable
 
-from modules.model.BaseModel import BaseModelEmbedding
+from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.util.config.TrainConfig import TrainEmbeddingConfig
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 
@@ -36,6 +36,7 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
     def _create_new_embedding(
             self,
+            model: BaseModel,
             embedding_config: TrainEmbeddingConfig,
             tokenizer: PreTrainedTokenizer | None,
             text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel | None,
@@ -43,8 +44,6 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     ) -> Tensor | None:
         if tokenizer is None or text_encoder is None:
             return None
-
-        vector = None
 
         with torch.no_grad():
             initial_token_ids = tokenizer(
@@ -72,9 +71,10 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             if embedding_config.is_output_embedding and create_output_embedding_fn is not None:
                 token_count = len(initial_token_ids)
 
-                vector = create_output_embedding_fn(
-                    embedding_config.initial_embedding_text + token_count * '*',
-                )[:token_count]
+                with model.autocast_context:
+                    vector = create_output_embedding_fn(
+                        embedding_config.initial_embedding_text + token_count * '*',
+                    )[:token_count]
 
         return vector
 

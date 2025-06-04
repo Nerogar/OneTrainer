@@ -33,12 +33,6 @@ class StableDiffusion3ModelEmbedding:
             placeholder: str,
             is_output_embedding: bool,
     ):
-        super().__init__(
-            uuid=uuid,
-            token_count=text_encoder_1_vector.shape[0],
-            placeholder=placeholder,
-        )
-
         self.text_encoder_1_embedding = BaseModelEmbedding(
             uuid=uuid,
             placeholder=placeholder,
@@ -74,10 +68,8 @@ class StableDiffusion3Model(BaseModel):
     transformer: SD3Transformer2DModel | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     text_encoder_3_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     text_encoder_3_train_dtype: DataType
 
     text_encoder_3_offload_conductor: LayerOffloadConductor | None
@@ -97,9 +89,6 @@ class StableDiffusion3Model(BaseModel):
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
-    sd_config: dict | None
-    sd_config_filename: str | None
-
     def __init__(
             self,
             model_type: ModelType,
@@ -118,10 +107,8 @@ class StableDiffusion3Model(BaseModel):
         self.vae = None
         self.transformer = None
 
-        self.autocast_context = nullcontext()
         self.text_encoder_3_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_3_offload_conductor = None
@@ -138,6 +125,14 @@ class StableDiffusion3Model(BaseModel):
         self.text_encoder_3_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
+
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_1_lora,
+            self.text_encoder_2_lora,
+            self.text_encoder_3_lora,
+            self.transformer_lora,
+        ] if a is not None]
 
     def all_embeddings(self) -> list[StableDiffusion3ModelEmbedding]:
         return self.additional_embeddings \
@@ -435,9 +430,7 @@ class StableDiffusion3Model(BaseModel):
         prompt_embedding = torch.nn.functional.pad(
             prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
         )
-        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2) \
-            .to(dtype=self.train_dtype.torch_dtype())
-        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
-            .to(dtype=self.train_dtype.torch_dtype())
+        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
+        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
 
         return prompt_embedding, pooled_prompt_embedding

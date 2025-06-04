@@ -1,23 +1,24 @@
-import os.path
-from pathlib import Path
-
 from modules.model.FluxModel import FluxModel
-from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
 
-from safetensors.torch import save_file
+from omi_model_standards.convert.lora.convert_flux_lora import convert_flux_lora_key_sets
+from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
 class FluxLoRASaver(
-    DtypeModelSaverMixin,
+    LoRASaverMixin,
 ):
     def __init__(self):
         super().__init__()
 
-    def __get_state_dict(
+    def _get_convert_key_sets(self, model: FluxModel) -> list[LoraConversionKeySet] | None:
+        return convert_flux_lora_key_sets()
+
+    def _get_state_dict(
             self,
             model: FluxModel,
     ) -> dict[str, Tensor]:
@@ -46,39 +47,6 @@ class FluxLoRASaver(
 
         return state_dict
 
-    def __save_ckpt(
-            self,
-            model: FluxModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        torch.save(save_state_dict, destination)
-
-    def __save_safetensors(
-            self,
-            model: FluxModel,
-            destination: str,
-            dtype: torch.dtype | None,
-    ):
-        state_dict = self.__get_state_dict(model)
-        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
-
-        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
-        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
-
-    def __save_internal(
-            self,
-            model: FluxModel,
-            destination: str,
-    ):
-        os.makedirs(destination, exist_ok=True)
-
-        self.__save_safetensors(model, os.path.join(destination, "lora", "lora.safetensors"), None)
-
     def save(
             self,
             model: FluxModel,
@@ -86,12 +54,4 @@ class FluxLoRASaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        match output_model_format:
-            case ModelFormat.DIFFUSERS:
-                raise NotImplementedError
-            case ModelFormat.CKPT:
-                self.__save_ckpt(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
-                self.__save_safetensors(model, output_model_destination, dtype)
-            case ModelFormat.INTERNAL:
-                self.__save_internal(model, output_model_destination)
+        self._save(model, output_model_format, output_model_destination, dtype)

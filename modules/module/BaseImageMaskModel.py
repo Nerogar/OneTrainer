@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from modules.util import path_util
+from modules.util.image_util import load_image
 
 import torch
 from torch import Tensor
@@ -38,7 +39,7 @@ class MaskSample:
 
     def get_image(self) -> Image:
         if self.image is None:
-            self.image = Image.open(self.image_filename).convert('RGB')
+            self.image = load_image(self.image_filename, 'RGB')
             self.height = self.image.height
             self.width = self.image.width
 
@@ -46,7 +47,7 @@ class MaskSample:
 
     def get_mask_tensor(self) -> Tensor:
         if self.mask_tensor is None and os.path.exists(self.mask_filename):
-            mask = Image.open(self.mask_filename).convert('L')
+            mask = load_image(self.mask_filename, 'L')
             mask = self.image2Tensor(mask)
             mask = mask.to(self.device)
             self.mask_tensor = mask.unsqueeze(0)

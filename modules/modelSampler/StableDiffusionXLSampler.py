@@ -11,13 +11,13 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.image_util import load_image
 from modules.util.torch_util import torch_gc
 
 import torch
 from torch import nn
 from torchvision.transforms import transforms
 
-from PIL import Image
 from tqdm import tqdm
 
 
@@ -130,7 +130,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             ) * noise_scheduler.init_noise_sigma
 
             added_cond_kwargs = {
-                "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
+                "text_embeds": torch.concat([negative_pooled_text_encoder_2_output, pooled_text_encoder_2_output], dim=0),
                 "time_ids": torch.concat([add_time_ids] * 2, dim=0),
             }
 
@@ -254,13 +254,13 @@ class StableDiffusionXLSampler(BaseModelSampler):
                         ),
                     ])
 
-                    image = Image.open(base_image_path).convert("RGB")
+                    image = load_image(base_image_path, convert_mode="RGB")
                     image = t(image).to(
                         dtype=self.model.vae_train_dtype.torch_dtype(),
                         device=self.train_device,
                     )
 
-                    mask = Image.open(mask_image_path).convert("L")
+                    mask = load_image(mask_image_path, convert_mode='L')
                     mask = t(mask).to(
                         dtype=self.model.train_dtype.torch_dtype(),
                         device=self.train_device,
@@ -376,7 +376,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 latent_image = latent_image * noise_scheduler.init_noise_sigma
 
             added_cond_kwargs = {
-                "text_embeds": torch.concat([pooled_text_encoder_2_output, negative_pooled_text_encoder_2_output], dim=0),
+                "text_embeds": torch.concat([negative_pooled_text_encoder_2_output, pooled_text_encoder_2_output], dim=0),
                 "time_ids": torch.concat([add_time_ids] * 2, dim=0),
             }
 

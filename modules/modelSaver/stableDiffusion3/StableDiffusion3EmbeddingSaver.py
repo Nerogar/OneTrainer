@@ -56,13 +56,6 @@ class StableDiffusion3EmbeddingSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
-            case ModelFormat.CKPT:
-                self._save_ckpt(
-                    embedding,
-                    embedding_state,
-                    output_model_destination,
-                    dtype,
-                )
             case ModelFormat.SAFETENSORS:
                 self._save_safetensors(
                     embedding,
@@ -88,6 +81,9 @@ class StableDiffusion3EmbeddingSaver(
         embedding_uuids = set(model.embedding_state_dicts.keys() \
                               | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
 
+        if model.embedding is not None:
+            embedding_uuids.discard(model.embedding.text_encoder_1_embedding.uuid)
+
         embeddings = {x.text_encoder_1_embedding.uuid: x for x in model.additional_embeddings}
 
         for embedding_uuid in embedding_uuids:
@@ -103,13 +99,6 @@ class StableDiffusion3EmbeddingSaver(
             match output_model_format:
                 case ModelFormat.DIFFUSERS:
                     raise NotImplementedError
-                case ModelFormat.CKPT:
-                    self._save_ckpt(
-                        embedding,
-                        embedding_state,
-                        os.path.join(f"{output_model_destination}_embeddings", f"{embedding_name}.pt"),
-                        dtype,
-                    )
                 case ModelFormat.SAFETENSORS:
                     self._save_safetensors(
                         embedding,

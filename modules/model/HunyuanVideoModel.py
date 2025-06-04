@@ -20,7 +20,7 @@ from diffusers import (
     HunyuanVideoPipeline,
     HunyuanVideoTransformer3DModel,
 )
-from transformers import CLIPTextModel, CLIPTokenizer, LlamaModel, LlamaTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, LlamaModel, LlamaTokenizerFast
 
 DEFAULT_PROMPT_TEMPLATE = (
     "<|start_header_id|>system<|end_header_id|>\n\nDescribe the video by detailing the following aspects: "
@@ -59,7 +59,7 @@ class HunyuanVideoModelEmbedding:
 
 class HunyuanVideoModel(BaseModel):
     # base model data
-    tokenizer_1: LlamaTokenizer | None
+    tokenizer_1: LlamaTokenizerFast | None
     tokenizer_2: CLIPTokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder_1: LlamaModel | None
@@ -68,14 +68,12 @@ class HunyuanVideoModel(BaseModel):
     transformer: HunyuanVideoTransformer3DModel | None
 
     # original copies of base model data
-    orig_tokenizer_1: LlamaTokenizer | None
+    orig_tokenizer_1: LlamaTokenizerFast | None
     orig_tokenizer_2: CLIPTokenizer | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     transformer_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     transformer_train_dtype: DataType
 
     text_encoder_1_offload_conductor: LayerOffloadConductor | None
@@ -92,9 +90,6 @@ class HunyuanVideoModel(BaseModel):
     text_encoder_2_lora: LoRAModuleWrapper | None
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
-
-    sd_config: dict | None
-    sd_config_filename: str | None
 
     def __init__(
             self,
@@ -115,10 +110,8 @@ class HunyuanVideoModel(BaseModel):
         self.orig_tokenizer_1 = None
         self.orig_tokenizer_2 = None
 
-        self.autocast_context = nullcontext()
         self.transformer_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.transformer_train_dtype = DataType.FLOAT_32
 
         self.text_encoder_1_offload_conductor = None
@@ -133,6 +126,13 @@ class HunyuanVideoModel(BaseModel):
         self.text_encoder_2_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
+
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_1_lora,
+            self.text_encoder_2_lora,
+            self.transformer_lora,
+        ] if a is not None]
 
     def all_embeddings(self) -> list[HunyuanVideoModelEmbedding]:
         return self.additional_embeddings \

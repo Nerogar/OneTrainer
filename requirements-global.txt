@@ -2,12 +2,15 @@
 numpy==2.2.2
 opencv-python==4.11.0.86
 pillow==11.1.0
+imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.28.1
 scipy==1.15.1; sys_platform != 'win32'
 matplotlib==3.10.0
 av==14.1.0 # using an older version. only update once torchvision has been updated as well.
+yt-dlp  #no pinned version, frequently updated for compatibility with sites
+scenedetect==0.6.6
 imagesize==1.4.1
 pillow-jxl-plugin==1.3.2
 
@@ -17,19 +20,22 @@ safetensors==0.5.2
 tensorboard==2.18.0
 pytorch-lightning==2.5.0.post0
 
-# stable diffusion
--e git+https://github.com/huggingface/diffusers.git@464374f#egg=diffusers
+# diffusion models
+-e git+https://github.com/huggingface/diffusers.git@5873377#egg=diffusers
 transformers==4.48.3
 sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
+
+# model conversion
+-e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@4ad235c#egg=omi_model_standards
 
 # other models
 pooch==1.8.2
 open-clip-torch==2.30.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@42c7ca0#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@11ff4aa#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
@@ -37,6 +43,7 @@ lion-pytorch==0.2.3 # lion optimizer
 prodigyopt==1.1.2 # prodigy optimizer
 schedulefree==1.4.0 # schedule-free optimizers
 pytorch_optimizer==3.4.0 # pytorch optimizers
+prodigy-plus-schedule-free==1.9.1 # prodigy+schedulefree optimizer
 
 # Profiling
 scalene==1.5.51

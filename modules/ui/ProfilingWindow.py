@@ -1,6 +1,7 @@
 import faulthandler
 
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 from scalene import scalene_profiler
@@ -8,7 +9,7 @@ from scalene import scalene_profiler
 
 class ProfilingWindow(ctk.CTkToplevel):
     def __init__(self, parent, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
         self.parent = parent
 
         self.title("Profiling")
@@ -34,6 +35,7 @@ class ProfilingWindow(ctk.CTkToplevel):
 
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
         self.withdraw()
+        self.after(200, lambda: set_window_icon(self))
 
     def _dump_stack(self):
         with open('stacks.txt', 'w') as f:

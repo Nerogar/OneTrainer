@@ -11,6 +11,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
+from modules.util.path_util import write_json_atomic
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -95,6 +96,7 @@ class TopBar:
                 ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
                 ("Sana", ModelType.SANA),
                 ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
+                ("HiDream Full", ModelType.HI_DREAM_FULL),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -120,7 +122,8 @@ class TopBar:
                 or self.train_config.model_type.is_pixart() \
                 or self.train_config.model_type.is_flux() \
                 or self.train_config.model_type.is_sana() \
-                or self.train_config.model_type.is_hunyuan_video():
+                or self.train_config.model_type.is_hunyuan_video() \
+                or self.train_config.model_type.is_hi_dream():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
@@ -165,14 +168,12 @@ class TopBar:
         name = path_util.safe_filename(name)
         path = path_util.canonical_join("training_presets", f"{name}.json")
 
-        with open(path, "w") as f:
-            json.dump(self.train_config.to_settings_dict(secrets=False), f, indent=4)
+        write_json_atomic(path, self.train_config.to_settings_dict(secrets=False))
 
         return path
 
     def __save_secrets(self, path) -> str:
-        with open(path, "w") as f:
-            json.dump(self.train_config.secrets.to_dict(), f, indent=4)
+        write_json_atomic(path, self.train_config.secrets.to_dict())
         return path
 
     def open_wiki(self):

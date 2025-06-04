@@ -53,10 +53,8 @@ class StableDiffusionXLModel(BaseModel):
     unet: UNet2DConditionModel | None
 
     # autocast context
-    autocast_context: torch.autocast | nullcontext
     vae_autocast_context: torch.autocast | nullcontext
 
-    train_dtype: DataType
     vae_train_dtype: DataType
 
     # persistent embedding training data
@@ -90,10 +88,8 @@ class StableDiffusionXLModel(BaseModel):
         self.vae = None
         self.unet = None
 
-        self.autocast_context = nullcontext()
         self.vae_autocast_context = nullcontext()
 
-        self.train_dtype = DataType.FLOAT_32
         self.vae_train_dtype = DataType.FLOAT_32
 
         self.embedding = None
@@ -108,6 +104,13 @@ class StableDiffusionXLModel(BaseModel):
 
         self.sd_config = None
         self.sd_config_filename = None
+
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_1_lora,
+            self.text_encoder_2_lora,
+            self.unet_lora,
+        ] if a is not None]
 
     def all_embeddings(self) -> list[StableDiffusionXLModelEmbedding]:
         return self.additional_embeddings \

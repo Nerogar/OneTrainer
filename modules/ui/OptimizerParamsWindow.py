@@ -10,6 +10,7 @@ from modules.util.optimizer_util import (
     update_optimizer_config,
 )
 from modules.util.ui import components
+from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 
@@ -22,10 +23,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             ui_state,
             *args, **kwargs,
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+        super().__init__(parent, *args, **kwargs)
 
         self.parent = parent
-
         self.train_config = train_config
         self.ui_state = ui_state
         self.optimizer_ui_state = ui_state.get_var("optimizer")
@@ -34,9 +34,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.title("Optimizer Settings")
         self.geometry("800x500")
         self.resizable(True, True)
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=0)
@@ -53,6 +50,12 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         components.button(self, 1, 0, "ok", command=self.on_window_close)
         self.main_frame(self.frame)
+
+        self.wait_visibility()
+        self.grab_set()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
+
 
     def main_frame(self, master):
         # Optimizer
@@ -122,7 +125,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'nesterov': {'title': 'Nesterov', 'tooltip': 'Whether to enable Nesterov optimizer_momentum.', 'type': 'bool'},
             'no_prox': {'title': 'No Prox', 'tooltip': 'Whether to use proximity updates or not.', 'type': 'bool'},
             'optim_bits': {'title': 'Optim Bits', 'tooltip': 'Number of bits used for optimization.', 'type': 'int'},
-            'percentile_clipping': {'title': 'Percentile Clipping', 'tooltip': 'Gradient clipping based on percentile values.', 'type': 'float'},
+            'percentile_clipping': {'title': 'Percentile Clipping', 'tooltip': 'Gradient clipping based on percentile values.', 'type': 'int'},
             'relative_step': {'title': 'Relative Step', 'tooltip': 'Whether to use a relative step size.', 'type': 'bool'},
             'safeguard_warmup': {'title': 'Safeguard Warmup', 'tooltip': 'Avoid issues during warm-up stage.', 'type': 'bool'},
             'scale_parameter': {'title': 'Scale Parameter', 'tooltip': 'Whether to scale the parameter or not.', 'type': 'bool'},
@@ -145,6 +148,19 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'adam_debias': {'title': 'Adam Debias', 'tooltip': 'Only correct the denominator to avoid inflating step sizes early in training.', 'type': 'bool'},
             'slice_p': {'title': 'Slice parameters', 'tooltip': 'Reduce memory usage by calculating LR adaptation statistics on only every pth entry of each tensor. For values greater than 1 this is an approximation to standard Prodigy. Values ~11 are reasonable.', 'type': 'int'},
             'cautious': {'title': 'Cautious', 'tooltip': 'Whether to use the Cautious variant.', 'type': 'bool'},
+            'weight_decay_by_lr': {'title': 'weight_decay_by_lr', 'tooltip': 'Automatically adjust weight decay based on lr', 'type': 'bool'},
+            'prodigy_steps': {'title': 'prodigy_steps', 'tooltip': 'Turn off Prodigy after N steps', 'type': 'int'},
+            'use_speed': {'title': 'use_speed', 'tooltip': 'use_speed method', 'type': 'bool'},
+            'split_groups': {'title': 'split_groups', 'tooltip': 'Use split groups when training multiple params(uNet,TE..)', 'type': 'bool'},
+            'split_groups_mean': {'title': 'split_groups_mean', 'tooltip': 'Use mean for split groups', 'type': 'bool'},
+            'factored': {'title': 'factored', 'tooltip': 'Use factored', 'type': 'bool'},
+            'factored_fp32': {'title': 'factored_fp32', 'tooltip': 'Use factored_fp32', 'type': 'bool'},
+            'use_stableadamw': {'title': 'use_stableadamw', 'tooltip': 'Use use_stableadamw for gradient scaling', 'type': 'bool'},
+            'use_muon_pp': {'title': 'use_muon_pp', 'tooltip': 'Use muon_pp method', 'type': 'bool'},
+            'use_cautious': {'title': 'use_cautious', 'tooltip': 'Use cautious method', 'type': 'bool'},
+            'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
+            'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
+            'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
         }
         # @formatter:on
 
