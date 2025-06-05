@@ -6,11 +6,13 @@ imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.28.1
-scipy==1.15.1; sys_platform != 'win32'
+scipy==1.15.3; not (sys_platform == "win32" and platform_machine == "x86")
 matplotlib==3.10.0
 av==14.1.0 # using an older version. only update once torchvision has been updated as well.
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
+imagesize==1.4.1
+pillow-jxl-plugin==1.3.3
 
 # pytorch
 accelerate==1.3.0
@@ -56,3 +58,9 @@ fabric==3.2.2
 # debug
 psutil==6.1.1
 requests==2.32.3
+
+# dataset tools
+einops==0.8.1
+pyvips==2.2.3
+pyvips-binary==8.16.0
+pyoxipng==9.1.0

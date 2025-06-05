@@ -35,7 +35,7 @@ goto :no_python_found
 
 :windows_store_warning
 echo.
-echo ⚠️ [33m WINDOWS STORE PYTHON DETECTED[0m ⚠️
+echo ⚠︝ [33m WINDOWS STORE PYTHON DETECTED[0m ⚠︝
 echo.
 echo Windows Store Python has a known history of causing insidious issues with virtual environments due to how
 echo Microsoft sandboxes it.
