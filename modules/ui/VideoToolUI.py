@@ -296,7 +296,7 @@ class VideoToolUI(ctk.CTkToplevel):
         entry_box.insert(0, path)
         self.focus_set()
 
-    def __get_vid_paths(self, batch_mode : bool, input_path_single : str, input_path_dir : str):
+    def __get_vid_paths(self, batch_mode: bool, input_path_single: str, input_path_dir: str):
         input_videos = []
         if not batch_mode:
             path = pathlib.Path(input_path_single)
@@ -326,41 +326,41 @@ class VideoToolUI(ctk.CTkToplevel):
             print(f'Found {len(input_videos)} videos to process')
             return input_videos
 
-    def __get_random_aspect(self, size : tuple[int], variation : float):
+    def __get_random_aspect(self, size: tuple[int, int], variation: float) -> tuple[int, int, int, int]:
         if variation == 0:
-            return (0, size[0], 0, size[1])
+            return 0, size[0], 0, size[1]
 
         old_aspect = size[0]/size[1]    #height, width
         variation_scaled = old_aspect*variation
         if old_aspect > 1.2:
-            new_aspect = max(1, random.triangular(old_aspect-(variation_scaled*1.5), old_aspect+(variation_scaled/2), old_aspect))
+            new_aspect = max(1.0, random.triangular(old_aspect-(variation_scaled*1.5), old_aspect+(variation_scaled/2), old_aspect))
         elif old_aspect < 0.85:
-            new_aspect = min(1, random.triangular(old_aspect-(variation_scaled/2), old_aspect+(variation_scaled*1.5), old_aspect))
+            new_aspect = min(1.0, random.triangular(old_aspect-(variation_scaled/2), old_aspect+(variation_scaled*1.5), old_aspect))
         else:
             new_aspect = random.triangular(old_aspect-variation_scaled, old_aspect+variation_scaled)
 
         new_aspect = round(new_aspect, 2)
-        if new_aspect == old_aspect:
-            new_height = int(size[0])
-            new_width = int(size[1])
-        elif new_aspect > old_aspect:
+        if new_aspect > old_aspect:
             new_height = int(size[0])
             new_width = int(size[1]*(old_aspect/new_aspect))
         elif new_aspect < old_aspect:
             new_height = int(size[0]*(new_aspect/old_aspect))
             new_width = int(size[1])
+        else:
+            new_height = int(size[0])
+            new_width = int(size[1])
 
         position_x = random.randint(0, size[1]-new_width)
         position_y = random.randint(0, size[0]-new_height)
         #print(position_y, new_height, position_x, new_width)
-        return (position_y, new_height, position_x, new_width)
+        return position_y, new_height, position_x, new_width
 
-    def __extract_clips_button(self, batch_mode : bool):
+    def __extract_clips_button(self, batch_mode: bool):
         t = threading.Thread(target = self.__extract_clips_multi, args = [batch_mode])
         t.daemon = True
         t.start()
 
-    def __extract_clips_multi(self, batch_mode : bool):
+    def __extract_clips_multi(self, batch_mode: bool):
         if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
             print("Invalid output directory!")
             return
@@ -391,7 +391,8 @@ class VideoToolUI(ctk.CTkToplevel):
 
         print("Clip extraction from all videos complete")
 
-    def __extract_clips(self, video_path : str, timestamp_min : str, timestamp_max : str, max_length : float, split_at_cuts : bool, crop_variation: float, target_fps : int, output_dir : str):
+    def __extract_clips(self, video_path: str, timestamp_min: str, timestamp_max: str, max_length: float,
+                        split_at_cuts: bool, crop_variation: float, target_fps: int, output_dir: str):
         video = cv2.VideoCapture(video_path)
         fps = video.get(cv2.CAP_PROP_FPS)
         max_length_frames = int(max_length * fps)   #convert max length from seconds to frames
@@ -495,7 +496,8 @@ class VideoToolUI(ctk.CTkToplevel):
 
         print("Image extraction from all videos complete")
 
-    def __save_frames(self, video_path : str, timestamp_min : str, timestamp_max : str, capture_rate : float, blur_threshold : float, crop_variation : float, output_dir : str):
+    def __save_frames(self, video_path: str, timestamp_min: str, timestamp_max: str, capture_rate: float,
+                      blur_threshold: float, crop_variation: float, output_dir: str):
         video = cv2.VideoCapture(video_path)
         fps = video.get(cv2.CAP_PROP_FPS)
         image_rate = int(fps / capture_rate)   #convert capture rate from seconds to frames
@@ -541,12 +543,12 @@ class VideoToolUI(ctk.CTkToplevel):
                 #cv2.imwrite(filename, frame)    #save images
         video.release()
 
-    def __download_button(self, batch_mode : bool):
+    def __download_button(self, batch_mode: bool):
         t = threading.Thread(target = self.__download_multi, args = [batch_mode])
         t.daemon = True
         t.start()
 
-    def __download_multi(self, batch_mode : bool):
+    def __download_multi(self, batch_mode: bool):
         if not pathlib.Path(self.download_output_entry.get()).is_dir() or self.download_output_entry.get() == "":
             print("Invalid output directory!")
             return
@@ -569,7 +571,7 @@ class VideoToolUI(ctk.CTkToplevel):
 
         print(f'Completed {len(ydl_urls)} downloads.')
 
-    def __download_video(self, url : str, output_dir : str, output_args : str):
+    def __download_video(self, url: str, output_dir: str, output_args: str):
         ydl_filename = '-o%(title)s.%(ext)s'
         ydl_outpath = '-P ' + output_dir
         ydl_args = output_args.split()     #split args into list
