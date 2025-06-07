@@ -59,6 +59,7 @@ class Optimizer(Enum):
 
     # CAME
     CAME = 'CAME'
+    CAME_8BIT = 'CAME_8BIT'
 
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
@@ -90,6 +91,7 @@ class Optimizer(Enum):
         return self in [
             Optimizer.ADAFACTOR,
             Optimizer.CAME,
+            Optimizer.CAME_8BIT,
             Optimizer.ADAM,
             Optimizer.ADAMW,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
