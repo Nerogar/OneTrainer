@@ -1,8 +1,8 @@
 # pytorch
---extra-index-url https://download.pytorch.org/whl/rocm6.2.4
-torch==2.6.0+rocm6.2.4
-torchvision==0.21.0+rocm6.2.4
-onnxruntime==1.20.1
+--extra-index-url https://download.pytorch.org/whl/rocm6.3
+torch==2.7.1+rocm6.3
+torchvision==0.22.1+rocm6.3
+onnxruntime==1.22.0
 
 # optimizers
 # TODO
