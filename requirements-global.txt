@@ -6,7 +6,7 @@ imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.28.1
-scipy==1.15.1; sys_platform != 'win32'
+scipy==1.15.1
 matplotlib==3.10.0
 av==14.1.0 # using an older version. only update once torchvision has been updated as well.
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
