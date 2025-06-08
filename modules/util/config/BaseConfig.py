@@ -2,6 +2,8 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any, get_args, get_origin
 
+from modules.util.type_util import issubclass_safe
+
 
 class BaseConfig:
     config_version: int
@@ -9,7 +11,7 @@ class BaseConfig:
 
     def __init__(
             self,
-            data: list[(str, Any, type, bool)],
+            data: list[tuple[str, Any, type, bool]],
             config_version: int | None = None,
             config_migrations: dict[int, Callable[[dict], dict]] | None = None
     ):
@@ -32,15 +34,15 @@ class BaseConfig:
 
         for name in self.types:
             value = getattr(self, name)
-            if issubclass(self.types[name], BaseConfig):
+            if issubclass_safe(self.types[name], BaseConfig):
                 data[name] = value.to_dict()
             elif self.types[name] is list or get_origin(self.types[name]) is list:
-                if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
+                if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[0], BaseConfig):
                     data[name] = [le.to_dict() for le in value] if value is not None else None
                 else:
                     data[name] = value
             elif self.types[name] is dict or get_origin(self.types[name]) is dict:
-                if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[1], BaseConfig):
+                if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[1], BaseConfig):
                     dict_data = {}
                     for dict_key, dict_value in value.items():
                         dict_data[dict_key] = dict_value.to_dict()
@@ -49,7 +51,7 @@ class BaseConfig:
                     data[name] = value
             elif self.types[name] is str:
                 data[name] = value
-            elif issubclass(self.types[name], Enum):
+            elif issubclass_safe(self.types[name], Enum):
                 data[name] = None if value is None else str(value)
             elif self.types[name] is bool or self.types[name] is int:
                 data[name] = value
@@ -72,10 +74,10 @@ class BaseConfig:
 
         for name in self.types:
             try:
-                if issubclass(self.types[name], BaseConfig):
+                if issubclass_safe(self.types[name], BaseConfig):
                     getattr(self, name).from_dict(data[name])
                 elif self.types[name] is list or get_origin(self.types[name]) is list:
-                    if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[0], BaseConfig):
+                    if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[0], BaseConfig):
                         list_type = get_args(self.types[name])[0]
                         if data[name] is not None:
                             old_value = \
@@ -92,7 +94,7 @@ class BaseConfig:
                     else:
                         setattr(self, name, data[name])
                 elif self.types[name] is dict or get_origin(self.types[name]) is dict:
-                    if len(get_args(self.types[name])) > 0 and issubclass(get_args(self.types[name])[1], BaseConfig):
+                    if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[1], BaseConfig):
                         dict_type = get_args(self.types[name])[1]
                         value = {}
                         for dict_key, dict_value in data[name].items():
@@ -105,7 +107,7 @@ class BaseConfig:
                         setattr(self, name, None if data[name] is None else str(data[name]))
                     else:
                         setattr(self, name, str(data[name]))
-                elif issubclass(self.types[name], Enum):
+                elif issubclass_safe(self.types[name], Enum):
                     if isinstance(data[name], str):
                         if self.nullables[name]:
                             setattr(self, name, None if data[name] is None else self.types[name][data[name]])

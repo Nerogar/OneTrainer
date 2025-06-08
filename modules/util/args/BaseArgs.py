@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
+from modules.util.type_util import issubclass_safe
 
 
 class BaseArgs(BaseConfig):
@@ -21,7 +22,7 @@ class BaseArgs(BaseConfig):
             if value is not None:
                 if self.types[name] is str:
                     data.append(f"{self.__to_arg_name(name)}=\"{value}\"")
-                elif issubclass(self.types[name], Enum):
+                elif issubclass_safe(self.types[name], Enum):
                     data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                 elif self.types[name] is bool:
                     if self.nullables[name]:
