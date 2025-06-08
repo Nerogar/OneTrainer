@@ -69,13 +69,17 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             self,
             caption_sample: CaptionSample,
             initial_caption: str = "",
+            caption_prefix: str = "",  # Added
+            caption_postfix: str = ""  # Added
     ) -> str:
         """
         Generates caption for a single CaptionSample
 
         Args:
             caption_sample (`CaptionSample`): the sample to caption
-            initial_caption (`str`): the initial caption
+            initial_caption (`str`): the initial caption (e.g., for BLIP-style prompting)
+            caption_prefix (`str`): text to prepend to the generated caption
+            caption_postfix (`str`): text to append to the generated caption
 
         Returns: the generated caption
         """
@@ -108,6 +112,10 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             return
 
         predicted_caption = self.generate_caption(caption_sample, initial_caption, caption_prefix, caption_postfix)
+
+        # Replace newlines with spaces to ensure single-line captions
+        if isinstance(predicted_caption, str):
+            predicted_caption = predicted_caption.replace('\n', ' ').strip()
 
         if mode == 'replace' or mode == 'fill':
             caption_sample.set_caption(predicted_caption)

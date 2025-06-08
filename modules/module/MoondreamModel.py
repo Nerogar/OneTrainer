@@ -17,9 +17,9 @@ class MoondreamModel(BaseImageCaptionModel):
         self,
         device: torch.device,
         dtype: torch.dtype,
-        model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4", #DO NOT CHANGE. Commit hash has been reviewed.
+        model_revision: str = "4f5917588ff780f0ae93c1b15a0e39afa5139b8f", #DO NOT CHANGE. Commit hash has been reviewed.
         caption_length: str = "normal",
-        stream: bool = False,
+        stream: bool = False, # Default stream value for the model instance
     ):
         """
         Initialize the Moondream2 captioning model.
@@ -28,16 +28,14 @@ class MoondreamModel(BaseImageCaptionModel):
             device (torch.device): Device to use (CPU/CUDA)
             dtype (torch.dtype): Data type for model
             model_revision (str): Model revision to use
-            caption_length (str): "short" or "normal" caption length
-            stream (bool): Whether to stream output (only relevant for interactive use)
+            caption_length (str): "short", "normal", or "long" caption length
+            stream (bool): Whether the underlying model call should stream output.
         """
         self.device = device
         self.dtype = dtype
         self.caption_length = caption_length
-        self.stream = stream
+        self.stream = stream # This instance's stream preference
 
-        # For CUDA devices, map the entire model to CUDA using the empty string key
-        # which serves as a default mapping for all model components
         device_map = {"": "cuda"} if device.type == "cuda" else None
 
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -52,54 +50,79 @@ class MoondreamModel(BaseImageCaptionModel):
         """Helper method to get the image from the caption sample."""
         try:
             image = caption_sample.get_image()
-            logger.debug("MoondreamModel: Acquired image")
+            # logger.debug("MoondreamModel: Acquired image") # Can be verbose
             return image
         except Exception:
-            logger.exception("ERROR in model.caption")
-            return ""
+            logger.exception("MoondreamModel: ERROR getting image from caption_sample")
+            return None # Return None, not empty string
 
     def generate_caption(
         self,
         caption_sample: CaptionSample,
-        initial: str = "",
+        initial: str = "",  # This parameter is being passed by BaseImageCaptionModel but wasn't defined here
         initial_caption: str = "",
         caption_prefix: str = "",
         caption_postfix: str = ""
     ) -> str:
-        logger.debug("Generating caption called")
+        logger.debug(
+            f"MoondreamModel: Generating caption. Length: {self.caption_length}, Stream setting for model call: {self.stream}. "
+            f"Initial: '{initial}', UI_InitialCap: '{initial_caption}', UI_Prefix: '{caption_prefix}', UI_Postfix: '{caption_postfix}'"
+        )
         image = self._get_image(caption_sample)
         if image is None:
+            logger.warning("MoondreamModel: Could not get image from sample, returning empty caption.")
             return ""
 
         try:
             with torch.no_grad():
-                result = self.model.caption(
+                # Call the underlying moondream2 model's caption method
+                model_output_dict = self.model.caption(
                     image,
                     length=self.caption_length,
                     stream=self.stream
                 )
-                logger.debug(f"MoondreamModel.generate_caption: model.caption result: {result}")
-                generated_caption = result.get("caption", "")
-                logger.debug(f"MoondreamModel.generate_caption: Received raw caption: {generated_caption}")
 
-                if self.stream and not isinstance(generated_caption, str):
-                    generated_caption = ''.join(generated_caption)
-                    logger.debug(f"MoondreamModel.generate_caption: Assembled streaming caption: {generated_caption}")
+                raw_caption_content: any
+                if isinstance(model_output_dict, dict):
+                    raw_caption_content = model_output_dict.get("caption", "")
+                else:
+                    logger.warning(f"MoondreamModel: model.caption did not return a dict. Got: {type(model_output_dict)}. Using raw output if string.")
+                    raw_caption_content = str(model_output_dict) if isinstance(model_output_dict, str) else ""
 
+                # Process the raw caption content
+                assembled_caption: str
+                if hasattr(raw_caption_content, '__iter__') and not isinstance(raw_caption_content, str):
+                    tokens = list(raw_caption_content)  # Fully consume any generator/iterator
+                    assembled_caption = "".join(str(t) for t in tokens)
+                elif isinstance(raw_caption_content, str):
+                    assembled_caption = raw_caption_content
+                else:
+                    assembled_caption = ""
+
+                # Replace all newlines with spaces
+                assembled_caption = assembled_caption.replace("\n", " ")
+
+                # Apply the initial and other modifiers
+                current_caption = assembled_caption
+
+                # Handle both initial and initial_caption (they appear to serve similar purposes)
                 if initial:
-                    generated_caption = f"{initial} {generated_caption}".strip()
-                elif initial_caption:
-                    generated_caption = f"{initial_caption} {generated_caption}".strip()
+                    current_caption = f"{initial} {current_caption.lstrip()}"
+
+                if initial_caption and initial_caption != initial:  # Only apply if different from initial
+                    current_caption = f"{initial_caption} {current_caption.lstrip()}"
 
                 if caption_prefix:
-                    generated_caption = f"{caption_prefix}{generated_caption}"
-                if caption_postfix:
-                    generated_caption = f"{generated_caption}{caption_postfix}"
+                    current_caption = f"{caption_prefix}{current_caption.lstrip()}"
 
-                logger.debug(f"MoondreamModel.generate_caption: Final generated caption: {generated_caption}")
-                return generated_caption
+                if caption_postfix:
+                    current_caption = f"{current_caption.rstrip()}{caption_postfix}"
+
+                final_caption = current_caption.strip()
+                return final_caption
+
         except Exception as e:
-            logger.error(f"ERROR in model.caption: {str(e)}")
+            logger.error(f"ERROR in MoondreamModel.generate_caption: {str(e)}")
             traceback.print_exc()
             return ""
 

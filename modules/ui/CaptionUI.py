@@ -1,7 +1,7 @@
 """
 OneTrainer Dataset Tools
 
-This module defines a CTkToplevel window for image editing with the capbility to automatically
+This module defines a CTkToplevel window for image/caption editing with the capbility to automatically
 or manually caption and mask images from a loaded directory.
 """
 
@@ -13,16 +13,21 @@ import subprocess
 import tkinter as tk
 from collections.abc import Callable
 from enum import Enum
+import traceback
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import TypeAlias
 
 from modules.module.BaseImageMaskModel import BaseImageMaskModel
 from modules.module.Blip2Model import Blip2Model
-from modules.module.BaseBooruModel import WDBooruModel, JoyTagBooruModel  # Updated import
+from modules.module.BaseBooruModel import (
+    WDBooruModel,
+    JoyTagBooruModel,
+)
 from modules.module.ClipSegModel import ClipSegModel
 from modules.module.MaskByColor import MaskByColor
 from modules.module.MoondreamModel import MoondreamModel
+from modules.module.JoyCaptionModel import JoyCaptionModel
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
 from modules.module.SAMdreamMaskModel import SAMdreamMaskModel
@@ -69,6 +74,11 @@ FILE_LIST_WIDTH: int = 300
 MASK_MIN_OPACITY: float = 0.3
 DEFAULT_BRUSH_SIZE: float = 0.03
 
+MIN_CAPTION_LINES: int = 1
+MAX_CAPTION_LINES: int = 7
+CAPTION_CHAR_THRESHOLD: int = 900
+CAPTION_LINE_HEIGHT: int = 25
+
 
 THEME_COLORS = {
     "dark": {
@@ -92,14 +102,17 @@ THEME_COLORS = {
         "selected_file_text": "#0056aa",
         "transparent": "transparent",
         "file_text": "#2d2d2d",
-    }
+    },
 }
 
-CANVAS_BACKGROUND_COLOR: tuple[int, int, int] = THEME_COLORS["dark"]["canvas_bg"]
+CANVAS_BACKGROUND_COLOR: tuple[int, int, int] = THEME_COLORS["dark"][
+    "canvas_bg"
+]
 
 
 RGBColor: TypeAlias = tuple[int, int, int]
 ImageCoordinates: TypeAlias = tuple[int, int, int, int]
+
 
 def get_theme_color(color_name: str) -> str | tuple[int, int, int]:
     """Get the appropriate color based on current theme."""
@@ -107,7 +120,10 @@ def get_theme_color(color_name: str) -> str | tuple[int, int, int]:
     theme = "dark" if appearance_mode == "dark" else "light"
     return THEME_COLORS[theme][color_name]
 
-def get_themed_icon(icon_name: str, size: tuple[int, int]) -> ImageTk.PhotoImage:
+
+def get_themed_icon(
+    icon_name: str, size: tuple[int, int]
+) -> ImageTk.PhotoImage:
     """Get an icon with theme-specific variant if available."""
     appearance_mode = ctk.get_appearance_mode().lower()
     if appearance_mode == "light" and icon_name == "folder-tree":
@@ -118,12 +134,16 @@ def get_themed_icon(icon_name: str, size: tuple[int, int]) -> ImageTk.PhotoImage
             pass
     return load_icon(icon_name, size)
 
+
 def natural_sort_key(s):
     """Sort strings with embedded numbers in natural order."""
+
     # Split the input string into text and numeric parts
     def convert(text):
         return int(text) if text.isdigit() else text.lower()
-    return [convert(c) for c in re.split(r'(\d+)', s)]
+
+    return [convert(c) for c in re.split(r"(\d+)", s)]
+
 
 def scan_for_supported_images(
     directory: Path,
@@ -134,7 +154,7 @@ def scan_for_supported_images(
     if include_subdirs:
         results = [
             p.relative_to(directory)
-            for p in directory.glob('**/*')
+            for p in directory.glob("**/*")
             if p.is_file() and is_supported(p)
         ]
     else:
@@ -145,6 +165,7 @@ def scan_for_supported_images(
         ]
     # Use natural sorting instead of lexicographical sorting
     return sorted(results, key=natural_sort_key)
+
 
 def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
     """Get platform-specific cursor representation."""
@@ -165,7 +186,13 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
 
     # First check for custom cursor files on Windows
     if platform.system() == "Windows":
-        cursor_path = Path(__file__).parent.parent.parent / "resources" / "icons" / "cursors" / f"cursor_{cursor_name}.cur"
+        cursor_path = (
+            Path(__file__).parent.parent.parent
+            / "resources"
+            / "icons"
+            / "cursors"
+            / f"cursor_{cursor_name}.cur"
+        )
         if cursor_path.exists():
             # Use forward slashes instead of backslashes for Tk or it will freak out
             normalized_path = str(cursor_path).replace("\\", "/")
@@ -183,8 +210,6 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
 
 
 class CaptionUI(ctk.CTkToplevel):
-
-
     def __init__(
         self,
         parent: ctk.CTk,
@@ -200,7 +225,9 @@ class CaptionUI(ctk.CTkToplevel):
         # Set up explicit parent reference for proper stacking behavior
         self.parent = parent
         self.dir: str | None = initial_dir
-        self.config_ui_data: dict = {"include_subdirectories": include_subdirectories}
+        self.config_ui_data: dict = {
+            "include_subdirectories": include_subdirectories
+        }
         self.config_ui_state: UIState = UIState(self, self.config_ui_data)
 
         # Initialize other attributes and managers
@@ -210,7 +237,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.pil_mask: Image.Image | None = None
         self.image_width: int = 0
         self.image_height: int = 0
-        self.caption_lines: list[str] = []
+        self.caption_lines: list[str] = [""] * 5
         self.current_caption_line: int = 0
 
         self.masking_model = None
@@ -222,6 +249,8 @@ class CaptionUI(ctk.CTkToplevel):
         self.caption_manager = CaptionManager(self)
         self.file_manager = FileManager(self)
         self.image_handler = ImageHandler(self)
+
+        self.caption_area_split_threshold = 1200
 
         self._setup_window()
 
@@ -242,22 +271,23 @@ class CaptionUI(ctk.CTkToplevel):
         self.after(200, lambda: self.attributes("-topmost", False))
 
         self.help_text: str = (
-                "Keyboard shortcuts:\n\n"
-                "⬅️➡️: Navigate between images\n"
-                "Tab: Switch between caption lines\n"
-                "Return or Ctrl+S: Save changes\n"
-                "Ctrl+M: Toggle mask display\n"
-                "Ctrl+D: Switch to draw mode\n"
-                "Ctrl+F: Switch to fill mode\n"
-                "Ctrl+Z: Undo mask edit\n"
-                "Ctrl+Y: Redo mask edit\n"
-                "[ or ]: Decrease/increase brush size by 0.1\n\n"
-                "When editing masks:\n"
-                "Left click: Add to mask\n"
-                "Right click: Remove from mask\n"
-                "Mouse wheel: Adjust brush size"
-                "Middle mouse click: Reset image (clear caption and mask, save to commit change)\n"
-            )
+            "Keyboard shortcuts:\n\n"
+            "⬅️➡️: Navigate between images\n"
+            "Tab: Switch between caption lines\n"
+            "Return or Ctrl+S: Save changes\n"
+            "Ctrl+M: Toggle mask display\n"
+            "Ctrl+D: Switch to draw mode\n"
+            "Ctrl+F: Switch to fill mode\n"
+            "Ctrl+Z: Undo mask edit\n"
+            "Ctrl+Y: Redo mask edit\n"
+            "[ or ]: Decrease/increase brush size by 0.1\n\n"
+            "When editing masks:\n"
+            "Left click: Add to mask\n"
+            "Right click: Remove from mask\n"
+            "Mouse wheel: Adjust brush size"
+            "Middle mouse click: Reset image (clear caption and mask, save to commit change)\n"
+            "Ctrl+Delete: Delete image, caption and mask)\n"
+        )
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
@@ -349,7 +379,7 @@ class CaptionUI(ctk.CTkToplevel):
             "Bulk Caption Edit",
             self._open_bulk_caption_edit,
             "bulk",
-            "Apply bulk transformations to captions at once"
+            "Apply bulk transformations to captions at once",
         )
         top_frame.grid_columnconfigure(7, weight=1)
         self._create_icon_button(
@@ -364,7 +394,9 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_main_content(self) -> None:
         """Create the main content area."""
-        main_frame = ctk.CTkFrame(self, fg_color=get_theme_color("main_frame_bg"))
+        main_frame = ctk.CTkFrame(
+            self, fg_color=get_theme_color("main_frame_bg")
+        )
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=10)
         main_frame.grid_columnconfigure(0, weight=0)
         main_frame.grid_columnconfigure(1, weight=1)
@@ -383,11 +415,15 @@ class CaptionUI(ctk.CTkToplevel):
         file_area_frame.grid_rowconfigure(0, weight=0)  # Header
         file_area_frame.grid_rowconfigure(1, weight=0)  # File filter
         file_area_frame.grid_rowconfigure(2, weight=0)  # Caption filter
-        file_area_frame.grid_rowconfigure(3, weight=1)  # Scrollable file list
+        file_area_frame.grid_rowconfigure(
+            3, weight=1
+        )  # Scrollable file list
 
         # 1. Create header frame (folder display)
         header_frame = ctk.CTkFrame(file_area_frame)
-        header_frame.grid(row=0, column=0, sticky="ew", padx=2, pady=(2, 4))
+        header_frame.grid(
+            row=0, column=0, sticky="ew", padx=2, pady=(2, 4)
+        )
         header_frame.grid_columnconfigure(1, weight=1)
         folder_icon = get_themed_icon("folder-tree", (20, 20))
         ctk.CTkLabel(header_frame, text="", image=folder_icon).grid(
@@ -410,17 +446,27 @@ class CaptionUI(ctk.CTkToplevel):
 
         # 2. Create file/path filter frame
         file_filter_frame = ctk.CTkFrame(file_area_frame)
-        file_filter_frame.grid(row=1, column=0, sticky="ew", padx=2, pady=(2, 4))
+        file_filter_frame.grid(
+            row=1, column=0, sticky="ew", padx=2, pady=(2, 4)
+        )
         file_filter_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(file_filter_frame, text="File/Path Filter:", anchor="w").grid(
+        ctk.CTkLabel(
+            file_filter_frame, text="File/Path Filter:", anchor="w"
+        ).grid(
             row=0, column=0, columnspan=2, sticky="w", padx=5, pady=(5, 0)
         )
 
         self.file_filter_var = ctk.StringVar(value="")
-        self.file_filter_entry = ctk.CTkEntry(file_filter_frame, textvariable=self.file_filter_var)
-        self.file_filter_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
-        self.file_filter_entry.bind("<KeyRelease>", lambda e: self._debounce_filter())
+        self.file_filter_entry = ctk.CTkEntry(
+            file_filter_frame, textvariable=self.file_filter_var
+        )
+        self.file_filter_entry.grid(
+            row=1, column=0, sticky="ew", padx=5, pady=5
+        )
+        self.file_filter_entry.bind(
+            "<KeyRelease>", lambda e: self._debounce_filter()
+        )
 
         self.file_filter_type_var = ctk.StringVar(value="File")
         self.file_filter_type = ctk.CTkOptionMenu(
@@ -428,23 +474,35 @@ class CaptionUI(ctk.CTkToplevel):
             values=["File", "Path", "Both"],
             variable=self.file_filter_type_var,
             width=80,
-            command=lambda _: self._apply_filters()  # Dropdown changes apply immediately
+            command=lambda _: self._apply_filters(),  # Dropdown changes apply immediately
         )
-        self.file_filter_type.grid(row=1, column=1, sticky="e", padx=(3, 5), pady=5)
+        self.file_filter_type.grid(
+            row=1, column=1, sticky="e", padx=(3, 5), pady=5
+        )
 
         # 3. Create caption filter frame
         caption_filter_frame = ctk.CTkFrame(file_area_frame)
-        caption_filter_frame.grid(row=2, column=0, sticky="ew", padx=2, pady=(2, 4))
+        caption_filter_frame.grid(
+            row=2, column=0, sticky="ew", padx=2, pady=(2, 4)
+        )
         caption_filter_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(caption_filter_frame, text="Caption Filter:", anchor="w").grid(
+        ctk.CTkLabel(
+            caption_filter_frame, text="Caption Filter:", anchor="w"
+        ).grid(
             row=0, column=0, columnspan=2, sticky="w", padx=5, pady=(5, 0)
         )
 
         self.caption_filter_var = ctk.StringVar(value="")
-        self.caption_filter_entry = ctk.CTkEntry(caption_filter_frame, textvariable=self.caption_filter_var)
-        self.caption_filter_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
-        self.caption_filter_entry.bind("<KeyRelease>", lambda e: self._debounce_filter())
+        self.caption_filter_entry = ctk.CTkEntry(
+            caption_filter_frame, textvariable=self.caption_filter_var
+        )
+        self.caption_filter_entry.grid(
+            row=1, column=0, sticky="ew", padx=5, pady=5
+        )
+        self.caption_filter_entry.bind(
+            "<KeyRelease>", lambda e: self._debounce_filter()
+        )
 
         self.caption_filter_type_var = ctk.StringVar(value="Contains")
         self.caption_filter_type = ctk.CTkOptionMenu(
@@ -452,9 +510,11 @@ class CaptionUI(ctk.CTkToplevel):
             values=["Contains", "Matches", "Excludes", "Regex"],
             variable=self.caption_filter_type_var,
             width=80,
-            command=lambda _: self._apply_filters()  # Dropdown changes apply immediately
+            command=lambda _: self._apply_filters(),  # Dropdown changes apply immediately
         )
-        self.caption_filter_type.grid(row=1, column=1, sticky="e", padx=(3, 5), pady=5)
+        self.caption_filter_type.grid(
+            row=1, column=1, sticky="e", padx=(3, 5), pady=5
+        )
 
         # 4. Create scrollable file list
         self.file_list = ctk.CTkScrollableFrame(
@@ -474,19 +534,23 @@ class CaptionUI(ctk.CTkToplevel):
     def _debounce_filter(self) -> None:
         """Debounce the filter application to avoid lag during typing."""
         # Cancel any pending timer
-        if hasattr(self, 'filter_debounce_timer') and self.filter_debounce_timer:
+        if (
+            hasattr(self, "filter_debounce_timer")
+            and self.filter_debounce_timer
+        ):
             self.after_cancel(self.filter_debounce_timer)
 
         # Set a new timer
         self.filter_debounce_timer = self.after(
-            self.FILTER_DEBOUNCE_DELAY,
-            self._apply_filters
+            self.FILTER_DEBOUNCE_DELAY, self._apply_filters
         )
 
     def _create_file_item(self, row_idx, file_path):
         """Create a single file item in the list."""
         safe_filename = (
-            file_path if isinstance(file_path, str) else file_path.decode("utf-8", errors="replace")
+            file_path
+            if isinstance(file_path, str)
+            else file_path.decode("utf-8", errors="replace")
         )
 
         # Create the label
@@ -495,16 +559,21 @@ class CaptionUI(ctk.CTkToplevel):
             text=safe_filename,
             wraplength=FILE_LIST_WIDTH - 20,
             font=("Segoe UI", 11),
-            text_color=get_theme_color("file_text")
+            text_color=get_theme_color("file_text"),
         )
 
         # Highlight if this is the current file
-        is_current = self.image_rel_paths.index(file_path) == self.current_image_index if self.current_image_index >= 0 else False
+        is_current = (
+            self.image_rel_paths.index(file_path)
+            == self.current_image_index
+            if self.current_image_index >= 0
+            else False
+        )
         if is_current:
             label.configure(
                 text_color=get_theme_color("selected_file_text"),
                 fg_color=get_theme_color("selected_file_bg"),
-                corner_radius=6
+                corner_radius=6,
             )
 
         # Create click handler with proper closure
@@ -527,10 +596,15 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _apply_filters(self) -> None:
         """Apply filters to the file list and update the display."""
-        if not hasattr(self, "image_rel_paths") or not self.image_rel_paths:
+        if (
+            not hasattr(self, "image_rel_paths")
+            or not self.image_rel_paths
+        ):
             return
 
-        self.filtered_image_paths = self._filter_files(self.image_rel_paths)
+        self.filtered_image_paths = self._filter_files(
+            self.image_rel_paths
+        )
         self._update_file_list_display()
 
     def _filter_files(self, files: list) -> list:
@@ -545,11 +619,20 @@ class CaptionUI(ctk.CTkToplevel):
                 pattern = re.compile(re.escape(file_filter), re.IGNORECASE)
 
                 if filter_type == "File":
-                    filtered = [f for f in filtered if pattern.search(Path(f).name)]
+                    filtered = [
+                        f for f in filtered if pattern.search(Path(f).name)
+                    ]
                 elif filter_type == "Path":
-                    filtered = [f for f in filtered if pattern.search(str(f))]
+                    filtered = [
+                        f for f in filtered if pattern.search(str(f))
+                    ]
                 else:  # Both
-                    filtered = [f for f in filtered if pattern.search(str(f)) or pattern.search(Path(f).name)]
+                    filtered = [
+                        f
+                        for f in filtered
+                        if pattern.search(str(f))
+                        or pattern.search(Path(f).name)
+                    ]
 
             except re.error:
                 # In case of regex error, don't filter
@@ -572,19 +655,32 @@ class CaptionUI(ctk.CTkToplevel):
                         continue
 
                     try:
-                        caption_content = caption_path.read_text(encoding="utf-8").strip()
+                        caption_content = caption_path.read_text(
+                            encoding="utf-8"
+                        ).strip()
 
                         if caption_filter_type == "Contains":
-                            if caption_filter.lower() in caption_content.lower():
+                            if (
+                                caption_filter.lower()
+                                in caption_content.lower()
+                            ):
                                 caption_files.append(file_path)
                         elif caption_filter_type == "Matches":
-                            if caption_filter.lower() == caption_content.lower():
+                            if (
+                                caption_filter.lower()
+                                == caption_content.lower()
+                            ):
                                 caption_files.append(file_path)
                         elif caption_filter_type == "Excludes":
-                            if caption_filter.lower() not in caption_content.lower():
+                            if (
+                                caption_filter.lower()
+                                not in caption_content.lower()
+                            ):
                                 caption_files.append(file_path)
                         elif caption_filter_type == "Regex":
-                            pattern = re.compile(caption_filter, re.IGNORECASE)
+                            pattern = re.compile(
+                                caption_filter, re.IGNORECASE
+                            )
                             if pattern.search(caption_content):
                                 caption_files.append(file_path)
                     except Exception:
@@ -613,7 +709,7 @@ class CaptionUI(ctk.CTkToplevel):
                 self.file_list,
                 text=f"{len(self.filtered_image_paths)} files",
                 font=("Segoe UI", 10, "italic"),
-                text_color="grey75"
+                text_color="grey75",
             )
             status_label.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
             row_start = 1
@@ -634,7 +730,10 @@ class CaptionUI(ctk.CTkToplevel):
         self.filtered_image_paths = self.image_rel_paths.copy()
 
         # Reset scroll position
-        if hasattr(self.file_list, "_parent_canvas") and self.file_list._parent_canvas.winfo_exists():
+        if (
+            hasattr(self.file_list, "_parent_canvas")
+            and self.file_list._parent_canvas.winfo_exists()
+        ):
             self.file_list._parent_canvas.yview_moveto(0.0)
 
         # Update the display
@@ -658,7 +757,9 @@ class CaptionUI(ctk.CTkToplevel):
                 ) > 15 else self._file_list_scrollbar.grid_remove()
         except Exception as e:
             self._file_list_scrollbar.grid()
-            logger.debug(f"Note: Could not adjust scrollbar visibility: {e}")
+            logger.debug(
+                f"Note: Could not adjust scrollbar visibility: {e}"
+            )
 
     def _restore_scroll_position(self, position: float) -> None:
         """Restore scroll position after updating file list."""
@@ -683,23 +784,32 @@ class CaptionUI(ctk.CTkToplevel):
                 ) > 15 else self._file_list_scrollbar.grid_remove()
         except Exception as e:
             self._file_list_scrollbar.grid()
-            logger.debug(f"Note: Could not adjust scrollbar visibility: {e}")
+            logger.debug(
+                f"Note: Could not adjust scrollbar visibility: {e}"
+            )
 
     def _create_editor_panel(self, parent: ctk.CTkFrame) -> None:
         """Create the editor panel with tools, image container, and caption area."""
-        editor_frame = ctk.CTkFrame(parent, fg_color=get_theme_color("main_frame_bg"))
-        editor_frame.grid(row=0, column=1, sticky="nsew")
-        editor_frame.grid_columnconfigure(0, weight=1)
-        editor_frame.grid_rowconfigure(0, weight=0)
-        editor_frame.grid_rowconfigure(1, weight=1)
-        editor_frame.grid_rowconfigure(2, weight=0)
-        self._create_tools_bar(editor_frame)
-        self._create_image_container(editor_frame)
-        self._create_caption_area(editor_frame)
+        self.editor_frame = ctk.CTkFrame( # Store as self.editor_frame
+            parent, fg_color=get_theme_color("main_frame_bg")
+        )
+        self.editor_frame.grid(row=0, column=1, sticky="nsew")
+        self.editor_frame.grid_columnconfigure(0, weight=1)
+        self.editor_frame.grid_rowconfigure(0, weight=0) # Tools bar
+        self.editor_frame.grid_rowconfigure(1, weight=1) # Image container
+        self.editor_frame.grid_rowconfigure(2, weight=0) # Caption area
+
+        self._create_tools_bar(self.editor_frame)
+        self._create_image_container(self.editor_frame)
+        self._create_caption_area(self.editor_frame)
+
+        self.editor_frame.bind("<Configure>", self._adjust_caption_area_layout)
 
     def _create_tools_bar(self, parent: ctk.CTkFrame) -> None:
         """Create the tools bar for mask editing."""
-        tools_frame = ctk.CTkFrame(parent, fg_color=get_theme_color("tools_frame_bg"))
+        tools_frame = ctk.CTkFrame(
+            parent, fg_color=get_theme_color("tools_frame_bg")
+        )
         tools_frame.grid(row=0, column=0, sticky="new")
         # Update the column count for the added button
         for i in range(10):
@@ -735,12 +845,14 @@ class CaptionUI(ctk.CTkToplevel):
             tools_frame,
             text="Edit Mode",
             variable=self.enable_mask_editing_var,
-            command=self.mask_editor.update_cursor
+            command=self.mask_editor.update_cursor,
         ).grid(row=0, column=2, padx=5, pady=2)
         self.brush_opacity_entry = ctk.CTkEntry(tools_frame, width=40)
         self.brush_opacity_entry.insert(0, "1.0")
         self.brush_opacity_entry.grid(row=0, column=3, padx=5, pady=2)
-        self.brush_opacity_entry.bind("<FocusOut>", self._validate_brush_opacity)
+        self.brush_opacity_entry.bind(
+            "<FocusOut>", self._validate_brush_opacity
+        )
         ctk.CTkLabel(tools_frame, text="Brush Opacity").grid(
             row=0, column=4, padx=2, pady=2
         )
@@ -787,13 +899,17 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_image_container(self, parent: ctk.CTkFrame) -> None:
         """Create the image display container."""
-        self.image_container = ctk.CTkFrame(parent, fg_color=get_theme_color("image_container_bg"))
+        self.image_container = ctk.CTkFrame(
+            parent, fg_color=get_theme_color("image_container_bg")
+        )
         self.image_container.grid(row=1, column=0, sticky="nsew")
         self.image_container.grid_columnconfigure(0, weight=1)
         self.image_container.grid_rowconfigure(0, weight=1)
         self.image_container.grid_propagate(False)
         placeholder: Image.Image = Image.new(
-            "RGB", (DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT), get_theme_color("canvas_bg")
+            "RGB",
+            (DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT),
+            get_theme_color("canvas_bg"),
         )
         self.image_tk: ImageTk.PhotoImage = ImageTk.PhotoImage(placeholder)
         self.image_label = ctk.CTkLabel(
@@ -832,7 +948,9 @@ class CaptionUI(ctk.CTkToplevel):
             self.mask_editor.adjust_brush_size,
         )
         self.image_label.bind("<Enter>", self.mask_editor.update_cursor)
-        self.image_label.bind("<Leave>", self.mask_editor.set_default_cursor)
+        self.image_label.bind(
+            "<Leave>", self.mask_editor.set_default_cursor
+        )
 
     def _handle_middle_click(self, event: tk.Event) -> None:
         """Handle middle mouse button click as a shortcut for reset."""
@@ -841,10 +959,15 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _create_caption_area(self, parent: ctk.CTkFrame) -> None:
         """Create the caption area for editing."""
-        caption_frame = ctk.CTkFrame(parent, fg_color=get_theme_color("caption_frame_bg"))
-        caption_frame.grid(row=2, column=0, sticky="sew")
-        caption_frame.grid_columnconfigure(0, weight=0)
-        caption_frame.grid_columnconfigure(1, weight=1)
+        self.caption_frame = ctk.CTkFrame(
+            parent, fg_color=get_theme_color("caption_frame_bg")
+        )
+        self.caption_frame.grid(row=2, column=0, sticky="sew")
+
+        self.caption_frame.grid_columnconfigure(0, weight=0)  # For OptionMenu
+        self.caption_frame.grid_columnconfigure(1, weight=1)  # For caption_entry
+        self.caption_frame.grid_columnconfigure(2, weight=0)  # For an empty spacer, initially no weight
+
         self.caption_line_values: list[str] = [
             f"Caption {i}" for i in range(1, 6)
         ]
@@ -852,39 +975,127 @@ class CaptionUI(ctk.CTkToplevel):
             value=self.caption_line_values[0]
         )
         ctk.CTkOptionMenu(
-            caption_frame,
+            self.caption_frame,
             values=self.caption_line_values,
             variable=self.caption_line_var,
             command=self.caption_manager.on_caption_line_changed,
         ).grid(row=0, column=0, padx=5, pady=5)
-        self.caption_entry = ctk.CTkEntry(caption_frame)
+
+        # Initialize with minimum height (one line)
+        initial_height = MIN_CAPTION_LINES * CAPTION_LINE_HEIGHT
+
+        self.caption_entry = ctk.CTkTextbox(
+            self.caption_frame, height=initial_height, wrap="word"
+        )
         self.caption_entry.grid(
             row=0, column=1, padx=5, pady=5, sticky="ew"
         )
+
+        # Add an empty label as a spacer in column 2
+        self.caption_spacer = ctk.CTkLabel(self.caption_frame, text="")
+        self.caption_spacer.grid(row=0, column=2, padx=(0,5), pady=5, sticky="ew")
+
         # Bind to store value on focus out
         self.caption_entry.bind("<FocusOut>", self._on_caption_focus_out)
+        # Add binding for dynamic height adjustment
+        self.caption_entry.bind("<KeyRelease>", self._update_caption_height)
         self._bind_key_events(self.caption_entry)
+
+    def _calculate_caption_height(self, text_length: int) -> int:
+        """Calculate the appropriate height for the caption textbox based on content length."""
+        if text_length >= CAPTION_CHAR_THRESHOLD:
+            lines = MAX_CAPTION_LINES
+        else:
+            # Calculate proportional number of lines between 1 and 7
+            proportion = min(1.0, text_length / CAPTION_CHAR_THRESHOLD)
+            lines = max(MIN_CAPTION_LINES, round(proportion * MAX_CAPTION_LINES))
+
+        return lines * CAPTION_LINE_HEIGHT
+
+    def _update_caption_height(self, event: tk.Event = None) -> None:
+        """Update the caption textbox height based on its content."""
+        if not hasattr(self, "caption_entry") or not self.caption_entry.winfo_exists():
+            return
+
+        current_text = self.caption_entry.get("1.0", "end-1c")
+        text_length = len(current_text)
+        new_height = self._calculate_caption_height(text_length)
+
+        current_height = self.caption_entry.cget("height")
+        if current_height != new_height:
+            self.caption_entry.configure(height=new_height)
 
     def _on_caption_focus_out(self, event: tk.Event | None = None) -> None:
         """Store caption value when focus changes."""
-        current_text: str = self.caption_entry.get()
+        current_text: str = self.caption_entry.get("1.0", "end-1c").strip()
         self.caption_lines[self.current_caption_line] = current_text
+
+    def _handle_caption_enter(self, event: tk.Event) -> str:
+        """Handle Enter key in caption box: save and prevent newline."""
+        self.file_manager.save_changes(event)
+        return "break"  # Prevents the default newline character insertion
+
+    def _adjust_caption_area_layout(self, event: tk.Event | None = None) -> None:
+        """Adjusts the caption area layout based on the editor_frame width."""
+        if not hasattr(self, "caption_frame") or not self.caption_frame.winfo_exists():
+            return
+
+        editor_frame_width = 0
+        # event.widget should be self.editor_frame
+        if event and event.widget and event.widget.winfo_exists():
+            try:
+                editor_frame_width = event.widget.winfo_width()
+            except tk.TclError:  # Widget might be destroyed
+                return
+        elif hasattr(self, "editor_frame") and self.editor_frame.winfo_exists(): # Fallback
+            try:
+                editor_frame_width = self.editor_frame.winfo_width()
+            except tk.TclError:
+                return
+        else:
+            return # Not enough info to proceed
+
+        if editor_frame_width == 0: # Still not determined or too small
+            return
+
+        if editor_frame_width > self.caption_area_split_threshold:
+            # Large window: caption_entry takes 50%, spacer takes 50%
+            self.caption_frame.grid_columnconfigure(1, weight=1)
+            self.caption_frame.grid_columnconfigure(2, weight=1)
+        else:
+            # Default/Smaller window: caption_entry takes 100% of available, spacer takes 0%
+            self.caption_frame.grid_columnconfigure(1, weight=1)
+            self.caption_frame.grid_columnconfigure(2, weight=0)
 
     def _bind_key_events(self, component: ctk.CTkBaseClass) -> None:
         """Bind common key events to the given component."""
-        self.bind("<Right>", self.navigation_manager.next_image)
-        self.bind("<Left>", self.navigation_manager.previous_image)
-        component.bind("<Return>", self.file_manager.save_changes)
+        self.bind("<Control-Right>", self.navigation_manager.next_image)
+        self.bind("<Control-Left>", self.navigation_manager.previous_image)
+
+        # Specifically handle Return key for the caption_entry (CTkTextbox)
+        if component == self.caption_entry:
+            component.bind("<Return>", self._handle_caption_enter)
+        else: # For other components that might be passed (though currently only caption_entry is)
+            component.bind("<Return>", self.file_manager.save_changes)
+
         self.bind("<Tab>", self.caption_manager.next_caption_line)
-        self.bind("<Control-m>", self.mask_editor.toggle_mask_visibility_mode)
+        self.bind(
+            "<Control-m>", self.mask_editor.toggle_mask_visibility_mode
+        )
         self.bind("<Control-d>", self.mask_editor.switch_to_brush_mode)
         self.bind("<Control-f>", self.mask_editor.switch_to_fill_mode)
         self.bind("<Control-s>", self.file_manager.save_changes)
-        self.bind("<bracketleft>", self.mask_editor.stepped_decrease_brush_size)
-        self.bind("<bracketright>", self.mask_editor.stepped_increase_brush_size)
+        self.bind(
+            "<bracketleft>", self.mask_editor.stepped_decrease_brush_size
+        )
+        self.bind(
+            "<bracketright>", self.mask_editor.stepped_increase_brush_size
+        )
         self.bind("<Control-z>", self.mask_editor.undo_mask_edit)
         self.bind("<Control-y>", self.mask_editor.redo_mask_edit)
-        self.bind("<Control-Delete>", self.file_manager.delete_current_image_file)
+        self.bind(
+            "<Control-Delete>", self.file_manager.delete_current_image_file
+        )
 
         # Add support for removing focus from entry fields when clicking elsewhere
         self.bind_all("<Button-1>", self._clear_focus, add="+")
@@ -907,7 +1118,9 @@ class CaptionUI(ctk.CTkToplevel):
             # Set focus to clicked widget or main window
             self.focus_set()
 
-    def _validate_brush_opacity(self, event: tk.Event | None = None) -> None:
+    def _validate_brush_opacity(
+        self, event: tk.Event | None = None
+    ) -> None:
         """Validate brush opacity value when focus changes."""
         try:
             opacity = float(self.brush_opacity_entry.get())
@@ -929,8 +1142,12 @@ class CaptionUI(ctk.CTkToplevel):
     def clear_ui(self) -> None:
         """Clear the current image, mask, and caption data."""
         if self.image_container and self.image_container.winfo_ismapped():
-            width = max(MIN_CONTAINER_SIZE, self.image_container.winfo_width())
-            height = max(MIN_CONTAINER_SIZE, self.image_container.winfo_height())
+            width = max(
+                MIN_CONTAINER_SIZE, self.image_container.winfo_width()
+            )
+            height = max(
+                MIN_CONTAINER_SIZE, self.image_container.winfo_height()
+            )
         else:
             width, height = DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT
         empty_image: Image.Image = Image.new(
@@ -938,7 +1155,7 @@ class CaptionUI(ctk.CTkToplevel):
         )
         self.image_tk = ImageTk.PhotoImage(empty_image)
         self.image_label.configure(image=self.image_tk)
-        self.caption_entry.delete(0, "end")
+        self.caption_entry.delete("1.0", "end")
         self.pil_image = None
         self.pil_mask = None
         self.caption_lines = [""] * 5
@@ -955,7 +1172,9 @@ class CaptionUI(ctk.CTkToplevel):
             )
             self.wait_window(dialog)
             if 0 <= self.current_image_index < len(self.image_rel_paths):
-                self.navigation_manager.switch_to_image(self.current_image_index)
+                self.navigation_manager.switch_to_image(
+                    self.current_image_index
+                )
 
     def _open_mask_window(self) -> None:
         """Open the auto-mask generation window as a modal dialog."""
@@ -967,14 +1186,18 @@ class CaptionUI(ctk.CTkToplevel):
             )
             self.wait_window(dialog)
             if 0 <= self.current_image_index < len(self.image_rel_paths):
-                self.navigation_manager.switch_to_image(self.current_image_index)
+                self.navigation_manager.switch_to_image(
+                    self.current_image_index
+                )
 
     def _open_file_tools(self) -> None:
         """Open the file tools window as a modal dialog."""
         file_ops_window = FileOperationsWindow(self, self.dir)
         self.wait_window(file_ops_window)
         if 0 <= self.current_image_index < len(self.image_rel_paths):
-            self.navigation_manager.switch_to_image(self.current_image_index)
+            self.navigation_manager.switch_to_image(
+                self.current_image_index
+            )
 
     def _open_bulk_caption_edit(self) -> None:
         """Open the bulk caption edit window as a modal dialog."""
@@ -986,7 +1209,9 @@ class CaptionUI(ctk.CTkToplevel):
             )
             self.wait_window(dialog)
             if 0 <= self.current_image_index < len(self.image_rel_paths):
-                self.navigation_manager.switch_to_image(self.current_image_index)
+                self.navigation_manager.switch_to_image(
+                    self.current_image_index
+                )
 
     def _post_dialog_focus_restore(self, previous_focus):
         """Restore focus after a dialog closes"""
@@ -1002,6 +1227,50 @@ class CaptionUI(ctk.CTkToplevel):
     def _show_help(self) -> None:
         """Show help text (currently printed to console)."""
         logger.info(self.help_text)
+
+
+class CaptionManager:
+    def __init__(self, parent: CaptionUI) -> None:
+        self.parent: CaptionUI = parent
+
+    def refresh_caption(self) -> None:
+        """Refresh the caption entry with the current caption line."""
+        self.parent.caption_entry.delete("1.0", "end")
+        self.parent.caption_entry.insert(
+            "1.0", self.parent.caption_lines[self.parent.current_caption_line]
+        )
+        # Update height after setting content
+        self.parent._update_caption_height()
+
+    def next_caption_line(self, event: tk.Event | None = None) -> str:
+        """Switch to the next caption line."""
+        current_text: str = self.parent.caption_entry.get("1.0", "end-1c").strip()
+        self.parent.caption_lines[self.parent.current_caption_line] = (
+            current_text
+        )
+        self.parent.current_caption_line = (
+            self.parent.current_caption_line + 1
+        ) % len(self.parent.caption_lines)
+        self.parent.caption_line_var.set(
+            self.parent.caption_line_values[
+                self.parent.current_caption_line
+            ]
+        )
+        self.refresh_caption()
+        return "break"
+
+    def on_caption_line_changed(self, value: str) -> None:
+        """Handle changes in the selected caption line."""
+        current_text: str = self.parent.caption_entry.get("1.0", "end-1c").strip()
+        self.parent.caption_lines[self.parent.current_caption_line] = (
+            current_text
+        )
+        try:
+            line_number: int = int(value.split(" ")[1]) - 1
+            self.parent.current_caption_line = line_number
+        except (ValueError, IndexError):
+            self.parent.current_caption_line = 0
+        self.refresh_caption()
 
 
 class ImageHandler:
@@ -1048,6 +1317,11 @@ class ImageHandler:
         if not self.parent.pil_image:
             return
 
+        # Force Tkinter to process pending geometry calculations
+        # This might help get more accurate dimensions on initial load.
+        if self.parent.winfo_exists(): # Ensure parent window exists
+            self.parent.update_idletasks()
+
         # Get dimensions and create canvas
         display_dimensions = self._prepare_display()
         if not all(display_dimensions):
@@ -1061,7 +1335,9 @@ class ImageHandler:
 
     def _prepare_display(self) -> tuple[int, int, int, int]:
         """Prepare display dimensions and store in parent."""
-        display_width, display_height, left_offset, top_offset = self._calculate_display_dimensions()
+        display_width, display_height, left_offset, top_offset = (
+            self._calculate_display_dimensions()
+        )
 
         # Store values in parent for use by other methods
         self.parent.display_width = display_width
@@ -1071,21 +1347,29 @@ class ImageHandler:
 
         return display_width, display_height, left_offset, top_offset
 
-    def _prepare_image_with_mask(self, dimensions: tuple[int, int, int, int]) -> Image.Image:
+    def _prepare_image_with_mask(
+        self, dimensions: tuple[int, int, int, int]
+    ) -> Image.Image:
         """Create the final image with mask applied if available."""
         display_width, display_height, left_offset, top_offset = dimensions
         container_width = self.parent.image_container.winfo_width()
         container_height = self.parent.image_container.winfo_height()
 
         # Create a blank canvas for the final image
-        canvas = Image.new("RGB", (container_width, container_height), get_theme_color("image_container_bg"))
+        canvas = Image.new(
+            "RGB",
+            (container_width, container_height),
+            get_theme_color("image_container_bg"),
+        )
 
         # Get resized image
         resized_image = self._resize_image(display_width, display_height)
 
         # If mask exists, process it
         if self.parent.pil_mask:
-            final_image = self._process_masked_image(resized_image, display_width, display_height)
+            final_image = self._process_masked_image(
+                resized_image, display_width, display_height
+            )
         else:
             final_image = resized_image
 
@@ -1096,13 +1380,19 @@ class ImageHandler:
     def _resize_image(self, width: int, height: int) -> Image.Image:
         """Resize the current image to specified dimensions."""
         if width and height:
-            return self.parent.pil_image.resize((width, height), Image.Resampling.LANCZOS)
+            return self.parent.pil_image.resize(
+                (width, height), Image.Resampling.BICUBIC
+            )
         return self.parent.pil_image.copy()
 
-    def _process_masked_image(self, resized_image: Image.Image, width: int, height: int) -> Image.Image:
+    def _process_masked_image(
+        self, resized_image: Image.Image, width: int, height: int
+    ) -> Image.Image:
         """Process image with mask and return the final image."""
         # Resize mask to match image
-        resized_mask = self.parent.pil_mask.resize((width, height), Image.Resampling.NEAREST)
+        resized_mask = self.parent.pil_mask.resize(
+            (width, height), Image.Resampling.NEAREST
+        )
 
         # If display_only_mask is true, return just the mask
         if self.parent.mask_editor.display_only_mask:
@@ -1111,7 +1401,9 @@ class ImageHandler:
         # Otherwise blend mask with image
         return self._blend_mask_with_image(resized_image, resized_mask)
 
-    def _blend_mask_with_image(self, image: Image.Image, mask: Image.Image) -> Image.Image:
+    def _blend_mask_with_image(
+        self, image: Image.Image, mask: Image.Image
+    ) -> Image.Image:
         """Blend a mask with an image according to mask opacity settings."""
 
         np_image = np.array(image, dtype=np.float32) / 255.0
@@ -1134,11 +1426,15 @@ class ImageHandler:
         elif np.min(np_mask) < 1:
             # Scale mask values between min_opacity and 1.0
             min_val = float(np.min(np_mask))
-            return (np_mask - min_val) / (1.0 - min_val) * (1.0 - min_opacity) + min_opacity
+            return (np_mask - min_val) / (1.0 - min_val) * (
+                1.0 - min_opacity
+            ) + min_opacity
 
         return np_mask
 
-    def _update_display(self, final_image: Image.Image, dimensions: tuple) -> None:
+    def _update_display(
+        self, final_image: Image.Image, dimensions: tuple
+    ) -> None:
         """Update the Tkinter display with the processed image."""
         self.parent.image_tk = ImageTk.PhotoImage(final_image)
         self.parent.image_label.configure(image=self.parent.image_tk)
@@ -1147,11 +1443,14 @@ class ImageHandler:
         """Update container size and refresh image display."""
         if (
             self.parent.image_container.winfo_width() > MIN_CONTAINER_SIZE
-            and self.parent.image_container.winfo_height() > MIN_CONTAINER_SIZE
+            and self.parent.image_container.winfo_height()
+            > MIN_CONTAINER_SIZE
         ):
             self.refresh_image()
         else:
-            self.parent.image_container.config(width=DEFAULT_IMAGE_WIDTH, height=DEFAULT_IMAGE_HEIGHT)
+            self.parent.image_container.config(
+                width=DEFAULT_IMAGE_WIDTH, height=DEFAULT_IMAGE_HEIGHT
+            )
             self.parent.after(100, self.update_image_container_size)
 
     def on_resize(self, event: tk.Event | None = None) -> None:
@@ -1176,7 +1475,10 @@ class ImageHandler:
             return
 
         # Use pathlib for path operations
-        image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+        image_path = (
+            Path(self.parent.dir)
+            / self.parent.image_rel_paths[self.parent.current_image_index]
+        )
 
         try:
             self.parent.pil_image = Image.open(image_path).convert("RGB")
@@ -1186,7 +1488,9 @@ class ImageHandler:
             logger.error(f"Error loading image {image_path}: {e}")
             self.parent.pil_image = None
 
-        mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
+        mask_path = image_path.with_name(
+            f"{image_path.stem}-masklabel.png"
+        )
         if mask_path.exists():
             try:
                 self.parent.pil_mask = Image.open(mask_path).convert("RGB")
@@ -1217,18 +1521,20 @@ class ImageHandler:
         self.parent.caption_line_var.set(
             self.parent.caption_line_values[0]
         )
-        self.parent.caption_entry.delete(0, "end")
-        self.parent.caption_entry.insert(0, self.parent.caption_lines[0])
+        self.parent.caption_entry.delete("1.0", "end")
+        self.parent.caption_entry.insert("1.0", self.parent.caption_lines[0])
+        # Update the caption height for the newly loaded content
+        self.parent._update_caption_height()
 
     def is_supported_image(self, filename: str) -> bool:
         """Determine if the file is a supported image."""
         path = Path(filename)
-        return (path_util.is_supported_image_extension(path.suffix) and
-                not path.stem.endswith("-masklabel"))
+        return path_util.is_supported_image_extension(
+            path.suffix
+        ) and not path.stem.endswith("-masklabel")
 
 
 class MaskEditor:
-
     def __init__(self, parent: CaptionUI) -> None:
         self.parent: CaptionUI = parent
         self.mask_draw_x: float = 0.0
@@ -1243,14 +1549,22 @@ class MaskEditor:
         self.edit_started: bool = False
         self._cached_image_dimensions: tuple[int, int] = (0, 0)
 
-    def stepped_decrease_brush_size(self, event: tk.Event | None = None) -> str:
+    def stepped_decrease_brush_size(
+        self, event: tk.Event | None = None
+    ) -> str:
         """Decrease the brush size by a fixed step."""
-        self.mask_draw_radius = max(MIN_BRUSH_SIZE, self.mask_draw_radius - BRACKET_BRUSH_SIZE_STEP)
+        self.mask_draw_radius = max(
+            MIN_BRUSH_SIZE, self.mask_draw_radius - BRACKET_BRUSH_SIZE_STEP
+        )
         return "break"
 
-    def stepped_increase_brush_size(self, event: tk.Event | None = None) -> str:
+    def stepped_increase_brush_size(
+        self, event: tk.Event | None = None
+    ) -> str:
         """Increase the brush size by a fixed step."""
-        self.mask_draw_radius = min(MAX_BRUSH_SIZE, self.mask_draw_radius + BRACKET_BRUSH_SIZE_STEP)
+        self.mask_draw_radius = min(
+            MAX_BRUSH_SIZE, self.mask_draw_radius + BRACKET_BRUSH_SIZE_STEP
+        )
         return "break"
 
     def reset_for_new_image(self) -> None:
@@ -1305,7 +1619,9 @@ class MaskEditor:
             return
 
         # Apply appropriate editing action
-        self._apply_editing_action(start_x, start_y, end_x, end_y, is_left, is_right)
+        self._apply_editing_action(
+            start_x, start_y, end_x, end_y, is_left, is_right
+        )
 
     def _can_edit_mask(self, event: tk.Event) -> bool:
         """Check if mask editing is permitted."""
@@ -1319,7 +1635,9 @@ class MaskEditor:
             < len(self.parent.image_rel_paths)
         )
 
-    def _convert_screen_to_mask_coordinates(self, event: tk.Event) -> ImageCoordinates:
+    def _convert_screen_to_mask_coordinates(
+        self, event: tk.Event
+    ) -> ImageCoordinates:
         """Convert screen coordinates to mask coordinates."""
         # Get event coordinates
         event_position = self._get_event_position(event)
@@ -1327,7 +1645,9 @@ class MaskEditor:
             return 0, 0, 0, 0
 
         # Convert to image coordinates
-        start_coordinates = self._convert_to_image_coordinates(event_position)
+        start_coordinates = self._convert_to_image_coordinates(
+            event_position
+        )
         if not start_coordinates:
             return 0, 0, 0, 0
 
@@ -1338,15 +1658,24 @@ class MaskEditor:
         self._store_current_position(event)
 
         # Return start_x, start_y, end_x, end_y
-        return start_coordinates[0], start_coordinates[1], end_coordinates[0], end_coordinates[1]
+        return (
+            start_coordinates[0],
+            start_coordinates[1],
+            end_coordinates[0],
+            end_coordinates[1],
+        )
 
-    def _get_event_position(self, event: tk.Event) -> tuple[float, float] | None:
+    def _get_event_position(
+        self, event: tk.Event
+    ) -> tuple[float, float] | None:
         """Extract event position and check if it's within the image area."""
         event_x = event.x
         event_y = event.y
         return event_x, event_y
 
-    def _convert_to_image_coordinates(self, position: tuple[float, float]) -> tuple[int, int] | None:
+    def _convert_to_image_coordinates(
+        self, position: tuple[float, float]
+    ) -> tuple[int, int] | None:
         """Convert screen coordinates to image coordinates."""
         event_x, event_y = position
         left_offset = self.parent.left_offset
@@ -1359,7 +1688,9 @@ class MaskEditor:
         image_y = event_y - top_offset
 
         # Check if coordinates are within the image area
-        if not (0 <= image_x < display_width and 0 <= image_y < display_height):
+        if not (
+            0 <= image_x < display_width and 0 <= image_y < display_height
+        ):
             return None
 
         # Convert to original image coordinates
@@ -1371,7 +1702,9 @@ class MaskEditor:
 
         return start_x, start_y
 
-    def _get_end_coordinates(self, current_position: tuple[float, float]) -> tuple[int, int]:
+    def _get_end_coordinates(
+        self, current_position: tuple[float, float]
+    ) -> tuple[int, int]:
         """Calculate end coordinates based on previous position for line drawing."""
         event_x, event_y = current_position
         left_offset = self.parent.left_offset
@@ -1386,7 +1719,10 @@ class MaskEditor:
             prev_image_x = self.mask_draw_x - left_offset
             prev_image_y = self.mask_draw_y - top_offset
 
-            if 0 <= prev_image_x < display_width and 0 <= prev_image_y < display_height:
+            if (
+                0 <= prev_image_x < display_width
+                and 0 <= prev_image_y < display_height
+            ):
                 end_x = int(prev_image_x * image_width / display_width)
                 end_y = int(prev_image_y * image_height / display_height)
                 return end_x, end_y
@@ -1402,7 +1738,9 @@ class MaskEditor:
         self.mask_draw_x = event.x
         self.mask_draw_y = event.y
 
-    def _determine_mouse_buttons(self, event: tk.Event) -> tuple[bool, bool]:
+    def _determine_mouse_buttons(
+        self, event: tk.Event
+    ) -> tuple[bool, bool]:
         """Determine which mouse buttons are pressed."""
         is_left = bool(event.state & 0x0100 or event.num == 1)
         is_right = bool(event.state & 0x0400 or event.num == 3)
@@ -1415,15 +1753,19 @@ class MaskEditor:
         end_x: int,
         end_y: int,
         is_left: bool,
-        is_right: bool
+        is_right: bool,
     ) -> None:
         """Apply the appropriate mask editing action based on current mode."""
         if self.mask_editing_mode == EditMode.DRAW:
-            self._draw_mask(start_x, start_y, end_x, end_y, is_left, is_right)
+            self._draw_mask(
+                start_x, start_y, end_x, end_y, is_left, is_right
+            )
         elif self.mask_editing_mode == EditMode.FILL:
             self._fill_mask(start_x, start_y, is_left, is_right)
 
-    def _determine_brush_mask_color(self, is_left: bool) -> RGBColor | None:
+    def _determine_brush_mask_color(
+        self, is_left: bool
+    ) -> RGBColor | None:
         """Determine the brush color based (b or w) base on the mouse button."""
         if is_left:
             try:
@@ -1483,7 +1825,9 @@ class MaskEditor:
 
     def _calculate_brush_radius(self) -> int:
         """Calculate brush radius based on mask dimensions and radius setting, ensuring minimum 1px."""
-        max_dimension = max(self.parent.pil_mask.width, self.parent.pil_mask.height)
+        max_dimension = max(
+            self.parent.pil_mask.width, self.parent.pil_mask.height
+        )
         # Ensure radius is at least 1 pixel even with small brush sizes
         return max(1, int(self.mask_draw_radius * max_dimension))
 
@@ -1494,14 +1838,16 @@ class MaskEditor:
         end_x: int,
         end_y: int,
         radius: int,
-        color: RGBColor
+        color: RGBColor,
     ) -> None:
         """Draw line and end points on mask."""
         draw = ImageDraw.Draw(self.parent.pil_mask)
 
         # Draw line between points
         line_width = 2 * radius + 1
-        draw.line((start_x, start_y, end_x, end_y), fill=color, width=line_width)
+        draw.line(
+            (start_x, start_y, end_x, end_y), fill=color, width=line_width
+        )
 
         # Draw circle at start point
         draw.ellipse(
@@ -1550,34 +1896,50 @@ class MaskEditor:
     def adjust_brush_size(self, delta: float, raw_event: object) -> None:
         """Adjust the brush size based on mouse wheel movement, ensuring valid size."""
         multiplier: float = 1.0 + (
-            delta * (BRUSH_SIZE_WHEEL_SMALL_FACTOR if self.mask_draw_radius < BRUSH_SIZE_THRESHOLD else BRUSH_SIZE_WHEEL_LARGE_FACTOR)
+            delta
+            * (
+                BRUSH_SIZE_WHEEL_SMALL_FACTOR
+                if self.mask_draw_radius < BRUSH_SIZE_THRESHOLD
+                else BRUSH_SIZE_WHEEL_LARGE_FACTOR
+            )
         )
         # Calculate new size and enforce minimum/maximum
         new_radius = self.mask_draw_radius * multiplier
-        self.mask_draw_radius = max(MIN_BRUSH_SIZE, min(MAX_BRUSH_SIZE, new_radius))
+        self.mask_draw_radius = max(
+            MIN_BRUSH_SIZE, min(MAX_BRUSH_SIZE, new_radius)
+        )
 
     def _save_mask_to_history(self) -> None:
-            """Save the current mask state to history for undo/redo."""
-            if self.parent.pil_mask is None:
-                return
-            current_mask: Image.Image = self.parent.pil_mask.copy()
-            if self.mask_history_position < len(self.mask_history) - 1:
-                self.mask_history = self.mask_history[
-                    : self.mask_history_position + 1
+        """Save the current mask state to history for undo/redo."""
+        if self.parent.pil_mask is None:
+            return
+        current_mask: Image.Image = self.parent.pil_mask.copy()
+        if self.mask_history_position < len(self.mask_history) - 1:
+            self.mask_history = self.mask_history[
+                : self.mask_history_position + 1
+            ]
+        self.mask_history.append(current_mask)
+        if len(self.mask_history) > self.mask_history_limit:
+            self.mask_history.pop(0)
+        self.mask_history_position = len(self.mask_history) - 1
+
+        # Mark the mask as modified for the current image
+        if (
+            hasattr(self.parent.file_manager, "_mask_modified")
+            and self.parent.dir
+            and 0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
+        ):
+            image_path = (
+                Path(self.parent.dir)
+                / self.parent.image_rel_paths[
+                    self.parent.current_image_index
                 ]
-            self.mask_history.append(current_mask)
-            if len(self.mask_history) > self.mask_history_limit:
-                self.mask_history.pop(0)
-            self.mask_history_position = len(self.mask_history) - 1
+            )
+            self.parent.file_manager._mask_modified[str(image_path)] = True
 
-            # Mark the mask as modified for the current image
-            if hasattr(self.parent.file_manager, '_mask_modified') and self.parent.dir and 0 <= self.parent.current_image_index < len(self.parent.image_rel_paths):
-                image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
-                self.parent.file_manager._mask_modified[str(image_path)] = True
-
-    def undo_mask_edit(
-        self, event: tk.Event | None = None
-    ) -> str | None:
+    def undo_mask_edit(self, event: tk.Event | None = None) -> str | None:
         """Undo the last mask edit."""
         if not self.mask_history or self.mask_history_position <= 0:
             return "break" if event else None
@@ -1588,9 +1950,7 @@ class MaskEditor:
         self.parent.image_handler.refresh_image()
         return "break" if event else None
 
-    def redo_mask_edit(
-        self, event: tk.Event | None = None
-    ) -> str | None:
+    def redo_mask_edit(self, event: tk.Event | None = None) -> str | None:
         """Redo the previously undone mask edit."""
         if self.mask_history_position >= len(self.mask_history) - 1:
             return "break" if event else None
@@ -1601,19 +1961,25 @@ class MaskEditor:
         self.parent.image_handler.refresh_image()
         return "break" if event else None
 
-    def switch_to_brush_mode(self, event: tk.Event | None = None) -> str | None:
+    def switch_to_brush_mode(
+        self, event: tk.Event | None = None
+    ) -> str | None:
         """Switch to draw mask mode."""
         self.mask_editing_mode = EditMode.DRAW
         self.update_cursor()
         return "break" if event else None
 
-    def switch_to_fill_mode(self, event: tk.Event | None = None) -> str | None:
+    def switch_to_fill_mode(
+        self, event: tk.Event | None = None
+    ) -> str | None:
         """Switch to fill mask mode."""
         self.mask_editing_mode = EditMode.FILL
         self.update_cursor()
         return "break" if event else None
 
-    def toggle_mask_visibility_mode(self, event: tk.Event | None = None) -> str:
+    def toggle_mask_visibility_mode(
+        self, event: tk.Event | None = None
+    ) -> str:
         """Toggle between displaying only the mask or the combined image."""
         self.display_only_mask = not self.display_only_mask
         self.parent.image_handler.refresh_image()
@@ -1634,7 +2000,9 @@ class MaskEditor:
         """Set the cursor to brush mode."""
         brush_cursor = get_platform_cursor("brush", "pencil")
         if "!label" in self.parent.image_label.children:
-            self.parent.image_label.children["!label"].configure(cursor=brush_cursor)
+            self.parent.image_label.children["!label"].configure(
+                cursor=brush_cursor
+            )
         else:
             self.parent.image_label.configure(cursor=brush_cursor)
 
@@ -1642,7 +2010,9 @@ class MaskEditor:
         """Set the cursor to fill mode."""
         fill_cursor = get_platform_cursor("fill", "dotbox")
         if "!label" in self.parent.image_label.children:
-            self.parent.image_label.children["!label"].configure(cursor=fill_cursor)
+            self.parent.image_label.children["!label"].configure(
+                cursor=fill_cursor
+            )
         else:
             self.parent.image_label.configure(cursor=fill_cursor)
 
@@ -1657,15 +2027,24 @@ class MaskEditor:
 class NavigationManager:
     def __init__(self, parent: CaptionUI) -> None:
         self.parent: CaptionUI = parent
-        self.last_highlighted_label = None  # Keep track of the last highlighted label
+        self.last_highlighted_label = (
+            None  # Keep track of the last highlighted label
+        )
 
-    def switch_to_image(self, index: int, from_click: bool = False) -> None:
+    def switch_to_image(
+        self, index: int, from_click: bool = False
+    ) -> None:
         """Switch to the image at the given index."""
         # Clear highlight from the last highlighted item
-        if self.last_highlighted_label and self.last_highlighted_label.winfo_exists():
+        if (
+            self.last_highlighted_label
+            and self.last_highlighted_label.winfo_exists()
+        ):
             with contextlib.suppress(tk.TclError, RuntimeError):
                 self.last_highlighted_label.configure(
-                    text_color=ThemeManager.theme["CTkLabel"]["text_color"],
+                    text_color=ThemeManager.theme["CTkLabel"][
+                        "text_color"
+                    ],
                     fg_color="transparent",
                     corner_radius=0,
                 )
@@ -1683,11 +2062,15 @@ class NavigationManager:
                 # Find the new item in the filtered paths
                 new_path = self.parent.image_rel_paths[index]
                 if new_path in self.parent.filtered_image_paths:
-                    filtered_idx = self.parent.filtered_image_paths.index(new_path)
+                    filtered_idx = self.parent.filtered_image_paths.index(
+                        new_path
+                    )
                     if filtered_idx < len(self.parent.image_labels):
                         new_label = self.parent.image_labels[filtered_idx]
                         new_label.configure(
-                            text_color=get_theme_color("selected_file_text"),
+                            text_color=get_theme_color(
+                                "selected_file_text"
+                            ),
                             fg_color=get_theme_color("selected_file_bg"),
                             corner_radius=6,
                         )
@@ -1705,21 +2088,30 @@ class NavigationManager:
 
     def _ensure_selected_item_visible(self) -> None:
         """Make sure the selected item is visible in the scrollable area."""
-        if not (0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+        if not (
+            0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
+        ):
             return
 
         # Check if the current image is in the filtered list
-        current_path = self.parent.image_rel_paths[self.parent.current_image_index]
+        current_path = self.parent.image_rel_paths[
+            self.parent.current_image_index
+        ]
         if current_path not in self.parent.filtered_image_paths:
             return
 
         # If we have a valid canvas, scroll to the item
-        if (hasattr(self.parent.file_list, "_parent_canvas") and
-                self.parent.file_list._parent_canvas.winfo_exists()):
-
+        if (
+            hasattr(self.parent.file_list, "_parent_canvas")
+            and self.parent.file_list._parent_canvas.winfo_exists()
+        ):
             # Find the position in the filtered list
             try:
-                filtered_idx = self.parent.filtered_image_paths.index(current_path)
+                filtered_idx = self.parent.filtered_image_paths.index(
+                    current_path
+                )
                 total_items = len(self.parent.filtered_image_paths)
 
                 if total_items > 0:
@@ -1737,7 +2129,9 @@ class NavigationManager:
             self.parent.current_image_index + 1
         ) < len(self.parent.image_rel_paths):
             self.parent.file_manager.save_changes()
-            self.switch_to_image(self.parent.current_image_index + 1, from_click=False)
+            self.switch_to_image(
+                self.parent.current_image_index + 1, from_click=False
+            )
         return "break"
 
     def previous_image(self, event: tk.Event | None = None) -> str:
@@ -1747,7 +2141,9 @@ class NavigationManager:
             and (self.parent.current_image_index - 1) >= 0
         ):
             self.parent.file_manager.save_changes()
-            self.switch_to_image(self.parent.current_image_index - 1, from_click=False)
+            self.switch_to_image(
+                self.parent.current_image_index - 1, from_click=False
+            )
         return "break"
 
 
@@ -1763,11 +2159,12 @@ class ModelManager:
         # Model registries for better extensibility
         self._captioning_registry = {
             "Moondream 2": MoondreamModel,
-            "Blip2": Blip2Model, #TODO Replace with blip 3 when it comes out.
+            "Blip2": Blip2Model,  # TODO Replace with blip 3 when it comes out.
             "WD14 VIT v2": WDBooruModel,
             "WD EVA02-Large Tagger v3": WDBooruModel,
             "WD SwinV2 Tagger v3": WDBooruModel,
             "JoyTag": JoyTagBooruModel,
+            "JoyCaption": JoyCaptionModel,
         }
 
         self._masking_registry = {
@@ -1791,49 +2188,61 @@ class ModelManager:
         """Return a list of available masking models."""
         return list(self._masking_registry.keys())
 
-    def load_masking_model(
-            self, model: str
-        ) -> BaseImageMaskModel | None:
-            """Load the specified masking model, unloading any captioning model."""
-            self.captioning_model = None
-            self.current_captioning_model_name = None
+    def load_masking_model(self, model: str) -> BaseImageMaskModel | None:
+        """Load the specified masking model, unloading any captioning model."""
+        self.captioning_model = None
+        self.current_captioning_model_name = None
 
-            if model not in self._masking_registry:
-                logger.error(f"Unknown masking model: {model}")
-                return None
+        if model not in self._masking_registry:
+            logger.error(f"Unknown masking model: {model}")
+            return None
 
-            # If the requested model is already loaded, return it
-            if self.current_masking_model_name == model and self.masking_model is not None:
-                logger.info(f"Model {model} is already loaded")
-                return self.masking_model
-
-            model_class = self._masking_registry[model]
-
-            if self.masking_model is None or not isinstance(
-                self.masking_model, model_class
-            ):
-                logger.info(f"Loading {model} model, this may take a while")
-
-                # Special handling for SAMoondream model
-                if model == "SAMoondream":
-                    logger.debug("Creating SAMoondream model with default parameters")
-                    self.masking_model = model_class(
-                        device=self.device,
-                        dtype=torch.float32,
-                        sam2_model_size="large",
-                        moondream_model_revision="2025-01-09"  # Use latest Moondream version
-                    )
-                else:
-                    # Default initialization for other models
-                    self.masking_model = model_class(self.device, torch.float32)
-
-                self.current_masking_model_name = model
-
+        # If the requested model is already loaded, return it
+        if (
+            self.current_masking_model_name == model
+            and self.masking_model is not None
+        ):
+            logger.info(f"Model {model} is already loaded")
             return self.masking_model
+
+        model_class = self._masking_registry[model]
+
+        if self.masking_model is None or not isinstance(
+            self.masking_model, model_class
+        ):
+            logger.info(f"Loading {model} model, this may take a while")
+
+            # Special handling for SAMoondream model
+            if model == "SAMoondream":
+                logger.debug(
+                    "Creating SAMoondream model with default parameters"
+                )
+                self.masking_model = model_class(
+                    device=self.device,
+                    dtype=torch.float32,
+                    sam2_model_size="large",
+                    moondream_model_revision="2025-01-09",  # Use latest Moondream version
+                )
+            else:
+                # Default initialization for other models
+                self.masking_model = model_class(
+                    self.device, torch.float32
+                )
+
+            self.current_masking_model_name = model
+
+        return self.masking_model
 
     def load_captioning_model(
         self, model: str, **kwargs
-    ) -> Blip2Model | WDBooruModel | JoyTagBooruModel | MoondreamModel | None:
+    ) -> (
+        Blip2Model
+        | WDBooruModel
+        | JoyTagBooruModel
+        | MoondreamModel
+        | JoyCaptionModel # Added JoyCaptionModel to the type hint
+        | None
+    ):
         """Load the specified captioning model, unloading any masking model."""
         self.masking_model = None
         self.current_masking_model_name = None
@@ -1842,40 +2251,90 @@ class ModelManager:
             logger.error(f"Unknown captioning model: {model}")
             return None
 
-        # If the requested model is already loaded, return it
-        if (
-            self.current_captioning_model_name == model
-            and self.captioning_model is not None
-        ):
-            logger.info(f"Model {model} is already loaded")
-            return self.captioning_model
-
         model_class = self._captioning_registry[model]
+        force_reload = False
 
-        if self.captioning_model is None or not isinstance(
-            self.captioning_model, model_class
+        # Check if the model of the same type is already loaded
+        if (
+            self.current_captioning_model_name == model and
+            isinstance(self.captioning_model, model_class)
         ):
-            logger.info(f"Loading {model} model, this may take a while")
-
-            # For WDBooruModel, pass the model name
-            if model_class == WDBooruModel:
-                logger.debug(f"Creating WDBooruModel with model_name='{model}'")
-                self.captioning_model = model_class(
-                    self.device, self.precision, model_name=model, **kwargs
-                )
-            elif model_class == JoyTagBooruModel:
-                logger.debug(f"Creating JoyTagBooruModel with model_name='{model}'")
-                # JoyTagBooruModel's __init__ handles the model_name internally.
-                self.captioning_model = model_class(
-                    self.device, self.precision, **kwargs
-                )
+            # If new kwargs are provided, it implies a potential configuration change.
+            if kwargs:
+                logger.info(f"Model {model} is already loaded, but new parameters {kwargs} provided. Scheduling re-load.")
+                force_reload = True
             else:
-                logger.debug(f"Creating {model} with kwargs: {kwargs}")
-                # Pass kwargs to all model types
-                self.captioning_model = model_class(
-                    self.device, self.precision, **kwargs
-                )
-            self.current_captioning_model_name = model
+                # Same model, same type, no new kwargs - safe to return cached
+                logger.info(f"Model {model} is already loaded and no new parameters specified.")
+                return self.captioning_model
+
+        needs_load_or_reload = (
+            force_reload or
+            self.captioning_model is None or
+            not isinstance(self.captioning_model, model_class) or
+            self.current_captioning_model_name != model
+        )
+
+        if needs_load_or_reload:
+            logger.info(f"Loading/Re-loading {model} model with parameters: {kwargs}. This may take a while.")
+
+            # Specific check for JoyCaptionModel to prevent loading with an empty caption_type
+            if model_class == JoyCaptionModel:
+                caption_type_value = kwargs.get("caption_type")
+                if caption_type_value == "":  # Intentionally empty string
+                    logger.error(
+                        f"Critical: {model} cannot be loaded with an empty 'caption_type'. "
+                        "This parameter is essential for the model to function correctly. "
+                        "Please ensure a valid caption type is specified in the configuration. Aborting model load."
+                    )
+                    # Clear any previously loaded model state if we are aborting
+                    if self.captioning_model is not None:
+                        del self.captioning_model
+                        self.captioning_model = None
+                    self.current_captioning_model_name = None
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    return None # Prevent loading with invalid configuration
+
+            # Clear existing model if any, to free resources before loading new.
+            if self.captioning_model is not None:
+                logger.debug(f"Unloading previous captioning model: {self.current_captioning_model_name}")
+                # Explicitly delete the model object to help with garbage collection
+                del self.captioning_model
+                self.captioning_model = None
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache() # Clear CUDA cache if applicable
+            # Instantiate the new model
+            try:
+                if model_class == WDBooruModel:
+                    # WDBooruModel specifically takes model_name in its constructor
+                    self.captioning_model = model_class(
+                        self.device, self.precision, model_name=model, **kwargs
+                    )
+                elif model_class == JoyCaptionModel:
+                    # JoyCaptionModel's __init__ takes model_path (can default) and device.
+                    # It does not use ModelManager's device/precision directly in its __init__ signature.
+                    # We pass ModelManager's device (as string) for device.
+                    # The **kwargs are UI/generation parameters; JoyCaptionModel.__init__
+                    # will accept and ignore those it doesn't use for initialization.
+                    # These kwargs are passed to generate_caption later by the base class methods.
+                    self.captioning_model = model_class(
+                        device=str(self.device), # Pass ModelManager's device choice
+                        **kwargs # Pass all other UI/generation params
+                    )
+                # Other models like Moondream, Blip2, JoyTag take parameters via **kwargs
+                else:
+                    self.captioning_model = model_class(
+                        self.device, self.precision, **kwargs
+                    )
+                self.current_captioning_model_name = model
+                logger.info(f"Successfully loaded/re-loaded {model}.")
+            except Exception as e:
+                logger.error(f"Failed to load captioning model {model} with kwargs {kwargs}: {e}")
+                logger.error(traceback.format_exc()) # Log the full traceback
+                self.captioning_model = None
+                self.current_captioning_model_name = None
+                return None # Return None on failure
 
         return self.captioning_model
 
@@ -1886,7 +2345,13 @@ class ModelManager:
 
     def get_captioning_model(
         self,
-    ) -> Blip2Model | WDBooruModel | JoyTagBooruModel | MoondreamModel | None:
+    ) -> (
+        Blip2Model
+        | WDBooruModel
+        | JoyTagBooruModel
+        | MoondreamModel
+        | None
+    ):
         return self.captioning_model
 
 
@@ -1897,23 +2362,31 @@ class FileManager:
         self._mask_modified = {}  # Track if mask has been modified
         self._reset_pending = {}  # Track images with pending reset
 
-    def delete_current_image_file(self, event: tk.Event | None = None) -> str | None:
+    def delete_current_image_file(
+        self, event: tk.Event | None = None
+    ) -> str | None:
         """Delete the current image, its caption, and mask from the file system after confirmation."""
         if not self.parent.dir or not (
-            0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)
+            0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
         ):
             return "break" if event else None
 
-        current_image_relative_path = self.parent.image_rel_paths[self.parent.current_image_index]
+        current_image_relative_path = self.parent.image_rel_paths[
+            self.parent.current_image_index
+        ]
         image_path = Path(self.parent.dir) / current_image_relative_path
-        image_name = Path(current_image_relative_path).name # Get filename for message
+        image_name = Path(
+            current_image_relative_path
+        ).name  # Get filename for message
 
         # Confirmation dialog
         confirm = messagebox.askyesno(
             "Confirm Delete",
             f"Are you sure you want to permanently delete '{image_name}' "
             "and its associated caption and mask files?",
-            parent=self.parent
+            parent=self.parent,
         )
 
         if not confirm:
@@ -1922,7 +2395,9 @@ class FileManager:
         try:
             # Define paths for associated files
             caption_path = image_path.with_suffix(".txt")
-            mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
+            mask_path = image_path.with_name(
+                f"{image_path.stem}-masklabel.png"
+            )
 
             # Delete files if they exist
             if image_path.exists():
@@ -1936,7 +2411,9 @@ class FileManager:
                 logger.info(f"Deleted mask file: {mask_path}")
 
             # Clean up caches
-            image_key = str(image_path) # Use absolute path as key if that's consistent
+            image_key = str(
+                image_path
+            )  # Use absolute path as key if that's consistent
             if image_key in self._last_saved_caption:
                 del self._last_saved_caption[image_key]
             if image_key in self._mask_modified:
@@ -1957,41 +2434,65 @@ class FileManager:
                 self.parent.current_image_index = -1
                 self.parent.clear_ui()
                 self.parent.folder_name_label.configure(
-                    text=f"{Path(self.parent.dir)} (No images)" if self.parent.dir else "No folder selected"
+                    text=f"{Path(self.parent.dir)} (No images)"
+                    if self.parent.dir
+                    else "No folder selected"
                 )
-            elif not self.parent.filtered_image_paths: # No images left after filtering
-                self.parent.current_image_index = -1 # Or set to first of image_rel_paths if desired
+            elif (
+                not self.parent.filtered_image_paths
+            ):  # No images left after filtering
+                self.parent.current_image_index = (
+                    -1
+                )  # Or set to first of image_rel_paths if desired
                 self.parent.clear_ui()
                 self.parent.folder_name_label.configure(
                     text=f"{Path(self.parent.dir)} (No matching images)"
                 )
             else:
                 # Select the image at the same index, or the last one if the deleted image was last
-                new_navigation_index = min(deleted_item_original_index, len(self.parent.image_rel_paths) - 1)
-                if new_navigation_index < 0 and self.parent.image_rel_paths: # Should only happen if list became empty and handled above
+                new_navigation_index = min(
+                    deleted_item_original_index,
+                    len(self.parent.image_rel_paths) - 1,
+                )
+                if (
+                    new_navigation_index < 0
+                    and self.parent.image_rel_paths
+                ):  # Should only happen if list became empty and handled above
                     new_navigation_index = 0
 
                 if new_navigation_index >= 0:
-                     # switch_to_image expects an index for the main image_rel_paths list
-                    self.parent.navigation_manager.switch_to_image(new_navigation_index)
-                else: # Fallback if somehow new_navigation_index is invalid but lists are not empty
+                    # switch_to_image expects an index for the main image_rel_paths list
+                    self.parent.navigation_manager.switch_to_image(
+                        new_navigation_index
+                    )
+                else:  # Fallback if somehow new_navigation_index is invalid but lists are not empty
                     self.parent.current_image_index = -1
                     self.parent.clear_ui()
 
-
         except Exception as e:
             logger.error(f"Error deleting file {image_path}: {e}")
-            messagebox.showerror("Error", f"Could not delete file(s): {e}", parent=self.parent)
+            messagebox.showerror(
+                "Error",
+                f"Could not delete file(s): {e}",
+                parent=self.parent,
+            )
 
         return "break" if event else None
 
     def reset_current_image(self) -> None:
         """Reset the current image by clearing caption and mask (preview only until saved)."""
-        if not (0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+        if not (
+            0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
+        ):
             return
 
         # Get the image path for the current image
-        image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+        image_path = (
+            Path(self.parent.dir)
+            / self.parent.image_rel_paths[self.parent.current_image_index]
+        )
         image_key = str(image_path)
 
         # Mark this image as pending reset
@@ -1999,7 +2500,7 @@ class FileManager:
 
         # Clear the caption
         self.parent.caption_lines = [""] * 5
-        self.parent.caption_entry.delete(0, "end")
+        self.parent.caption_entry.delete("1.0", "end") # Correct for CTkTextbox
 
         # Clear the mask
         self.parent.pil_mask = None
@@ -2009,7 +2510,9 @@ class FileManager:
         self.parent.refresh_ui()
 
         # Show message to user
-        logger.info("Reset preview applied. Press Ctrl+S or click Save to confirm and delete files.")
+        logger.info(
+            "Reset preview applied. Press Ctrl+S or click Save to confirm and delete files."
+        )
 
     def save_changes(self, event: tk.Event | None = None) -> None:
         """Save the current mask and caption data to disk."""
@@ -2030,7 +2533,9 @@ class FileManager:
         # Check if this image is pending reset
         if self._reset_pending.get(image_key, False):
             # Actually delete the files
-            mask_path = image_path.with_name(f"{image_path.stem}-masklabel.png")
+            mask_path = image_path.with_name(
+                f"{image_path.stem}-masklabel.png"
+            )
             caption_path = image_path.with_suffix(".txt")
 
             # Delete mask file if it exists
@@ -2076,7 +2581,7 @@ class FileManager:
                     logger.error(f"Error saving mask: {e}")
 
         # Handle caption saving with change detection
-        current_text = self.parent.caption_entry.get()
+        current_text = self.parent.caption_entry.get("1.0", "end-1c").strip()
         self.parent.caption_lines[self.parent.current_caption_line] = (
             current_text
         )
@@ -2114,20 +2619,31 @@ class FileManager:
     def open_in_explorer(self) -> None:
         """Open the current image location in the system file explorer."""
         if not (
-            0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)
+            0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
         ):
             return
 
-        image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+        image_path = (
+            Path(self.parent.dir)
+            / self.parent.image_rel_paths[self.parent.current_image_index]
+        )
         image_path = image_path.resolve()  # Gets absolute normalized path
 
         try:
             if platform.system() == "Windows":
-                subprocess.run(["explorer", f"/select,{image_path}"], check=False)
+                subprocess.run(
+                    ["explorer", f"/select,{image_path}"], check=False
+                )
             elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", "-R", str(image_path)], check=False)
+                subprocess.run(
+                    ["open", "-R", str(image_path)], check=False
+                )
             else:  # Linux
-                subprocess.run(["xdg-open", str(image_path.parent)], check=False)
+                subprocess.run(
+                    ["xdg-open", str(image_path.parent)], check=False
+                )
         except Exception as e:
             logger.error(f"Error opening file in explorer: {e}")
 
@@ -2153,13 +2669,19 @@ class FileManager:
             return
 
         dir_path = Path(self.parent.dir)
-        self.parent.folder_name_label.configure(text=str(dir_path))  # Show full path instead of just name
+        self.parent.folder_name_label.configure(
+            text=str(dir_path)
+        )  # Show full path instead of just name
 
-        include_subdirs = self.parent.config_ui_data["include_subdirectories"]
+        include_subdirs = self.parent.config_ui_data[
+            "include_subdirectories"
+        ]
 
         # For huge directories, show immediate feedback that loading is happening
         if include_subdirs:
-            logger.info(f"Scanning directory {dir_path} (including subdirectories)")
+            logger.info(
+                f"Scanning directory {dir_path} (including subdirectories)"
+            )
         else:
             logger.info(f"Scanning directory {dir_path}")
 
@@ -2174,12 +2696,16 @@ class FileManager:
         if hasattr(self.parent, "_apply_filters"):
             self.parent._apply_filters()
         else:
-            self.parent.filtered_image_paths = self.parent.image_rel_paths.copy()
+            self.parent.filtered_image_paths = (
+                self.parent.image_rel_paths.copy()
+            )
             self.parent._update_file_list()
 
         if self.parent.filtered_image_paths:
             # Find the index in the original list
-            idx = self.parent.image_rel_paths.index(self.parent.filtered_image_paths[0])
+            idx = self.parent.image_rel_paths.index(
+                self.parent.filtered_image_paths[0]
+            )
             self.parent.navigation_manager.switch_to_image(idx)
         else:
             self.parent.clear_ui()
@@ -2192,50 +2718,6 @@ class FileManager:
         self.parent.after(
             100, lambda: self.parent.attributes("-topmost", False)
         )
-
-
-
-
-class CaptionManager:
-    def __init__(self, parent: CaptionUI) -> None:
-        self.parent: CaptionUI = parent
-
-    def refresh_caption(self) -> None:
-        """Refresh the caption entry with the current caption line."""
-        self.parent.caption_entry.delete(0, "end")
-        self.parent.caption_entry.insert(
-            0, self.parent.caption_lines[self.parent.current_caption_line]
-        )
-
-    def next_caption_line(self, event: tk.Event | None = None) -> str:
-        """Switch to the next caption line."""
-        current_text: str = self.parent.caption_entry.get()
-        self.parent.caption_lines[self.parent.current_caption_line] = (
-            current_text
-        )
-        self.parent.current_caption_line = (
-            self.parent.current_caption_line + 1
-        ) % len(self.parent.caption_lines)
-        self.parent.caption_line_var.set(
-            self.parent.caption_line_values[
-                self.parent.current_caption_line
-            ]
-        )
-        self.refresh_caption()
-        return "break"
-
-    def on_caption_line_changed(self, value: str) -> None:
-        """Handle changes in the selected caption line."""
-        current_text: str = self.parent.caption_entry.get()
-        self.parent.caption_lines[self.parent.current_caption_line] = (
-            current_text
-        )
-        try:
-            line_number: int = int(value.split(" ")[1]) - 1
-            self.parent.current_caption_line = line_number
-        except (ValueError, IndexError):
-            self.parent.current_caption_line = 0
-        self.refresh_caption()
 
 
 class EditMode(Enum):
