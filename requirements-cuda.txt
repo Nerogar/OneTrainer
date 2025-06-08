@@ -6,3 +6,6 @@ onnxruntime-gpu==1.20.1
 
 # optimizers
 bitsandbytes==0.45.2 # bitsandbytes for 8-bit optimizers and weight quantization
+
+# masking
+-e git+https://github.com/facebookresearch/sam2.git@main#egg=sam-2 # SAM2.X requires a custom CUDA kernel, meaning you cant install on AMD or CPU only - https://github.com/facebookresearch/sam2/issues/71#issuecomment-2261391926
