@@ -150,9 +150,9 @@ class TrainUI(ctk.CTk):
         self.general_tab = self.create_general_tab(self.tabview.add("general"))
         self.model_tab = self.create_model_tab(self.tabview.add("model"))
         self.data_tab = self.create_data_tab(self.tabview.add("data"))
-        self.create_concepts_tab(self.tabview.add("concepts"))
+        self.concepts_tab = self.create_concepts_tab(self.tabview.add("concepts"))
         self.training_tab = self.create_training_tab(self.tabview.add("training"))
-        self.create_sampling_tab(self.tabview.add("sampling"))
+        self.sampling_tab = self.create_sampling_tab(self.tabview.add("sampling"))
         self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
         self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
         self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
@@ -265,7 +265,7 @@ class TrainUI(ctk.CTk):
         return frame
 
     def create_concepts_tab(self, master):
-        ConceptTab(master, self.train_config, self.ui_state)
+        return ConceptTab(master, self.train_config, self.ui_state)
 
     def create_training_tab(self, master) -> TrainingTab:
         return TrainingTab(master, self.train_config, self.ui_state)
@@ -315,7 +315,7 @@ class TrainUI(ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
 
-        SamplingTab(frame, self.train_config, self.ui_state)
+        return SamplingTab(frame, self.train_config, self.ui_state)
 
     def create_backup_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -627,7 +627,7 @@ class TrainUI(ctk.CTk):
 
     def start_training(self):
         if self.training_thread is None:
-            self.top_bar_component.save_default()
+            self.save_default()
 
             self.training_button.configure(text="Stop Training", state="normal")
 
@@ -639,6 +639,12 @@ class TrainUI(ctk.CTk):
             self.training_button.configure(state="disabled")
             self.on_update_status("stopping")
             self.training_commands.stop()
+
+    def save_default(self):
+        self.top_bar_component.save_default()
+        self.concepts_tab.save_current_config()
+        self.sampling_tab.save_current_config()
+        self.additional_embeddings_tab.save_current_config()
 
     def export_training(self):
         file_path = filedialog.asksaveasfilename(filetypes=[
