@@ -47,6 +47,7 @@ class StableDiffusionXLBaseDataLoader(
         if is_validation:
             config = copy.copy(config)
             config.batch_size = 1
+            config.multi_gpu = False
 
         self.__ds = self.create_dataset(
             config=config,
