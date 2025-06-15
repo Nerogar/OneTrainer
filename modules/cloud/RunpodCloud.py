@@ -74,7 +74,7 @@ class RunpodCloud(LinuxCloud):
             cloud_type=config.sub_type,
             support_public_ip=True,
             volume_in_gb=config.volume_size,
-            container_disk_in_gb=10,
+            container_disk_in_gb=20,
             volume_mount_path="/workspace",
             min_download=config.min_download,
             env={"JUPYTER_PASSWORD": pysecrets.token_urlsafe(16)},
