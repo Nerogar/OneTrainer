@@ -11,6 +11,8 @@ import numpy as np
 import onnxruntime
 from PIL import Image
 
+from .captioning.caption_config_types import WDGenerationConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -278,10 +280,8 @@ class BaseBooruModel(BaseImageCaptionModel):
     def generate_caption(
         self,
         caption_sample: CaptionSample,
-        initial: str = "",
-        initial_caption: str = "",
-        caption_prefix: str = "",
-        caption_postfix: str = "",
+        prompt: str,
+        generation_config: WDGenerationConfig | None = None
     ) -> str:
         """
         Generate a caption for the given image using the model
@@ -322,17 +322,11 @@ class BaseBooruModel(BaseImageCaptionModel):
         all_tags_list = self._convert_probs_to_tags(probs)
         generated_caption = ", ".join(all_tags_list)
 
-        # Add the initial caption; prioritize `initial` if present
-        if initial:
-            generated_caption = f"{initial} {generated_caption}"
-        elif initial_caption:
-            generated_caption = f"{initial_caption} {generated_caption}"
-
-        # Add prefix and postfix
-        final_caption = (
-            caption_prefix + generated_caption + caption_postfix
-        ).strip()
-        return final_caption
+        # Add the prompt if provided
+        if prompt:
+            generated_caption = f"{prompt} {generated_caption}"
+        # Prefix and postfix are handled by BaseImageCaptionModel.caption_image
+        return generated_caption.strip()
 
 
 class WDBooruModel(BaseBooruModel):

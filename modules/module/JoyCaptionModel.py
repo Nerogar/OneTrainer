@@ -1,10 +1,12 @@
 import logging
-from typing import Any  # Added for **kwargs type hinting
+from typing import Any
 
-# Import the base class and the helper CaptionSample
 from modules.module.captioning.BaseImageCaptionModel import (
     BaseImageCaptionModel,
     CaptionSample,
+)
+from modules.module.captioning.caption_config_types import (
+    JoyCaptionGenerationConfig,
 )
 
 import torch
@@ -127,44 +129,43 @@ CAPTION_LENGTH_CHOICES = [
 ] + [str(i) for i in range(20, 261, 10)]
 
 
+
 class JoyCaptionModel(BaseImageCaptionModel):
     def __init__(
         self,
         model_path: str = MODEL_PATH,
-        temperature: float = DEFAULT_TEMPERATURE,
-        top_p: float = DEFAULT_TOP_P,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
         device: str | None = None,
-        **kwargs: Any,
+        # Instance defaults are set from module constants.
+        **loader_kwargs: Any,
     ):
         super().__init__()
 
         self.model_path = model_path
-        self.temperature = temperature
-        self.top_p = top_p
-        self.max_tokens = max_tokens
+        # Instance defaults for generation parameters
+        self.default_temperature: float = DEFAULT_TEMPERATURE
+        self.default_top_p: float = DEFAULT_TOP_P
+        self.default_max_tokens: int = DEFAULT_MAX_TOKENS
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
 
         logger.info(f"Initializing JoyCaptionModel '{self.model_path}' on device: {self.device}")
 
         self.processor = AutoProcessor.from_pretrained(self.model_path)
 
-        load_kwargs = {"torch_dtype": torch.bfloat16} # Initialize with only relevant args
-        if self.device != "cpu":
-            # Use "auto" for automatic device mapping on GPUs
-            # This is generally more robust for various GPU setups
-            load_kwargs["device_map"] = "auto"
+        # Prepare kwargs for from_pretrained, ensuring type consistency
+        effective_loader_kwargs: dict[str, Any] = {"torch_dtype": torch.bfloat16}
+        effective_loader_kwargs.update(loader_kwargs) # Allow override via **loader_kwargs
+
+        if self.device != "cpu" and "device_map" not in effective_loader_kwargs:
+            effective_loader_kwargs["device_map"] = "auto"
+
+        # If stream was passed in loader_kwargs and affects model loading, it's handled here.
 
         self.llava_model = LlavaForConditionalGeneration.from_pretrained(
             self.model_path,
-            **load_kwargs
+            **effective_loader_kwargs
         )
 
-        # If device_map was not used (e.g., for CPU or if "auto" still put it on CPU when not desired)
-        # and the model is not on the target device, move it.
-        # However, device_map="auto" should handle GPU placement. For CPU, model loads on CPU by default if no device_map.
-        # Explicitly moving to CPU if target is CPU and device_map wasn't in load_kwargs (meaning it was a CPU scenario)
-        if self.device == "cpu" and "device_map" not in load_kwargs:
+        if self.device == "cpu" and "device_map" not in effective_loader_kwargs:
             self.llava_model.to(self.device)
 
         self.llava_model.eval()
@@ -173,25 +174,31 @@ class JoyCaptionModel(BaseImageCaptionModel):
     def generate_caption(
         self,
         caption_sample: CaptionSample,
-        initial_caption: str = "Write a long detailed description for this image.",
-        caption_prefix: str = "",
-        caption_postfix: str = ""
+        prompt: str, # The fully constructed prompt for the model
+        generation_config: JoyCaptionGenerationConfig | None = None
     ) -> str:
         image = caption_sample.get_image()
         if image.mode != "RGB":
             image = image.convert("RGB")
 
-        prompt = initial_caption
+        # Determine generation parameters: use config if provided, else instance defaults
+        cfg = generation_config or {}
+        current_temperature = cfg.get('temperature', self.default_temperature)
+        current_top_p = cfg.get('top_p', self.default_top_p)
+        current_max_tokens = cfg.get('max_tokens', self.default_max_tokens)
+
+        # The 'prompt' parameter is the fully formed prompt from the UI/caller
+        llava_prompt = prompt
 
         with torch.no_grad():
             convo = [
                 {
                     "role": "system",
-                    "content": "You are a helpful image captioner.",
+                    "content": "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions.",
                 },
                 {
                     "role": "user",
-                    "content": prompt,
+                    "content": llava_prompt.strip(),
                 },
             ]
 
@@ -199,27 +206,25 @@ class JoyCaptionModel(BaseImageCaptionModel):
             assert isinstance(convo_string, str)
 
             inputs = self.processor(text=[convo_string], images=[image], return_tensors="pt").to(self.llava_model.device)
-            if 'pixel_values' in inputs: # Ensure pixel_values are bfloat16 if they exist
+            if 'pixel_values' in inputs:
                 inputs['pixel_values'] = inputs['pixel_values'].to(torch.bfloat16)
 
             generate_ids = self.llava_model.generate(
                 **inputs,
-                max_new_tokens=self.max_tokens,
+                max_new_tokens=current_max_tokens,
                 do_sample=True,
                 suppress_tokens=None,
                 use_cache=True,
-                temperature=self.temperature,
-                top_k=None,
-                top_p=self.top_p,
+                temperature=current_temperature,
+                top_k=None, # JoyCaption typically uses top_p, not top_k
+                top_p=current_top_p,
             )[0]
 
-            # Ensure input_ids are on the same device as generate_ids for slicing
             input_ids_on_device = inputs['input_ids'].to(generate_ids.device)
             generate_ids = generate_ids[input_ids_on_device.shape[1]:]
 
             generated_text = self.processor.tokenizer.decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
             generated_text = generated_text.strip()
 
-            final_caption = caption_prefix + generated_text + caption_postfix
-
-            return final_caption.strip()
+            # UI Prefix and postfix are applied externally by BaseImageCaptionModel.caption_image
+            return generated_text

@@ -1,7 +1,9 @@
 import logging
 import traceback
 
-from modules.module.captioning.BaseImageCaptionModel import BaseImageCaptionModel
+from modules.module.captioning.BaseImageCaptionModel import (
+    BaseImageCaptionModel,
+)
 from modules.module.captioning.CaptionSample import CaptionSample
 
 import torch
@@ -9,6 +11,8 @@ import torch
 from transformers import AutoModelForCausalLM
 
 from PIL import Image
+
+from .captioning.caption_config_types import MoondreamGenerationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -59,14 +63,16 @@ class MoondreamModel(BaseImageCaptionModel):
     def generate_caption(
         self,
         caption_sample: CaptionSample,
-        initial: str = "",  # This parameter is being passed by BaseImageCaptionModel but wasn't defined here
-        initial_caption: str = "",
-        caption_prefix: str = "",
-        caption_postfix: str = ""
+        prompt: str,  # Used for interface consistency, Moondream might not use it directly
+        generation_config: MoondreamGenerationConfig | None = None
     ) -> str:
+        current_caption_length = self.caption_length  # Start with instance default
+        if generation_config and generation_config.get('caption_length') is not None:
+            current_caption_length = generation_config['caption_length']
+
         logger.debug(
-            f"MoondreamModel: Generating caption. Length: {self.caption_length}, Stream setting for model call: {self.stream}. "
-            f"Initial: '{initial}', UI_InitialCap: '{initial_caption}', UI_Prefix: '{caption_prefix}', UI_Postfix: '{caption_postfix}'"
+            f"MoondreamModel: Generating caption. Effective Length: {current_caption_length}, Stream setting for model call: {self.stream}. "
+            f"Prompt (interface): '{prompt}'"
         )
         image = self._get_image(caption_sample)
         if image is None:
@@ -78,7 +84,7 @@ class MoondreamModel(BaseImageCaptionModel):
                 # Call the underlying moondream2 model's caption method
                 model_output_dict = self.model.caption(
                     image,
-                    length=self.caption_length,
+                    length=current_caption_length, # Use effective length
                     stream=self.stream
                 )
 
@@ -102,23 +108,7 @@ class MoondreamModel(BaseImageCaptionModel):
                 # Replace all newlines with spaces
                 assembled_caption = assembled_caption.replace("\n", " ")
 
-                # Apply the initial and other modifiers
-                current_caption = assembled_caption
-
-                # Handle both initial and initial_caption (they appear to serve similar purposes)
-                if initial:
-                    current_caption = f"{initial} {current_caption.lstrip()}"
-
-                if initial_caption and initial_caption != initial:  # Only apply if different from initial
-                    current_caption = f"{initial_caption} {current_caption.lstrip()}"
-
-                if caption_prefix:
-                    current_caption = f"{caption_prefix}{current_caption.lstrip()}"
-
-                if caption_postfix:
-                    current_caption = f"{current_caption.rstrip()}{caption_postfix}"
-
-                final_caption = current_caption.strip()
+                final_caption = assembled_caption.strip()
                 return final_caption
 
         except Exception as e:
