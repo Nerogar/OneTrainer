@@ -405,10 +405,12 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             option_item_frame.grid_columnconfigure(0, weight=0)
             option_item_frame.grid_columnconfigure(1, weight=1)
 
-            var = ctk.BooleanVar(self, False)
+            is_default_option = option_text == "Your response will be used by a text-to-image model, so avoid useless meta phrases like \"This image shows…\", \"You are looking at...\", etc."
+            var = ctk.BooleanVar(self, value=is_default_option)
             var.trace_add("write", self._update_joycaption_prompt_display)
 
             if option_text == NAME_OPTION:
+                self.joy_name_option_active_var = var
                 self.joy_name_option_active_var = var # Store the specific var for NAME_OPTION
                 # Trace this var to update the visibility of the name input field
                 var.trace_add("write", self._on_name_option_toggled)
@@ -442,7 +444,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         # Initial layout of JoyCaption widgets
         self._layout_joycaption_widgets()
-        # Initial prompt update
+
         self._update_joycaption_prompt_display()
 
     def _on_name_option_toggled(self, *args: Any) -> None:
@@ -521,12 +523,11 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
     def _update_joycaption_prompt_display(self, *args: Any) -> None:
         """Constructs and displays the JoyCaption prompt based on UI selections."""
-        if not hasattr(self, 'joy_caption_type_var') or not self.joycaption_options_frame.winfo_ismapped():
+        if not hasattr(self, 'joy_live_prompt_textbox'):
             return
 
         caption_type_key = self.joy_caption_type_var.get()
         caption_length_str = self.joy_caption_length_var.get()
-        # Name input is now sourced conditionally based on its own checkbox
 
         prompt_parts: list[str] = []
 
@@ -559,13 +560,16 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         final_prompt = " ".join(prompt_parts).strip().replace("  ", " ")
 
-        if hasattr(self, 'joy_live_prompt_textbox'):
-            # Preserve cursor and selection if possible (might be tricky with full replace)
-            # For simplicity, just replace content.
+        try:
             current_content = self.joy_live_prompt_textbox.get("1.0", "end-1c")
             if current_content != final_prompt: # Update only if changed to avoid unnecessary flicker/cursor jumps
                 self.joy_live_prompt_textbox.delete("1.0", "end")
                 self.joy_live_prompt_textbox.insert("1.0", final_prompt)
+        except TclError:
+            # This error is expected if the function is called before the window is fully drawn.
+            # The prompt will be correctly populated by a later call when the UI is visible.
+            pass
+
 
     # ─── Threshold configuration (for WD models) ───────────────────────────────
     def _create_threshold_configuration(self) -> None:
