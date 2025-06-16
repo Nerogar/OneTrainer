@@ -100,9 +100,8 @@ class Optimizer(Enum):
         if self.is_adaptive:
             return {
                 # Return `effective_lr * d` if "effective_lr" key present, otherwise return `lr * d`
-                key: ((optimizer.param_groups[i]["effective_lr"] if "effective_lr" in optimizer.param_groups[i] else lr)
-                      * optimizer.param_groups[i].get("d", 1.0)
-                    if lr is not None else None)
+                key: (optimizer.param_groups[i].get("effective_lr", lr) * optimizer.param_groups[i].get("d", 1.0)
+                      if lr is not None else None)
                 for i, (key, lr) in enumerate(lrs.items())
             }
         return lrs
