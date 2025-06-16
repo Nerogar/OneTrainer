@@ -99,7 +99,10 @@ class Optimizer(Enum):
     def maybe_adjust_lrs(self, lrs: dict[str, float], optimizer: torch.optim.Optimizer):
         if self.is_adaptive:
             return {
-                key: (lr * optimizer.param_groups[i].get("d", 1.0) if lr is not None else None)
+                # Return `effective_lr * d` if "effective_lr" key present, otherwise return `lr * d`
+                key: ((optimizer.param_groups[i]["effective_lr"] if "effective_lr" in optimizer.param_groups[i] else lr)
+                      * optimizer.param_groups[i].get("d", 1.0)
+                    if lr is not None else None)
                 for i, (key, lr) in enumerate(lrs.items())
             }
         return lrs
