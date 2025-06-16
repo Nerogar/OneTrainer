@@ -1,8 +1,8 @@
 # pytorch
---extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.6.0+cu124
-torchvision==0.21.0+cu124
-onnxruntime-gpu==1.20.1
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.1+cu128
+torchvision==0.22.1+cu128
+onnxruntime-gpu==1.22.0
 
 # optimizers
 bitsandbytes==0.46.0 # bitsandbytes for 8-bit optimizers and weight quantization
