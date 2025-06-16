@@ -1074,7 +1074,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             if caption_length not in self.config_state["caption_lengths"]:
                 self._show_error("Invalid caption length", f"Caption length must be one of: {', '.join(self.config_state['caption_lengths'])}")
                 return
-            model_init_params = {"stream": True} # Example init param
+            model_init_params = {"stream": False} # Example init param
             generation_config_data = MoondreamGenerationConfig(caption_length=caption_length)
             prompt_text_for_model = "" # Moondream handles internally based on caption_length
 
@@ -1141,8 +1141,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         elif self._is_blip_model(model_name):
             prompt_text_for_model = self.caption_entry.get() # BLIP uses "Initial Caption" as its prompt
-            prompt_text_for_model = self.caption_entry.get() # BLIP uses "Initial Caption" as its prompt
-            model_init_params = {}
             generation_config_data = BlipGenerationConfig() # Empty config for BLIP
 
         else: # Fallback for other/new models
