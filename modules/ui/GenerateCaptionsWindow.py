@@ -429,19 +429,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             self.joycaption_options_frame, height=100, wrap="word"
         )
 
-        # --- Temperature, Top-p, Max Tokens ---
-        # self.joy_temperature_label = ctk.CTkLabel(self.joycaption_options_frame, text="Temperature (0.0–1.0)", anchor="w")
-        # self.joy_temperature_var = ctk.StringVar(self, str(JoyCaptionModel.DEFAULT_TEMPERATURE) if hasattr(JoyCaptionModel, "DEFAULT_TEMPERATURE") else "0.6")
-        # self.joy_temperature_entry = ctk.CTkEntry(self.joycaption_options_frame, textvariable=self.joy_temperature_var)
-
-        # self.joy_topp_label = ctk.CTkLabel(self.joycaption_options_frame, text="Top-p (0.0–1.0)", anchor="w")
-        # self.joy_topp_var = ctk.StringVar(self, str(JoyCaptionModel.DEFAULT_TOP_P) if hasattr(JoyCaptionModel, "DEFAULT_TOP_P") else "0.9")
-        # self.joy_topp_entry = ctk.CTkEntry(self.joycaption_options_frame, textvariable=self.joy_topp_var)
-
-        # self.joy_max_tokens_label = ctk.CTkLabel(self.joycaption_options_frame, text="Max Tokens", anchor="w")
-        # self.joy_max_tokens_var = ctk.StringVar(self, str(JOY_DEFAULT_MAX_TOKENS))
-        # self.joy_max_tokens_entry = ctk.CTkEntry(self.joycaption_options_frame, textvariable=self.joy_max_tokens_var)
-
         # Initial layout of JoyCaption widgets
         self._layout_joycaption_widgets()
 
@@ -505,21 +492,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             padx=self.DEFAULT_PADX, pady=(0, self.DEFAULT_PADY)
         )
         current_row += 1
-
-        # --- Temperature ---
-        # self.joy_temperature_label.grid(row=current_row, column=0, **self.LABEL_GRID)
-        # self.joy_temperature_entry.grid(row=current_row, column=1, **self.WIDGET_GRID)
-        # current_row += 1
-
-        # # --- Top‐p ---
-        # self.joy_topp_label.grid(row=current_row, column=0, **self.LABEL_GRID)
-        # self.joy_topp_entry.grid(row=current_row, column=1, **self.WIDGET_GRID)
-        # current_row += 1
-
-        # # --- Max Tokens ---
-        # self.joy_max_tokens_label.grid(row=current_row, column=0, **self.LABEL_GRID)
-        # self.joy_max_tokens_entry.grid(row=current_row, column=1, **self.WIDGET_GRID)
-        # current_row += 1
 
     def _update_joycaption_prompt_display(self, *args: Any) -> None:
         """Constructs and displays the JoyCaption prompt based on UI selections."""

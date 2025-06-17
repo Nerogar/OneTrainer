@@ -38,7 +38,7 @@ from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.torch_util import default_device
 from modules.util.ui import components
-from modules.util.ui.ui_utils import bind_mousewheel
+from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
 from modules.util.ui.UIState import UIState
 from modules.util.ui.icons import load_icon
 import torch
@@ -288,6 +288,10 @@ class CaptionUI(ctk.CTkToplevel):
             "Middle mouse click: Reset image (clear caption and mask, save to commit change)\n"
             "Ctrl+Delete: Delete image, caption and mask)\n"
         )
+
+        self.wait_visibility()
+        self.focus_set()
+        self.after(200, lambda: set_window_icon(self))
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
@@ -812,7 +816,7 @@ class CaptionUI(ctk.CTkToplevel):
         )
         tools_frame.grid(row=0, column=0, sticky="new")
         # Update the column count for the added button
-        for i in range(10):
+        for i in range(11):
             tools_frame.grid_columnconfigure(i, weight=0)
         tools_frame.grid_columnconfigure(5, weight=1)
         icons = {
@@ -822,6 +826,7 @@ class CaptionUI(ctk.CTkToplevel):
             "undo": "undo",
             "redo": "redo",
             "reset": "reset",
+            "mask_reset": "mask-reset",
         }
         self._create_icon_button(
             tools_frame,
@@ -861,7 +866,7 @@ class CaptionUI(ctk.CTkToplevel):
             tools_frame,
             0,
             6,
-            "Clear",
+            "Clear All",
             self.file_manager.reset_current_image,
             icons["reset"],
             "Reset image (clear caption and mask, save to commit change)",
@@ -871,6 +876,16 @@ class CaptionUI(ctk.CTkToplevel):
             tools_frame,
             0,
             7,
+            "Reset",
+            self.mask_editor.reset_current_mask,
+            icons["mask_reset"],
+            "Clear mask for the current image",
+        )
+
+        self._create_icon_button(
+            tools_frame,
+            0,
+            8,
             "",
             self.file_manager.save_changes,
             icons["save"],
@@ -880,7 +895,7 @@ class CaptionUI(ctk.CTkToplevel):
         self._create_icon_button(
             tools_frame,
             0,
-            8,
+            9,
             "",
             lambda: self.mask_editor.undo_mask_edit(),
             icons["undo"],
@@ -890,7 +905,7 @@ class CaptionUI(ctk.CTkToplevel):
         self._create_icon_button(
             tools_frame,
             0,
-            9,
+            10,
             "",
             lambda: self.mask_editor.redo_mask_edit(),
             icons["redo"],
@@ -1549,6 +1564,33 @@ class MaskEditor:
         self.edit_started: bool = False
         self._cached_image_dimensions: tuple[int, int] = (0, 0)
 
+
+    def reset_current_mask(self, event: tk.Event | None = None) -> str | None:
+            """Clear the mask for the current image."""
+            if self.parent.pil_mask is not None:
+                self.parent.pil_mask = None
+                self.reset_for_new_image()
+                self.parent.image_handler.refresh_image()
+
+                # Mark the mask as modified so save_changes knows to potentially delete the file
+                if (
+                    hasattr(self.parent.file_manager, "_mask_modified")
+                    and self.parent.dir
+                    and 0
+                    <= self.parent.current_image_index
+                    < len(self.parent.image_rel_paths)
+                ):
+                    image_path = (
+                        Path(self.parent.dir)
+                        / self.parent.image_rel_paths[
+                            self.parent.current_image_index
+                        ]
+                    )
+
+                    self.parent.file_manager._mask_modified[str(image_path)] = True
+
+            return "break" if event else None
+
     def stepped_decrease_brush_size(
         self, event: tk.Event | None = None
     ) -> str:
@@ -1940,25 +1982,38 @@ class MaskEditor:
             self.parent.file_manager._mask_modified[str(image_path)] = True
 
     def undo_mask_edit(self, event: tk.Event | None = None) -> str | None:
-        """Undo the last mask edit."""
-        if not self.mask_history or self.mask_history_position <= 0:
+        """Undo the last mask edit, or the 'Clear All' action if it was last."""
+        # Attempt to undo a "Clear All" action first
+        if hasattr(self.parent.file_manager, '_attempt_undo_clear_all') and \
+           self.parent.file_manager._attempt_undo_clear_all():
+            logger.info("Undid 'Clear All' action.")
             return "break" if event else None
+
+        # Original mask undo logic
+        if not self.mask_history or self.mask_history_position <= 0:
+            logger.debug("Mask history is empty or at the beginning.")
+            return "break" if event else None
+
         self.mask_history_position -= 1
         self.parent.pil_mask = self.mask_history[
             self.mask_history_position
         ].copy()
         self.parent.image_handler.refresh_image()
+        logger.info("Undid mask edit.")
         return "break" if event else None
 
     def redo_mask_edit(self, event: tk.Event | None = None) -> str | None:
         """Redo the previously undone mask edit."""
         if self.mask_history_position >= len(self.mask_history) - 1:
+            logger.debug("Mask history is at the end, cannot redo.")
             return "break" if event else None
+
         self.mask_history_position += 1
         self.parent.pil_mask = self.mask_history[
             self.mask_history_position
         ].copy()
         self.parent.image_handler.refresh_image()
+        logger.info("Redid mask edit.")
         return "break" if event else None
 
     def switch_to_brush_mode(
@@ -2361,6 +2416,7 @@ class FileManager:
         self._last_saved_caption = {}  # Simple cache to track saved content
         self._mask_modified = {}  # Track if mask has been modified
         self._reset_pending = {}  # Track images with pending reset
+        self._undo_buffer_for_clear_all: dict | None = None
 
     def delete_current_image_file(
         self, event: tk.Event | None = None
@@ -2485,34 +2541,106 @@ class FileManager:
             0
             <= self.parent.current_image_index
             < len(self.parent.image_rel_paths)
-        ):
+        ) or not self.parent.dir:
             return
 
-        # Get the image path for the current image
         image_path = (
             Path(self.parent.dir)
             / self.parent.image_rel_paths[self.parent.current_image_index]
         )
         image_key = str(image_path)
 
-        # Mark this image as pending reset
+        # Store state for potential undo
+        logger.debug(f"Storing undo state for 'Clear All' on image: {image_key}")
+        self._undo_buffer_for_clear_all = {
+            "image_key": image_key,
+            "pil_mask": self.parent.pil_mask.copy() if self.parent.pil_mask else None,
+            "caption_lines": self.parent.caption_lines.copy(),
+            "mask_editor_history": self.parent.mask_editor.mask_history.copy(),
+            "mask_editor_history_position": self.parent.mask_editor.mask_history_position,
+        }
+
+        # Mark this image as pending reset (for file deletion on save)
         self._reset_pending[image_key] = True
+        # Mark mask as modified (it's being cleared)
+        self._mask_modified[image_key] = True
 
-        # Clear the caption
+
+        # Clear the caption in UI
         self.parent.caption_lines = [""] * 5
-        self.parent.caption_entry.delete("1.0", "end") # Correct for CTkTextbox
+        self.parent.caption_entry.delete("1.0", "end")
 
-        # Clear the mask
+        # Clear the mask in UI
         self.parent.pil_mask = None
+        # Reset mask editor's internal state (its history will be cleared)
         self.parent.mask_editor.reset_for_new_image()
 
-        # Refresh the UI to show the preview
+        # Refresh the UI to show the cleared state
         self.parent.refresh_ui()
 
-        # Show message to user
         logger.info(
-            "Reset preview applied. Press Ctrl+S or click Save to confirm and delete files."
+            "Reset preview applied. Press Ctrl+S or click Save to confirm and delete files, or Ctrl+Z to undo."
         )
+
+    def _attempt_undo_clear_all(self) -> bool:
+        """Attempts to undo the last 'Clear All' action if buffer exists and matches current image."""
+        if self._undo_buffer_for_clear_all is None:
+            return False
+
+        buffer = self._undo_buffer_for_clear_all
+        buffered_image_key = buffer["image_key"]
+
+        current_image_path_str = ""
+        if 0 <= self.parent.current_image_index < len(self.parent.image_rel_paths) and self.parent.dir:
+            current_image_path = Path(self.parent.dir) / self.parent.image_rel_paths[self.parent.current_image_index]
+            current_image_path_str = str(current_image_path)
+
+        if buffered_image_key != current_image_path_str:
+            logger.debug(
+                "Undo buffer for 'Clear All' is for a different image (%s) than current (%s). "
+                "This undo action is not applicable here.",
+                buffered_image_key, current_image_path_str
+            )
+            # Optionally clear buffer if it should not persist across image contexts:
+            # self._undo_buffer_for_clear_all = None
+            return False
+
+        logger.info(f"Attempting to undo 'Clear All' for image: {buffered_image_key}")
+
+        # Restore state from buffer
+        self.parent.pil_mask = buffer["pil_mask"]
+        self.parent.caption_lines = buffer["caption_lines"]
+
+        # Restore MaskEditor's state
+        self.parent.mask_editor.mask_history = buffer["mask_editor_history"]
+        self.parent.mask_editor.mask_history_position = buffer["mask_editor_history_position"]
+
+        # If pil_mask is now None (was None before clear), ensure mask editor history is also appropriate
+        if self.parent.pil_mask is None and not self.parent.mask_editor.mask_history:
+             # If mask was None and history was empty, reset_for_new_image effectively handles this.
+             # However, we restored history, so if pil_mask is None, history should reflect that.
+             # The restored history should be correct. If pil_mask was None, history might be empty or have one None state.
+             pass
+
+
+        # Crucially, undo the _reset_pending flag as the reset action is being undone
+        if buffered_image_key in self._reset_pending:
+            self._reset_pending[buffered_image_key] = False
+            logger.debug(f"Cleared _reset_pending for {buffered_image_key} due to undo.")
+
+        # Mark mask as modified because its state changed back from cleared
+        # This ensures that if the user saves after undoing, the restored mask is saved.
+        self._mask_modified[buffered_image_key] = True
+
+        # Refresh caption UI with restored captions
+        self.parent.caption_manager.refresh_caption()
+        # Refresh image UI with restored image/mask
+        self.parent.image_handler.refresh_image()
+
+        # Clear the buffer as this undo action is consumed
+        self._undo_buffer_for_clear_all = None
+        logger.info(f"'Clear All' action for {buffered_image_key} has been undone.")
+        return True
 
     def save_changes(self, event: tk.Event | None = None) -> None:
         """Save the current mask and caption data to disk."""
@@ -2530,7 +2658,13 @@ class FileManager:
         )
         image_key = str(image_path)
 
-        # Check if this image is pending reset
+        # If a save occurs for an image that had a pending "Clear All" undo,
+        # that undo is no longer valid as the save action supersedes it.
+        if self._undo_buffer_for_clear_all and self._undo_buffer_for_clear_all["image_key"] == image_key:
+            logger.debug(f"Clearing 'Clear All' undo buffer for {image_key} due to save operation.")
+            self._undo_buffer_for_clear_all = None
+
+        # Check if this image is pending reset (full reset)
         if self._reset_pending.get(image_key, False):
             # Actually delete the files
             mask_path = image_path.with_name(
@@ -2556,29 +2690,33 @@ class FileManager:
 
             # Clear the pending reset flag
             self._reset_pending[image_key] = False
-
             # Clear the saved caption cache
             if image_key in self._last_saved_caption:
                 del self._last_saved_caption[image_key]
-
             # Clear the modified mask flag
             if image_key in self._mask_modified:
                 del self._mask_modified[image_key]
-
             return
 
-        # Handle mask saving if it exists and was modified
-        if self.parent.pil_mask:
-            mask_path = image_path.with_name(
-                f"{image_path.stem}-masklabel.png"
-            )
-            if self._mask_modified.get(image_key, False):
+        # Handle mask saving or deletion
+        mask_path = image_path.with_name(
+            f"{image_path.stem}-masklabel.png"
+        )
+        if self._mask_modified.get(image_key, False):
+            if self.parent.pil_mask: # Mask exists and was modified, save it
                 try:
                     self.parent.pil_mask.save(mask_path)
                     logger.info(f"Saved mask to {mask_path}")
-                    self._mask_modified[image_key] = False
                 except Exception as e:
                     logger.error(f"Error saving mask: {e}")
+            elif mask_path.exists(): # Mask was modified (cleared) and file exists, delete it
+                try:
+                    mask_path.unlink()
+                    logger.info(f"Deleted mask file (due to reset): {mask_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting mask file: {e}")
+            self._mask_modified[image_key] = False
+
 
         # Handle caption saving with change detection
         current_text = self.parent.caption_entry.get("1.0", "end-1c").strip()
@@ -2654,6 +2792,11 @@ class FileManager:
         self.parent.attributes("-topmost", False)
 
         new_dir: str = filedialog.askdirectory()
+
+        # Clear the global undo buffer if the directory changes
+        if new_dir and Path(new_dir) != Path(self.parent.dir or ""):
+            self._undo_buffer_for_clear_all = None
+            logger.debug("Directory changed, cleared 'Clear All' undo buffer.")
 
         # Restore focus after dialog closes
         self.parent.lift()

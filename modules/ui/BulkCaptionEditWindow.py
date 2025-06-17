@@ -148,7 +148,6 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
 
         self.preview_frame = preview_frame
 
-
     def _create_button_frame(self, row: int) -> None:
         """Create action buttons."""
         frame = ctk.CTkFrame(self)
