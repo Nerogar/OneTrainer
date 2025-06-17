@@ -5,29 +5,30 @@ This module defines a CTkToplevel window for image/caption editing with the capb
 or manually caption and mask images from a loaded directory.
 """
 
-import contextlib  # noqa: I001
+import contextlib
 import logging
 import platform
 import re
 import subprocess
 import tkinter as tk
+import traceback
 from collections.abc import Callable
 from enum import Enum
-import traceback
 from pathlib import Path
 from tkinter import filedialog, messagebox
+from tkinter import font as tkfont
 from typing import TypeAlias
 
+from modules.module.BaseBooruModel import (
+    JoyTagBooruModel,
+    WDBooruModel,
+)
 from modules.module.BaseImageMaskModel import BaseImageMaskModel
 from modules.module.Blip2Model import Blip2Model
-from modules.module.BaseBooruModel import (
-    WDBooruModel,
-    JoyTagBooruModel,
-)
 from modules.module.ClipSegModel import ClipSegModel
+from modules.module.JoyCaptionModel import JoyCaptionModel
 from modules.module.MaskByColor import MaskByColor
 from modules.module.MoondreamModel import MoondreamModel
-from modules.module.JoyCaptionModel import JoyCaptionModel
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
 from modules.module.SAMdreamMaskModel import SAMdreamMaskModel
@@ -38,16 +39,16 @@ from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.torch_util import default_device
 from modules.util.ui import components
+from modules.util.ui.CTKListbox import CTkListbox
+from modules.util.ui.icons import load_icon
 from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
 from modules.util.ui.UIState import UIState
-from modules.util.ui.icons import load_icon
+
 import torch
 
 import customtkinter as ctk
 import cv2
 import numpy as np
-
-from customtkinter import ThemeManager
 from PIL import Image, ImageDraw, ImageTk
 
 logger = logging.getLogger(__name__)
@@ -149,22 +150,23 @@ def scan_for_supported_images(
     directory: Path,
     include_subdirs: bool,
     is_supported: Callable[[Path], bool],
-) -> list[Path]:
+) -> list[str]:
     directory = Path(directory)
     if include_subdirs:
-        results = [
+        results_paths = [
             p.relative_to(directory)
             for p in directory.glob("**/*")
             if p.is_file() and is_supported(p)
         ]
     else:
-        results = [
-            p.name
+        results_paths = [
+            Path(p.name) # Ensure Path object for name
             for p in directory.iterdir()
             if p.is_file() and is_supported(p)
         ]
-    # Use natural sorting instead of lexicographical sorting
-    return sorted(results, key=natural_sort_key)
+    # Use natural sorting instead of lexicographical sorting, convert Path to str for key
+    sorted_paths = sorted(results_paths, key=lambda p: natural_sort_key(str(p)))
+    return [str(p) for p in sorted_paths] # Convert to list of strings
 
 
 def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
@@ -208,6 +210,37 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
     get_platform_cursor.cursor_cache[cache_key] = result
     return result
 
+class SpacedListbox(tk.Listbox):
+    def __init__(
+        self,
+        parent,
+        ipady=0,
+        **kwargs,
+    ):
+        super().__init__(parent, **kwargs)
+        self.on_select_callback = None
+        self.bind("<<ListboxSelect>>", self._on_select)
+        if ipady:
+            self.configure(selectborderwidth=ipady)
+        # For mousewheel scrolling
+        self.bind("<MouseWheel>", lambda e: self.yview_scroll(int(-1*(e.delta/120)), "units"))
+        self.configure(takefocus=0)
+
+    def insert(self, index, *elements):
+        super().insert(index, *elements)
+
+    def delete(self, start, end=None):
+        if end is None:
+            super().delete(start)
+        else:
+            super().delete(start, end)
+
+    def bind_select(self, callback):
+        self.on_select_callback = callback
+
+    def _on_select(self, event):
+        if self.on_select_callback:
+            self.on_select_callback(event)
 
 class CaptionUI(ctk.CTkToplevel):
     def __init__(
@@ -404,7 +437,7 @@ class CaptionUI(ctk.CTkToplevel):
             self, fg_color=get_theme_color("main_frame_bg")
         )
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=10)
-        main_frame.grid_columnconfigure(0, weight=0)
+        main_frame.grid_columnconfigure(0, minsize=FILE_LIST_WIDTH, weight=0) # Give file list area a min width
         main_frame.grid_columnconfigure(1, weight=1)
         main_frame.grid_rowconfigure(0, weight=1)
         self._create_file_list(main_frame)
@@ -440,7 +473,7 @@ class CaptionUI(ctk.CTkToplevel):
             text="No folder selected",
             anchor="w",
             font=("Segoe UI", 12, "bold"),
-            wraplength=FILE_LIST_WIDTH - 35,
+            wraplength=FILE_LIST_WIDTH - 35, # Keep wraplength for folder name
         )
         self.folder_name_label.grid(
             row=0, column=1, sticky="ew", padx=0, pady=5
@@ -480,7 +513,7 @@ class CaptionUI(ctk.CTkToplevel):
             values=["File", "Path", "Both"],
             variable=self.file_filter_type_var,
             width=80,
-            command=lambda _: self._apply_filters(),  # Dropdown changes apply immediately
+            command=lambda _: self._apply_filters(),
         )
         self.file_filter_type.grid(
             row=1, column=1, sticky="e", padx=(3, 5), pady=5
@@ -516,26 +549,52 @@ class CaptionUI(ctk.CTkToplevel):
             values=["Contains", "Matches", "Excludes", "Regex"],
             variable=self.caption_filter_type_var,
             width=80,
-            command=lambda _: self._apply_filters(),  # Dropdown changes apply immediately
+            command=lambda _: self._apply_filters(),
         )
         self.caption_filter_type.grid(
             row=1, column=1, sticky="e", padx=(3, 5), pady=5
         )
 
-        # 4. Create scrollable file list
-        self.file_list = ctk.CTkScrollableFrame(
-            file_area_frame,
-            width=FILE_LIST_WIDTH,
-            scrollbar_fg_color="transparent",
-            scrollbar_button_hover_color="grey75",
-            scrollbar_button_color="grey50",
-        )
-        self.file_list.grid(row=3, column=0, sticky="nsew")
-        self._file_list_scrollbar = self.file_list._scrollbar
+        self.file_list_frame = ctk.CTkFrame(file_area_frame, fg_color="transparent")
+        self.file_list_frame.grid(row=3, column=0, sticky="nsew")
+        self.file_list_frame.grid_rowconfigure(0, weight=1)
+        self.file_list_frame.grid_columnconfigure(0, weight=1)
 
-        # Initialize file list variables
-        self.image_labels = []
-        self.filtered_image_paths = []
+        listbox_bg = get_theme_color("main_frame_bg")
+        if isinstance(listbox_bg, tuple):
+            r, g, b = listbox_bg
+            listbox_bg = f"#{r:02x}{g:02x}{b:02x}"
+
+        file_font = tkfont.Font(family="Segoe UI", size=10)
+        self.file_list = CTkListbox(
+            self.file_list_frame,
+            width=0,
+            fg_color=listbox_bg,
+            text_color=get_theme_color("file_text"),
+            highlight_color=get_theme_color("selected_file_bg"),
+            font=file_font,
+            command=lambda value: self._on_file_list_select_ctk(value),
+            hover=True,
+            border_width=0,
+            border_color=listbox_bg,
+            height=300,
+            multiple_selection=False,
+        )
+        self.file_list.grid(row=0, column=0, sticky="nsew", padx=(12, 0))
+        # No need to bind <<ListboxSelect>>; use the command argument
+
+
+    def _on_file_list_select_ctk(self, value):
+        """Handle selection changes in the CTkListbox."""
+        # value is the selected option text
+        try:
+            idx = self.file_list.curselection()[0]
+            if 0 <= idx < len(self.filtered_image_paths):
+                selected_path = self.filtered_image_paths[idx]
+                original_index = self.image_rel_paths.index(str(selected_path))
+                self.navigation_manager.switch_to_image(original_index, from_click=True)
+        except Exception as e:
+            logger.error(f"Error in CTkListbox selection: {e}")
 
     def _debounce_filter(self) -> None:
         """Debounce the filter application to avoid lag during typing."""
@@ -550,55 +609,6 @@ class CaptionUI(ctk.CTkToplevel):
         self.filter_debounce_timer = self.after(
             self.FILTER_DEBOUNCE_DELAY, self._apply_filters
         )
-
-    def _create_file_item(self, row_idx, file_path):
-        """Create a single file item in the list."""
-        safe_filename = (
-            file_path
-            if isinstance(file_path, str)
-            else file_path.decode("utf-8", errors="replace")
-        )
-
-        # Create the label
-        label = ctk.CTkLabel(
-            self.file_list,
-            text=safe_filename,
-            wraplength=FILE_LIST_WIDTH - 20,
-            font=("Segoe UI", 11),
-            text_color=get_theme_color("file_text"),
-        )
-
-        # Highlight if this is the current file
-        is_current = (
-            self.image_rel_paths.index(file_path)
-            == self.current_image_index
-            if self.current_image_index >= 0
-            else False
-        )
-        if is_current:
-            label.configure(
-                text_color=get_theme_color("selected_file_text"),
-                fg_color=get_theme_color("selected_file_bg"),
-                corner_radius=6,
-            )
-
-        # Create click handler with proper closure
-        def click_handler(e, file_path=file_path):
-            idx = self.image_rel_paths.index(file_path)
-            self.navigation_manager.switch_to_image(idx, from_click=True)
-
-        label.bind("<Button-1>", click_handler)
-
-        # Grid in the next row
-        label.grid(
-            row=row_idx,
-            column=0,
-            sticky="w",
-            padx=2,
-            pady=(1 if row_idx == 0 else 2, 2),
-        )
-
-        return label
 
     def _apply_filters(self) -> None:
         """Apply filters to the file list and update the display."""
@@ -619,7 +629,10 @@ class CaptionUI(ctk.CTkToplevel):
         file_filter = self.file_filter_var.get().strip()
         filter_type = self.file_filter_type_var.get()
 
-        filtered = files
+        # Ensure files are strings for Path operations
+        string_files = [str(f) for f in files]
+        filtered = string_files
+
         if file_filter:
             try:
                 pattern = re.compile(re.escape(file_filter), re.IGNORECASE)
@@ -630,18 +643,69 @@ class CaptionUI(ctk.CTkToplevel):
                     ]
                 elif filter_type == "Path":
                     filtered = [
-                        f for f in filtered if pattern.search(str(f))
+                        f for f in filtered if pattern.search(f) # f is already str
                     ]
                 else:  # Both
                     filtered = [
                         f
                         for f in filtered
-                        if pattern.search(str(f))
-                        or pattern.search(Path(f).name)
+                        if pattern.search(f) or pattern.search(Path(f).name)
                     ]
-
             except re.error:
-                # In case of regex error, don't filter
+                pass
+
+        # Apply caption filter
+        caption_filter = self.caption_filter_var.get().strip()
+        caption_filter_type = self.caption_filter_type_var.get()
+
+        if caption_filter and self.dir:
+            try:
+                caption_files = []
+                for file_path_str in filtered: # Iterate over strings
+                    full_path = Path(self.dir) / file_path_str # file_path_str is relative
+                    caption_path = full_path.with_suffix(".txt")
+
+                    if not caption_path.exists():
+                        continue
+                    try:
+                        caption_content = caption_path.read_text(
+                            encoding="utf-8"
+                        ).strip()
+                        match = False
+                        if caption_filter_type == "Contains":
+                            if caption_filter.lower() in caption_content.lower():
+                                match = True
+                        elif caption_filter_type == "Matches":
+                            if caption_filter.lower() == caption_content.lower():
+                                match = True
+                        elif caption_filter_type == "Excludes":
+                            if caption_filter.lower() not in caption_content.lower():
+                                match = True
+                        elif caption_filter_type == "Regex":
+                            pat = re.compile(caption_filter, re.IGNORECASE)
+                            if pat.search(caption_content):
+                                match = True
+                        if match:
+                            caption_files.append(Path(file_path_str)) # Store as Path object if preferred, or keep as str
+                    except Exception:
+                        continue
+                filtered = [str(p) for p in caption_files] # Convert back to list of strings if needed
+            except Exception as e:
+                logger.error(f"Error applying caption filter: {e}")
+
+        path_files = [Path(f) for f in files] # Ensure input is list of Path
+        filtered_paths = path_files
+
+        if file_filter:
+            try:
+                pattern = re.compile(re.escape(file_filter), re.IGNORECASE)
+                if filter_type == "File":
+                    filtered_paths = [p for p in filtered_paths if pattern.search(p.name)]
+                elif filter_type == "Path":
+                    filtered_paths = [p for p in filtered_paths if pattern.search(str(p))]
+                else:  # Both
+                    filtered_paths = [p for p in filtered_paths if pattern.search(str(p)) or pattern.search(p.name)]
+            except re.error:
                 pass
 
         # Apply caption filter
@@ -701,98 +765,73 @@ class CaptionUI(ctk.CTkToplevel):
         return filtered
 
     def _update_file_list_display(self) -> None:
-        """Update the file list display by creating all items at once."""
-        # Clear the list completely
-        for widget in self.file_list.winfo_children():
-            widget.destroy()
+        """Update the file list display by populating the Listbox."""
+        # Update folder name label with count
+        if self.dir:
+            path_text = str(Path(self.dir).name) # Display only dir name for brevity
+            base_path_text = str(Path(self.dir))
 
-        # Reset our labels list
-        self.image_labels = []
+            num_filtered = len(self.filtered_image_paths)
+            num_total_in_dir = len(self.image_rel_paths)
 
-        # Show statistics if there are many files
-        if len(self.filtered_image_paths) > 100:
-            status_label = ctk.CTkLabel(
-                self.file_list,
-                text=f"{len(self.filtered_image_paths)} files",
-                font=("Segoe UI", 10, "italic"),
-                text_color="grey75",
-            )
-            status_label.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-            row_start = 1
+            if num_filtered == num_total_in_dir:
+                count_text = f" ({num_filtered} files)"
+            else:
+                count_text = f" ({num_filtered}/{num_total_in_dir} files)"
+
+            if not self.image_rel_paths:
+                 count_text = " (No images)"
+
+            self.folder_name_label.configure(text=path_text + count_text) # Removed tooltip_text argument
+            if hasattr(self.folder_name_label, "_tooltip") and self.folder_name_label._tooltip is not None: # Check if _tooltip exists and is not None
+                 self.folder_name_label._tooltip.text = base_path_text
+            elif not hasattr(self.folder_name_label, "_tooltip"):
+                pass
+
+
         else:
-            row_start = 0
+            self.folder_name_label.configure(text="No folder selected")
+            if hasattr(self.folder_name_label, "_tooltip") and self.folder_name_label._tooltip is not None:
+                 self.folder_name_label._tooltip.text = "No folder selected"
 
-        # Create all file items at once
-        for i, file_path in enumerate(self.filtered_image_paths):
-            label = self._create_file_item(i + row_start, file_path)
-            self.image_labels.append(label)
 
-        # Update scrollbar visibility
-        self._update_scrollbar_visibility()
+        # Clear the listbox
+
+
+        # Clear the listbox
+        self.file_list.delete(0, tk.END)
+        for _i, file_path_str in enumerate(self.filtered_image_paths):
+            self.file_list.insert('end', file_path_str)
+
+        # Highlight current selection if it's in the filtered list
+        if 0 <= self.current_image_index < len(self.image_rel_paths):
+            current_path_str = str(self.image_rel_paths[self.current_image_index])
+            if current_path_str in self.filtered_image_paths:
+                try:
+                    listbox_idx = self.filtered_image_paths.index(current_path_str)
+                    if hasattr(self.file_list, 'select'):
+                        self.file_list.select(listbox_idx)
+                    if hasattr(self.file_list, 'see'):
+                        self.file_list.see(listbox_idx) # Ensure visible
+                except (ValueError, IndexError, tk.TclError):
+                    pass
+
 
     def _update_file_list(self) -> None:
         """Initialize the file list with all image paths."""
-        # Initialize filtered image paths
-        self.filtered_image_paths = self.image_rel_paths.copy()
+        # Ensure filtered_image_paths is a list of strings
+        self.filtered_image_paths = [str(p) for p in self.image_rel_paths.copy()]
+
 
         # Reset scroll position
         if (
-            hasattr(self.file_list, "_parent_canvas")
-            and self.file_list._parent_canvas.winfo_exists()
+            hasattr(self, "file_list") # Check if file_list exists
+            and isinstance(self.file_list, tk.Listbox) # Check if it's a Listbox
+            and self.file_list.winfo_exists() # Check if widget exists
         ):
-            self.file_list._parent_canvas.yview_moveto(0.0)
+            self.file_list.yview_moveto(0.0)
 
-        # Update the display
         self._update_file_list_display()
-
-    def _update_scrollbar_visibility(self) -> None:
-        """Update scrollbar visibility based on file list content."""
-        try:
-            if hasattr(self.file_list, "_scrollbar_frame") and hasattr(
-                self.file_list, "_parent_canvas"
-            ):
-                canvas = self.file_list._parent_canvas
-                inner_frame = self.file_list._scrollbar_frame
-                if inner_frame.winfo_reqheight() > canvas.winfo_height():
-                    self._file_list_scrollbar.grid()
-                else:
-                    self._file_list_scrollbar.grid_remove()
-            else:
-                self._file_list_scrollbar.grid() if len(
-                    self.image_rel_paths
-                ) > 15 else self._file_list_scrollbar.grid_remove()
-        except Exception as e:
-            self._file_list_scrollbar.grid()
-            logger.debug(
-                f"Note: Could not adjust scrollbar visibility: {e}"
-            )
-
-    def _restore_scroll_position(self, position: float) -> None:
-        """Restore scroll position after updating file list."""
-        with contextlib.suppress(Exception):
-            self.file_list._parent_canvas.yview_moveto(position)
-
-    def _update_scrollbar_visibility(self) -> None:
-        """Update scrollbar visibility based on file list content."""
-        try:
-            if hasattr(self.file_list, "_scrollbar_frame") and hasattr(
-                self.file_list, "_parent_canvas"
-            ):
-                canvas = self.file_list._parent_canvas
-                inner_frame = self.file_list._scrollbar_frame
-                if inner_frame.winfo_reqheight() > canvas.winfo_height():
-                    self._file_list_scrollbar.grid()
-                else:
-                    self._file_list_scrollbar.grid_remove()
-            else:
-                self._file_list_scrollbar.grid() if len(
-                    self.image_rel_paths
-                ) > 15 else self._file_list_scrollbar.grid_remove()
-        except Exception as e:
-            self._file_list_scrollbar.grid()
-            logger.debug(
-                f"Note: Could not adjust scrollbar visibility: {e}"
-            )
 
     def _create_editor_panel(self, parent: ctk.CTkFrame) -> None:
         """Create the editor panel with tools, image container, and caption area."""
@@ -2084,67 +2123,48 @@ class MaskEditor:
 class NavigationManager:
     def __init__(self, parent: CaptionUI) -> None:
         self.parent: CaptionUI = parent
-        self.last_highlighted_label = (
-            None  # Keep track of the last highlighted label
-        )
+        # self.last_highlighted_label = (
+        #     None  # Keep track of the last highlighted label
+        # )
 
     def switch_to_image(
         self, index: int, from_click: bool = False
     ) -> None:
         """Switch to the image at the given index."""
-        # Clear highlight from the last highlighted item
-        if (
-            self.last_highlighted_label
-            and self.last_highlighted_label.winfo_exists()
-        ):
-            with contextlib.suppress(tk.TclError, RuntimeError):
-                self.last_highlighted_label.configure(
-                    text_color=ThemeManager.theme["CTkLabel"][
-                        "text_color"
-                    ],
-                    fg_color="transparent",
-                    corner_radius=0,
-                )
+        # Clear previous selection in tk.Listbox
+        if hasattr(self.parent, "file_list") and isinstance(self.parent.file_list, tk.Listbox):
+            with contextlib.suppress(tk.TclError):
+                self.parent.file_list.selection_clear(0, tk.END)
 
-        # Update current index
         self.parent.current_image_index = index
 
-        # Only ensure visibility if not clicked (keyboard navigation)
-        if not from_click:
-            self._ensure_selected_item_visible()
-
-        # Highlight the new item if it exists in the filtered list
+        # Highlight the new item in tk.Listbox if it exists in the filtered list
         if 0 <= index < len(self.parent.image_rel_paths):
-            try:
-                # Find the new item in the filtered paths
-                new_path = self.parent.image_rel_paths[index]
-                if new_path in self.parent.filtered_image_paths:
-                    filtered_idx = self.parent.filtered_image_paths.index(
-                        new_path
-                    )
-                    if filtered_idx < len(self.parent.image_labels):
-                        new_label = self.parent.image_labels[filtered_idx]
-                        new_label.configure(
-                            text_color=get_theme_color(
-                                "selected_file_text"
-                            ),
-                            fg_color=get_theme_color("selected_file_bg"),
-                            corner_radius=6,
-                        )
-                        # Store reference to the highlighted label
-                        self.last_highlighted_label = new_label
-            except (ValueError, IndexError):
-                pass
+            current_path_str = str(self.parent.image_rel_paths[index]) # Ensure string for comparison
+            if hasattr(self.parent, 'filtered_image_paths') and current_path_str in self.parent.filtered_image_paths:
+                if hasattr(self.parent, 'file_list') and isinstance(self.parent.file_list, tk.Listbox):
+                    try:
+                        listbox_idx = self.parent.filtered_image_paths.index(current_path_str)
+                        self.parent.file_list.selection_set(listbox_idx)
+                        self.parent.file_list.activate(listbox_idx)
+                        if not from_click: # Scroll to item if navigation was not from a direct click
+                            self.parent.file_list.see(listbox_idx)
+                    except (ValueError, IndexError, tk.TclError):
+                        logger.debug(f"Error selecting/showing item {listbox_idx} in listbox.")
 
-        # Load and display the image regardless of whether the label exists
+        # Load and display the image
         if 0 <= index < len(self.parent.image_rel_paths):
             self.parent.image_handler.load_image_data()
             self.parent.refresh_ui()
         else:
             self.parent.clear_ui()
+            # If index is out of bounds (e.g. -1), ensure no selection in listbox
+        if hasattr(self.parent, "file_list") and isinstance(self.parent.file_list, tk.Listbox):
+            with contextlib.suppress(tk.TclError):
+                self.parent.file_list.selection_clear(0, tk.END)
 
     def _ensure_selected_item_visible(self) -> None:
-        """Make sure the selected item is visible in the scrollable area."""
+        """Make sure the selected item is visible in the listbox."""
         if not (
             0
             <= self.parent.current_image_index
@@ -2152,33 +2172,14 @@ class NavigationManager:
         ):
             return
 
-        # Check if the current image is in the filtered list
-        current_path = self.parent.image_rel_paths[
-            self.parent.current_image_index
-        ]
-        if current_path not in self.parent.filtered_image_paths:
-            return
-
-        # If we have a valid canvas, scroll to the item
-        if (
-            hasattr(self.parent.file_list, "_parent_canvas")
-            and self.parent.file_list._parent_canvas.winfo_exists()
-        ):
-            # Find the position in the filtered list
-            try:
-                filtered_idx = self.parent.filtered_image_paths.index(
-                    current_path
-                )
-                total_items = len(self.parent.filtered_image_paths)
-
-                if total_items > 0:
-                    # Calculate position (with padding) and scroll there
-                    yview_position = filtered_idx / total_items
-                    self.parent.file_list._parent_canvas.yview_moveto(
-                        max(0.0, min(1.0, yview_position - 0.2))
-                    )
-            except (ValueError, IndexError):
-                pass
+        current_path_str = str(self.parent.image_rel_paths[self.parent.current_image_index])
+        if hasattr(self.parent, 'filtered_image_paths') and current_path_str in self.parent.filtered_image_paths:
+            if hasattr(self.parent, 'file_list') and isinstance(self.parent.file_list, tk.Listbox):
+                try:
+                    listbox_idx = self.parent.filtered_image_paths.index(current_path_str)
+                    self.parent.file_list.see(listbox_idx)
+                except (ValueError, IndexError, tk.TclError):
+                    pass
 
     def next_image(self, event: tk.Event | None = None) -> str:
         """Switch to the next image."""
@@ -2813,8 +2814,6 @@ class FileManager:
                     logger.info(f"Explorer: macOS command: {command}")
                     subprocess.run(command, check=False)
             else:  # Linux
-                # For Linux, xdg-open typically opens the directory.
-                # If a file is highlighted, open its parent directory. Otherwise, open the base_dir.
                 dir_to_open_linux = path_to_highlight.parent if path_to_highlight else base_dir
                 logger.info(f"Explorer: Linux directory to open: {dir_to_open_linux}")
                 if dir_to_open_linux.is_dir():
@@ -2854,51 +2853,50 @@ class FileManager:
             return
 
         dir_path = Path(self.parent.dir)
-        self.parent.folder_name_label.configure(
-            text=str(dir_path)
-        )  # Show full path instead of just name
+        # self.parent.folder_name_label.configure(text=str(dir_path)) # Updated in _update_file_list_display
 
         include_subdirs = self.parent.config_ui_data[
             "include_subdirectories"
         ]
+        logger.info(
+            f"Scanning directory {dir_path} "
+            f"{'(including subdirectories)' if include_subdirs else ''}"
+        )
 
-        # For huge directories, show immediate feedback that loading is happening
-        if include_subdirs:
-            logger.info(
-                f"Scanning directory {dir_path} (including subdirectories)"
-            )
-        else:
-            logger.info(f"Scanning directory {dir_path}")
-
-        # Use scan_for_supported_images for all platforms - no need for special cases
+        # scan_for_supported_images now returns list[str]
         self.parent.image_rel_paths = scan_for_supported_images(
-            str(dir_path),
+            dir_path, # Pass Path object
             include_subdirs,
             self.parent.image_handler.is_supported_image,
         )
 
-        # Initialize filtered paths and apply filters
-        if hasattr(self.parent, "_apply_filters"):
-            self.parent._apply_filters()
-        else:
-            self.parent.filtered_image_paths = (
-                self.parent.image_rel_paths.copy()
-            )
-            self.parent._update_file_list()
+        # Initialize filtered_image_paths as list of strings
+        self.parent.filtered_image_paths = self.parent.image_rel_paths.copy()
 
+
+        if hasattr(self.parent, "_apply_filters"):
+            self.parent._apply_filters() # This will call _update_file_list_display
+        else: # Fallback, should not be needed if _apply_filters exists
+            self.parent._update_file_list() # This also calls _update_file_list_display
+
+        # Initial navigation after load
         if self.parent.filtered_image_paths:
-            # Find the index in the original list
-            idx = self.parent.image_rel_paths.index(
-                self.parent.filtered_image_paths[0]
-            )
-            self.parent.navigation_manager.switch_to_image(idx)
+            # filtered_image_paths contains strings, image_rel_paths also strings
+            try:
+                # Find the index in the original list for the first filtered item
+                first_filtered_path_str = self.parent.filtered_image_paths[0]
+                idx = self.parent.image_rel_paths.index(first_filtered_path_str)
+                self.parent.navigation_manager.switch_to_image(idx)
+            except (ValueError, IndexError):
+                 self.parent.clear_ui() # Should not happen if filtered_image_paths is not empty
         else:
             self.parent.clear_ui()
+            # Update display even if empty to show correct counts
+            if hasattr(self.parent, "_update_file_list_display"):
+                 self.parent._update_file_list_display()
 
-        # Regain focus after directory is loaded
+
         self.parent.lift()
-
-        # Temporarily set topmost to ensure focus, then remove it
         self.parent.attributes("-topmost", True)
         self.parent.after(
             100, lambda: self.parent.attributes("-topmost", False)
