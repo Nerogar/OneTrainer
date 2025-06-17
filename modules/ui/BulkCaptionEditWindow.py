@@ -3,15 +3,34 @@ import re
 import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
+
+from modules.util.ui.ui_utils import (
+    load_window_session_settings,
+    save_window_session_settings,
+    set_window_icon,
+)
 
 import customtkinter as ctk
 
 logger = logging.getLogger(__name__)
 
 class BulkCaptionEditWindow(ctk.CTkToplevel):
+    SESSION_SETTINGS_KEY = "bulk_caption_edit_window_settings"
+
+    _SESSION_SETTINGS_METADATA = [
+        ("add_text", 'attr', "add_text_var", ""),
+        ("add_position", 'attr', "add_position_var", "Prepend"),
+        ("remove_text", 'attr', "remove_text_var", ""),
+        ("replace_text", 'attr', "replace_text_var", ""),
+        ("replace_with", 'attr', "replace_with_var", ""),
+        ("regex_pattern", 'attr', "regex_pattern_var", ""),
+        ("regex_replace", 'attr', "regex_replace_var", ""),
+    ]
+
     def __init__(
         self,
-        parent,
+        parent: Any, # Changed from parent to parent: Any for clarity
         directory: str,
         include_subdirectories: bool = False
     ) -> None:
@@ -22,6 +41,17 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
 
         self._setup_window()
         self._create_widgets()
+        self._load_session_settings() # Load settings after UI is created
+
+    def _load_session_settings(self):
+        load_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+
+    def _save_session_settings(self):
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+
+    def destroy(self):
+        self._save_session_settings()
+        super().destroy()
 
     def _setup_window(self) -> None:
         """Set up window properties."""
@@ -30,19 +60,26 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
         self.resizable(True, True)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
+        self.transient(self.parent)
+        self.attributes("-topmost", True)
+        self.grab_set()
+
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1)  # Preview area gets extra space
 
+        self.wait_visibility()
+        self.lift()
+        self.focus_force()
+        self.after(200, lambda: set_window_icon(self))
+
     def _create_widgets(self) -> None:
         """Create all widgets for the window."""
-        # Create frames for each operation
         self._create_add_frame(0)
         self._create_remove_frame(1)
         self._create_replace_frame(2)
         self._create_regex_frame(3)
         self._create_preview_frame(4)
         self._create_button_frame(5)
-        # Load preview after all widgets are created
         self._load_preview()
 
     def _create_add_frame(self, row: int) -> None:

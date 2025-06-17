@@ -1,17 +1,38 @@
 import logging
 import threading
 from tkinter import END, filedialog, messagebox
+from typing import Any
 
 from modules.util.ui.ToolTip import ToolTip
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui.ui_utils import (
+    load_window_session_settings,
+    save_window_session_settings,
+    set_window_icon,
+)
 
 import customtkinter as ctk
 
 logger = logging.getLogger(__name__)
 
 class GenerateMasksWindow(ctk.CTkToplevel):
+
+    SESSION_SETTINGS_KEY = "generate_masks_window_settings"
+
+    _SESSION_SETTINGS_METADATA = [
+        ("model", 'attr', "model_var", None),
+        ("path", 'attr', "path_entry", ""),
+        ("prompt", 'attr', "prompt_entry", ""),
+        ("mode", 'attr', "mode_var", "Create if absent"),
+        ("threshold", 'attr', "threshold_entry", "0.3"),
+        ("smooth", 'attr', "smooth_entry", "0"),
+        ("expand", 'attr', "expand_entry", "10"),
+        ("alpha", 'attr', "alpha_entry", "1"),
+        ("include_subdirectories", 'attr', "include_subdirectories_var", False),
+        ("preview_mode", 'attr', "preview_mode_var", False),
+    ]
+
     def __init__(
-            self, parent, path, include_subdirectories, *args, **kwargs
+            self, parent: Any, path: str | None, include_subdirectories: bool, *args: Any, **kwargs: Any
         ):
             """
             Window for generating masks for a folder of images
@@ -51,6 +72,18 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
             # Set up the UI
             self._create_layout(path, include_subdirectories)
+            self._load_session_settings() # Load settings after UI is created
+
+    def _load_session_settings(self):
+        load_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+
+    def _save_session_settings(self):
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+
+    def destroy(self):
+        self._save_session_settings()
+        super().destroy()
+
 
     def _setup_window(self, title, geometry):
         self.title(title)

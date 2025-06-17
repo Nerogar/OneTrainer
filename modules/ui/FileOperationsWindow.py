@@ -1,5 +1,5 @@
 """
-OneTrainer File Operations Window
+OneTrainer Image Tools Dialog
 
 This module defines a CTkToplevel window for performing common batch operations on files
 such as renaming, resizing, and format conversion.
@@ -23,6 +23,9 @@ from queue import Queue
 from tkinter import filedialog
 
 from modules.util import path_util
+from modules.util.ui.ui_utils import (
+    set_window_icon,
+)
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -104,8 +107,6 @@ class FileOperationsWindow(ctk.CTkToplevel):
             "optimization_type": "None"
         }
         self.config_state = UIState(self, self.config_data)
-
-        # Initialize thread pool and messaging
         self.executor = ThreadPoolExecutor(max_workers=self.MAX_WORKERS)
         self.message_queue: Queue = Queue()
         self.processing_active: bool = False
@@ -118,6 +119,7 @@ class FileOperationsWindow(ctk.CTkToplevel):
             self.dir_path_var.set(initial_dir)
 
         # Start processing UI messages from worker threads
+
         self.after(100, self._process_message_queue)
 
     def _setup_window(self) -> None:
@@ -138,6 +140,8 @@ class FileOperationsWindow(ctk.CTkToplevel):
         self.progress_var = ctk.DoubleVar(value=0)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.wait_visibility()
+        self.after(200, lambda: set_window_icon(self))
 
     def _on_close(self) -> None:
         """Handle window close: cancel ongoing operations and clean up."""

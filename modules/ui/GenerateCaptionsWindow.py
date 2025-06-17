@@ -25,6 +25,8 @@ from modules.module.JoyCaptionModel import (
     DEFAULT_MAX_TOKENS as JOY_DEFAULT_MAX_TOKENS,
 )
 from modules.util.ui.ui_utils import (
+    load_window_session_settings,
+    save_window_session_settings,
     set_window_icon,
 )
 
@@ -64,6 +66,42 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
     # JOY_DEFAULT_MAX_TOKENS is already imported
     JOY_DEFAULT_REPETITION_PENALTY: float = 1.2
     JOY_DEFAULT_GPU_INDEX: int = 0
+    SESSION_SETTINGS_KEY = "generate_captions_window_settings"
+
+    _SESSION_SETTINGS_METADATA = [
+        # General settings
+        ("model", 'config', "model_var", None), # Default usually from StringVar init
+        ("mode", 'config', "mode_var", None),   # Default usually from StringVar init
+        ("caption_length", 'config', "caption_length_var", None), # Default usually from StringVar init
+        ("path", 'attr', "path_entry", None),
+        ("initial_caption", 'attr', "caption_entry", None), # For BLIP
+        ("prefix", 'attr', "prefix_entry", None),
+        ("postfix", 'attr', "postfix_entry", None),
+        ("blacklist_path", 'attr', "blacklist_entry", None),
+        ("regex_enabled", 'attr', "regex_enabled_var", False),
+
+        # WD Thresholds
+        ("general_threshold", 'attr', "general_threshold_var", None), # Default from StringVar init
+        ("general_mcut", 'attr', "general_mcut_var", False),
+        ("character_threshold", 'attr', "character_threshold_var", None), # Default from StringVar init
+        ("character_mcut", 'attr', "character_mcut_var", False),
+
+        ("include_subdirectories", 'attr', "include_subdirectories_var", False),
+
+        # JoyCaption specific
+        ("joy_caption_type", 'attr', "joy_caption_type_var", None), # Default from StringVar init
+        ("joy_caption_length", 'attr', "joy_caption_length_var", None), # Default from StringVar init
+        ("joy_name", 'attr', "joy_name_var", None),
+        ("joy_advanced_mode", 'attr', "joy_advanced_mode_var", False),
+
+        # Advanced JoyCaption params (defaults can be direct or lambda for self/imported constants)
+        ("joy_temp", 'attr', "joy_temp_var", lambda s: str(s.JOY_DEFAULT_TEMPERATURE)),
+        ("joy_topp", 'attr', "joy_topp_var", lambda s: str(s.JOY_DEFAULT_TOP_P)),
+        ("joy_topk", 'attr', "joy_topk_var", lambda s: str(s.JOY_DEFAULT_TOP_K)),
+        ("joy_max_tokens", 'attr', "joy_max_tokens_var", lambda s: str(JOY_DEFAULT_MAX_TOKENS)), # Imported
+        ("joy_rep_penalty", 'attr', "joy_rep_penalty_var", lambda s: str(s.JOY_DEFAULT_REPETITION_PENALTY)),
+        ("joy_gpu_index", 'attr', "joy_gpu_index_var", lambda s: str(s.JOY_DEFAULT_GPU_INDEX)),
+    ]
 
     def __init__(
         self,
@@ -74,21 +112,20 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         **kwargs: Any,
     ) -> None:
         super().__init__(parent, *args, **kwargs)
-        self.parent = parent
+        self.parent = parent # Ensure self.parent is the CaptionUI instance
         self.config_state: dict[str, Any] = {}
         self._threshold_visible: bool = False
         self._moondream_options_visible: bool = False
         self._joycaption_visible: bool = False
         self._joy_name_input_visible: bool = False
         self._joycaption_width_applied: bool = False
-        self._joy_advanced_toggle_visible: bool = False # New flag
-        self._joy_advanced_options_visible: bool = False # New flag
+        self._joy_advanced_toggle_visible: bool = False
+        self._joy_advanced_options_visible: bool = False
 
-        self._setup_window("Batch generate captions", "405x520") #initial dim
+        self._setup_window("Batch generate captions", "405x520")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # 1) Populate basic config_state
         self.config_state["models"] = self.parent.model_manager.get_available_captioning_models()
         self.config_state["model_var"] = ctk.StringVar(
             self, self.config_state["models"][0] if self.config_state["models"] else ""
@@ -106,16 +143,49 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         }
         self.config_state["mode_var"] = ctk.StringVar(self, "Create if absent")
 
-        # 2) Add caption length options for Moondream2
         self.config_state["caption_lengths"] = ["short", "normal", "long"]
         self.config_state["caption_length_var"] = ctk.StringVar(self, "normal")
 
-        # JoyCaption Advanced Mode Variable
         self.joy_advanced_mode_var = ctk.BooleanVar(self, False)
         self.joy_advanced_mode_var.trace_add("write", lambda *args: self._update_model_specific_options())
 
-        # 3) Build the layout (this also creates the new JoyCaption frame)
         self._create_layout(path, parent_include_subdirectories)
+
+        self._load_session_settings() # Load settings after UI is created
+
+    def _load_session_settings(self):
+        loaded_settings = load_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+
+        # Special handling for joy_extra_options_checkboxes (remains here)
+        # It uses 'loaded_settings' which contains the raw dictionary from the session store for this window.
+        if hasattr(self, "joy_extra_options_checkboxes"):
+            saved_extra_options = loaded_settings.get("joy_extra_options", {})
+            for var, option_text in self.joy_extra_options_checkboxes:
+                var.set(saved_extra_options.get(option_text, var.get())) # Default to current if not found
+
+        # Post-load UI updates (remain here)
+        self._update_model_specific_options()
+        if self._is_wd_model(self.config_state["model_var"].get()):
+            self._update_threshold_states()
+        if self._is_joycaption_model(self.config_state["model_var"].get()):
+            self._update_joycaption_prompt_display()
+
+    def _save_session_settings(self):
+        additional_settings_to_save = {}
+        # Special handling for joy_extra_options (remains here)
+        if hasattr(self, "joy_extra_options_checkboxes"):
+            additional_settings_to_save["joy_extra_options"] = {
+                opt_text: var.get() for var, opt_text in self.joy_extra_options_checkboxes
+            }
+        else: # Ensure the key exists even if empty
+            additional_settings_to_save["joy_extra_options"] = {}
+
+        # Call the utility function
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA, additional_settings_to_save)
+
+    def destroy(self):
+        self._save_session_settings()
+        super().destroy()
 
     def _setup_window(self, title: str, geometry: str) -> None:
         self.title(title)

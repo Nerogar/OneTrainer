@@ -230,6 +230,9 @@ class CaptionUI(ctk.CTkToplevel):
         }
         self.config_ui_state: UIState = UIState(self, self.config_ui_data)
 
+        # Initialize session settings store
+        self.session_ui_settings: dict = {}
+
         # Initialize other attributes and managers
         self.image_rel_paths: list[str] = []
         self.current_image_index: int = -1
@@ -290,7 +293,6 @@ class CaptionUI(ctk.CTkToplevel):
         )
 
         self.wait_visibility()
-        self.focus_set()
         self.after(200, lambda: set_window_icon(self))
 
     def _create_layout(self) -> None:
