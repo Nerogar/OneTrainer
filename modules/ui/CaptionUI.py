@@ -52,10 +52,8 @@ import customtkinter as ctk
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageTk
-from scalene import scalene_profiler
 
 logger = logging.getLogger(__name__)
-scalene_profiler.start()
 
 
 MAX_VISIBLE_FILES: int = 50
@@ -251,38 +249,6 @@ def get_platform_cursor(cursor_name: str, fallback_cursor: str) -> str:
     # Cache the result
     get_platform_cursor.cursor_cache[cache_key] = result
     return result
-
-class SpacedListbox(tk.Listbox):
-    def __init__(
-        self,
-        parent,
-        ipady=0,
-        **kwargs,
-    ):
-        super().__init__(parent, **kwargs)
-        self.on_select_callback = None
-        self.bind("<<ListboxSelect>>", self._on_select)
-        if ipady:
-            self.configure(selectborderwidth=ipady)
-        # For mousewheel scrolling
-        self.bind("<MouseWheel>", lambda e: self.yview_scroll(int(-1*(e.delta/120)), "units"))
-        self.configure(takefocus=0)
-
-    def insert(self, index, *elements):
-        super().insert(index, *elements)
-
-    def delete(self, start, end=None):
-        if end is None:
-            super().delete(start)
-        else:
-            super().delete(start, end)
-
-    def bind_select(self, callback):
-        self.on_select_callback = callback
-
-    def _on_select(self, event):
-        if self.on_select_callback:
-            self.on_select_callback(event)
 
 class CaptionUI(ctk.CTkToplevel):
     def __init__(
@@ -856,7 +822,6 @@ class CaptionUI(ctk.CTkToplevel):
                         self.file_list.see(listbox_idx) # Ensure visible
                 except (ValueError, IndexError, tk.TclError):
                     pass
-        scalene_profiler.stop()
 
 
     def _update_file_list(self) -> None:
@@ -1201,8 +1166,12 @@ class CaptionUI(ctk.CTkToplevel):
     def _clear_focus(self, event: tk.Event) -> None:
         """Clear focus from input widgets when clicking elsewhere."""
         # Skip if already focusing on the clicked widget
-        if event.widget == self.focus_get():
-            return
+        try:
+            if event.widget == self.focus_get():
+                self.focus_set()
+        except KeyError:
+            # This can happen on Linux when a file dialog is closed
+            pass
 
         # Focus on the main window to remove focus from input widgets
         focused = self.focus_get()
