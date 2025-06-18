@@ -147,7 +147,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             filtered_files = []
             for file_path in all_files:
                 # 1. Direct match with the full path
-                if file_path.endswith(str(single_file)):
+                if Path(file_path).resolve() == single_file_path.resolve():
                     filtered_files.append(file_path)
                     logger.info(f"Found matching file: {file_path}")
                     break
