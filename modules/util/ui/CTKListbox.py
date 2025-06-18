@@ -1,4 +1,5 @@
 import ast
+from contextlib import contextmanager
 
 import customtkinter
 
@@ -104,17 +105,37 @@ class CTkListbox(customtkinter.CTkFrame):
             self.listvariable.trace_add("write", lambda a, b, c: self.update_listvar())
             self.update_listvar()
 
+    _bulk_flag = "_bulk_updating"        # internal attribute name
+
+    @contextmanager
+    def bulk_load(self):
+        """Context manager: suppress redraw until the block exits."""
+        setattr(self, self._bulk_flag, True)
+        try:
+            yield self
+        finally:
+            setattr(self, self._bulk_flag, False)
+            self._redraw_items()
+
     def insert(self, index, option, update=True, **args):
         if str(index).lower() == "end":
             index = len(self._items)
         self._items.insert(index, {"text": option})
-        self._redraw_items()
+
+        # Only redraw if:
+        #   * caller asked for it (update=True)  AND
+        #   * we’re not inside bulk_load()
+        if update and not getattr(self, self._bulk_flag, False):
+            self._redraw_items()
 
     def insert_many(self, options):
-        self._items.clear()
-        for option in options:
-            self._items.append({"text": option})
-        self._selected_indices.clear()
+        setattr(self, self._bulk_flag, True)
+        try:
+            # rebuild the internal list in one go
+            self._items = [{"text": opt} for opt in options]
+            self._selected_indices.clear()
+        finally:
+            setattr(self, self._bulk_flag, False)
         self._redraw_items()
 
     def update_listvar(self):
@@ -122,10 +143,11 @@ class CTkListbox(customtkinter.CTkFrame):
         self.insert_many(values)
 
     def delete(self, index, last=None):
+        # Fast-path: clear everything without per-item redraw
         if str(index).lower() == "all":
             self._items.clear()
             self._selected_indices.clear()
-            self._redraw_items()
+            # postpone the expensive redraw to the caller
             return
         if str(index).lower() == "end":
             index = len(self._items) - 1
