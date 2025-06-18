@@ -21,16 +21,28 @@ def get_linux_scaling_factor():
     """
     try:
         # Check for GNOME/Cinnamon/MATE settings (text scaling is often the one users set for fractional)
-        cmd = ["gsettings", "get", "org.gnome.desktop.interface", "text-scaling-factor"]
+        cmd = ["gsettings", "get", "org.gnome.desktop.interface", "scaling-factor"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode == 0 and result.stdout:
-            return float(result.stdout.strip())
+            factor = float(result.stdout.strip())
+            if factor > 1.0:
+                return factor
+
+        # Check for KDE Plasma
+        cmd = ["kreadconfig5", "--group", "KScreen", "--key", "Scale"]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode == 0 and result.stdout:
+            factor = float(result.stdout.strip())
+            if factor > 1.0:
+                return factor
 
         # Check for XFCE settings
         cmd = ["xfconf-query", "-c", "xsettings", "-p", "/Gdk/WindowScalingFactor"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode == 0 and result.stdout:
-            return int(result.stdout.strip())
+            factor = int(result.stdout.strip())
+            if factor > 1:
+                return factor
 
         # Fallback to DPI check (good for integer scaling, less so for fractional)
         temp_root = ctk.CTk()
@@ -43,11 +55,10 @@ def get_linux_scaling_factor():
     except (FileNotFoundError, ValueError, Exception):
         pass
 
-    return 1.0
+    return 1.5
 
 
 def main():
-    # This logic is for Linux, where we may need to manually set the scaling factor.
     if platform.system() == "Linux":
         # Prioritize manual override via environment variable, as it's the most reliable
         scaling_env = os.environ.get("ONETRAINER_UI_SCALING")
