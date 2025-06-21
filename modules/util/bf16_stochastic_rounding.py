@@ -1,6 +1,11 @@
 import torch
 from torch import Tensor
 
+generator = None
+
+def init_stochastic_rounding():
+    global generator
+    generator = None
 
 def copy_stochastic_(target: Tensor, source: Tensor):
     """
@@ -10,12 +15,20 @@ def copy_stochastic_(target: Tensor, source: Tensor):
         target: the target tensor with dtype=bfloat16
         source: the target tensor with dtype=float32
     """
+
+    global generator
+    if generator is None:
+        generator = torch.Generator(device = source.device)
+        generator.manual_seed(0)
+
     # create a random 16 bit integer
-    result = torch.randint_like(
-        source,
+    result = torch.randint(
+        size=source.shape,
+        device=source.device,
         dtype=torch.int32,
         low=0,
         high=(1 << 16),
+        generator=generator,
     )
 
     # add the random number to the lower 16 bit of the mantissa

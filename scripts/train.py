@@ -4,7 +4,7 @@ script_imports()
 
 import json
 
-from modules.trainer.GenericTrainer import GenericTrainer
+from modules.util import create
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -29,7 +29,7 @@ def main():
         if args.secrets_path is not None:
             raise
 
-    trainer = GenericTrainer(train_config, callbacks, commands)
+    trainer = create.create_trainer(train_config, callbacks, commands)
 
     trainer.start()
 
