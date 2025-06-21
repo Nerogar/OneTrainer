@@ -18,17 +18,24 @@ import customtkinter as ctk
 
 
 class LoraTab:
-    # example showing how to use the custom layer filter input
-    DEFAULT_CUSTOM_PATTERN = "up_blocks.0.attentions.[01], (up|down)_blocks.0.resnets, down_blocks.2.attentions.*"
-
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super().__init__()
 
         self.master = master
         self.train_config = train_config
         self.ui_state = ui_state
+
+        # Set default for new property to avoid KeyError with old configs
+        if not hasattr(self.ui_state, 'lora_layers_regex'):
+            self.ui_state.lora_layers_regex = self.train_config.lora_layers_regex
+
         self.layer_entry = None
+        self.layer_entry = None
+        self.layer_entry_fg_color = None
+        self.layer_entry_text_color = None
         self.layer_selector = None
+        self.regex_label = None
+        self.regex_switch = None
         self.presets = {}
         self.presets_list = []
         self.prior_custom = ""
@@ -147,15 +154,24 @@ class LoraTab:
 
         self.layer_entry = components.entry(
             master, 6, 2, self.ui_state, "lora_layers",
-            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions are supported. Any model layer with a matching name will be trained"
+            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions if toggled are supported. Any model layer with a matching name will be trained"
+        )
+        self.layer_entry_fg_color = self.layer_entry.cget("fg_color")
+        self.layer_entry_text_color = self.layer_entry.cget("text_color")
+
+        self.regex_label = components.label(
+            master, 7, 0, "Use Regex for Layer Preset",
+            tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used."
+        )
+        self.regex_switch = components.switch(
+            master, 7, 1, self.ui_state, "lora_layers_regex"
         )
 
-        # avoid storing e.g. 'attn' or '' into self.prior_custom when a non-custom layer
-        # was chosen and the UI was then closed.
+        # Let the user provide their own filter https://github.com/Nerogar/OneTrainer/pull/778/files#r2040104962
         if self.train_config.lora_layers and self.train_config.lora_layer_preset == "custom":
             self.prior_custom = self.train_config.lora_layers
         else:
-            self.prior_custom = LoraTab.DEFAULT_CUSTOM_PATTERN
+            self.prior_custom = ""
 
         self.layer_entry.grid(row=6, column=2, columnspan=3, sticky="ew")
         # Some configs will come with the lora_layer_preset unset or wrong for
@@ -165,16 +181,25 @@ class LoraTab:
             self.layer_selector.set(self.presets_list[0])
         self.__preset_set_layer_choice(self.layer_selector.get())
 
+
     def __preset_set_layer_choice(self, selected: str):
         if not selected:
             selected = self.presets_list[0]
 
         if selected == "custom":
-            self.layer_entry.configure(state="normal")
+            self.layer_entry.configure(state="normal", fg_color=self.layer_entry_fg_color, text_color=self.layer_entry_text_color)
             self.layer_entry.cget('textvariable').set(self.prior_custom)
+            self.layer_entry.grid_configure(columnspan=3, sticky="ew")
+            self.regex_label.grid()
+            self.regex_switch.grid()
         else:
             if self.prior_selected == "custom":
                 self.prior_custom = self.layer_entry.get()
-            self.layer_entry.configure(state="readonly")
+            disabled_color = ("gray85", "gray17")
+            disabled_text_color = ("gray30", "gray70")
+            self.layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
             self.layer_entry.cget('textvariable').set(",".join(self.presets[selected]))
+            self.layer_entry.grid_configure(columnspan=1, sticky="w")
+            self.regex_label.grid_remove()
+            self.regex_switch.grid_remove()
         self.prior_selected = selected

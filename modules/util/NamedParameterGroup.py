@@ -17,7 +17,6 @@ class NamedParameterGroup:
     ):
         self.unique_name = unique_name
         self.display_name = display_name if display_name is not None else unique_name
-        assert len(parameters) != 0, f'Parameter group cannot be empty: {repr(parameters)}'
         self.parameters = list(parameters)
         self.learning_rate = learning_rate
 
@@ -32,7 +31,10 @@ class NamedParameterGroupCollection:
         self.__groups.append(group)
 
     def parameters(self) -> list[Parameter]:
-        return sum([x.parameters for x in self.__groups], [])
+        params = [p for group in self.__groups for p in group.parameters]
+        # Some parameter groups might not have parameters. Only the collection of all param groups need to have at least one parameter.
+        assert len(params) != 0, 'Parameter group collection cannot be empty.'
+        return params
 
     def parameters_for_optimizer(self, config: TrainConfig) -> list[dict]:
         parameters = []

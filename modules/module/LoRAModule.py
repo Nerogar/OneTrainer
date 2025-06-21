@@ -1,4 +1,5 @@
 import copy
+import logging
 import math
 from abc import abstractmethod
 from collections.abc import Mapping
@@ -14,6 +15,7 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Conv2d, Dropout, Linear, Parameter
 
+logger = logging.getLogger(__name__)
 
 class PeftBase(nn.Module):
     is_applied: bool
@@ -427,7 +429,13 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        self.module_filters = [ModuleFilter(pattern) for pattern in module_filter] if module_filter is not None else []
+        if not hasattr(config, "lora_layers_regex"):
+            config.lora_layers_regex = False
+
+        self.module_filters = [
+            ModuleFilter(pattern, use_regex=config.lora_layers_regex)
+            for pattern in (module_filter or [])
+        ]
 
         weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
@@ -454,18 +462,22 @@ class LoRAModuleWrapper:
 
     def __create_modules(self, orig_module: nn.Module | None) -> dict[str, PeftBase]:
         lora_modules = {}
-
+        selected = []
+        skipped = []
         if orig_module is not None:
             for name, child_module in orig_module.named_modules():
                 if not isinstance(child_module, Linear | Conv2d):
+                    skipped.append(name)
                     continue
-
                 if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
                     lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
-
-            for module_filter in self.module_filters:
-                assert (module_filter.was_used()), f'Custom layer filters: no modules were matched by the custom filter {repr(module_filter)}'
-
+                    selected.append(name)
+                else:
+                    skipped.append(name)
+                for module_filter in self.module_filters:
+                    assert (module_filter.was_used()), f'Custom layer filters: no modules were matched by the custom filter {repr(module_filter)}'
+            logger.info(f"[LoRAModuleWrapper] Selected layers: {selected}")
+            logger.info(f"[LoRAModuleWrapper] Skipped layers: {skipped}")
         return lora_modules
 
     def requires_grad_(self, requires_grad: bool):
