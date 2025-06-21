@@ -29,7 +29,7 @@ class PeftBase(nn.Module):
 
     def __init__(self, prefix: str, orig_module: nn.Module | None):
         super().__init__()
-        self.prefix = prefix.replace('.', '_') + '.'
+        self.prefix = prefix + '.'
         self._orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = {}
@@ -343,10 +343,12 @@ class DoRAModule(LoRAModule):
     dora_num_dims: int
     dora_scale: Tensor | None
     norm_epsilon: bool
+    decompose_output_axis: bool
 
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
         self.norm_epsilon = kwargs.pop('norm_epsilon', False)
+        self.decompose_output_axis = kwargs.pop('decompose_output_axis', False)
         self.train_device = kwargs.pop('train_device')
         super().__init__(*args, **kwargs)
 
@@ -359,14 +361,23 @@ class DoRAModule(LoRAModule):
         # wrangling that works for both Linear and Convolutional layers. If you
         # were just doing this for Linear, it would be substantially simpler.
         self.dora_num_dims = orig_weight.dim() - 1
-        self.dora_scale = nn.Parameter(
-            torch.norm(
-                orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1),
-                dim=1, keepdim=True)
-            .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
-            .transpose(1, 0)
-            .to(device=self.orig_module.weight.device)
-        )
+        if self.decompose_output_axis:
+            self.dora_scale = nn.Parameter(
+                torch.norm(
+                    orig_weight.reshape(orig_weight.shape[0], -1),
+                    dim=1, keepdim=True)
+                .reshape(orig_weight.shape[0], *[1] * self.dora_num_dims)
+                .to(device=self.orig_module.weight.device)
+            )
+        else:
+            self.dora_scale = nn.Parameter(
+                torch.norm(
+                    orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1),
+                    dim=1, keepdim=True)
+                .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
+                .transpose(1, 0)
+                .to(device=self.orig_module.weight.device)
+            )
 
         del orig_weight
 
@@ -388,12 +399,19 @@ class DoRAModule(LoRAModule):
         # backpropagation in order to save VRAM (to do this, we detach it from
         # the gradient graph).
         eps = torch.finfo(WP.dtype).eps if self.norm_epsilon else 0.0
-        norm = WP.detach() \
-                 .transpose(0, 1) \
-                 .reshape(WP.shape[1], -1) \
-                 .norm(dim=1, keepdim=True) \
-                 .reshape(WP.shape[1], *[1] * self.dora_num_dims) \
-                 .transpose(0, 1) + eps
+        if self.decompose_output_axis:
+            norm = WP.detach() \
+                    .reshape(WP.shape[0], -1) \
+                    .norm(dim=1) \
+                    .reshape(WP.shape[0], *[1] * self.dora_num_dims) \
+                    + eps
+        else:
+            norm = WP.detach() \
+                    .transpose(0, 1) \
+                    .reshape(WP.shape[1], -1) \
+                    .norm(dim=1, keepdim=True) \
+                    .reshape(WP.shape[1], *[1] * self.dora_num_dims) \
+                    .transpose(0, 1) + eps
         WP = self.dora_scale * (WP / norm)
         # In the DoRA codebase (and thus the paper results), they perform
         # dropout on the *input*, rather than between layers, so we duplicate
@@ -445,6 +463,7 @@ class LoRAModuleWrapper:
                 self.additional_args = [self.rank, self.alpha]
                 self.additional_kwargs = {
                     'norm_epsilon': config.lora_decompose_norm_epsilon,
+                    'decompose_output_axis': config.lora_decompose_output_axis,
                     'train_device': torch.device(config.train_device),
                 }
             else:
@@ -470,7 +489,7 @@ class LoRAModuleWrapper:
                     skipped.append(name)
                     continue
                 if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                    lora_modules[name] = self.klass(self.prefix + "_" + name, child_module, *self.additional_args, **self.additional_kwargs)
+                    lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
                     selected.append(name)
                 else:
                     skipped.append(name)

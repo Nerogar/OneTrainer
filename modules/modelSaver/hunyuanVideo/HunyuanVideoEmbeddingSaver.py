@@ -52,13 +52,6 @@ class HunyuanVideoEmbeddingSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
-            case ModelFormat.CKPT:
-                self._save_ckpt(
-                    embedding,
-                    embedding_state,
-                    output_model_destination,
-                    dtype,
-                )
             case ModelFormat.SAFETENSORS:
                 self._save_safetensors(
                     embedding,
@@ -102,13 +95,6 @@ class HunyuanVideoEmbeddingSaver(
             match output_model_format:
                 case ModelFormat.DIFFUSERS:
                     raise NotImplementedError
-                case ModelFormat.CKPT:
-                    self._save_ckpt(
-                        embedding,
-                        embedding_state,
-                        os.path.join(f"{output_model_destination}_embeddings", f"{embedding_name}.pt"),
-                        dtype,
-                    )
                 case ModelFormat.SAFETENSORS:
                     self._save_safetensors(
                         embedding,

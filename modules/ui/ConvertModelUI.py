@@ -100,7 +100,6 @@ class ConvertModelUI(ctk.CTkToplevel):
         components.options_kv(master, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
-            ("Checkpoint", ModelFormat.CKPT),
         ], self.ui_state, "output_model_format")
 
         # output model destination

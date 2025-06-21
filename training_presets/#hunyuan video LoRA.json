@@ -11,6 +11,7 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "timestep_distribution": "LOGIT_NORMAL",
+    "dynamic_timestep_shifting": false,
     "train_dtype": "BFLOAT_16",
     "training_method": "LORA",
     "weight_dtype": "FLOAT_8",

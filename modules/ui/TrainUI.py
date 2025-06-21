@@ -20,6 +20,7 @@ from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
+from modules.ui.VideoToolUI import VideoToolUI
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -149,9 +150,9 @@ class TrainUI(ctk.CTk):
         self.general_tab = self.create_general_tab(self.tabview.add("general"))
         self.model_tab = self.create_model_tab(self.tabview.add("model"))
         self.data_tab = self.create_data_tab(self.tabview.add("data"))
-        self.create_concepts_tab(self.tabview.add("concepts"))
+        self.concepts_tab = self.create_concepts_tab(self.tabview.add("concepts"))
         self.training_tab = self.create_training_tab(self.tabview.add("training"))
-        self.create_sampling_tab(self.tabview.add("sampling"))
+        self.sampling_tab = self.create_sampling_tab(self.tabview.add("sampling"))
         self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
         self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
         self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
@@ -264,7 +265,7 @@ class TrainUI(ctk.CTk):
         return frame
 
     def create_concepts_tab(self, master):
-        ConceptTab(master, self.train_config, self.ui_state)
+        return ConceptTab(master, self.train_config, self.ui_state)
 
     def create_training_tab(self, master) -> TrainingTab:
         return TrainingTab(master, self.train_config, self.ui_state)
@@ -314,7 +315,7 @@ class TrainUI(ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
 
-        SamplingTab(frame, self.train_config, self.ui_state)
+        return SamplingTab(frame, self.train_config, self.ui_state)
 
     def create_backup_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -478,19 +479,24 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the captioning tool")
         components.button(frame, 0, 1, "Open", self.open_dataset_tool)
 
+        # video tools
+        components.label(frame, 1, 0, "Video Tools",
+                         tooltip="Open the video tools")
+        components.button(frame, 1, 1, "Open", self.open_video_tool)
+
         # convert model
-        components.label(frame, 1, 0, "Convert Model Tools",
+        components.label(frame, 2, 0, "Convert Model Tools",
                          tooltip="Open the model conversion tool")
-        components.button(frame, 1, 1, "Open", self.open_convert_model_tool)
+        components.button(frame, 2, 1, "Open", self.open_convert_model_tool)
 
         # sample
-        components.label(frame, 2, 0, "Sampling Tool",
+        components.label(frame, 3, 0, "Sampling Tool",
                          tooltip="Open the model sampling tool")
-        components.button(frame, 2, 1, "Open", self.open_sampling_tool)
+        components.button(frame, 3, 1, "Open", self.open_sampling_tool)
 
-        components.label(frame, 3, 0, "Profiling Tool",
+        components.label(frame, 4, 0, "Profiling Tool",
                          tooltip="Open the profiling tools.")
-        components.button(frame, 3, 1, "Open", self.open_profiling_tool)
+        components.button(frame, 4, 1, "Open", self.open_profiling_tool)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -542,6 +548,10 @@ class TrainUI(ctk.CTk):
 
     def open_dataset_tool(self):
         window = CaptionUI(self, None, False)
+        self.wait_window(window)
+
+    def open_video_tool(self):
+        window = VideoToolUI(self)
         self.wait_window(window)
 
     def open_convert_model_tool(self):
@@ -617,7 +627,7 @@ class TrainUI(ctk.CTk):
 
     def start_training(self):
         if self.training_thread is None:
-            self.top_bar_component.save_default()
+            self.save_default()
 
             self.training_button.configure(text="Stop Training", state="normal")
 
@@ -629,6 +639,12 @@ class TrainUI(ctk.CTk):
             self.training_button.configure(state="disabled")
             self.on_update_status("stopping")
             self.training_commands.stop()
+
+    def save_default(self):
+        self.top_bar_component.save_default()
+        self.concepts_tab.save_current_config()
+        self.sampling_tab.save_current_config()
+        self.additional_embeddings_tab.save_current_config()
 
     def export_training(self):
         file_path = filedialog.asksaveasfilename(filetypes=[

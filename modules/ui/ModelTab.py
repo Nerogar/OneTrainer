@@ -56,6 +56,8 @@ class ModelTab:
             self.__setup_sana_ui()
         elif self.train_config.model_type.is_hunyuan_video():
             self.__setup_hunyuan_video_ui()
+        elif self.train_config.model_type.is_hi_dream():
+            self.__setup_hi_dream_ui()
 
     def __setup_stable_diffusion_ui(self):
         row = 0
@@ -73,7 +75,7 @@ class ModelTab:
                 TrainingMethod.FINE_TUNE,
                 TrainingMethod.FINE_TUNE_VAE,
             ],
-            allow_checkpoint=True,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_3_ui(self):
@@ -91,7 +93,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=True,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_flux_ui(self):
@@ -100,6 +102,7 @@ class ModelTab:
         row = self.__create_base_components(
             row,
             has_prior=True,
+            allow_override_prior=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_vae=True,
@@ -108,7 +111,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=False,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_xl_ui(self):
@@ -125,7 +128,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=True,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_wuerstchen_ui(self):
@@ -144,7 +147,7 @@ class ModelTab:
             allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
                               or self.train_config.model_type.is_stable_cascade(),
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=self.train_config.training_method != TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_pixart_alpha_ui(self):
@@ -160,7 +163,7 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=True,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_sana_ui(self):
@@ -176,7 +179,7 @@ class ModelTab:
             row,
             allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=False,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_hunyuan_video_ui(self):
@@ -193,7 +196,27 @@ class ModelTab:
             row,
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_checkpoint=True,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_hi_dream_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            has_text_encoder_1=True,
+            has_text_encoder_2=True,
+            has_text_encoder_3=True,
+            has_text_encoder_4=True,
+            allow_override_text_encoder_4=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __create_dtype_options(self, include_none:bool=True) -> list[tuple[str, DataType]]:
@@ -210,7 +233,6 @@ class ModelTab:
             options.insert(0, ("", DataType.NONE))
 
         return options
-
 
     def __create_base_dtype_components(self, row: int) -> int:
         # huggingface token
@@ -246,10 +268,12 @@ class ModelTab:
             has_unet: bool = False,
             has_prior: bool = False,
             allow_override_prior: bool = False,
+            allow_override_text_encoder_4: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
             has_text_encoder_2: bool = False,
             has_text_encoder_3: bool = False,
+            has_text_encoder_4: bool = False,
             has_vae: bool = False,
     ) -> int:
         if has_unet:
@@ -265,7 +289,7 @@ class ModelTab:
             if allow_override_prior:
                 # prior model
                 components.label(self.scroll_frame, row, 0, "Prior Model",
-                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model. For Flux, it must be a safetensors file that only contains the transformer.")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
@@ -312,6 +336,24 @@ class ModelTab:
                              tooltip="Overrides the text encoder 3 weight data type")
             components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder_3.weight_dtype")
+
+            row += 1
+
+        if has_text_encoder_4:
+            if allow_override_text_encoder_4:
+                # prior model
+                components.label(self.scroll_frame, row, 0, "Text Encoder 4 Override",
+                                 tooltip="Filename, directory or Hugging Face repository of the text encoder 4 model")
+                components.file_entry(
+                    self.scroll_frame, row, 1, self.ui_state, "text_encoder_4.model_name",
+                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                )
+
+            # text encoder 4 weight dtype
+            components.label(self.scroll_frame, row, 3, "Override Text Encoder 4 Data Type",
+                             tooltip="Overrides the text encoder 4 weight data type")
+            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
+                                  self.ui_state, "text_encoder_4.weight_dtype")
 
             row += 1
 
@@ -398,7 +440,7 @@ class ModelTab:
             row: int,
             allow_safetensors: bool = False,
             allow_diffusers: bool = False,
-            allow_checkpoint: bool = False,
+            allow_legacy_safetensors: bool = False,
     ) -> int:
         # output model destination
         components.label(self.scroll_frame, row, 0, "Model Output Destination",
@@ -424,8 +466,8 @@ class ModelTab:
             formats.append(("Safetensors", ModelFormat.SAFETENSORS))
         if allow_diffusers:
             formats.append(("Diffusers", ModelFormat.DIFFUSERS))
-        if allow_checkpoint:
-            formats.append(("Checkpoint", ModelFormat.CKPT))
+        # if allow_legacy_safetensors:
+        #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
 
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
