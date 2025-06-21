@@ -25,7 +25,7 @@ rem --- Helpers ---
 
 :warn_store
   echo.
-  echo %YEL% WARNING: Windows Store Python detected %RESET%
+  echo %YEL% WARNING: Possible Windows Store Python detected %RESET%
   echo Windows Store Python has a known history of causing insidious issues with virtual environments due to how
   echo Microsoft sandboxes it.
   echo.
@@ -86,15 +86,39 @@ for /f "tokens=2 delims=:" %%L in ('py --list 2^>nul ^| findstr /R /C:"-V:[0-9][
 
 :found_python_via_py_list
 if not defined PYTHON_VERSION_FROM_PY_LIST (
-    echo %YEL%No suitable Python version found via "py --list" that satisfies %MIN_PY% ^<= v ^< %MAX_PY%.%RESET%
-    rem PYTHON remains unset, script will proceed to Step 3 or final failure handling
+    echo %YEL%No suitable Python version found via "py --list" that satisfies %MIN_PY% ^>= v ^< %MAX_PY%.%RESET%
+    rem PYTHON remains unset, script will proceed to the next step
 )
 
-rem Check if PYTHON was set by the new logic. If so, go to :py_ok.
-rem Otherwise, continue to Step 3 (Windows Store Python check).
+rem Check if PYTHON was set by the py --list logic. If so, go to :py_ok.
 if defined PYTHON (
     goto :py_ok
 )
+
+rem 2) If py launcher fails, search common install directories
+echo.
+echo %CYAN%Step 2: Searching for Python in common installation directories...%RESET%
+set "SEARCH_PATHS="%ProgramFiles%\Python" "%LOCALAPPDATA%\Programs\Python""
+for %%D in (%SEARCH_PATHS%) do (
+    if exist "%%~D" (
+        for /d %%P in ("%%~D\Python*") do (
+            if exist "%%P\python.exe" (
+                if not defined PYTHON (
+                    echo   Testing "%%P\python.exe"...
+                    "%%P\python.exe" "%VERSION_FILE%" %MIN_PY% %MAX_PY% >nul 2>&1
+                    if not errorlevel 1 (
+                        echo   %GRN%SELECTED Python from "%%P"%RESET%
+                        set "PYTHON="%%P\python.exe""
+                        goto :py_ok
+                    ) else (
+                        echo   %YEL%"%%P\python.exe" is not a suitable version.%RESET%
+                    )
+                )
+            )
+        )
+    )
+)
+echo %YEL%No suitable Python found in common directories.%RESET%
 
 rem 3) Finally as a failsafe try to ask about Windows Store python, only if not found yet
 if not defined PYTHON (
