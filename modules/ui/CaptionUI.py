@@ -319,7 +319,7 @@ class CaptionUI(ctk.CTkToplevel):
 
         self.help_text: str = (
             "Keyboard shortcuts:\n\n"
-            "⬅️➡️: Navigate between images\n"
+            "Ctrl + ⬅️➡️: Navigate between images\n"
             "Tab: Switch between caption lines\n"
             "Return or Ctrl+S: Save changes\n"
             "Ctrl+M: Toggle mask display\n"
@@ -328,7 +328,7 @@ class CaptionUI(ctk.CTkToplevel):
             "Ctrl+Z: Undo mask edit\n"
             "Ctrl+Y: Redo mask edit\n"
             "[ or ]: Decrease/increase brush size by 0.1\n\n"
-            "When editing masks:\n"
+            "When editing masks:\n\n"
             "Left click: Add to mask\n"
             "Right click: Remove from mask\n"
             "Mouse wheel: Adjust brush size"
