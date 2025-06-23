@@ -181,11 +181,14 @@ def is_supported_fast(name: str) -> bool:
     * No lower() for every file (only for the slice that matters)
     * One hash-lookup, one endswith, no branches
     """
-    if name.endswith(_MASK_SUFFIX):
-        return False
     dot = name.rfind('.')
     if dot == -1:
         return False
+
+    # Check if the stem (filename without extension) ends with the mask suffix
+    if name[:dot].endswith(_MASK_SUFFIX):
+        return False
+
     ext = name[dot:].lower()               # slice, not copy of whole string
     return ext in _EXT_SET
 
@@ -596,10 +599,28 @@ class CaptionUI(ctk.CTkToplevel):
         """Handle selection changes in the CTkListbox."""
         # value is the selected option text
         try:
+            if not self.file_list.curselection():
+                return  # Nothing is selected
+
             idx = self.file_list.curselection()[0]
             if 0 <= idx < len(self.filtered_image_paths):
                 selected_path = self.filtered_image_paths[idx]
                 original_index = self.image_rel_paths.index(str(selected_path))
+
+                # If clicking the same image, check for unsaved changes
+                if original_index == self.current_image_index:
+                    if self.file_manager.has_unsaved_changes():
+                        confirm = messagebox.askyesno(
+                            "Unsaved Changes",
+                            "You have unsaved changes. Do you want to discard them and reload the image?",
+                            parent=self
+                        )
+                        if not confirm:
+                            return  # User cancelled, do nothing
+                    else:
+                        logger.debug("Clicked on the same image, no changes to reload.")
+                        return # No changes, do nothing
+
                 self.navigation_manager.switch_to_image(original_index, from_click=True)
         except Exception as e:
             logger.error(f"Error in CTkListbox selection: {e}")
@@ -1546,6 +1567,7 @@ class ImageHandler:
             Path(self.parent.dir)
             / self.parent.image_rel_paths[self.parent.current_image_index]
         )
+        image_key = str(image_path)
 
         try:
             self.parent.pil_image = Image.open(image_path).convert("RGB")
@@ -1569,10 +1591,16 @@ class ImageHandler:
             self.parent.pil_mask = None
             self.parent.mask_editor.reset_for_new_image()
 
+        # Clear modification flags for the newly loaded image
+        self.parent.file_manager._mask_modified.pop(image_key, None)
+        self.parent.file_manager._reset_pending.pop(image_key, None)
+
         caption_path = image_path.with_suffix(".txt")
+        caption_content_from_file = ""
         if caption_path.exists():
             try:
                 content = caption_path.read_text(encoding="utf-8").strip()
+                caption_content_from_file = content
                 self.parent.caption_lines = content.split("\n")
                 self.parent.caption_lines.extend(
                     [""] * (5 - len(self.parent.caption_lines))
@@ -1583,6 +1611,9 @@ class ImageHandler:
                 self.parent.caption_lines = [""] * 5
         else:
             self.parent.caption_lines = [""] * 5
+
+        # Update the cache with the content as it was on disk
+        self.parent.file_manager._last_saved_caption[image_key] = caption_content_from_file
 
         self.parent.current_caption_line = 0
         self.parent.caption_line_var.set(
@@ -2431,6 +2462,49 @@ class FileManager:
         self._mask_modified = {}  # Track if mask has been modified
         self._reset_pending = {}  # Track images with pending reset
         self._undo_buffer_for_clear_all: dict | None = None
+
+    def has_unsaved_changes(self) -> bool:
+        """Check if there are any unsaved changes for the current image."""
+        if not (
+            0
+            <= self.parent.current_image_index
+            < len(self.parent.image_rel_paths)
+        ) or not self.parent.dir:
+            return False
+
+        image_path = (
+            Path(self.parent.dir)
+            / self.parent.image_rel_paths[self.parent.current_image_index]
+        )
+        image_key = str(image_path)
+
+        # 1. Check for a pending full reset
+        if self._reset_pending.get(image_key, False):
+            logger.debug(f"Unsaved change detected: pending reset for {image_key}")
+            return True
+
+        # 2. Check if the mask has been modified
+        if self._mask_modified.get(image_key, False):
+            logger.debug(f"Unsaved change detected: mask modified for {image_key}")
+            return True
+
+        # 3. Check if the caption has been modified
+        # First, get the current state of the caption from the UI
+        temp_caption_lines = self.parent.caption_lines.copy()
+        current_text_in_box = self.parent.caption_entry.get("1.0", "end-1c").strip()
+        temp_caption_lines[self.parent.current_caption_line] = current_text_in_box
+
+        non_empty_lines = [line for line in temp_caption_lines if line]
+        current_caption_content = "\n".join(non_empty_lines)
+
+        # Compare with the last known saved state from file load or last save
+        last_saved_content = self._last_saved_caption.get(image_key)
+
+        if last_saved_content != current_caption_content:
+            logger.debug(f"Unsaved change detected: caption content differs for {image_key}")
+            return True
+
+        return False
 
     def delete_current_image_file(
         self, event: tk.Event | None = None
