@@ -1186,25 +1186,28 @@ class CaptionUI(ctk.CTkToplevel):
 
     def _clear_focus(self, event: tk.Event) -> None:
         """Clear focus from input widgets when clicking elsewhere."""
-        # Skip if already focusing on the clicked widget
-        try:
-            if event.widget == self.focus_get():
-                self.focus_set()
-        except KeyError:
-            # This can happen on Linux when a file dialog is closed
-            pass
+        clicked_widget = event.widget
 
-        # Focus on the main window to remove focus from input widgets
-        focused = self.focus_get()
-        if focused and str(focused).endswith("entry"):
-            # If we're losing focus from an entry, save its content first
-            if focused == self.caption_entry:
+        # If the clicked widget is an input field (or a child of one), do nothing.
+        # Let the default behavior handle focus.
+        w = clicked_widget
+        while w:
+            if isinstance(w, (ctk.CTkEntry | ctk.CTkTextbox| ctk.CTkOptionMenu| ctk.CTkButton| ctk.CTkCheckBox| ctk.CTkSwitch)):
+                return
+            if w == self:
+                break
+            w = w.master
+
+        # If we clicked on a non-interactive widget, check if an input widget currently has focus.
+        focused_widget = self.focus_get()
+        if isinstance(focused_widget, (ctk.CTkEntry | ctk.CTkTextbox)):
+            # If so, trigger its "focus out" handler and then remove focus.
+            if focused_widget == self.caption_entry:
                 self._on_caption_focus_out(None)
-            elif focused == self.brush_opacity_entry:
+            elif focused_widget == self.brush_opacity_entry:
                 self._validate_brush_opacity(None)
 
-            # Set focus to clicked widget or main window
-            self.focus_set()
+            self.focus_set() # Give focus to the main window.
 
     def _validate_brush_opacity(
         self, event: tk.Event | None = None
