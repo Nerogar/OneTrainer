@@ -1,7 +1,8 @@
 import logging
 import os
 import threading
-from tkinter import TclError, filedialog, messagebox
+from dataclasses import dataclass, fields
+from tkinter import END, TclError, filedialog, messagebox
 from typing import Any, TypedDict
 
 from modules.module.captioning.caption_config_types import (
@@ -45,6 +46,33 @@ class GridOptions(TypedDict, total=False):
     columnspan: int
     rowspan: int
 
+@dataclass
+class CaptionWindowSettings:
+    model: str = ""
+    mode: str = "Create if absent"
+    caption_length: str = "normal"
+    path: str = ""
+    initial_caption: str = ""
+    prefix: str = ""
+    postfix: str = ""
+    blacklist_path: str = ""
+    regex_enabled: bool = False
+    general_threshold: str = "0.35"
+    general_mcut: bool = False
+    character_threshold: str = "0.85"
+    character_mcut: bool = False
+    include_subdirectories: bool = False
+    joy_caption_type: str = ""
+    joy_caption_length: str = ""
+    joy_name: str = ""
+    joy_advanced_mode: bool = False
+    joy_temp: str = "0.6"
+    joy_topp: str = "0.9"
+    joy_topk: str = "0"
+    joy_max_tokens: str = "60"
+    joy_rep_penalty: str = "1.2"
+    joy_gpu_index: str = "0"
+    joy_extra_options: dict = None
 
 class GenerateCaptionsWindow(ctk.CTkToplevel):
     # Standard UI configuration constants
@@ -68,40 +96,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
     JOY_DEFAULT_GPU_INDEX: int = 0
     SESSION_SETTINGS_KEY = "generate_captions_window_settings"
 
-    _SESSION_SETTINGS_METADATA = [
-        # General settings
-        ("model", 'config', "model_var", None), # Default usually from StringVar init
-        ("mode", 'config', "mode_var", None),   # Default usually from StringVar init
-        ("caption_length", 'config', "caption_length_var", None), # Default usually from StringVar init
-        ("path", 'attr', "path_entry", None),
-        ("initial_caption", 'attr', "caption_entry", None), # For BLIP
-        ("prefix", 'attr', "prefix_entry", None),
-        ("postfix", 'attr', "postfix_entry", None),
-        ("blacklist_path", 'attr', "blacklist_entry", None),
-        ("regex_enabled", 'attr', "regex_enabled_var", False),
-
-        # WD Thresholds
-        ("general_threshold", 'attr', "general_threshold_var", None), # Default from StringVar init
-        ("general_mcut", 'attr', "general_mcut_var", False),
-        ("character_threshold", 'attr', "character_threshold_var", None), # Default from StringVar init
-        ("character_mcut", 'attr', "character_mcut_var", False),
-
-        ("include_subdirectories", 'attr', "include_subdirectories_var", False),
-
-        # JoyCaption specific
-        ("joy_caption_type", 'attr', "joy_caption_type_var", None), # Default from StringVar init
-        ("joy_caption_length", 'attr', "joy_caption_length_var", None), # Default from StringVar init
-        ("joy_name", 'attr', "joy_name_var", None),
-        ("joy_advanced_mode", 'attr', "joy_advanced_mode_var", False),
-
-        # Advanced JoyCaption params (defaults can be direct or lambda for self/imported constants)
-        ("joy_temp", 'attr', "joy_temp_var", lambda s: str(s.JOY_DEFAULT_TEMPERATURE)),
-        ("joy_topp", 'attr', "joy_topp_var", lambda s: str(s.JOY_DEFAULT_TOP_P)),
-        ("joy_topk", 'attr', "joy_topk_var", lambda s: str(s.JOY_DEFAULT_TOP_K)),
-        ("joy_max_tokens", 'attr', "joy_max_tokens_var", lambda s: str(JOY_DEFAULT_MAX_TOKENS)), # Imported
-        ("joy_rep_penalty", 'attr', "joy_rep_penalty_var", lambda s: str(s.JOY_DEFAULT_REPETITION_PENALTY)),
-        ("joy_gpu_index", 'attr', "joy_gpu_index_var", lambda s: str(s.JOY_DEFAULT_GPU_INDEX)),
-    ]
 
     def __init__(
         self,
@@ -150,19 +144,18 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.joy_advanced_mode_var.trace_add("write", lambda *args: self._update_model_specific_options())
 
         self._create_layout(path, parent_include_subdirectories)
-
         self._load_session_settings() # Load settings after UI is created
 
+        # If a non-empty path is passed from the parent, ensure it overrides any session-loaded path.
+        # The `if path:` check handles None, empty strings, and other "falsy" values.
+        if path:
+            self.path_entry.delete(0, END)
+            self.path_entry.insert(0, path)
+
     def _load_session_settings(self):
-        loaded_settings = load_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
-
-        # Special handling for joy_extra_options_checkboxes (remains here)
-        # It uses 'loaded_settings' which contains the raw dictionary from the session store for this window.
-        if hasattr(self, "joy_extra_options_checkboxes"):
-            saved_extra_options = loaded_settings.get("joy_extra_options", {})
-            for var, option_text in self.joy_extra_options_checkboxes:
-                var.set(saved_extra_options.get(option_text, var.get())) # Default to current if not found
-
+        settings_dict = load_window_session_settings(self, self.SESSION_SETTINGS_KEY)
+        if settings_dict:
+            self._apply_settings_to_ui(settings_dict)
         # Post-load UI updates (remain here)
         self._update_model_specific_options()
         if self._is_wd_model(self.config_state["model_var"].get()):
@@ -171,17 +164,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             self._update_joycaption_prompt_display()
 
     def _save_session_settings(self):
-        additional_settings_to_save = {}
-        # Special handling for joy_extra_options (remains here)
-        if hasattr(self, "joy_extra_options_checkboxes"):
-            additional_settings_to_save["joy_extra_options"] = {
-                opt_text: var.get() for var, opt_text in self.joy_extra_options_checkboxes
-            }
-        else: # Ensure the key exists even if empty
-            additional_settings_to_save["joy_extra_options"] = {}
-
-        # Call the utility function
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA, additional_settings_to_save)
+        settings = self._gather_settings_from_ui()
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, settings)
 
     def destroy(self):
         self._save_session_settings()
@@ -196,6 +180,53 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
+
+    def _gather_settings_from_ui(self) -> CaptionWindowSettings:
+        data = {}
+        for f in fields(CaptionWindowSettings):
+            name = f.name
+            val = None
+            if hasattr(self, f"{name}_var"):
+                val = getattr(self, f"{name}_var").get()
+            elif hasattr(self, f"{name}_entry"):
+                val = getattr(self, f"{name}_entry").get()
+            elif name + "_var" in self.config_state:
+                val = self.config_state[name + "_var"].get()
+            elif name in self.config_state and hasattr(self.config_state[name], "get"):
+                val = self.config_state[name].get()
+            elif hasattr(self, name):
+                widget = getattr(self, name)
+                if hasattr(widget, "get"):
+                    val = widget.get()
+            else:
+                val = getattr(CaptionWindowSettings, name, None)
+            data[name] = val
+        # Special case for joy_extra_options
+        if hasattr(self, "joy_extra_options_checkboxes"):
+            data["joy_extra_options"] = {
+                opt_text: var.get() for var, opt_text in self.joy_extra_options_checkboxes
+            }
+        return CaptionWindowSettings(**data)
+
+    def _apply_settings_to_ui(self, settings: CaptionWindowSettings | dict):
+        from dataclasses import asdict
+        s = asdict(settings) if not isinstance(settings, dict) else settings
+        for name, value in s.items():
+            if hasattr(self, f"{name}_var"):
+                getattr(self, f"{name}_var").set(value)
+            elif hasattr(self, f"{name}_entry"):
+                entry = getattr(self, f"{name}_entry")
+                entry.delete(0, "end")
+                entry.insert(0, value)
+            elif name + "_var" in self.config_state:
+                self.config_state[name + "_var"].set(value)
+            elif name in self.config_state and hasattr(self.config_state[name], "set"):
+                self.config_state[name].set(value)
+        # Special case for joy_extra_options
+        if hasattr(self, "joy_extra_options_checkboxes"):
+            saved_extra_options = s.get("joy_extra_options", {})
+            for var, option_text in self.joy_extra_options_checkboxes:
+                var.set(saved_extra_options.get(option_text, var.get()))
 
     def _create_layout(self, path: str, include_subdirectories: bool) -> None:
         self.main_frame = ctk.CTkFrame(self)

@@ -1,5 +1,7 @@
+import concurrent.futures
 import logging
-import threading
+from dataclasses import dataclass
+from pathlib import Path
 from tkinter import END, filedialog, messagebox
 from typing import Any
 
@@ -14,22 +16,23 @@ import customtkinter as ctk
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class MaskWindowSettings:
+    model: str = ""
+    path: str = ""
+    prompt: str = ""
+    mode: str = "Create if absent"
+    threshold: str = "0.3"
+    smooth: str = "0"
+    expand: str = "10"
+    alpha: str = "1"
+    include_subdirectories: bool = False
+    preview_mode: bool = False
+
 class GenerateMasksWindow(ctk.CTkToplevel):
 
     SESSION_SETTINGS_KEY = "generate_masks_window_settings"
-
-    _SESSION_SETTINGS_METADATA = [
-        ("model", 'attr', "model_var", None),
-        ("path", 'attr', "path_entry", ""),
-        ("prompt", 'attr', "prompt_entry", ""),
-        ("mode", 'attr', "mode_var", "Create if absent"),
-        ("threshold", 'attr', "threshold_entry", "0.3"),
-        ("smooth", 'attr', "smooth_entry", "0"),
-        ("expand", 'attr', "expand_entry", "10"),
-        ("alpha", 'attr', "alpha_entry", "1"),
-        ("include_subdirectories", 'attr', "include_subdirectories_var", False),
-        ("preview_mode", 'attr', "preview_mode_var", False),
-    ]
+    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def __init__(
             self, parent: Any, path: str | None, include_subdirectories: bool, *args: Any, **kwargs: Any
@@ -74,16 +77,74 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             self._create_layout(path, include_subdirectories)
             self._load_session_settings() # Load settings after UI is created
 
+            # If a non-empty path is passed from the parent, ensure it overrides any session-loaded path.
+            # The `if path:` check handles None, empty strings, and other "falsy" values.
+            if path:
+                self.path_entry.delete(0, END)
+                self.path_entry.insert(0, path)
+
+    def _apply_settings_to_ui(self, settings: MaskWindowSettings):
+        self.model_var.set(settings.model)
+        self.path_entry.delete(0, END)
+        self.path_entry.insert(0, settings.path)
+        self.prompt_entry.delete(0, END)
+        self.prompt_entry.insert(0, settings.prompt)
+        self.mode_var.set(settings.mode)
+        self.threshold_entry.delete(0, END)
+        self.threshold_entry.insert(0, settings.threshold)
+        self.smooth_entry.delete(0, END)
+        self.smooth_entry.insert(0, settings.smooth)
+        self.expand_entry.delete(0, END)
+        self.expand_entry.insert(0, settings.expand)
+        self.alpha_entry.delete(0, END)
+        self.alpha_entry.insert(0, settings.alpha)
+        self.include_subdirectories_var.set(settings.include_subdirectories)
+        self.preview_mode_var.set(settings.preview_mode)
+
+
+    def _gather_settings_from_ui(self) -> MaskWindowSettings:
+        return MaskWindowSettings(
+            model=self.model_var.get(),
+            path=self.path_entry.get(),
+            prompt=self.prompt_entry.get(),
+            mode=self.mode_var.get(),
+            threshold=self.threshold_entry.get(),
+            smooth=self.smooth_entry.get(),
+            expand=self.expand_entry.get(),
+            alpha=self.alpha_entry.get(),
+            include_subdirectories=self.include_subdirectories_var.get(),
+            preview_mode=self.preview_mode_var.get(),
+        )
+
     def _load_session_settings(self):
-        load_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+        settings_dict = load_window_session_settings(self, self.SESSION_SETTINGS_KEY)
+        if settings_dict:
+            settings = MaskWindowSettings(**settings_dict)
+            self._apply_settings_to_ui(settings)
 
     def _save_session_settings(self):
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+        settings = self._gather_settings_from_ui()
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, settings.__dict__)
 
     def destroy(self):
         self._save_session_settings()
         super().destroy()
 
+    def _add_labeled_entry(self, row, label, default="", width=200, placeholder=None, tooltip=None):
+        """
+        Adds a labeled entry field to the UI at the specified row.
+
+        Returns:
+            ctk.CTkEntry: The created entry widget.
+        """
+        lbl = ctk.CTkLabel(self.frame, text=label, width=100)
+        lbl.grid(row=row, column=0, sticky="w", padx=5, pady=5)
+        entry = ctk.CTkEntry(self.frame, width=width, placeholder_text=placeholder)
+        entry.insert(0, default)
+        entry.grid(row=row, column=1, sticky="w", padx=5, pady=5)
+        if tooltip:
+            ToolTip(entry, tooltip)
+        return entry
 
     def _setup_window(self, title, geometry):
         self.title(title)
@@ -129,49 +190,60 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
     def _create_mask_options(self):
         # Prompt
-        self.prompt_label = ctk.CTkLabel(self.frame, text="Prompt", width=100)
-        self.prompt_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.prompt_entry = ctk.CTkEntry(self.frame, width=200)
-        self.prompt_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
-        ToolTip(self.prompt_entry, "Enter object to detect (e.g. 'person', 'dog', 'car')")
+        self.prompt_entry = self._add_labeled_entry(
+            row=2,
+            label="Prompt",
+            default="",
+            tooltip="Enter object to detect (e.g. 'person', 'dog', 'car')"
+        )
 
-        # Mode (moved up for better flow)
+        # Mode (special case: dropdown)
         self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
         self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
+        self.mode_dropdown = ctk.CTkOptionMenu(
+            self.frame,
+            variable=self.mode_var,
+            values=self.modes,
+            dynamic_resizing=False,
+            width=200
+        )
         self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
         # Threshold
-        self.threshold_label = ctk.CTkLabel(self.frame, text="Threshold", width=100)
-        self.threshold_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
-        self.threshold_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
-        self.threshold_entry.insert(0, "0.3")
-        self.threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
-        ToolTip(self.threshold_entry, "Confidence threshold: Lower values detect more objects but may include incorrect regions")
+        self.threshold_entry = self._add_labeled_entry(
+            row=4,
+            label="Threshold",
+            default="0.3",
+            placeholder="0.0 - 1.0",
+            tooltip="Confidence threshold: Lower values detect more objects but may include incorrect regions"
+        )
 
-        # Smooth - Changed default to 0 since SAM2 has built-in smoothing
-        self.smooth_label = ctk.CTkLabel(self.frame, text="Smooth", width=100)
-        self.smooth_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
-        self.smooth_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0-10")
-        self.smooth_entry.insert(0, "0")  # Changed default to 0
-        self.smooth_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
-        ToolTip(self.smooth_entry, "Additional smoothing (0=use built-in smoothing, higher values for extra smoothing)")
+        # Smooth
+        self.smooth_entry = self._add_labeled_entry(
+            row=5,
+            label="Smooth",
+            default="0",
+            placeholder="0-10",
+            tooltip="Additional smoothing (0=use built-in smoothing, higher values for extra smoothing)"
+        )
 
         # Expand
-        self.expand_label = ctk.CTkLabel(self.frame, text="Expand", width=100)
-        self.expand_label.grid(row=6, column=0, sticky="w", padx=5, pady=5)
-        self.expand_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0-20")
-        self.expand_entry.insert(0, "10")
-        self.expand_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
-        ToolTip(self.expand_entry, "Expansion pixels: Expands mask boundaries outward")
+        self.expand_entry = self._add_labeled_entry(
+            row=6,
+            label="Expand",
+            default="10",
+            placeholder="0-20",
+            tooltip="Expansion pixels: Expands mask boundaries outward"
+        )
 
         # Alpha
-        self.alpha_label = ctk.CTkLabel(self.frame, text="Alpha", width=100)
-        self.alpha_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
-        self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
-        self.alpha_entry.insert(0, "1")
-        self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
-        ToolTip(self.alpha_entry, "Blending strength when combining with existing masks")
+        self.alpha_entry = self._add_labeled_entry(
+            row=7,
+            label="Alpha",
+            default="1",
+            placeholder="0.0 - 1.0",
+            tooltip="Blending strength when combining with existing masks"
+        )
 
     def _create_subdirectory_option(self, include_subdirectories):
         self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subdirs", width=100)
@@ -198,13 +270,30 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
         self.create_masks_button.grid(row=11, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
+    def validate_inputs(self) -> tuple[bool, str]:
+        """Validate all user inputs. Returns (is_valid, error_message)."""
+        try:
+            if not 0 <= (_threshold := float(self.threshold_entry.get())) <= 0.90:
+                return False, "Threshold must be between 0.0 and 0.9 for usable results"
+            if not 0 <= (_smooth_pixels := int(self.smooth_entry.get())) <= 10:
+                return False, "Smooth pixels should be between 0 and 10"
+            if not 0 <= (_expand_pixels := int(self.expand_entry.get())) <= 64:
+                return False, "Expand pixels should be between 0 and 64"
+            if not 0 <= (_alpha := float(self.alpha_entry.get())) <= 1:
+                return False, "Alpha must be between 0.0 and 1.0"
+            if not (_prompt := self.prompt_entry.get().strip()):
+                return False, "Please enter a detection prompt"
+            if not (_path := Path(self.path_entry.get())).is_dir():
+                return False, "Please select a valid folder"
+            return True, ""
+        except ValueError as e:
+            logger.exception("Validation error")
+            return False, f"Invalid input: {e}"
+
     def browse_for_path(self, entry_box):
-        # get the path from the user
         path = filedialog.askdirectory()
-        # set the path to the entry box
-        # delete entry box text
         entry_box.focus_set()
-        entry_box.delete(0, END)  # Using proper END constant
+        entry_box.delete(0, END)
         entry_box.insert(0, path)
         self.focus_set()
 
@@ -215,43 +304,53 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.progress.update()
 
     def create_masks(self):
-        try:
-            threshold = float(self.threshold_entry.get())
-            if not 0 <= threshold <= 0.90:
-                messagebox.showwarning("Invalid Value", "Threshold must be between 0.0 and 0.9 for usable results")
-                return
-
-            smooth_pixels = int(self.smooth_entry.get())
-            if smooth_pixels < 0 or smooth_pixels > 10:
-                messagebox.showwarning("Invalid Value", "Smooth pixels should be between 0 and 10")
-                return
-
-            expand_pixels = int(self.expand_entry.get())
-            if expand_pixels < 0 or expand_pixels > 64:
-                messagebox.showwarning("Invalid Value", "Expand pixels should be between 0 and 64")
-                return
-
-            alpha = float(self.alpha_entry.get())
-            if not 0 <= alpha <= 1:
-                messagebox.showwarning("Invalid Value", "Alpha must be between 0.0 and 1.0")
-                return
-
-            # Check for empty prompt
-            prompt = self.prompt_entry.get().strip()
-            if not prompt:
-                messagebox.showwarning("Invalid Input", "Please enter a detection prompt")
-                return
-        except ValueError:
-            messagebox.showerror("Invalid Input", "Please enter valid numeric values for threshold, smooth, expand, and alpha")
+        is_valid, error = self.validate_inputs()
+        if not is_valid:
+            messagebox.showwarning("Invalid Input", error)
             return
 
-        # Disable the create button to prevent multiple clicks
         self.create_masks_button.configure(state="disabled", text="Processing...")
+        try:
+            # Submit the task to the executor
+            future = self._executor.submit(self._run_masking_process,
+                self.prompt_entry.get(),
+                float(self.alpha_entry.get()),
+                float(self.threshold_entry.get()),
+                int(self.smooth_entry.get()),
+                int(self.expand_entry.get())
+            )
+            # Schedule a callback to handle completion/errors
+            self.after(100, lambda: self._check_future(future))
+        except Exception as e:
+            logger.exception("Failed to start masking thread")
+            self.create_masks_button.configure(state="normal", text="Create Masks")
+            messagebox.showerror("Thread Error", str(e))
 
-        # Run the masking process in a background thread
-        thread = threading.Thread(target=self._run_masking_process, args=(prompt, alpha, threshold, smooth_pixels, expand_pixels))
-        thread.daemon = True  # Thread will close when main application closes
-        thread.start()
+    def _check_future(self, future):
+        if future.done():
+            exc = future.exception()
+            if exc:
+                logger.exception("Error in masking process", exc_info=exc)
+                self.create_masks_button.configure(state="normal", text="Create Masks")
+                messagebox.showerror("Processing Error", f"An error occurred during mask creation:\n{exc}")
+            # else: success is handled by _run_masking_process/_update_ui_after_processing
+        else:
+            # Not done yet, check again after 100ms
+            self.after(100, lambda: self._check_future(future))
+
+    def get_mode(self, mode_str: str) -> str:
+        mode_map = {
+            "Replace all masks": "replace",
+            "Create if absent": "fill",
+            "Add to existing": "add",
+            "Subtract from existing": "subtract",
+            "Blend with existing": "blend",
+        }
+        try:
+            return mode_map[mode_str]
+        except ValueError as e:
+            logger.exception("Validation error")
+            raise RuntimeError(f"Invalid input: {e}") from e
 
     def _run_masking_process(self, prompt, alpha, threshold, smooth_pixels, expand_pixels):
         try:
@@ -269,13 +368,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
                 if masking_model.__class__.__name__ == "SAMdreamMaskModel":
                     masking_model.model_manager = self.parent.model_manager
 
-            mode = {
-                "Replace all masks": "replace",
-                "Create if absent": "fill",
-                "Add to existing": "add",
-                "Subtract from existing": "subtract",
-                "Blend with existing": "blend",
-            }[self.mode_var.get()]
+            mode = self.get_mode(self.mode_var.get())
 
             # Check if preview mode is enabled
             if self.preview_mode_var.get() and hasattr(self.parent, "current_image_index"):

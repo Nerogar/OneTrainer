@@ -7,7 +7,6 @@ from pathlib import Path
 from tkinter import EventType
 from typing import Any
 
-import customtkinter as ctk
 from customtkinter import CTk, CTkToplevel
 
 logger = logging.getLogger(__name__)
@@ -103,124 +102,47 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
     except Exception as e:
         print(f"Failed to set window icon: {e}")
 
-def _safe_set_widget_value(var_or_entry: Any, value: Any, default_value: Any = None) -> None:
-    """
-    Helper to safely set the value of a CTk widget (StringVar, BooleanVar, CTkEntry).
-    """
-    if value is None and default_value is not None:
-        value = default_value
-    if value is None:  # Still None, skip
-        return
-
-    if isinstance(var_or_entry, (ctk.StringVar | ctk.BooleanVar)):
-        var_or_entry.set(value)
-    elif isinstance(var_or_entry, ctk.CTkEntry):
-        var_or_entry.delete(0, "end")
-        var_or_entry.insert(0, str(value))
-
 def load_window_session_settings(
     window_instance: Any,
     session_settings_key: str,
-    metadata_list: list[tuple[str, str, str, Any]],
 ) -> dict:
     """
-    Loads session settings for a window based on provided metadata.
-    Applies defaults if settings are not found or if specific keys are missing.
+    Loads session settings for a window using the dataclass approach.
 
     Args:
         window_instance: The instance of the CTkToplevel window.
         session_settings_key: The key used to store this window's settings in session_ui_settings.
-        metadata_list: A list of tuples, where each tuple defines a setting:
-                       (setting_key, target_type, target_name, default_value_or_lambda).
-                       target_type can be 'attr' or 'config'.
 
     Returns:
         The dictionary of saved settings that were found (could be empty if none were found).
     """
-    loaded_settings_values = {}
-    apply_defaults_to_all = True
-
     if hasattr(window_instance, "parent") and hasattr(window_instance.parent, "session_ui_settings"):
-        saved_settings_for_window = window_instance.parent.session_ui_settings.get(session_settings_key, {})
-        if saved_settings_for_window:
-            loaded_settings_values = saved_settings_for_window
-            apply_defaults_to_all = False # We found settings, so only apply defaults for missing keys
+        saved_settings = window_instance.parent.session_ui_settings.get(session_settings_key, {})
+        if saved_settings:
             logger.debug(f"Loaded session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
+            return saved_settings
         else:
-            logger.debug(f"No saved session settings found for key '{session_settings_key}' in {window_instance.__class__.__name__}. Applying defaults.")
+            logger.debug(f"No saved session settings found for key '{session_settings_key}' in {window_instance.__class__.__name__}.")
     else:
-        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__}. Applying defaults.")
-
-    for setting_key, target_type, target_name, default_val_or_lambda in metadata_list:
-        target_widget = None
-        if target_type == 'attr':
-            if hasattr(window_instance, target_name):
-                target_widget = getattr(window_instance, target_name)
-        elif target_type == 'config':
-            if hasattr(window_instance, "config_state") and isinstance(window_instance.config_state, dict):
-                target_widget = window_instance.config_state.get(target_name)
-
-        if target_widget:
-            actual_default = default_val_or_lambda
-            if callable(default_val_or_lambda):
-                try:
-                    actual_default = default_val_or_lambda(window_instance)
-                except Exception as e:
-                    logger.error(f"Error calling default lambda for {target_name} in {window_instance.__class__.__name__}: {e}")
-                    actual_default = None
-
-            value_to_set = None
-            if not apply_defaults_to_all and setting_key in loaded_settings_values:
-                value_to_set = loaded_settings_values.get(setting_key)
-                _safe_set_widget_value(target_widget, value_to_set, actual_default)
-            else: # Apply default if applying all defaults or key is missing
-                _safe_set_widget_value(target_widget, None, actual_default) # Pass None to force default application
-        elif target_type in ['attr', 'config']:
-             logger.warning(f"Target widget for setting '{setting_key}' (type: {target_type}, name: {target_name}) not found in {window_instance.__class__.__name__}.")
-
-    return loaded_settings_values
+        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__}.")
+    return {}
 
 def save_window_session_settings(
     window_instance: Any,
     session_settings_key: str,
-    metadata_list: list[tuple[str, str, str, Any]],
-    additional_settings: dict | None = None
+    settings_dict: dict,
 ) -> None:
     """
-    Saves session settings for a window based on provided metadata.
+    Saves session settings for a window using the dataclass approach.
 
     Args:
         window_instance: The instance of the CTkToplevel window.
         session_settings_key: The key used to store this window's settings in session_ui_settings.
-        metadata_list: A list of tuples, where each tuple defines a setting:
-                       (setting_key, target_type, target_name, default_value_or_lambda - not used for saving).
-        additional_settings: An optional dictionary of settings to merge, for special cases.
+        settings_dict: The dictionary of settings to save (from the dataclass).
     """
     if not hasattr(window_instance, "parent") or not hasattr(window_instance.parent, "session_ui_settings"):
         logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__} during save.")
         return
 
-    current_settings_to_save = {}
-    for setting_key, target_type, target_name, _ in metadata_list:
-        value_to_save = None
-        target_widget = None
-
-        if target_type == 'attr':
-            if hasattr(window_instance, target_name):
-                target_widget = getattr(window_instance, target_name)
-        elif target_type == 'config':
-            if hasattr(window_instance, "config_state") and isinstance(window_instance.config_state, dict):
-                target_widget = window_instance.config_state.get(target_name)
-
-        if target_widget:
-            if isinstance(target_widget, (ctk.StringVar | ctk.BooleanVar | ctk.CTkEntry)):
-                value_to_save = target_widget.get()
-            else:
-                logger.warning(f"Unsupported widget type for saving: {type(target_widget)} for setting '{setting_key}' in {window_instance.__class__.__name__}")
-        current_settings_to_save[setting_key] = value_to_save
-
-    if additional_settings:
-        current_settings_to_save.update(additional_settings)
-
-    window_instance.parent.session_ui_settings[session_settings_key] = current_settings_to_save
+    window_instance.parent.session_ui_settings[session_settings_key] = settings_dict
     logger.debug(f"Saved session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
