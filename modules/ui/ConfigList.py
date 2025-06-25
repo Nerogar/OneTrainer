@@ -93,7 +93,7 @@ class ConfigList(metaclass=ABCMeta):
         if self.from_external_file:
             current_config = getattr(self.train_config, self.attr_name)
             try:
-                for (name, file_path) in self.configs:
+                for (_name, file_path) in self.configs:
                     with open(file_path, "r+") as f:
                         loaded_config = json.load(f)
                         for item in loaded_config:
