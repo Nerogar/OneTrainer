@@ -21,7 +21,7 @@ class MoondreamModel(BaseImageCaptionModel):
         self,
         device: torch.device,
         dtype: torch.dtype,
-        model_revision: str = "4f5917588ff780f0ae93c1b15a0e39afa5139b8f", #DO NOT CHANGE. Commit hash has been reviewed.
+        model_revision: str = "200690cab483ff88cef2c68a897df7186e5dd7e0", #DO NOT CHANGE. Commit hash has been reviewed.
         caption_length: str = "normal",
         stream: bool = False, # Default stream value for the model instance
     ):
@@ -63,56 +63,85 @@ class MoondreamModel(BaseImageCaptionModel):
     def generate_caption(
         self,
         caption_sample: CaptionSample,
-        prompt: str,  # Used for interface consistency, Moondream might not use it directly
+        prompt: str,  # Used for query mode, ignored for caption mode
         generation_config: MoondreamGenerationConfig | None = None
     ) -> str:
-        current_caption_length = self.caption_length  # Start with instance default
-        if generation_config and generation_config.get('caption_length') is not None:
-            current_caption_length = generation_config['caption_length']
+        mode = "caption"
+        if generation_config and generation_config.get('mode'):
+            mode = generation_config['mode']
 
         logger.debug(
-            f"MoondreamModel: Generating caption. Effective Length: {current_caption_length}, Stream setting for model call: {self.stream}. "
-            f"Prompt (interface): '{prompt}'"
+            f"MoondreamModel: Generating with mode: {mode}. "
+            f"Prompt: '{prompt}'"
         )
         image = self._get_image(caption_sample)
         if image is None:
-            logger.warning("MoondreamModel: Could not get image from sample, returning empty caption.")
+            logger.warning("MoondreamModel: Could not get image from sample, returning empty string.")
             return ""
 
         try:
             with torch.no_grad():
-                # Call the underlying moondream2 model's caption method
-                model_output_dict = self.model.caption(
-                    image,
-                    length=current_caption_length, # Use effective length
-                    stream=self.stream
-                )
+                final_output: str = ""
+                if mode == "query":
+                    if not hasattr(self.model, 'query'):
+                        logger.error("ERROR: Moondream2 model does not have 'query' method. You may need to update the model version.")
+                        return ""
 
-                raw_caption_content: any
-                if isinstance(model_output_dict, dict):
-                    raw_caption_content = model_output_dict.get("caption", "")
-                else:
-                    logger.warning(f"MoondreamModel: model.caption did not return a dict. Got: {type(model_output_dict)}. Using raw output if string.")
-                    raw_caption_content = str(model_output_dict) if isinstance(model_output_dict, str) else ""
+                    reasoning = False
+                    if generation_config and generation_config.get('reasoning') is not None:
+                        reasoning = generation_config['reasoning']
 
-                # Process the raw caption content
-                assembled_caption: str
-                if hasattr(raw_caption_content, '__iter__') and not isinstance(raw_caption_content, str):
-                    tokens = list(raw_caption_content)  # Fully consume any generator/iterator
-                    assembled_caption = "".join(str(t) for t in tokens)
-                elif isinstance(raw_caption_content, str):
-                    assembled_caption = raw_caption_content
-                else:
-                    assembled_caption = ""
+                    # The prompt for the query comes from the `prompt` argument
+                    answer_dict = self.model.query(
+                        image,
+                        prompt,
+                        reasoning
+                    )
 
-                # Replace all newlines with spaces
-                assembled_caption = assembled_caption.replace("\n", " ")
+                    # The output of query is a dict like {'answer': '...', 'reasoning': '...'} or just a string
+                    if isinstance(answer_dict, dict):
+                        final_output = answer_dict.get("answer", "")
+                    elif isinstance(answer_dict, str):
+                        final_output = answer_dict
+                    else:
+                        final_output = str(answer_dict)
 
-                final_caption = assembled_caption.strip()
-                return final_caption
+                else:  # Default to caption mode
+                    current_caption_length = self.caption_length  # Start with instance default
+                    if generation_config and generation_config.get('caption_length') is not None:
+                        current_caption_length = generation_config['caption_length']
+
+                    # Call the underlying moondream2 model's caption method
+                    model_output_dict = self.model.caption(
+                        image,
+                        length=current_caption_length,  # Use effective length
+                        stream=self.stream
+                    )
+
+                    raw_caption_content: any
+                    if isinstance(model_output_dict, dict):
+                        raw_caption_content = model_output_dict.get("caption", "")
+                    else:
+                        logger.warning(f"MoondreamModel: model.caption did not return a dict. Got: {type(model_output_dict)}. Using raw output if string.")
+                        raw_caption_content = str(model_output_dict) if isinstance(model_output_dict, str) else ""
+
+                    # Process the raw caption content
+                    assembled_caption: str
+                    if hasattr(raw_caption_content, '__iter__') and not isinstance(raw_caption_content, str):
+                        tokens = list(raw_caption_content)  # Fully consume any generator/iterator
+                        assembled_caption = "".join(str(t) for t in tokens)
+                    elif isinstance(raw_caption_content, str):
+                        assembled_caption = raw_caption_content
+                    else:
+                        assembled_caption = ""
+                    final_output = assembled_caption
+
+                # Common post-processing for both modes
+                final_output = final_output.replace("\n", " ").strip()
+                return final_output
 
         except Exception as e:
-            logger.error(f"ERROR in MoondreamModel.generate_caption: {str(e)}")
+            logger.error(f"ERROR in MoondreamModel processing mode '{mode}': {str(e)}")
             traceback.print_exc()
             return ""
 
@@ -173,3 +202,48 @@ class MoondreamModel(BaseImageCaptionModel):
             logger.error(f"ERROR in model.detect: {str(e)}")
             traceback.print_exc()
             return {"objects": []}
+
+    def generate_query(
+            self,
+            caption_sample: CaptionSample,
+            prompt: str,
+            reasoning: bool = False
+        ) -> str:
+            """
+            Ask a question about the image, with optional reasoning.
+
+            Args:
+                caption_sample (CaptionSample): The sample containing the image.
+                prompt (str): The question to ask about the image.
+                reasoning (bool): Whether to generate reasoning for the answer.
+
+            Returns:
+                str: The answer to the question.
+            """
+            logger.debug(f"MoondreamModel: Generating query response for prompt: '{prompt}', Reasoning: {reasoning}")
+            image = self._get_image(caption_sample)
+            if image is None:
+                logger.warning("MoondreamModel: Could not get image from sample, returning empty response.")
+                return ""
+
+            if not hasattr(self.model, 'query'):
+                logger.error("ERROR: Moondream2 model does not have 'query' method. You may need to update the model version.")
+                return ""
+
+            try:
+                with torch.no_grad():
+                    answer = self.model.query(
+                        image,
+                        prompt,
+                        reasoning
+                    )
+
+                    # The output format may vary based on the model version and `reasoning` flag.
+                    # This implementation converts the output to a string.
+                    final_answer = str(answer).strip()
+                    return final_answer
+
+            except Exception as e:
+                logger.error(f"ERROR in MoondreamModel.generate_query: {str(e)}")
+                traceback.print_exc()
+                return ""

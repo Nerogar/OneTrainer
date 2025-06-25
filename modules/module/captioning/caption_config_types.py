@@ -13,6 +13,8 @@ class JoyCaptionGenerationConfig(BaseGenerationConfig):
 
 class MoondreamGenerationConfig(BaseGenerationConfig):
     caption_length: NotRequired[str]
+    mode: NotRequired[str]
+    reasoning: NotRequired[bool]
 
 
 class WDGenerationConfig(BaseGenerationConfig):

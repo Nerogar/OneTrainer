@@ -73,6 +73,9 @@ class CaptionWindowSettings:
     joy_rep_penalty: str = "1.2"
     joy_gpu_index: str = "0"
     joy_extra_options: dict = None
+    moondream_mode: str = "caption"
+    moondream_reasoning: bool = False
+
 
 class GenerateCaptionsWindow(ctk.CTkToplevel):
     # Standard UI configuration constants
@@ -136,6 +139,9 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             "Add as new line": "add",
         }
         self.config_state["mode_var"] = ctk.StringVar(self, "Create if absent")
+
+        self.moondream_mode_var = ctk.StringVar(self, "caption")
+        self.moondream_reasoning_var = ctk.BooleanVar(self, False)
 
         self.config_state["caption_lengths"] = ["short", "normal", "long"]
         self.config_state["caption_length_var"] = ctk.StringVar(self, "normal")
@@ -272,8 +278,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self._configure_standard_frame(self.threshold_frame)
         self._configure_standard_frame(self.moondream_options_frame)
         self._configure_standard_frame(self.joycaption_options_frame)
-        self._configure_standard_frame(self.joy_advanced_toggle_frame) # Configure new frame
-        self._configure_standard_frame(self.joy_advanced_options_frame) # Configure new frame
+        self._configure_standard_frame(self.joy_advanced_toggle_frame)
+        self._configure_standard_frame(self.joy_advanced_options_frame)
 
         # Now build each section
         self._create_basic_options(path)
@@ -282,8 +288,8 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self._create_threshold_configuration()
         self._create_moondream_configuration()
         self._create_additional_options(include_subdirectories)
-        self._create_joycaption_advanced_toggle() # New
-        self._create_joycaption_advanced_options() # New
+        self._create_joycaption_advanced_toggle()
+        self._create_joycaption_advanced_options()
         self._create_progress_indicators()
         self._create_action_buttons()
 
@@ -700,23 +706,70 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
     # ─── Moondream2 configuration ─────────────────────────────────────
     def _create_moondream_configuration(self) -> None:
-        # Caption length dropdown (short vs. normal)
-        self.caption_length_label = ctk.CTkLabel(
-            self.moondream_options_frame, text="Caption Length", anchor="w"
+        # Mode dropdown (Caption vs. Query)
+        self.moondream_mode_dropdown = ctk.CTkOptionMenu(
+            self.moondream_options_frame,
+            variable=self.moondream_mode_var,
+            values=["caption", "tags"],
+            dynamic_resizing=False,
+            width=120,
         )
-        self.caption_length_label.grid(row=0, column=0, **self.LABEL_GRID)
+        self._create_labeled_widget(self.moondream_options_frame, "Mode", self.moondream_mode_dropdown, row=0)
+        self.moondream_mode_var.trace_add("write", lambda *args: self._update_moondream_sub_options())
+
+        # --- Caption Length Frame (conditionally visible) ---
+        self.moondream_caption_length_frame = ctk.CTkFrame(self.moondream_options_frame, fg_color="transparent")
+        self.moondream_caption_length_frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self._configure_standard_frame(self.moondream_caption_length_frame)
 
         self.caption_length_dropdown = ctk.CTkOptionMenu(
-            self.moondream_options_frame,
+            self.moondream_caption_length_frame,
             variable=self.config_state["caption_length_var"],
             values=self.config_state["caption_lengths"],
             dynamic_resizing=False,
             width=120,
         )
-        self.caption_length_dropdown.grid(row=0, column=1, **self.WIDGET_GRID)
+        self._create_labeled_widget(self.moondream_caption_length_frame, "Caption Length", self.caption_length_dropdown, row=0)
 
-        explanation = "Choose 'short' for a brief description or 'normal' for a more detailed caption and 'long' for an even more detailed caption."
-        self._create_explanation_label(self.moondream_options_frame, explanation, row=1)
+        explanation_caption = "Choose 'short' for a brief description, 'normal' for a more detailed caption, or 'long' for the most detail."
+        self._create_explanation_label(self.moondream_caption_length_frame, explanation_caption, row=1)
+
+        # --- Query Reasoning Frame (conditionally visible) ---
+        self.moondream_reasoning_frame = ctk.CTkFrame(self.moondream_options_frame, fg_color="transparent")
+        # This frame is gridded on the same row as the caption length frame; only one will be visible at a time.
+        self.moondream_reasoning_frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self._configure_standard_frame(self.moondream_reasoning_frame)
+
+        self.moondream_reasoning_checkbox = ctk.CTkCheckBox(
+            self.moondream_reasoning_frame,
+            text="Generate reasoning for the answer",
+            variable=self.moondream_reasoning_var,
+        )
+        # Place checkbox in column 1 to align with other widgets, but let it align left within that column
+        self.moondream_reasoning_checkbox.grid(row=0, column=1, sticky="w", **{k: v for k, v in self.WIDGET_GRID.items() if k != 'sticky'})
+
+
+        # Initial update to set correct visibility
+        self._update_moondream_sub_options()
+
+    def _update_moondream_sub_options(self, *args: Any) -> None:
+        """Shows/hides Moondream's sub-options based on the selected mode (caption/tags)."""
+        if not hasattr(self, 'moondream_mode_var'): # Guard against calls during init
+            return
+
+        mode = self.moondream_mode_var.get()
+        is_caption_mode = mode == "caption"
+
+        if is_caption_mode:
+            self.moondream_caption_length_frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+        else: # This handles 'tags' mode
+            self.moondream_caption_length_frame.grid_remove()
+
+        # The reasoning checkbox was for the old query mode and is not used for caption or tags mode.
+        self.moondream_reasoning_frame.grid_remove()
+
+        # Update visibility of the main prompt entry, which depends on the mode
+        self._update_initial_caption_visibility()
 
     # ─── “Include subfolders” switch ───────────────────────────────────────────
     def _create_additional_options(self, include_subdirectories: bool) -> None:
@@ -859,6 +912,29 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
                 self._is_joytag_model(model_name) or
                 self._is_booru_model(model_name))
 
+    def _update_initial_caption_visibility(self, *args: Any) -> None:
+        """Controls visibility and labeling of the 'Initial Caption' field."""
+        if not hasattr(self, 'config_state'): # Guard against calls during init
+            return
+
+        model = self.config_state["model_var"].get()
+        is_blip = self._is_blip_model(model)
+        # The free-form query mode for moondream is replaced by a fixed 'tags' mode, which doesn't need user input.
+
+        if hasattr(self, 'initial_caption_label') and hasattr(self, 'caption_entry'):
+            if is_blip:
+                self.initial_caption_label.grid(row=0, column=0, **self.LABEL_GRID)
+                self.caption_entry.grid(row=0, column=1, **self.WIDGET_GRID)
+                self.caption_entry.configure(state="normal")
+                self.initial_caption_label.configure(text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"])
+
+                self.initial_caption_label.configure(text="Initial Caption")
+                self.caption_entry.configure(placeholder_text="e.g., a photo of a woman")
+            else:
+                self.initial_caption_label.grid_remove()
+                self.caption_entry.grid_remove()
+                self.caption_entry.delete(0, "end")
+
     # ─── Show/hide Booru, Moondream, JoyCaption frames ────────────────────────────
     def _update_model_specific_options(self, *args: Any) -> None:
         """Update which option frames are visible and UI state based on the selected model."""
@@ -866,16 +942,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         is_joy_model_selected = self._is_joycaption_model(model)
 
         # Update Initial Caption field state
-        if hasattr(self, 'initial_caption_label') and hasattr(self, 'caption_entry'):
-            if self._is_blip_model(model):
-                self.initial_caption_label.grid(row=0, column=0, **self.LABEL_GRID)
-                self.caption_entry.grid(row=0, column=1, **self.WIDGET_GRID)
-                self.initial_caption_label.configure(text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"])
-                self.caption_entry.configure(state="normal", placeholder_text="")
-            else:
-                self.initial_caption_label.grid_remove()
-                self.caption_entry.grid_remove()
-                self.caption_entry.delete(0, "end")
+        self._update_initial_caption_visibility()
 
         # Update Prefix/Suffix fields state based on JoyCaption
         is_joy = self._is_joycaption_model(model)
@@ -957,12 +1024,13 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
 
         # 2) Moondream frame
         is_moondream = self._is_moondream_model(model)
-        moondream_height_change = 70
+        moondream_height_change = 100
         if is_moondream:
             if not self._moondream_options_visible:
                 new_height += moondream_height_change
             self.moondream_options_frame.grid(row=current_main_frame_row, column=0, columnspan=2, sticky="ew", pady=self.DEFAULT_PADY)
             self._moondream_options_visible = True
+            self._update_moondream_sub_options()
             current_main_frame_row += 1
         else:
             if self._moondream_options_visible:
@@ -1147,13 +1215,42 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             generation_config_data = WDGenerationConfig() # Empty config for WD
 
         elif self._is_moondream_model(model_name):
-            caption_length = self.config_state["caption_length_var"].get()
-            if caption_length not in self.config_state["caption_lengths"]:
-                self._show_error("Invalid caption length", f"Caption length must be one of: {', '.join(self.config_state['caption_lengths'])}")
+            model_init_params = {"stream": False}
+            moondream_mode = self.moondream_mode_var.get()
+
+            if moondream_mode == "caption":
+                caption_length = self.config_state["caption_length_var"].get()
+                if caption_length not in self.config_state["caption_lengths"]:
+                    self._show_error("Invalid caption length", f"Caption length must be one of: {', '.join(self.config_state['caption_lengths'])}")
+                    return
+                generation_config_data = MoondreamGenerationConfig(
+                    caption_length=caption_length,
+                    mode="caption"
+                )
+                prompt_text_for_model = "" # Moondream handles caption prompt internally
+
+            elif moondream_mode == "tags":
+                # This mode uses the query functionality with a hardcoded prompt to generate tags.
+                prompt_text_for_model = "List all visible objects, features, and characteristics of this image. Return the result as a comma delimited string"
+                # Reasoning is enabled by default to get a better list of tags.
+                generation_config_data = MoondreamGenerationConfig(
+                    mode="query", # Internally, this is a query
+                    reasoning=True
+                )
+            # elif moondream_mode == "query":
+            #     prompt_text_for_model = self.caption_entry.get().strip()
+            #     if not prompt_text_for_model:
+            #         self._show_error("Query Missing", "Please enter a question/query for the Moondream model.")
+            #         return
+            #
+            #     reasoning = self.moondream_reasoning_var.get()
+            #     generation_config_data = MoondreamGenerationConfig(
+            #         mode="query",
+            #         reasoning=reasoning
+            #     )
+            else:
+                self._show_error("Internal Error", f"Unknown Moondream mode: {moondream_mode}")
                 return
-            model_init_params = {"stream": False} # Example init param
-            generation_config_data = MoondreamGenerationConfig(caption_length=caption_length)
-            prompt_text_for_model = "" # Moondream handles internally based on caption_length
 
         elif self._is_joycaption_model(model_name):
             # Prefix and suffix are ignored for JoyCaption
