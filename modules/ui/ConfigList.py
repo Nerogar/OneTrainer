@@ -92,8 +92,8 @@ class ConfigList(metaclass=ABCMeta):
     def disable_all(self):
         if self.from_external_file:
             current_config = getattr(self.train_config, self.attr_name)
-            for config_file_name in self.configs:
-                try:
+            try:
+                for config_file_name in self.configs:
                     with open(config_file_name[1], "r+") as f:
                         loaded_config = json.load(f)
                         for item in loaded_config:
@@ -106,9 +106,9 @@ class ConfigList(metaclass=ABCMeta):
                         loaded_config
                     )
                     self.__load_current_config(current_config)
-                except Exception:
-                    traceback.print_exc()
-                    print("Failed to disable all items in all configs")
+            except Exception:
+                traceback.print_exc()
+                print("Failed to disable all items in all configs")
         else:
             for config in self.current_config:
                 setattr(config, self.enabled_attr_name, False)
