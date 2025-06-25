@@ -28,7 +28,7 @@ class CAME8bit(torch.optim.Optimizer):
         clip_threshold (float): threshold of root-mean-square of
             final gradient update (default: 1.0)
         betas (tuple[float, float, float]): coefficient used for computing running averages of
-        update, square gradient and instability (default: (0.9, 0.999, 0.9999)))
+        update, square gradient and instability (default: (0.9, 0.999, 0.9999))
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
         stochastic_rounding: utilize stochastic rounding with BF16 on non-8bit params (default: False)
         min_8bit_size (int) The minimum size of a tensor before it is eligible to be quantized (default: 16384)
