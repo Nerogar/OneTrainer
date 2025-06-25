@@ -21,7 +21,7 @@ class SamplingTab(ConfigList):
             default_config_name="samples.json",
             add_button_text="add sample",
             is_full_width=True,
-            can_disable_all=True
+            show_toggle_all_button=True
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):

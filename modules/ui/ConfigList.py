@@ -24,24 +24,27 @@ class ConfigList(metaclass=ABCMeta):
             ui_state: UIState,
             from_external_file: bool,
             attr_name: str = "",
-            enabled_attr_name: str = "enabled",
+            enable_key: str = "enabled",
             config_dir: str = "",
             default_config_name: str = "",
             add_button_text: str = "",
+            add_button_tooltip: str = "",
             is_full_width: bool = "",
-            can_disable_all: bool = False,
+            show_toggle_all_button: bool = False,
     ):
         self.master = master
         self.train_config = train_config
         self.ui_state = ui_state
         self.from_external_file = from_external_file
         self.attr_name = attr_name
-        self.enabled_attr_name = enabled_attr_name
+        self.enable_key = enable_key
 
         self.config_dir = config_dir
         self.default_config_name = default_config_name
 
         self.is_full_width = is_full_width
+        self.toggle_all_button = None
+        self.is_opening_window = False
 
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(1, weight=1)
@@ -62,20 +65,23 @@ class ConfigList(metaclass=ABCMeta):
             self.__load_current_config(getattr(self.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
-            components.icon_button(self.top_frame, 0, 2, "add config", self.__add_config)
-            components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
+            components.button(self.top_frame, 0, 2, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=30, padx=5)
+            components.button(self.top_frame, 0, 3, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
         else:
             self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
             self.top_frame.grid(row=0, column=0, sticky="nsew")
-            components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
+            components.button(self.top_frame, 0, 3, add_button_text, self.__add_element, width=30, padx=5)
 
             self.current_config = getattr(self.train_config, self.attr_name)
 
             self.element_list = None
             self._create_element_list()
 
-        if can_disable_all:
-            components.icon_button(self.top_frame, 0, 4, "disable all", self.disable_all)
+        if show_toggle_all_button:
+            self.toggle_all_button = components.button(self.top_frame, 0, 4, "", self.toggle_all, tooltip="Disables/Enables all items in all configs", width=30, padx=5)
+            self._update_toggle_all_button_text()
+
+
 
     @abstractmethod
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
@@ -89,30 +95,64 @@ class ConfigList(metaclass=ABCMeta):
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         pass
 
-    def disable_all(self):
+    def _is_any_enabled(self) -> bool:
         if self.from_external_file:
-            current_config = getattr(self.train_config, self.attr_name)
             try:
                 for (_name, file_path) in self.configs:
-                    with open(file_path, "r+") as f:
+                    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                        continue
+                    with open(file_path, "r") as f:
                         loaded_config = json.load(f)
-                        for item in loaded_config:
-                            if isinstance(item, dict):
-                                item[self.enabled_attr_name] = False
-                            else:
-                                setattr(item, self.enabled_attr_name, False)
+                    for item in loaded_config:
+                        if isinstance(item, dict) and item.get(self.enable_key, False):
+                            return True
+            except (OSError):
+                pass
+            except Exception:
+                traceback.print_exc()
+                return False
+        else:
+            for config in self.current_config:
+                if getattr(config, self.enable_key, False):
+                    return True
+        return False
+
+    def _update_toggle_all_button_text(self):
+        if self.toggle_all_button is None:
+            return
+        text = "Disable All" if self._is_any_enabled() else "Enable All"
+        self.toggle_all_button.configure(text=text)
+
+    def toggle_all(self):
+        any_enabled = self._is_any_enabled()
+        new_state = not any_enabled
+
+        if self.from_external_file:
+            current_config_path = getattr(self.train_config, self.attr_name)
+            try:
+                for (_name, file_path) in self.configs:
+                    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                        continue
+                    with open(file_path, "r") as f:
+                        loaded_config = json.load(f)
+                    for item in loaded_config:
+                        if isinstance(item, dict):
+                            item[self.enable_key] = new_state
                     write_json_atomic(
                         file_path,
                         loaded_config
                     )
-                self.__load_current_config(current_config)
             except Exception:
                 traceback.print_exc()
-                print("Failed to disable all items in all configs")
+                print(f"Failed to set all items to {new_state} in all configs")
+            else:
+                self.__load_current_config(current_config_path)
         else:
             for config in self.current_config:
-                setattr(config, self.enabled_attr_name, False)
+                setattr(config, self.enable_key, new_state)
             self._create_element_list()
+
+        self._update_toggle_all_button_text()
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
@@ -121,6 +161,7 @@ class ConfigList(metaclass=ABCMeta):
         self.configs_dropdown = components.options_kv(
             self.top_frame, 0, 1, self.configs, self.ui_state, self.attr_name, self.__load_current_config
         )
+        self._update_toggle_all_button_text()
 
     def _create_element_list(self):
         if not self.from_external_file:
@@ -161,6 +202,7 @@ class ConfigList(metaclass=ABCMeta):
             name = self.default_config_name.removesuffix(".json")
             self.__create_config(name)
             self.save_current_config()
+            self._update_toggle_all_button_text()
 
     def __create_config(self, name: str):
         name = path_util.safe_filename(name)
@@ -209,6 +251,7 @@ class ConfigList(metaclass=ABCMeta):
         widget.place_in_list()
 
         self.save_current_config()
+        self._update_toggle_all_button_text()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
@@ -219,6 +262,7 @@ class ConfigList(metaclass=ABCMeta):
             widget.place_in_list()
 
         self.save_current_config()
+        self._update_toggle_all_button_text()
 
     def __load_current_config(self, filename):
         try:
@@ -233,6 +277,7 @@ class ConfigList(metaclass=ABCMeta):
             self.current_config = []
 
         self._create_element_list()
+        self._update_toggle_all_button_text()
 
     def save_current_config(self):
         if self.from_external_file:
@@ -244,9 +289,17 @@ class ConfigList(metaclass=ABCMeta):
                     getattr(self.train_config, self.attr_name),
                     [element.to_dict() for element in self.current_config]
                 )
+        self._update_toggle_all_button_text()
 
     def __open_element_window(self, i, ui_state):
+        if self.is_opening_window:
+            return
+        self.is_opening_window = True
+
         window = self.open_element_window(i, ui_state)
         self.master.wait_window(window)
         self.widgets[i].configure_element()
         self.save_current_config()
+        self._update_toggle_all_button_text()
+
+        self.is_opening_window = False
