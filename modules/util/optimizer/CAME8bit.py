@@ -257,7 +257,7 @@ class CAME8bit(torch.optim.Optimizer):
 
             # Convert a trimmed tensor back into the original shape
             if res_approx.shape != grad.shape:
-                res_approx = update.view(grad.shape)
+                res_approx = res_approx.view(grad.shape)
 
             update = res_approx.mul_(exp_avg)
         else:
