@@ -16,9 +16,11 @@ class AdditionalEmbeddingsTab(ConfigList):
             train_config,
             ui_state,
             attr_name="additional_embeddings",
+            enabled_attr_name="train",
             from_external_file=False,
             add_button_text="add embedding",
             is_full_width=True,
+            can_disable_all=True
         )
 
     def refresh_ui(self):
