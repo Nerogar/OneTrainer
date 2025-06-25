@@ -102,7 +102,7 @@ class CAME8bit(torch.optim.Optimizer):
     def _quantize_param(params: torch.Tensor, quant_block_size: int):
         # Quantize our values in normalized `quant_block_size`-sized blocks.
         # We shift the range of our data between max/min, so the closer data values
-        # are to each other, the higher precisision our data is. The value of
+        # are to each other, the higher precision our data is. The value of
         # `quant_block_size` should balance space-savings and data precision.
 
         if params.numel() <= 1:
@@ -267,7 +267,7 @@ class CAME8bit(torch.optim.Optimizer):
             update = exp_avg.clone()
 
         # Cautious masking (https://arxiv.org/abs/2411.16085)
-        if self.use_cautious:
+        if group["use_cautious"]:
             mask = (update * grad > 0).to(grad.dtype)
             mask.div_(mask.mean().clamp_(min=1e-3))
             update.mul_(mask)
