@@ -4,8 +4,8 @@
 # Implements the "Memory-Efficient CAME-8bit Optimizer" modifications described in the paper:
 #   "SANA 1.5: Efficient Scaling of Training-Time and Inference-Time Compute in Linear
 #    Diffusion Transformer" (https://arxiv.org/pdf/2501.18427v3)
-#
-
+# Implements cautious masking from "Cautious Optimizers: Improving Training with One Line of Code"
+#    (https://arxiv.org/abs/2411.16085)
 
 from modules.util.bf16_stochastic_rounding import add_stochastic_
 from modules.util.torch_util import torch_gc
@@ -31,6 +31,7 @@ class CAME8bit(torch.optim.Optimizer):
         update, square gradient and instability (default: (0.9, 0.999, 0.9999))
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
         stochastic_rounding: utilize stochastic rounding with BF16 on non-8bit params (default: False)
+        use_cautious: use cautious masking (default: False)
         min_8bit_size (int) The minimum size of a tensor before it is eligible to be quantized (default: 16384)
         quant_block_size (int) The amount of values to quantize into a single block (default: 2048)
     """
@@ -44,6 +45,7 @@ class CAME8bit(torch.optim.Optimizer):
         betas=(0.9, 0.999, 0.9999),
         weight_decay=0.0,
         stochastic_rounding=False,
+        use_cautious=False,
         min_8bit_size=16384,
         quant_block_size=2048,
     ):
@@ -57,6 +59,7 @@ class CAME8bit(torch.optim.Optimizer):
             "betas": betas,
             "weight_decay": weight_decay,
             "stochastic_rounding": stochastic_rounding,
+            "use_cautious": use_cautious,
             "min_8bit_size": min_8bit_size,
             "quant_block_size": quant_block_size,
         }
@@ -263,6 +266,12 @@ class CAME8bit(torch.optim.Optimizer):
         else:
             update = exp_avg.clone()
 
+        # Cautious masking (https://arxiv.org/abs/2411.16085)
+        if self.use_cautious:
+            mask = (update * grad > 0).to(grad.dtype)
+            mask.div_(mask.mean().clamp_(min=1e-3))
+            update.mul_(mask)
+
         # Decay weights if needed
         if group["weight_decay"] > 0:
             if p.dtype == torch.bfloat16 and group["stochastic_rounding"]:
@@ -279,7 +288,6 @@ class CAME8bit(torch.optim.Optimizer):
             add_stochastic_(p.data, -update)
         else:
             p.data.add_(-update)
-
 
     @torch.no_grad()
     def step(self, closure=None):
