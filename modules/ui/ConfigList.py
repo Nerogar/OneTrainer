@@ -105,7 +105,7 @@ class ConfigList(metaclass=ABCMeta):
                         config_file_name[1],
                         loaded_config
                     )
-                    self.__load_current_config(current_config)
+                self.__load_current_config(current_config)
             except Exception:
                 traceback.print_exc()
                 print("Failed to disable all items in all configs")
