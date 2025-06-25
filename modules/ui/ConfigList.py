@@ -90,14 +90,17 @@ class ConfigList(metaclass=ABCMeta):
         pass
 
     def disable_all(self):
-        if (self.from_external_file):
+        if self.from_external_file:
             current_config = getattr(self.train_config, self.attr_name)
             for config_file_name in self.configs:
                 try:
                     with open(config_file_name[1], "r+") as f:
                         loaded_config = json.load(f)
-                        for concept in loaded_config:
-                            concept["enabled"] = False
+                        for item in loaded_config:
+                            if isinstance(item, dict):
+                                item[self.enabled_attr_name] = False
+                            else:
+                                setattr(item, self.enabled_attr_name, False)
                     write_json_atomic(
                         config_file_name[1],
                         loaded_config
