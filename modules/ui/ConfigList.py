@@ -93,8 +93,8 @@ class ConfigList(metaclass=ABCMeta):
         if self.from_external_file:
             current_config = getattr(self.train_config, self.attr_name)
             try:
-                for config_file_name in self.configs:
-                    with open(config_file_name[1], "r+") as f:
+                for (name, file_path) in self.configs:
+                    with open(file_path, "r+") as f:
                         loaded_config = json.load(f)
                         for item in loaded_config:
                             if isinstance(item, dict):
@@ -102,7 +102,7 @@ class ConfigList(metaclass=ABCMeta):
                             else:
                                 setattr(item, self.enabled_attr_name, False)
                     write_json_atomic(
-                        config_file_name[1],
+                        file_path,
                         loaded_config
                     )
                 self.__load_current_config(current_config)
