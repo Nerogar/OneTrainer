@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractmethod
 from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.path_util import write_json_atomic
 from modules.util.ui import components, dialogs
 from modules.util.ui.UIState import UIState
 
@@ -54,19 +55,19 @@ class ConfigList(metaclass=ABCMeta):
             self.element_list = None
 
             self.configs = []
-            self.load_available_config_names()
+            self.__load_available_config_names()
 
             self.current_config = getattr(self.train_config, self.attr_name)
             self.widgets = []
-            self.load_current_config(getattr(self.train_config, self.attr_name))
+            self.__load_current_config(getattr(self.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
             components.icon_button(self.top_frame, 0, 2, "add config", self.__add_config)
-            components.icon_button(self.top_frame, 0, 3, add_button_text, self.add_element)
+            components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
         else:
             self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
             self.top_frame.grid(row=0, column=0, sticky="nsew")
-            components.icon_button(self.top_frame, 0, 3, add_button_text, self.add_element)
+            components.icon_button(self.top_frame, 0, 3, add_button_text, self.__add_element)
 
             self.current_config = getattr(self.train_config, self.attr_name)
 
@@ -97,10 +98,11 @@ class ConfigList(metaclass=ABCMeta):
                         loaded_config = json.load(f)
                         for concept in loaded_config:
                             concept["enabled"] = False
-                        f.seek(0)
-                        f.truncate()
-                        json.dump(loaded_config, f, indent=4)
-                    self.load_current_config(current_config)
+                    write_json_atomic(
+                        config_file_name[1],
+                        loaded_config
+                    )
+                    self.__load_current_config(current_config)
                 except Exception:
                     traceback.print_exc()
                     print("Failed to disable all items in all configs")
@@ -114,7 +116,7 @@ class ConfigList(metaclass=ABCMeta):
             self.configs_dropdown.destroy()
 
         self.configs_dropdown = components.options_kv(
-            self.top_frame, 0, 1, self.configs, self.ui_state, self.attr_name, self.load_current_config
+            self.top_frame, 0, 1, self.configs, self.ui_state, self.attr_name, self.__load_current_config
         )
 
     def _create_element_list(self):
@@ -137,13 +139,13 @@ class ConfigList(metaclass=ABCMeta):
                 self.__open_element_window,
                 self.__remove_element,
                 self.__clone_element,
-                self.__save_current_config
+                self.save_current_config
             )
             self.widgets.append(widget)
 
             widget.place_in_list()
 
-    def load_available_config_names(self):
+    def __load_available_config_names(self):
         if os.path.isdir(self.config_dir):
             for path in os.listdir(self.config_dir):
                 path = path_util.canonical_join(self.config_dir, path)
@@ -155,7 +157,7 @@ class ConfigList(metaclass=ABCMeta):
         if len(self.configs) == 0:
             name = self.default_config_name.removesuffix(".json")
             self.__create_config(name)
-            self.__save_current_config()
+            self.save_current_config()
 
     def __create_config(self, name: str):
         name = path_util.safe_filename(name)
@@ -166,7 +168,7 @@ class ConfigList(metaclass=ABCMeta):
     def __add_config(self):
         dialogs.StringInputDialog(self.master, "name", "Name", self.__create_config)
 
-    def add_element(self):
+    def __add_element(self):
         i = len(self.current_config)
         new_element = self.create_new_element()
 
@@ -176,13 +178,13 @@ class ConfigList(metaclass=ABCMeta):
             self.__open_element_window,
             self.__remove_element,
             self.__clone_element,
-            self.__save_current_config
+            self.save_current_config
         )
         self.widgets.append(widget)
 
         widget.place_in_list()
 
-        self.__save_current_config()
+        self.save_current_config()
 
     def __clone_element(self, clone_i, modify_element_fun=None):
         i = len(self.current_config)
@@ -197,13 +199,13 @@ class ConfigList(metaclass=ABCMeta):
             self.__open_element_window,
             self.__remove_element,
             self.__clone_element,
-            self.__save_current_config
+            self.save_current_config
         )
         self.widgets.append(widget)
 
         widget.place_in_list()
 
-        self.__save_current_config()
+        self.save_current_config()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
@@ -213,9 +215,9 @@ class ConfigList(metaclass=ABCMeta):
             widget.i = i
             widget.place_in_list()
 
-        self.__save_current_config()
+        self.save_current_config()
 
-    def load_current_config(self, filename):
+    def __load_current_config(self, filename):
         try:
             with open(filename, "r") as f:
                 self.current_config = []
@@ -229,20 +231,19 @@ class ConfigList(metaclass=ABCMeta):
 
         self._create_element_list()
 
-    def __save_current_config(self):
+    def save_current_config(self):
         if self.from_external_file:
             with contextlib.suppress(Exception):
                 if not os.path.exists(self.config_dir):
                     os.mkdir(self.config_dir)
 
-                with open(getattr(self.train_config, self.attr_name), "w") as f:
-                    json.dump(
-                        [element.to_dict() for element in self.current_config],
-                        f, indent=4
-                    )
+                write_json_atomic(
+                    getattr(self.train_config, self.attr_name),
+                    [element.to_dict() for element in self.current_config]
+                )
 
     def __open_element_window(self, i, ui_state):
         window = self.open_element_window(i, ui_state)
         self.master.wait_window(window)
         self.widgets[i].configure_element()
-        self.__save_current_config()
+        self.save_current_config()
