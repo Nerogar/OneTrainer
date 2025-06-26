@@ -45,15 +45,10 @@ class Group(TypedDict):
 
 # --- Constants ---
 # Progress increments for sequential renaming and other operations
-PROGRESS_INITIAL: float = 0.05
-PROGRESS_RENAME_TEMP_PHASE_START: float = 0.15
-PROGRESS_RENAME_TEMP_PHASE_RANGE: float = 0.3
-PROGRESS_RENAME_EXEC_PHASE_START: float = 0.45
-PROGRESS_RENAME_EXEC_PHASE_RANGE: float = 0.1
-PROGRESS_RENAME_FINAL_PHASE_START: float = 0.55
-PROGRESS_RENAME_FINAL_PHASE_RANGE: float = 0.4
-PROGRESS_RENAME_FINAL_EXEC_PHASE_START: float = 0.95
-PROGRESS_RENAME_FINAL_EXEC_PHASE_RANGE: float = 0.05
+PROGRESS_RENAME_TEMP_START: float = 0.1
+PROGRESS_RENAME_TEMP_RANGE: float = 0.4
+PROGRESS_RENAME_FINAL_START: float = 0.5
+PROGRESS_RENAME_FINAL_RANGE: float = 0.4
 
 # Megapixel constants
 ONE_MEGAPIXEL: int = 1_048_576
@@ -64,6 +59,8 @@ FUTURE_PROOF_MEGAPIXEL_THRESHOLD: int = 16_777_216
 
 class FileProcessor:
     """Handles the backend file processing operations."""
+
+    __slots__ = ("config_data", "message_queue", "cancel_requested", "max_workers")
 
     def __init__(
         self,
@@ -101,6 +98,79 @@ class FileProcessor:
         new_height = int(original_height * scale_factor)
         return new_width, new_height
 
+    @staticmethod
+    def _filter_is_image(f: Path) -> bool:
+        """Filter for supported image files."""
+        return path_util.is_supported_image_extension(f.suffix)
+
+    @staticmethod
+    def _filter_images_and_skip_masks(f: Path) -> bool:
+        """Filter for supported image files, excluding mask files."""
+        return path_util.is_supported_image_extension(f.suffix) and not f.stem.endswith("-masklabel")
+
+    def _run_parallel_task(
+        self,
+        task_name: str,
+        files: list[Path],
+        worker_func: Callable[[Path], tuple[str, object | None]],
+        summary_func: Callable[[dict[str, int], dict[str, list]], str],
+        progress_callback: Callable[[float, str], None] | None = None,
+        filter_func: Callable[[Path], bool] | None = None,
+    ) -> None:
+        """
+        Generic parallel task executor for image files.
+        Handles filtering, threading, progress, cancellation, and logging.
+        """
+        if filter_func is None:
+            filter_func = self._filter_is_image
+
+        image_files = [f for f in files if filter_func(f)]
+        self._log(f"{task_name}: Found {len(image_files)} files to process.")
+        if not image_files:
+            return
+
+        results = collections.defaultdict(int)
+        extra_data = collections.defaultdict(list)
+        results_lock = threading.Lock()
+        total_files = len(image_files)
+
+        def process_wrapper(file: Path) -> None:
+            if self.cancel_requested():
+                return
+
+            try:
+                status, data = worker_func(file)
+            except Exception as e:
+                self._log(f"Error processing {file.name} during {task_name}: {e}")
+                status, data = "errors", (file.name, str(e))
+
+            with results_lock:
+                results[status] += 1
+                if data is not None:
+                    extra_data[status].append(data)
+
+                processed_count = sum(results.values())
+                if progress_callback:
+                    progress_callback(
+                        processed_count / total_files,
+                        f"{task_name}: {file.name}",
+                    )
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            list(executor.map(process_wrapper, image_files))
+
+        if self.cancel_requested():
+            self._log(f"{task_name} was cancelled.")
+            return
+
+        summary_message = summary_func(results, extra_data)
+        self._log(summary_message)
+
+        if "errors" in extra_data:
+            self._log("Problematic files:")
+            for name, error in extra_data["errors"]:
+                self._log(f"  - {name}: {error}")
+
     def verify_single_image(self, file: Path) -> tuple[bool, str, bool]:
         """
         Verify a single image file for corruption.
@@ -121,83 +191,41 @@ class FileProcessor:
     def verify_images(
         self,
         files: list[Path],
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
+        progress_callback: Callable[[float, str | None], None] | None = None,
     ) -> None:
         """Verify images for corruption using parallel processing."""
         self._log("Starting image verification process...")
-        image_files = [
-            f
-            for f in files
-            if path_util.is_supported_image_extension(f.suffix)
-        ]
-        if not image_files:
-            self._log("No image files found to verify")
-            return
-        self._log(f"Found {len(image_files)} images to verify")
-        results = {"valid": 0, "corrupted": 0, "error_files": []}
-        results_lock = threading.Lock()
-        total_files = len(image_files)
-        processed_count = [0]
 
-        def process_image(idx_file: tuple[int, Path]) -> None:
-            idx, file = idx_file
-            if self.cancel_requested():
-                return
+        def worker(file: Path) -> tuple[str, object | None]:
             try:
-                valid, error_msg, _ = self.verify_single_image(file)
-                with results_lock:
-                    processed_count[0] += 1
-                    progress = processed_count[0] / total_files
-                    if progress_callback:
-                        progress_callback(
-                            progress, f"Verifying image: {file.name}"
-                        )
-                    if valid:
-                        results["valid"] += 1
-                        log_msg = f"✓ {file.name} is valid"
-                    else:
-                        results["corrupted"] += 1
-                        results["error_files"].append(
-                            (file.name, error_msg)
-                        )
-                        log_msg = (
-                            f"✗ {file.name} is CORRUPTED: {error_msg}"
-                        )
-                    self._log(log_msg)
+                with Image.open(file) as img:
+                    img.verify()
+                with Image.open(file) as img:
+                    img.load()
+                    if hasattr(img, "getpixel"):
+                        img.getpixel((0, 0))
+                self._log(f"✓ {file.name} is valid")
+                return "valid", None
             except Exception as e:
-                with results_lock:
-                    processed_count[0] += 1
-                    results["corrupted"] += 1
-                    results["error_files"].append((file.name, str(e)))
-                    self._log(f"! Error verifying {file.name}: {e}")
-                    if progress_callback:
-                        progress_callback(processed_count[0] / total_files)
+                error_msg = str(e)
+                self._log(f"✗ {file.name} is CORRUPTED: {error_msg}")
+                return "errors", (file.name, error_msg)
 
-        try:
-            with ThreadPoolExecutor(
-                max_workers=self.max_workers
-            ) as executor:
-                list(executor.map(process_image, enumerate(image_files)))
-            if results["corrupted"] == 0:
-                self._log(
-                    f"✓ Image verification complete: All {results['valid']} images are valid"
-                )
-            else:
-                self._log(
-                    f"⚠ Image verification complete: {results['valid']} valid, {results['corrupted']} corrupted/problematic"
-                )
-                self._log("Problematic files:")
-                error_types = {}
-                for name, error in results["error_files"]:
-                    self._log(f"  - {name}: {error}")
-                    etype = error.split(":")[0] if ":" in error else error
-                    error_types[etype] = error_types.get(etype, 0) + 1
-                self._log("Error breakdown:")
-                for etype, count in error_types.items():
-                    self._log(f"  - {etype}: {count} files")
-        except Exception as e:
-            self._log(f"Error during parallel image verification: {e}")
+        def summary(results: dict, extra_data: dict) -> str:
+            valid_count = results.get("valid", 0)
+            error_count = results.get("errors", 0)
+            if error_count == 0:
+                return f"✓ Image verification complete: All {valid_count} images are valid"
+
+            return f"⚠ Image verification complete: {valid_count} valid, {error_count} corrupted/problematic"
+
+        self._run_parallel_task(
+            task_name="Image Verification",
+            files=files,
+            worker_func=worker,
+            summary_func=summary,
+            progress_callback=progress_callback,
+        )
 
     def convert_image_format(
         self,
@@ -205,158 +233,73 @@ class FileProcessor:
         target_format: str,
         skip_extensions: set,
         format_options: dict,
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
+        progress_callback: Callable[[float, str | None], None] | None = None,
     ) -> None:
         """Generic image conversion function for multiple formats."""
         self._log(f"Starting conversion to {target_format} format...")
-        format_ext = format_options.get("format_ext", ".unknown")
-        pil_format = format_options.get("pil_format", "")
-        lossless_extensions = format_options.get(
-            "lossless_extensions", set()
-        )
-        is_lossless_check = format_options.get(
-            "is_lossless_check", lambda file, img: False
-        )
+
+        # Use local variables for performance and clarity
+        format_ext = format_options["format_ext"]
+        pil_format = format_options["pil_format"]
+        lossless_extensions = format_options.get("lossless_extensions", set())
+        is_lossless_check = format_options.get("is_lossless_check", lambda f, i: False)
         quality = format_options.get("quality", 90)
+        save_kwargs_base = format_options.get("save_kwargs", {})
 
-        # Filter files to exclude masks (identified by '-' in filename)
-        image_files = [
-            f
-            for f in files
-            if path_util.is_supported_image_extension(f.suffix)
-            and f.suffix.lower() not in skip_extensions
-            and "-" not in f.stem  # Skip mask files
-        ]
-
-        if not image_files:
-            self._log(
-                f"No suitable image files found to convert to {target_format}"
+        def file_filter(f: Path) -> bool:
+            return (
+                path_util.is_supported_image_extension(f.suffix)
+                and f.suffix.lower() not in skip_extensions
+                and "-" not in f.stem  # Skip mask files
             )
-            return
 
-        self._log(
-            f"Found {len(image_files)} images to convert to {target_format}"
-        )
-        results = {
-            "success": 0,
-            "skipped": 0,
-            "errors": 0,
-            "total_bytes_saved": 0,
-        }
-        results_lock = threading.Lock()
-        total_files = len(image_files)
-        processed_count = [0]
+        def worker(file: Path) -> tuple[str, object | None]:
+            original_size = file.stat().st_size
+            new_path = file.with_suffix(format_ext)
 
-        def process_image(idx_file: tuple[int, Path]) -> None:
-            idx, file = idx_file
-            if self.cancel_requested():
-                return
-            try:
-                original_size = file.stat().st_size
-                new_path = file.with_suffix(format_ext)
-                with results_lock:
-                    processed_count[0] += 1
-                    if progress_callback:
-                        progress_callback(
-                            processed_count[0] / total_files,
-                            f"Converting to {target_format}: {file.name}",
-                        )
-                with Image.open(file) as img:
-                    is_lossless = (
-                        file.suffix.lower() in lossless_extensions
-                    )
-                    is_lossless = (
-                        is_lossless_check(file, img) or is_lossless
-                    )
-                    save_kwargs = {"quality": quality}
-                    if is_lossless:
-                        save_kwargs["lossless"] = True
-                        self._log(
-                            f"Converting {file.name} to {target_format} using lossless encoding"
-                        )
-                    else:
-                        self._log(
-                            f"Converting {file.name} to {target_format} using {quality}% quality"
-                        )
-                    save_kwargs.update(
-                        format_options.get("save_kwargs", {})
-                    )
-                    img.save(new_path, pil_format, **save_kwargs)
-                if new_path.exists():
-                    new_size = new_path.stat().st_size
-                    bytes_saved = original_size - new_size
-                    percent_saved = (
-                        (bytes_saved / original_size) * 100
-                        if original_size > 0
-                        else 0
-                    )
-                    if new_size < original_size:
-                        file.unlink()
-                        self._log(
-                            f"Converted {file.name} to {target_format}: "
-                            f"{bytes_saved:,} bytes saved ({percent_saved:.1f}%)"
-                        )
-                        with results_lock:
-                            results["success"] += 1
-                            results["total_bytes_saved"] += bytes_saved
-                    else:
-                        new_path.unlink()
-                        self._log(
-                            f"Skipped {file.name}: {target_format} version would be "
-                            f"larger by {-bytes_saved:,} bytes"
-                        )
-                        with results_lock:
-                            results["skipped"] += 1
-            except Exception as e:
-                self._log(
-                    f"Error converting {file.name} to {target_format}: {e}"
-                )
-                if "new_path" in locals() and new_path.exists():
-                    with contextlib.suppress(
-                        FileNotFoundError, PermissionError
-                    ):
-                        new_path.unlink()
-                with results_lock:
-                    results["errors"] += 1
-                    processed_count[0] += 1
-                    if progress_callback:
-                        progress_callback(processed_count[0] / total_files)
+            with Image.open(file) as img:
+                is_lossless = file.suffix.lower() in lossless_extensions or is_lossless_check(file, img)
 
-        try:
-            with ThreadPoolExecutor(
-                max_workers=self.max_workers
-            ) as executor:
-                list(executor.map(process_image, enumerate(image_files)))
-            if results["success"] > 0:
-                avg_saving = (
-                    results["total_bytes_saved"] / results["success"]
-                )
-                self._log(
-                    f"Completed {target_format} conversion: "
-                    f"{results['success']} of {total_files} images converted"
-                )
-                self._log(
-                    f"Total bytes saved: {results['total_bytes_saved']:,} "
-                    f"(avg: {avg_saving:,.1f} per file)"
-                )
-                if results["skipped"] > 0:
-                    self._log(
-                        f"Skipped {results['skipped']} images where "
-                        f"{target_format} would be larger"
-                    )
+                save_kwargs = save_kwargs_base.copy()
+                save_kwargs["quality"] = quality
+                if is_lossless:
+                    save_kwargs["lossless"] = True
+
+                img.save(new_path, pil_format, **save_kwargs)
+
+            if not new_path.exists():
+                return "errors", (file.name, "Failed to save new file.")
+
+            new_size = new_path.stat().st_size
+            bytes_saved = original_size - new_size
+
+            if new_size < original_size:
+                file.unlink()
+                self._log(f"Converted {file.name} to {target_format}: {bytes_saved:,} bytes saved")
+                return "success", bytes_saved
             else:
-                self._log(
-                    f"{target_format} conversion completed with 0 successful conversions"
-                )
-            if results["errors"] > 0:
-                self._log(
-                    f"Encountered {results['errors']} errors during conversion"
-                )
-        except Exception as e:
-            self._log(
-                f"Error during parallel {target_format} conversion: {e}"
-            )
+                new_path.unlink()
+                self._log(f"Skipped {file.name}: {target_format} version would be larger.")
+                return "skipped", None
+
+        def summary(results: dict, extra_data: dict) -> str:
+            success_count = results.get("success", 0)
+            total_bytes_saved = sum(extra_data.get("success", []))
+
+            msg = f"Completed {target_format} conversion: {success_count} converted, {results.get('skipped', 0)} skipped, {results.get('errors', 0)} errors."
+            if success_count > 0:
+                avg_saving = total_bytes_saved / success_count
+                msg += f"\nTotal bytes saved: {total_bytes_saved:,} (avg: {avg_saving:,.1f} per file)"
+            return msg
+
+        self._run_parallel_task(
+            task_name=f"Convert to {target_format}",
+            files=files,
+            worker_func=worker,
+            summary_func=summary,
+            progress_callback=progress_callback,
+            filter_func=file_filter,
+        )
 
     def convert_to_webp(
         self,
@@ -425,28 +368,25 @@ class FileProcessor:
 
         self._log("Starting sequential file renaming…")
 
-        # collect images
-        image_files = [
-            f
-            for f in files
-            if path_util.is_supported_image_extension(f.suffix)
-            and not f.stem.endswith("-masklabel")
-        ]
-        image_stem_map = {f.stem: f for f in image_files}
-
-        file_groups: dict[Path, Group] = defaultdict(lambda: {"caption": None, "masks": []})
+        # --- Refactored file grouping (single pass) ---
+        groups = defaultdict(lambda: {"image": None, "caption": None, "masks": []})
         for f in files:
-            if f in image_stem_map.values():
-                continue
-            if f.suffix.lower() == ".txt" and f.stem in image_stem_map:
-                file_groups[image_stem_map[f.stem]]["caption"] = f
-            elif f.stem.endswith("-masklabel"):
-                base = f.stem[: -len("-masklabel")]
-                if base in image_stem_map:
-                    file_groups[image_stem_map[base]]["masks"].append((f, "masklabel"))
+            stem = f.stem
+            # Use removesuffix (Python 3.9+) for cleaner logic
+            if stem.endswith("-masklabel"):
+                base_stem = stem.removesuffix("-masklabel")
+                groups[base_stem]["masks"].append((f, "masklabel"))
+            elif path_util.is_supported_image_extension(f.suffix):
+                groups[stem]["image"] = f
+            elif f.suffix.lower() == ".txt":
+                groups[stem]["caption"] = f
+
+        # Filter for groups that actually have an image file and get the image paths
+        image_groups = {stem: data for stem, data in groups.items() if data.get("image")}
+        image_files = [data["image"] for data in image_groups.values()]
 
         self._log(
-            f"Found {len(image_files)} images and {sum(bool(v['caption']) or v['masks'] for v in file_groups.values())} groups"
+            f"Found {len(image_files)} images and their associated files to rename."
         )
 
         sorted_imgs = sorted(image_files, key=lambda p: p.name)
@@ -471,9 +411,9 @@ class FileProcessor:
             fin = img.with_name(f"{i}{img.suffix}")
             rename_plan.append((img, tmp, fin))
 
-            grp = file_groups.get(img)
+            grp = image_groups.get(img.stem)
             if grp:
-                if (cap := grp["caption"]) is not None:
+                if (cap := grp.get("caption")) is not None:
                     rename_plan.append(
                         (
                             cap,
@@ -481,7 +421,7 @@ class FileProcessor:
                             cap.with_name(f"{i}.txt"),
                         )
                     )
-                for m, label in grp["masks"]:
+                for m, label in grp.get("masks", []):
                     rename_plan.append(
                         (
                             m,
@@ -495,11 +435,12 @@ class FileProcessor:
         total = len(rename_plan)
         for idx, (orig, tmp, _) in enumerate(rename_plan):
             progress_callback and progress_callback(
-                0.1 + 0.4 * idx / total, f"Temp rename: {orig.name}"
+                PROGRESS_RENAME_TEMP_START + PROGRESS_RENAME_TEMP_RANGE * idx / total,
+                f"Temp rename: {orig.name}",
             )
             if _safe_rename(orig, tmp):
                 succeeded.append((orig, tmp))
-            else:  # rollback every successful temp
+            else:   # rollback every successful temp
                 for o, t in reversed(succeeded):
                     _safe_rename(t, o)
                 progress_callback and progress_callback(1.0, "Rename failed, rolled back.")
@@ -509,7 +450,8 @@ class FileProcessor:
         final_imgs: list[Path] = []
         for idx, (_, tmp, fin) in enumerate(rename_plan):
             progress_callback and progress_callback(
-                0.5 + 0.4 * idx / total, f"Final rename: {tmp.name}"
+                PROGRESS_RENAME_FINAL_START + PROGRESS_RENAME_FINAL_RANGE * idx / total,
+                f"Final rename: {tmp.name}",
             )
             if _safe_rename(tmp, fin):
                 if path_util.is_supported_image_extension(fin.suffix) and not fin.stem.endswith("-masklabel"):
@@ -519,93 +461,27 @@ class FileProcessor:
         self._log(f"Sequential renaming complete: {len(final_imgs)} images renamed.")
         return sorted(final_imgs, key=lambda p: int(p.stem))
 
-    def _execute_parallel_image_task(
-        self,
-        task_name: str,
-        files: list[Path],
-        worker_func: Callable[[Path, threading.Lock, dict], None],
-        summary_func: Callable[[dict], str],
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
-    ) -> None:
-        """
-        Executes a parallel image processing task, handling threading, progress, and logging.
-        """
-        image_files = [
-            f
-            for f in files
-            if path_util.is_supported_image_extension(f.suffix)
-            and not f.stem.endswith("-masklabel")
-        ]
-        self._log(
-            f"Found {len(image_files)} image files to process for {task_name}"
-        )
-
-        if not image_files:
-            self._log(f"No suitable image files found for {task_name}.")
-            return
-
-        results = collections.defaultdict(int)
-        results_lock = threading.Lock()
-        total_files = len(image_files)
-        processed_count = [0]
-
-        def process_wrapper(file: Path) -> None:
-            if self.cancel_requested():
-                return
-
-            try:
-                worker_func(file, results_lock, results)
-            except Exception as e:
-                self._log(
-                    f"Error processing {file.name} during {task_name}: {e}"
-                )
-                with results_lock:
-                    results["errors"] += 1
-            finally:
-                with results_lock:
-                    processed_count[0] += 1
-                if progress_callback:
-                    progress_callback(
-                        processed_count[0] / total_files,
-                        f"{task_name}: {file.name}",
-                    )
-
-        try:
-            with ThreadPoolExecutor(
-                max_workers=self.max_workers
-            ) as executor:
-                list(executor.map(process_wrapper, image_files))
-
-            summary_message = summary_func(results)
-            self._log(summary_message)
-
-        except Exception as e:
-            self._log(f"Error during parallel {task_name}: {e}")
-
     def resize_large_images(
         self,
         files: list[Path],
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
+        progress_callback: Callable[[float, str | None], None] | None = None,
     ) -> None:
         """Resize images larger than the defined threshold using a PIL-based pipeline."""
+        cfg = self.config_data
         megapixels_map = {
             "1MP": ONE_MEGAPIXEL,
             "Compute Proof (4MP)": COMPUTE_PROOF_MEGAPIXEL_THRESHOLD,
             "Middleground (8MP)": MIDDLEGROUND_MEGAPIXEL_THRESHOLD,
             "Zoom-in proof(16MP)": FUTURE_PROOF_MEGAPIXEL_THRESHOLD,
         }
-        resize_option = self.config_data["resize_megapixels"]
+        resize_option = cfg["resize_megapixels"]
         if resize_option == "Custom":
             try:
-                custom_mp = int(
-                    self.config_data["resize_custom_megapixels"]
-                )
-                target_pixels = custom_mp * 1_048_576
+                custom_mp = int(cfg["resize_custom_megapixels"])
+                target_pixels = custom_mp * ONE_MEGAPIXEL
             except (ValueError, TypeError):
                 self._log(
-                    f"Invalid custom megapixel value '{self.config_data['resize_custom_megapixels']}'. Using 4MP."
+                    f"Invalid custom megapixel value '{cfg['resize_custom_megapixels']}'. Using 4MP."
                 )
                 target_pixels = COMPUTE_PROOF_MEGAPIXEL_THRESHOLD
         else:
@@ -617,19 +493,13 @@ class FileProcessor:
             f"Starting resizing of large images... Target: {target_pixels / ONE_MEGAPIXEL:.1f}MP"
         )
 
-        def resize_worker(
-            file: Path, lock: threading.Lock, results: dict
-        ) -> None:
+        def worker(file: Path) -> tuple[str, object | None]:
             width, height = imagesize.get(file)
             if width * height <= target_pixels:
-                with lock:
-                    results["skipped"] += 1
-                return
+                return "skipped", None
 
-            new_width, new_height = (
-                self.calculate_dimensions_for_megapixels(
-                    width, height, target_pixels
-                )
+            new_width, new_height = self.calculate_dimensions_for_megapixels(
+                width, height, target_pixels
             )
             reduction_factor = width / new_width
 
@@ -640,206 +510,135 @@ class FileProcessor:
                     else Image.LANCZOS
                 )
 
-                if reduction_factor >= 3 and hasattr(
-                    image_util, "dpid_resize"
-                ):
-                    self._log(
-                        f"DPID chosen for {file.name} (reduction factor: {reduction_factor:.2f})"
-                    )
-                    resized_img = image_util.dpid_resize(
-                        img, (new_width, new_height)
-                    )
+                if reduction_factor >= 3 and hasattr(image_util, "dpid_resize"):
+                    self._log(f"DPID chosen for {file.name} (reduction factor: {reduction_factor:.2f})")
+                    resized_img = image_util.dpid_resize(img, (new_width, new_height))
                 else:
-                    self._log(
-                        f"Using PIL LANCZOS resize for {file.name} (reduction factor: {reduction_factor:.2f})"
-                    )
-                    resized_img = img.resize(
-                        (new_width, new_height), resample=resample_filter
-                    )
+                    self._log(f"Using PIL LANCZOS resize for {file.name} (reduction factor: {reduction_factor:.2f})")
+                    resized_img = img.resize((new_width, new_height), resample=resample_filter)
 
                 save_kwargs = {}
-                ext = file.suffix.lower()
-                if ext in [".jpg", ".jpeg"]:
+                if file.suffix.lower() in [".jpg", ".jpeg"]:
                     save_kwargs["quality"] = 95
                     if "icc_profile" in img.info:
-                        save_kwargs["icc_profile"] = img.info[
-                            "icc_profile"
-                        ]
+                        save_kwargs["icc_profile"] = img.info["icc_profile"]
                     if "exif" in img.info:
                         save_kwargs["exif"] = img.info["exif"]
-                elif ext == ".png":
+                elif file.suffix.lower() == ".png":
                     save_kwargs["compress_level"] = 4
 
                 if resized_img.mode == "P":
                     resized_img = resized_img.convert("RGB")
 
                 resized_img.save(str(file), **save_kwargs)
+            return "resized", None
 
-            with lock:
-                results["resized"] += 1
+        def summary(results: dict, extra_data: dict) -> str:
+            return f"Completed resizing: {results.get('resized', 0)} resized, {results.get('skipped', 0)} skipped, {results.get('errors', 0)} errors"
 
-        def summary_generator(results: dict) -> str:
-            return f"Completed resizing: {results['resized']} images resized, {results['skipped']} skipped, {results['errors']} errors"
-
-        self._execute_parallel_image_task(
+        self._run_parallel_task(
             "Image Resizing",
             files,
-            resize_worker,
-            summary_generator,
+            worker,
+            summary,
             progress_callback,
+            filter_func=self._filter_images_and_skip_masks
         )
 
     def process_alpha_images(
         self,
         files: list[Path],
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
+        progress_callback: Callable[[float, str | None], None] | None = None,
     ) -> None:
         """Replace image transparency with a solid background color using parallel processing."""
-        self._log(
-            "Processing transparent images (excluding mask files)..."
-        )
-        bg_color = self.config_data["alpha_bg_color"].strip().lower()
-        if bg_color in ("-1", "random"):
-            import random
+        self._log("Processing transparent images (excluding mask files)...")
+        cfg = self.config_data
+        bg_color_str = cfg["alpha_bg_color"].strip().lower()
 
-            r, g, b = (
-                random.randint(0, 255),
-                random.randint(0, 255),
-                random.randint(0, 255),
-            )
-            bg_color_tuple = (r, g, b)
-            self._log(
-                f"Using random background color: #{r:02x}{g:02x}{b:02x} (RGB: {bg_color_tuple})"
-            )
-        else:
-            try:
-                if bg_color.startswith("#") and len(bg_color) == 7:
-                    bg_color_tuple = tuple(
-                        int(bg_color[i : i + 2], 16) for i in (1, 3, 5)
-                    )
-                else:
-                    img = Image.new("RGB", (1, 1), bg_color)
-                    bg_color_tuple = img.getpixel((0, 0))
-                self._log(
-                    f"Using background color: {bg_color} (RGB: {bg_color_tuple})"
-                )
-            except Exception as e:
-                self._log(
-                    f"Invalid color '{bg_color}': {e}. Using white instead."
-                )
-                bg_color_tuple = (255, 255, 255)
+        try:
+            if bg_color_str in ("-1", "random"):
+                import random
+                r, g, b = (random.randint(0, 255) for _ in range(3))
+                bg_color_tuple = (r, g, b)
+                self._log(f"Using random background color: #{r:02x}{g:02x}{b:02x}")
+            else:
+                bg_color_tuple = Image.Color.getrgb(bg_color_str)
+            self._log(f"Using background color: {bg_color_str} (RGB: {bg_color_tuple})")
+        except Exception as e:
+            self._log(f"Invalid color '{bg_color_str}': {e}. Using white instead.")
+            bg_color_tuple = (255, 255, 255)
 
-        def alpha_worker(
-            file: Path, lock: threading.Lock, results: dict
-        ) -> None:
+        def worker(file: Path) -> tuple[str, object | None]:
             with Image.open(file) as img:
-                if img.mode not in ("RGBA", "LA"):
-                    with lock:
-                        results["skipped"] += 1
-                    return
-
-                # Fast transparency check using getextrema on the alpha channel
-                alpha = img.getchannel("A")
-                if alpha.getextrema()[0] == 255:
-                    with lock:
-                        results["skipped"] += 1
-                    return
+                if img.mode not in ("RGBA", "LA") or img.getchannel("A").getextrema()[0] == 255:
+                    return "skipped", None
 
                 background = Image.new("RGB", img.size, bg_color_tuple)
                 background.paste(img, (0, 0), img)
                 background.save(str(file))
-                with lock:
-                    results["processed"] += 1
+                return "processed", None
 
-        def summary_generator(results: dict) -> str:
-            return f"Transparency processing complete: {results['processed']} processed, {results['skipped']} skipped, {results['errors']} errors"
+        def summary(results: dict, extra_data: dict) -> str:
+            return f"Transparency processing complete: {results.get('processed', 0)} processed, {results.get('skipped', 0)} skipped, {results.get('errors', 0)} errors"
 
-        self._execute_parallel_image_task(
+        self._run_parallel_task(
             "Transparency Processing",
             files,
-            alpha_worker,
-            summary_generator,
+            worker,
+            summary,
             progress_callback,
+            filter_func=self._filter_images_and_skip_masks
         )
-
-    def _update_progress(
-        self,
-        idx: int,
-        total: int,
-        message: str,
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
-    ) -> None:
-        """Helper to update progress."""
-        progress = (idx + 1) / total
-        if progress_callback:
-            progress_callback(progress, message)
-        else:
-            self._update_status(message, progress)
 
     def optimize_pngs(
         self,
         files: list[Path],
-        progress_callback: Callable[[float, str | None], None]
-        | None = None,
+        progress_callback: Callable[[float, str | None], None] | None = None,
     ) -> None:
-        """Optimize PNG files using oxipng."""
+        """Optimize PNG files using oxipng in parallel."""
         self._log("Starting PNG optimization...")
-        png_files = [f for f in files if f.suffix.lower() == ".png"]
-        if not png_files:
-            self._log("No PNG files found to optimize")
-            return
-        self._log(f"Found {len(png_files)} PNG files to optimize")
-        success_count = 0
-        total_bytes_saved = 0
-        total_files = len(png_files)
-        for idx, file in enumerate(png_files):
-            if self.cancel_requested():
-                break
-            self._update_progress(
-                idx,
-                total_files,
-                f"Optimizing PNG: {file.name}",
-                progress_callback,
-            )
-            try:
-                original_size = file.stat().st_size
-            except Exception as e:
-                self._log(
-                    f"Error getting original size for {file.name}: {e}"
-                )
-                continue
-            try:
-                oxipng.optimize(file, level=5, fix_errors=True)
-            except Exception as e:
-                self._log(f"Error optimizing {file.name}: {e}")
-                continue
-            try:
-                new_size = file.stat().st_size
-                bytes_saved = original_size - new_size
-                success_count += 1
-                total_bytes_saved += bytes_saved
-            except Exception as e:
-                self._log(
-                    f"Error calculating results for {file.name}: {e}"
-                )
-        if success_count:
-            avg_saving = total_bytes_saved / success_count
-            self._log(
-                f"Completed optimization: {success_count} of {total_files} PNGs optimized"
-            )
-            self._log(
-                f"Total bytes saved: {total_bytes_saved:,} (avg: {avg_saving:,.1f} per file)"
-            )
-        else:
-            self._log(
-                "PNG optimization completed with 0 successful optimizations"
-            )
+
+        def worker(file: Path) -> tuple[str, object | None]:
+            original_size = file.stat().st_size
+            oxipng.optimize(file, level=5, fix_errors=True)
+            new_size = file.stat().st_size
+            bytes_saved = original_size - new_size
+            if bytes_saved > 0:
+                return "optimized", bytes_saved
+            else:
+                return "skipped", None
+
+        def summary(results: dict, extra_data: dict) -> str:
+            optimized_count = results.get("optimized", 0)
+            total_bytes_saved = sum(extra_data.get("optimized", []))
+
+            msg = f"Completed optimization: {optimized_count} PNGs optimized, {results.get('skipped', 0)} skipped, {results.get('errors', 0)} errors."
+            if optimized_count > 0:
+                avg_saving = total_bytes_saved / optimized_count
+                msg += f"\nTotal bytes saved: {total_bytes_saved:,} (avg: {avg_saving:,.1f} per file)"
+            return msg
+
+        self._run_parallel_task(
+            task_name="Optimize PNGs",
+            files=files,
+            worker_func=worker,
+            summary_func=summary,
+            progress_callback=progress_callback,
+            filter_func=lambda f: f.suffix.lower() == ".png",
+        )
 
 
 class ProgressThrottler:
     """Helper class to throttle progress updates to the UI."""
+
+    __slots__ = (
+        "update_func",
+        "min_interval",
+        "last_update_time",
+        "last_progress",
+        "last_message",
+        "lock",
+    )
 
     def __init__(
         self,
@@ -882,7 +681,7 @@ class ProgressThrottler:
 
 class FileOperationsWindow(ctk.CTkToplevel):
     WINDOW_WIDTH: int = 440
-    WINDOW_HEIGHT: int = 600
+    WINDOW_HEIGHT: int = 690
     MAX_WORKERS: int = max(
         4, os.cpu_count() or 4
     )  # Use at least 4 workers
