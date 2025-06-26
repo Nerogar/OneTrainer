@@ -170,7 +170,7 @@ class ConfigList(metaclass=ABCMeta):
                     )
             except Exception:
                 traceback.print_exc()
-                print(f"Failed to set all items to {enable_state} in {"all configs" if all_configs else "current config"}")
+                print(f"Failed to set all items to {enable_state} in {'all configs' if all_configs else 'current config'}")
                 # refresh from file if anything goes wrong to make sure UI state is accurate
                 self.__load_current_config(current_config_path)
             else:
