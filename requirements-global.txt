@@ -6,7 +6,7 @@ imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.32.4
-scipy==1.15.3;
+scipy==1.15.3
 matplotlib==3.10.3
 av==14.4.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
