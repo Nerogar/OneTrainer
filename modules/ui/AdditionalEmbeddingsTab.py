@@ -20,7 +20,7 @@ class AdditionalEmbeddingsTab(ConfigList):
             from_external_file=False,
             add_button_text="add embedding",
             is_full_width=True,
-            show_toggle_all_button=True
+            show_toggle_buttons=True
         )
 
     def refresh_ui(self):
@@ -103,7 +103,7 @@ class EmbeddingWidget(ctk.CTkFrame):
 
         # trainable
         components.label(bottom_frame, 0, 0, "train:")
-        trainable_switch = components.switch(bottom_frame, 0, 1, self.ui_state, "train")
+        trainable_switch = components.switch(bottom_frame, 0, 1, self.ui_state, "train", command=save_command)
         trainable_switch.configure(width=40)
 
         # output embedding

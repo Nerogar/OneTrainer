@@ -22,7 +22,7 @@ class SamplingTab(ConfigList):
             add_button_text="Add Sample",
             add_button_tooltip="Add a new sample configuration.",
             is_full_width=True,
-            show_toggle_all_button=True
+            show_toggle_buttons=True
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):

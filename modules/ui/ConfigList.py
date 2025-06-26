@@ -30,7 +30,7 @@ class ConfigList(metaclass=ABCMeta):
             add_button_text: str = "",
             add_button_tooltip: str = "",
             is_full_width: bool = "",
-            show_toggle_all_button: bool = False,
+            show_toggle_buttons: bool = False,
     ):
         self.master = master
         self.train_config = train_config
@@ -44,7 +44,10 @@ class ConfigList(metaclass=ABCMeta):
 
         self.is_full_width = is_full_width
         self.toggle_all_button = None
+        self.toggle_button = None
         self.is_opening_window = False
+        self._is_any_item_enabled = False
+        self._is_current_item_enabled = False
 
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(1, weight=1)
@@ -77,8 +80,11 @@ class ConfigList(metaclass=ABCMeta):
             self.element_list = None
             self._create_element_list()
 
-        if show_toggle_all_button:
-            self.toggle_all_button = components.button(self.top_frame, 0, 4, "", self.toggle_all, tooltip="Disables/Enables all items in all configs", width=30, padx=5)
+        if show_toggle_buttons:
+            # tooltips break if you initialize with an empty string, default to a single space
+            self.toggle_button = components.button(self.top_frame, 0, 4, " ", self.toggle, tooltip="Disables/Enables all items in the current config", width=30, padx=5)
+            if self.from_external_file:
+                self.toggle_all_button = components.button(self.top_frame, 0, 5, " ", self.toggle_all, tooltip="Disables/Enables all items in all configs", width=30, padx=5)
             self._update_toggle_all_button_text()
 
 
@@ -95,64 +101,80 @@ class ConfigList(metaclass=ABCMeta):
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         pass
 
-    def _is_any_enabled(self) -> bool:
+    def _update_any_item_enabled_state(self) -> bool:
+        self._is_current_item_enabled = False
+        self._is_any_item_enabled = False
         if self.from_external_file:
             try:
+                current_config_path = getattr(self.train_config, self.attr_name)
+                should_skip = False
                 for (_name, file_path) in self.configs:
-                    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                    if (not os.path.exists(file_path) or os.path.getsize(file_path) == 0
+                            or (file_path != current_config_path and should_skip)):
                         continue
                     with open(file_path, "r") as f:
                         loaded_config = json.load(f)
                     for item in loaded_config:
                         if isinstance(item, dict) and item.get(self.enable_key, False):
-                            return True
+                            self._is_any_item_enabled = True
+                            if file_path == current_config_path:
+                                self._is_current_item_enabled = True
+                            should_skip = True
+                    if should_skip and self._is_current_item_enabled:
+                        break
             except (OSError):
                 pass
             except Exception:
                 traceback.print_exc()
                 return False
         else:
-            for config in self.current_config:
-                if getattr(config, self.enable_key, False):
-                    return True
-        return False
+            for widget in self.widgets:
+                if widget.ui_state.get_var(self.enable_key).get():
+                    self._is_current_item_enabled = True
+                    break
+
 
     def _update_toggle_all_button_text(self):
-        if self.toggle_all_button is None:
-            return
-        text = "Disable All" if self._is_any_enabled() else "Enable All"
-        self.toggle_all_button.configure(text=text)
+        self._update_any_item_enabled_state()
+        if self.toggle_all_button is not None:
+            self.toggle_all_button.configure(text="Disable All" if self._is_any_item_enabled else "Enable All")
+        if self.toggle_button is not None:
+            self.toggle_button.configure(text="Disable" if self._is_current_item_enabled else "Enable")
 
-    def toggle_all(self):
-        any_enabled = self._is_any_enabled()
-        new_state = not any_enabled
 
+    def _toggle(self, all_configs: bool = False):
         if self.from_external_file:
             current_config_path = getattr(self.train_config, self.attr_name)
+            configs_to_update = [current_config_path] if not all_configs else [file_path for (_name, file_path) in self.configs]
             try:
-                for (_name, file_path) in self.configs:
-                    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                for config_path in configs_to_update:
+                    if not os.path.exists(config_path) or os.path.getsize(config_path) == 0:
                         continue
-                    with open(file_path, "r") as f:
+                    with open(config_path, "r") as f:
                         loaded_config = json.load(f)
                     for item in loaded_config:
                         if isinstance(item, dict):
-                            item[self.enable_key] = new_state
+                            item[self.enable_key] = not self._is_any_item_enabled if all_configs else not self._is_current_item_enabled
                     write_json_atomic(
-                        file_path,
+                        config_path,
                         loaded_config
                     )
             except Exception:
                 traceback.print_exc()
-                print(f"Failed to set all items to {new_state} in all configs")
+                print(f"Failed to set all items to {not self._is_any_item_enabled if all_configs else not self._is_current_item_enabled} in {"all configs" if all_configs else "current config"}")
             else:
                 self.__load_current_config(current_config_path)
         else:
-            for config in self.current_config:
-                setattr(config, self.enable_key, new_state)
-            self._create_element_list()
+            for widget in self.widgets:
+                widget.ui_state.get_var(self.enable_key).set(not self._is_current_item_enabled)
+            self.save_current_config()
+        return
 
-        self._update_toggle_all_button_text()
+    def toggle(self):
+        self._toggle()
+
+    def toggle_all(self):
+        self._toggle(all_configs=True)
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
@@ -202,7 +224,6 @@ class ConfigList(metaclass=ABCMeta):
             name = self.default_config_name.removesuffix(".json")
             self.__create_config(name)
             self.save_current_config()
-            self._update_toggle_all_button_text()
 
     def __create_config(self, name: str):
         name = path_util.safe_filename(name)
@@ -251,7 +272,6 @@ class ConfigList(metaclass=ABCMeta):
         widget.place_in_list()
 
         self.save_current_config()
-        self._update_toggle_all_button_text()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
@@ -262,7 +282,6 @@ class ConfigList(metaclass=ABCMeta):
             widget.place_in_list()
 
         self.save_current_config()
-        self._update_toggle_all_button_text()
 
     def __load_current_config(self, filename):
         try:
@@ -300,6 +319,5 @@ class ConfigList(metaclass=ABCMeta):
         self.master.wait_window(window)
         self.widgets[i].configure_element()
         self.save_current_config()
-        self._update_toggle_all_button_text()
 
         self.is_opening_window = False

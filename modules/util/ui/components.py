@@ -316,7 +316,7 @@ def switch(
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
-    component = ctk.CTkSwitch(master, variable=var, text=text)
+    component = ctk.CTkSwitch(master, variable=var, text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
     def create_destroy(component):
