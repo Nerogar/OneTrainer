@@ -101,7 +101,7 @@ class ConfigList(metaclass=ABCMeta):
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         pass
 
-    def _update_any_item_enabled_state(self) -> bool:
+    def _update_any_item_enabled_state(self):
         self._is_current_item_enabled = False
         self._is_any_item_enabled = False
         if self.from_external_file:
@@ -126,7 +126,6 @@ class ConfigList(metaclass=ABCMeta):
                 pass
             except Exception:
                 traceback.print_exc()
-                return False
         else:
             for widget in self.widgets:
                 if widget.ui_state.get_var(self.enable_key).get():
