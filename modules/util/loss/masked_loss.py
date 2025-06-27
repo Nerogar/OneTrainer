@@ -33,7 +33,7 @@ def masked_losses_with_prior(
     if normalize_masked_area_loss:
         losses = losses / clamped_mask.mean(dim=(1, 2, 3), keepdim=True)
 
-    if masked_prior_preservation_weight == 0:
+    if masked_prior_preservation_weight == 0 or prior_losses is None:
         return losses
 
     clamped_mask = (1 - clamped_mask)
