@@ -11,6 +11,7 @@ import os
 import platform
 import re
 import subprocess
+import time
 import tkinter as tk
 import traceback
 from collections.abc import Callable
@@ -279,6 +280,7 @@ class CaptionUI(ctk.CTkToplevel):
 
         # Initialize other attributes and managers
         self.image_rel_paths: list[str] = []
+        self.filtered_image_paths: list[str] = []
         self.current_image_index: int = -1
         self.pil_image: Image.Image | None = None
         self.pil_mask: Image.Image | None = None
@@ -594,6 +596,9 @@ class CaptionUI(ctk.CTkToplevel):
         self.file_list.grid(row=0, column=0, sticky="nsew", padx=(12, 0))
         # No need to bind <<ListboxSelect>>; use the command argument
 
+        # Set initial state for the listbox and scrollbar
+        self._update_file_list_display()
+
 
     def _on_file_list_select_ctk(self, value):
         """Handle selection changes in the CTkListbox."""
@@ -813,13 +818,11 @@ class CaptionUI(ctk.CTkToplevel):
             if not self.image_rel_paths:
                  count_text = " (No images)"
 
-            self.folder_name_label.configure(text=path_text + count_text) # Removed tooltip_text argument
-            if hasattr(self.folder_name_label, "_tooltip") and self.folder_name_label._tooltip is not None: # Check if _tooltip exists and is not None
+            self.folder_name_label.configure(text=path_text + count_text)
+            if hasattr(self.folder_name_label, "_tooltip") and self.folder_name_label._tooltip is not None:
                  self.folder_name_label._tooltip.text = base_path_text
             elif not hasattr(self.folder_name_label, "_tooltip"):
                 pass
-
-
         else:
             self.folder_name_label.configure(text="No folder selected")
             if hasattr(self.folder_name_label, "_tooltip") and self.folder_name_label._tooltip is not None:
@@ -827,23 +830,65 @@ class CaptionUI(ctk.CTkToplevel):
 
         # Clear the listbox
         t0 = time.perf_counter()
-        self.file_list.delete("all")                    # cheap – no redraw
-        self.file_list.insert_many(self.filtered_image_paths)
+        self.file_list.delete("all")
+
+        # Only populate if there are items to show
+        if self.filtered_image_paths:
+            self.file_list.insert_many(self.filtered_image_paths)
+            # Update scrollbar visibility - show when there are items
+            self._update_scrollbar_visibility(True)
+
+            # Highlight current selection if it's in the filtered list
+            if 0 <= self.current_image_index < len(self.image_rel_paths):
+                current_path_str = str(self.image_rel_paths[self.current_image_index])
+                if current_path_str in self.filtered_image_paths:
+                    try:
+                        listbox_idx = self.filtered_image_paths.index(current_path_str)
+                        if hasattr(self.file_list, 'select'):
+                            self.file_list.select(listbox_idx)
+                        if hasattr(self.file_list, 'see'):
+                            self.file_list.see(listbox_idx) # Ensure visible
+                    except (ValueError, IndexError, tk.TclError):
+                        pass
+        else:
+            # Hide scrollbar when there are no items
+            self._update_scrollbar_visibility(False)
+
         print("populate ms:", (time.perf_counter()-t0)*1e3)
 
-        # Highlight current selection if it's in the filtered list
-        if 0 <= self.current_image_index < len(self.image_rel_paths):
-            current_path_str = str(self.image_rel_paths[self.current_image_index])
-            if current_path_str in self.filtered_image_paths:
-                try:
-                    listbox_idx = self.filtered_image_paths.index(current_path_str)
-                    if hasattr(self.file_list, 'select'):
-                        self.file_list.select(listbox_idx)
-                    if hasattr(self.file_list, 'see'):
-                        self.file_list.see(listbox_idx) # Ensure visible
-                except (ValueError, IndexError, tk.TclError):
-                    pass
+    def _update_scrollbar_visibility(self, show: bool) -> None:
+        """Show or hide scrollbar based on whether there are items to scroll."""
+        # Access the scrollbar from CTkListbox
+        if hasattr(self.file_list, "_scrollbar"):
+            # If no items, disable the scrollbar to prevent unnecessary UI interaction
+            if not show:
+                self.file_list._scrollbar.grid_remove()  # Hide the scrollbar
+                # Also unbind scroll events when there's nothing to scroll
+                if hasattr(self.file_list, "_canvas"):
+                    self.file_list._canvas.unbind("<MouseWheel>")
+                    self.file_list._canvas.unbind("<Button-4>")
+                    self.file_list._canvas.unbind("<Button-5>")
+                    self.file_list._canvas.unbind("<B1-Motion>")
+            else:
+                self.file_list._scrollbar.grid()  # Show the scrollbar
+                # Re-bind scroll events with throttling
+                if hasattr(self.file_list, "_canvas"):
+                    # Add throttling to scroll events by checking for a cooldown period
+                    if not hasattr(self, '_last_scroll_time'):
+                        self._last_scroll_time = 0
 
+                    def throttled_scroll_event(event):
+                        current_time = time.time()
+                        if current_time - self._last_scroll_time > 0.0165:  # ~60fps throttle
+                            self._last_scroll_time = current_time
+                            # Call the original handler if it exists
+                            if hasattr(self.file_list, "_on_mousewheel"):
+                                self.file_list._on_mousewheel(event)
+                        return "break"
+
+                    self.file_list._canvas.bind("<MouseWheel>", throttled_scroll_event)
+                    self.file_list._canvas.bind("<Button-4>", throttled_scroll_event)
+                    self.file_list._canvas.bind("<Button-5>", throttled_scroll_event)
 
     def _update_file_list(self) -> None:
         """Initialize the file list with all image paths."""
