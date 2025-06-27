@@ -1,6 +1,6 @@
 import concurrent.futures
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from tkinter import END, filedialog, messagebox
 from typing import Any
@@ -16,7 +16,7 @@ import customtkinter as ctk
 
 logger = logging.getLogger(__name__)
 
-@dataclass
+@dataclass(slots=True)
 class MaskWindowSettings:
     model: str = ""
     path: str = ""
@@ -30,6 +30,12 @@ class MaskWindowSettings:
     preview_mode: bool = False
 
 class GenerateMasksWindow(ctk.CTkToplevel):
+    __slots__ = (
+        'parent', 'models', 'model_var', 'mode_map', 'modes', 'mode_var', 'preview_mode_var',
+        'frame', 'model_dropdown', 'path_entry', 'path_button', 'prompt_entry', 'mode_dropdown',
+        'threshold_entry', 'smooth_entry', 'expand_entry', 'alpha_entry', 'include_subdirectories_var',
+        'progress_label', 'progress', 'create_masks_button'
+    )
 
     SESSION_SETTINGS_KEY = "generate_masks_window_settings"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -61,13 +67,14 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             )
 
             # Define modes with mapping to API values
-            self.modes = [
-                "Replace all masks",
-                "Create if absent",
-                "Add to existing",
-                "Subtract from existing",
-                "Blend with existing",
-            ]
+            self.mode_map = {
+                "Replace all masks": "replace",
+                "Create if absent": "fill",
+                "Add to existing": "add",
+                "Subtract from existing": "subtract",
+                "Blend with existing": "blend",
+            }
+            self.modes = list(self.mode_map.keys())
             self.mode_var = ctk.StringVar(self, "Create if absent")
 
             # Add preview mode toggle
@@ -124,7 +131,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
     def _save_session_settings(self):
         settings = self._gather_settings_from_ui()
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, settings.__dict__)
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, asdict(settings))
 
     def destroy(self):
         self._save_session_settings()
@@ -174,14 +181,14 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self._create_action_buttons()
 
     def _create_model_selection(self):
-        self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
-        self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
+        model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
         self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
     def _create_path_selection(self, path):
-        self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
-        self.path_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
+        path_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.path_entry = ctk.CTkEntry(self.frame, width=150)
         self.path_entry.insert(0, path)
         self.path_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
@@ -198,8 +205,8 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         )
 
         # Mode (special case: dropdown)
-        self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
-        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
+        mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.mode_dropdown = ctk.CTkOptionMenu(
             self.frame,
             variable=self.mode_var,
@@ -246,19 +253,19 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         )
 
     def _create_subdirectory_option(self, include_subdirectories):
-        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subdirs", width=100)
-        self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
+        include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subdirs", width=100)
+        include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
         self.include_subdirectories_var = ctk.BooleanVar(self, include_subdirectories)
-        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
-        self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
+        include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
+        include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
     def _create_preview_option(self):
         """Create a toggle for test mode (only process current image)"""
-        self.preview_mode_label = ctk.CTkLabel(self.frame, text="Test Run", width=100)
-        self.preview_mode_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
-        self.preview_mode_switch = ctk.CTkSwitch(self.frame, text="", variable=self.preview_mode_var)
-        self.preview_mode_switch.grid(row=9, column=1, sticky="w", padx=5, pady=5)
-        ToolTip(self.preview_mode_switch, "Masks only the current image to more quickly get feedback")
+        preview_mode_label = ctk.CTkLabel(self.frame, text="Test Run", width=100)
+        preview_mode_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
+        preview_mode_switch = ctk.CTkSwitch(self.frame, text="", variable=self.preview_mode_var)
+        preview_mode_switch.grid(row=9, column=1, sticky="w", padx=5, pady=5)
+        ToolTip(preview_mode_switch, "Masks only the current image to more quickly get feedback")
 
     def _create_progress_indicators(self):
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
@@ -272,23 +279,27 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
     def validate_inputs(self) -> tuple[bool, str]:
         """Validate all user inputs. Returns (is_valid, error_message)."""
+        validators = [
+            ("Threshold", self.threshold_entry, float, 0.0, 0.9, "Threshold must be between 0.0 and 0.9 for usable results"),
+            ("Smooth", self.smooth_entry, int, 0, 10, "Smooth pixels should be between 0 and 10"),
+            ("Expand", self.expand_entry, int, 0, 64, "Expand pixels should be between 0 and 64"),
+            ("Alpha", self.alpha_entry, float, 0.0, 1.0, "Alpha must be between 0.0 and 1.0"),
+        ]
+
         try:
-            if not 0 <= (_threshold := float(self.threshold_entry.get())) <= 0.90:
-                return False, "Threshold must be between 0.0 and 0.9 for usable results"
-            if not 0 <= (_smooth_pixels := int(self.smooth_entry.get())) <= 10:
-                return False, "Smooth pixels should be between 0 and 10"
-            if not 0 <= (_expand_pixels := int(self.expand_entry.get())) <= 64:
-                return False, "Expand pixels should be between 0 and 64"
-            if not 0 <= (_alpha := float(self.alpha_entry.get())) <= 1:
-                return False, "Alpha must be between 0.0 and 1.0"
-            if not (_prompt := self.prompt_entry.get().strip()):
-                return False, "Please enter a detection prompt"
-            if not (_path := Path(self.path_entry.get())).is_dir():
-                return False, "Please select a valid folder"
-            return True, ""
-        except ValueError as e:
-            logger.exception("Validation error")
-            return False, f"Invalid input: {e}"
+            for _name, entry, type_conv, min_val, max_val, msg in validators:
+                value = type_conv(entry.get())
+                if not min_val <= value <= max_val:
+                    return False, msg
+        except ValueError:
+            return False, "Invalid number value. Please check your inputs."
+
+        if not self.prompt_entry.get().strip():
+            return False, "Please enter a detection prompt"
+        if not Path(self.path_entry.get()).is_dir():
+            return False, "Please select a valid folder"
+
+        return True, ""
 
     def browse_for_path(self, entry_box):
         path = filedialog.askdirectory()
@@ -296,6 +307,9 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         entry_box.delete(0, END)
         entry_box.insert(0, path)
         self.focus_set()
+
+    def _reset_button_state(self):
+        self.create_masks_button.configure(state="normal", text="Create Masks")
 
     def set_progress(self, value, max_value):
         progress = value / max_value
@@ -323,109 +337,84 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             self.after(100, lambda: self._check_future(future))
         except Exception as e:
             logger.exception("Failed to start masking thread")
-            self.create_masks_button.configure(state="normal", text="Create Masks")
+            self._reset_button_state()
             messagebox.showerror("Thread Error", str(e))
 
     def _check_future(self, future):
-        if future.done():
-            exc = future.exception()
-            if exc:
-                logger.exception("Error in masking process", exc_info=exc)
-                self.create_masks_button.configure(state="normal", text="Create Masks")
-                messagebox.showerror("Processing Error", f"An error occurred during mask creation:\n{exc}")
-            # else: success is handled by _run_masking_process/_update_ui_after_processing
-        else:
-            # Not done yet, check again after 100ms
+        if not future.done():
             self.after(100, lambda: self._check_future(future))
+            return
+
+        try:
+            future.result()
+            self._update_ui_after_processing()
+        except Exception as e:
+            logger.exception("Error in masking process")
+            self._handle_masking_error(str(e))
 
     def get_mode(self, mode_str: str) -> str:
-        mode_map = {
-            "Replace all masks": "replace",
-            "Create if absent": "fill",
-            "Add to existing": "add",
-            "Subtract from existing": "subtract",
-            "Blend with existing": "blend",
+        return self.mode_map.get(mode_str, "fill")
+
+    def _prepare_mask_args(self, prompt: str, alpha: float, threshold: float, smooth_pixels: int, expand_pixels: int) -> tuple[dict[str, Any] | None, str | None]:
+        """Prepare arguments for the masking model based on UI settings."""
+        mode = self.get_mode(self.mode_var.get())
+
+        args = {
+            "prompts": [prompt],
+            "mode": mode,
+            "alpha": alpha,
+            "threshold": threshold,
+            "smooth_pixels": smooth_pixels,
+            "expand_pixels": expand_pixels,
+            "progress_callback": self.set_progress,
         }
-        try:
-            return mode_map[mode_str]
-        except ValueError as e:
-            logger.exception("Validation error")
-            raise RuntimeError(f"Invalid input: {e}") from e
+
+        if self.preview_mode_var.get():
+            if not hasattr(self.parent, "current_image_index"):
+                return None, "Preview mode is enabled, but no image is selected."
+
+            if not (hasattr(self.parent, "image_rel_paths") and
+                    0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+                return None, "No current image is selected for preview."
+
+            current_image_rel_path = self.parent.image_rel_paths[self.parent.current_image_index]
+            logger.info("Preview mode: Processing only image %s", current_image_rel_path)
+
+            args.update({
+                "sample_dir": self.parent.dir,
+                "include_subdirectories": True,
+                "single_file": current_image_rel_path
+            })
+        else:
+            args.update({
+                "sample_dir": self.path_entry.get(),
+                "include_subdirectories": self.include_subdirectories_var.get()
+            })
+
+        return args, None
 
     def _run_masking_process(self, prompt, alpha, threshold, smooth_pixels, expand_pixels):
-        try:
-            masking_model = self.parent.model_manager.load_masking_model(
-                self.model_var.get()
-            )
+        masking_model = self.parent.model_manager.load_masking_model(
+            self.model_var.get()
+        )
 
-            # Skip processing if model failed to load
-            if masking_model is None:
-                print(f"Failed to load masking model: {self.model_var.get()}")
-                return
+        if masking_model is None:
+            raise RuntimeError(f"Failed to load masking model: {self.model_var.get()}")
 
-            # Set model_manager reference if this is a SAMdreamMaskModel
-            if hasattr(masking_model, "__class__") and hasattr(masking_model.__class__, "__name__"):
-                if masking_model.__class__.__name__ == "SAMdreamMaskModel":
-                    masking_model.model_manager = self.parent.model_manager
+        if hasattr(masking_model, "model_manager"):
+            masking_model.model_manager = self.parent.model_manager
 
-            mode = self.get_mode(self.mode_var.get())
+        mask_args, error = self._prepare_mask_args(prompt, alpha, threshold, smooth_pixels, expand_pixels)
 
-            # Check if preview mode is enabled
-            if self.preview_mode_var.get() and hasattr(self.parent, "current_image_index"):
-                # Get the current image path from parent window
-                if (hasattr(self.parent, "image_rel_paths") and
-                    0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+        if error:
+            raise RuntimeError(error)
 
-                    # Get the full path to the current image
-                    current_image_rel_path = self.parent.image_rel_paths[self.parent.current_image_index]
-                    logger.info(f"Preview mode: Processing only image {current_image_rel_path}")
-
-                    # Process just this single image
-                    # We'll pass the sample_dir as the parent directory, but also pass the full relative path
-                    # for precise filtering
-                    masking_model.mask_folder(
-                        sample_dir=self.parent.dir,
-                        prompts=[prompt],
-                        mode=mode,
-                        alpha=alpha,
-                        threshold=threshold,
-                        smooth_pixels=smooth_pixels,
-                        expand_pixels=expand_pixels,
-                        progress_callback=self.set_progress,
-                        include_subdirectories=True,  # Ensure we can find the file in subdirectories
-                        single_file=current_image_rel_path  # Pass the relative path, not just the filename
-                    )
-                else:
-                    messagebox.showwarning("Preview Error", "No current image is selected")
-                    self.after(100, lambda: self.create_masks_button.configure(state="normal", text="Create Masks"))
-                    return
-            else:
-                # Normal folder processing
-                masking_model.mask_folder(
-                    sample_dir=self.path_entry.get(),
-                    prompts=[prompt],
-                    mode=mode,
-                    alpha=alpha,
-                    threshold=threshold,
-                    smooth_pixels=smooth_pixels,
-                    expand_pixels=expand_pixels,
-                    progress_callback=self.set_progress,
-                    include_subdirectories=self.include_subdirectories_var.get(),
-                )
-
-            # Use after to safely update UI from the main thread
-            self.after(100, self._update_ui_after_processing)
-        except Exception as e:
-            error_message = str(e)
-            print(f"Error during masking process: {error_message}")
-            # Use after to safely update UI from the main thread
-            self.after(100, lambda: self._handle_masking_error(error_message))
+        if mask_args:
+            masking_model.mask_folder(**mask_args)
 
     def _update_ui_after_processing(self):
-        # Re-enable the create button
-        self.create_masks_button.configure(state="normal", text="Create Masks")
+        self._reset_button_state()
 
-        # Reload the current image data using image_handler
         if hasattr(self.parent, "image_handler") and hasattr(
             self.parent.image_handler, "load_image_data"
         ):
@@ -433,5 +422,5 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             self.parent.refresh_ui()
 
     def _handle_masking_error(self, error_message):
-        self.create_masks_button.configure(state="normal", text="Create Masks")
+        self._reset_button_state()
         messagebox.showerror("Processing Error", f"An error occurred during mask creation:\n{error_message}")

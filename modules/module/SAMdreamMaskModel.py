@@ -635,7 +635,7 @@ class SAMdreamMaskModel(BaseImageMaskModel):
         device: torch.device,
         dtype: torch.dtype,
         sam2_model_size: str = "large",  # "tiny", "small", "base-plus", or "large"
-        moondream_model_revision: str = "05d640e6da70c37b2473e0db8fef0233c0709ce4",  # DO NOT CHANGE.
+        moondream_model_revision: str = "200690cab483ff88cef2c68a897df7186e5dd7e0",  # DO NOT CHANGE.
     ):
         """
         Initialize the MoondreamSAM mask model using SAM2 from Hugging Face.
@@ -646,10 +646,15 @@ class SAMdreamMaskModel(BaseImageMaskModel):
             sam2_model_size (str): SAM2 model size - "tiny", "small", "base-plus", "large"
             moondream_model_revision (str): Moondream2 model revision
         """
+        logger.debug(f"DEBUG: SAMdreamMaskModel.__init__() called with device={device}, sam2_model_size={sam2_model_size}")
+
         self.device = device
         self.dtype = dtype
         self.use_cuda = device.type == "cuda"
         self.captioning_model: MoondreamModel | None = None
+
+        # Initialize model_manager to None - this will be set by the parent system
+        self.model_manager = None
 
         # Map model size to proper HF model name
         self.sam2_model_map = {
@@ -669,13 +674,31 @@ class SAMdreamMaskModel(BaseImageMaskModel):
             dtype=dtype,
             model_revision=moondream_model_revision,
         )
-
         self.SAM = SAM(device=device, sam2_model_name=self.sam2_model_name)
 
     def _load_models(self) -> None:
         """Load both Moondream2 and SAM2 models."""
-        self.detector.load(model_manager=self.model_manager)
-        self.SAM.load()
+        try:
+            logger.debug("DEBUG: Loading Moondream detector...")
+            self.detector.load(model_manager=self.model_manager)
+            logger.debug("DEBUG: Moondream detector loaded successfully")
+        except Exception as e:
+            logger.error(f"DEBUG: Error loading Moondream detector: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+        try:
+            logger.debug("DEBUG: Loading SAM model...")
+            self.SAM.load()
+            logger.debug("DEBUG: SAM model loaded successfully")
+        except Exception as e:
+            logger.error(f"DEBUG: Error loading SAM model: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+        logger.debug("DEBUG: Both models loaded successfully")
 
     def mask_image(
         self,
