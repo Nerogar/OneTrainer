@@ -2848,10 +2848,12 @@ class FileManager:
                 except Exception as e:
                     logger.error(f"Error saving caption: {e}")
 
+
     def open_in_explorer(self) -> None:
         """Open the current image's location or the base directory in the system file explorer."""
         if not self.parent.dir:
             logger.warning("Cannot open in explorer: No base directory loaded.")
+            messagebox.showerror("Error", "A directory must be loaded first to open in your File System", parent=self.parent)
             return
 
         try:
@@ -2869,13 +2871,13 @@ class FileManager:
         if 0 <= self.parent.current_image_index < len(self.parent.image_rel_paths):
             try:
                 relative_image_path_str = self.parent.image_rel_paths[self.parent.current_image_index]
-                logger.info(f"Explorer: Relative image path string: {relative_image_path_str}")
+                logger.debug(f"Explorer: Relative image path string: {relative_image_path_str}")
                 if relative_image_path_str:  # Ensure it's not an empty string
                     candidate_path = base_dir / relative_image_path_str
-                    logger.info(f"Explorer: Candidate path to highlight: {candidate_path}")
+                    logger.debug(f"Explorer: Candidate path to highlight: {candidate_path}")
                     if candidate_path.is_file():
                         path_to_highlight = candidate_path
-                        logger.info(f"Explorer: Path to highlight set to: {path_to_highlight}")
+                        logger.debug(f"Explorer: Path to highlight set to: {path_to_highlight}")
                     else:
                         logger.warning(f"Explorer: Constructed image path '{candidate_path}' is not a valid file. Will open base directory '{base_dir}'.")
                 else:
@@ -2883,33 +2885,33 @@ class FileManager:
             except Exception as e:
                 logger.error(f"Explorer: Error constructing specific image path: {e}. Will open base directory '{base_dir}'.")
         else:
-            logger.info(f"Explorer: No image selected or list empty. Will open base directory '{base_dir}'.")
+            logger.debug(f"Explorer: No image selected in listbox or list empty. Opening base directory '{base_dir}'.")
 
         try:
             if platform.system() == "Windows":
                 if path_to_highlight:
                     command_str = f'explorer /select,"{str(path_to_highlight)}"'
-                    logger.info(f"Explorer: Windows command (shell=True): {command_str}")
+                    logger.debug(f"Explorer: Windows command (shell=True): {command_str}")
                     subprocess.run(command_str, check=False, shell=True)
                 else:
                     command_str = f'explorer "{str(base_dir)}"'
-                    logger.info(f"Explorer: Windows command (shell=True): {command_str}")
+                    logger.debug(f"Explorer: Windows command (shell=True): {command_str}")
                     subprocess.run(command_str, check=False, shell=True)
             elif platform.system() == "Darwin":  # macOS
                 if path_to_highlight:
                     command = ["open", "-R", str(path_to_highlight)]
-                    logger.info(f"Explorer: macOS command: {command}")
+                    logger.debug(f"Explorer: macOS command: {command}")
                     subprocess.run(command, check=False)
                 else: # Open the base directory
                     command = ["open", str(base_dir)]
-                    logger.info(f"Explorer: macOS command: {command}")
+                    logger.debug(f"Explorer: macOS command: {command}")
                     subprocess.run(command, check=False)
             else:  # Linux
                 dir_to_open_linux = path_to_highlight.parent if path_to_highlight else base_dir
-                logger.info(f"Explorer: Linux directory to open: {dir_to_open_linux}")
+                logger.debug(f"Explorer: Linux directory to open: {dir_to_open_linux}")
                 if dir_to_open_linux.is_dir():
                     command = ["xdg-open", str(dir_to_open_linux)]
-                    logger.info(f"Explorer: Linux command: {command}")
+                    logger.debug(f"Explorer: Linux command: {command}")
                     subprocess.run(command, check=False)
                 else:
                     logger.error(f"Explorer: Linux: Directory '{str(dir_to_open_linux)}' not found or is not a directory.")
