@@ -1,11 +1,13 @@
 import os
 import pathlib
+from tkinter import BooleanVar, StringVar
 
 from modules.ui.ConceptWindow import ConceptWindow
 from modules.ui.ConfigList import ConfigList
 from modules.util import path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -28,6 +30,7 @@ class ConceptTab(ConfigList):
             add_button_text="add concept",
             is_full_width=False,
         )
+        self._add_search_bar()
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
@@ -37,6 +40,83 @@ class ConceptTab(ConfigList):
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
+
+    def _add_search_bar(self):
+        """Add search and filter toolbar"""
+        toolbar = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        toolbar.grid(row=0, column=4, columnspan=2, padx=10, sticky="ew")
+        toolbar.grid_columnconfigure(2, weight=1)
+
+        # Search
+        ctk.CTkLabel(toolbar, text="Search:").grid(row=0, column=0, padx=(0,5))
+        self.search_var = StringVar()
+        self.search_entry = ctk.CTkEntry(toolbar, textvariable=self.search_var,
+                                         placeholder_text="Filter...", width=200)
+        self.search_entry.grid(row=0, column=1)
+        self.search_var.trace("w", lambda *a: self._update_filters())
+
+        # Spacer
+        ctk.CTkLabel(toolbar, text="").grid(row=0, column=2, padx=5)
+
+        # Type filter
+        ctk.CTkLabel(toolbar, text="Type:").grid(row=0, column=3, padx=(0,5))
+        self.filter_var = StringVar(value="ALL")
+        ctk.CTkOptionMenu(toolbar, values=["ALL", "STANDARD", "VALIDATION", "PRIOR_PREDICTION"],
+                          variable=self.filter_var, command=lambda x: self._update_filters(),
+                          width=150).grid(row=0, column=4)
+
+        # Show disabled checkbox
+        self.show_disabled_var = BooleanVar(value=True)
+        ctk.CTkCheckBox(toolbar, text="Show Disabled", variable=self.show_disabled_var,
+                        command=self._update_filters, width=100).grid(row=0, column=5, padx=(10,0))
+
+        # Clear button
+        ctk.CTkButton(toolbar, text="Clear", width=50,
+                      command=self._clear_filters).grid(row=0, column=6, padx=(10,0))
+
+    def _update_filters(self):
+        """Update view with current filters"""
+        self._create_element_list(search=self.search_var.get(),
+                                  type=self.filter_var.get(),
+                                  show_disabled=self.show_disabled_var.get())
+
+    def _clear_filters(self):
+        """Reset all filters"""
+        self.search_var.set("")
+        self.filter_var.set("ALL")
+        self.show_disabled_var.set(True)
+        self._update_filters()
+
+    def _element_matches_filters(self, element):
+        """Combined filter matching"""
+        # Check enabled status
+        if not self.filters.get("show_disabled", True):
+            if hasattr(element, 'enabled') and not element.enabled:
+                return False
+
+        # Search filter
+        search = self.filters.get("search", "").lower()
+        if search:
+            texts = []
+            if element.name:
+                texts.append(element.name.lower())
+            if element.path:
+                texts.extend([os.path.basename(element.path).lower(),
+                              element.path.lower()])
+            if not any(search in text for text in texts):
+                return False
+
+        # Type filter
+        type_filter = self.filters.get("type", "ALL")
+        if type_filter != "ALL":
+            if hasattr(element, 'type') and element.type:
+                try:
+                    return ConceptType(element.type).value == type_filter
+                except (ValueError, AttributeError):
+                    return True
+            return False
+
+        return True
 
 
 class ConceptWidget(ctk.CTkFrame):
@@ -144,7 +224,8 @@ class ConceptWidget(ctk.CTkFrame):
         return image
 
     def place_in_list(self):
-        x = self.i % 6
-        y = self.i // 6
+        index = getattr(self, 'visible_index', self.i)
+        x = index % 6
+        y = index // 6
 
         self.grid(row=y, column=x, pady=5, padx=5)
