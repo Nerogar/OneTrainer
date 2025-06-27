@@ -1,4 +1,3 @@
-from pathlib import Path
 from queue import Queue
 from unittest.mock import MagicMock
 
@@ -11,82 +10,14 @@ from modules.ui.FileOperationsWindow import (
 import pytest
 from PIL import Image
 
+from .helpers import (
+    assert_message_in_queue,
+    create_dummy_image,
+    create_dummy_text_file,
+    setup_test_directory,
+)
+
 # Helpers
-
-def create_dummy_image(
-    path: Path,
-    width: int = 10,
-    height: int = 10,
-    mode: str = "RGB",
-    format: str = "PNG",
-):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    img = Image.new(mode, (width, height), color="blue")
-    img.save(path, format=format)
-    return path
-
-
-def create_dummy_text_file(path: Path, content: str = "caption"):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
-    return path
-
-
-def setup_test_directory(tmp_path, dirname, file_specs):
-    """Create a test directory with specified files.
-
-    Args:
-        tmp_path: pytest fixture tmp_path
-        dirname: name of the directory to create
-        file_specs: list of tuples (filename, is_image, **kwargs)
-                    For images: kwargs can include width, height, mode, format
-                    For text: kwargs should contain 'content'
-
-    Returns:
-        tuple: (directory_path, list_of_created_files)
-    """
-    d = tmp_path / dirname
-    d.mkdir()
-    created_files = []
-
-    for spec in file_specs:
-        filename, is_image = spec[0], spec[1]
-        kwargs = spec[2] if len(spec) > 2 else {}
-
-        if is_image:
-            created_files.append(create_dummy_image(d / filename, **kwargs))
-        else:
-            content = kwargs.get('content', "caption")
-            created_files.append(create_dummy_text_file(d / filename, content))
-
-    return d, created_files
-
-
-def assert_message_in_queue(queue, message_type, message_content):
-    """Check if a specific message exists in the queue.
-
-    Args:
-        queue: The queue to check
-        message_type: Expected message type (e.g., "log")
-        message_content: String that should be contained in the message
-
-    Returns:
-        bool: True if message was found
-    """
-    messages = []
-    found = False
-
-    while not queue.empty():
-        msg = queue.get()
-        messages.append(msg)
-        if msg[0] == message_type and message_content in msg[1]:
-            found = True
-
-    # Restore messages to queue
-    for msg in messages:
-        queue.put(msg)
-
-    return found
 
 def process_files_in_directory(processor, directory, method_name):
     """Collect files from directory and process them with the specified method.
@@ -124,24 +55,6 @@ def file_processor(base_config):
     return FileProcessor(
         base_config, message_queue, cancel_requested, max_workers=1
     )
-
-
-@pytest.fixture
-def dataset_dir(tmp_path):
-    file_specs = [
-        ("img_b.png", True),
-        ("img_b.txt", False, {"content": "caption for b"}),
-        ("img_a.jpg", True),
-        ("img_a.txt", False, {"content": "caption for a"}),
-        ("img_a_mask.png", True),
-        ("img_c_no_caption.tiff", True),
-        ("large_image.png", True, {"width": 3000, "height": 3000}),  # 9MP image
-        ("alpha_image.png", True, {"mode": "RGBA"}),
-        ("not_an_image.md", False)
-    ]
-    d, _ = setup_test_directory(tmp_path, "dataset", file_specs)
-    return d
-
 
 # Tests
 
