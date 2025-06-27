@@ -1303,6 +1303,9 @@ class CaptionUI(ctk.CTkToplevel):
                 self.navigation_manager.switch_to_image(
                     self.current_image_index
                 )
+        else:
+            messagebox.showerror("Error", "A directory must be loaded first to open Bulk Caption Edit", parent=self)
+
 
     def _post_dialog_focus_restore(self, previous_focus):
         """Restore focus after a dialog closes"""

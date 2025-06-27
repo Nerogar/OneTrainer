@@ -640,6 +640,7 @@ class FileProcessor:
             filter_func=lambda f: f.suffix.lower() == ".png",
         )
 
+
 class ProgressThrottler:
     """Helper class to throttle progress updates to the UI."""
 

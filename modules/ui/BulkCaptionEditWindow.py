@@ -15,6 +15,79 @@ import customtkinter as ctk
 
 logger = logging.getLogger(__name__)
 
+
+class CaptionEditorLogic:
+    """Handles the business logic for editing caption files."""
+
+    def __init__(self, directory: str, include_subdirectories: bool = False):
+        self.directory = directory
+        self.include_subdirectories = include_subdirectories
+        self.caption_files = self._get_caption_files()
+
+    def _get_caption_files(self) -> list[Path]:
+        """Get all caption (.txt) files in the directory."""
+        base_path = Path(self.directory)
+        files = list(base_path.glob("**/*.txt")) if self.include_subdirectories else list(base_path.glob("*.txt"))
+        return [f for f in files if self._is_caption_file(f)]
+
+    def _is_caption_file(self, file_path: Path) -> bool:
+        """Check if this is likely a caption file (not README, etc)."""
+        return any(file_path.with_suffix(ext).exists() for ext in [".jpg", ".jpeg", ".png", ".webp"])
+
+    def _read_file_content(self, file_path: Path) -> str | None:
+        """Reads a file and returns its stripped content, or None on error."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+        except Exception as e:
+            logger.error(f"Error reading caption file {file_path}: {e}")
+            return None
+
+    def get_preview_items(self, limit: int = 10) -> list[tuple[Path, str]]:
+        """Reads a limited number of caption files for preview."""
+        preview_items = []
+        for file_path in self.caption_files[:limit]:
+            content = self._read_file_content(file_path)
+            if content is not None:
+                preview_items.append((file_path, content))
+        return preview_items
+
+    def _process_and_write_file(self, file_path: Path, operation: Callable[[str], str]) -> tuple[bool, bool]:
+        """
+        Processes and writes a single file. Returns a tuple of (success, changed).
+        """
+        original = self._read_file_content(file_path)
+        if original is None:
+            return (False, False)
+
+        try:
+            modified = operation(original)
+            if original != modified:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(modified)
+                return (True, True)  # Succeeded and changed
+            return (True, False)  # Succeeded, no change
+        except Exception as e:
+            logger.error(f"Error processing or writing caption file {file_path}: {e}")
+            return (False, False)  # Failed
+
+    def apply_changes(self, operation: Callable[[str], str]) -> tuple[int, int]:
+        """Apply the given operation to all caption files."""
+        count = 0
+        failures = 0
+        logger.info(f"Starting bulk caption edit on {len(self.caption_files)} files")
+
+        for file_path in self.caption_files:
+            success, changed = self._process_and_write_file(file_path, operation)
+            if success:
+                if changed:
+                    count += 1
+            else:
+                failures += 1
+
+        return count, failures
+
+
 class BulkCaptionEditWindow(ctk.CTkToplevel):
     SESSION_SETTINGS_KEY = "bulk_caption_edit_window_settings"
 
@@ -30,24 +103,32 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
 
     def __init__(
         self,
-        parent: Any, # Changed from parent to parent: Any for clarity
+        parent: Any,
         directory: str,
         include_subdirectories: bool = False
     ) -> None:
         super().__init__(parent)
         self.parent = parent
-        self.directory = directory
-        self.include_subdirectories = include_subdirectories
+        self.logic = CaptionEditorLogic(directory, include_subdirectories)
 
         self._setup_window()
         self._create_widgets()
-        self._load_session_settings() # Load settings after UI is created
+        self._load_session_settings()
 
     def _load_session_settings(self):
-        load_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+        saved_settings = load_window_session_settings(self, self.SESSION_SETTINGS_KEY)
+        if saved_settings:
+            for key, _, var_name, _ in self._SESSION_SETTINGS_METADATA:
+                if key in saved_settings:
+                    var = getattr(self, var_name)
+                    var.set(saved_settings[key])
 
     def _save_session_settings(self):
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._SESSION_SETTINGS_METADATA)
+        settings_to_save = {}
+        for key, _, var_name, _ in self._SESSION_SETTINGS_METADATA:
+            var = getattr(self, var_name)
+            settings_to_save[key] = var.get()
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, settings_to_save)
 
     def destroy(self):
         self._save_session_settings()
@@ -65,7 +146,7 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
         self.grab_set()
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(4, weight=1)  # Preview area gets extra space
+        self.grid_rowconfigure(4, weight=1)
 
         self.wait_visibility()
         self.lift()
@@ -122,50 +203,53 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
             row=0, column=2, padx=5, pady=5
         )
 
-    def _create_replace_frame(self, row: int) -> None:
-        """Create widgets for replacing text."""
+    def _create_dual_entry_frame(
+        self,
+        row: int,
+        label1_text: str,
+        var1: ctk.StringVar,
+        label2_text: str,
+        var2: ctk.StringVar,
+        preview_command: Callable[[], None]
+    ) -> None:
+        """Helper to create a frame with two labeled text entries and a preview button."""
         frame = ctk.CTkFrame(self)
         frame.grid(row=row, column=0, padx=10, pady=5, sticky="ew")
         frame.grid_columnconfigure(1, weight=1)
         frame.grid_columnconfigure(3, weight=1)
 
-        ctk.CTkLabel(frame, text="Replace:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ctk.CTkLabel(frame, text=label1_text).grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        entry1 = ctk.CTkEntry(frame, textvariable=var1)
+        entry1.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
-        self.replace_text_var = ctk.StringVar()
-        entry = ctk.CTkEntry(frame, textvariable=self.replace_text_var)
-        entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        ctk.CTkLabel(frame, text=label2_text).grid(row=0, column=2, padx=5, pady=5, sticky="w")
+        entry2 = ctk.CTkEntry(frame, textvariable=var2)
+        entry2.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkLabel(frame, text="With:").grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
-        self.replace_with_var = ctk.StringVar()
-        entry = ctk.CTkEntry(frame, textvariable=self.replace_with_var)
-        entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
-
-        ctk.CTkButton(frame, text="Preview", command=self._preview_replace).grid(
+        ctk.CTkButton(frame, text="Preview", command=preview_command).grid(
             row=0, column=4, padx=5, pady=5
+        )
+
+    def _create_replace_frame(self, row: int) -> None:
+        """Create widgets for replacing text."""
+        self.replace_text_var = ctk.StringVar()
+        self.replace_with_var = ctk.StringVar()
+        self._create_dual_entry_frame(
+            row,
+            "Replace:", self.replace_text_var,
+            "With:", self.replace_with_var,
+            self._preview_replace
         )
 
     def _create_regex_frame(self, row: int) -> None:
         """Create widgets for regex replacement."""
-        frame = ctk.CTkFrame(self)
-        frame.grid(row=row, column=0, padx=10, pady=5, sticky="ew")
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(3, weight=1)
-
-        ctk.CTkLabel(frame, text="Regex:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
         self.regex_pattern_var = ctk.StringVar()
-        entry = ctk.CTkEntry(frame, textvariable=self.regex_pattern_var)
-        entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-
-        ctk.CTkLabel(frame, text="Replace With:").grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
         self.regex_replace_var = ctk.StringVar()
-        entry = ctk.CTkEntry(frame, textvariable=self.regex_replace_var)
-        entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
-
-        ctk.CTkButton(frame, text="Preview", command=self._preview_regex).grid(
-            row=0, column=4, padx=5, pady=5
+        self._create_dual_entry_frame(
+            row,
+            "Regex:", self.regex_pattern_var,
+            "Replace With:", self.regex_replace_var,
+            self._preview_regex
         )
 
     def _create_preview_frame(self, row: int) -> None:
@@ -208,25 +292,10 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
 
     def _load_preview(self) -> None:
         """Load initial preview of captions."""
-        # Clear existing widgets
         for widget in self.preview_frame.winfo_children():
             widget.destroy()
 
-        # Get caption files
-        caption_files = self._get_caption_files()
-        self.caption_files = caption_files
-
-        # Read caption contents first, handling errors outside the main loop
-        preview_items = []
-        for file_path in caption_files[:10]:
-            content = ""
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read().strip()
-                preview_items.append((file_path, content))
-            except Exception as e:
-                logger.error(f"Error reading caption file {file_path}: {e}")
-                continue
+        preview_items = self.logic.get_preview_items(limit=10)
 
         # Now create labels with already-loaded content
         for i, (file_path, content) in enumerate(preview_items):
@@ -239,23 +308,7 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
             )
             label.grid(row=i, column=0, sticky="w", padx=5, pady=2)
 
-        # Update affected count
-        self.affected_count.set(f"{len(caption_files)} captions will be affected")
-
-    def _get_caption_files(self) -> list[Path]:
-        """Get all caption (.txt) files in the directory."""
-        base_path = Path(self.directory)
-
-        files = list(base_path.glob("**/*.txt")) if self.include_subdirectories else list(base_path.glob("*.txt"))
-
-        # Filter to only include valid caption files (exclude README, etc)
-        valid_files = [f for f in files if self._is_caption_file(f)]
-        return valid_files
-
-    def _is_caption_file(self, file_path: Path) -> bool:
-        """Check if this is likely a caption file (not README, etc)."""
-        # Simple heuristic: corresponding image file should exist
-        return any(file_path.with_suffix(ext).exists() for ext in [".jpg", ".jpeg", ".png", ".webp"])
+        self.affected_count.set(f"{len(self.logic.caption_files)} captions will be affected")
 
     def _preview_add(self) -> None:
         """Preview adding text to captions."""
@@ -304,31 +357,14 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
 
     def _preview_operation(self, operation: Callable[[str], str]) -> None:
         """Preview an operation on the first 10 captions."""
-        # Clear existing widgets
         for widget in self.preview_frame.winfo_children():
             widget.destroy()
 
-        # Track if any changes will be made
         changes_found = False
         preview_results = []
 
-        # Get the first 10 files to preview
-        files_to_preview = self.caption_files[:10]
-
-        # Helper function to safely read a file
-        def safe_read_file(path: Path) -> tuple[Path, str | None]:
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    return path, f.read().strip()
-            except Exception as e:
-                logger.error(f"Error reading caption file {path}: {e}")
-                return path, None
-
-        # Read all files at once using dictionary comprehension
-        file_contents = {file_path: content for file_path, content in map(safe_read_file, files_to_preview) if content is not None}
-
-        # Now process all content without try-except in the loop
-        for file_path, original in file_contents.items():
+        preview_items = self.logic.get_preview_items(limit=10)
+        for file_path, original in preview_items:
             modified = operation(original)
             if original != modified:
                 changes_found = True
@@ -339,14 +375,13 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
             # Create label showing before/after
             label = ctk.CTkLabel(
                 self.preview_frame,
-                text=f"{Path(file_path).stem}:\nBefore: {original}\nAfter: {modified}",
+                text=f"{Path(file_path).stem}:\nBefore: {original}\n\nAfter: {modified}",
                 justify="left",
                 anchor="w",
                 wraplength=550
             )
             label.grid(row=i*2, column=0, sticky="w", padx=5, pady=(10, 0))
 
-            # Add separator for clarity
             if i < len(preview_results)-1:  # Don't add after the last one
                 sep = ctk.CTkFrame(self.preview_frame, height=1, fg_color="gray")
                 sep.grid(row=i*2+1, column=0, sticky="ew", padx=20, pady=5)
@@ -364,59 +399,8 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
         if not hasattr(self, 'current_operation'):
             return
 
-        operation = self.current_operation
-        count = 0
-        failures = 0
+        count, failures = self.logic.apply_changes(self.current_operation)
 
-        # Log the start of the operation
-        logger.info(f"Starting bulk caption edit on {len(self.caption_files)} files")
-
-        # Helper function to process a single file, handling exceptions
-        def process_file(file_path: Path) -> tuple[bool, bool]:
-            """Process a single file, return (success, changed)"""
-            try:
-                # Read content
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    original = f.read().strip()
-
-                # Process content
-                modified = operation(original)
-
-                # Only write if changed
-                if original != modified:
-                    try:
-                        # Use explicit flush and close to ensure writing completes
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(modified)
-                            f.flush()
-                        logger.debug(f"Updated caption: {file_path}")
-                        return True, True  # Success and changed
-                    except Exception as e:
-                        logger.error(f"Error writing to file {file_path}: {e}")
-                        return False, True  # Failed but would have changed
-                return True, False  # Success but no changes needed
-            except Exception as e:
-                logger.error(f"Error processing caption file {file_path}: {e}")
-                return False, False  # Failed to process
-
-        # Process in batches
-        batch_size = 50
-        total_batches = len(self.caption_files) // batch_size + 1
-
-        for batch_idx in range(total_batches):
-            start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, len(self.caption_files))
-            batch = self.caption_files[start_idx:end_idx]
-
-            # Process this batch without try-except in the loop
-            for file_path in batch:
-                success, changed = process_file(file_path)
-                if success and changed:
-                    count += 1
-                elif not success:
-                    failures += 1
-
-        # Final summary message
         success_msg = f"Updated {count} caption files successfully."
         if failures > 0:
             success_msg += f" ({failures} files failed)"
