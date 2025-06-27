@@ -13,6 +13,7 @@ import collections
 import contextlib
 import logging
 import os
+import random
 import threading
 import time
 import tkinter as tk
@@ -32,7 +33,7 @@ from modules.util.ui.UIState import UIState
 import customtkinter as ctk
 import imagesize
 import oxipng
-from PIL import Image
+from PIL import Image, ImageColor
 
 logger = logging.getLogger(__name__)
 for handler in logging.root.handlers:
@@ -116,10 +117,11 @@ class FileProcessor:
         summary_func: Callable[[dict[str, int], dict[str, list]], str],
         progress_callback: Callable[[float, str], None] | None = None,
         filter_func: Callable[[Path], bool] | None = None,
-    ) -> None:
+    ) -> dict:
         """
         Generic parallel task executor for image files.
         Handles filtering, threading, progress, cancellation, and logging.
+        Returns a dictionary with the aggregated results.
         """
         if filter_func is None:
             filter_func = self._filter_is_image
@@ -127,7 +129,7 @@ class FileProcessor:
         image_files = [f for f in files if filter_func(f)]
         self._log(f"{task_name}: Found {len(image_files)} files to process.")
         if not image_files:
-            return
+            return {}
 
         results = collections.defaultdict(int)
         extra_data = collections.defaultdict(list)
@@ -152,7 +154,7 @@ class FileProcessor:
                 processed_count = sum(results.values())
                 if progress_callback:
                     progress_callback(
-                        processed_count / total_files,
+                        (processed_count / total_files) * 100,
                         f"{task_name}: {file.name}",
                     )
 
@@ -161,7 +163,7 @@ class FileProcessor:
 
         if self.cancel_requested():
             self._log(f"{task_name} was cancelled.")
-            return
+            return results
 
         summary_message = summary_func(results, extra_data)
         self._log(summary_message)
@@ -171,43 +173,41 @@ class FileProcessor:
             for name, error in extra_data["errors"]:
                 self._log(f"  - {name}: {error}")
 
-    def verify_single_image(self, file: Path) -> tuple[bool, str, bool]:
+        return results
+
+    def verify_single_image(self, file: Path) -> None:
         """
-        Verify a single image file for corruption.
+        Verify a single image file for corruption. Raises ValueError on failure.
 
         Note: The image is opened twice because Pillow's .verify() invalidates the image object.
         """
+        file_path = Path(file)
         try:
-            with Image.open(file) as img:
+            with Image.open(file_path) as img:
                 img.verify()
-            with Image.open(file) as img:
+            with Image.open(file_path) as img:
                 img.load()
                 if hasattr(img, "getpixel"):
                     img.getpixel((0, 0))
-            return True, "", False
         except Exception as e:
-            return False, str(e), True
+            raise ValueError(f"Image file {file_path.name} is corrupt or invalid: {e}") from e
 
     def verify_images(
         self,
         files: list[Path],
         progress_callback: Callable[[float, str | None], None] | None = None,
-    ) -> None:
+    ) -> dict:
         """Verify images for corruption using parallel processing."""
         self._log("Starting image verification process...")
 
         def worker(file: Path) -> tuple[str, object | None]:
             try:
-                with Image.open(file) as img:
-                    img.verify()
-                with Image.open(file) as img:
-                    img.load()
-                    if hasattr(img, "getpixel"):
-                        img.getpixel((0, 0))
+                self.verify_single_image(file)
                 self._log(f"✓ {file.name} is valid")
                 return "valid", None
-            except Exception as e:
-                error_msg = str(e)
+            except ValueError as e:
+                original_error = e.__cause__ or e
+                error_msg = str(original_error)
                 self._log(f"✗ {file.name} is CORRUPTED: {error_msg}")
                 return "errors", (file.name, error_msg)
 
@@ -219,7 +219,7 @@ class FileProcessor:
 
             return f"⚠ Image verification complete: {valid_count} valid, {error_count} corrupted/problematic"
 
-        self._run_parallel_task(
+        return self._run_parallel_task(
             task_name="Image Verification",
             files=files,
             worker_func=worker,
@@ -368,11 +368,10 @@ class FileProcessor:
 
         self._log("Starting sequential file renaming…")
 
-        # --- Refactored file grouping (single pass) ---
+        # --- File grouping ---
         groups = defaultdict(lambda: {"image": None, "caption": None, "masks": []})
         for f in files:
             stem = f.stem
-            # Use removesuffix (Python 3.9+) for cleaner logic
             if stem.endswith("-masklabel"):
                 base_stem = stem.removesuffix("-masklabel")
                 groups[base_stem]["masks"].append((f, "masklabel"))
@@ -400,6 +399,7 @@ class FileProcessor:
             for i, f in enumerate(sorted_imgs)
         )
         if not seq_needed:
+            self._log("Files are already named sequentially. No action needed.")
             progress_callback and progress_callback(1.0, "Files are already sequential.")
             return sorted_imgs
 
@@ -551,29 +551,42 @@ class FileProcessor:
         progress_callback: Callable[[float, str | None], None] | None = None,
     ) -> None:
         """Replace image transparency with a solid background color using parallel processing."""
+        import re
+
         self._log("Processing transparent images (excluding mask files)...")
         cfg = self.config_data
-        bg_color_str = cfg["alpha_bg_color"].strip().lower()
+        bg_color_str = cfg["alpha_bg_color"].strip()
+        use_white_fallback = False
 
         try:
-            if bg_color_str in ("-1", "random"):
-                import random
+            if bg_color_str.lower() in ("-1", "random"):
                 r, g, b = (random.randint(0, 255) for _ in range(3))
                 bg_color_tuple = (r, g, b)
                 self._log(f"Using random background color: #{r:02x}{g:02x}{b:02x}")
             else:
-                bg_color_tuple = Image.Color.getrgb(bg_color_str)
+                if bg_color_str.startswith("#") and not re.fullmatch(
+                    r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", bg_color_str
+                ):
+                    raise ValueError("Invalid hex color format")
+
+                color = ImageColor.getrgb(bg_color_str)
+                # Ensure we have a 3-channel RGB tuple for the background
+                bg_color_tuple = color[:3]
             self._log(f"Using background color: {bg_color_str} (RGB: {bg_color_tuple})")
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             self._log(f"Invalid color '{bg_color_str}': {e}. Using white instead.")
-            bg_color_tuple = (255, 255, 255)
+            bg_color_tuple = (255, 255, 255)  # White
+            use_white_fallback = True  # Set flag to use white fallback
 
         def worker(file: Path) -> tuple[str, object | None]:
             with Image.open(file) as img:
-                if img.mode not in ("RGBA", "LA") or img.getchannel("A").getextrema()[0] == 255:
+                if img.mode not in ("RGBA", "LA"):
                     return "skipped", None
 
-                background = Image.new("RGB", img.size, bg_color_tuple)
+                # Always use white if the fallback flag is set
+                color_to_use = (255, 255, 255) if use_white_fallback else bg_color_tuple
+
+                background = Image.new("RGB", img.size, color_to_use)
                 background.paste(img, (0, 0), img)
                 background.save(str(file))
                 return "processed", None
@@ -587,7 +600,7 @@ class FileProcessor:
             worker,
             summary,
             progress_callback,
-            filter_func=self._filter_images_and_skip_masks
+            filter_func=self._filter_images_and_skip_masks,
         )
 
     def optimize_pngs(
@@ -626,7 +639,6 @@ class FileProcessor:
             progress_callback=progress_callback,
             filter_func=lambda f: f.suffix.lower() == ".png",
         )
-
 
 class ProgressThrottler:
     """Helper class to throttle progress updates to the UI."""
@@ -1083,7 +1095,7 @@ class FileOperationsWindow(ctk.CTkToplevel):
             hover_color="#218838",
         ).grid(row=0, column=0, padx=(5, 2), pady=10)
         ctk.CTkButton(
-            action_frame, text="Close", command=self.destroy
+            action_frame, text="Close", command=self._on_close
         ).grid(row=0, column=2, padx=(2, 5), pady=10)
 
     def _browse_directory(self) -> None:

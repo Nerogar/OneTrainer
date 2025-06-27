@@ -1191,7 +1191,7 @@ class CaptionUI(ctk.CTkToplevel):
         # If the clicked widget is an input field (or a child of one), do nothing.
         # Let the default behavior handle focus.
         w = clicked_widget
-        while w:
+        while isinstance(w, tk.Widget):
             if isinstance(w, (ctk.CTkEntry | ctk.CTkTextbox| ctk.CTkOptionMenu| ctk.CTkButton| ctk.CTkCheckBox| ctk.CTkSwitch)):
                 return
             if w == self:

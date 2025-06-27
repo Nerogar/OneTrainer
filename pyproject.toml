@@ -1,5 +1,7 @@
 [project]
 requires-python = ">=3.10"
+name = "onetrainer"
+version = "1.0.0"
 
 [tool.ruff]
 extend-exclude = [
@@ -13,6 +15,9 @@ extend-exclude = [
     "scripts/util/version_check.py",
 ]
 line-length = 120
+
+[tool.setuptools]
+packages = ["modules"]
 
 [tool.ruff.lint]
 select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF"]
