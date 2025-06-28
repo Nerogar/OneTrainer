@@ -1,3 +1,4 @@
+import logging
 import platform
 import sys
 import tkinter as tk
@@ -8,6 +9,7 @@ from typing import Any
 
 from customtkinter import CTk, CTkToplevel
 
+logger = logging.getLogger(__name__)
 
 def bind_mousewheel(
     widget: Any,
@@ -99,3 +101,48 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
 
     except Exception as e:
         print(f"Failed to set window icon: {e}")
+
+def load_window_session_settings(
+    window_instance: Any,
+    session_settings_key: str,
+) -> dict:
+    """
+    Loads session settings for a window using the dataclass approach.
+
+    Args:
+        window_instance: The instance of the CTkToplevel window.
+        session_settings_key: The key used to store this window's settings in session_ui_settings.
+
+    Returns:
+        The dictionary of saved settings that were found (could be empty if none were found).
+    """
+    if hasattr(window_instance, "parent") and hasattr(window_instance.parent, "session_ui_settings"):
+        saved_settings = window_instance.parent.session_ui_settings.get(session_settings_key, {})
+        if saved_settings:
+            logger.debug(f"Loaded session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
+            return saved_settings
+        else:
+            logger.debug(f"No saved session settings found for key '{session_settings_key}' in {window_instance.__class__.__name__}.")
+    else:
+        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__}.")
+    return {}
+
+def save_window_session_settings(
+    window_instance: Any,
+    session_settings_key: str,
+    settings_dict: dict,
+) -> None:
+    """
+    Saves session settings for a window using the dataclass approach.
+
+    Args:
+        window_instance: The instance of the CTkToplevel window.
+        session_settings_key: The key used to store this window's settings in session_ui_settings.
+        settings_dict: The dictionary of settings to save (from the dataclass).
+    """
+    if not hasattr(window_instance, "parent") or not hasattr(window_instance.parent, "session_ui_settings"):
+        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__} during save.")
+        return
+
+    window_instance.parent.session_ui_settings[session_settings_key] = settings_dict
+    logger.debug(f"Saved session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")

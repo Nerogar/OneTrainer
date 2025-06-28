@@ -11,6 +11,7 @@ matplotlib==3.10.3
 av==14.4.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
+pillow-jxl-plugin==1.3.3
 
 # pytorch
 accelerate==1.7.0
@@ -56,3 +57,12 @@ fabric==3.2.2
 # debug
 psutil==7.0.0
 requests==2.32.3
+
+# dataset tools
+einops==0.8.1
+pyvips==3.0.0
+pyvips-binary==8.17.0
+pyoxipng==9.1.0
+# required for DPID https://dl.acm.org/doi/10.1145/2980179.2980239
+pepeline==0.3.14
+pepedpid==0.1.1
