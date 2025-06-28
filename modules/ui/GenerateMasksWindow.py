@@ -17,7 +17,7 @@ import customtkinter as ctk
 logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
-class MaskWindowSettings:
+class MaskingModel:
     model: str = ""
     path: str = ""
     prompt: str = ""
@@ -29,16 +29,155 @@ class MaskWindowSettings:
     include_subdirectories: bool = False
     preview_mode: bool = False
 
-class GenerateMasksWindow(ctk.CTkToplevel):
+class MaskingController:
+    SESSION_SETTINGS_KEY = "generate_masks_window_settings"
+    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+
+    def __init__(self, parent: Any, view: 'MaskingView'):
+        self.parent = parent
+        self.view = view
+        self.model = MaskingModel()
+        self.mode_map = {
+            "Replace all masks": "replace",
+            "Create if absent": "fill",
+            "Add to existing": "add",
+            "Subtract from existing": "subtract",
+            "Blend with existing": "blend",
+        }
+
+    def load_settings(self):
+        settings_dict = load_window_session_settings(self.view, self.SESSION_SETTINGS_KEY)
+        if settings_dict:
+            self.model = MaskingModel(**settings_dict)
+            self.view.apply_settings_to_ui(self.model)
+
+    def save_settings(self):
+        self.model = self.view.gather_settings_from_ui()
+        save_window_session_settings(self.view, self.SESSION_SETTINGS_KEY, asdict(self.model))
+
+    def get_mode(self, mode_str: str) -> str:
+        return self.mode_map.get(mode_str, "fill")
+
+    def _prepare_mask_args(self) -> tuple[dict[str, Any] | None, str | None]:
+        """Prepare arguments for the masking model based on UI settings."""
+        mode = self.get_mode(self.model.mode)
+
+        args = {
+            "prompts": [self.model.prompt],
+            "mode": mode,
+            "alpha": float(self.model.alpha),
+            "threshold": float(self.model.threshold),
+            "smooth_pixels": int(self.model.smooth),
+            "expand_pixels": int(self.model.expand),
+            "progress_callback": self.view.set_progress,
+        }
+
+        if self.model.preview_mode:
+            if not hasattr(self.parent, "current_image_index"):
+                return None, "Preview mode is enabled, but no image is selected."
+
+            if not (hasattr(self.parent, "image_rel_paths") and
+                    0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
+                return None, "No current image is selected for preview."
+
+            current_image_rel_path = self.parent.image_rel_paths[self.parent.current_image_index]
+            logger.info("Preview mode: Processing only image %s", current_image_rel_path)
+
+            args.update({
+                "sample_dir": self.parent.dir,
+                "include_subdirectories": True,
+                "single_file": current_image_rel_path
+            })
+        else:
+            args.update({
+                "sample_dir": self.model.path,
+                "include_subdirectories": self.model.include_subdirectories
+            })
+
+        return args, None
+
+    def run_masking_process(self):
+        masking_model = self.parent.model_manager.load_masking_model(
+            self.model.model
+        )
+
+        if masking_model is None:
+            raise RuntimeError(f"Failed to load masking model: {self.model.model}")
+
+        if hasattr(masking_model, "model_manager"):
+            masking_model.model_manager = self.parent.model_manager
+
+        mask_args, error = self._prepare_mask_args()
+
+        if error:
+            raise RuntimeError(error)
+
+        if mask_args:
+            masking_model.mask_folder(**mask_args)
+
+    def create_masks(self):
+        self.model = self.view.gather_settings_from_ui()
+        is_valid, error = self.validate_inputs(self.model)
+        if not is_valid:
+            self.view.show_warning("Invalid Input", error)
+            return
+
+        self.view.processing_started()
+        try:
+            future = self._executor.submit(self.run_masking_process)
+            self.view.after(100, lambda: self._check_future(future))
+        except Exception as e:
+            logger.exception("Failed to start masking thread")
+            self.view.show_error("Thread Error", str(e))
+
+    def _check_future(self, future):
+        if not future.done():
+            self.view.after(100, lambda: self._check_future(future))
+            return
+
+        try:
+            future.result()
+            self.view.processing_finished()
+            if hasattr(self.parent, "image_handler") and hasattr(
+                self.parent.image_handler, "load_image_data"
+            ):
+                self.parent.image_handler.load_image_data()
+                self.parent.refresh_ui()
+        except Exception as e:
+            logger.exception("Error in masking process")
+            self.view.show_error("Processing Error", f"An error occurred during mask creation:\n{str(e)}")
+
+    def validate_inputs(self, settings: MaskingModel) -> tuple[bool, str]:
+        """Validate all user inputs. Returns (is_valid, error_message)."""
+        validators = [
+            ("Threshold", settings.threshold, float, 0.0, 0.9, "Threshold must be between 0.0 and 0.9 for usable results"),
+            ("Smooth", settings.smooth, int, 0, 10, "Smooth pixels should be between 0 and 10"),
+            ("Expand", settings.expand, int, 0, 64, "Expand pixels should be between 0 and 64"),
+            ("Alpha", settings.alpha, float, 0.0, 1.0, "Alpha must be between 0.0 and 1.0"),
+        ]
+
+        try:
+            for _name, value_str, type_conv, min_val, max_val, msg in validators:
+                value = type_conv(value_str)
+                if not min_val <= value <= max_val:
+                    return False, msg
+        except ValueError:
+            return False, "Invalid number value. Please check your inputs."
+
+        if not settings.prompt.strip():
+            return False, "Please enter a detection prompt"
+        if not Path(settings.path).is_dir():
+            return False, "Please select a valid folder"
+
+        return True, ""
+
+class MaskingView(ctk.CTkToplevel):
     __slots__ = (
-        'parent', 'models', 'model_var', 'mode_map', 'modes', 'mode_var', 'preview_mode_var',
+        'parent', 'controller', 'models', 'model_var', 'modes', 'mode_var', 'preview_mode_var',
         'frame', 'model_dropdown', 'path_entry', 'path_button', 'prompt_entry', 'mode_dropdown',
         'threshold_entry', 'smooth_entry', 'expand_entry', 'alpha_entry', 'include_subdirectories_var',
         'progress_label', 'progress', 'create_masks_button'
     )
-
-    SESSION_SETTINGS_KEY = "generate_masks_window_settings"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def __init__(
             self, parent: Any, path: str | None, include_subdirectories: bool, *args: Any, **kwargs: Any
@@ -53,6 +192,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             """
             super().__init__(parent, *args, **kwargs)
             self.parent = parent
+            self.controller = MaskingController(parent, self)
 
             if path is None:
                 path = ""
@@ -67,14 +207,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             )
 
             # Define modes with mapping to API values
-            self.mode_map = {
-                "Replace all masks": "replace",
-                "Create if absent": "fill",
-                "Add to existing": "add",
-                "Subtract from existing": "subtract",
-                "Blend with existing": "blend",
-            }
-            self.modes = list(self.mode_map.keys())
+            self.modes = list(self.controller.mode_map.keys())
             self.mode_var = ctk.StringVar(self, "Create if absent")
 
             # Add preview mode toggle
@@ -82,7 +215,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
             # Set up the UI
             self._create_layout(path, include_subdirectories)
-            self._load_session_settings() # Load settings after UI is created
+            self.controller.load_settings() # Load settings after UI is created
 
             # If a non-empty path is passed from the parent, ensure it overrides any session-loaded path.
             # The `if path:` check handles None, empty strings, and other "falsy" values.
@@ -90,7 +223,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
                 self.path_entry.delete(0, END)
                 self.path_entry.insert(0, path)
 
-    def _apply_settings_to_ui(self, settings: MaskWindowSettings):
+    def apply_settings_to_ui(self, settings: MaskingModel):
         self.model_var.set(settings.model)
         self.path_entry.delete(0, END)
         self.path_entry.insert(0, settings.path)
@@ -109,8 +242,8 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.preview_mode_var.set(settings.preview_mode)
 
 
-    def _gather_settings_from_ui(self) -> MaskWindowSettings:
-        return MaskWindowSettings(
+    def gather_settings_from_ui(self) -> MaskingModel:
+        return MaskingModel(
             model=self.model_var.get(),
             path=self.path_entry.get(),
             prompt=self.prompt_entry.get(),
@@ -123,18 +256,8 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             preview_mode=self.preview_mode_var.get(),
         )
 
-    def _load_session_settings(self):
-        settings_dict = load_window_session_settings(self, self.SESSION_SETTINGS_KEY)
-        if settings_dict:
-            settings = MaskWindowSettings(**settings_dict)
-            self._apply_settings_to_ui(settings)
-
-    def _save_session_settings(self):
-        settings = self._gather_settings_from_ui()
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, asdict(settings))
-
     def destroy(self):
-        self._save_session_settings()
+        self.controller.save_settings()
         super().destroy()
 
     def _add_labeled_entry(self, row, label, default="", width=200, placeholder=None, tooltip=None):
@@ -274,32 +397,8 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.progress.grid(row=10, column=1, sticky="w", padx=5, pady=5)
 
     def _create_action_buttons(self):
-        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
+        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.controller.create_masks)
         self.create_masks_button.grid(row=11, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-
-    def validate_inputs(self) -> tuple[bool, str]:
-        """Validate all user inputs. Returns (is_valid, error_message)."""
-        validators = [
-            ("Threshold", self.threshold_entry, float, 0.0, 0.9, "Threshold must be between 0.0 and 0.9 for usable results"),
-            ("Smooth", self.smooth_entry, int, 0, 10, "Smooth pixels should be between 0 and 10"),
-            ("Expand", self.expand_entry, int, 0, 64, "Expand pixels should be between 0 and 64"),
-            ("Alpha", self.alpha_entry, float, 0.0, 1.0, "Alpha must be between 0.0 and 1.0"),
-        ]
-
-        try:
-            for _name, entry, type_conv, min_val, max_val, msg in validators:
-                value = type_conv(entry.get())
-                if not min_val <= value <= max_val:
-                    return False, msg
-        except ValueError:
-            return False, "Invalid number value. Please check your inputs."
-
-        if not self.prompt_entry.get().strip():
-            return False, "Please enter a detection prompt"
-        if not Path(self.path_entry.get()).is_dir():
-            return False, "Please select a valid folder"
-
-        return True, ""
 
     def browse_for_path(self, entry_box):
         path = filedialog.askdirectory()
@@ -308,7 +407,20 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         entry_box.insert(0, path)
         self.focus_set()
 
-    def _reset_button_state(self):
+    def show_warning(self, title, message):
+        messagebox.showwarning(title, message, parent=self)
+
+    def show_error(self, title, message):
+        self.reset_button_state()
+        messagebox.showerror(title, message, parent=self)
+
+    def processing_started(self):
+        self.create_masks_button.configure(state="disabled", text="Processing...")
+
+    def processing_finished(self):
+        self.reset_button_state()
+
+    def reset_button_state(self):
         self.create_masks_button.configure(state="normal", text="Create Masks")
 
     def set_progress(self, value, max_value):
@@ -316,111 +428,3 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.progress.set(progress)
         self.progress_label.configure(text=f"{value}/{max_value}")
         self.progress.update()
-
-    def create_masks(self):
-        is_valid, error = self.validate_inputs()
-        if not is_valid:
-            messagebox.showwarning("Invalid Input", error)
-            return
-
-        self.create_masks_button.configure(state="disabled", text="Processing...")
-        try:
-            # Submit the task to the executor
-            future = self._executor.submit(self._run_masking_process,
-                self.prompt_entry.get(),
-                float(self.alpha_entry.get()),
-                float(self.threshold_entry.get()),
-                int(self.smooth_entry.get()),
-                int(self.expand_entry.get())
-            )
-            # Schedule a callback to handle completion/errors
-            self.after(100, lambda: self._check_future(future))
-        except Exception as e:
-            logger.exception("Failed to start masking thread")
-            self._reset_button_state()
-            messagebox.showerror("Thread Error", str(e))
-
-    def _check_future(self, future):
-        if not future.done():
-            self.after(100, lambda: self._check_future(future))
-            return
-
-        try:
-            future.result()
-            self._update_ui_after_processing()
-        except Exception as e:
-            logger.exception("Error in masking process")
-            self._handle_masking_error(str(e))
-
-    def get_mode(self, mode_str: str) -> str:
-        return self.mode_map.get(mode_str, "fill")
-
-    def _prepare_mask_args(self, prompt: str, alpha: float, threshold: float, smooth_pixels: int, expand_pixels: int) -> tuple[dict[str, Any] | None, str | None]:
-        """Prepare arguments for the masking model based on UI settings."""
-        mode = self.get_mode(self.mode_var.get())
-
-        args = {
-            "prompts": [prompt],
-            "mode": mode,
-            "alpha": alpha,
-            "threshold": threshold,
-            "smooth_pixels": smooth_pixels,
-            "expand_pixels": expand_pixels,
-            "progress_callback": self.set_progress,
-        }
-
-        if self.preview_mode_var.get():
-            if not hasattr(self.parent, "current_image_index"):
-                return None, "Preview mode is enabled, but no image is selected."
-
-            if not (hasattr(self.parent, "image_rel_paths") and
-                    0 <= self.parent.current_image_index < len(self.parent.image_rel_paths)):
-                return None, "No current image is selected for preview."
-
-            current_image_rel_path = self.parent.image_rel_paths[self.parent.current_image_index]
-            logger.info("Preview mode: Processing only image %s", current_image_rel_path)
-
-            args.update({
-                "sample_dir": self.parent.dir,
-                "include_subdirectories": True,
-                "single_file": current_image_rel_path
-            })
-        else:
-            args.update({
-                "sample_dir": self.path_entry.get(),
-                "include_subdirectories": self.include_subdirectories_var.get()
-            })
-
-        return args, None
-
-    def _run_masking_process(self, prompt, alpha, threshold, smooth_pixels, expand_pixels):
-        masking_model = self.parent.model_manager.load_masking_model(
-            self.model_var.get()
-        )
-
-        if masking_model is None:
-            raise RuntimeError(f"Failed to load masking model: {self.model_var.get()}")
-
-        if hasattr(masking_model, "model_manager"):
-            masking_model.model_manager = self.parent.model_manager
-
-        mask_args, error = self._prepare_mask_args(prompt, alpha, threshold, smooth_pixels, expand_pixels)
-
-        if error:
-            raise RuntimeError(error)
-
-        if mask_args:
-            masking_model.mask_folder(**mask_args)
-
-    def _update_ui_after_processing(self):
-        self._reset_button_state()
-
-        if hasattr(self.parent, "image_handler") and hasattr(
-            self.parent.image_handler, "load_image_data"
-        ):
-            self.parent.image_handler.load_image_data()
-            self.parent.refresh_ui()
-
-    def _handle_masking_error(self, error_message):
-        self._reset_button_state()
-        messagebox.showerror("Processing Error", f"An error occurred during mask creation:\n{error_message}")

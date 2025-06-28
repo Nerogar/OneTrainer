@@ -38,7 +38,7 @@ from modules.module.SAMdreamMaskModel import SAMdreamMaskModel
 from modules.ui.BulkCaptionEditWindow import BulkCaptionEditWindow
 from modules.ui.FileOperationsWindow import FileOperationsWindow
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
-from modules.ui.GenerateMasksWindow import GenerateMasksWindow
+from modules.ui.GenerateMasksWindow import MaskingView
 from modules.util import path_util
 from modules.util.torch_util import default_device
 from modules.util.ui import components
@@ -1311,11 +1311,13 @@ class CaptionUI(ctk.CTkToplevel):
                 self.navigation_manager.switch_to_image(
                     self.current_image_index
                 )
+        else:
+            messagebox.showerror("Error", "A directory must be loaded first to open Auto-Caption", parent=self)
 
     def _open_mask_window(self) -> None:
         """Open the auto-mask generation window as a modal dialog."""
         if self.dir:
-            dialog = GenerateMasksWindow(
+            dialog = MaskingView(
                 self,
                 self.dir,
                 self.config_ui_data["include_subdirectories"],
@@ -1325,6 +1327,8 @@ class CaptionUI(ctk.CTkToplevel):
                 self.navigation_manager.switch_to_image(
                     self.current_image_index
                 )
+        else:
+            messagebox.showerror("Error", "A directory must be loaded first to open Auto-Mask", parent=self)
 
     def _open_file_tools(self) -> None:
         """Open the file tools window as a modal dialog."""
