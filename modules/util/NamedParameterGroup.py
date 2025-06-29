@@ -31,7 +31,10 @@ class NamedParameterGroupCollection:
         self.__groups.append(group)
 
     def parameters(self) -> list[Parameter]:
-        return sum([x.parameters for x in self.__groups], [])
+        params = [p for group in self.__groups for p in group.parameters]
+        # Some parameter groups might not have parameters. Only the collection of all param groups need to have at least one parameter.
+        assert len(params) != 0, 'Parameter group collection cannot be empty.'
+        return params
 
     def parameters_for_optimizer(self, config: TrainConfig) -> list[dict]:
         parameters = []
