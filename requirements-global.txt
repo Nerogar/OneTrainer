@@ -64,5 +64,4 @@ pyvips==3.0.0
 pyvips-binary==8.17.0
 pyoxipng==9.1.0
 # required for DPID https://dl.acm.org/doi/10.1145/2980179.2980239
-pepeline==0.3.14
 pepedpid==0.1.1
