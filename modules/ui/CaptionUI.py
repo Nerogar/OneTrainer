@@ -458,8 +458,12 @@ class CaptionUI(ctk.CTkToplevel):
         self._create_editor_panel(main_frame)
 
     def _on_window_resize(self, event: tk.Event) -> None:
-        """Update file list display on window resize (e.g., maximize)."""
-        # Only update if the file list exists and there are files loaded
+        """Debounced update of file list display on window resize (e.g., maximize)."""
+        if hasattr(self, "_resize_filelist_after_id"):
+            self.after_cancel(self._resize_filelist_after_id)
+        self._resize_filelist_after_id = self.after(200, self._debounced_update_file_list_display)
+
+    def _debounced_update_file_list_display(self):
         if hasattr(self, "file_list") and self.image_rel_paths:
             self._update_file_list_display()
 
