@@ -54,7 +54,7 @@ class MoondreamModel(BaseImageCaptionModel):
         """Helper method to get the image from the caption sample."""
         try:
             image = caption_sample.get_image()
-            # logger.debug("MoondreamModel: Acquired image") # Can be verbose
+            # logger.debug("MoondreamModel: Acquired image")
             return image
         except Exception:
             logger.exception("MoondreamModel: ERROR getting image from caption_sample")
@@ -238,8 +238,6 @@ class MoondreamModel(BaseImageCaptionModel):
                         reasoning
                     )
 
-                    # The output format may vary based on the model version and `reasoning` flag.
-                    # This implementation converts the output to a string.
                     final_answer = str(answer).strip()
                     return final_answer
 

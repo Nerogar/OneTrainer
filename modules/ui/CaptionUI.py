@@ -304,6 +304,7 @@ class CaptionUI(ctk.CTkToplevel):
         self._setup_window()
 
         self._create_layout()
+        self.bind("<Configure>", self._on_window_resize)
 
         if initial_dir:
             logger.debug("Loading initial directory: %s", initial_dir)
@@ -455,6 +456,12 @@ class CaptionUI(ctk.CTkToplevel):
         main_frame.grid_rowconfigure(0, weight=1)
         self._create_file_list(main_frame)
         self._create_editor_panel(main_frame)
+
+    def _on_window_resize(self, event: tk.Event) -> None:
+        """Update file list display on window resize (e.g., maximize)."""
+        # Only update if the file list exists and there are files loaded
+        if hasattr(self, "file_list") and self.image_rel_paths:
+            self._update_file_list_display()
 
     def _create_file_list(self, parent: ctk.CTkFrame) -> None:
         """Create the file list pane with fixed headers."""
