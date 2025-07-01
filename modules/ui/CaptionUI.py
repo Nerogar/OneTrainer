@@ -6,6 +6,7 @@ or manually caption and mask images from a loaded directory.
 """
 
 import contextlib
+import gc
 import logging
 import os
 import platform
@@ -315,7 +316,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.title("Dataset Tools")
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.resizable(True, True)
-        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # After a short delay, remove the topmost attribute so the window behaves normally.
         self.after(200, lambda: self.attributes("-topmost", False))
@@ -341,6 +342,13 @@ class CaptionUI(ctk.CTkToplevel):
 
         self.wait_visibility()
         self.after(200, lambda: set_window_icon(self))
+
+    def on_close(self) -> None:
+        """Handle window closing event."""
+        logger.info("CaptionUI closing. Unloading models.")
+        if self.model_manager:
+            self.model_manager.unload_all_models()
+        self.destroy()
 
     def _create_layout(self) -> None:
         """Create the main UI layout."""
@@ -2519,6 +2527,34 @@ class ModelManager:
         | None
     ):
         return self.captioning_model
+
+    def unload_all_models(self) -> None:
+        """Unload all models and clear VRAM."""
+        logger.info("Unloading all models.")
+
+        if torch.cuda.is_available():
+            allocated_before = torch.cuda.memory_allocated() / 1024**2
+            reserved_before = torch.cuda.memory_reserved() / 1024**2
+            logger.info(f"VRAM before unload: {allocated_before:.2f} MB allocated, {reserved_before:.2f} MB reserved.")
+
+        if self.captioning_model is not None:
+            logger.debug(f"Unloading captioning model: {self.current_captioning_model_name}")
+            del self.captioning_model
+            self.captioning_model = None
+            self.current_captioning_model_name = None
+
+        if self.masking_model is not None:
+            logger.debug(f"Unloading masking model: {self.current_masking_model_name}")
+            del self.masking_model
+            self.masking_model = None
+            self.current_masking_model_name = None
+
+        # Force garbage collection to release model objects before clearing cache
+        gc.collect()
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
 
 
 class FileManager:
