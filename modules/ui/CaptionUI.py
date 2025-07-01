@@ -2530,12 +2530,7 @@ class ModelManager:
 
     def unload_all_models(self) -> None:
         """Unload all models and clear VRAM."""
-        logger.info("Unloading all models.")
-
-        if torch.cuda.is_available():
-            allocated_before = torch.cuda.memory_allocated() / 1024**2
-            reserved_before = torch.cuda.memory_reserved() / 1024**2
-            logger.info(f"VRAM before unload: {allocated_before:.2f} MB allocated, {reserved_before:.2f} MB reserved.")
+        logger.debug("Unloading all models.")
 
         if self.captioning_model is not None:
             logger.debug(f"Unloading captioning model: {self.current_captioning_model_name}")
