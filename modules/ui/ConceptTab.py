@@ -28,7 +28,7 @@ class ConceptTab(ConfigList):
             add_button_text="Add Concept",
             add_button_tooltip="Adds a new concept to the current config.",
             is_full_width=False,
-            show_toggle_buttons=True
+            show_toggle_button=True
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):

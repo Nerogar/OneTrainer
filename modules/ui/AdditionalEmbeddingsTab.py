@@ -20,7 +20,7 @@ class AdditionalEmbeddingsTab(ConfigList):
             from_external_file=False,
             add_button_text="add embedding",
             is_full_width=True,
-            show_toggle_buttons=True
+            show_toggle_button=True
         )
 
     def refresh_ui(self):
