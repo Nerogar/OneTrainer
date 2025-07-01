@@ -6,7 +6,6 @@ or manually caption and mask images from a loaded directory.
 """
 
 import contextlib
-import gc
 import logging
 import os
 import platform
@@ -41,7 +40,7 @@ from modules.ui.FileOperationsWindow import FileOperationsWindow
 from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import MaskingView
 from modules.util import path_util
-from modules.util.torch_util import default_device
+from modules.util.torch_util import default_device, torch_gc
 from modules.util.ui import components
 from modules.util.ui.CTKListbox import CTkListbox
 from modules.util.ui.icons import load_icon
@@ -2544,11 +2543,7 @@ class ModelManager:
             self.masking_model = None
             self.current_masking_model_name = None
 
-        # Force garbage collection to release model objects before clearing cache
-        gc.collect()
-
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        torch_gc()
 
 
 
