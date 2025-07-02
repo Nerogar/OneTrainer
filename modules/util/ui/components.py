@@ -185,9 +185,11 @@ def icon_button(master, row, column, text, command):
     return component
 
 
-def button(master, row, column, text, command, tooltip=None):
+def button(master, row, column, text, command, tooltip=None, width=None, padx=PAD, pady=PAD, sticky="new", **grid_kwargs):
     component = ctk.CTkButton(master, text=text, command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    if width is not None:
+        component.configure(width=width)
+    component.grid(row=row, column=column, padx=padx, pady=pady, sticky=sticky, **grid_kwargs)
     if tooltip:
         ToolTip(component, tooltip, x_position=25)
     return component

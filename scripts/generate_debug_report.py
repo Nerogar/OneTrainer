@@ -5,9 +5,13 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
+import traceback
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -28,6 +32,64 @@ logging.basicConfig(
 )
 
 # == Helper Classes ==
+
+def anonymize_config_dict(config_item):
+    """Recursively anonymize paths in the configuration dictionary."""
+    if isinstance(config_item, dict):
+        return {k: anonymize_config_dict(v) for k, v in config_item.items()}
+    elif isinstance(config_item, list):
+        return [anonymize_config_dict(i) for i in config_item]
+    elif isinstance(config_item, str):
+        return Utility.anonymize_path(config_item)
+    else:
+        return config_item
+
+def create_debug_package(output_zip_path: str, config_json_string: str):
+    """Generates a zip file containing an anonymized config and a debug report."""
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            config_dict = json.loads(config_json_string)
+            anonymized_config = anonymize_config_dict(config_dict)
+            config_path = temp_path / "config.json"
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(anonymized_config, f, indent=4)
+
+            script_path = Path(__file__)
+            onetrainer_dir = script_path.parent.parent  # Go up from scripts/ to OneTrainer/
+
+            result = subprocess.run(
+                [sys.executable, str(script_path)],
+                check=False,
+                cwd=onetrainer_dir,
+                capture_output=True,
+                text=True
+            )
+
+            source_report = onetrainer_dir / "debug_report.log"
+            report_path = temp_path / "debug_report.log"
+
+            if source_report.exists():
+                shutil.copy2(source_report, report_path)
+                source_report.unlink()
+
+            with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.write(config_path, arcname="config.json")
+                if report_path.exists():
+                    zf.write(report_path, arcname="debug_report.log")
+                else:
+                    error_msg = f"Failed to generate debug_report.log.\nReturn code: {result.returncode}"
+                    if result.stderr:
+                        error_msg += f"\nError output:\n{result.stderr}"
+                    if result.stdout:
+                        error_msg += f"\nStandard output:\n{result.stdout}"
+                    zf.writestr("debug_report.log", error_msg)
+
+        logger.info(f"Debug package saved to {Path(output_zip_path).name}")
+    except Exception as e:
+        logger.error(f"Error generating debug package: {e}")
+        traceback.print_exc()
 
 
 class Utility:

@@ -18,6 +18,7 @@ debug*.py
 /update.var
 config.json
 secrets.json
+*.zip
 
 # environments
 /.venv*
