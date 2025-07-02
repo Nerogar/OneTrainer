@@ -61,6 +61,13 @@ class BaseCloud(metaclass=ABCMeta):
 
             if hasattr(concept,"local_path"):
                 if self.config.cloud.transfer_datasets_as_tar:
+                    # Check if remote directory exists and has files using existing sync infrastructure
+                    try:
+                        sync_info = self.file_sync._BaseSSHFileSync__get_sync_info(Path(concept.path))
+                        if sync_info:
+                            continue
+                    except Exception:
+                        pass
                     # Create and upload tar.gz file
                     with tempfile.TemporaryDirectory(prefix="onetrainer_dataset_") as temp_dir:
                         tar_path = Path(temp_dir) / f"{Path(concept.local_path).name}.tar.gz"
