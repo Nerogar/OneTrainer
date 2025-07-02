@@ -1,4 +1,6 @@
 import json
+import tarfile
+import tempfile
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 
@@ -58,10 +60,31 @@ class BaseCloud(metaclass=ABCMeta):
                 return
 
             if hasattr(concept,"local_path"):
-                self.file_sync.sync_up_dir(
-                    local=Path(concept.local_path),
-                    remote=Path(concept.path),
-                    recursive=concept.include_subdirectories)
+                if self.config.cloud.transfer_datasets_as_tar:
+                    # Create and upload tar.gz file
+                    with tempfile.TemporaryDirectory(prefix="onetrainer_dataset_") as temp_dir:
+                        tar_path = Path(temp_dir) / f"{Path(concept.local_path).name}.tar.gz"
+
+                        with tarfile.open(tar_path, 'w:gz') as tar:
+                            if concept.include_subdirectories:
+                                tar.add(concept.local_path, arcname=Path(concept.local_path).name)
+                            else:
+                                # Only add files in root directory
+                                for item in Path(concept.local_path).iterdir():
+                                    if item.is_file():
+                                        tar.add(item, arcname=item.name)
+
+                        # Upload and extract
+                        remote_tar_path = Path(concept.path).parent / f"{Path(concept.path).name}.tar.gz"
+                        self.file_sync.sync_up_file(local=tar_path, remote=remote_tar_path)
+
+                        if hasattr(self, '_extract_tar_files'):
+                            self._extract_tar_files([(remote_tar_path, concept.path)])
+                else:
+                    self.file_sync.sync_up_dir(
+                        local=Path(concept.local_path),
+                        remote=Path(concept.path),
+                        recursive=concept.include_subdirectories)
 
             if hasattr(concept.text,"local_prompt_path"):
                 self.file_sync.sync_up_file(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))

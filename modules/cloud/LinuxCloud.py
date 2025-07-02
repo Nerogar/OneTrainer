@@ -249,3 +249,13 @@ class LinuxCloud(BaseCloud):
 
     def delete_workspace(self):
         self.connection.run(f"rm -r {shlex.quote(self.config.workspace_dir)}",in_stream=False)
+
+    def _extract_tar_files(self, tar_files):
+        # Extract uploaded tar files on the remote instance
+        for remote_tar_path, extract_to in tar_files:
+            # Convert Windows paths to POSIX for Linux remote
+            extract_dir = Path(extract_to).parent.as_posix()
+            tar_name = Path(remote_tar_path).name
+            extract_cmd = f"cd {shlex.quote(extract_dir)} && tar -xzf {shlex.quote(tar_name)} && rm {shlex.quote(tar_name)}"
+            self.connection.run(extract_cmd, in_stream=False)
+            print(f"Extracted {tar_name}")

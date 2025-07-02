@@ -52,6 +52,8 @@ class CloudConfig(BaseConfig):
     download_saves : bool
     download_backups : bool
     download_tensorboard : bool
+    delete_workspace: bool
+    transfer_datasets_as_tar: bool
     on_finish: CloudAction
     on_error: CloudAction
     on_detached_finish: CloudAction
@@ -89,6 +91,7 @@ class CloudConfig(BaseConfig):
         data.append(("download_backups", False, bool, False))
         data.append(("download_tensorboard", False, bool, False))
         data.append(("delete_workspace", False, bool, False))
+        data.append(("transfer_datasets_as_tar", False, bool, False))
         data.append(("on_finish", CloudAction.NONE, CloudAction, False))
         data.append(("on_error", CloudAction.NONE, CloudAction, False))
         data.append(("on_detached_finish", CloudAction.NONE, CloudAction, False))
