@@ -118,7 +118,7 @@ class TrainUI(ctk.CTk):
 
         self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.status_label = components.label(frame, 0, 1, "",
+        self.status_label = components.label(frame, 0, 1, " ",
                                              tooltip="Current status of the training run")
 
         # padding
