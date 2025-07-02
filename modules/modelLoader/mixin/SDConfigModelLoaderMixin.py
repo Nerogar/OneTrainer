@@ -48,7 +48,7 @@ class SDConfigModelLoaderMixin(metaclass=ABCMeta):
         yaml_name = self._get_sd_config_name(model_type, base_model_name)
 
         if yaml_name:
-            with open(yaml_name, "r") as f:
+            with open(yaml_name, "r", encoding="utf-8") as f:
                 return yaml.safe_load(f)
         else:
             return None

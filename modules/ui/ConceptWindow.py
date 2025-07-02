@@ -580,7 +580,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         try:
             if self.concept.text.prompt_source == "sample":
-                with open(splitext[0] + ".txt") as prompt_file:
+                with open(splitext[0] + ".txt", encoding="utf-8") as prompt_file:
                     if self.preview_augmentations.get():
                         prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
                         prompt_output = random.choice(prompt_list)
@@ -589,7 +589,7 @@ class ConceptWindow(ctk.CTkToplevel):
             elif self.concept.text.prompt_source == "filename":
                 prompt_output = os.path.splitext(os.path.basename(preview_image_path))[0]
             elif self.concept.text.prompt_source == "concept":
-                with open(self.concept.text.prompt_path) as prompt_file:
+                with open(self.concept.text.prompt_path, encoding="utf-8") as prompt_file:
                     if self.preview_augmentations.get():
                         prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
                         prompt_output = random.choice(prompt_list)

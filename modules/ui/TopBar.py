@@ -213,7 +213,7 @@ class TopBar:
             basename = os.path.basename(filename)
             is_built_in_preset = basename.startswith("#") and basename != "#.json"
 
-            with open(filename, "r") as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 loaded_dict = json.load(f)
                 default_config = TrainConfig.default_values()
                 if is_built_in_preset:

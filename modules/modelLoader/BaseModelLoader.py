@@ -19,7 +19,7 @@ class BaseModelLoader(metaclass=ABCMeta):
             model: BaseModel,
             base_model_name: str,
     ):
-        with open(os.path.join(base_model_name, "meta.json"), "r") as meta_file:
+        with open(os.path.join(base_model_name, "meta.json"), "r", encoding="utf-8") as meta_file:
             meta = json.load(meta_file)
             train_progress = TrainProgress(
                 epoch=meta['train_progress']['epoch'],
