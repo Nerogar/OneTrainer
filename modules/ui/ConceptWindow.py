@@ -580,23 +580,40 @@ class ConceptWindow(ctk.CTkToplevel):
 
         try:
             if self.concept.text.prompt_source == "sample":
-                with open(splitext[0] + ".txt", encoding="utf-8") as prompt_file:
-                    if self.preview_augmentations.get():
-                        prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
-                        prompt_output = random.choice(prompt_list)
-                    else:
-                        prompt_output = prompt_file.read()
+                caption_file_path = splitext[0] + ".txt"
+                if not os.path.exists(caption_file_path):
+                    prompt_output = "[No caption file]"
+                else:
+                    with open(caption_file_path, encoding="utf-8") as prompt_file:
+                        if self.preview_augmentations.get():
+                            prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
+                            prompt_output = random.choice(prompt_list) if prompt_list else "[Empty caption file]"
+                        else:
+                            prompt_output = prompt_file.read()
+                            if not prompt_output.strip():
+                                prompt_output = "[Empty caption file]"
             elif self.concept.text.prompt_source == "filename":
                 prompt_output = os.path.splitext(os.path.basename(preview_image_path))[0]
             elif self.concept.text.prompt_source == "concept":
-                with open(self.concept.text.prompt_path, encoding="utf-8") as prompt_file:
-                    if self.preview_augmentations.get():
-                        prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
-                        prompt_output = random.choice(prompt_list)
-                    else:
-                        prompt_output = prompt_file.read()
+                if not os.path.exists(self.concept.text.prompt_path):
+                    prompt_output = "[Concept file not found]"
+                else:
+                    with open(self.concept.text.prompt_path, encoding="utf-8") as prompt_file:
+                        if self.preview_augmentations.get():
+                            prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
+                            prompt_output = random.choice(prompt_list) if prompt_list else "[Empty concept file]"
+                        else:
+                            prompt_output = prompt_file.read()
+                            if not prompt_output.strip():
+                                prompt_output = "[Empty concept file]"
         except FileNotFoundError:
-            prompt_output = "No caption found."
+            prompt_output = "[Caption file not found]"
+        except IsADirectoryError:
+            prompt_output = "[Caption path is a directory]"
+        except PermissionError:
+            prompt_output = "[Permission denied]"
+        except UnicodeDecodeError:
+            prompt_output = "[Invalid file encoding]"
 
         modules = []
         if self.preview_augmentations.get():
