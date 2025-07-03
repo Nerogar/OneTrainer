@@ -222,7 +222,7 @@ class TrainingTab:
         # learning rate
         components.label(frame, 2, 0, "Learning Rate",
                          tooltip="The base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "learning_rate", validation_debounce_ms=350)
 
         # learning rate warmup steps
         components.label(frame, 3, 0, "Learning Rate Warmup Steps",
@@ -370,7 +370,7 @@ class TrainingTab:
         # text encoder learning rate
         components.label(frame, 3, 0, "Text Encoder Learning Rate",
                          tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-        components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate")
+        components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate", validation_debounce_ms=350)
 
         # text encoder layer skip (clip skip)
         components.label(frame, 4, 0, "Clip Skip",
@@ -427,7 +427,7 @@ class TrainingTab:
         # text encoder learning rate
         components.label(frame, row, 0, f"Text Encoder {i} Learning Rate",
                          tooltip=f"The learning rate of the text encoder {i}. Overrides the base learning rate")
-        components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}.learning_rate")
+        components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}.learning_rate", validation_debounce_ms=350)
         row += 1
 
         if supports_layer_skip:
@@ -444,7 +444,7 @@ class TrainingTab:
         # embedding learning rate
         components.label(frame, 0, 0, "Embeddings Learning Rate",
                          tooltip="The learning rate of embeddings. Overrides the base learning rate")
-        components.entry(frame, 0, 1, self.ui_state, "embedding_learning_rate")
+        components.entry(frame, 0, 1, self.ui_state, "embedding_learning_rate", validation_debounce_ms=350)
 
         # preserve embedding norm
         components.label(frame, 1, 0, "Preserve Embedding Norm",
@@ -470,7 +470,7 @@ class TrainingTab:
         # unet learning rate
         components.label(frame, 2, 0, "UNet Learning Rate",
                          tooltip="The learning rate of the UNet. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate", validation_debounce_ms=350)
 
         # rescale noise scheduler to zero terminal SNR
         components.label(frame, 3, 0, "Rescale Noise Scheduler",
@@ -496,7 +496,7 @@ class TrainingTab:
         # prior learning rate
         components.label(frame, 2, 0, "Prior Learning Rate",
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate", validation_debounce_ms=350)
 
     def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -517,7 +517,7 @@ class TrainingTab:
         # transformer learning rate
         components.label(frame, 2, 0, "Transformer Learning Rate",
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate", validation_debounce_ms=350)
 
         # transformer learning rate
         components.label(frame, 3, 0, "Force Attention Mask",

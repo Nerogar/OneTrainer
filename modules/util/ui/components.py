@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import Any
 
 from modules.util.enum.TimeUnit import TimeUnit
@@ -48,32 +48,69 @@ def entry(
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
+        validation_debounce_ms: int | None = None,
 ):
     var = ui_state.get_var(var_name)
+    trace_id = None
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
-    component = ctk.CTkEntry(master, textvariable=var,width=width)
+    component = ctk.CTkEntry(master, textvariable=var, width=width)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
-    def create_destroy(component):
-        orig_destroy = component.destroy
+    validation_after_id = None
 
-        def destroy(self):
-            # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
-            if self._textvariable_callback_name:
-                self._textvariable.trace_remove("write", self._textvariable_callback_name)
-                self._textvariable_callback_name = ""
+    def validate_value(value: str, show_error_popup: bool = False) -> bool:
+        """Validates if the input value is a valid float. Reverts to last known good value on failure."""
+        try:
+            # An empty string is a valid nullable value, but float() will raise a ValueError.
+            # The UIState trace handler will correctly set the model to None.
+            if value == "" and ui_state.is_nullable(var_name):
+                component.configure(border_color="gray50")
+                return True
 
-            if command is not None:
-                ui_state.remove_var_trace(var_name, trace_id)
+            float(value)
+            component.configure(border_color="gray50")  # Reset to default
+            return True
+        except (ValueError, TypeError):
+            component.configure(border_color="red")
+            if show_error_popup:
+                messagebox.showerror("Invalid Input", f"Invalid floating-point number: {value}")
+                # Revert to the last known good value from the model
+                last_good_value = ui_state.get_value(var_name)
+                var.set("" if last_good_value is None else str(last_good_value))
+                component.configure(border_color="gray50")
+            return False
 
-            orig_destroy()
+    def schedule_validation(*_):
+        nonlocal validation_after_id
+        if validation_after_id:
+            component.after_cancel(validation_after_id)
+        validation_after_id = component.after(validation_debounce_ms, lambda: validate_value(var.get()))
 
-        return destroy
+    if validation_debounce_ms is not None:
+        validation_trace_name = var.trace_add("write", schedule_validation)
+        component.bind("<FocusOut>", lambda e: validate_value(var.get(), show_error_popup=True))
+    else:
+        validation_trace_name = None
 
-    destroy = create_destroy(component)
-    component.destroy = lambda: destroy(component)
+    original_destroy = component.destroy
+
+    def new_destroy():
+        # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+        if component._textvariable_callback_name:
+            component._textvariable.trace_remove("write", component._textvariable_callback_name)
+            component._textvariable_callback_name = ""
+
+        if validation_debounce_ms is not None and validation_trace_name is not None:
+            var.trace_remove("write", validation_trace_name)
+
+        if command is not None and trace_id is not None:
+            ui_state.remove_var_trace(var_name, trace_id)
+
+        original_destroy()
+
+    component.destroy = new_destroy
 
     if tooltip:
         ToolTip(component, tooltip, wide=wide_tooltip)
