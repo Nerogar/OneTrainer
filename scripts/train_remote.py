@@ -9,7 +9,7 @@ import threading
 import traceback
 from contextlib import suppress
 
-from modules.trainer.GenericTrainer import GenericTrainer
+from modules.util import create
 from modules.util.args.TrainArgs import TrainArgs
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -46,17 +46,7 @@ def command_thread_function(commands: TrainCommands,filename : str,stop_event):
         except EOFError:
             continue
 
-        if remote_commands.get_stop_command():
-            commands.stop()
-        for entry in remote_commands.get_and_reset_sample_custom_commands():
-            commands.sample_custom(entry)
-        if remote_commands.get_and_reset_sample_default_command():
-            commands.sample_default()
-        if remote_commands.get_and_reset_backup_command():
-            commands.backup()
-        if remote_commands.get_and_reset_save_command():
-            commands.save()
-
+        commands.merge(remote_commands)
 
 
 def main():
@@ -77,6 +67,7 @@ def main():
     train_config = TrainConfig.default_values()
     with open(args.config_path, "r") as f:
         train_config.from_dict(json.load(f))
+    train_config.cloud.enabled=False
 
     try:
         with open("secrets.json" if args.secrets_path is None else args.secrets_path, "r") as f:
@@ -86,7 +77,7 @@ def main():
         if args.secrets_path is not None:
             raise
 
-    trainer = GenericTrainer(train_config, callbacks, commands)
+    trainer = create.create_trainer(train_config, callbacks, commands)
 
     if args.command_path:
         stop_event=threading.Event()
