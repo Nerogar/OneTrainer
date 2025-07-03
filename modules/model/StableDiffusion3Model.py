@@ -89,9 +89,6 @@ class StableDiffusion3Model(BaseModel):
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
-    sd_config: dict | None
-    sd_config_filename: str | None
-
     def __init__(
             self,
             model_type: ModelType,
@@ -433,9 +430,7 @@ class StableDiffusion3Model(BaseModel):
         prompt_embedding = torch.nn.functional.pad(
             prompt_embedding, (0, text_encoder_3_output.shape[-1] - prompt_embedding.shape[-1])
         )
-        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2) \
-            .to(dtype=self.train_dtype.torch_dtype())
-        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1) \
-            .to(dtype=self.train_dtype.torch_dtype())
+        prompt_embedding = torch.cat([prompt_embedding, text_encoder_3_output], dim=-2)
+        pooled_prompt_embedding = torch.cat([pooled_text_encoder_1_output, pooled_text_encoder_2_output], dim=-1)
 
         return prompt_embedding, pooled_prompt_embedding

@@ -221,7 +221,7 @@ class GenericTrainer(BaseTrainer):
 
                     sample_path = os.path.join(
                         sample_dir,
-                        f"{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                        f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
                     )
 
                     def on_sample_default(sampler_output: ModelSamplerOutput):
@@ -672,13 +672,18 @@ class GenericTrainer(BaseTrainer):
                 with TorchMemoryRecorder(enabled=False):
                     prior_pred_indices = [i for i in range(self.config.batch_size)
                                           if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
-                    if len(prior_pred_indices) > 0:
+                    if len(prior_pred_indices) > 0 \
+                            or (self.config.masked_training
+                                and self.config.masked_prior_preservation_weight > 0
+                                and self.config.training_method == TrainingMethod.LORA):
                         with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
                             #do NOT create a subbatch using the indices, even though it would be more efficient:
                             #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
                             prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        model_output_data['target'][prior_pred_indices] = prior_model_output_data['predicted'][prior_pred_indices]
+                        prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
+                        model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                        model_output_data['prior_target'] = prior_model_prediction
                     else:
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
