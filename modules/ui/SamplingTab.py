@@ -19,8 +19,10 @@ class SamplingTab(ConfigList):
             attr_name="sample_definition_file_name",
             config_dir="training_samples",
             default_config_name="samples.json",
-            add_button_text="add sample",
+            add_button_text="Add Sample",
+            add_button_tooltip="Add a new sample configuration.",
             is_full_width=True,
+            show_toggle_button=True
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
