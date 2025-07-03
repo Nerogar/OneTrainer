@@ -110,7 +110,7 @@ class ConfigList(metaclass=ABCMeta):
                 self.__open_element_window,
                 self.__remove_element,
                 self.__clone_element,
-                self.__save_current_config
+                self.save_current_config
             )
             self.widgets.append(widget)
 
@@ -128,7 +128,7 @@ class ConfigList(metaclass=ABCMeta):
         if len(self.configs) == 0:
             name = self.default_config_name.removesuffix(".json")
             self.__create_config(name)
-            self.__save_current_config()
+            self.save_current_config()
 
     def __create_config(self, name: str):
         name = path_util.safe_filename(name)
@@ -149,13 +149,13 @@ class ConfigList(metaclass=ABCMeta):
             self.__open_element_window,
             self.__remove_element,
             self.__clone_element,
-            self.__save_current_config
+            self.save_current_config
         )
         self.widgets.append(widget)
 
         widget.place_in_list()
 
-        self.__save_current_config()
+        self.save_current_config()
 
     def __clone_element(self, clone_i, modify_element_fun=None):
         i = len(self.current_config)
@@ -170,13 +170,13 @@ class ConfigList(metaclass=ABCMeta):
             self.__open_element_window,
             self.__remove_element,
             self.__clone_element,
-            self.__save_current_config
+            self.save_current_config
         )
         self.widgets.append(widget)
 
         widget.place_in_list()
 
-        self.__save_current_config()
+        self.save_current_config()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
@@ -186,7 +186,7 @@ class ConfigList(metaclass=ABCMeta):
             widget.i = i
             widget.place_in_list()
 
-        self.__save_current_config()
+        self.save_current_config()
 
     def __load_current_config(self, filename):
         try:
@@ -202,7 +202,7 @@ class ConfigList(metaclass=ABCMeta):
 
         self._create_element_list()
 
-    def __save_current_config(self):
+    def save_current_config(self):
         if self.from_external_file:
             with contextlib.suppress(Exception):
                 if not os.path.exists(self.config_dir):
@@ -217,4 +217,4 @@ class ConfigList(metaclass=ABCMeta):
         window = self.open_element_window(i, ui_state)
         self.master.wait_window(window)
         self.widgets[i].configure_element()
-        self.__save_current_config()
+        self.save_current_config()
