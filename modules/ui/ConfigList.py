@@ -2,7 +2,6 @@ import contextlib
 import copy
 import json
 import os
-import traceback
 from abc import ABCMeta, abstractmethod
 
 from modules.util import path_util
@@ -99,28 +98,9 @@ class ConfigList(metaclass=ABCMeta):
         pass
 
     def _update_item_enabled_state(self):
-        self._is_current_item_enabled = False
-
-        if self.from_external_file:
-            try:
-                current_config_path = getattr(self.train_config, self.attr_name)
-                if os.path.exists(current_config_path) and os.path.getsize(current_config_path) > 0:
-                    with open(current_config_path, "r") as f:
-                        cfg = json.load(f)
-                    self._is_current_item_enabled = any(
-                        isinstance(item, dict) and item.get(self.enable_key, False)
-                        for item in cfg
-                    )
-            except (OSError):
-                pass
-            except Exception:
-                traceback.print_exc()
-        else:
-            for widget in self.widgets:
-                if widget.ui_state.get_var(self.enable_key).get():
-                    self._is_current_item_enabled = True
-                    break
-
+        self._is_current_item_enabled = any(
+            item.ui_state.get_var(self.enable_key).get() for item in self.widgets
+        )
 
     def _update_toggle_button_text(self):
         if not self.show_toggle_button:
@@ -134,34 +114,10 @@ class ConfigList(metaclass=ABCMeta):
 
     def _toggle_items(self):
         enable_state = not self._is_current_item_enabled
-        if self.from_external_file:
-            current_config_path = getattr(self.train_config, self.attr_name)
-            try:
-                if not os.path.exists(current_config_path) or os.path.getsize(current_config_path) == 0:
-                    return
-                with open(current_config_path, "r") as f:
-                    loaded_config = json.load(f)
-                for item in loaded_config:
-                    if isinstance(item, dict):
-                        item[self.enable_key] = enable_state
-                write_json_atomic(
-                    current_config_path,
-                    loaded_config
-                )
-            except Exception:
-                traceback.print_exc()
-                print(f"Failed to set all items to {enable_state} in current config")
-                # refresh from file if anything goes wrong to make sure UI state is accurate
-                self.__load_current_config(current_config_path)
-            else:
-                for widget in self.widgets:
-                    widget.ui_state.get_var(self.enable_key).set(enable_state)
-                self._update_toggle_button_text()
-        else:
-            for widget in self.widgets:
-                widget.ui_state.get_var(self.enable_key).set(enable_state)
-            self.save_current_config()
-        return
+
+        for widget in self.widgets:
+            widget.ui_state.get_var(self.enable_key).set(enable_state)
+        self.save_current_config()
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
