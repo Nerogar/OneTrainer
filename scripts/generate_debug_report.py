@@ -17,6 +17,20 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+try:
+    from deepdiff import DeepDiff
+except ImportError:
+    DeepDiff = None
+    logging.warning("deepdiff is not installed. Some features will be unavailable. Install with: pip install deepdiff")
+
+try:
+    from modules.util.config.TrainConfig import TrainConfig
+    from modules.util.enum.ModelType import ModelType
+except ImportError:
+    sys.path.append(str(Path(__file__).parent.parent))
+    from modules.util.config.TrainConfig import TrainConfig
+    from modules.util.enum.ModelType import ModelType
+
 import psutil
 import requests
 
@@ -56,6 +70,45 @@ def create_debug_package(output_zip_path: str, config_json_string: str):
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(anonymized_config, f, indent=4)
 
+            generate_default_config_file(temp_path)
+            default_config_path = temp_path / "default_settings.json"
+            diff_path = temp_path / "config_diff.txt"
+
+            if DeepDiff and default_config_path.exists():
+                try:
+                    with open(default_config_path, "r", encoding="utf-8") as f:
+                        default_config_dict = json.load(f)
+
+                    diff = DeepDiff(
+                        default_config_dict,
+                        anonymized_config,
+                        ignore_order=True,
+                        verbose_level=2,
+                        exclude_regex_paths=(
+                            r"root\['(?:optimizer_defaults|concepts|samples|sample_definition_file_name|concept_file_name)'\]"
+                            r"|root\['embedding'\]\['uuid'\]",
+                            r"root\['text_encoder(?:_[1-4])?'\]\['model_name'\]",
+                            r"root\['unet?'\]\['model_name'\]",
+                        ),
+                        ignore_string_type_changes=True,
+                        ignore_numeric_type_changes=True,
+                    )
+
+                    diff.pop('type_changes', None)
+
+                    formatted_diff = format_diff_output(diff)
+
+                    with open(diff_path, "w", encoding="utf-8") as f:
+                        f.write(formatted_diff)
+                    logger.info("Generated config diff file.")
+                except Exception as e:
+                    logger.error(f"Could not generate config diff: {e}")
+                    with open(diff_path, "w", encoding="utf-8") as f:
+                        f.write(f"Error generating diff: {e}")
+            elif not DeepDiff:
+                logger.warning("deepdiff is not installed. Skipping config diff generation. `pip install deepdiff`")
+
+
             script_path = Path(__file__)
             onetrainer_dir = script_path.parent.parent  # Go up from scripts/ to OneTrainer/
 
@@ -76,6 +129,8 @@ def create_debug_package(output_zip_path: str, config_json_string: str):
 
             with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.write(config_path, arcname="config.json")
+                if diff_path.exists():
+                    zf.write(diff_path, arcname="config_diff.txt")
                 if report_path.exists():
                     zf.write(report_path, arcname="debug_report.log")
                 else:
@@ -91,6 +146,104 @@ def create_debug_package(output_zip_path: str, config_json_string: str):
         logger.error(f"Error generating debug package: {e}")
         traceback.print_exc()
 
+def format_diff_output(diff) -> str:
+    """Format DeepDiff output in a more human-readable way."""
+    lines = []
+
+    # Handle values_changed
+    if 'values_changed' in diff:
+        for path, change in diff['values_changed'].items():
+            # Extract the key from the path
+            key = extract_key_from_path(path)
+            old_value = change['old_value']
+            new_value = change['new_value']
+            lines.append(f"{key}: {old_value} ⇒ {new_value}")
+
+    # Handle dictionary_item_added
+    if 'dictionary_item_added' in diff:
+        for path in diff['dictionary_item_added']:
+            key = extract_key_from_path(path)
+            value = diff['dictionary_item_added'][path]
+            lines.append(f"{key}: [ADDED] {value}")
+
+    # Handle dictionary_item_removed
+    if 'dictionary_item_removed' in diff:
+        for path in diff['dictionary_item_removed']:
+            key = extract_key_from_path(path)
+            value = diff['dictionary_item_removed'][path]
+            lines.append(f"{key}: [REMOVED] {value}")
+
+    # Handle iterable_item_added
+    if 'iterable_item_added' in diff:
+        for path, value in diff['iterable_item_added'].items():
+            key = extract_key_from_path(path)
+            lines.append(f"{key}: [ADDED] {value}")
+
+    # Handle iterable_item_removed
+    if 'iterable_item_removed' in diff:
+        for path, value in diff['iterable_item_removed'].items():
+            key = extract_key_from_path(path)
+            lines.append(f"{key}: [REMOVED] {value}")
+
+    return "\n".join(lines) if lines else "No differences found."
+
+def extract_key_from_path(path: str) -> str:
+    """Extract a clean key path from DeepDiff path notation."""
+    # Remove 'root' and clean up the path
+    # Example: "root['training_method']" -> "training_method"
+    # Example: "root['unet']['train']" -> "unet.train"
+
+    # Remove 'root' prefix
+    clean_path = path.replace('root', '')
+
+    # Remove brackets and quotes, split by ']['
+    parts = clean_path.strip('[]').replace("'", "").replace('][', '.').split('.')
+
+    # Filter out empty parts
+    parts = [part for part in parts if part]
+
+    return '.'.join(parts)
+
+def generate_default_config_file(output_dir: Path):
+    """Generates a JSON file with the default TrainConfig settings for SD1.5 Fine-Tune."""
+    try:
+        logger.info("Generating default settings file for SD1.5 Fine-Tune...")
+        default_config = TrainConfig.default_values()
+
+        # Set defaults for a standard SD1.5 Fine-Tune scenario (which is the default for TrainConfig)
+        default_config.model_type = ModelType.STABLE_DIFFUSION_15
+        default_config.training_method = 'FINE_TUNE' # Using string to avoid enum import issues here
+
+        # Enable training for components used in SD1.5 fine-tuning
+        default_config.unet.train = True
+        default_config.text_encoder.train = True
+
+        # Disable training for components not used in SD1.5
+        default_config.text_encoder_2.train = False
+        default_config.text_encoder_3.include = False
+        default_config.text_encoder_3.train = False
+        default_config.text_encoder_4.include = False
+        default_config.text_encoder_4.train = False
+        default_config.prior.train = False
+
+        # Inject default optimizer (AdamW) settings into optimizer_defaults
+        from modules.util.optimizer_util import change_optimizer
+        default_opt_cfg = change_optimizer(default_config)
+
+        default_config.optimizer = default_opt_cfg
+
+        default_config.optimizer_defaults[str(default_opt_cfg.optimizer)] = default_opt_cfg
+
+        # The to_settings_dict method provides a clean representation of the config
+        default_config_dict = default_config.to_settings_dict(secrets=False)
+
+        output_file = output_dir / "default_settings.json"
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(default_config_dict, f, indent=4, sort_keys=False)
+        logger.info(f"Default settings file saved to {output_file}")
+    except Exception as e:
+        logger.error(f"Could not generate default settings file: {e}")
+        traceback.print_exc()
 
 class Utility:
     @staticmethod

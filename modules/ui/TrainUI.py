@@ -125,23 +125,25 @@ class TrainUI(ctk.CTk):
         # padding
         frame.grid_columnconfigure(2, weight=1)
 
-        # tensorboard button
-        components.button(frame, 0, 3, "Tensorboard", self.open_tensorboard,
-                                             width=100, padx=(0, 5), pady=(15, 0))
-
-        # training button
-        self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training,
-                                               width=100, padx=5, pady=(15, 0))
 
         # export button
-        self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
+        self.export_button = components.button(frame, 0, 3, "Export", self.export_training,
                                              width=60, padx=5, pady=(15, 0),
                                              tooltip="Export the current configuration as a script to run without a UI")
 
         # debug button
-        components.button(frame, 0, 6, "Debug", self.generate_debug_package,
-                                       width=60, padx=(5, 20), pady=(15, 0),
-                                       tooltip="Generate a zip file with debug information.")
+        components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+                                       width=60, padx=(5, 25), pady=(15, 0),
+                                       tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+
+        # tensorboard button
+        components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
+                                             width=100, padx=(0, 5), pady=(15, 0))
+
+        # training button
+        self.training_button = components.button(frame, 0, 6, "Start Training", self.start_training,
+                                             padx=(5, 20), pady=(15, 0))
+
 
         return frame
 
@@ -578,36 +580,24 @@ class TrainUI(ctk.CTk):
     def open_profiling_tool(self):
         self.profiling_window.deiconify()
 
-    def _anonymize_config_dict(self, config_item):
-        """Recursively anonymize paths in the configuration dictionary."""
-        if isinstance(config_item, dict):
-            return {k: self._anonymize_config_dict(v) for k, v in config_item.items()}
-        elif isinstance(config_item, list):
-            return [self._anonymize_config_dict(i) for i in config_item]
-        elif isinstance(config_item, str):
-            return self._anonymize_path(config_item)
-        else:
-            return config_item
-
     def generate_debug_package(self):
         """Generates a zip file containing an anonymized config and a debug report."""
-        zip_path = filedialog.asksaveasfilename(
-            defaultextension=".zip",
-            filetypes=[("Zip Files", "*.zip")],
+        zip_path = filedialog.askdirectory(
             initialdir=".",
-            initialfile="OneTrainer_debug.zip",
-            title="Save Debug Package"
+            title="Select Directory to Save Debug Package"
         )
 
         if not zip_path:
             return
 
+        zip_path = Path(zip_path) / "OneTrainer_debug_report.zip"
+
         self.on_update_status("Generating debug package...")
 
         try:
             config_json_string = json.dumps(self.train_config.to_pack_dict(secrets=False))
-            scripts.generate_debug_report.create_debug_package(zip_path, config_json_string)
-            self.on_update_status(f"Debug package saved to {Path(zip_path).name}")
+            scripts.generate_debug_report.create_debug_package(str(zip_path), config_json_string)
+            self.on_update_status(f"Debug package saved to {zip_path.name}")
         except Exception as e:
             traceback.print_exc()
             self.on_update_status(f"Error generating debug package: {e}")
@@ -666,13 +656,23 @@ class TrainUI(ctk.CTk):
         else:
             self.on_update_status("stopped")
 
-        self.training_button.configure(text="Start Training", state="normal")
+        self.training_button.configure(
+            text="Start Training",
+            state="normal",
+            fg_color="green",
+            hover_color="darkgreen"
+        )
 
     def start_training(self):
         if self.training_thread is None:
             self.top_bar_component.save_default()
 
-            self.training_button.configure(text="Stop Training", state="normal")
+            self.training_button.configure(
+                text="Stop Training",
+                state="normal",
+                fg_color="red",
+                hover_color="darkred"
+            )
 
             self.training_commands = TrainCommands()
 
