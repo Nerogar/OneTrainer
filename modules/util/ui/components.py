@@ -9,9 +9,12 @@ from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
-from PIL import Image
+from PIL import Image as PILImage
 
 PAD = 10
+ICON_ONLY_WIDTH = 40
+DEFAULT_PAD = 5
+TOOLTIP_X_POSITION = 25
 
 
 def app_title(master, row, column):
@@ -19,7 +22,7 @@ def app_title(master, row, column):
     frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
 
     image_component = ctk.CTkImage(
-        Image.open("resources/icons/icon.png").resize((40, 40), Image.Resampling.LANCZOS),
+       PILImage.open("resources/icons/icon.png").resize((40, 40), PILImage.Resampling.BICUBIC),
         size=(40, 40)
     )
     image_label_component = ctk.CTkLabel(frame, image=image_component, text="")
@@ -178,10 +181,75 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
+def icon_button(
+    master: ctk.CTkBaseClass,
+    row: int,
+    column: int,
+    text: str,
+    command: Callable,
+    width: int = ICON_ONLY_WIDTH,
+    tooltip: str | None = None,
+    image: ctk.CTkImage | PILImage.Image | None = None,
+    compound: str = "left",
+    **kwargs,
+) -> ctk.CTkButton:
+    """
+    Create a button with an icon and optional text.
 
-def icon_button(master, row, column, text, command):
-    component = ctk.CTkButton(master, text=text, width=40, command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    Parameters:
+        master: Parent widget.
+        row (int): Grid row position.
+        column (int): Grid column position.
+        text (str): Button text.
+        command (Callable): Callback function.
+        width (int): Button width (default 40 for icon-only buttons).
+        tooltip (Optional[str]): Tooltip text.
+        image (Optional[ctk.CTkImage | Image]): Icon image.
+        compound (str): Position of image relative to text ('left', 'right', 'top', 'bottom').
+        **kwargs: Additional button configuration.
+
+    Returns:
+        ctk.CTkButton: The created button component.
+    """
+    # Validate that command is callable
+    if not callable(command):
+        raise ValueError("The 'command' parameter must be callable.")
+
+    button_config = {
+        "text": text,
+        "command": command,
+        "width": width,
+    }
+
+    if image is not None:
+        # Use the image directly if it is a CTkImage; otherwise, try converting it
+        if isinstance(image, ctk.CTkImage):
+            button_config["image"] = image
+        elif hasattr(image, "size"):
+            button_config["image"] = ctk.CTkImage(
+                light_image=image,
+                dark_image=image,
+                size=image.size,
+            )
+        else:
+            raise TypeError("Provided image must be a CTkImage or have a 'size' attribute.")
+
+        button_config["compound"] = compound
+
+        # Auto-adjust width if text is present and default width is used
+        if text and width == ICON_ONLY_WIDTH:
+            text_width = len(text) * 6 + 30  # Heuristic for text width plus icon/padding
+            button_config["width"] = max(ICON_ONLY_WIDTH, text_width)
+
+    # Update with any additional keyword arguments
+    button_config.update(kwargs)
+
+    component = ctk.CTkButton(master, **button_config)
+    component.grid(row=row, column=column, padx=DEFAULT_PAD, pady=DEFAULT_PAD, sticky="new")
+
+    if tooltip:
+        ToolTip(component, tooltip, x_position=TOOLTIP_X_POSITION)
+
     return component
 
 
@@ -311,6 +379,7 @@ def switch(
         var_name: str,
         command: Callable[[], None] = None,
         text: str = "",
+        tooltip: str = None,  # Add tooltip parameter
 ):
     var = ui_state.get_var(var_name)
     if command:
@@ -318,6 +387,10 @@ def switch(
 
     component = ctk.CTkSwitch(master, variable=var, text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+
+    # Add tooltip if provided
+    if tooltip:
+        ToolTip(component, tooltip)
 
     def create_destroy(component):
         orig_destroy = component.destroy

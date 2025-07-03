@@ -1,4 +1,3 @@
-
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
 import torch
@@ -7,6 +6,11 @@ from torchvision.transforms import functional, transforms
 
 
 class MaskByColor(BaseImageMaskModel):
+    __slots__ = (
+        'device', 'dtype', 'smoothing_kernel_radius', 'smoothing_kernel',
+        'expand_kernel_radius', 'expand_kernel', 'image2Tensor'
+    )
+
     def __init__(self, device: torch.device, dtype: torch.dtype):
         self.device = device
         self.dtype = dtype
@@ -17,11 +21,7 @@ class MaskByColor(BaseImageMaskModel):
         self.expand_kernel_radius = None
         self.expand_kernel = self.__create_average_kernel(self.expand_kernel_radius)
 
-        self.dot_kernel = self.__create_dot_kernel((1.0, 1.0, 1.0))
-
-        self.image2Tensor = transforms.Compose([
-            transforms.ToTensor(),
-        ])
+        self.image2Tensor = transforms.ToTensor()
 
     def __create_average_kernel(self, kernel_radius: int | None):
         if kernel_radius is None:
@@ -36,17 +36,6 @@ class MaskByColor(BaseImageMaskModel):
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
         kernel.to(self.device)
-        return kernel
-
-    def __create_dot_kernel(self, color: tuple[float, float, float]):
-        kernel_weights = torch.tensor(color).view(1, 3, 1, 1)
-        kernel = nn.Conv2d(
-            in_channels=1, out_channels=1, kernel_size=1, bias=False, padding_mode='replicate',
-            padding=0
-        )
-        kernel.weight.data = kernel_weights
-        kernel.requires_grad_(False)
-        kernel.to(self.device, self.dtype)
         return kernel
 
     def __process_mask(self, mask: Tensor, target_height: int, target_width: int, threshold: float) -> Tensor:
@@ -65,18 +54,17 @@ class MaskByColor(BaseImageMaskModel):
         return mask
 
     def __parse_color(self, color: str) -> tuple[float, float, float]:
-        if len(color) == 7 and color.startswith('#'):
-            color = color[1:]
-        if len(color) == 8 and color.startswith('0x'):
+        color = color.lstrip('#')
+        if color.lower().startswith('0x'):
             color = color[2:]
+
         if len(color) == 6:
-            r = float(int(color[0:2], 16)) / 255.0
-            g = float(int(color[2:4], 16)) / 255.0
-            b = float(int(color[4:6], 16)) / 255.0
+            try:
+                return tuple(int(color[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+            except ValueError:
+                pass
 
-            return (r, g, b)
-
-        return (0.0, 0.0, 0.0)
+        return 0.0, 0.0, 0.0
 
     def mask_image(
             self,
@@ -109,11 +97,8 @@ class MaskByColor(BaseImageMaskModel):
             .unsqueeze(0)
 
         color_tensor = torch.tensor(color, dtype=self.dtype, device=self.device).view(1, 3, 1, 1)
-        similarity = image_tensor - color_tensor
-        similarity = similarity * similarity
-        similarity = self.dot_kernel(similarity)
-        similarity = torch.sqrt(similarity)
-        output = similarity.to(dtype=torch.float32)
+        distance = torch.norm(image_tensor - color_tensor, p=2, dim=1, keepdim=True)
+        output = distance.to(dtype=torch.float32)
 
         predicted_mask = self.__process_mask(output, mask_sample.height, mask_sample.width, threshold)
         mask_sample.apply_mask(mode, predicted_mask, alpha, True)
