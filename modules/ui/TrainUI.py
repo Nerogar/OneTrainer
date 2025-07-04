@@ -211,20 +211,22 @@ class TrainUI(ctk.CTk):
         components.dir_entry(frame, 5, 1, self.ui_state, "debug_dir")
 
         # tensorboard
-        components.label(frame, 6, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
+        components.label(frame, 6, 0, "Tensorboard During Training",
+                         tooltip="Starts the Tensorboard Web UI during training only")
         components.switch(frame, 6, 1, self.ui_state, "tensorboard")
 
-        components.label(frame, 7, 0, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-        components.switch(frame, 7, 1, self.ui_state, "tensorboard_expose")
-        components.label(frame, 7, 2, "Tensorboard Port",
-                         tooltip="Port to use for Tensorboard link")
-        components.entry(frame, 7, 3, self.ui_state, "tensorboard_port")
-
-        components.label(frame, 8, 0, "Always-On Tensorboard",
+        components.label(frame, 7, 0, "Always-On Tensorboard",
                          tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
-        components.switch(frame, 8, 1, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
+        components.switch(frame, 7, 1, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
+
+        components.label(frame, 8, 0, "Tensorboard Port",
+                         tooltip="Port to use for Tensorboard link")
+        components.entry(frame, 8, 1, self.ui_state, "tensorboard_port")
+
+        components.label(frame, 8, 2, "Expose Tensorboard",
+                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
+        components.switch(frame, 8, 3, self.ui_state, "tensorboard_expose")
+
 
         # validation
         components.label(frame, 9, 0, "Validation",
