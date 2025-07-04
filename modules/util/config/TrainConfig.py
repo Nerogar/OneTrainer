@@ -634,12 +634,10 @@ class TrainConfig(BaseConfig):
         tensorboard = migrated_data.pop("tensorboard", True)
         tensorboard_always_on = migrated_data.pop("tensorboard_always_on", False)
 
-        if tensorboard_always_on:
+        if tensorboard_always_on or tensorboard:
             migrated_data["tensorboard_mode"] = TensorboardMode.ALWAYS_ON
-        elif tensorboard:
-            migrated_data["tensorboard_mode"] = TensorboardMode.TRAIN_ONLY
         else:
-            migrated_data["tensorboard_mode"] = TensorboardMode.OFF
+            migrated_data["tensorboard_mode"] = TensorboardMode.ALWAYS_ON
 
         return migrated_data
 
@@ -786,7 +784,7 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
-        data.append(("tensorboard_mode", TensorboardMode.TRAIN_ONLY, TensorboardMode, False))
+        data.append(("tensorboard_mode", TensorboardMode.ALWAYS_ON, TensorboardMode, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
