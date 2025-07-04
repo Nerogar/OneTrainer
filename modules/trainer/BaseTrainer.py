@@ -1,6 +1,4 @@
-import os
 import subprocess
-import sys
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
@@ -12,6 +10,7 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.tensorboard_util import start_filtered_tensorboard, stop_tensorboard
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -84,23 +83,10 @@ class BaseTrainer(
             self.config.model_type,
             self.config.training_method
         )
+
     def _start_tensorboard(self):
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
-        tensorboard_log_dir = os.path.join(self.config.workspace_dir, "tensorboard")
-
-        tensorboard_args = [
-            tensorboard_executable,
-            "--logdir",
-            tensorboard_log_dir,
-            "--port",
-            str(self.config.tensorboard_port),
-            "--samples_per_plugin=images=100,scalars=10000",
-        ]
-
-        if self.config.tensorboard_expose:
-            tensorboard_args.append("--bind_all")
-
-        self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+        self.tensorboard_subprocess = start_filtered_tensorboard(self.config)
 
     def _stop_tensorboard(self):
-        self.tensorboard_subprocess.kill()
+        stop_tensorboard(self.tensorboard_subprocess)
+        self.tensorboard_subprocess = None
