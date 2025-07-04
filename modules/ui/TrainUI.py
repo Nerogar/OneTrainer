@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import subprocess
@@ -94,7 +95,7 @@ class TrainUI(ctk.CTk):
 
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
-        self._check_start_always_on_tensorboard()
+        self._initialize_tensorboard()
 
         self.workspace_dir_trace_id = self.ui_state.add_var_trace("workspace_dir", self._on_workspace_dir_change_trace)
 
@@ -211,9 +212,9 @@ class TrainUI(ctk.CTk):
         components.dir_entry(frame, 5, 1, self.ui_state, "debug_dir")
 
         # tensorboard
-        components.label(frame, 6, 0, "Tensorboard During Training",
+        components.label(frame, 6, 0, "Tensorboard (Train Only)",
                          tooltip="Starts the Tensorboard Web UI during training only")
-        components.switch(frame, 6, 1, self.ui_state, "tensorboard")
+        components.switch(frame, 6, 1, self.ui_state, "tensorboard", command=self._on_train_only_tensorboard_toggle)
 
         components.label(frame, 7, 0, "Always-On Tensorboard",
                          tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
@@ -643,17 +644,11 @@ class TrainUI(ctk.CTk):
 
         self.training_button.configure(text="Start Training", state="normal")
 
-        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
-            self._start_always_on_tensorboard()
-
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
 
             self.training_button.configure(text="Stop Training", state="normal")
-
-            if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._stop_always_on_tensorboard()
 
             self.training_commands = TrainCommands()
 
@@ -695,20 +690,19 @@ class TrainUI(ctk.CTk):
         if train_commands:
             train_commands.save()
 
-    def _check_start_always_on_tensorboard(self):
-        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
+    def _initialize_tensorboard(self):
+        """Initialize Tensorboard state on startup"""
+        if self.train_config.tensorboard_always_on:
             self._start_always_on_tensorboard()
 
-    def _start_always_on_tensorboard(self):
-        if self.always_on_tensorboard_subprocess:
-            self._stop_always_on_tensorboard()
-
+    def _get_tensorboard_args(self):
+        """Build Tensorboard command arguments"""
         tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
         tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
 
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
 
-        tensorboard_args = [
+        args = [
             tensorboard_executable,
             "--logdir",
             tensorboard_log_dir,
@@ -718,44 +712,78 @@ class TrainUI(ctk.CTk):
         ]
 
         if self.train_config.tensorboard_expose:
-            tensorboard_args.append("--bind_all")
+            args.append("--bind_all")
+
+        return args
+
+
+    def _start_tensorboard_subprocess(self):
+        """Start a new Tensorboard subprocess"""
+        try:
+            return subprocess.Popen(self._get_tensorboard_args())
+        except Exception:
+            return None
+
+    def _stop_tensorboard_subprocess(self, process):
+        """Gracefully stop a Tensorboard subprocess"""
+        if not process:
+            return
 
         try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            process.terminate()
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(Exception):
+                process.kill()
         except Exception:
-            self.always_on_tensorboard_subprocess = None
+            pass
+
+    def _start_always_on_tensorboard(self):
+        """Start always-on Tensorboard if not already running"""
+        if not self.always_on_tensorboard_subprocess:
+            self.always_on_tensorboard_subprocess = self._start_tensorboard_subprocess()
 
     def _stop_always_on_tensorboard(self):
+        """Stop always-on Tensorboard"""
         if self.always_on_tensorboard_subprocess:
-            try:
-                self.always_on_tensorboard_subprocess.terminate()
-                self.always_on_tensorboard_subprocess.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.always_on_tensorboard_subprocess.kill()
-            except Exception:
-                pass
-            finally:
-                self.always_on_tensorboard_subprocess = None
+            self._stop_tensorboard_subprocess(self.always_on_tensorboard_subprocess)
+            self.always_on_tensorboard_subprocess = None
 
-    def _on_workspace_dir_change(self, new_workspace_dir: str):
-        if new_workspace_dir != self.current_workspace_dir:
-            self.current_workspace_dir = new_workspace_dir
+    def _restart_always_on_tensorboard(self):
+        """Restart always-on Tensorboard (for workspace directory changes)"""
+        if self.train_config.tensorboard_always_on:
+            self._stop_always_on_tensorboard()
+            self._start_always_on_tensorboard()
 
-            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
-
-    def _on_workspace_dir_change_trace(self, *args):
-        new_workspace_dir = self.train_config.workspace_dir
-        if new_workspace_dir != self.current_workspace_dir:
-            self.current_workspace_dir = new_workspace_dir
-
-            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
+    def _on_train_only_tensorboard_toggle(self):
+        """Handle train-only Tensorboard toggle"""
+        if self.train_config.tensorboard:
+            # If train-only is enabled, disable always-on
+            if self.train_config.tensorboard_always_on:
+                self.ui_state.get_var("tensorboard_always_on").set(False)
+                self._stop_always_on_tensorboard()
 
     def _on_always_on_tensorboard_toggle(self):
+        """Handle always-on Tensorboard toggle"""
         if self.train_config.tensorboard_always_on:
-            if not (self.training_thread and self.train_config.tensorboard):
-                self._start_always_on_tensorboard()
+            # If always-on is enabled, disable train-only
+            if self.train_config.tensorboard:
+                self.ui_state.get_var("tensorboard").set(False)
+            # Start always-on Tensorboard
+            self._start_always_on_tensorboard()
         else:
-            if not (self.training_thread and self.train_config.tensorboard):
-                self._stop_always_on_tensorboard()
+            # Stop always-on Tensorboard
+            self._stop_always_on_tensorboard()
+
+    def _on_workspace_dir_change(self, new_workspace_dir: str):
+        """Handle direct workspace directory changes"""
+        if new_workspace_dir != self.current_workspace_dir:
+            self.current_workspace_dir = new_workspace_dir
+            # Restart always-on Tensorboard with new workspace directory if it's enabled
+            if self.train_config.tensorboard_always_on:
+                self._restart_always_on_tensorboard()
+
+    def _on_workspace_dir_change_trace(self, *args):
+        """Handle workspace directory changes via UI state trace"""
+        new_workspace_dir = self.train_config.workspace_dir
+        self._on_workspace_dir_change(new_workspace_dir)
