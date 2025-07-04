@@ -23,6 +23,7 @@ from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.memory_util import TorchMemoryRecorder
@@ -66,7 +67,7 @@ class GenericTrainer(BaseTrainer):
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
         self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
-        if config.tensorboard and not config.tensorboard_always_on:
+        if config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
             super()._start_tensorboard()
 
         self.model = None
@@ -799,7 +800,7 @@ class GenericTrainer(BaseTrainer):
 
         self.tensorboard.close()
 
-        if self.config.tensorboard and not self.config.tensorboard_always_on:
+        if self.config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
             super()._stop_tensorboard()
 
         for handle in self.grad_hook_handles:

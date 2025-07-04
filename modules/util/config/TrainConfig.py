@@ -22,6 +22,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -269,7 +270,7 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
-    tensorboard: bool
+    tensorboard_mode: TensorboardMode
     tensorboard_expose: bool
     tensorboard_always_on: bool
     tensorboard_port: str
@@ -453,7 +454,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=6,
+            config_version=7,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -461,6 +462,7 @@ class TrainConfig(BaseConfig):
                 3: self.__migration_3,
                 4: self.__migration_4,
                 5: self.__migration_5,
+                6: self.__migration_6,
             }
         )
 
@@ -626,6 +628,21 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_6(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        tensorboard = migrated_data.pop("tensorboard", True)
+        tensorboard_always_on = migrated_data.pop("tensorboard_always_on", False)
+
+        if tensorboard_always_on:
+            migrated_data["tensorboard_mode"] = TensorboardMode.ALWAYS_ON
+        elif tensorboard:
+            migrated_data["tensorboard_mode"] = TensorboardMode.TRAIN_ONLY
+        else:
+            migrated_data["tensorboard_mode"] = TensorboardMode.OFF
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -769,7 +786,7 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
-        data.append(("tensorboard", True, bool, False))
+        data.append(("tensorboard_mode", TensorboardMode.TRAIN_ONLY, TensorboardMode, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
