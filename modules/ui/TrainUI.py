@@ -623,16 +623,16 @@ class TrainUI(ctk.CTk):
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
             error_caught = True
             traceback.print_exc()
+        finally:
+            trainer.end()
 
-        trainer.end()
+            # clear gpu memory
+            del trainer
 
-        # clear gpu memory
-        del trainer
-
-        self.training_thread = None
-        self.training_commands = None
-        torch.clear_autocast_cache()
-        torch_gc()
+            self.training_thread = None
+            self.training_commands = None
+            torch.clear_autocast_cache()
+            torch_gc()
 
         if error_caught:
             self.on_update_status("error: check the console for more information")
