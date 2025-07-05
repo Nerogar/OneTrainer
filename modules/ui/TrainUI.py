@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog
 
+import scripts.generate_debug_report
 from modules.trainer.CloudTrainer import CloudTrainer
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
@@ -130,21 +131,30 @@ class TrainUI(ctk.CTk):
 
         self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.status_label = components.label(frame, 0, 1, "",
+        self.status_label = components.label(frame, 0, 1, " ",
                                              tooltip="Current status of the training run")
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
 
-        # tensorboard button
-        components.button(frame, 0, 3, "Tensorboard", self.open_tensorboard)
-
-        # training button
-        self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training)
 
         # export button
-        self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
-                                               tooltip="Export the current configuration as a script to run without a UI")
+        self.export_button = components.button(frame, 0, 3, "Export", self.export_training,
+                                             width=60, padx=5, pady=(15, 0),
+                                             tooltip="Export the current configuration as a script to run without a UI")
+
+        # debug button
+        components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+                                       width=60, padx=(5, 25), pady=(15, 0),
+                                       tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+
+        # tensorboard button
+        components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
+                                             width=100, padx=(0, 5), pady=(15, 0))
+
+        # training button
+        self.training_button = components.button(frame, 0, 6, "Start Training", self.start_training,
+                                             padx=(5, 20), pady=(15, 0))
 
 
         return frame
@@ -586,6 +596,29 @@ class TrainUI(ctk.CTk):
     def open_profiling_tool(self):
         self.profiling_window.deiconify()
 
+    def generate_debug_package(self):
+        """Generates a zip file containing an anonymized config and a debug report."""
+        zip_path = filedialog.askdirectory(
+            initialdir=".",
+            title="Select Directory to Save Debug Package"
+        )
+
+        if not zip_path:
+            return
+
+        zip_path = Path(zip_path) / "OneTrainer_debug_report.zip"
+
+        self.on_update_status("Generating debug package...")
+
+        try:
+            config_json_string = json.dumps(self.train_config.to_pack_dict(secrets=False))
+            scripts.generate_debug_report.create_debug_package(str(zip_path), config_json_string)
+            self.on_update_status(f"Debug package saved to {zip_path.name}")
+        except Exception as e:
+            traceback.print_exc()
+            self.on_update_status(f"Error generating debug package: {e}")
+
+
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
@@ -639,7 +672,12 @@ class TrainUI(ctk.CTk):
         else:
             self.on_update_status("stopped")
 
-        self.training_button.configure(text="Start Training", state="normal")
+        self.training_button.configure(
+            text="Start Training",
+            state="normal",
+            fg_color="green",
+            hover_color="darkgreen"
+        )
 
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
             self._start_always_on_tensorboard()
@@ -648,7 +686,12 @@ class TrainUI(ctk.CTk):
         if self.training_thread is None:
             self.save_default()
 
-            self.training_button.configure(text="Stop Training", state="normal")
+            self.training_button.configure(
+                text="Stop Training",
+                state="normal",
+                fg_color="red",
+                hover_color="darkred"
+            )
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
                 self._stop_always_on_tensorboard()
@@ -675,7 +718,7 @@ class TrainUI(ctk.CTk):
         ], initialdir=".", initialfile="config.json")
 
         if file_path:
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(self.train_config.to_pack_dict(secrets=False), f, indent=4)
 
     def sample_now(self):

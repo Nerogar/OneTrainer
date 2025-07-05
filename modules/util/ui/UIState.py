@@ -35,6 +35,24 @@ class UIState:
                 state = state.get_var(name_part)
             return state
 
+    def get_value(self, name: str) -> Any:
+        """Gets a value directly from the underlying model object, handling nested names."""
+        obj = self.obj
+        for name_part in name.split('.'):
+            obj = getattr(obj, name_part)
+        return obj
+
+    def is_nullable(self, name: str) -> bool:
+        """Checks if a property is nullable, handling nested names."""
+        obj = self.obj
+        parts = name.split('.')
+        for name_part in parts[:-1]:
+            obj = getattr(obj, name_part)
+
+        if isinstance(obj, BaseConfig):
+            return obj.nullables.get(parts[-1], False)
+        return False
+
     def add_var_trace(self, name, command: Callable[[], None]) -> int:
         self.__latest_var_trace_id += 1
         self.__var_traces[name][self.__latest_var_trace_id] = command

@@ -102,7 +102,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 if (basename + ".txt") in file_list_str:
                     stats_dict["paired_captions"] += 1
                     stats_dict["image_with_caption_count"] += 1
-                    with open(basename + ".txt", "r") as captionfile:
+                    with open(basename + ".txt", "r", encoding="utf-8") as captionfile:
                         captionlist = captionfile.read().splitlines()
                         #get character/word count of captions, split by newlines in each text file
                         for caption in captionlist:
@@ -146,7 +146,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 if (basename + ".txt") in file_list_str:
                     stats_dict["paired_captions"] += 1
                     stats_dict["video_with_caption_count"] += 1
-                    with open(basename + ".txt", "r") as captionfile:
+                    with open(basename + ".txt", "r", encoding="utf-8") as captionfile:
                         captionlist = captionfile.read().splitlines()
                         #get character/word count of captions, split by newlines in each text file
                         for caption in captionlist:
