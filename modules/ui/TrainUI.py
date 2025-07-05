@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 import threading
 import traceback
 import webbrowser
@@ -90,6 +93,12 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+        self.always_on_tensorboard_subprocess = None
+        self.current_workspace_dir = self.train_config.workspace_dir
+        self._check_start_always_on_tensorboard()
+
+        self.workspace_dir_trace_id = self.ui_state.add_var_trace("workspace_dir", self._on_workspace_dir_change_trace)
+
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
 
@@ -97,6 +106,9 @@ class TrainUI(ctk.CTk):
 
     def __close(self):
         self.top_bar_component.save_default()
+        self._stop_always_on_tensorboard()
+        if hasattr(self, 'workspace_dir_trace_id'):
+            self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
         self.quit()
 
     def top_bar(self, master):
@@ -182,7 +194,7 @@ class TrainUI(ctk.CTk):
         # workspace dir
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir")
+        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", command=self._on_workspace_dir_change)
 
         # cache dir
         components.label(frame, 1, 0, "Cache Directory",
@@ -220,27 +232,31 @@ class TrainUI(ctk.CTk):
                          tooltip="Port to use for Tensorboard link")
         components.entry(frame, 7, 3, self.ui_state, "tensorboard_port")
 
-        # validation
-        components.label(frame, 8, 0, "Validation",
-                         tooltip="Enable validation steps and add new graph in tensorboard")
-        components.switch(frame, 8, 1, self.ui_state, "validation")
+        components.label(frame, 8, 0, "Always-On Tensorboard",
+                         tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
+        components.switch(frame, 8, 1, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
 
-        components.label(frame, 9, 0, "Validate after",
+        # validation
+        components.label(frame, 9, 0, "Validation",
+                         tooltip="Enable validation steps and add new graph in tensorboard")
+        components.switch(frame, 9, 1, self.ui_state, "validation")
+
+        components.label(frame, 10, 0, "Validate after",
                          tooltip="The interval used when validate training")
-        components.time_entry(frame, 9, 1, self.ui_state, "validate_after", "validate_after_unit")
+        components.time_entry(frame, 10, 1, self.ui_state, "validate_after", "validate_after_unit")
 
         # device
-        components.label(frame, 10, 0, "Dataloader Threads",
+        components.label(frame, 11, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 11, 1, self.ui_state, "dataloader_threads")
 
-        components.label(frame, 11, 0, "Train Device",
+        components.label(frame, 12, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\"")
-        components.entry(frame, 11, 1, self.ui_state, "train_device")
+        components.entry(frame, 12, 1, self.ui_state, "train_device")
 
-        components.label(frame, 12, 0, "Temp Device",
+        components.label(frame, 13, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 12, 1, self.ui_state, "temp_device")
+        components.entry(frame, 13, 1, self.ui_state, "temp_device")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -663,6 +679,9 @@ class TrainUI(ctk.CTk):
             hover_color="darkgreen"
         )
 
+        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
+            self._start_always_on_tensorboard()
+
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
@@ -673,6 +692,9 @@ class TrainUI(ctk.CTk):
                 fg_color="red",
                 hover_color="darkred"
             )
+
+            if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
+                self._stop_always_on_tensorboard()
 
             self.training_commands = TrainCommands()
 
@@ -713,3 +735,68 @@ class TrainUI(ctk.CTk):
         train_commands = self.training_commands
         if train_commands:
             train_commands.save()
+
+    def _check_start_always_on_tensorboard(self):
+        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
+            self._start_always_on_tensorboard()
+
+    def _start_always_on_tensorboard(self):
+        if self.always_on_tensorboard_subprocess:
+            self._stop_always_on_tensorboard()
+
+        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
+        tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
+
+        os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
+
+        tensorboard_args = [
+            tensorboard_executable,
+            "--logdir",
+            tensorboard_log_dir,
+            "--port",
+            str(self.train_config.tensorboard_port),
+            "--samples_per_plugin=images=100,scalars=10000",
+        ]
+
+        if self.train_config.tensorboard_expose:
+            tensorboard_args.append("--bind_all")
+
+        try:
+            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+        except Exception:
+            self.always_on_tensorboard_subprocess = None
+
+    def _stop_always_on_tensorboard(self):
+        if self.always_on_tensorboard_subprocess:
+            try:
+                self.always_on_tensorboard_subprocess.terminate()
+                self.always_on_tensorboard_subprocess.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.always_on_tensorboard_subprocess.kill()
+            except Exception:
+                pass
+            finally:
+                self.always_on_tensorboard_subprocess = None
+
+    def _on_workspace_dir_change(self, new_workspace_dir: str):
+        if new_workspace_dir != self.current_workspace_dir:
+            self.current_workspace_dir = new_workspace_dir
+
+            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
+                self._start_always_on_tensorboard()
+
+    def _on_workspace_dir_change_trace(self, *args):
+        new_workspace_dir = self.train_config.workspace_dir
+        if new_workspace_dir != self.current_workspace_dir:
+            self.current_workspace_dir = new_workspace_dir
+
+            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
+                self._start_always_on_tensorboard()
+
+    def _on_always_on_tensorboard_toggle(self):
+        if self.train_config.tensorboard_always_on:
+            if not (self.training_thread and self.train_config.tensorboard):
+                self._start_always_on_tensorboard()
+        else:
+            if not (self.training_thread and self.train_config.tensorboard):
+                self._stop_always_on_tensorboard()
