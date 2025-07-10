@@ -35,6 +35,21 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 
+:check_python_version
+echo Checking Python version...
+%PYTHON% --version
+if errorlevel 1 (
+    echo Error: Failed to get Python version
+    goto :end_error
+)
+
+echo.
+%PYTHON% "%~dp0scripts\util\version_check.py" 3.10 3.13 2>&1
+if errorlevel 1 (
+    echo.
+    goto :wrong_python_version
+)
+
 :launch
 echo Starting UI...
 %PYTHON% scripts\train_ui.py

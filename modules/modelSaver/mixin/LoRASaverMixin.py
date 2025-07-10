@@ -4,12 +4,16 @@ from pathlib import Path
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
-from modules.util.convert.convert_lora_util import LoraConversionKeySet, convert_to_legacy_diffusers, convert_to_omi
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
 
+from omi_model_standards.convert.lora.convert_lora_util import (
+    LoraConversionKeySet,
+    convert_to_legacy_diffusers,
+    convert_to_omi,
+)
 from safetensors.torch import save_file
 
 
@@ -78,16 +82,18 @@ class LoRASaverMixin(
             output_model_format: ModelFormat,
             output_model_destination: str,
             dtype: torch.dtype | None,
+            enable_omi_format: bool = False,
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 raise NotImplementedError
             case ModelFormat.SAFETENSORS:
+                # TODO: remove the enable_omi_format switch and always enable self.__save_safetensors
+                if enable_omi_format:
+                    self.__save_safetensors(model, output_model_destination, dtype)
+                else:
+                    self.__save_legacy_safetensors(model, output_model_destination, dtype)
+            case ModelFormat.LEGACY_SAFETENSORS:
                 self.__save_legacy_safetensors(model, output_model_destination, dtype)
-            # TODO: activate these cases again and remove the previous one
-            # case ModelFormat.SAFETENSORS:
-            #     self.__save_safetensors(model, output_model_destination, dtype)
-            # case ModelFormat.LEGACY_SAFETENSORS:
-            #     self.__save_legacy_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)

@@ -26,6 +26,7 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
         self.orig_module = orig_module
         self.embeddings = embeddings
         self.original_token_count = len(tokenizer) - sum(embedding.token_count for embedding in self.embeddings)
+        self.pad_vector = None
 
         self.is_applied = False
         self.orig_forward = self.orig_module.forward
@@ -34,8 +35,18 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
     def forward(self, x, *args, **kwargs):
         # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create
         orig_module_weight = self.orig_module.weight[0:self.original_token_count]
+
+        # if the original weights don't contain enough vectors, pad with zero vectors
+        pad_vector = []
+        if orig_module_weight.shape[0] < self.original_token_count:
+            pad_count = self.original_token_count - orig_module_weight.shape[0]
+            pad_vector = [torch.zeros(size=(pad_count, self.orig_module.weight.shape[1]),
+                                      dtype=self.orig_module.weight.dtype, device=self.orig_module.weight.device,
+                                      requires_grad=False)]
+
         weight = torch.cat(
             [orig_module_weight] \
+            + pad_vector \
             + [embedding.vector for embedding in self.embeddings],
             dim=0
         )

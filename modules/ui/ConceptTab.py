@@ -25,8 +25,10 @@ class ConceptTab(ConfigList):
             attr_name="concept_file_name",
             config_dir="training_concepts",
             default_config_name="concepts.json",
-            add_button_text="add concept",
+            add_button_text="Add Concept",
+            add_button_tooltip="Adds a new concept to the current config.",
             is_full_width=False,
+            show_toggle_button=True
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
@@ -128,7 +130,7 @@ class ConceptWidget(ctk.CTkFrame):
             for path in pathlib.Path(self.concept.path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
-                        and not path.name.endswith("-masklabel.png"):
+                        and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
                     preview_path = path_util.canonical_join(self.concept.path, path)
                     break
 
@@ -140,7 +142,7 @@ class ConceptWidget(ctk.CTkFrame):
             (image.width - size) // 2 + size,
             (image.height - size) // 2 + size,
         ))
-        image = image.resize((150, 150), Image.Resampling.LANCZOS)
+        image = image.resize((150, 150), Image.Resampling.BILINEAR)
         return image
 
     def place_in_list(self):
