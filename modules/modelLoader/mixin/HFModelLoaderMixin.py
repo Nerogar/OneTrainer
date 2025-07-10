@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 from abc import ABCMeta
 from itertools import repeat
 
@@ -18,7 +19,6 @@ import accelerate
 import huggingface_hub
 from huggingface_hub.utils import EntryNotFoundError
 from safetensors.torch import load_file
-import traceback
 
 
 class HFModelLoaderMixin(metaclass=ABCMeta):
