@@ -90,6 +90,12 @@ class StableDiffusionModel(BaseModel):
         self.sd_config = None
         self.sd_config_filename = None
 
+    def adapters(self) -> list[LoRAModuleWrapper]:
+        return [a for a in [
+            self.text_encoder_lora,
+            self.unet_lora,
+        ] if a is not None]
+
     def all_embeddings(self) -> list[StableDiffusionModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
@@ -194,7 +200,7 @@ class StableDiffusionModel(BaseModel):
                 self.add_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=self.text_encoder.config.max_position_embeddings,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
