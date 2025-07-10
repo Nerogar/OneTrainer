@@ -236,9 +236,9 @@ class TrainUI(ctk.CTk):
         components.time_entry(frame, 8, 3, self.ui_state, "validate_after", "validate_after_unit")
 
         # device
-        components.label(frame, 11, 0, "Dataloader Threads",
+        components.label(frame, 10, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 11, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
 
         components.label(frame, 11, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
