@@ -121,24 +121,31 @@ def finish_async(precision: GradientReducePrecision):
 
 
 
-def parameter_divergence(params: list[torch.Tensor]):
+@torch.no_grad()
+def parameter_divergence(params: list[torch.Tensor], train_device: torch.device):
     if not is_enabled():
         return 0.0
-    diff = 0.0
 
-    #TODO this can take an unnecessary amount of VRAM during full finetuning with many GPUs and large individual tensors.
-    #use send()/recv() instead or chunk up the tensors
+    diff = 0.0
     for param in params:
-        #some parameters could be offloaded to GPU during full-finetuning. We have to ignore those:
-        if param.requires_grad and param.is_cuda:
-            param_list = [torch.zeros_like(param) for _ in range(world_size())] if is_master() else None
-            torch.distributed.gather(param, param_list, dst=0)
-            if is_master():
-                for r in range(1, world_size()):
-                    diff += torch.sum(torch.abs(param_list[0] - param_list[r]))
+        param_list = [torch.zeros_like(param, device=train_device) for _ in range(world_size())] if is_master() else None
+        torch.distributed.gather(param.to(train_device), param_list, dst=0)
+        if is_master():
+            for r in range(1, world_size()):
+                diff += torch.sum(torch.abs(param_list[0] - param_list[r]))
 
     return diff if is_master() else None
 
+@torch.no_grad()
+def broadcast_parameters(params: list[torch.Tensor], train_device: torch.device):
+    if not is_enabled():
+        return
+
+    for param in params:
+        gpu_param = param.to(train_device)
+        torch.distributed.broadcast(gpu_param, src=0)
+        if not is_master() and gpu_param is not param:
+            param.copy_(gpu_param)
 
 
 global_commands = None

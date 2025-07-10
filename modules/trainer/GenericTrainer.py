@@ -148,6 +148,7 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue = []
 
         self.parameters = self.model.parameters.parameters()
+
         if self.config.validation:
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model.train_progress, is_validation=True
@@ -631,7 +632,7 @@ class GenericTrainer(BaseTrainer):
                     self.data_loader.get_data_set().start_next_epoch()
 
             #TODO either remove (if we are reasonably sure this doesn't happen), or add an interval to TrainConfig:
-            #divergence = multi.parameter_divergence(self.model.parameters.parameters())
+            #divergence = multi.parameter_divergence(self.parameters, train_device)
             #if multi.is_enabled() and multi.is_master():
             #    self.tensorboard.add_scalar("parameter divergence", divergence, train_progress.global_step)
             #    if divergence > 0:
@@ -742,7 +743,7 @@ class GenericTrainer(BaseTrainer):
                         if self.config.fused_gradient_reduce:
                             multi.finish_async(self.config.gradient_reduce_precision)
                         else:
-                            multi.reduce_grads_mean(self.model.parameters.parameters(), self.config.gradient_reduce_precision)
+                            multi.reduce_grads_mean(self.parameters, self.config.gradient_reduce_precision)
 
                         if scaler and self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass:
                             scaler.step_after_unscale_parameter_(self.model.optimizer)
