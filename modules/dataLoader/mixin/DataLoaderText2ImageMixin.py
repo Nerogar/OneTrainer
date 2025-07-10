@@ -19,6 +19,7 @@ from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedC
 from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
+from mgds.pipelineModules.InlineDistributedSampler import InlineDistributedSampler
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.LoadVideo import LoadVideo
@@ -280,10 +281,11 @@ class DataLoaderText2ImageMixin:
         world_size = multi.world_size() if config.multi_gpu else 1  #world_size can be 1 for validation dataloader, even if multi.world_size() returns > 1
         if config.latent_caching:
             batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
+            distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
         else:
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
+            distributed_sampler = InlineDistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
 
-        distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
         output = OutputPipelineModule(names=output_names)
 
         modules = []
