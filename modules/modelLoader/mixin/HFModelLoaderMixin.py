@@ -18,6 +18,7 @@ import accelerate
 import huggingface_hub
 from huggingface_hub.utils import EntryNotFoundError
 from safetensors.torch import load_file
+import traceback
 
 
 class HFModelLoaderMixin(metaclass=ABCMeta):
@@ -298,7 +299,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         transformers_paths = [folder + "/model*" for folder in transformers_modules]
         transformers_paths.extend([folder + "/pytorch_model*" for folder in transformers_modules])
 
-        huggingface_hub.snapshot_download(
-            pretrained_model_name_or_path,
-            allow_patterns=diffusers_paths + transformers_paths,
-        )
+        try:
+            huggingface_hub.snapshot_download(
+                pretrained_model_name_or_path,
+                allow_patterns=diffusers_paths + transformers_paths,
+            )
+        except huggingface_hub.errors.HFValidationError:
+            pass
+        except Exception:
+            traceback.print_exc()
+            print("Error during bulk preloading of Huggingface model repository, proceeding without preloading")
