@@ -204,6 +204,7 @@ class FluxModel(BaseModel):
             tokens_mask_2: Tensor = None,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
+            text_encoder_2_sequence_length: int | None = None,
             text_encoder_1_dropout_probability: float | None = None,
             text_encoder_2_dropout_probability: float | None = None,
             apply_attention_mask: bool = False,
@@ -226,7 +227,7 @@ class FluxModel(BaseModel):
                 self.add_text_encoder_2_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=text_encoder_2_sequence_length,
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
@@ -262,7 +263,9 @@ class FluxModel(BaseModel):
             )
             if text_encoder_2_output is None:
                 text_encoder_2_output = torch.zeros(
-                    size=(batch_size, 77, 4096),
+                    size=(batch_size,
+                          self.tokenizer_2.model_max_length if text_encoder_2_sequence_length is None else text_encoder_2_sequence_length,
+                          4096),
                     device=train_device,
                     dtype=self.train_dtype.torch_dtype(),
                 )

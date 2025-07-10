@@ -143,7 +143,7 @@ class TrainingTab:
     def __setup_flux_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
-        self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 2, i=2, supports_include=True, supports_sequence_length=True)
         self.__create_embedding_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0)
@@ -384,6 +384,7 @@ class TrainingTab:
             i: int,
             supports_include: bool = False,
             supports_layer_skip: bool = True,
+            supports_sequence_length: bool = False,
     ):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -435,6 +436,13 @@ class TrainingTab:
             components.label(frame, row, 0, f"Text Encoder {i} Clip Skip",
                              tooltip="The number of additional clip layers to skip. 0 = the model default")
             components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_layer_skip")
+            row += 1
+
+        if supports_sequence_length:
+            # text encoder layer skip (clip skip)
+            components.label(frame, row, 0, f"Text Encoder {i} Sequence Length",
+                             tooltip="Overrides the number of tokens used for captions. If empty, the model default is used, which is 512 on many models. 77 is the default only for backwards compatibility.")
+            components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_sequence_length")
             row += 1
 
     def __create_embedding_frame(self, master, row):
