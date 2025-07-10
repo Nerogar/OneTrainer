@@ -712,7 +712,6 @@ class GenericTrainer(BaseTrainer):
                 with TorchMemoryRecorder(enabled=False):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
-                    print(f"{multi.rank()}: ", batch['image_path'])
 
                     prior_pred_indices = [i for i in range(self.config.batch_size)
                                           if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
