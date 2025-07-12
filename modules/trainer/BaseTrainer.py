@@ -22,7 +22,7 @@ class BaseTrainer(
     metaclass=ABCMeta,
 ):
 
-    tensorboard_subprocess: subprocess.Popen
+    tensorboard_subprocess: subprocess.Popen = None
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__()
@@ -85,8 +85,16 @@ class BaseTrainer(
         )
 
     def _start_tensorboard(self):
-        self.tensorboard_subprocess = start_filtered_tensorboard(self.config)
+        is_remote_with_tunnel = (self.config.cloud and self.config.cloud.tensorboard_tunnel)
+        if is_remote_with_tunnel:
+            print("Remote training with TensorBoard TCP tunnel enabled.")
+            self.tensorboard_subprocess = None
+        else:
+            print("Starting local TensorBoard instance.")
+            self.tensorboard_subprocess = start_filtered_tensorboard(self.config)
 
     def _stop_tensorboard(self):
-        stop_tensorboard(self.tensorboard_subprocess)
-        self.tensorboard_subprocess = None
+        if self.tensorboard_subprocess:
+            print("Stopping local TensorBoard instance.")
+            stop_tensorboard(self.tensorboard_subprocess)
+            self.tensorboard_subprocess = None
