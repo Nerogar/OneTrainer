@@ -185,9 +185,13 @@ def icon_button(master, row, column, text, command):
     return component
 
 
-def button(master, row, column, text, command, tooltip=None):
-    component = ctk.CTkButton(master, text=text, command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+def button(master, row, column, text, command, tooltip=None, **kwargs):
+    # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
+    padx = kwargs.pop('padx', PAD)
+    pady = kwargs.pop('pady', PAD)
+
+    component = ctk.CTkButton(master, text=text, command=command, **kwargs)
+    component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
     if tooltip:
         ToolTip(component, tooltip, x_position=25)
     return component
@@ -312,7 +316,7 @@ def switch(
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
-    component = ctk.CTkSwitch(master, variable=var, text=text)
+    component = ctk.CTkSwitch(master, variable=var, text=text, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
     def create_destroy(component):
