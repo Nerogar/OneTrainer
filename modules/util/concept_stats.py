@@ -72,8 +72,8 @@ def init_concept_stats(advanced_checks : bool):
 
         aspect_ratio_list = []
         for aspect in AspectBucketing.all_possible_input_aspects:   #input parameters don't matter but can't be blank
-            aspect_ratio_list.append(round(aspect[0]/aspect[1], 4))     #get both wide and tall ratios
-            aspect_ratio_list.append(round(aspect[1]/aspect[0], 4))
+            aspect_ratio_list.append(round(aspect[0]/aspect[1], 6))     #get both wide and tall ratios
+            aspect_ratio_list.append(round(aspect[1]/aspect[0], 6))
         aspect_ratio_list = list(set(aspect_ratio_list))
         aspect_ratio_list.sort()
 
@@ -217,16 +217,22 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
 
     return stats_dict
 
+#currently unused
 def combine_stats_dicts(input_dicts : list[dict], advanced_checks : bool):
     final_dict = init_concept_stats(advanced_checks)
+    total_pixels = 0
+    total_fps = 0
+    total_length = 0
+    total_caption_length = [0,0]
 
     for dict in input_dicts:
-        if dict["force_cancelled"]:
+        if dict["force_cancelled"]:     #if any scans were cancelled indicate it on the final result
             final_dict["force_cancelled"] = True
             continue
         for key in dict:
             if key in ["file_size", "image_count", "video_count",
-                "mask_count", "caption_count", "directory_count"] or advanced_checks and key in ["image_with_mask_count", "image_with_caption_count", "video_with_mask_count", "subcaption_count",
+                "mask_count", "caption_count", "directory_count"] \
+                or advanced_checks and key in ["image_with_mask_count", "image_with_caption_count", "video_with_mask_count","subcaption_count",
                 "video_with_caption_count", "paired_masks", "unpaired_masks", "paired_captions", "unpaired_captions"]:
                 final_dict[key] += dict[key]
             elif advanced_checks and key in ["aspect_buckets"]:
@@ -238,28 +244,30 @@ def combine_stats_dicts(input_dicts : list[dict], advanced_checks : bool):
             elif advanced_checks and key in ["min_pixels", "min_length", "min_fps", "min_caption_length"]:
                 if dict[key][0] < final_dict[key][0]:
                     final_dict[key] = dict[key]
-            elif advanced_checks and key in ["avg_pixels"]:
-                final_dict[key] += dict[key] * (dict["image_count"] + dict["video_count"])
-            elif advanced_checks and key in ["avg_fps", "avg_length"]:
-                final_dict[key] += dict[key] * dict["video_count"]
+            elif advanced_checks and key in ["avg_pixels"]:     #add averages * count initially to later divide out count
+                total_pixels += dict[key] * (dict["image_count"] + dict["video_count"])
+            elif advanced_checks and key in ["avg_fps"]:
+                total_fps += dict[key] * dict["video_count"]
+            elif advanced_checks and key in ["avg_length"]:
+                total_length += dict[key] * dict["video_count"]
             elif advanced_checks and key in ["avg_caption_length"]:
-                final_dict[key][0] += dict[key][0] * dict["subcaption_count"]
-                final_dict[key][1] += dict[key][1] * dict["subcaption_count"]
+                total_caption_length[0] += dict[key][0] * dict["subcaption_count"]
+                total_caption_length[1] += dict[key][1] * dict["subcaption_count"]
 
-    if advanced_checks:
+    if advanced_checks:     #divide out total counts for pixels/length/etc by total image/video count
         try:
-            final_dict["avg_pixels"] = final_dict["avg_pixels"] / (final_dict["image_count"] + final_dict["video_count"])
+            final_dict["avg_pixels"] = total_pixels / (final_dict["image_count"] + final_dict["video_count"])
         except ZeroDivisionError:
             final_dict["avg_pixels"] = 0
         try:
-            final_dict["avg_caption_length"][0] = final_dict["avg_caption_length"][0] / final_dict["subcaption_count"]
-            final_dict["avg_caption_length"][1] = final_dict["avg_caption_length"][1] / final_dict["subcaption_count"]
+            final_dict["avg_caption_length"][0] = total_caption_length[0] / final_dict["subcaption_count"]
+            final_dict["avg_caption_length"][1] = total_caption_length[1] / final_dict["subcaption_count"]
         except ZeroDivisionError:
             final_dict["avg_caption_length"][0] = 0
             final_dict["avg_caption_length"][1] = 0
         try:
-            final_dict["avg_fps"] = final_dict["avg_fps"] / final_dict["video_count"]
-            final_dict["avg_length"] = final_dict["avg_length"] / final_dict["video_count"]
+            final_dict["avg_fps"] = total_fps / final_dict["video_count"]
+            final_dict["avg_length"] = total_length / final_dict["video_count"]
         except ZeroDivisionError:
             final_dict["avg_fps"] = 0
             final_dict["avg_length"] = 0
@@ -267,6 +275,7 @@ def combine_stats_dicts(input_dicts : list[dict], advanced_checks : bool):
     return final_dict
 
 #loop through all subfolders of top-level path
+#currently unused, but similar logic in ConceptWindow
 def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, wait_time : float):
     stats_dict = init_concept_stats(advanced_checks)
     start_time = time.perf_counter()
@@ -281,6 +290,8 @@ def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, wait_t
     return stats_dict
 
 #loop through all subfolders of top-level path, uses concurrent.futures to process multiple directories in parallel
+#faster for files on HDDs but slower on SSDs, likely due to creating/destroying threads
+#currently unused
 def subfolder_scan_threaded(conceptconfig : ConceptConfig, advanced_checks : bool, wait_time : float):
     start_time = time.perf_counter()
     subfolders = [conceptconfig.path]

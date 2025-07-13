@@ -812,6 +812,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.canvas.draw()
 
     def decimal_to_aspect_ratio(self, value : float):
+        #find closest fraction to decimal aspect value and convert to a:b format
         aspect_fraction = fractions.Fraction(value).limit_denominator(16)
         aspect_string = f'{aspect_fraction.denominator}:{aspect_fraction.numerator}'
         return aspect_string
