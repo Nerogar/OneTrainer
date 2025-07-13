@@ -1,5 +1,7 @@
 from typing import Any
 
+import fabric
+
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudFileSync import CloudFileSync
@@ -8,6 +10,7 @@ from modules.util.enum.CloudType import CloudType
 
 class CloudSecretsConfig(BaseConfig):
     api_key: str
+    keyfile: str
     host: str
     port: int
     user: str
@@ -16,11 +19,25 @@ class CloudSecretsConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
 
+    def create_connection(self):
+        """Create a fabric connection using these secrets"""
+        if not self.host or not self.port:
+            raise ValueError('Host and port required for connection')
+        
+        connect_kwargs = {'key_filename': self.keyfile} if self.keyfile else {}
+        return fabric.Connection(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            connect_kwargs=connect_kwargs
+        )
+
     @staticmethod
     def default_values():
         data = []
 
         data.append(("api_key", "", str, False))
+        data.append(("keyfile", "", str, False))
         data.append(("id", "", str, False))
         data.append(("host", "", str, False))
         data.append(("port", 0, str, False))

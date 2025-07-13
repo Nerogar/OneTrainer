@@ -13,6 +13,9 @@ class NativeSCPFileSync(BaseSSHFileSync):
                 "-P", str(secrets.port),
                 "-o", "StrictHostKeyChecking=no",
             ]
+        
+        if secrets.keyfile:
+            self.base_args.extend(["-i", secrets.keyfile])
 
     def __upload_batch(self,local_files,remote_dir : Path):
         args=self.base_args.copy()

@@ -48,29 +48,35 @@ class CloudTab:
             ("FABRIC_SFTP", CloudFileSync.FABRIC_SFTP),
         ], self.ui_state, "cloud.file_sync")
 
+
         components.label(self.frame, 3, 0, "API key",
                          tooltip="Cloud service API key for RUNPOD. Leave empty for LINUX. This value is stored separately, not saved to your configuration file. ")
         components.entry(self.frame, 3, 1, self.ui_state, "secrets.cloud.api_key")
 
-        components.label(self.frame, 4, 0, "Hostname",
+        # SSH keyfile path component
+        components.label(self.frame, 4, 0, "SSH keyfile path",
+                         tooltip="Path to your SSH private key file used for authentication. Leave empty to use no key.")
+        components.entry(self.frame, 4, 1, self.ui_state, "secrets.cloud.keyfile")
+
+        components.label(self.frame, 5, 0, "Hostname",
                          tooltip="SSH server hostname or IP. Leave empty if you have a Cloud ID or want to automatically create a new cloud.")
-        components.entry(self.frame, 4, 1, self.ui_state, "secrets.cloud.host")
+        components.entry(self.frame, 5, 1, self.ui_state, "secrets.cloud.host")
 
-        components.label(self.frame, 5, 0, "Port",
+        components.label(self.frame, 6, 0, "Port",
                          tooltip="SSH server port. Leave empty if you have a Cloud ID or want to automatically create a new cloud.")
-        components.entry(self.frame, 5, 1, self.ui_state, "secrets.cloud.port")
+        components.entry(self.frame, 6, 1, self.ui_state, "secrets.cloud.port")
 
-        components.label(self.frame, 6, 0, "User",
+        components.label(self.frame, 7, 0, "User",
                          tooltip='SSH username. Use "root" for RUNPOD. Your SSH client must be set up to connect to the cloud using a public key, without a password. For RUNPOD, create an ed25519 key locally, and copy the contents of the public keyfile to your "SSH Public Keys" on the RunPod website.')
-        components.entry(self.frame, 6, 1, self.ui_state, "secrets.cloud.user")
+        components.entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.user")
 
-        components.label(self.frame, 7, 0, "Cloud id",
+        components.label(self.frame, 8, 0, "Cloud id",
                          tooltip="RUNPOD Cloud ID. The cloud service must have a public IP and SSH service. Leave empty if you want to automatically create a new RUNPOD cloud, or if you're connecting to another cloud provider via SSH Hostname and Port.")
-        components.entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.id")
+        components.entry(self.frame, 8, 1, self.ui_state, "secrets.cloud.id")
 
-        components.label(self.frame, 8, 0, "Tensorboard TCP tunnel",
+        components.label(self.frame, 9, 0, "Tensorboard TCP tunnel",
                          tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud")
-        components.switch(self.frame, 8, 1, self.ui_state, "cloud.tensorboard_tunnel")
+        components.switch(self.frame, 9, 1, self.ui_state, "cloud.tensorboard_tunnel")
 
 
 

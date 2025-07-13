@@ -11,7 +11,7 @@ class FabricFileSync(BaseSSHFileSync):
         super().__init__(config,secrets)
 
     def __upload_batch(self,local_files,remote_dir : Path):
-        with fabric.Connection(host=self.secrets.host,port=self.secrets.port,user=self.secrets.user) as connection:
+        with self.secrets.create_connection() as connection:
             for local_file in local_files:
                 self.__put(connection,local_file=local_file,remote_file=remote_dir / local_file.name)
 
@@ -26,7 +26,7 @@ class FabricFileSync(BaseSSHFileSync):
                 max_batch_size=100)
 
     def __download_batch(self,local_dir : Path,remote_files):
-        with fabric.Connection(host=self.secrets.host,port=self.secrets.port,user=self.secrets.user) as connection:
+        with self.secrets.create_connection() as connection:
             for remote_file in remote_files:
                 self.__get(connection,local_file=local_dir / remote_file.name,remote_file=remote_file)
 
