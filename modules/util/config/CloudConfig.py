@@ -1,11 +1,11 @@
 from typing import Any
 
-import fabric
-
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudFileSync import CloudFileSync
 from modules.util.enum.CloudType import CloudType
+
+import fabric
 
 
 class CloudSecretsConfig(BaseConfig):

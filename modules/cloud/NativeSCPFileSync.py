@@ -13,7 +13,7 @@ class NativeSCPFileSync(BaseSSHFileSync):
                 "-P", str(secrets.port),
                 "-o", "StrictHostKeyChecking=no",
             ]
-        
+
         if secrets.keyfile:
             self.base_args.extend(["-i", secrets.keyfile])
 

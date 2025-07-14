@@ -5,8 +5,6 @@ from pathlib import Path
 from modules.cloud.BaseFileSync import BaseFileSync
 from modules.util.config.CloudConfig import CloudConfig, CloudSecretsConfig
 
-import fabric
-
 
 class BaseSSHFileSync(BaseFileSync):
     def __init__(self, config: CloudConfig, secrets: CloudSecretsConfig):
