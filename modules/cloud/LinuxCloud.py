@@ -44,13 +44,13 @@ class LinuxCloud(BaseCloud):
             raise ValueError('Host and port required for SSH connection')
 
         try:
-            self.connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.connection=secrets.create_connection()
             self.connection.open()
             self.connection.transport.set_keepalive(30)
 
-            self.callback_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.callback_connection=secrets.create_connection()
 
-            self.command_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.command_connection=secrets.create_connection()
             #the command connection isn't used for long periods of time; prevent remote from closing it:
             self.command_connection.open()
             self.command_connection.transport.set_keepalive(30)
