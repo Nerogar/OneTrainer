@@ -60,6 +60,9 @@ class Optimizer(Enum):
     # CAME
     CAME = 'CAME'
 
+    # SMMF
+    SMMF = 'SMMF'
+
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
     TIGER = 'TIGER'
@@ -90,6 +93,7 @@ class Optimizer(Enum):
         return self in [
             Optimizer.ADAFACTOR,
             Optimizer.CAME,
+            Optimizer.SMMF,
             Optimizer.ADAM,
             Optimizer.ADAMW,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
