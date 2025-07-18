@@ -183,10 +183,6 @@ class SMMF(torch.optim.Optimizer):
         
         state['step'] += 1
         
-        # Weight decay
-        if group['weight_decay'] != 0.0:
-            p.mul_(1 - group['lr'] * group['weight_decay'])
-        
         beta1 = group['beta1']
         eps = group['eps']
         decay_rate = group['decay_rate']
@@ -233,11 +229,22 @@ class SMMF(torch.optim.Optimizer):
             else:
                 update = grad / (update_v.sqrt() + eps)
 
-        # Apply final update to parameter with optional stochastic rounding
+        if group["weight_decay"] != 0:
+            if p.dtype == torch.bfloat16 and self.stochastic_rounding:
+                add_stochastic_(p.data, p.data,
+                                alpha=-group["weight_decay"] * group["lr"])
+            else:
+                p.data.add_(
+                    p.data, alpha=-group["weight_decay"] * group["lr"]
+                )
+
+        update.mul_(group["lr"])
         if p.dtype == torch.bfloat16 and self.stochastic_rounding:
-            add_stochastic_(p.data, update, alpha=-group['lr'])
+            add_stochastic_(p.data, -update)
         else:
-            p.data.add_(update, alpha=-group['lr'])
+            p.data.add_(-update)
+
+
 
     @torch.no_grad()
     def step(self, closure=None):
