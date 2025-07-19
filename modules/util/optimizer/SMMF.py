@@ -59,11 +59,11 @@ class SMMF(torch.optim.Optimizer):
         if beta1_growth_rate is not None and not (0.0 <= beta1_growth_rate <= 1.0):
             raise ValueError(f"Growth-rate should be in [0.0, 1.0]. Got {beta1_growth_rate}")
 
-        defaults = dict(
-            lr=lr, beta1=beta1, eps=eps, weight_decay=weight_decay,
-            decay_rate=decay_rate, beta1_growth_rate=beta1_growth_rate,
-            vector_reshape=vector_reshape,
-        )
+        defaults = {
+            "lr": lr, "beta1": beta1, "eps": eps, "weight_decay": weight_decay,
+            "decay_rate": decay_rate, "beta1_growth_rate": beta1_growth_rate,
+            "vector_reshape": vector_reshape,
+        }
         self.stochastic_rounding = stochastic_rounding
         self.use_bmf = use_bmf
         super().__init__(params, defaults)
@@ -224,10 +224,7 @@ class SMMF(torch.optim.Optimizer):
             update_v.mul_(beta_v).addcmul_(grad, grad, value=1.0 - beta_v)
             
             # Compute parameter update
-            if beta1 is not None:
-                update = update_m / (update_v.sqrt() + eps)
-            else:
-                update = grad / (update_v.sqrt() + eps)
+            update = update_m / (update_v.sqrt() + eps) if beta1 is not None else grad / (update_v.sqrt() + eps)
 
         if group["weight_decay"] != 0:
             if p.dtype == torch.bfloat16 and self.stochastic_rounding:
