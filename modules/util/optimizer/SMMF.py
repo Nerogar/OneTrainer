@@ -8,11 +8,11 @@
 # - Optional Binary Matrix Factorization (BMF) for sign matrices, as suggested by the SMMF paper.
 #
 
-import torch
-import torch.optim
-from typing import Optional
 
 from modules.util.bf16_stochastic_rounding import add_stochastic_
+
+import torch
+import torch.optim
 
 
 class SMMF(torch.optim.Optimizer):
@@ -37,22 +37,22 @@ class SMMF(torch.optim.Optimizer):
         self,
         params,
         lr: float = 1e-3,
-        beta1: Optional[float] = 0.9,
+        beta1: float | None = 0.9,
         eps: float = 1e-8,
         weight_decay: float = 0.0,
         decay_rate: float = -0.8,
-        beta1_growth_rate: Optional[float] = 0.999,
+        beta1_growth_rate: float | None = 0.999,
         vector_reshape: bool = True,
         stochastic_rounding: bool = False,
         use_bmf: bool = False,
     ):
-        if not (0.0 <= lr):
+        if not (lr >= 0.0):
             raise ValueError(f"Learning-rate should be >= 0.0. Got {lr}")
         if beta1 is not None and not (0.0 <= beta1 <= 1.0):
             raise ValueError(f"beta1 should be in [0.0, 1.0]. Got {beta1}")
-        if not (0.0 <= eps):
+        if not (eps >= 0.0):
             raise ValueError(f"Epsilon should be >= 0.0. Got {eps}")
-        if not (0.0 <= weight_decay):
+        if not (weight_decay >= 0.0):
             raise ValueError(f"Weight-decay should be >= 0.0. Got {weight_decay}")
         if not (-1.0 <= decay_rate <= 0.0):
             raise ValueError(f"Decay-rate should be in [-1.0, 0.0]. Got {decay_rate}")
@@ -86,7 +86,7 @@ class SMMF(torch.optim.Optimizer):
         if numel == sqrt_num_sq:
             sqrt_num = int(numel ** 0.5)
             return (sqrt_num, sqrt_num)
-        
+
         for i in reversed(range(1, int(numel ** 0.5) + 1)):
             if numel % i == 0:
                 return (numel // i, i)
@@ -121,12 +121,12 @@ class SMMF(torch.optim.Optimizer):
                 sign = sign_approx > 0.5
             else:
                 sign = state['sign']
-            
+
             if sign.dtype != torch.bool:
                 sign = sign.type(torch.bool)
             torch.where(sign, update, -update, out=update)
         return update
-        
+
     def _compress_momentum(self, matrix: torch.Tensor, state, momentum_name: str):
         """Compresses a momentum tensor into its factorized form."""
         if momentum_name == 'momentum_m':
@@ -140,25 +140,25 @@ class SMMF(torch.optim.Optimizer):
             self._nnmf(matrix, out=state[momentum_name])
 
     @torch.no_grad()
-    def step_parameter(self, p: torch.Tensor, group: dict, i: Optional[int] = None):
+    def step_parameter(self, p: torch.Tensor, group: dict, i: int | None = None):
         """Performs a single optimization step on a single parameter."""
         if p.grad is None:
             return
-        
+
         grad = p.grad
         state = self.state[p]
-        
+
         # State Initialization
         if len(state) == 0:
             state['step'] = 0
-            
+
             dimension = len(grad.squeeze().shape)
             state['factored'] = not (dimension == 1 and not group['vector_reshape'])
-            
+
             if state['factored']:
                 state['effective_shape'] = self._get_effective_shape(p.numel())
                 device = p.device
-                
+
                 if group['beta1'] is not None:
                     state['momentum_m'] = (
                         torch.zeros(state['effective_shape'][0], device=device),
@@ -171,7 +171,7 @@ class SMMF(torch.optim.Optimizer):
                         )
                     else:
                         state['sign'] = torch.zeros(state['effective_shape'], dtype=torch.bool, device=device)
-                
+
                 state['momentum_v'] = (
                     torch.zeros(state['effective_shape'][0], device=device),
                     torch.zeros(state['effective_shape'][1], device=device),
@@ -180,14 +180,14 @@ class SMMF(torch.optim.Optimizer):
                 if group['beta1'] is not None:
                     state['momentum_m'] = torch.zeros_like(p)
                 state['momentum_v'] = torch.zeros_like(p)
-        
+
         state['step'] += 1
-        
+
         beta1 = group['beta1']
         eps = group['eps']
         decay_rate = group['decay_rate']
         beta1_growth_rate = group['beta1_growth_rate']
-        
+
         if state['factored']:
             original_shape = p.shape
             if not grad.is_contiguous():
@@ -212,7 +212,7 @@ class SMMF(torch.optim.Optimizer):
             else:
                 update = grad_reshaped / (update_v.sqrt() + eps)
             update = update.contiguous().view(original_shape)
-        
+
         else:  # Non-factorized path
             if beta1 is not None:
                 update_m = state['momentum_m']
@@ -222,7 +222,7 @@ class SMMF(torch.optim.Optimizer):
             update_v = state['momentum_v']
             beta_v = 1.0 - (state['step'] ** decay_rate)
             update_v.mul_(beta_v).addcmul_(grad, grad, value=1.0 - beta_v)
-            
+
             # Compute parameter update
             update = update_m / (update_v.sqrt() + eps) if beta1 is not None else grad / (update_v.sqrt() + eps)
 
@@ -250,7 +250,7 @@ class SMMF(torch.optim.Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
-            
+
         for group in self.param_groups:
             for i, p in enumerate(group['params']):
                 self.step_parameter(p, group, i)
