@@ -80,6 +80,17 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "stochastic_rounding": True,
         "fused_back_pass": False,
     },
+    Optimizer.SMMF: {
+        "eps": 1e-8,
+        "decay_rate": -0.8,
+        "beta1": 0.9,
+        "weight_decay": 0.0,
+        "vector_reshape": True,
+        "use_bmf": False,
+        "beta1_growth_rate": 0.999,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+    },
     Optimizer.ADAGRAD: {
         "lr_decay": 0,
         "weight_decay": 0,
