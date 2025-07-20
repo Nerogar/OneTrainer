@@ -47,7 +47,7 @@ class GenerateCaptionsArgs(BaseArgs):
     def default_values():
         data = []
 
-        data.append(("model", GenerateCaptionsModel.BLIP, GenerateCaptionsModel, False))
+        data.append(("model", GenerateCaptionsModel.MOONDREAM2, GenerateCaptionsModel, False))
         data.append(("sample_dir", "", str, False))
         data.append(("initial_caption", "", str, False))
         data.append(("caption_prefix", "", str, False))
