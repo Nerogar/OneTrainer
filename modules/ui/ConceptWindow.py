@@ -558,11 +558,11 @@ class ConceptWindow(ctk.CTkToplevel):
         self.caption_preview.configure(state="disabled")
 
     @staticmethod
-    def get_concept_path(path: str):
+    def get_concept_path(path: str) -> str | None:
         if os.path.isdir(path):
             return path
         try:
-            #don't donwload, only check if available locally:
+            #don't download, only check if available locally:
             return huggingface_hub.snapshot_download(repo_id=path, repo_type="dataset", local_files_only=True)
         except Exception:
             return None
@@ -573,7 +573,6 @@ class ConceptWindow(ctk.CTkToplevel):
             huggingface_hub.snapshot_download(repo_id=self.concept.path, repo_type="dataset")
         except Exception:
             traceback.print_exc()
-
 
     def __download_dataset_threaded(self):
         download_thread = threading.Thread(target=self.__download_dataset, daemon=True)
