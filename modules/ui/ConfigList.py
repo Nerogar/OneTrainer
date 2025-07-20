@@ -42,6 +42,12 @@ class ConfigList(metaclass=ABCMeta):
         self.default_config_name = default_config_name
 
         self.is_full_width = is_full_width
+
+        # From search-concepts
+        self.filters = {"search": "", "type": "ALL"}  # Single filter state
+        self.widgets_initialized = False  # Track if widgets are created
+
+        # From master
         self.toggle_button = None
         self.show_toggle_button = show_toggle_button
         self.is_opening_window = False
@@ -128,10 +134,20 @@ class ConfigList(metaclass=ABCMeta):
         )
         self._update_toggle_button_text()
 
-    def _create_element_list(self):
+    def _create_element_list(self, **filters):
         if not self.from_external_file:
             self.current_config = getattr(self.train_config, self.attr_name)
 
+        self.filters.update(filters)
+
+        if not self.widgets_initialized:
+            self._initialize_all_widgets()
+            self.widgets_initialized = True
+
+        self._update_widget_visibility()
+
+    def _initialize_all_widgets(self):
+        """Create all widgets once at startup"""
         self.widgets = []
         if self.element_list is not None:
             self.element_list.destroy()
@@ -152,7 +168,20 @@ class ConfigList(metaclass=ABCMeta):
             )
             self.widgets.append(widget)
 
-            widget.place_in_list()
+    def _update_widget_visibility(self):
+        """Update visibility and position of widgets based on filters"""
+        visible_index = 0
+
+        for i, widget in enumerate(self.widgets):
+            if i < len(self.current_config):
+                element = self.current_config[i]
+
+                if self._element_matches_filters(element):
+                    widget.visible_index = visible_index
+                    widget.place_in_list()
+                    visible_index += 1
+                else:
+                    widget.grid_remove()
 
     def __load_available_config_names(self):
         if os.path.isdir(self.config_dir):
@@ -178,51 +207,32 @@ class ConfigList(metaclass=ABCMeta):
         dialogs.StringInputDialog(self.master, "name", "Name", self.__create_config)
 
     def __add_element(self):
-        i = len(self.current_config)
         new_element = self.create_new_element()
-
         self.current_config.append(new_element)
-        widget = self.create_widget(
-            self.element_list, new_element, i,
-            self.__open_element_window,
-            self.__remove_element,
-            self.__clone_element,
-            self.save_current_config
-        )
-        self.widgets.append(widget)
 
-        widget.place_in_list()
+        self.widgets_initialized = False
+        self._create_element_list()
 
         self.save_current_config()
 
     def __clone_element(self, clone_i, modify_element_fun=None):
-        i = len(self.current_config)
         new_element = copy.deepcopy(self.current_config[clone_i])
 
         if modify_element_fun is not None:
             new_element = modify_element_fun(new_element)
 
         self.current_config.append(new_element)
-        widget = self.create_widget(
-            self.element_list, new_element, i,
-            self.__open_element_window,
-            self.__remove_element,
-            self.__clone_element,
-            self.save_current_config
-        )
-        self.widgets.append(widget)
 
-        widget.place_in_list()
+        self.widgets_initialized = False
+        self._create_element_list()
 
         self.save_current_config()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
-        self.widgets.pop(remove_i).destroy()
 
-        for i, widget in enumerate(self.widgets):
-            widget.i = i
-            widget.place_in_list()
+        self.widgets_initialized = False
+        self._create_element_list()
 
         self.save_current_config()
 
@@ -238,6 +248,7 @@ class ConfigList(metaclass=ABCMeta):
         except Exception:
             self.current_config = []
 
+        self.widgets_initialized = False
         self._create_element_list()
         self._update_toggle_button_text()
 
@@ -252,6 +263,10 @@ class ConfigList(metaclass=ABCMeta):
                     [element.to_dict() for element in self.current_config]
                 )
         self._update_toggle_button_text()
+
+    def _element_matches_filters(self, element):
+        """Override in subclasses to implement filter logic"""
+        return True  # Default: show all elements
 
     def __open_element_window(self, i, ui_state):
         if self.is_opening_window:
