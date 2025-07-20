@@ -1,8 +1,10 @@
 import contextlib
 import copy
+import datetime
 import json
 import os
 import shutil
+import time
 import traceback
 from collections.abc import Callable
 from pathlib import Path
@@ -18,7 +20,7 @@ from modules.util import create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
@@ -59,6 +61,10 @@ class GenericTrainer(BaseTrainer):
     tensorboard: SummaryWriter
 
     grad_hook_handles: list[RemovableHandle]
+    _active_training_parts: set[str]
+    _eta_tracker: dict[str, float | int]
+    _is_sampling_enabled: bool
+    _first_sample_done: bool
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
@@ -73,6 +79,10 @@ class GenericTrainer(BaseTrainer):
         self.one_step_trained = False
 
         self.grad_hook_handles = []
+        self._active_training_parts = set()
+        self._eta_tracker = {}
+        self._is_sampling_enabled = self.config.sample_after_unit != TimeUnit.NEVER
+        self._first_sample_done = False
 
     def start(self):
         self.__save_config_to_workspace()
@@ -153,7 +163,7 @@ class GenericTrainer(BaseTrainer):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
         os.makedirs(Path(path).absolute(), exist_ok=True)
         path = path_util.canonical_join(path, f"{get_string_timestamp()}.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
 
     def __clear_cache(self):
@@ -189,9 +199,15 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
+        if not self.sample_queue:
+            return
+
         for fun in self.sample_queue:
             fun()
         self.sample_queue = []
+
+        if self._is_sampling_enabled and not self._first_sample_done:
+            self._first_sample_done = True
 
     def __sample_loop(
             self,
@@ -278,7 +294,7 @@ class GenericTrainer(BaseTrainer):
             if self.config.samples is not None:
                 sample_params_list = self.config.samples
             else:
-                with open(self.config.sample_definition_file_name, 'r') as f:
+                with open(self.config.sample_definition_file_name, 'r', encoding="utf-8") as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
@@ -396,7 +412,7 @@ class GenericTrainer(BaseTrainer):
 
         os.makedirs(Path(config_path).absolute(), exist_ok=True)
 
-        with open(args_path, "w") as f:
+        with open(args_path, "w", encoding="utf-8") as f:
             json.dump(self.config.to_settings_dict(secrets=False), f, indent=4)
         if os.path.isfile(self.config.concept_file_name):
             shutil.copy2(self.config.concept_file_name, concepts_path)
@@ -565,6 +581,116 @@ class GenericTrainer(BaseTrainer):
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
+
+    def _get_active_training_parts(self, train_progress: TrainProgress) -> set[str]:
+        active_parts = set()
+        if self._is_model_part_training_active(self.config.unet, train_progress):
+            active_parts.add("Model")
+
+        te_configs = [
+            (1, self.config.text_encoder),
+            (2, self.config.text_encoder_2),
+            (3, self.config.text_encoder_3),
+            (4, self.config.text_encoder_4),
+        ]
+
+        for i, te_config in te_configs:
+            if self._is_model_part_training_active(te_config, train_progress):
+                active_parts.add(f"TE {i}")
+
+        return active_parts
+
+    def _calculate_eta_string(self, train_progress: TrainProgress) -> str | None:
+        if not self._eta_tracker:
+            return None
+
+
+        if self._is_sampling_enabled and not self._first_sample_done:
+            return None
+
+        steps_done = train_progress.global_step - self._eta_tracker.get("initial_step", 0)
+        if steps_done <= 10:  # Wait for a few steps to get a stable estimate
+            return None
+
+        time_elapsed = time.monotonic() - self._eta_tracker.get("start_time", 0)
+        time_per_step = time_elapsed / steps_done
+
+        total_steps = self._eta_tracker.get("total_steps", 0)
+        remaining_steps = total_steps - train_progress.global_step
+
+        if remaining_steps <= 0:
+            return None
+
+        eta_seconds = remaining_steps * time_per_step
+        td = datetime.timedelta(seconds=eta_seconds)
+
+        days = td.days
+        hours, remainder = divmod(td.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+
+        if days > 0:
+            return f"{days}d {hours}h"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        elif minutes > 0:
+            return f"{minutes}m"
+
+        return None
+
+    def _get_training_status_string(self, train_progress: TrainProgress) -> str:
+        active_parts_set = self._get_active_training_parts(train_progress)
+
+        status_parts = []
+        if not active_parts_set:
+            status_parts.append("Training")
+        else:
+            display_parts = []
+            if "Model" in active_parts_set:
+                display_parts.append("Model")
+
+            te_parts = sorted([p for p in active_parts_set if p.startswith("TE")])
+            if te_parts:
+                te_numbers = [p.split(" ")[1] for p in te_parts]
+                display_parts.append(f"TE ({', '.join(te_numbers)})")
+
+            status_parts.append(f"Training: {' + '.join(display_parts)}")
+
+        # ETA calculation
+        eta_str = self._calculate_eta_string(train_progress)
+        if eta_str:
+            status_parts.append(f"ETA: {eta_str}")
+
+        return " | ".join(status_parts)
+
+    def _is_model_part_training_active(self, part_config: TrainModelPartConfig, train_progress: TrainProgress) -> bool:
+        if not part_config.train:
+            return False
+
+        if part_config.stop_training_after is None or part_config.stop_training_after_unit == TimeUnit.NEVER:
+            return True
+
+        action_name = f"stop_training_{part_config.model_name}"
+        return not self.single_action_elapsed(
+            action_name,
+            part_config.stop_training_after,
+            part_config.stop_training_after_unit,
+            train_progress
+        )
+
+
+    def _update_and_log_training_status(self, train_progress: TrainProgress):
+        current_active_parts = self._get_active_training_parts(train_progress)
+
+        if not self._active_training_parts and current_active_parts:
+            # Initial setup
+            print(f"Training started with: {', '.join(sorted(current_active_parts))}")
+        else:
+            # Check for deactivations
+            for part in sorted(self._active_training_parts - current_active_parts):
+                print(f"Stopping training for {part}.")
+
+        self._active_training_parts = current_active_parts
+
     def train(self):
         train_device = torch.device(self.config.train_device)
 
@@ -588,6 +714,9 @@ class GenericTrainer(BaseTrainer):
         accumulated_loss = 0.0
         ema_loss = None
         ema_loss_steps = 0
+
+        self._update_and_log_training_status(self.model.train_progress)
+
         for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -623,6 +752,15 @@ class GenericTrainer(BaseTrainer):
                 )
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
+
+            if not self._eta_tracker:
+                approx_total_steps = self.config.epochs * current_epoch_length
+                self._eta_tracker = {
+                    "start_time": time.monotonic(),
+                    "initial_step": train_progress.global_step,
+                    "total_steps": approx_total_steps
+                }
+
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
             for batch in step_tqdm:
@@ -667,7 +805,7 @@ class GenericTrainer(BaseTrainer):
                     if transferred_to_temp_device:
                         self.model_setup.setup_train_device(self.model, self.config)
 
-                self.callbacks.on_update_status("training")
+                self.callbacks.on_update_status(self._get_training_status_string(train_progress))
 
                 with TorchMemoryRecorder(enabled=False):
                     prior_pred_indices = [i for i in range(self.config.batch_size)
@@ -752,6 +890,7 @@ class GenericTrainer(BaseTrainer):
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
+                self._update_and_log_training_status(train_progress)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
