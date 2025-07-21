@@ -980,7 +980,6 @@ def create_optimizer(
                 beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else None,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 vector_reshape=optimizer_config.vector_reshape,
-                use_bmf=optimizer_config.use_bmf,
                 beta1_growth_rate=optimizer_config.beta1_growth_rate if optimizer_config.beta1_growth_rate is not None else 0.999,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
             )

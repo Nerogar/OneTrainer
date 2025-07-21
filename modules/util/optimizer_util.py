@@ -86,7 +86,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.9,
         "weight_decay": 0.0,
         "vector_reshape": True,
-        "use_bmf": False,
         "beta1_growth_rate": 0.999,
         "stochastic_rounding": True,
         "fused_back_pass": False,
