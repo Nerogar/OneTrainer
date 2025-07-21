@@ -59,6 +59,7 @@ class Optimizer(Enum):
 
     # CAME
     CAME = 'CAME'
+    CAME_8BIT = 'CAME_8BIT'
 
     # SMMF
     SMMF = 'SMMF'
@@ -93,6 +94,7 @@ class Optimizer(Enum):
         return self in [
             Optimizer.ADAFACTOR,
             Optimizer.CAME,
+            Optimizer.CAME_8BIT,
             Optimizer.SMMF,
             Optimizer.ADAM,
             Optimizer.ADAMW,

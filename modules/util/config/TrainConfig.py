@@ -65,6 +65,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -152,6 +153,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
