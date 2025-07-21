@@ -5,7 +5,6 @@
 # This version incorporates:
 # - A structure that supports fused backward passes.
 # - Stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192) for the final parameter update.
-# - Optional Binary Matrix Factorization (BMF) for sign matrices, as suggested by the SMMF paper.
 #
 
 
@@ -30,7 +29,6 @@ class SMMF(torch.optim.Optimizer):
         beta1_growth_rate (Optional[float], optional): growth-rate for 1st moment ('lambda' in paper) (default: 0.999)
         vector_reshape (bool, optional): whether to reshape 1D vectors into 2D matrices (default: True)
         stochastic_rounding (bool, optional): whether to use stochastic rounding for BF16 (default: False)
-        use_bmf (bool, optional): whether to use Binary Matrix Factorization for signs (default: False)
     """
 
     def __init__(
@@ -44,7 +42,6 @@ class SMMF(torch.optim.Optimizer):
         beta1_growth_rate: float | None = 0.999,
         vector_reshape: bool = True,
         stochastic_rounding: bool = False,
-        use_bmf: bool = False,
     ):
         if not (lr >= 0.0):
             raise ValueError(f"Learning-rate should be >= 0.0. Got {lr}")
@@ -65,7 +62,6 @@ class SMMF(torch.optim.Optimizer):
             "vector_reshape": vector_reshape,
         }
         self.stochastic_rounding = stochastic_rounding
-        self.use_bmf = use_bmf
         super().__init__(params, defaults)
 
     @property
@@ -112,83 +108,11 @@ class SMMF(torch.optim.Optimizer):
             if scale != 0:
                 out[1].div_(scale)
 
-    def _bmf(self, matrix: torch.Tensor, out: tuple):
-        """
-        Performs a rank-1 Binary Matrix Factorization (BMF) heuristic.
-        It includes a False Discovery Rate (FDR) control mechanism inspired by:
-        "The Trustworthy Pal: Controlling the False Discovery Rate in Boolean Matrix Factorization"
-        This implementation uses the full probability bound from Theorem 3.1, including
-        the union bound (via binomial coefficients) to correct for multiple testing.
-        This is a very strict test that asks "what is the probability of a tile this
-        dense appearing *anywhere* in a random matrix of this size?".
-        Calculations are performed in log-space to avoid numerical overflow from the
-        extremely large binomial coefficients.
-        """
-        p_noise = 0.1 # This is the assumed probability that a "1" in the matrix is just random noise, not part of a meaningful pattern.
-        q_fdr = 0.01 # This is the False Discovery Rate (FDR) threshold. It's the maximum proportion of "discoveries" (identified blocks) that the algorithm is willing to tolerate being false positives. A lower q_fdr means a stricter test.
-
-        m, n = matrix.shape
-
-        # 1. Propose a candidate tile using a simple heuristic (row/column sums)
-        row_sum = torch.sum(matrix, dim=1)
-        col_sum = torch.sum(matrix, dim=0)        
-        
-        u_candidate = (row_sum > 0).to(row_sum.dtype)
-        v_candidate = (col_sum > 0).to(col_sum.dtype)
-        
-        # 2. Calculate tile properties
-        a = u_candidate.sum()
-        b = v_candidate.sum()    
-
-        # If the proposed tile is empty, it's trivially insignificant. Reject.
-        if a == 0 or b == 0:
-            out[0].zero_()
-            out[1].zero_()
-            return
-        
-        # Density (delta) of 1s in the candidate tile
-        # Use .item() to get scalar values for calculation to avoid creating graphs
-        a_val, b_val = a.item(), b.item()
-        captured_ones = torch.dot(matrix @ v_candidate, u_candidate)
-        delta = captured_ones / (a_val * b_val)
-
-        # 3. Apply FDR check in log-space to avoid numerical instability
-        density_diff_sq = (max(0.0, delta.item() - p_noise))**2
-        log_q_fdr = torch.log(torch.tensor(q_fdr, device=matrix.device))
-
-        # Probability from Hoeffding's inequality for a *specific* tile
-        # This is log( exp(-2ab(delta-p)^2) )
-        log_prob_specific_tile = -2.0 * a_val * b_val * density_diff_sq
-
-        # Log of the binomial coefficients: log(C(m,a)) and log(C(n,b))
-        # Inputs must be Tensors.
-        device = matrix.device
-        # This is the log of the union bound correction factor.
-        # log(C(k, r)) = lgamma(k+1) - lgamma(r+1) - lgamma(k-r+1)
-        log_comb_m = torch.lgamma(torch.tensor(m + 1., device=device)) - torch.lgamma(torch.tensor(a_val + 1., device=device)) - torch.lgamma(torch.tensor(m - a_val + 1., device=device))
-        log_comb_n = torch.lgamma(torch.tensor(n + 1., device=device)) - torch.lgamma(torch.tensor(b_val + 1., device=device)) - torch.lgamma(torch.tensor(n - b_val + 1., device=device))
-
-        # Total log-probability bound: log(C(m,a)) + log(C(n,b)) + log_prob
-        log_p_total = log_comb_m + log_comb_n + log_prob_specific_tile
-
-        # If the log-probability of a false discovery is greater than the log of our
-        # significance level, we reject the tile.
-        if log_p_total > log_q_fdr:
-            out[0].zero_()
-            out[1].zero_()
-        else:
-            out[0].copy_(u_candidate)
-            out[1].copy_(v_candidate)
-
     def _decompress_momentum(self, state, momentum_name: str) -> torch.Tensor:
         """Decompresses a momentum tensor from its factorized form."""
         update = self._unnmf(state[momentum_name])
         if momentum_name == 'momentum_m':
-            if self.use_bmf:
-                sign_approx = self._unnmf(state['sign'])
-                sign = sign_approx > 0.5
-            else:
-                sign = state['sign']
+            sign = state['sign']
 
             if sign.dtype != torch.bool:
                 sign = sign.type(torch.bool)
@@ -199,10 +123,7 @@ class SMMF(torch.optim.Optimizer):
         """Compresses a momentum tensor into its factorized form."""
         if momentum_name == 'momentum_m':
             sign_matrix = matrix > 0
-            if self.use_bmf:
-                self._bmf(sign_matrix.float(), out=state['sign'])
-            else:
-                state['sign'] = sign_matrix
+            state['sign'] = sign_matrix
             self._nnmf(torch.abs(matrix), out=state[momentum_name])
         else:  # for momentum_v
             self._nnmf(matrix, out=state[momentum_name])
@@ -232,13 +153,7 @@ class SMMF(torch.optim.Optimizer):
                         torch.zeros(state['effective_shape'][0], device=device),
                         torch.zeros(state['effective_shape'][1], device=device),
                     )
-                    if self.use_bmf:
-                        state['sign'] = (
-                            torch.zeros(state['effective_shape'][0], device=device),
-                            torch.zeros(state['effective_shape'][1], device=device),
-                        )
-                    else:
-                        state['sign'] = torch.zeros(state['effective_shape'], dtype=torch.bool, device=device)
+                    state['sign'] = torch.zeros(state['effective_shape'], dtype=torch.bool, device=device)
 
                 state['momentum_v'] = (
                     torch.zeros(state['effective_shape'][0], device=device),
