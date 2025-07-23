@@ -61,6 +61,9 @@ class Optimizer(Enum):
     CAME = 'CAME'
     CAME_8BIT = 'CAME_8BIT'
 
+    # SMMF
+    SMMF = 'SMMF'
+
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
     TIGER = 'TIGER'
@@ -92,6 +95,7 @@ class Optimizer(Enum):
             Optimizer.ADAFACTOR,
             Optimizer.CAME,
             Optimizer.CAME_8BIT,
+            Optimizer.SMMF,
             Optimizer.ADAM,
             Optimizer.ADAMW,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
