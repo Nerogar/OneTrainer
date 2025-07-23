@@ -88,6 +88,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "vector_reshape": True,
         "beta1_growth_rate": 0.999,
         "stochastic_rounding": True,
+        "factored_sign": False,
         "fused_back_pass": False,
     },
     Optimizer.ADAGRAD: {

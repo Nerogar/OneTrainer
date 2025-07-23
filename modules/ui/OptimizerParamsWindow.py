@@ -162,8 +162,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
             'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
             'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
-            'vector_reshape': {'title': 'vector_reshape', 'tooltip': ' If True (default), 1D tensors (like bias terms) are reshaped into 2D matrices and factorized for maximum memory savings. If False, they are updated using a standard, non-factorized method, which may improve stability at a negligible memory cost.', 'type': 'bool'},
+            'vector_reshape': {'title': 'vector_reshape', 'tooltip': 'If True (default), 1D tensors (like bias terms) are reshaped into 2D matrices and factorized for maximum memory savings. If False, they are updated using a standard, non-factorized method, which may improve stability at a negligible memory cost.', 'type': 'bool'},
             'beta1_growth_rate': {'title': 'beta1 growth rate', 'tooltip': 'First Momentum Growth Rate (lambda). SMMF-specific hyperparameter that modifies the beta coefficient over time. A value less than 1.0 gradually reduces the influence of the first moments history, allowing the optimizer to adapt more to recent gradients later in training.', 'type': 'float'},
+            'factored_sign': {'title': 'factored sign', 'tooltip': 'An experimental feature. If True, the optimizer will mathematically decompose the first momentum matrix (M) into its positive (M pos) and negative (M neg) components, and then approximate each using its own rank-1 factorization. This pushes memory savings even further at the cost of an additional approximation.', 'type': 'bool'},
         }
         # @formatter:on
 

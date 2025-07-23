@@ -5,6 +5,7 @@
 # This version incorporates:
 # - A structure that supports fused backward passes.
 # - Stochastic rounding from "Revisiting BFloat16 Training" (https://arxiv.org/abs/2010.06192) for the final parameter update.
+# - A toggleable 'factored_sign' mode for maximum memory efficiency.
 #
 
 
@@ -28,7 +29,8 @@ class SMMF(torch.optim.Optimizer):
         decay_rate (float, optional): decay-rate for 2nd moment ('gamma' in paper) (default: -0.5)
         beta1_growth_rate (Optional[float], optional): growth-rate for 1st moment ('lambda' in paper) (default: 0.999)
         vector_reshape (bool, optional): whether to reshape 1D vectors into 2D matrices (default: True)
-        stochastic_rounding (bool, optional): whether to use stochastic rounding for BF16 (default: False)
+        stochastic_rounding (bool, optional): whether to use stochastic rounding for BF16 (default: True)
+        factored_sign (bool, optional): whether to use the memory-efficient pos/neg factorization instead of a sign matrix (default: False)
     """
 
     def __init__(
@@ -41,7 +43,8 @@ class SMMF(torch.optim.Optimizer):
         decay_rate: float = -0.8,
         beta1_growth_rate: float | None = 0.999,
         vector_reshape: bool = True,
-        stochastic_rounding: bool = False,
+        stochastic_rounding: bool = True,
+        factored_sign: bool = False,
     ):
         if not (lr >= 0.0):
             raise ValueError(f"Learning-rate should be >= 0.0. Got {lr}")
@@ -60,6 +63,7 @@ class SMMF(torch.optim.Optimizer):
             "lr": lr, "beta1": beta1, "eps": eps, "weight_decay": weight_decay,
             "decay_rate": decay_rate, "beta1_growth_rate": beta1_growth_rate,
             "vector_reshape": vector_reshape,
+            "factored_sign": factored_sign,
         }
         self.stochastic_rounding = stochastic_rounding
         super().__init__(params, defaults)
@@ -108,25 +112,37 @@ class SMMF(torch.optim.Optimizer):
             if scale != 0:
                 out[1].div_(scale)
 
-    def _decompress_momentum(self, state, momentum_name: str) -> torch.Tensor:
+    def _decompress_momentum(self, state, momentum_name: str, group: dict) -> torch.Tensor:
         """Decompresses a momentum tensor from its factorized form."""
-        update = self._unnmf(state[momentum_name])
-        if momentum_name == 'momentum_m':
-            sign = state['sign']
+        if momentum_name != 'momentum_m':
+            return self._unnmf(state[momentum_name])
+        if not group['factored_sign']:
+            # Original method (with patch for resume-spike)
+            update = self._unnmf(state['momentum_m'])
+            if state['sign'].dtype != torch.bool:
+                state['sign'] = state['sign'].to(torch.bool)
+            torch.where(state['sign'], update, -update, out=update)
+            return update
+        else:
+            # True Factorization method
+            m_pos = self._unnmf(state['momentum_m_pos'])
+            m_neg = self._unnmf(state['momentum_m_neg'])
+            return torch.sub(m_pos, m_neg, out=m_pos) # In-place subtraction
 
-            if sign.dtype != torch.bool:
-                sign = sign.type(torch.bool)
-            torch.where(sign, update, -update, out=update)
-        return update
-        
-    def _compress_momentum(self, matrix: torch.Tensor, state, momentum_name: str):
+    def _compress_momentum(self, matrix: torch.Tensor, state, momentum_name: str, group: dict):
         """Compresses a momentum tensor into its factorized form."""
-        if momentum_name == 'momentum_m':
-            sign_matrix = matrix > 0
-            state['sign'] = sign_matrix
-            self._nnmf(torch.abs(matrix), out=state[momentum_name])
-        else:  # for momentum_v
+        if momentum_name != 'momentum_m':
             self._nnmf(matrix, out=state[momentum_name])
+            return
+
+        if not group['factored_sign']:
+            state['sign'] = matrix > 0
+            self._nnmf(torch.abs(matrix), out=state['momentum_name'])
+        else:
+            m_pos = matrix.relu()
+            m_neg = matrix.neg().relu_()
+            self._nnmf(m_pos, out=state['momentum_m_pos'])
+            self._nnmf(m_neg, out=state['momentum_m_neg'])
 
     @torch.no_grad()
     def step_parameter(self, p: torch.Tensor, group: dict, i: int | None = None):
@@ -147,18 +163,17 @@ class SMMF(torch.optim.Optimizer):
             if state['factored']:
                 state['effective_shape'] = self._get_effective_shape(p.numel())
                 device = p.device
+                shape0, shape1 = state['effective_shape']
 
                 if group['beta1'] is not None:
-                    state['momentum_m'] = (
-                        torch.zeros(state['effective_shape'][0], device=device),
-                        torch.zeros(state['effective_shape'][1], device=device),
-                    )
-                    state['sign'] = torch.zeros(state['effective_shape'], dtype=torch.bool, device=device)
+                    if group['factored_sign']:
+                        state['momentum_m_pos'] = (torch.zeros(shape0, device=device), torch.zeros(shape1, device=device))
+                        state['momentum_m_neg'] = (torch.zeros(shape0, device=device), torch.zeros(shape1, device=device))
+                    else:
+                        state['momentum_m'] = (torch.zeros(shape0, device=device), torch.zeros(shape1, device=device))
+                        state['sign'] = torch.zeros(state['effective_shape'], dtype=torch.bool, device=device)
 
-                state['momentum_v'] = (
-                    torch.zeros(state['effective_shape'][0], device=device),
-                    torch.zeros(state['effective_shape'][1], device=device),
-                )
+                state['momentum_v'] = (torch.zeros(shape0, device=device), torch.zeros(shape1, device=device))
             else:  # not factored
                 if group['beta1'] is not None:
                     state['momentum_m'] = torch.zeros_like(p)
@@ -179,40 +194,44 @@ class SMMF(torch.optim.Optimizer):
 
             # Decompress, update, and compress momentums
             # 1. Decompress momentums ONCE into full local matrices
+            update_m = None
             if beta1 is not None:
-                update_m = self._decompress_momentum(state, 'momentum_m')
-            update_v = self._decompress_momentum(state, 'momentum_v')
+                update_m = self._decompress_momentum(state, 'momentum_m', group)
+            update_v = self._decompress_momentum(state, 'momentum_v', group)
 
             # 2. Update the full local matrices
             if beta1 is not None:
                 beta_m = beta1 * (beta1_growth_rate ** (state['step'] - 1.0))
                 update_m.mul_(beta_m).add_(grad_reshaped, alpha=(1.0 - beta_m))
+            else:
+                # If no beta1, update_m is just the gradient for the division step
+                update_m = grad_reshaped
+
             beta_v = 1.0 - (state['step'] ** decay_rate)
             update_v.mul_(beta_v).addcmul_(grad_reshaped, grad_reshaped, value=1.0 - beta_v)
 
             # 3. Compute the final update using the full local matrices
-            if beta1 is not None:
-                update = update_m / (update_v.sqrt() + eps)
-            else:
-                update = grad_reshaped / (update_v.sqrt() + eps)
+            update = update_m / (update_v.sqrt() + eps)
             update = update.contiguous().view(original_shape)
 
             # 4. Compress the updated full local matrices back into state ONCE
             if beta1 is not None:
-                self._compress_momentum(update_m, state, 'momentum_m')
-            self._compress_momentum(update_v, state, 'momentum_v')
+                self._compress_momentum(update_m, state, 'momentum_m', group)
+            self._compress_momentum(update_v, state, 'momentum_v', group)
 
         else:  # Non-factorized path
             if beta1 is not None:
                 update_m = state['momentum_m']
                 beta_m = beta1 * (beta1_growth_rate ** (state['step'] - 1.0))
                 update_m.mul_(beta_m).add_(grad, alpha=(1.0 - beta_m))
+            else:
+                update_m = grad
 
             update_v = state['momentum_v']
             beta_v = 1.0 - (state['step'] ** decay_rate)
             update_v.mul_(beta_v).addcmul_(grad, grad, value=1.0 - beta_v)
             # Compute parameter update
-            update = update_m / (update_v.sqrt() + eps) if beta1 is not None else grad / (update_v.sqrt() + eps)
+            update = update_m / (update_v.sqrt() + eps)
 
         if group["weight_decay"] != 0:
             if p.dtype == torch.bfloat16 and self.stochastic_rounding:

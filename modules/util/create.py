@@ -982,6 +982,7 @@ def create_optimizer(
                 vector_reshape=optimizer_config.vector_reshape,
                 beta1_growth_rate=optimizer_config.beta1_growth_rate if optimizer_config.beta1_growth_rate is not None else 0.999,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
+                factored_sign=optimizer_config.factored_sign if optimizer_config.factored_sign is not None else False,
             )
 
         # ADABELIEF Optimizer
