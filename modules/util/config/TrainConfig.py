@@ -108,7 +108,7 @@ class TrainOptimizerConfig(BaseConfig):
     use_grams: False
     use_adopt: False
     use_focus: False
-    Rank: int
+    rank: int
     vector_reshape: False
     use_orthograd: False
     use_atan2: False
