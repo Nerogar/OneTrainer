@@ -968,6 +968,80 @@ def create_optimizer(
                 quant_block_size=optimizer_config.quant_block_size if optimizer_config.quant_block_size is not None else 2048
             )
 
+        # MLorc_AdamW Optimizer
+        case Optimizer.MLorc_AdamW:
+            from modules.util.optimizer.MLorc_AdamW import MLorc_AdamW
+            optimizer = MLorc_AdamW(
+                params=parameters,
+                lr=config.learning_rate,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                vector_reshape=optimizer_config.vector_reshape if optimizer_config.vector_reshape is not None else False,
+                rank=optimizer_config.rank if optimizer_config.rank is not None else 4,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+            )
+
+        # MLorc_Prodigy Optimizer
+        case Optimizer.MLorc_Prodigy:
+            from modules.util.optimizer.MLorc_Prodigy import MLorc_Prodigy
+            optimizer = MLorc_Prodigy(
+                params=parameters,
+                lr=config.learning_rate,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                vector_reshape=optimizer_config.vector_reshape if optimizer_config.vector_reshape is not None else True,
+                rank=optimizer_config.rank if optimizer_config.rank is not None else 4,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
+                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
+                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 11,
+            )
+
+        # MLorc_Lion Optimizer
+        case Optimizer.MLorc_Lion:
+            from modules.util.optimizer.MLorc_Lion import MLorc_Lion
+            optimizer = MLorc_Lion(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                vector_reshape=optimizer_config.vector_reshape if optimizer_config.vector_reshape is not None else True,
+                rank=optimizer_config.rank if optimizer_config.rank is not None else 4,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+            )
+
+        # MLorc_DAdapt_Lion Optimizer
+        case Optimizer.MLorc_DAdapt_Lion:
+            from modules.util.optimizer.MLorc_DAdapt_Lion import MLorc_DAdapt_Lion
+            optimizer = MLorc_DAdapt_Lion(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                vector_reshape=optimizer_config.vector_reshape if optimizer_config.vector_reshape is not None else True,
+                rank=optimizer_config.rank if optimizer_config.rank is not None else 4,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 11,
+            )
 
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:

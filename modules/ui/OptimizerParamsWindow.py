@@ -162,6 +162,10 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
             'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
             'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
+            'vector_reshape': {'title': 'vector_reshape', 'tooltip': 'If True (default), 1D tensors (like bias terms) are reshaped into 2D matrices and factorized for maximum memory savings. If False, they are updated using a standard, non-factorized method, which may improve stability at a negligible memory cost.', 'type': 'bool'},
+            'rank': {'title': 'rank', 'tooltip': 'the rank for the low-rank approximation', 'type': 'int'},
+            'use_orthograd': {'title': 'use_orthograd', 'tooltip': 'Prevents "naïve loss minimization" (NLM) that can lead to overfitting by removing the gradient component parallel to the weight, thus improving generalization.', 'type': 'bool'},
+            'use_atan2': {'title': 'use_atan2', 'tooltip': 'A robust replacement for eps (no tuning required), which also incorporates gradient clipping. (If True, eps is ignored).', 'type': 'bool'},
         }
         # @formatter:on
 
