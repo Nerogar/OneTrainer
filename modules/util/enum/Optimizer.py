@@ -94,6 +94,7 @@ class Optimizer(Enum):
             Optimizer.CAME_8BIT,
             Optimizer.ADAM,
             Optimizer.ADAMW,
+            Optimizer.LION,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 

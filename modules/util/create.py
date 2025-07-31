@@ -656,14 +656,19 @@ def create_optimizer(
 
         # LION Optimizer
         case Optimizer.LION:
-            import lion_pytorch as lp
-            optimizer = lp.Lion(
+            from modules.util.optimizer.LION import LION
+            optimizer = LION(
                 params=parameters,
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                use_triton=optimizer_config.use_triton if optimizer_config.use_triton is not None else False,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
+                use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                use_arctan=optimizer_config.use_arctan if optimizer_config.use_arctan is not None else False,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 50,
             )
 
         # LARS Optimizer
