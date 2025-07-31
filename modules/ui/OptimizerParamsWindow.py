@@ -162,6 +162,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
             'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
             'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
+            'use_orthograd': {'title': 'use_orthograd', 'tooltip': 'Prevents "naïve loss minimization" (NLM) that can lead to overfitting by removing the gradient component parallel to the weight, thus improving generalization.', 'type': 'bool'},
+            'use_arctan': {'title': 'use_arctan', 'tooltip': 'If True, uses a refined LION variant that replaces the discontinuous sign function with a continuous arctan, which has proven to be more robust and stable.', 'type': 'bool'},
         }
         # @formatter:on
 
