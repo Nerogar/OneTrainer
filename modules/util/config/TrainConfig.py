@@ -271,6 +271,7 @@ class TrainConfig(BaseConfig):
     cache_dir: str
     tensorboard: bool
     tensorboard_expose: bool
+    tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
     validate_after: float
@@ -392,6 +393,9 @@ class TrainConfig(BaseConfig):
     unmasked_weight: float
     normalize_masked_area_loss: bool
     masked_prior_preservation_weight: float
+
+    # custom conditioning image
+    custom_conditioning_image: bool
 
     # embedding
     embedding_learning_rate: float
@@ -767,6 +771,7 @@ class TrainConfig(BaseConfig):
         data.append(("cache_dir", "workspace-cache/run", str, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
+        data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))
@@ -933,6 +938,7 @@ class TrainConfig(BaseConfig):
         data.append(("unmasked_weight", 0.1, float, False))
         data.append(("normalize_masked_area_loss", False, bool, False))
         data.append(("masked_prior_preservation_weight", 0.0, float, False))
+        data.append(("custom_conditioning_image", False, bool, False))
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))

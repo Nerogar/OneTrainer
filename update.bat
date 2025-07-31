@@ -41,12 +41,10 @@ if not defined tracking_info (
     )
     echo Tracking: !tracking_info!
 
-    set "temp_tracking_remote=%tracking_remote%"
-
-    FOR /F "tokens=* USEBACKQ" %%F IN (`"%GIT%" config --get remote/%temp_tracking_remote%.url`) DO (
+    FOR /F "tokens=* USEBACKQ" %%F IN (`"!GIT!" config --get remote.!tracking_remote!.url 2^>NUL`) DO (
         set "remote_url=%%F"
     )
-    echo Remote %temp_tracking_remote%: !remote_url!
+    echo Remote !tracking_remote!: !remote_url!
 
     set "is_official_repo="
     echo !remote_url! | findstr /i "Nerogar/OneTrainer" >nul && set "is_official_repo=1"
@@ -103,8 +101,13 @@ if errorlevel 1 (
     echo Error: Virtual environment not found, please run install.bat first
     goto :end_error
 ) else (
-    goto :check_python_version
+    goto :activate_venv
 )
+
+:activate_venv
+echo Activating virtual environment: %VENV_DIR%
+set "PYTHON=%VENV_DIR%\Scripts\python.exe"
+goto :check_python_version
 
 :check_python_version
 echo Checking Python version...
@@ -120,11 +123,7 @@ if errorlevel 1 (
     echo.
     goto :wrong_python_version
 )
-goto :activate_venv
-
-:activate_venv
-echo Activating virtual environment: %VENV_DIR%
-set "PYTHON=%VENV_DIR%\Scripts\python.exe"
+goto :install_dependencies
 
 :install_dependencies
 echo Installing dependencies...
