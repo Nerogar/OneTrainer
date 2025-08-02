@@ -65,6 +65,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -151,6 +152,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
@@ -275,6 +277,7 @@ class TrainConfig(BaseConfig):
     cache_dir: str
     tensorboard: bool
     tensorboard_expose: bool
+    tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
     validate_after: float
@@ -774,6 +777,7 @@ class TrainConfig(BaseConfig):
         data.append(("cache_dir", "workspace-cache/run", str, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
+        data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))

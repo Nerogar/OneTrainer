@@ -11,6 +11,7 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
+from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
 from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
@@ -53,6 +54,11 @@ class DataLoaderText2ImageMixin:
         if allow_videos:
             supported_extensions |= path_util.supported_video_extensions()
 
+        download_datasets = DownloadHuggingfaceDatasets(
+            concept_in_name='concept', path_in_name='path', enabled_in_name='enabled',
+            concept_out_name='concept',
+        )
+
         collect_paths = CollectPaths(
             concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
             path_out_name='image_path', concept_out_name='concept',
@@ -63,7 +69,7 @@ class DataLoaderText2ImageMixin:
         cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
-        modules = [collect_paths, sample_prompt_path]
+        modules = [download_datasets, collect_paths, sample_prompt_path]
 
         if config.masked_training:
             modules.append(mask_path)

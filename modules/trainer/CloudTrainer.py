@@ -30,7 +30,7 @@ class CloudTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        if config.tensorboard and not config.cloud.tensorboard_tunnel:
+        if config.tensorboard and not config.cloud.tensorboard_tunnel and not config.tensorboard_always_on:
             super()._start_tensorboard()
 
         match config.cloud.type:
@@ -114,7 +114,7 @@ class CloudTrainer(BaseTrainer):
 
     def end(self):
         try:
-            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel:
+            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel and not self.config.tensorboard_always_on:
                 super()._stop_tensorboard()
 
             if self.config.cloud.delete_workspace and not self.error_caught and not self.commands.get_stop_command():
@@ -148,11 +148,11 @@ class CloudTrainer(BaseTrainer):
         remote.cloud = local.cloud
         remote.secrets.cloud = local.secrets.cloud
 
-        def adjust(config,attribute : str):
+        def adjust(config, attribute: str, if_exists: bool=False):
             path=getattr(config,attribute)
             if path.startswith("cloud:"):
                 setattr(config,attribute,path.replace("cloud:","",1))
-            elif path != "":
+            elif path != "" and (not if_exists or Path(path).exists()):
                 setattr(config,"local_"+attribute,path)
                 path=CloudTrainer.__adjust_path(path,remote.cloud.remote_dir)
                 setattr(config,attribute,path)
@@ -160,11 +160,8 @@ class CloudTrainer(BaseTrainer):
         adjust(remote,"debug_dir")
         adjust(remote,"workspace_dir")
         adjust(remote,"cache_dir")
-        if Path(remote.base_model_name).exists() or remote.base_model_name.startswith("cloud:"):
-            adjust(remote,"base_model_name")
-        if Path(remote.prior.model_name).exists() or remote.prior.model_name.startswith("cloud:"):
-            adjust(remote.prior,"model_name")
-
+        adjust(remote,"base_model_name", if_exists=True)
+        adjust(remote.prior,"model_name", if_exists=True)
         adjust(remote,"output_model_destination")
         adjust(remote,"lora_model_name")
 
@@ -176,7 +173,7 @@ class CloudTrainer(BaseTrainer):
         remote.concepts = [concept for concept in remote.concepts if concept.enabled]
 
         for concept in remote.concepts:
-            adjust(concept,"path")
+            adjust(concept,"path", if_exists=True)
             adjust(concept.text,"prompt_path")
 
         if remote.train_device == "cpu":
