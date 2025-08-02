@@ -118,12 +118,19 @@ class VideoToolUI(ctk.CTkToplevel):
         self.clip_fps_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
         self.clip_fps_entry.insert(0, "24")
 
+        # Remove borders
+        self.clip_bordercrop = ctk.BooleanVar(self, False)
+        components.label(frame, 8, 0, "Remove Borders",
+                         tooltip="Remove black borders from output clip")
+        self.clip_bordercrop_entry = ctk.CTkSwitch(frame, variable=self.clip_bordercrop, text="")
+        self.clip_bordercrop_entry.grid(row=8, column=1, sticky="w", padx=5, pady=5)
+
         # Crop Variation
-        components.label(frame, 8, 0, "Crop Variation",
+        components.label(frame, 9, 0, "Crop Variation",
                          tooltip="Output clips will be randomly cropped to +- the base aspect ratio, \
                               somewhat biased towards making square videos. Set to 0 to use only base aspect.")
         self.clip_crop_entry = ctk.CTkEntry(frame, width=220)
-        self.clip_crop_entry.grid(row=8, column=1, sticky="w", padx=5, pady=5)
+        self.clip_crop_entry.grid(row=9, column=1, sticky="w", padx=5, pady=5)
         self.clip_crop_entry.insert(0, "0.2")
 
         # object filter
@@ -208,12 +215,19 @@ class VideoToolUI(ctk.CTkToplevel):
         self.blur_threshold_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
         self.blur_threshold_entry.insert(0, "0.2")
 
+        # Remove borders
+        self.image_bordercrop = ctk.BooleanVar(self, False)
+        components.label(frame, 7, 0, "Remove Borders",
+                         tooltip="Remove black borders from output image")
+        self.image_bordercrop_entry = ctk.CTkSwitch(frame, variable=self.image_bordercrop, text="")
+        self.image_bordercrop_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
+
         # Crop Variation
-        components.label(frame, 7, 0, "Crop Variation",
+        components.label(frame, 8, 0, "Crop Variation",
                          tooltip="Output images will be randomly cropped to +- the base aspect ratio, \
                             somewhat biased towards making square images. Set to 0 to use only base sapect.")
         self.image_crop_entry = ctk.CTkEntry(frame, width=220)
-        self.image_crop_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
+        self.image_crop_entry.grid(row=8, column=1, sticky="w", padx=5, pady=5)
         self.image_crop_entry.insert(0, "0.2")
 
         # # object filter
@@ -326,32 +340,33 @@ class VideoToolUI(ctk.CTkToplevel):
             print(f'Found {len(input_videos)} videos to process')
             return input_videos
 
-    def __get_random_aspect(self, size: tuple[int, int], variation: float) -> tuple[int, int, int, int]:
+    def __get_random_aspect(self, height : int, width : int, variation: float) -> tuple[int, int, int, int]:
         if variation == 0:
-            return 0, size[0], 0, size[1]
+            return 0, height, 0, width
 
-        old_aspect = size[0]/size[1]    #height, width
+        old_aspect = height/width
         variation_scaled = old_aspect*variation
         if old_aspect > 1.2:
-            new_aspect = max(1.0, random.triangular(old_aspect-(variation_scaled*1.5), old_aspect+(variation_scaled/2), old_aspect))
+            new_aspect = min(4.0, max(1.0, random.triangular(old_aspect-(variation_scaled*1.5), old_aspect+(variation_scaled/2), old_aspect)))
         elif old_aspect < 0.85:
-            new_aspect = min(1.0, random.triangular(old_aspect-(variation_scaled/2), old_aspect+(variation_scaled*1.5), old_aspect))
+            new_aspect = max(0.25, min(1.0, random.triangular(old_aspect-(variation_scaled/2), old_aspect+(variation_scaled*1.5), old_aspect)))
         else:
             new_aspect = random.triangular(old_aspect-variation_scaled, old_aspect+variation_scaled)
 
         new_aspect = round(new_aspect, 2)
         if new_aspect > old_aspect:
-            new_height = int(size[0])
-            new_width = int(size[1]*(old_aspect/new_aspect))
+            new_height = int(height)
+            new_width = int(width*(old_aspect/new_aspect))
         elif new_aspect < old_aspect:
-            new_height = int(size[0]*(new_aspect/old_aspect))
-            new_width = int(size[1])
+            new_height = int(height*(new_aspect/old_aspect))
+            new_width = int(width)
         else:
-            new_height = int(size[0])
-            new_width = int(size[1])
+            new_height = int(height)
+            new_width = int(width)
 
-        position_x = random.randint(0, size[1]-new_width)
-        position_y = random.randint(0, size[0]-new_height)
+        position_x = random.randint(0, width-new_width)
+        position_y = random.randint(0, height-new_height)
+        #print(new_aspect)
         #print(position_y, new_height, position_x, new_width)
         return position_y, new_height, position_x, new_width
 
@@ -383,16 +398,19 @@ class VideoToolUI(ctk.CTkToplevel):
                 if batch_mode:
                     executor.submit(self.__extract_clips,
                                 str(video_path), str(self.clip_time_start_entry.get()), str(self.clip_time_end_entry.get()), float(self.clip_length_entry.get()), self.split_at_cuts.get(),
-                                float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
+                                self.clip_bordercrop_entry.get(), float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
                 else:
                     executor.submit(self.__extract_clips,
                                 str(video_path), "00:00:00", "99:99:99", float(self.clip_length_entry.get()), self.split_at_cuts.get(),
-                                float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
+                                self.clip_bordercrop_entry.get(), float(self.clip_crop_entry.get()), int(self.clip_fps_entry.get()), output_directory)
 
-        print("Clip extraction from all videos complete")
+        if batch_mode:
+            print(f'Clip extraction from all videos in {self.clip_list_entry.get()} complete')
+        else:
+            print(f'Clip extraction from {self.clip_single_entry.get()} complete')
 
     def __extract_clips(self, video_path: str, timestamp_min: str, timestamp_max: str, max_length: float,
-                        split_at_cuts: bool, crop_variation: float, target_fps: int, output_dir: str):
+                        split_at_cuts: bool, remove_borders : bool, crop_variation: float, target_fps: int, output_dir: str):
         video = cv2.VideoCapture(video_path)
         fps = video.get(cv2.CAP_PROP_FPS)
         max_length_frames = int(max_length * fps)   #convert max length from seconds to frames
@@ -429,34 +447,67 @@ class VideoToolUI(ctk.CTkToplevel):
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for scene in scene_list_split:
-                executor.submit(self.__save_clip, scene, video_path, target_fps, crop_variation, output_dir)
+                executor.submit(self.__save_clip, scene, video_path, target_fps, remove_borders, crop_variation, output_dir)
 
         video.release()
 
-    def __save_clip(self, scene : tuple[int, int], video_path : str, target_fps : int, crop_variation : float, output_dir : str):
+    def __save_clip(self, scene : tuple[int, int], video_path : str, target_fps : int, remove_borders : bool, crop_variation : float, output_dir : str):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         basename, ext = os.path.splitext(os.path.basename(video_path))
         video = cv2.VideoCapture(video_path)
-        size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        #size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         fps = video.get(cv2.CAP_PROP_FPS)
-        y, h, x, w = self.__get_random_aspect((size[1], size[0]), crop_variation)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_name = f'{output_dir}{os.sep}{basename}_{scene[0]}-{scene[1]}'
         output_ext = ".mp4"
-        writer = cv2.VideoWriter(output_name+output_ext,fourcc,fps,(w,h))
+
+        video.set(cv2.CAP_PROP_POS_FRAMES, (scene[1] + scene[0])//2)
+        frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
+        success, frame = video.read()
+
+        #crop out borders of frame - blends five random frames from the scene to get "average" image
+        #helps prevent incorrect cropping when sampled frame may be all black or otherwise deteet incorrect border
+        if remove_borders:
+            frame_blend = frame
+            for i in range(5):  #blend 5 random frames to get "average"
+                random_frame = random.randint(scene[0], scene[1])
+                video.set(cv2.CAP_PROP_POS_FRAMES, random_frame)
+                success, frame = video.read()
+                a = 1/(i+1)
+                b = 1-a
+                frame_blend = cv2.addWeighted(frame, a, frame_blend, b, 0)
+
+            frame_grayscale = cv2.cvtColor(frame_blend, cv2.COLOR_BGR2GRAY)
+            _, frame_thresh = cv2.threshold(frame_grayscale, 5, 255, cv2.THRESH_BINARY)
+            frame_contours, _ = cv2.findContours(frame_thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            frame_maincontour = max(frame_contours, key = cv2.contourArea)
+            x1,y1,w1,h1 = cv2.boundingRect(frame_maincontour)
+        else:
+            x1 = 0
+            y1 = 0
+            h1, w1, _ = frame.shape
+        if h1 < 10 or w1 < 10:  #if bounding box did not detect the correct area, likely due to black frame
+            x1 = 0
+            y1 = 0
+            h1, w1, _ = frame.shape
+
+        y2, h2, x2, w2 = self.__get_random_aspect(h1, w1, crop_variation)
+        writer = cv2.VideoWriter(output_name+output_ext,fourcc,fps,(w2,h2))
         video.set(cv2.CAP_PROP_POS_FRAMES, scene[0])
         frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
         success, frame = video.read()
+        #print(y1, h1, x1, w1, ":", y2, h2, x2, w2)
+
         while success and (frame_number < scene[1]):    #loop through frames within each scene
-            writer.write(frame[y:y+h, x:x+w])
-            #writer.write(frame)
+            frame_trimmed = frame[y1:y1+h1, x1:x1+w1]   #cut out black borders if applicable
+            writer.write(frame_trimmed[y2:y2+h2, x2:x2+w2]) #save frame with random crop variation if applicable
             success, frame = video.read()
             frame_number += 1
         writer.release()
         video.release()
 
-        if target_fps > 0:
+        if target_fps > 0:  #use ffmpeg to change to set framerate - saves copy and deletes original
             subprocess.run(f'ffmpeg -y -i "{output_name}{output_ext}" -c:a copy -r {target_fps} "{output_name}_{target_fps}fps{output_ext}"',shell=True,stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
             os.remove(output_name+output_ext)
 
@@ -488,16 +539,18 @@ class VideoToolUI(ctk.CTkToplevel):
                 if batch_mode:
                     executor.submit(self.__save_frames,
                                 video_path, str(self.image_time_start_entry.get()), str(self.image_time_end_entry.get()), float(self.capture_rate_entry.get()),
-                                float(self.blur_threshold_entry.get()), float(self.image_crop_entry.get()), output_directory)
+                                float(self.blur_threshold_entry.get()), self.image_bordercrop.get(), float(self.image_crop_entry.get()), output_directory)
                 else:
                     executor.submit(self.__save_frames,
                                 video_path, "00:00:00", "99:99:99", float(self.capture_rate_entry.get()),
-                                float(self.blur_threshold_entry.get()), float(self.image_crop_entry.get()), output_directory)
-
-        print("Image extraction from all videos complete")
+                                float(self.blur_threshold_entry.get()), self.image_bordercrop.get(), float(self.image_crop_entry.get()), output_directory)
+        if batch_mode:
+            print(f'Image extraction from all videos in {self.image_list_entry.get()} complete')
+        else:
+            print(f'Image extraction from {self.image_single_entry.get()} complete')
 
     def __save_frames(self, video_path: str, timestamp_min: str, timestamp_max: str, capture_rate: float,
-                      blur_threshold: float, crop_variation: float, output_dir: str):
+                      blur_threshold: float, remove_borders : bool, crop_variation: float, output_dir: str):
         video = cv2.VideoCapture(video_path)
         fps = video.get(cv2.CAP_PROP_FPS)
         image_rate = int(fps / capture_rate)   #convert capture rate from seconds to frames
@@ -531,16 +584,36 @@ class VideoToolUI(ctk.CTkToplevel):
         basename, ext = os.path.splitext(os.path.basename(video_path))
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
         for f in output_list_cut:
             filename = f'{output_dir}{os.sep}{basename}_{f[0]}.jpg'
-            y, h, x, w = self.__get_random_aspect((size[1], size[0]), crop_variation)
             video.set(cv2.CAP_PROP_POS_FRAMES, f[0])
             success, frame = video.read()
+
+            #crop out borders of frame
+            if remove_borders:
+                frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                _, frame_thresh = cv2.threshold(frame_grayscale, 5, 255, cv2.THRESH_BINARY)
+                frame_contours, _ = cv2.findContours(frame_thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+                frame_maincontour = max(frame_contours, key = cv2.contourArea)
+                x1,y1,w1,h1 = cv2.boundingRect(frame_maincontour)
+                frame_cropped = frame[y1:y1+h1, x1:x1+w1]
+            else:
+                frame_cropped = frame
+                x1 = 0
+                y1 = 0
+                h1, w1, _ = frame_cropped.shape
+            if h1 < 10 or w1 < 10:  #if bounding box did not detect the correct area, likely due to black frame
+                frame_cropped = frame
+                x1 = 0
+                y1 = 0
+                h1, w1, _ = frame_cropped.shape
+
+            y2, h2, x2, w2 = self.__get_random_aspect(h1, w1, crop_variation)
+            #print(y1, h1, x1, w1, ":", y2, h2, x2, w2)
+
             if success:
-                cv2.imwrite(filename, frame[y:y+h, x:x+w])    #save images
-                #cv2.imwrite(filename, frame)    #save images
+                cv2.imwrite(filename, frame_cropped[y2:y2+h2, x2:x2+w2])    #save images
         video.release()
 
     def __download_button(self, batch_mode: bool):
