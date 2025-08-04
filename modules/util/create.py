@@ -983,6 +983,9 @@ def create_optimizer(
                 beta1_growth_rate=optimizer_config.beta1_growth_rate if optimizer_config.beta1_growth_rate is not None else 0.999,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 factored_sign=optimizer_config.factored_sign if optimizer_config.factored_sign is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
             )
 
         # ADABELIEF Optimizer

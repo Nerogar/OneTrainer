@@ -89,6 +89,9 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1_growth_rate": 0.999,
         "stochastic_rounding": True,
         "factored_sign": False,
+        "use_grams": False,
+        "use_orthograd": False,
+        "use_atan2": False,
         "fused_back_pass": False,
     },
     Optimizer.ADAGRAD: {
