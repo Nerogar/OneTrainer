@@ -969,6 +969,25 @@ def create_optimizer(
             )
 
 
+        # SMMF Optimizer
+        case Optimizer.SMMF:
+            from modules.util.optimizer.SMMF import SMMF
+            optimizer = SMMF(
+                params=parameters,
+                lr=config.learning_rate,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                decay_rate=optimizer_config.decay_rate if optimizer_config.decay_rate is not None else -0.8,
+                beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else None,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                vector_reshape=optimizer_config.vector_reshape,
+                beta1_growth_rate=optimizer_config.beta1_growth_rate if optimizer_config.beta1_growth_rate is not None else 0.999,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                factored_sign=optimizer_config.factored_sign if optimizer_config.factored_sign is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+            )
+
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:
             from timm.optim.adabelief import AdaBelief

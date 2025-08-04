@@ -108,6 +108,11 @@ class TrainOptimizerConfig(BaseConfig):
     use_grams: False
     use_adopt: False
     use_focus: False
+    vector_reshape: False
+    beta1_growth_rate: float
+    factored_sign: False
+    use_orthograd: False
+    use_atan2: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -192,6 +197,11 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
         data.append(("use_focus", False, bool, False))
+        data.append(("vector_reshape", False, bool, False))
+        data.append(("beta1_growth_rate", None, float, True))
+        data.append(("factored_sign", False, bool, False))
+        data.append(("use_orthograd", False, bool, False))
+        data.append(("use_atan2", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
