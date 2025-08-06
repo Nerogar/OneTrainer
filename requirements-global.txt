@@ -59,9 +59,8 @@ psutil==7.0.0
 requests==2.32.3
 
 # dataset tools
-einops==0.8.1
-pyvips==3.0.0
-pyvips-binary==8.17.0
-pyoxipng==9.1.0
-# required for DPID https://dl.acm.org/doi/10.1145/2980179.2980239
-pepedpid==0.1.1
+einops==0.8.1 # required by moondream: https://moondream.ai/c/docs/advanced/transformers
+pyvips==3.0.0 # required by moondream: https://moondream.ai/c/docs/advanced/transformers
+pyvips-binary==8.17.0 # required by moondream: https://moondream.ai/c/docs/advanced/transformers
+pyoxipng==9.1.0 # Multithreaded PNG optimisation, used in FileOperationsWindow
+pepedpid==0.1.1 # required for DPID resizing https://dl.acm.org/doi/10.1145/2980179.2980239 https://pypi.org/project/pepedpid/

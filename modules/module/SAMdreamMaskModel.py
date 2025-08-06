@@ -3,7 +3,6 @@ import logging
 from contextlib import nullcontext
 from functools import partial
 from pathlib import Path
-from typing import Any, Protocol, Self
 
 from modules.module.BaseImageMaskModel import (
     BaseImageMaskModel,
@@ -18,6 +17,7 @@ import torch
 import cv2
 import numpy as np
 from PIL import Image
+from typing_extensions import Any, Protocol, Self
 
 try:
     from sam2.sam2_image_predictor import SAM2ImagePredictor

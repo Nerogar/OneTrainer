@@ -1,7 +1,7 @@
 import logging
 import os
 import threading
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from tkinter import END, TclError, filedialog, messagebox
 from typing import Any, TypedDict
 
@@ -26,7 +26,6 @@ from modules.module.JoyCaptionModel import (
     DEFAULT_MAX_TOKENS as JOY_DEFAULT_MAX_TOKENS,
 )
 from modules.util.ui.ui_utils import (
-    load_window_session_settings,
     save_window_session_settings,
     set_window_icon,
 )
@@ -150,6 +149,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.joy_advanced_mode_var.trace_add("write", lambda *args: self._update_model_specific_options())
 
         self._create_layout(path, parent_include_subdirectories)
+        self._build_settings_map()
         self._load_session_settings() # Load settings after UI is created
 
         # If a non-empty path is passed from the parent, ensure it overrides any session-loaded path.
@@ -158,20 +158,74 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             self.path_entry.delete(0, END)
             self.path_entry.insert(0, path)
 
+    def _build_settings_map(self):
+        """Creates a mapping from setting names to their corresponding UI variable objects."""
+        # Map setting names from CaptionWindowSettings to the tk.Variable objects in the UI
+        self._settings_map = {
+            "model": self.config_state["model_var"],
+            "mode": self.config_state["mode_var"],
+            "caption_length": self.config_state["caption_length_var"],
+            "path": self.path_entry, # Entry widgets have .get()/.set() through proxy
+            "initial_caption": self.caption_entry,
+            "prefix": self.prefix_entry,
+            "postfix": self.postfix_entry,
+            "blacklist_path": self.blacklist_entry,
+            "regex_enabled": self.regex_enabled_var,
+            "general_threshold": self.general_threshold_var,
+            "general_mcut": self.general_mcut_var,
+            "character_threshold": self.character_threshold_var,
+            "character_mcut": self.character_mcut_var,
+            "include_subdirectories": self.include_subdirectories_var,
+            "joy_caption_type": self.joy_caption_type_var,
+            "joy_caption_length": self.joy_caption_length_var,
+            "joy_name": self.joy_name_var,
+            "joy_advanced_mode": self.joy_advanced_mode_var,
+            "joy_temp": self.joy_temp_var,
+            "joy_topp": self.joy_topp_var,
+            "joy_topk": self.joy_topk_var,
+            "joy_max_tokens": self.joy_max_tokens_var,
+            "joy_rep_penalty": self.joy_rep_penalty_var,
+            "joy_gpu_index": self.joy_gpu_index_var,
+            "moondream_mode": self.moondream_mode_var,
+            "moondream_reasoning": self.moondream_reasoning_var,
+        }
+
     def _load_session_settings(self):
-        settings_dict = load_window_session_settings(self, self.SESSION_SETTINGS_KEY)
-        if settings_dict:
-            self._apply_settings_to_ui(settings_dict)
-        # Post-load UI updates (remain here)
+        # Load standard settings
+        store = getattr(getattr(self, "parent", None), "session_ui_settings", {})
+        saved = store.get(self.SESSION_SETTINGS_KEY, {})
+        if not saved:
+            self._update_model_specific_options() # Ensure UI is in a consistent state
+            return
+
+        # Apply settings from the saved dictionary to the UI
+        self._apply_settings_to_ui(saved)
+
+        # Load special-cased settings (checkboxes) that are not in the main map
+        saved_extra_options = saved.get("joy_extra_options")
+        if saved_extra_options:
+            for var, option_text in self.joy_extra_options_checkboxes:
+                if option_text in saved_extra_options:
+                    var.set(saved_extra_options[option_text])
+
+        # Post-load UI updates
         self._update_model_specific_options()
         if self._is_wd_model(self.config_state["model_var"].get()):
             self._update_threshold_states()
         if self._is_joycaption_model(self.config_state["model_var"].get()):
             self._update_joycaption_prompt_display()
 
+
     def _save_session_settings(self):
-        settings = self._gather_settings_from_ui()
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, settings)
+        # Save standard settings
+        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, self._settings_map)
+
+        # Save special-cased settings (checkboxes)
+        store = getattr(getattr(self, "parent", None), "session_ui_settings", None)
+        if store is not None and self.SESSION_SETTINGS_KEY in store:
+            store[self.SESSION_SETTINGS_KEY]["joy_extra_options"] = {
+                opt_text: var.get() for var, opt_text in self.joy_extra_options_checkboxes
+            }
 
     def destroy(self):
         self._save_session_settings()
@@ -187,52 +241,32 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
 
-    def _gather_settings_from_ui(self) -> CaptionWindowSettings:
-        data = {}
-        for f in fields(CaptionWindowSettings):
-            name = f.name
-            val = None
-            if hasattr(self, f"{name}_var"):
-                val = getattr(self, f"{name}_var").get()
-            elif hasattr(self, f"{name}_entry"):
-                val = getattr(self, f"{name}_entry").get()
-            elif name + "_var" in self.config_state:
-                val = self.config_state[name + "_var"].get()
-            elif name in self.config_state and hasattr(self.config_state[name], "get"):
-                val = self.config_state[name].get()
-            elif hasattr(self, name):
-                widget = getattr(self, name)
-                if hasattr(widget, "get"):
-                    val = widget.get()
-            else:
-                val = getattr(CaptionWindowSettings, name, None)
-            data[name] = val
-        # Special case for joy_extra_options
-        if hasattr(self, "joy_extra_options_checkboxes"):
-            data["joy_extra_options"] = {
-                opt_text: var.get() for var, opt_text in self.joy_extra_options_checkboxes
-            }
-        return CaptionWindowSettings(**data)
+    def _gather_settings_from_ui(self) -> dict:
+        """Gathers all UI settings into a dictionary."""
+        settings = {key: var.get() for key, var in self._settings_map.items()}
+        settings["joy_extra_options"] = {
+            opt_text: var.get() for var, opt_text in self.joy_extra_options_checkboxes
+        }
+        return settings
 
-    def _apply_settings_to_ui(self, settings: CaptionWindowSettings | dict):
-        from dataclasses import asdict
-        s = asdict(settings) if not isinstance(settings, dict) else settings
-        for name, value in s.items():
-            if hasattr(self, f"{name}_var"):
-                getattr(self, f"{name}_var").set(value)
-            elif hasattr(self, f"{name}_entry"):
-                entry = getattr(self, f"{name}_entry")
-                entry.delete(0, "end")
-                entry.insert(0, value)
-            elif name + "_var" in self.config_state:
-                self.config_state[name + "_var"].set(value)
-            elif name in self.config_state and hasattr(self.config_state[name], "set"):
-                self.config_state[name].set(value)
-        # Special case for joy_extra_options
-        if hasattr(self, "joy_extra_options_checkboxes"):
-            saved_extra_options = s.get("joy_extra_options", {})
+    def _apply_settings_to_ui(self, settings: dict):
+        """Applies settings from a dictionary to the UI."""
+        # Apply standard settings
+        for key, var in self._settings_map.items():
+            if key in settings and settings[key] is not None:
+                # Handle CTkEntry widgets which don't have a .set() method like tk.Variable
+                if isinstance(var, ctk.CTkEntry):
+                    var.delete(0, "end")
+                    var.insert(0, settings[key])
+                else:
+                    var.set(settings[key])
+
+        # Special case for joy_extra_options checkboxes
+        saved_extra_options = settings.get("joy_extra_options")
+        if saved_extra_options:
             for var, option_text in self.joy_extra_options_checkboxes:
-                var.set(saved_extra_options.get(option_text, var.get()))
+                if option_text in saved_extra_options:
+                    var.set(saved_extra_options[option_text])
 
     def _create_layout(self, path: str, include_subdirectories: bool) -> None:
         self.main_frame = ctk.CTkFrame(self)

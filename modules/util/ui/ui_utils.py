@@ -105,44 +105,50 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
 def load_window_session_settings(
     window_instance: Any,
     session_settings_key: str,
-) -> dict:
+    settings_map: dict[str, Any],
+) -> None:
     """
-    Loads session settings for a window using the dataclass approach.
+    Loads session settings and immediately applies them to the provided variables.
 
     Args:
-        window_instance: The instance of the CTkToplevel window.
-        session_settings_key: The key used to store this window's settings in session_ui_settings.
-
-    Returns:
-        The dictionary of saved settings that were found (could be empty if none were found).
+        window_instance: The CTkToplevel window with a parent.session_ui_settings dict.
+        session_settings_key: The key under which settings are stored.
+        settings_map: A dictionary of {setting_key: tk.Variable} pairs to populate.
     """
-    if hasattr(window_instance, "parent") and hasattr(window_instance.parent, "session_ui_settings"):
-        saved_settings = window_instance.parent.session_ui_settings.get(session_settings_key, {})
-        if saved_settings:
-            logger.debug(f"Loaded session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
-            return saved_settings
-        else:
-            logger.debug(f"No saved session settings found for key '{session_settings_key}' in {window_instance.__class__.__name__}.")
-    else:
-        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__}.")
-    return {}
+    parent = getattr(window_instance, "parent", None)
+    store = getattr(parent, "session_ui_settings", None)
+    if not parent or store is None:
+        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__}")
+        return None
+
+    saved = store.get(session_settings_key, {})
+    for key, var in settings_map.items():
+        if key in saved and saved[key] is not None:
+            try:
+                var.set(saved[key])
+            except Exception as e:
+                logger.warning(f"Failed to set session value for '{key}' in {window_instance.__class__.__name__}: {e}")
+    logger.debug(f"Loaded session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
+    return saved
 
 def save_window_session_settings(
     window_instance: Any,
     session_settings_key: str,
-    settings_dict: dict,
+    settings_map: dict[str, Any],
 ) -> None:
     """
-    Saves session settings for a window using the dataclass approach.
+    Reads values from the provided variables and writes them into session_ui_settings.
 
     Args:
-        window_instance: The instance of the CTkToplevel window.
-        session_settings_key: The key used to store this window's settings in session_ui_settings.
-        settings_dict: The dictionary of settings to save (from the dataclass).
+        window_instance: The CTkToplevel window with a parent.session_ui_settings dict.
+        session_settings_key: The key under which to save settings.
+        settings_map: A dictionary of {setting_key: tk.Variable} pairs to read from.
     """
-    if not hasattr(window_instance, "parent") or not hasattr(window_instance.parent, "session_ui_settings"):
+    parent = getattr(window_instance, "parent", None)
+    store = getattr(parent, "session_ui_settings", None)
+    if not parent or store is None:
         logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__} during save.")
         return
 
-    window_instance.parent.session_ui_settings[session_settings_key] = settings_dict
+    store[session_settings_key] = { key: (var.get() if hasattr(var, "get") else var) for key, var in settings_map.items() }
     logger.debug(f"Saved session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")

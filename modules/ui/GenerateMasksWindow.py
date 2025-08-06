@@ -10,6 +10,7 @@ from modules.util.ui.ui_utils import (
     load_window_session_settings,
     save_window_session_settings,
     set_window_icon,
+    window_session_settings,  # ← import the shared settings map
 )
 
 import customtkinter as ctk
@@ -46,14 +47,28 @@ class MaskingController:
         }
 
     def load_settings(self):
-        settings_dict = load_window_session_settings(self.view, self.SESSION_SETTINGS_KEY)
-        if settings_dict:
-            self.model = MaskingModel(**settings_dict)
-            self.view.apply_settings_to_ui(self.model)
+        saved_settings = load_window_session_settings(
+            self.view,
+            window_session_settings,
+            self.SESSION_SETTINGS_KEY
+        )
+        # Initialize model from saved settings or defaults
+        if saved_settings is not None:
+            try:
+                self.model = MaskingModel(**saved_settings)
+            except TypeError:
+                # Fallback to defaults if keys mismatch
+                self.model = MaskingModel()
+        self.view.apply_settings_to_ui(self.model)
 
     def save_settings(self):
         self.model = self.view.gather_settings_from_ui()
-        save_window_session_settings(self.view, self.SESSION_SETTINGS_KEY, asdict(self.model))
+        save_window_session_settings(
+            self.view,
+            window_session_settings,
+            self.SESSION_SETTINGS_KEY,
+            asdict(self.model)
+        )
 
     def get_mode(self, mode_str: str) -> str:
         return self.mode_map.get(mode_str, "fill")

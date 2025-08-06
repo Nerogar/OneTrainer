@@ -1,8 +1,8 @@
 """
-OneTrainer Image Tools Dialog
+File Operations Window
 
 This module defines a CTkToplevel window for performing common batch operations on files
-such as renaming, resizing, and format conversion.
+such as renaming, resizing, optimisation and format conversion.
 
 Note on _verify_single_image:
   The image is opened twice because Pillow's .verify() invalidates the image object.

@@ -1,4 +1,4 @@
-from typing import NotRequired, TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class BaseGenerationConfig(TypedDict, total=False):
@@ -9,6 +9,9 @@ class JoyCaptionGenerationConfig(BaseGenerationConfig):
     temperature: NotRequired[float]
     top_p: NotRequired[float]
     max_tokens: NotRequired[int]
+    top_k: NotRequired[int]
+    repetition_penalty: NotRequired[float]
+    gpu_index: NotRequired[int]
 
 
 class MoondreamGenerationConfig(BaseGenerationConfig):
@@ -23,12 +26,3 @@ class WDGenerationConfig(BaseGenerationConfig):
 
 class BlipGenerationConfig(BaseGenerationConfig):
     pass
-
-
-# Union type for convenience, though `Any` will often be used in base class signatures
-AllGenerationConfigs = (
-    JoyCaptionGenerationConfig
-    | MoondreamGenerationConfig
-    | WDGenerationConfig
-    | BlipGenerationConfig
-)

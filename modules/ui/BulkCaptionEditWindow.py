@@ -91,16 +91,6 @@ class CaptionEditorLogic:
 class BulkCaptionEditWindow(ctk.CTkToplevel):
     SESSION_SETTINGS_KEY = "bulk_caption_edit_window_settings"
 
-    _SESSION_SETTINGS_METADATA = [
-        ("add_text", 'attr', "add_text_var", ""),
-        ("add_position", 'attr', "add_position_var", "Prepend"),
-        ("remove_text", 'attr', "remove_text_var", ""),
-        ("replace_text", 'attr', "replace_text_var", ""),
-        ("replace_with", 'attr', "replace_with_var", ""),
-        ("regex_pattern", 'attr', "regex_pattern_var", ""),
-        ("regex_replace", 'attr', "regex_replace_var", ""),
-    ]
-
     def __init__(
         self,
         parent: Any,
@@ -113,29 +103,42 @@ class BulkCaptionEditWindow(ctk.CTkToplevel):
 
         self._setup_window()
         self._create_widgets()
+        self._build_settings_map()
         self._load_session_settings()
 
+
+    def _build_settings_map(self):
+        """Creates a mapping from setting names to their corresponding UI variable objects."""
+        self._settings_map = {
+            "add_text":       self.add_text_var,
+            "add_position":   self.add_position_var,
+            "remove_text":    self.remove_text_var,
+            "replace_text":   self.replace_text_var,
+            "replace_with":   self.replace_with_var,
+            "regex_pattern":  self.regex_pattern_var,
+            "regex_replace":  self.regex_replace_var,
+        }
+
     def _load_session_settings(self):
-        saved_settings = load_window_session_settings(self, self.SESSION_SETTINGS_KEY)
-        if saved_settings:
-            for key, _, var_name, _ in self._SESSION_SETTINGS_METADATA:
-                if key in saved_settings:
-                    var = getattr(self, var_name)
-                    var.set(saved_settings[key])
+        load_window_session_settings(
+            self,
+            self.SESSION_SETTINGS_KEY,
+            self._settings_map
+        )
 
     def _save_session_settings(self):
-        settings_to_save = {}
-        for key, _, var_name, _ in self._SESSION_SETTINGS_METADATA:
-            var = getattr(self, var_name)
-            settings_to_save[key] = var.get()
-        save_window_session_settings(self, self.SESSION_SETTINGS_KEY, settings_to_save)
+        save_window_session_settings(
+            self,
+            self.SESSION_SETTINGS_KEY,
+            self._settings_map
+        )
 
     def destroy(self):
         self._save_session_settings()
         super().destroy()
 
     def _setup_window(self) -> None:
-        """Set up window properties."""
+
         self.title("Bulk Caption Editor")
         self.geometry("600x500")
         self.resizable(True, True)
