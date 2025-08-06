@@ -1,3 +1,4 @@
+import logging
 import platform
 import sys
 import tkinter as tk
@@ -8,6 +9,7 @@ from typing import Any
 
 from customtkinter import CTk, CTkToplevel
 
+logger = logging.getLogger(__name__)
 
 def bind_mousewheel(
     widget: Any,
@@ -99,3 +101,54 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
 
     except Exception as e:
         print(f"Failed to set window icon: {e}")
+
+def load_window_session_settings(
+    window_instance: Any,
+    session_settings_key: str,
+    settings_map: dict[str, Any],
+) -> None:
+    """
+    Loads session settings and immediately applies them to the provided variables.
+
+    Args:
+        window_instance: The CTkToplevel window with a parent.session_ui_settings dict.
+        session_settings_key: The key under which settings are stored.
+        settings_map: A dictionary of {setting_key: tk.Variable} pairs to populate.
+    """
+    parent = getattr(window_instance, "parent", None)
+    store = getattr(parent, "session_ui_settings", None)
+    if not parent or store is None:
+        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__}")
+        return None
+
+    saved = store.get(session_settings_key, {})
+    for key, var in settings_map.items():
+        if key in saved and saved[key] is not None:
+            try:
+                var.set(saved[key])
+            except Exception as e:
+                logger.warning(f"Failed to set session value for '{key}' in {window_instance.__class__.__name__}: {e}")
+    logger.debug(f"Loaded session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
+    return saved
+
+def save_window_session_settings(
+    window_instance: Any,
+    session_settings_key: str,
+    settings_map: dict[str, Any],
+) -> None:
+    """
+    Reads values from the provided variables and writes them into session_ui_settings.
+
+    Args:
+        window_instance: The CTkToplevel window with a parent.session_ui_settings dict.
+        session_settings_key: The key under which to save settings.
+        settings_map: A dictionary of {setting_key: tk.Variable} pairs to read from.
+    """
+    parent = getattr(window_instance, "parent", None)
+    store = getattr(parent, "session_ui_settings", None)
+    if not parent or store is None:
+        logger.warning(f"Parent or session_ui_settings not found for {window_instance.__class__.__name__} during save.")
+        return
+
+    store[session_settings_key] = { key: (var.get() if hasattr(var, "get") else var) for key, var in settings_map.items() }
+    logger.debug(f"Saved session settings for key '{session_settings_key}' in {window_instance.__class__.__name__}")
