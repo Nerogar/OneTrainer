@@ -110,7 +110,7 @@ class TrainOptimizerConfig(BaseConfig):
     d_limiter: True
     use_schedulefree: True
     use_orthograd: False
-    
+
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
 
@@ -196,7 +196,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("d_limiter", True, bool, True))
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
-        
+
         return TrainOptimizerConfig(data)
 
 
