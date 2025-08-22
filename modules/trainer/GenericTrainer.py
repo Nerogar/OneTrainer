@@ -583,20 +583,38 @@ class GenericTrainer(BaseTrainer):
 
 
     def _get_active_training_parts(self, train_progress: TrainProgress) -> set[str]:
-        active_parts = set()
+        active_parts: set[str] = set()
+
+        # UNet / main model
         if self._is_model_part_training_active(self.config.unet, train_progress):
             active_parts.add("Model")
 
-        te_configs = [
-            (1, self.config.text_encoder),
-            (2, self.config.text_encoder_2),
-            (3, self.config.text_encoder_3),
-            (4, self.config.text_encoder_4),
+        te_specs = [
+            (1, self.config.text_encoder, ["text_encoder", "text_encoder_1"]),
+            (2, self.config.text_encoder_2, ["text_encoder_2"]),
+            (3, self.config.text_encoder_3, ["text_encoder_3"]),
+            (4, self.config.text_encoder_4, ["text_encoder_4"]),
         ]
 
-        for i, te_config in te_configs:
-            if self._is_model_part_training_active(te_config, train_progress):
-                active_parts.add(f"TE {i}")
+        for idx, part_cfg, attr_names in te_specs:
+            if not self._is_model_part_training_active(part_cfg, train_progress):
+                continue
+
+            encoder_module = None
+            for attr in attr_names:
+                if hasattr(self.model, attr):
+                    m = getattr(self.model, attr)
+                    if m is not None:
+                        encoder_module = m
+                        break
+
+            if encoder_module is None:
+                continue  # attribute not present -> not part of this architecture
+
+            # Unsure how to properlly check for LoRA with text encoders training enabled.
+            has_trainable = any(p.requires_grad for p in encoder_module.parameters())
+            if has_trainable or part_cfg.train:
+                active_parts.add(f"TE {idx}")
 
         return active_parts
 
@@ -647,21 +665,18 @@ class GenericTrainer(BaseTrainer):
             display_parts = []
             if "Model" in active_parts_set:
                 display_parts.append("Model")
-
-            te_parts = sorted([p for p in active_parts_set if p.startswith("TE")])
+            te_parts = sorted(p for p in active_parts_set if p.startswith("TE"))
             if te_parts:
                 te_numbers = [p.split(" ")[1] for p in te_parts]
                 display_parts.append(f"TE ({', '.join(te_numbers)})")
-
             status_parts.append(f"Training: {' + '.join(display_parts)}")
 
-        # ETA calculation
         eta_str = self._calculate_eta_string(train_progress)
         if eta_str:
             status_parts.append(f"ETA: {eta_str}")
 
         return " | ".join(status_parts)
-
+#
     def _is_model_part_training_active(self, part_config: TrainModelPartConfig, train_progress: TrainProgress) -> bool:
         if not part_config.train:
             return False
