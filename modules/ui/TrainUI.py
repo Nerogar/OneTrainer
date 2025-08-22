@@ -54,6 +54,32 @@ class TrainUI(ctk.CTk):
     training_callbacks: TrainCallbacks | None
     training_commands: TrainCommands | None
 
+    _TRAIN_BUTTON_STYLES = {
+        "idle": {
+            "text": "Start Training",
+            "state": "normal",
+            "fg_color": "#198754",
+            "hover_color": "#146c43",
+            "text_color": "white",
+            "text_color_disabled": "white",
+        },
+        "running": {
+            "text": "Stop Training",
+            "state": "normal",
+            "fg_color": "#dc3545",
+            "hover_color": "#bb2d3b",
+            "text_color": "white",
+        },
+        "stopping": {
+            "text": "Stopping...",
+            "state": "disabled",
+            "fg_color": "#dc3545",
+            "hover_color": "#dc3545",
+            "text_color": "white",
+            "text_color_disabled": "white",
+        },
+    }
+
     def __init__(self):
         super().__init__()
 
@@ -154,8 +180,8 @@ class TrainUI(ctk.CTk):
 
         # training button
         self.training_button = components.button(frame, 0, 6, "Start Training", self.start_training,
-                                             padx=(5, 20), pady=(15, 0))
-
+                                                 padx=(5, 20), pady=(15, 0))
+        self._set_training_button_style("idle")  # centralized styling
 
         return frame
 
@@ -672,26 +698,15 @@ class TrainUI(ctk.CTk):
         else:
             self.on_update_status("stopped")
 
-        self.training_button.configure(
-            text="Start Training",
-            state="normal",
-            fg_color="green",
-            hover_color="darkgreen"
-        )
+        self.after(0, self._set_training_button_idle)
 
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
-            self._start_always_on_tensorboard()
+            self.after(0, self._start_always_on_tensorboard)
 
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
-
-            self.training_button.configure(
-                text="Stop Training",
-                state="normal",
-                fg_color="red",
-                hover_color="darkred"
-            )
+            self._set_training_button_running()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
                 self._stop_always_on_tensorboard()
@@ -701,7 +716,7 @@ class TrainUI(ctk.CTk):
             self.training_thread = threading.Thread(target=self.__training_thread_function)
             self.training_thread.start()
         else:
-            self.training_button.configure(state="disabled")
+            self._set_training_button_stopping()
             self.on_update_status("stopping")
             self.training_commands.stop()
 
@@ -800,3 +815,20 @@ class TrainUI(ctk.CTk):
         else:
             if not (self.training_thread and self.train_config.tensorboard):
                 self._stop_always_on_tensorboard()
+
+    def _set_training_button_style(self, mode: str):
+        if not self.training_button:
+            return
+        style = self._TRAIN_BUTTON_STYLES.get(mode)
+        if not style:
+            return
+        self.training_button.configure(**style)
+
+    def _set_training_button_idle(self):
+        self._set_training_button_style("idle")
+
+    def _set_training_button_running(self):
+        self._set_training_button_style("running")
+
+    def _set_training_button_stopping(self):
+        self._set_training_button_style("stopping")
