@@ -580,7 +580,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
     def _read_text_file_for_preview(self, file_path: str, empty_msg: str, missing_msg: str) -> str:
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, "r") as f:
                 if self.preview_augmentations.get():
                     lines = [line.strip() for line in f if line.strip()]
                     return random.choice(lines) if lines else empty_msg

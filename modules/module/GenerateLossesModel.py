@@ -103,5 +103,5 @@ class GenerateLossesModel:
         # Sort such that highest loss comes first
         filename_loss_list.sort(key=lambda x: x[1], reverse=True)
         filename_to_loss: dict[str, float] = {x[0]: x[1] for x in filename_loss_list}
-        with open(self.output_path, "w", encoding="utf-8") as f:
+        with open(self.output_path, "w") as f:
             json.dump(filename_to_loss, f, indent=4)

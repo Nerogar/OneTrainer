@@ -33,7 +33,7 @@ class CaptionSample:
     def get_caption(self) -> str:
         if self.captions is None and os.path.exists(self.caption_filename):
             try:
-                with open(self.caption_filename, "r", encoding="utf-8") as f:
+                with open(self.caption_filename, "r") as f:
                     self.captions = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
             except Exception:
                 self.captions = []

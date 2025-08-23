@@ -734,14 +734,14 @@ class TrainConfig(BaseConfig):
         config = TrainConfig.default_values().from_dict(self.to_dict())
 
         if config.concepts is None:
-            with open(config.concept_file_name, 'r', encoding="utf-8") as f:
+            with open(config.concept_file_name, 'r') as f:
                 concepts = json.load(f)
                 for i in range(len(concepts)):
                     concepts[i] = ConceptConfig.default_values().from_dict(concepts[i])
                 config.concepts = concepts
 
         if config.samples is None:
-            with open(config.sample_definition_file_name, 'r', encoding="utf-8") as f:
+            with open(config.sample_definition_file_name, 'r') as f:
                 samples = json.load(f)
                 for i in range(len(samples)):
                     samples[i] = SampleConfig.default_values().from_dict(samples[i])

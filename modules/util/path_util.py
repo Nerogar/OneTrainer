@@ -29,7 +29,7 @@ def canonical_join(base_path: str, *paths: str):
 
 
 def write_json_atomic(path: str, obj: Any):
-    with open(path + ".write", "w", encoding="utf-8") as f:
+    with open(path + ".write", "w") as f:
         json.dump(obj, f, indent=4)
     os.replace(path + ".write", path)
 

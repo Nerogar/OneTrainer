@@ -22,7 +22,7 @@ def main():
         data = TrainConfig.default_values().to_dict()
         os.makedirs(Path(path=args.config_output_destination).parent.absolute(), exist_ok=True)
 
-        with open(args.config_output_destination, "w", encoding="utf-8") as f:
+        with open(args.config_output_destination, "w") as f:
             json.dump(data, f, indent=4)
 
     if args.concepts_output_destination:
@@ -30,7 +30,7 @@ def main():
         data = [ConceptConfig.default_values().to_dict()]
         os.makedirs(Path(path=args.concepts_output_destination).parent.absolute(), exist_ok=True)
 
-        with open(args.concepts_output_destination, "w", encoding="utf-8") as f:
+        with open(args.concepts_output_destination, "w") as f:
             json.dump(data, f, indent=4)
 
     if args.samples_output_destination:
@@ -38,7 +38,7 @@ def main():
         data = [SampleConfig.default_values().to_dict()]
         os.makedirs(Path(path=args.samples_output_destination).parent.absolute(), exist_ok=True)
 
-        with open(args.samples_output_destination, "w", encoding="utf-8") as f:
+        with open(args.samples_output_destination, "w") as f:
             json.dump(data, f, indent=4)
 
 

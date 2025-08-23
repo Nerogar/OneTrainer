@@ -558,7 +558,7 @@ class VideoToolUI(ctk.CTkToplevel):
         elif batch_mode:
             ydl_path = pathlib.Path(self.download_list_entry.get())
             if ydl_path.is_file() and ydl_path.suffix.lower() == ".txt":
-                with open(ydl_path, encoding="utf-8") as file:
+                with open(ydl_path) as file:
                     ydl_urls = file.readlines()
             else:
                 print("Invalid link list!")

@@ -135,7 +135,7 @@ class WuerstchenModelLoader(
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_3.6b.json"
                     else:
                         config_filename = "resources/model_config/stable_cascade/stable_cascade_prior_1.0b.json"
-                    with open(config_filename, "r", encoding="utf-8") as config_file:
+                    with open(config_filename, "r") as config_file:
                         prior_config = json.load(config_file)
                 prior_prior = StableCascadeUNet(**prior_config)
                 prior_prior.load_state_dict(convert_stable_cascade_ckpt_to_diffusers(load_file(prior_prior_model_name)))

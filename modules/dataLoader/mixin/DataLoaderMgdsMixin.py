@@ -23,7 +23,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
     ):
         concepts = config.concepts
         if concepts is None:
-            with open(config.concept_file_name, 'r', encoding="utf-8") as f:
+            with open(config.concept_file_name, 'r') as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
 
         # choose all validation concepts, or none of them, depending on is_validation

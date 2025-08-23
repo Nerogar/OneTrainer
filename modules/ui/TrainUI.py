@@ -733,7 +733,7 @@ class TrainUI(ctk.CTk):
         ], initialdir=".", initialfile="config.json")
 
         if file_path:
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(file_path, "w") as f:
                 json.dump(self.train_config.to_pack_dict(secrets=False), f, indent=4)
 
     def sample_now(self):
