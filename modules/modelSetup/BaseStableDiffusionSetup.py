@@ -167,14 +167,21 @@ class BaseStableDiffusionSetup(
             if config.model_type.has_conditioning_image_input():
                 scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
-
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+            )
+
+            # move it below timesteps as generalized offset noise requires the timesteps
+            latent_noise = self._create_noise(
+                scaled_latent_image,
+                config,
+                generator,
+                timestep,
+                model.noise_scheduler.betas,
             )
 
             scaled_noisy_latent_image = self._add_noise_discrete(
