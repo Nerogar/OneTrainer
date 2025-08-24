@@ -84,7 +84,7 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_unet_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -110,7 +110,7 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 3)
 
         self.__create_base2_frame(column_1, 0)
-        self.__create_unet_frame(column_1, 1)
+        self.__create_unet_frame(column_1, 1, supports_generalized_offset_noise=True)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)
@@ -530,7 +530,7 @@ class TrainingTab:
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
             components.entry(frame, 4, 1, self.ui_state, "prior.guidance_scale")
 
-    def __create_noise_frame(self, master, row):
+    def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -540,47 +540,53 @@ class TrainingTab:
                          tooltip="The weight of offset noise added to each training step")
         components.entry(frame, 0, 1, self.ui_state, "offset_noise_weight")
 
+        if supports_generalized_offset_noise:
+            # generalized offset noise weight
+            components.label(frame, 1, 0, "Use Generalized Offset Noise",
+                            tooltip="Use the time-dependent generalized offset noise, instead of the original method.")
+            components.switch(frame, 1, 1, self.ui_state, "use_generalized_offset_noise")
+
         # perturbation noise weight
-        components.label(frame, 1, 0, "Perturbation Noise Weight",
+        components.label(frame, 2, 0, "Perturbation Noise Weight",
                          tooltip="The weight of perturbation noise added to each training step")
-        components.entry(frame, 1, 1, self.ui_state, "perturbation_noise_weight")
+        components.entry(frame, 2, 1, self.ui_state, "perturbation_noise_weight")
 
         # timestep distribution
-        components.label(frame, 2, 0, "Timestep Distribution",
+        components.label(frame, 3, 0, "Timestep Distribution",
                          tooltip="Selects the function to sample timesteps during training",
                          wide_tooltip=True)
-        components.options_adv(frame, 2, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution",
+        components.options_adv(frame, 3, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution",
                                adv_command=self.__open_timestep_distribution_window)
 
         # min noising strength
-        components.label(frame, 3, 0, "Min Noising Strength",
+        components.label(frame, 4, 0, "Min Noising Strength",
                          tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        components.entry(frame, 3, 1, self.ui_state, "min_noising_strength")
+        components.entry(frame, 4, 1, self.ui_state, "min_noising_strength")
 
         # max noising strength
-        components.label(frame, 4, 0, "Max Noising Strength",
+        components.label(frame, 5, 0, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(frame, 4, 1, self.ui_state, "max_noising_strength")
+        components.entry(frame, 5, 1, self.ui_state, "max_noising_strength")
 
         # noising weight
-        components.label(frame, 5, 0, "Noising Weight",
+        components.label(frame, 6, 0, "Noising Weight",
                          tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(frame, 5, 1, self.ui_state, "noising_weight")
+        components.entry(frame, 6, 1, self.ui_state, "noising_weight")
 
         # noising bias
-        components.label(frame, 6, 0, "Noising Bias",
+        components.label(frame, 7, 0, "Noising Bias",
                          tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(frame, 6, 1, self.ui_state, "noising_bias")
+        components.entry(frame, 7, 1, self.ui_state, "noising_bias")
 
         # timestep shift
-        components.label(frame, 7, 0, "Timestep Shift",
+        components.label(frame, 8, 0, "Timestep Shift",
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
-        components.entry(frame, 7, 1, self.ui_state, "timestep_shift")
+        components.entry(frame, 8, 1, self.ui_state, "timestep_shift")
 
         # dynamic timestep shifting
-        components.label(frame, 8, 0, "Dynamic Timestep Shifting",
+        components.label(frame, 9, 0, "Dynamic Timestep Shifting",
                          tooltip="Dynamically shift the timestep distribution based on resolution. Use the preview to see more details.")
-        components.switch(frame, 8, 1, self.ui_state, "dynamic_timestep_shifting")
+        components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
 
