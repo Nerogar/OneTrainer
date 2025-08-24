@@ -1,6 +1,6 @@
-
 import datetime
 import os
+import platform
 import subprocess
 import traceback
 from contextlib import suppress
@@ -20,16 +20,19 @@ class MultiTrainer(BaseTrainer):
         super().__init__(config, callbacks, commands)
         if config.samples_to_tensorboard:
             print("Warning: If 'Samples To Tensorboard' is enabled, only one GPU is used for sampling!")
+        if not config.latent_caching:
+            print("Warning: Latent caching is disabled, but recommended for multi-GPU training!")
 
     def start(self):
         os.environ.setdefault('MASTER_ADDR', 'localhost')
         os.environ.setdefault('MASTER_PORT', '12355')
 
-        with suppress(subprocess.CalledProcessError):
-            subprocess.run(['nvidia-smi', 'topo', '-p2p', 'rw'], check=True)
-            print("\nWarning: If the matrix above does not show OK everywhere, your GPUs cannot communicate directly with each other. "
-                    "Multi-GPU training with values other than OK is still possible, but this can have a major performance impact, "
-                    "especially for full finetuning.\n")
+        if platform.system() == 'Linux': #topo is not supported on Windows
+            with suppress(subprocess.CalledProcessError):
+                subprocess.run(['nvidia-smi', 'topo', '-p2p', 'rw'], check=True)
+                print("\nWarning: If the matrix above does not show OK everywhere, your GPUs cannot communicate directly with each other. "
+                        "Multi-GPU training with values other than OK is still possible, but this can have a major performance impact, "
+                        "especially for full finetuning.\n")
 
     @staticmethod #must be static and not use __ prefix, otherwise the pickling done by torch.multiprocessing fails
     def _train_process(spawn_rank: int, world_size: int, config_dict: dict, devices: list[torch.device], callbacks: TrainCallbacks=None):
@@ -43,7 +46,9 @@ class MultiTrainer(BaseTrainer):
         #The other GPU processes have to wait without timing out:
         timeout = datetime.timedelta(hours=24)
 
-        torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device, timeout=timeout)
+        torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device, timeout=timeout,
+            backend='gloo' if platform.system() == 'Windows' else 'nccl',
+        )
         torch.cuda.set_device(device.index)
 
         #use barrier synchronisation now already, to discover NCCL communication issues early:
