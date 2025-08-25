@@ -35,6 +35,16 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 
+REM Disable HF_HUB_DISABLE_XET, buggy; default disables Xet (set to 0 to enable) - https://github.com/Nerogar/OneTrainer/issues/949
+if not defined HF_HUB_DISABLE_XET (
+    set "HF_HUB_DISABLE_XET=1"
+)
+echo HF_HUB_DISABLE_XET=%HF_HUB_DISABLE_XET%
+echo.
+echo NOTE: XeT allows even higher speed, parallel downloads, however its buggy
+echo NOTE: Only enable it if your download speed is greater than 40 megabytes per second (MB/s) - not megabits.
+echo.
+
 :launch
 echo Starting UI...
 %PYTHON% scripts\train_ui.py
