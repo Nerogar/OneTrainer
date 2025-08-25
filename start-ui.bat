@@ -35,6 +35,14 @@ set PYTHON="%VENV_DIR%\Scripts\python.exe"
 if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 
+REM Disable HF_HUB_DISABLE_XET, buggy; default disables Xet (set to 0 to enable) - https://github.com/Nerogar/OneTrainer/issues/949
+if not defined HF_HUB_DISABLE_XET (
+    set "HF_HUB_DISABLE_XET=1"
+)
+echo HF_HUB_DISABLE_XET=%HF_HUB_DISABLE_XET%
+echo.
+echo NOTE: Xet disabled, to enable it set as 0 before launch
+
 :check_python_version
 echo Checking Python version...
 %PYTHON% --version
