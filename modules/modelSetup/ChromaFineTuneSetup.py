@@ -45,9 +45,13 @@ class ChromaFineTuneSetup(
                 )
 
         if config.prior.train:
+            #TODO apply a configurable layer filter
+            filtered_parameters = [param[1] for param in model.transformer.named_parameters() if "guidance_layer" not in param[0]]
+            print("Warning: not training layers ", end='')
+            print(', '.join([param[0] for param in model.transformer.named_parameters() if "guidance_layer" in param[0]]))
             parameter_group_collection.add_group(NamedParameterGroup(
                 unique_name="transformer",
-                parameters=model.transformer.parameters(),
+                parameters=filtered_parameters,
                 learning_rate=config.prior.learning_rate,
             ))
 
