@@ -159,7 +159,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype: DataType,
             train_dtype: DataType,
             pretrained_model_name_or_path: str,
-            subfolder: str | None = None,
+            subfolder: str = "",
     ):
         user_agent = {
             "file_type": "model",

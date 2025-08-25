@@ -1,44 +1,47 @@
 # base requirements
-numpy==2.2.2
+numpy==2.2.6
 opencv-python==4.11.0.86
-pillow==11.1.0
+pillow==11.2.1
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
-huggingface-hub==0.28.1
-scipy==1.15.1; sys_platform != 'win32'
-matplotlib==3.10.0
-av==14.1.0 # using an older version. only update once torchvision has been updated as well.
+huggingface-hub==0.32.4
+scipy==1.15.3
+matplotlib==3.10.3
+av==14.4.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
 
 # pytorch
-accelerate==1.3.0
-safetensors==0.5.2
-tensorboard==2.18.0
-pytorch-lightning==2.5.0.post0
+accelerate==1.7.0
+safetensors==0.5.3
+tensorboard==2.19.0
+pytorch-lightning==2.5.1.post0
 
-# stable diffusion
--e git+https://github.com/huggingface/diffusers.git@1d37f42#egg=diffusers
-transformers==4.48.3
+# diffusion models
+-e git+https://github.com/huggingface/diffusers.git@73a9d58#egg=diffusers
+transformers==4.52.4
 sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
+# model conversion
+-e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@4ad235c#egg=omi_model_standards
+
 # other models
 pooch==1.8.2
-open-clip-torch==2.30.0
+open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@2c67a5a#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@314d714#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.2.3 # lion optimizer
 prodigyopt==1.1.2 # prodigy optimizer
-schedulefree==1.4.0 # schedule-free optimizers
-pytorch_optimizer==3.4.0 # pytorch optimizers
-prodigy-plus-schedule-free==1.9.1 # prodigy+schedulefree optimizer
+schedulefree==1.4.1 # schedule-free optimizers
+pytorch_optimizer==3.6.0 # pytorch optimizers
+prodigy-plus-schedule-free==1.9.2 # prodigy+schedulefree optimizer
 
 # Profiling
 scalene==1.5.51
@@ -47,9 +50,9 @@ scalene==1.5.51
 customtkinter==5.2.2
 
 # cloud
-runpod==1.7.7
+runpod==1.7.10
 fabric==3.2.2
 
 # debug
-psutil==6.1.1
+psutil==7.0.0
 requests==2.32.3

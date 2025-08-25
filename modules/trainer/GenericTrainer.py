@@ -20,6 +20,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
+from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
@@ -65,7 +66,7 @@ class GenericTrainer(BaseTrainer):
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
         self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
-        if config.tensorboard:
+        if config.tensorboard and not config.tensorboard_always_on:
             super()._start_tensorboard()
 
         self.model = None
@@ -220,7 +221,7 @@ class GenericTrainer(BaseTrainer):
 
                     sample_path = os.path.join(
                         sample_dir,
-                        f"{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                        f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
                     )
 
                     def on_sample_default(sampler_output: ModelSamplerOutput):
@@ -669,7 +670,22 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
-                    model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                    prior_pred_indices = [i for i in range(self.config.batch_size)
+                                          if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
+                    if len(prior_pred_indices) > 0 \
+                            or (self.config.masked_training
+                                and self.config.masked_prior_preservation_weight > 0
+                                and self.config.training_method == TrainingMethod.LORA):
+                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                            #do NOT create a subbatch using the indices, even though it would be more efficient:
+                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
+                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
+                        model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                        model_output_data['prior_target'] = prior_model_prediction
+                    else:
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
@@ -778,12 +794,12 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
-        elif self.model is not None:
-            self.model.to(self.temp_device)
+
+        self.model.to(self.temp_device)
 
         self.tensorboard.close()
 
-        if self.config.tensorboard:
+        if self.config.tensorboard and not self.config.tensorboard_always_on:
             super()._stop_tensorboard()
 
         for handle in self.grad_hook_handles:

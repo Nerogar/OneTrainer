@@ -65,6 +65,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -149,6 +150,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
@@ -271,6 +273,7 @@ class TrainConfig(BaseConfig):
     cache_dir: str
     tensorboard: bool
     tensorboard_expose: bool
+    tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
     validate_after: float
@@ -367,6 +370,10 @@ class TrainConfig(BaseConfig):
     text_encoder_3: TrainModelPartConfig
     text_encoder_3_layer_skip: int
 
+    # text encoder 4
+    text_encoder_4: TrainModelPartConfig
+    text_encoder_4_layer_skip: int
+
     # vae
     vae: TrainModelPartConfig
 
@@ -387,6 +394,10 @@ class TrainConfig(BaseConfig):
     unmasked_probability: float
     unmasked_weight: float
     normalize_masked_area_loss: bool
+    masked_prior_preservation_weight: float
+
+    # custom conditioning image
+    custom_conditioning_image: bool
 
     # embedding
     embedding_learning_rate: float
@@ -402,6 +413,7 @@ class TrainConfig(BaseConfig):
     lora_alpha: float
     lora_decompose: bool
     lora_decompose_norm_epsilon: bool
+    lora_decompose_output_axis: bool
     lora_weight_dtype: DataType
     lora_layers: str  # comma-separated
     lora_layer_preset: str
@@ -625,6 +637,7 @@ class TrainConfig(BaseConfig):
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
             self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
             self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
+            self.weight_dtype if self.text_encoder_4.weight_dtype == DataType.NONE else self.text_encoder_4.weight_dtype,
             self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
             self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
             self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
@@ -640,6 +653,7 @@ class TrainConfig(BaseConfig):
             prior_model=self.prior.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
+            text_encoder_4=self.text_encoder_4.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
             embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name) \
@@ -649,6 +663,7 @@ class TrainConfig(BaseConfig):
             include_text_encoder=self.text_encoder.include,
             include_text_encoder_2=self.text_encoder_2.include,
             include_text_encoder_3=self.text_encoder_3.include,
+            include_text_encoder_4=self.text_encoder_4.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -675,6 +690,12 @@ class TrainConfig(BaseConfig):
         return (self.text_encoder_3.train and self.training_method != TrainingMethod.EMBEDDING
                 and not self.embedding.is_output_embedding) \
             or ((self.text_encoder_3.train_embedding or not self.model_type.has_multiple_text_encoders())
+                and self.train_any_embedding())
+
+    def train_text_encoder_4_or_embedding(self) -> bool:
+        return (self.text_encoder_4.train and self.training_method != TrainingMethod.EMBEDDING
+                and not self.embedding.is_output_embedding) \
+            or ((self.text_encoder_4.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
 
     def all_embedding_configs(self):
@@ -752,6 +773,7 @@ class TrainConfig(BaseConfig):
         data.append(("cache_dir", "workspace-cache/run", str, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
+        data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))
@@ -874,6 +896,16 @@ class TrainConfig(BaseConfig):
         data.append(("text_encoder_3", text_encoder_3, TrainModelPartConfig, False))
         data.append(("text_encoder_3_layer_skip", 0, int, False))
 
+        # text encoder 4
+        text_encoder_4 = TrainModelPartConfig.default_values()
+        text_encoder_4.train = True
+        text_encoder_4.stop_training_after = 30
+        text_encoder_4.stop_training_after_unit = TimeUnit.EPOCH
+        text_encoder_4.learning_rate = None
+        text_encoder_4.weight_dtype = DataType.NONE
+        data.append(("text_encoder_4", text_encoder_4, TrainModelPartConfig, False))
+        data.append(("text_encoder_4_layer_skip", 0, int, False))
+
         # vae
         vae = TrainModelPartConfig.default_values()
         vae.model_name = ""
@@ -907,6 +939,8 @@ class TrainConfig(BaseConfig):
         data.append(("unmasked_probability", 0.1, float, False))
         data.append(("unmasked_weight", 0.1, float, False))
         data.append(("normalize_masked_area_loss", False, bool, False))
+        data.append(("masked_prior_preservation_weight", 0.0, float, False))
+        data.append(("custom_conditioning_image", False, bool, False))
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
@@ -925,6 +959,7 @@ class TrainConfig(BaseConfig):
         data.append(("lora_alpha", 1.0, float, False))
         data.append(("lora_decompose", False, bool, False))
         data.append(("lora_decompose_norm_epsilon", True, bool, False))
+        data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("lora_layers", "", str, False))
         data.append(("lora_layer_preset", None, str, True))

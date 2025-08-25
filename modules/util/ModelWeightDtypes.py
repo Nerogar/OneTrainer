@@ -13,6 +13,7 @@ class ModelWeightDtypes:
             text_encoder: DataType,
             text_encoder_2: DataType,
             text_encoder_3: DataType,
+            text_encoder_4: DataType,
             vae: DataType,
             effnet_encoder: DataType,
             decoder: DataType,
@@ -29,6 +30,7 @@ class ModelWeightDtypes:
         self.text_encoder = text_encoder
         self.text_encoder_2 = text_encoder_2
         self.text_encoder_3 = text_encoder_3
+        self.text_encoder_4 = text_encoder_4
         self.vae = vae
         self.effnet_encoder = effnet_encoder
         self.decoder = decoder
@@ -44,6 +46,7 @@ class ModelWeightDtypes:
             self.text_encoder,
             self.text_encoder_2,
             self.text_encoder_3,
+            self.text_encoder_4,
             self.vae,
             self.effnet_encoder,
             self.decoder,
