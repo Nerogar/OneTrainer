@@ -70,6 +70,8 @@ class TrainingTab:
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_chroma():
+            self.__setup_chroma_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_sana():
             self.__setup_sana_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hunyuan_video():
@@ -148,6 +150,18 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
+        self.__create_noise_frame(column_1, 2)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+
+    def __setup_chroma_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1)
+        self.__create_embedding_frame(column_0, 4)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)

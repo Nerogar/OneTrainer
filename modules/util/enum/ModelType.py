@@ -32,6 +32,8 @@ class ModelType(Enum):
 
     HI_DREAM_FULL = 'HI_DREAM_FULL'
 
+    CHROMA_1 = 'CHROMA_1'
+
     def __str__(self):
         return self.value
 
@@ -73,6 +75,9 @@ class ModelType(Enum):
     def is_flux(self):
         return self == ModelType.FLUX_DEV_1 \
             or self == ModelType.FLUX_FILL_DEV_1
+
+    def is_chroma(self):
+        return self == ModelType.CHROMA_1
 
     def is_sana(self):
         return self == ModelType.SANA

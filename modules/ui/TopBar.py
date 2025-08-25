@@ -78,7 +78,7 @@ class TopBar:
             master=self.frame,
             row=0,
             column=6,
-            values=[
+            values=[ #TODO simplify
                 ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
                 ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
                 ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
@@ -97,6 +97,7 @@ class TopBar:
                 ("Sana", ModelType.SANA),
                 ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
                 ("HiDream Full", ModelType.HI_DREAM_FULL),
+                ("Chroma1", ModelType.CHROMA_1),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -108,7 +109,7 @@ class TopBar:
             self.training_method.destroy()
 
         values = []
-
+        #TODO simplify
         if self.train_config.model_type.is_stable_diffusion():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
@@ -123,7 +124,8 @@ class TopBar:
                 or self.train_config.model_type.is_flux() \
                 or self.train_config.model_type.is_sana() \
                 or self.train_config.model_type.is_hunyuan_video() \
-                or self.train_config.model_type.is_hi_dream():
+                or self.train_config.model_type.is_hi_dream() \
+                or self.train_config.model_type.is_chroma():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

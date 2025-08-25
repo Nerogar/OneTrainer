@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from modules.modelSetup.ChromaLoRASetup import PRESETS as chroma_presets
 from modules.modelSetup.FluxLoRASetup import PRESETS as flux_presets
 from modules.modelSetup.HiDreamLoRASetup import PRESETS as hidream_presets
 from modules.modelSetup.HunyuanVideoLoRASetup import PRESETS as hunyuan_video_presets
@@ -43,7 +44,7 @@ class LoraTab:
         self.scroll_frame = ctk.CTkFrame(self.master, fg_color="transparent")
         self.scroll_frame.grid(row=0, column=0, sticky="nsew")
 
-        if self.train_config.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
             self.presets = sd_presets
         elif self.train_config.model_type.is_stable_diffusion_xl():
             self.presets = sdxl_presets
@@ -55,6 +56,8 @@ class LoraTab:
             self.presets = pixart_presets
         elif self.train_config.model_type.is_flux():
             self.presets = flux_presets
+        elif self.train_config.model_type.is_chroma():
+            self.presets = chroma_presets
         elif self.train_config.model_type.is_sana():
             self.presets = sana_presets
         elif self.train_config.model_type.is_hunyuan_video():
