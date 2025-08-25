@@ -41,9 +41,7 @@ if not defined HF_HUB_DISABLE_XET (
 )
 echo HF_HUB_DISABLE_XET=%HF_HUB_DISABLE_XET%
 echo.
-echo NOTE: XeT allows even higher speed, parallel downloads, however its buggy
-echo NOTE: Only enable it if your download speed is greater than 40 megabytes per second (MB/s) - not megabits.
-echo.
+echo NOTE: Xet disabled, to enable it set as 0 before launch
 
 :check_python_version
 echo Checking Python version...
