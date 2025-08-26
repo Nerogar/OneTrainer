@@ -47,24 +47,7 @@ class StableDiffusion3ModelLoader(
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
     ):
-        diffusers_sub = []
-        transformers_sub = []
-
-        diffusers_sub.append("transformer")
-        if include_text_encoder_1:
-            transformers_sub.append("text_encoder")
-        if include_text_encoder_2:
-            transformers_sub.append("text_encoder_2")
-        if include_text_encoder_3:
-            transformers_sub.append("text_encoder_3")
-        if not vae_model_name:
-            diffusers_sub.append("vae")
-
-        self._prepare_sub_modules(
-            base_model_name,
-            diffusers_modules=diffusers_sub,
-            transformers_modules=transformers_sub,
-        )
+        #no call to self._prepare_sub_modules, because SAI polluted their sd3 / sd3.5 medium repo text encoders with fp16 files
 
         if include_text_encoder_1:
             tokenizer_1 = CLIPTokenizer.from_pretrained(
