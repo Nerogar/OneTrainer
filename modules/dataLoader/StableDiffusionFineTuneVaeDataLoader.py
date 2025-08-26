@@ -138,6 +138,8 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_frames_in_name='settings.target_frames',
+            frame_dim_enabled=False,
             target_resolutions_override_in_name='concept.image.resolution_override',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
@@ -238,6 +240,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         sort_names = output_names + ['concept']
         output_names = output_names + [('concept.loss_weight', 'loss_weight')]
+        output_names = output_names + [('concept.type', 'concept_type')]
 
         # add for calculating loss per concept
         if config.validation:

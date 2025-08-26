@@ -82,20 +82,21 @@ class LinuxCloud(BaseCloud):
                                   && cd {shlex.quote(parent)} \
                                   && {config.install_cmd})',in_stream=False)
 
-        #OT requires cuda in PATH, but runpod only sets that up in bashprofile, which is not used by fabric
-        #TODO test with other clouds
         result=self.connection.run(f"test -d {shlex.quote(config.onetrainer_dir)}/venv",warn=True,in_stream=False)
+
+        #many docker images, including the default ones on RunPod and vast.ai, only set up $PATH correctly
+        #for interactive shells. On RunPod, cuda is missing from $PATH; on vast.ai, python is missing.
+        #We cannot pretend to be interactive either, because then vast.ai starts a tmux screen.
+        #Add these paths manually:
+        cmd_env = f"export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin \
+                   && export OT_LAZY_UPDATES=true \
+                   && cd {shlex.quote(config.onetrainer_dir)}"
+
         if result.exited == 0:
             if update:
-                self.connection.run(f'cd {shlex.quote(config.onetrainer_dir)} \
-                                      && export PATH=$PATH:/usr/local/cuda/bin \
-                                      && export OT_LAZY_UPDATES=true \
-                                      && ./update.sh',in_stream=False)
+                self.connection.run(cmd_env + "&& ./update.sh", in_stream=False)
         else:
-            self.connection.run(f'cd {shlex.quote(config.onetrainer_dir)} \
-                                  && export PATH=$PATH:/usr/local/cuda/bin \
-                                  && export OT_LAZY_UPDATES=true \
-                                  && ./install.sh',in_stream=False)
+            self.connection.run(cmd_env + "&& ./install.sh", in_stream=False)
 
     def _make_tensorboard_tunnel(self):
         self.tensorboard_tunnel_stop=threading.Event()
@@ -138,7 +139,8 @@ class LinuxCloud(BaseCloud):
             self.__trail_detached_trainer()
             return
 
-        cmd="export PYTHONUNBUFFERED=1 \
+        cmd="export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin \
+             && export PYTHONUNBUFFERED=1 \
              && export OT_LAZY_UPDATES=true"
 
         if self.config.secrets.huggingface_token != "":

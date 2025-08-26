@@ -394,7 +394,20 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "eps2": 1e-16,
         "weight_decay": 1e-2,
         "stochastic_rounding": False,
+        "use_cautious": False,
         "fused_back_pass": False,
+    },
+    Optimizer.CAME_8BIT: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "beta3": 0.9999,
+        "eps": 1e-30,
+        "eps2": 1e-16,
+        "weight_decay": 1e-2,
+        "stochastic_rounding": False,
+        "fused_back_pass": False,
+        "min_8bit_size": 16384,
+        "quant_block_size": 2048
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

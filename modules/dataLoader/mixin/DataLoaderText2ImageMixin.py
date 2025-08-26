@@ -11,6 +11,7 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
+from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
 from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
@@ -31,6 +32,7 @@ from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
+from mgds.pipelineModules.SelectFirstInput import SelectFirstInput
 from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
@@ -52,19 +54,27 @@ class DataLoaderText2ImageMixin:
         if allow_videos:
             supported_extensions |= path_util.supported_video_extensions()
 
+        download_datasets = DownloadHuggingfaceDatasets(
+            concept_in_name='concept', path_in_name='path', enabled_in_name='enabled',
+            concept_out_name='concept',
+        )
+
         collect_paths = CollectPaths(
             concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
             path_out_name='image_path', concept_out_name='concept',
-            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel']
+            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel','-condlabel']
         )
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
+        cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
-        modules = [collect_paths, sample_prompt_path]
+        modules = [download_datasets, collect_paths, sample_prompt_path]
 
         if config.masked_training:
             modules.append(mask_path)
+        if config.custom_conditioning_image:
+            modules.append(cond_path)
 
         return modules
 
@@ -81,6 +91,8 @@ class DataLoaderText2ImageMixin:
         generate_mask = GenerateImageLike(image_in_name='image', image_out_name='mask', color=255, range_min=0, range_max=1)
         load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, supported_extensions={".png"}, dtype=train_dtype.torch_dtype())
         mask_to_video = ImageToVideo(in_name='mask', out_name='mask')
+
+        load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='custom_conditioning_image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
@@ -104,6 +116,9 @@ class DataLoaderText2ImageMixin:
             modules.append(load_mask)
         elif config.model_type.has_mask_input():
             modules.append(generate_mask)
+
+        if config.custom_conditioning_image:
+            modules.append(load_cond_image)
 
         if allow_video:
             modules.append(mask_to_video)
@@ -171,6 +186,9 @@ class DataLoaderText2ImageMixin:
         if config.model_type.has_depth_input():
             inputs.append('depth')
 
+        if config.custom_conditioning_image:
+            inputs.append('custom_conditioning_image')
+
         scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
 
         modules = [scale_crop]
@@ -179,6 +197,7 @@ class DataLoaderText2ImageMixin:
 
     def _augmentation_modules(self, config: TrainConfig):
         inputs = ['image']
+        image_inputs = ['image']
 
         if config.masked_training or config.model_type.has_mask_input():
             inputs.append('mask')
@@ -186,12 +205,19 @@ class DataLoaderText2ImageMixin:
         if config.model_type.has_depth_input():
             inputs.append('depth')
 
+        if config.custom_conditioning_image:
+            inputs.append('custom_conditioning_image')
+            image_inputs.append('custom_conditioning_image')
+
+        # image augmentations
         random_flip = RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', fixed_enabled_in_name='concept.image.enable_fixed_flip')
         random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', fixed_enabled_in_name='concept.image.enable_fixed_rotate', max_angle_in_name='concept.image.random_rotate_max_angle')
-        random_brightness = RandomBrightness(names=['image'], enabled_in_name='concept.image.enable_random_brightness', fixed_enabled_in_name='concept.image.enable_fixed_brightness', max_strength_in_name='concept.image.random_brightness_max_strength')
-        random_contrast = RandomContrast(names=['image'], enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
-        random_saturation = RandomSaturation(names=['image'], enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
-        random_hue = RandomHue(names=['image'], enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
+        random_brightness = RandomBrightness(names=image_inputs, enabled_in_name='concept.image.enable_random_brightness', fixed_enabled_in_name='concept.image.enable_fixed_brightness', max_strength_in_name='concept.image.random_brightness_max_strength')
+        random_contrast = RandomContrast(names=image_inputs, enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
+        random_saturation = RandomSaturation(names=image_inputs, enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
+        random_hue = RandomHue(names=image_inputs, enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
+
+        # text augmentations
         drop_tags = DropTags(text_in_name='prompt', enabled_in_name='concept.text.tag_dropout_enable', probability_in_name='concept.text.tag_dropout_probability', dropout_mode_in_name='concept.text.tag_dropout_mode',
                              special_tags_in_name='concept.text.tag_dropout_special_tags', special_tag_mode_in_name='concept.text.tag_dropout_special_tags_mode', delimiter_in_name='concept.text.tag_delimiter',
                              keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt', regex_enabled_in_name='concept.text.tag_dropout_special_tags_regex')
@@ -215,18 +241,19 @@ class DataLoaderText2ImageMixin:
 
     def _inpainting_modules(self, config: TrainConfig):
         conditioning_image = GenerateMaskedConditioningImage(image_in_name='image', mask_in_name='mask', image_out_name='conditioning_image', image_range_min=0, image_range_max=1)
+        select_conditioning_image = SelectFirstInput(in_names=['custom_conditioning_image', 'conditioning_image'], out_name='conditioning_image')
 
         modules = []
 
         if config.model_type.has_conditioning_image_input():
             modules.append(conditioning_image)
+            modules.append(select_conditioning_image)
 
         return modules
 
     def _output_modules_from_out_names(
             self,
-            output_names: list[str],
-            sort_names: list[str],
+            output_names: list[str | tuple[str, str]],
             config: TrainConfig,
             before_cache_image_fun: Callable[[], None] | None = None,
             use_conditioning_image: bool = False,
@@ -234,6 +261,18 @@ class DataLoaderText2ImageMixin:
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
+        sort_names = output_names + ['concept']
+
+        output_names = output_names + [
+            ('concept.loss_weight', 'loss_weight'),
+            ('concept.type', 'concept_type'),
+        ]
+
+        if config.validation:
+            output_names.append(('concept.name', 'concept_name'))
+            output_names.append(('concept.path', 'concept_path'))
+            output_names.append(('concept.seed', 'concept_seed'))
+
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image' if use_conditioning_image else None,
             replace_probability=config.unmasked_probability, vae=vae,
