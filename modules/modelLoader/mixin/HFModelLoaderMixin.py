@@ -290,25 +290,18 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             None,
         )
 
-    def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list, transformers_modules: list):
+    def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]):
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if is_local:
             return
-        # SAI polluted their sd3 / sd3.5 medium repo text encoders with fp16 files, so we need to explicitly ignore them
-        ignore_patterns = [
-            "*fp16*.safetensors",
-            "*.bin",                # We dont ever want bin files
-        ]
 
-        diffusers_paths = [folder + "/diffusion_pytorch_model*" for folder in diffusers_modules]
-        transformers_paths = [folder + "/model*" for folder in transformers_modules]
-        transformers_paths.extend([folder + "/pytorch_model*" for folder in transformers_modules])
-
+        diffusers_paths = [((folder + "/") if folder else "") + "diffusion_pytorch_model*" for folder in diffusers_modules]
+        transformers_paths = [((folder + "/") if folder else "") + "model*" for folder in transformers_modules]
+        transformers_paths.extend([((folder + "/") if folder else "") + "pytorch_model*" for folder in transformers_modules])
         try:
             huggingface_hub.snapshot_download(
                 pretrained_model_name_or_path,
                 allow_patterns=diffusers_paths + transformers_paths,
-                ignore_patterns=ignore_patterns,
             )
         except huggingface_hub.errors.HFValidationError:
             pass
