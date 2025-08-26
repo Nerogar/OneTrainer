@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 from abc import ABCMeta
 from itertools import repeat
 
@@ -293,12 +294,24 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if is_local:
             return
+        # SAI polluted their sd3 / sd3.5 medium repo text encoders with fp16 files, so we need to explicitly ignore them
+        ignore_patterns = [
+            "*fp16*.safetensors",
+            "*.bin",                # We dont ever want bin files
+        ]
 
         diffusers_paths = [folder + "/diffusion_pytorch_model*" for folder in diffusers_modules]
         transformers_paths = [folder + "/model*" for folder in transformers_modules]
         transformers_paths.extend([folder + "/pytorch_model*" for folder in transformers_modules])
 
-        huggingface_hub.snapshot_download(
-            pretrained_model_name_or_path,
-            allow_patterns=diffusers_paths + transformers_paths,
-        )
+        try:
+            huggingface_hub.snapshot_download(
+                pretrained_model_name_or_path,
+                allow_patterns=diffusers_paths + transformers_paths,
+                ignore_patterns=ignore_patterns,
+            )
+        except huggingface_hub.errors.HFValidationError:
+            pass
+        except Exception:
+            traceback.print_exc()
+            print("Error during bulk preloading of Huggingface model repository, proceeding without preloading")
