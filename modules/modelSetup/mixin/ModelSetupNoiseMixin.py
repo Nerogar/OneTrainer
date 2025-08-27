@@ -135,9 +135,6 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weights = 2.0 / (math.pi - 2.0 * math.pi * linspace + 2.0 * math.pi * linspace ** 2.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
-
-                    samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
-                    timestep = samples.to(dtype=torch.long, device=generator.device)
                 elif config.timestep_distribution == TimestepDistribution.SIGMOID:
                     if self.__weights is None:
                         bias = config.noising_bias + 0.5
@@ -147,9 +144,6 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weights = 1 / (1 + torch.exp(-weight * (weights - bias)))  # Sigmoid
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
-
-                    samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
-                    timestep = samples.to(dtype=torch.long, device=generator.device)
                 elif config.timestep_distribution == TimestepDistribution.PARABOLA:
                     if self.__weights is None:
                         bias = config.noising_bias + 0.5
@@ -157,8 +151,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weights = torch.clamp(-weight * ((linspace - bias) ** 2) + 2, min=0.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
-                    samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
-                    timestep = samples.to(dtype=torch.long, device=generator.device)
+                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
+                timestep = samples.to(dtype=torch.long, device=generator.device)
 
             return timestep.int()
 
