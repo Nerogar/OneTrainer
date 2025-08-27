@@ -40,7 +40,7 @@ class ChromaEmbeddingSaver(
             dtype: torch.dtype | None,
     ):
         embedding_uuid = list(model.embedding_state_dicts.keys())[0] if model.embedding is None \
-            else model.embedding.text_encoder_1_embedding.uuid
+            else model.embedding.text_encoder_embedding.uuid
 
         embedding = model.embedding
         embedding_state = list(model.embedding_state_dicts.values())[0]
