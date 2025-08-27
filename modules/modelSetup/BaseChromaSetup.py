@@ -257,7 +257,7 @@ class BaseChromaSetup(
             if config.debug_mode: #TODO simplify
                 with torch.no_grad():
                     self._save_text(
-                        self._decode_tokens(batch['tokens_1'], model.tokenizer_1),
+                        self._decode_tokens(batch['tokens'], model.tokenizer),
                         config.debug_dir + "/training_batches",
                         "7-prompt",
                         train_progress.global_step,
