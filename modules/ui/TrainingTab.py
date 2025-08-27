@@ -161,7 +161,7 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0)
-        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)
@@ -512,7 +512,7 @@ class TrainingTab:
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
-    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False):
+    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False, supports_force_attention_mask: bool = True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -533,10 +533,11 @@ class TrainingTab:
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
-        # transformer learning rate
-        components.label(frame, 3, 0, "Force Attention Mask",
-                         tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
-        components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
+        if supports_force_attention_mask:
+            # transformer learning rate
+            components.label(frame, 3, 0, "Force Attention Mask",
+                             tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
+            components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
 
         if supports_guidance_scale:
             # guidance scale
