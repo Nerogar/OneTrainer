@@ -49,6 +49,18 @@ class ChromaModelLoader(
             transformer_model_name: str,
             vae_model_name: str,
     ):
+        diffusers_sub = []
+        if not transformer_model_name:
+            diffusers_sub.append("transformer")
+        if not vae_model_name:
+            diffusers_sub.append("vae")
+
+        self._prepare_sub_modules(
+            base_model_name,
+            diffusers_modules=diffusers_sub,
+            transformers_modules=["text_encoder"],
+        )
+
         tokenizer = T5Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
