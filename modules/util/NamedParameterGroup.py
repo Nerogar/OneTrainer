@@ -33,7 +33,8 @@ class NamedParameterGroupCollection:
     def parameters(self) -> list[Parameter]:
         params = [p for group in self.__groups for p in group.parameters]
         # Some parameter groups might not have parameters. Only the collection of all param groups need to have at least one parameter.
-        assert len(params) != 0, 'Parameter group collection cannot be empty.'
+        if len(params) == 0:
+            raise ValueError('Parameter group collection cannot be empty. No trainable parameters selected by the filter.')
         return params
 
     def parameters_for_optimizer(self, config: TrainConfig) -> list[dict]:

@@ -26,10 +26,6 @@ class LoraTab:
         self.train_config = train_config
         self.ui_state = ui_state
 
-        # Set default for new property to avoid KeyError with old configs
-        if not hasattr(self.ui_state, 'lora_layers_regex'):
-            self.ui_state.lora_layers_regex = self.train_config.lora_layers_regex
-
         self.layer_entry = None
         self.layer_entry = None
         self.layer_entry_fg_color = None
@@ -173,7 +169,7 @@ class LoraTab:
             master, 7, 1, self.ui_state, "lora_layers_regex"
         )
 
-        # Let the user provide their own filter https://github.com/Nerogar/OneTrainer/pull/778/files#r2040104962
+        # Let the user set their own layer filter
         if self.train_config.lora_layers and self.train_config.lora_layer_preset == "custom":
             self.prior_custom = self.train_config.lora_layers
         else:
@@ -193,19 +189,42 @@ class LoraTab:
             selected = self.presets_list[0]
 
         if selected == "custom":
+            # Restore prior custom text and allow editing + regex toggle
             self.layer_entry.configure(state="normal", fg_color=self.layer_entry_fg_color, text_color=self.layer_entry_text_color)
             self.layer_entry.cget('textvariable').set(self.prior_custom)
             self.layer_entry.grid_configure(columnspan=3, sticky="ew")
             self.regex_label.grid()
             self.regex_switch.grid()
         else:
+            # Preserve custom text before overwriting
             if self.prior_selected == "custom":
                 self.prior_custom = self.layer_entry.get()
+
+            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
+            preset_def = self.presets.get(selected, [])
+            if isinstance(preset_def, dict):
+                patterns = preset_def.get("patterns", [])
+                preset_uses_regex = bool(preset_def.get("regex", False))
+            else:
+                patterns = preset_def
+                preset_uses_regex = False
+
             disabled_color = ("gray85", "gray17")
             disabled_text_color = ("gray30", "gray70")
             self.layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
-            self.layer_entry.cget('textvariable').set(",".join(self.presets[selected]))
+            self.layer_entry.cget('textvariable').set(",".join(patterns))
             self.layer_entry.grid_configure(columnspan=1, sticky="w")
+
+            # Force regex flag according to preset; hide toggle (user can still go custom).
+            self.ui_state.lora_layers_regex = preset_uses_regex
+            if preset_uses_regex:
+                if hasattr(self.regex_switch, "select"):
+                    self.regex_switch.select()
+            else:
+                if hasattr(self.regex_switch, "deselect"):
+                    self.regex_switch.deselect()
+
             self.regex_label.grid_remove()
             self.regex_switch.grid_remove()
+
         self.prior_selected = selected

@@ -1,13 +1,12 @@
 import copy
-import logging
 import math
 from abc import abstractmethod
 from collections.abc import Mapping
 from typing import Any
 
-from modules.module.ModuleFilter import ModuleFilter
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
 import torch
@@ -15,7 +14,6 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Conv2d, Dropout, Linear, Parameter
 
-logger = logging.getLogger(__name__)
 
 class PeftBase(nn.Module):
     is_applied: bool
@@ -447,8 +445,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        if not hasattr(config, "lora_layers_regex"):
-            config.lora_layers_regex = False
+        config.lora_layers_regex = False
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.lora_layers_regex)
@@ -493,10 +490,14 @@ class LoRAModuleWrapper:
                     selected.append(name)
                 else:
                     skipped.append(name)
-                for module_filter in self.module_filters:
-                    assert (module_filter.was_used()), f'Custom layer filters: no modules were matched by the custom filter {repr(module_filter)}'
-            logger.info(f"[LoRAModuleWrapper] Selected layers: {selected}")
-            logger.info(f"[LoRAModuleWrapper] Skipped layers: {skipped}")
+            # Always log what was selected/skipped so the user can inspect their filter usage.
+            print(f"[LoRAModuleWrapper] Selected layers: {selected}")
+            print(f"[LoRAModuleWrapper] Skipped layers: {skipped}")
+
+            unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
+            if len(unused_filters) > 0:
+                msgs = ", ".join(repr(mf) for mf in unused_filters)
+                raise ValueError(f'Custom layer filters: no modules were matched by the custom filter(s): {msgs}')
         return lora_modules
 
     def requires_grad_(self, requires_grad: bool):
