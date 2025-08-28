@@ -855,6 +855,12 @@ class ConceptWindow(ctk.CTkToplevel):
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
         self.concept_stats_tab.after(0, self.__disable_scan_buttons)
+        concept_path = self.get_concept_path(self.concept.path)
+
+        if not concept_path:
+           print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
+           self.concept_stats_tab.after(0, self.__enable_scan_buttons)
+           return
         subfolders = [concept_path]
 
         stats_dict = concept_stats.init_concept_stats(advanced_checks)
