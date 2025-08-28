@@ -144,10 +144,11 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weights = 1 / (1 + torch.exp(-weight * (weights - bias)))  # Sigmoid
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
-                elif config.timestep_distribution == TimestepDistribution.PARABOLA:
+                elif config.timestep_distribution == TimestepDistribution.INVERTED_PARABOLA:
                     if self.__weights is None:
                         bias = config.noising_bias + 0.5
                         weight = config.noising_weight
+
                         weights = torch.clamp(-weight * ((linspace - bias) ** 2) + 2, min=0.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
