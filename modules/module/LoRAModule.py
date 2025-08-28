@@ -445,7 +445,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        config.lora_layers_regex = False
+        # print(f"[LoRAModuleWrapper] Initializing with regex={config.lora_layers_regex} patterns={module_filter}")
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.lora_layers_regex)

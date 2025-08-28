@@ -22,7 +22,6 @@ class ModuleFilter:
             raise ValueError(f"Custom layer filter contains non-printable characters: {repr(pattern)}")
 
         # empty patterns are allowed and will match all layers, resulting in full training
-        # track whether we actually compiled regex
         self._compiled_regex = False
         self._used = False
         self._compiled = None

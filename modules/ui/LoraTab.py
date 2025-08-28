@@ -217,6 +217,9 @@ class LoraTab:
 
             # Force regex flag according to preset; hide toggle (user can still go custom).
             self.ui_state.lora_layers_regex = preset_uses_regex
+            self.train_config.lora_layers_regex = preset_uses_regex
+            self.train_config.lora_layers = ",".join(patterns)
+
             if preset_uses_regex:
                 if hasattr(self.regex_switch, "select"):
                     self.regex_switch.select()
