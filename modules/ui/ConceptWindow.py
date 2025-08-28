@@ -5,9 +5,11 @@ import pathlib
 import random
 import threading
 import time
+import traceback
 
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
@@ -39,6 +41,7 @@ import torch
 from torchvision.transforms import functional
 
 import customtkinter as ctk
+import huggingface_hub
 from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -70,6 +73,7 @@ class ConceptWindow(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
+            train_config: TrainConfig,
             concept: ConceptConfig,
             ui_state: UIState,
             image_ui_state: UIState,
@@ -77,6 +81,8 @@ class ConceptWindow(ctk.CTkToplevel):
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
+
+        self.train_config = train_config
 
         self.concept = concept
         self.ui_state = ui_state
@@ -141,6 +147,8 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 3, 0, "Path",
                          tooltip="Path where the training data is located")
         components.dir_entry(frame, 3, 1, self.ui_state, "path")
+        components.button(frame, 3, 2, text="download now", command=self.__download_dataset_threaded,
+                          tooltip="Download dataset from Huggingface now, for the purpose of previewing and statistics. Otherwise, it will be downloaded when you start training. Path must be a Huggingface repository.")
 
         # prompt source
         components.label(frame, 4, 0, "Prompt Source",
@@ -551,17 +559,39 @@ class ConceptWindow(ctk.CTkToplevel):
         self.caption_preview.insert(index="1.0", text=caption_preview)
         self.caption_preview.configure(state="disabled")
 
+    @staticmethod
+    def get_concept_path(path: str) -> str | None:
+        if os.path.isdir(path):
+            return path
+        try:
+            #don't download, only check if available locally:
+            return huggingface_hub.snapshot_download(repo_id=path, repo_type="dataset", local_files_only=True)
+        except Exception:
+            return None
+
+    def __download_dataset(self):
+        try:
+            huggingface_hub.login(token=self.train_config.secrets.huggingface_token, new_session=False)
+            huggingface_hub.snapshot_download(repo_id=self.concept.path, repo_type="dataset")
+        except Exception:
+            traceback.print_exc()
+
+    def __download_dataset_threaded(self):
+        download_thread = threading.Thread(target=self.__download_dataset, daemon=True)
+        download_thread.start()
+
     def __get_preview_image(self):
         preview_image_path = "resources/icons/icon.png"
         file_index = -1
         glob_pattern = "**/*.*" if self.concept.include_subdirectories else "*.*"
 
-        if os.path.isdir(self.concept.path):
-            for path in pathlib.Path(self.concept.path).glob(glob_pattern):
+        concept_path = self.get_concept_path(self.concept.path)
+        if concept_path:
+            for path in pathlib.Path(concept_path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
-                    preview_image_path = path_util.canonical_join(self.concept.path, path)
+                    preview_image_path = path_util.canonical_join(concept_path, path)
                     file_index += 1
                     if file_index == self.image_preview_file_index:
                         break
@@ -825,7 +855,7 @@ class ConceptWindow(ctk.CTkToplevel):
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
         self.concept_stats_tab.after(0, self.__disable_scan_buttons)
-        subfolders = [self.concept.path]
+        subfolders = [concept_path]
 
         stats_dict = concept_stats.init_concept_stats(advanced_checks)
         for path in subfolders:
@@ -865,7 +895,8 @@ class ConceptWindow(ctk.CTkToplevel):
             if self.concept.concept_stats["file_size"] == 0:  #force rescan if empty
                 raise KeyError
         except KeyError:
-            if os.path.isdir(self.concept.path):
+            concept_path = self.get_concept_path(self.concept.path)
+            if concept_path:
                 self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
                 if self.concept.concept_stats["processing_time"] < 0.1:
                     self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
