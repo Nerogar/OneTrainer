@@ -1,3 +1,6 @@
+# chunk for forcing Windows to ignore DPI scaling when moving between monitors
+# fixes the long standing transparency bug
+import ctypes
 import json
 import os
 import subprocess
@@ -6,6 +9,7 @@ import threading
 import traceback
 import webbrowser
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from tkinter import filedialog
 
@@ -42,11 +46,6 @@ import torch
 
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
-
-# chunk for forcing Windows to ignore DPI scaling when moving between monitors
-# fixes the long standing transparency bug
-import ctypes
-from contextlib import suppress
 
 if sys.platform == "win32":
     with suppress(Exception):
