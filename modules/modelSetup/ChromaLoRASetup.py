@@ -12,7 +12,8 @@ import torch
 PRESETS = {
     "attn-mlp": ["attn", "ff.net"],
     "attn-only": ["attn"],
-    "full": [], #TODO exclude guidance approximator
+    "blocks": ["transformer_block"],
+    "full": [],
 }
 
 
