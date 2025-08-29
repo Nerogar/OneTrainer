@@ -43,6 +43,13 @@ import torch
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
 
+# chunk for forcing Windows to ignore DPI scaling when moving between monitors
+# fixes the long standing transparency bug
+import ctypes
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)  # System DPI aware
+except Exception:
+    pass
 
 class TrainUI(ctk.CTk):
     set_step_progress: Callable[[int, int], None]
