@@ -495,15 +495,14 @@ class LoRAModuleWrapper:
                 deselected.append(name)
 
         if len(self.module_filters) > 0:
-            if not config.debug_mode:
-                selected = len(selected)
-                deselected = len(deselected)
-                unsuitable = len(unsuitable)
-            print(f"[LoRAModuleWrapper] Selected layers: {selected}")
-            print(f"[LoRAModuleWrapper] Deselected layers: {deselected}")
-            print(f"[LoRAModuleWrapper] Unsuitable for LoRA training: {unsuitable}")
-            if not config.debug_mode:
-                print("[LoRAModuleWrapper] Note: Enable Debug mode to see the full list of layers")
+            if config.debug_mode:
+                print(f"[LoRAModuleWrapper] Selected layers: {selected}")
+                print(f"[LoRAModuleWrapper] Deselected layers: {deselected}")
+                print(f"[LoRAModuleWrapper] Unsuitable for LoRA training: {unsuitable}")
+            else:
+                print(f"[LoRAModuleWrapper] Selected layers: {len(selected)}")
+                print(f"[LoRAModuleWrapper] Deselected layers: {len(deselected)}")
+                print("[LoRAModuleWrapper] Note: Enable Debug mode to see the full list of layer names")
 
         unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
         if len(unused_filters) > 0:

@@ -147,7 +147,7 @@ class LoraTab:
         components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
         components.label(master, 6, 0, "Layer Preset",
-                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own")
+                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.")
         self.layer_selector = components.options(
             master, 6, 1, self.presets_list, self.ui_state, "lora_layer_preset",
             command=self.__preset_set_layer_choice
@@ -155,7 +155,7 @@ class LoraTab:
 
         self.layer_entry = components.entry(
             master, 6, 2, self.ui_state, "lora_layers",
-            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions if toggled are supported. Any model layer with a matching name will be trained"
+            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained"
         )
         self.layer_entry_fg_color = self.layer_entry.cget("fg_color")
         self.layer_entry_text_color = self.layer_entry.cget("text_color")
@@ -214,17 +214,10 @@ class LoraTab:
             self.layer_entry.cget('textvariable').set(",".join(patterns))
             self.layer_entry.grid_configure(columnspan=1, sticky="w")
 
-            # Force regex flag according to preset; hide toggle (user can still go custom).
-            self.ui_state.lora_layers_regex = preset_uses_regex
-            self.train_config.lora_layers_regex = preset_uses_regex
             self.train_config.lora_layers = ",".join(patterns)
 
-            if preset_uses_regex:
-                if hasattr(self.regex_switch, "select"):
-                    self.regex_switch.select()
-            else:
-                if hasattr(self.regex_switch, "deselect"):
-                    self.regex_switch.deselect()
+            self.train_config.lora_layers_regex = preset_uses_regex
+            self.ui_state.get_var("lora_layers_regex").set(preset_uses_regex)
 
             self.regex_label.grid_remove()
             self.regex_switch.grid_remove()
