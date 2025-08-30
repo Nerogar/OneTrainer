@@ -197,7 +197,7 @@ class ChromaModel(BaseModel):
                 layer_skip=text_encoder_layer_skip,
                 text_encoder_output=text_encoder_output,
                 use_attention_mask=True,
-                attention_mask=bool_attention_mask,#.float(),
+                attention_mask=bool_attention_mask.float(),
             )
 
         text_encoder_output = self._apply_output_embeddings(
