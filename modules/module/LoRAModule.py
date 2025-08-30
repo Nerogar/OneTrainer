@@ -494,7 +494,7 @@ class LoRAModuleWrapper:
             else:
                 deselected.append(name)
 
-        if len(deselected) > 0:
+        if len(self.module_filters) > 0:
             if not config.debug_mode:
                 selected = len(selected)
                 deselected = len(deselected)
