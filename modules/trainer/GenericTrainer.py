@@ -609,9 +609,9 @@ class GenericTrainer(BaseTrainer):
                         break
 
             if encoder_module is None:
-                continue  # attribute not present -> not part of this architecture
+                continue  # attribute not present == not part of this architecture
 
-            # Unsure how to properlly check for LoRA with text encoders training enabled.
+            # Unsure how to properly check for LoRA with text encoders training enabled.
             has_trainable = any(p.requires_grad for p in encoder_module.parameters())
             if has_trainable or part_cfg.train:
                 active_parts.add(f"TE {idx}")
@@ -622,20 +622,23 @@ class GenericTrainer(BaseTrainer):
         if not self._eta_tracker:
             return None
 
-
         if self._is_sampling_enabled and not self._first_sample_done:
             return None
 
         steps_done = train_progress.global_step - self._eta_tracker.get("initial_step", 0)
-        if steps_done <= 10:  # Wait for a few steps to get a stable estimate
+        if steps_done <= 10:  # wait for a few steps to get a stable estimate
             return None
 
         time_elapsed = time.monotonic() - self._eta_tracker.get("start_time", 0)
         time_per_step = time_elapsed / steps_done
 
-        total_steps = self._eta_tracker.get("total_steps", 0)
-        remaining_steps = total_steps - train_progress.global_step
+        # Use current epoch length and the EMA of epoch length to compute remaining steps.
+        current_epoch_len = self.data_loader.get_data_set().approximate_length()
+        epochs_left = max(0, self.config.epochs - train_progress.epoch - 1)
+        remaining_in_current = max(0, current_epoch_len - getattr(train_progress, "epoch_step", 0))
+        avg_epoch_len = float(self._eta_tracker.get("avg_epoch_len", current_epoch_len))
 
+        remaining_steps = remaining_in_current + epochs_left * avg_epoch_len
         if remaining_steps <= 0:
             return None
 
@@ -768,13 +771,17 @@ class GenericTrainer(BaseTrainer):
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
 
+            # avoid eta jumping
             if not self._eta_tracker:
-                approx_total_steps = self.config.epochs * current_epoch_length
                 self._eta_tracker = {
                     "start_time": time.monotonic(),
                     "initial_step": train_progress.global_step,
-                    "total_steps": approx_total_steps
+                    "avg_epoch_len": float(current_epoch_length)
                 }
+            else:
+                prev = float(self._eta_tracker.get("avg_epoch_len", current_epoch_length))
+                ema_decay = 0.9
+                self._eta_tracker["avg_epoch_len"] = prev * ema_decay + float(current_epoch_length) * (1 - ema_decay)
 
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
