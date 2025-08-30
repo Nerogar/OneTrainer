@@ -7,7 +7,7 @@ def set_seed(seed: int, device: torch.device):
     global generator
     if generator is None or generator.device != device:
         generator = torch.Generator(device=device)
-        generator.manual_seed(seed)
+    generator.manual_seed(seed)
 
 def copy_stochastic_(target: Tensor, source: Tensor):
     """
