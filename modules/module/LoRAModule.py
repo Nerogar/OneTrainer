@@ -445,7 +445,6 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        # print(f"[LoRAModuleWrapper] Initializing with regex={config.lora_layers_regex} patterns={module_filter}")
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.lora_layers_regex)
@@ -474,30 +473,43 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
 
-        self.lora_modules = self.__create_modules(orig_module)
+        self.lora_modules = self.__create_modules(orig_module, config)
 
-    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, PeftBase]:
+    def __create_modules(self, orig_module: nn.Module | None, config: TrainConfig) -> dict[str, PeftBase]:
+        if orig_module is None:
+            return {}
+
         lora_modules = {}
         selected = []
-        skipped = []
-        if orig_module is not None:
-            for name, child_module in orig_module.named_modules():
-                if not isinstance(child_module, Linear | Conv2d):
-                    skipped.append(name)
-                    continue
-                if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                    lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
-                    selected.append(name)
-                else:
-                    skipped.append(name)
-            # Always log what was selected/skipped so the user can inspect their filter usage.
-            print(f"[LoRAModuleWrapper] Selected layers: {selected}")
-            print(f"[LoRAModuleWrapper] Skipped layers: {skipped}")
+        deselected = []
+        unsuitable = []
 
-            unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
-            if len(unused_filters) > 0:
-                msgs = ", ".join(repr(mf) for mf in unused_filters)
-                raise ValueError(f'Custom layer filters: no modules were matched by the custom filter(s): {msgs}')
+        for name, child_module in orig_module.named_modules():
+            if not isinstance(child_module, Linear | Conv2d):
+                unsuitable.append(name)
+                continue
+            if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
+                lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                selected.append(name)
+            else:
+                deselected.append(name)
+
+        if len(deselected) > 0:
+            if not config.debug_mode:
+                selected = len(selected)
+                deselected = len(deselected)
+                unsuitable = len(unsuitable)
+            print(f"[LoRAModuleWrapper] Selected layers: {selected}")
+            print(f"[LoRAModuleWrapper] Deselected layers: {deselected}")
+            print(f"[LoRAModuleWrapper] Unsuitable for LoRA training: {unsuitable}")
+            if not config.debug_mode:
+                print("[LoRAModuleWrapper] Note: Enable Debug mode to see the full list of layers")
+
+        unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
+        if len(unused_filters) > 0:
+            msgs = ", ".join(repr(mf) for mf in unused_filters)
+            raise ValueError(f'Custom layer filters: no modules were matched by the custom filter(s): {msgs}')
+
         return lora_modules
 
     def requires_grad_(self, requires_grad: bool):

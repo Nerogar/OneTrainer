@@ -27,7 +27,6 @@ class LoraTab:
         self.ui_state = ui_state
 
         self.layer_entry = None
-        self.layer_entry = None
         self.layer_entry_fg_color = None
         self.layer_entry_text_color = None
         self.layer_selector = None
