@@ -506,8 +506,7 @@ class LoRAModuleWrapper:
 
         unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
         if len(unused_filters) > 0:
-            msgs = ", ".join(repr(mf) for mf in unused_filters)
-            raise ValueError(f'Custom layer filters: no modules were matched by the custom filter(s): {msgs}')
+            raise ValueError('Custom layer filters: no modules were matched by the custom filter(s)')
 
         return lora_modules
 
