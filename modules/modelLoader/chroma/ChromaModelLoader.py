@@ -11,7 +11,6 @@ import torch
 
 from diffusers import (
     AutoencoderKL,
-    ChromaPipeline,
     ChromaTransformer2DModel,
     FlowMatchEulerDiscreteScheduler,
 )
@@ -140,51 +139,8 @@ class ChromaModelLoader(
             transformer_model_name: str,
             vae_model_name: str,
     ):
-        transformer = ChromaTransformer2DModel.from_single_file(
-            #always load transformer separately even though ChromaPipeLine.from_single_file() could load it, to avoid loading in float32:
-            transformer_model_name if transformer_model_name else base_model_name,
-            torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
-        )
-        pipeline = ChromaPipeline.from_single_file(
-            pretrained_model_link_or_path=base_model_name,
-            safety_checker=None,
-            transformer=transformer,
-        )
-
-        # replace T5TokenizerFast with T5Tokenizer, loaded from the same repository
-        #TODO taken from Flux code. Why is this necessary? config files already use T5Tokenizer, in Flux and Chroma
-        pipeline.tokenizer_2 = T5Tokenizer.from_pretrained(
-            pretrained_model_name_or_path="lodestones/Chroma1-HD",
-            subfolder="tokenizer",
-        )
-
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._convert_diffusers_sub_module_to_dtype(
-                pipeline.vae, weight_dtypes.vae, weight_dtypes.train_dtype
-            )
-
-        text_encoder = self._convert_transformers_sub_module_to_dtype(
-            pipeline.text_encoder, weight_dtypes.text_encoder_2, weight_dtypes.fallback_train_dtype
-        )
-        tokenizer = pipeline.tokenizer
-
-        transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
-        )
-
-        model.model_type = model_type
-        model.tokenizer = tokenizer
-        model.noise_scheduler = pipeline.scheduler
-        model.text_encoder = text_encoder
-        model.vae = vae
-        model.transformer = transformer
+        #no single file .safetensors for Chroma available at the time of writing this code
+        raise NotImplementedError("Loading of single file Chroma models not supported. Transformer-only safetensor files can be loaded by using the diffusers base model and overriding the transformer.")
 
     def load(
             self,

@@ -44,7 +44,6 @@ class ChromaSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
-            cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
@@ -101,7 +100,9 @@ class ChromaSampler(BaseModelSampler):
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
 
-            if force_last_timestep: #TODO remove?
+            #TODO remove? Only set when rescale_noise_scheduler_to_zero_terminal_snr is set, but that's only available on unet models
+            #if so, also remove on other models like Flux
+            if force_last_timestep:
                 last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
                                 * (noise_scheduler.config.num_train_timesteps - 1)
 
@@ -110,6 +111,8 @@ class ChromaSampler(BaseModelSampler):
 
             # denoising loop
             extra_step_kwargs = {}
+            #TODO always True for FlowMatchEulerDiscreteScheduler - remove and pass directly?
+            #If so, also remove for other models
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator #TODO purpose?
 
@@ -190,7 +193,6 @@ class ChromaSampler(BaseModelSampler):
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
-            cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
             text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
             force_last_timestep=sample_config.force_last_timestep,
             on_update_progress=on_update_progress,

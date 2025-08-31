@@ -222,7 +222,7 @@ class ChromaModel(BaseModel):
 
         return (text_encoder_output, bool_attention_mask)
 
-    def prepare_latent_image_ids(
+    def prepare_latent_image_ids( #TODO share code with Flux
             self,
             height: int,
             width: int,

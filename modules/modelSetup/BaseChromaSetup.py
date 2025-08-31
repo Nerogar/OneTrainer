@@ -24,6 +24,7 @@ import torch
 from torch import Tensor
 
 
+#TODO share more code with Flux and other models
 class BaseChromaSetup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
