@@ -3,7 +3,7 @@ services:
         container_name: onetrainer
         build:
             context: .
-            dockerfile: resources/docker/Dockerfile
+            dockerfile: resources/docker/local.dockerfile
         # Allow GPU access
         deploy:
           resources:
