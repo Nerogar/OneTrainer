@@ -1,6 +1,7 @@
 import ctypes
 import json
 import os
+import platform
 import subprocess
 import sys
 import threading
@@ -47,7 +48,7 @@ from customtkinter import AppearanceModeTracker
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
-if sys.platform == "win32":
+if platform.system() == "Windows":
     with suppress(Exception):
         # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
