@@ -1,0 +1,27 @@
+services:
+    onetrainer:
+        container_name: onetrainer
+        build:
+            context: .
+            dockerfile: resources/docker/Dockerfile
+        # Allow GPU access
+        deploy:
+          resources:
+            reservations:
+              devices:
+                - capabilities: [gpu]
+        environment:
+            # Allow X11 access
+            - DISPLAY=${DISPLAY}
+            - UID=1000
+            - GID=1000
+        volumes:
+            # Give X11 access to OneTrainer
+            - /tmp/.X11-unix:/tmp/.X11-unix:ro
+            - ${HOME}/.Xauthority:/home/onetrainer/.Xauthority
+            # (Optional)
+            # data:/data
+        network_mode: host
+
+volumes:
+    data:
