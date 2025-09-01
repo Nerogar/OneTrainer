@@ -283,11 +283,14 @@ class GenericTrainer(BaseTrainer):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
                     sample_params_list = samples
             # We absolutely do not want to fail training just because the sample definition file becomes missing or broken during training.
-            except (FileNotFoundError, json.JSONDecodeError, ValueError, KeyError) as e:
-                print(f"Warning: Unable to load or parse sample definition file '{self.config.sample_definition_file_name}': {e}. Skipping sampling.")
+            except FileNotFoundError as e:
+                print(f"Warning: {e}. Skipping sampling.")
+                sample_params_list = []
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                print(f"Warning: Sample definition file '{self.config.sample_definition_file_name}' is invalid or corrupted: {e}. Skipping sampling.")
                 sample_params_list = []
             except Exception as e:
-                print(f"Warning: Unexpected error loading sample definition file '{self.config.sample_definition_file_name}': {e}. Skipping sampling.")
+                print(f"Warning: Unexpected error: {e}. Skipping sampling.")
                 sample_params_list = []
         else:
             is_custom_sample = True
