@@ -284,13 +284,13 @@ class GenericTrainer(BaseTrainer):
                     sample_params_list = samples
             # We absolutely do not want to fail training just because the sample definition file becomes missing or broken during training.
             except FileNotFoundError as e:
-                print(f"Warning: {e}. Skipping sampling.")
+                print(f" Warning: {e}. Skipping sampling.")
                 sample_params_list = []
             except (json.JSONDecodeError, ValueError, KeyError) as e:
-                print(f"Warning: Sample definition file '{self.config.sample_definition_file_name}' is invalid or corrupted: {e}. Skipping sampling.")
+                print(f" Warning: Sample definition file '{self.config.sample_definition_file_name}' is invalid or corrupted: {e}. Skipping sampling.")
                 sample_params_list = []
             except Exception as e:
-                print(f"Warning: Unexpected error: {e}. Skipping sampling.")
+                print(f" Warning: Unexpected error: {e}. Skipping sampling.")
                 sample_params_list = []
         else:
             is_custom_sample = True
