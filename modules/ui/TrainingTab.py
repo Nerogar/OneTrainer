@@ -487,7 +487,7 @@ class TrainingTab:
         components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate")
 
         # rescale noise scheduler to zero terminal SNR
-        rescale_label = components.label(frame, 3, 0, "Rescale Noise Scheduler (V-Pred)",
+        rescale_label = components.label(frame, 3, 0, "Rescale Noise Scheduler + V-Pred",
                          tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
         rescale_label.configure(wraplength=130, justify="left")
         components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
