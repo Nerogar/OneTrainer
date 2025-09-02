@@ -248,12 +248,19 @@ class ChromaModel(BaseModel):
             num_channels_latents: int,
             height: int,
             width: int,
+            mask: Tensor = None,
     ) -> Tensor:
         latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)
         latents = latents.permute(0, 2, 4, 1, 3, 5)
         latents = latents.reshape(batch_size, (height // 2) * (width // 2), num_channels_latents * 4)
 
-        return latents
+        if mask is not None:
+            mask = mask.view(batch_size, height // 2, 2, width // 2, 2)
+            mask = mask.permute(0, 1, 3, 2, 4)
+            mask = mask.reshape(batch_size, (height // 2) * (width // 2), 4)
+            mask = torch.all(mask, dim=2) #only unmask if all patches are unmasked
+
+        return (latents, mask)
 
     def unpack_latents(self, latents, height, width):
         batch_size, num_patches, channels = latents.shape
