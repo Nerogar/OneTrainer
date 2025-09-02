@@ -110,8 +110,8 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 3)
 
         self.__create_base2_frame(column_1, 0)
-        self.__create_unet_frame(column_1, 1, supports_generalized_offset_noise=True)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_unet_frame(column_1, 1)
+        self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
