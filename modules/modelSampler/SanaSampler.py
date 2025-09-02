@@ -44,9 +44,7 @@ class SanaSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
-            cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
-            force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -87,15 +85,6 @@ class SanaSampler(BaseModelSampler):
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
 
-            if force_last_timestep:
-                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                                * (noise_scheduler.config.num_train_timesteps - 1)
-
-                # add the final timestep to force predicting with zero snr if it's not already here
-                if timesteps[0] != last_timestep:
-                    noise_scheduler.set_timesteps(diffusion_steps + 1, device=self.train_device)
-                    timesteps = torch.cat([last_timestep, timesteps])
-
             # prepare latent image
             num_channels_latents = transformer.config.in_channels
             latent_image = torch.randn(
@@ -128,15 +117,6 @@ class SanaSampler(BaseModelSampler):
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
                 noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
-
-                if cfg_rescale > 0.0:
-                    # From: Common Diffusion Noise Schedules and Sample Steps are Flawed (https://arxiv.org/abs/2305.08891)
-                    std_positive = noise_pred_positive.std(dim=list(range(1, noise_pred_positive.ndim)), keepdim=True)
-                    std_pred = noise_pred.std(dim=list(range(1, noise_pred.ndim)), keepdim=True)
-                    noise_pred_rescaled = noise_pred * (std_positive / std_pred)
-                    noise_pred = (
-                            cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
-                    )
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latent_image = noise_scheduler.step(
@@ -186,9 +166,7 @@ class SanaSampler(BaseModelSampler):
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
-            cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
             text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
-            force_last_timestep=sample_config.force_last_timestep,
             on_update_progress=on_update_progress,
         )
 
