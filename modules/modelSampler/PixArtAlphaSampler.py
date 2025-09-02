@@ -91,8 +91,10 @@ class PixArtAlphaSampler(BaseModelSampler):
                 last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
                                 * (noise_scheduler.config.num_train_timesteps - 1)
 
-                # add the final timestep to force predicting with zero snr
-                timesteps = torch.cat([last_timestep, timesteps])
+                # add the final timestep to force predicting with zero snr if it's not already here
+                if timesteps[0] != last_timestep:
+                    noise_scheduler.set_timesteps(diffusion_steps + 1, device=self.train_device)
+                    timesteps = torch.cat([last_timestep, timesteps])
 
             # prepare latent image
             num_channels_latents = transformer.config.in_channels
