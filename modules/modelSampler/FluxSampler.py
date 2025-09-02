@@ -63,6 +63,7 @@ class FluxSampler(BaseModelSampler):
             cfg_rescale: float = 0.7,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
+            text_encoder_2_sequence_length: int | None = None,
             force_last_timestep: bool = False,
             prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
@@ -89,6 +90,7 @@ class FluxSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                text_encoder_2_sequence_length=text_encoder_2_sequence_length,
                 apply_attention_mask=prior_attention_mask,
             )
 
@@ -235,6 +237,7 @@ class FluxSampler(BaseModelSampler):
             mask_image_path: str = "",
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
+            text_encoder_2_sequence_length: int | None = None,
             force_last_timestep: bool = False,
             prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
@@ -352,6 +355,7 @@ class FluxSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                text_encoder_2_sequence_length=text_encoder_2_sequence_length,
                 apply_attention_mask=prior_attention_mask,
             )
 
@@ -496,6 +500,7 @@ class FluxSampler(BaseModelSampler):
                 mask_image_path=sample_config.mask_image_path,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+                text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
                 force_last_timestep=sample_config.force_last_timestep,
                 prior_attention_mask=sample_config.prior_attention_mask,
                 on_update_progress=on_update_progress,
@@ -514,6 +519,7 @@ class FluxSampler(BaseModelSampler):
                 cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+                text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
                 force_last_timestep=sample_config.force_last_timestep,
                 prior_attention_mask=sample_config.prior_attention_mask,
                 on_update_progress=on_update_progress,
