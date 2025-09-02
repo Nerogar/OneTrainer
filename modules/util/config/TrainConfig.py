@@ -643,7 +643,7 @@ class TrainConfig(BaseConfig):
             migrated_data["lora_layer_preset"] = "full"
 
         return migrated_data
-    
+
     def __migration_7(self, data: dict) -> dict:
         migrated_data = data.copy()
 

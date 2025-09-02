@@ -1,9 +1,6 @@
 import ctypes
 import json
-import os
 import platform
-import subprocess
-import sys
 import threading
 import traceback
 import webbrowser
