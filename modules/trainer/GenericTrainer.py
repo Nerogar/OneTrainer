@@ -799,7 +799,8 @@ class GenericTrainer(BaseTrainer):
                 dtype=self.config.output_dtype.torch_dtype()
             )
 
-        self.model.to(self.temp_device)
+        if self.model is not None:
+            self.model.to(self.temp_device)
 
         self.tensorboard.close()
 
