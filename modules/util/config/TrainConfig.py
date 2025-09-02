@@ -66,6 +66,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -150,6 +151,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
@@ -416,6 +418,7 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     lora_layers: str  # comma-separated
     lora_layer_preset: str
+    lora_layers_regex: bool
     bundle_additional_embeddings: bool
 
     # optimizer
@@ -463,6 +466,7 @@ class TrainConfig(BaseConfig):
                 4: self.__migration_4,
                 5: self.__migration_5,
                 6: self.__migration_6,
+                7: self.__migration_7,
             }
         )
 
@@ -629,6 +633,18 @@ class TrainConfig(BaseConfig):
         return migrated_data
 
     def __migration_6(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # None is not a valid value, but there was a bug that allowed it, so old config files can have it set to None:
+        if (
+            "lora_layer_preset" in migrated_data
+            and migrated_data["lora_layer_preset"] is None
+        ):
+            migrated_data["lora_layer_preset"] = "full"
+
+        return migrated_data
+    
+    def __migration_7(self, data: dict) -> dict:
         migrated_data = data.copy()
 
         tensorboard = migrated_data.pop("tensorboard", True)
@@ -975,7 +991,8 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("lora_layers", "", str, False))
-        data.append(("lora_layer_preset", None, str, True))
+        data.append(("lora_layer_preset", "full", str, False))
+        data.append(("lora_layers_regex", False, bool, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # optimizer

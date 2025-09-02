@@ -1,0 +1,46 @@
+{
+    "base_model_name": "lodestones/Chroma1-HD",
+    "batch_size": 2,
+    "learning_rate": 1e-5,
+    "model_type": "CHROMA_1",
+    "resolution": "512",
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.85,
+    "dataloader_threads": 1,
+    "prior": {
+        "train": true,
+        "weight_dtype": "BFLOAT_16"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "BFLOAT_16"
+    },
+    "training_method": "FINE_TUNE",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "train_dtype": "BFLOAT_16",
+    "weight_dtype": "BFLOAT_16",
+    "output_dtype": "BFLOAT_16",
+    "timestep_distribution": "INVERTED_PARABOLA",
+    "noising_weight": 7.7,
+    "optimizer": {
+        "optimizer": "ADAFACTOR"
+    },
+    "optimizer_defaults": {
+        "ADAFACTOR": {
+            "optimizer": "ADAFACTOR",
+            "fused_back_pass": true,
+            "beta1": null,
+            "clip_threshold": 1.0,
+            "decay_rate": -0.8,
+            "eps": 1e-30,
+            "eps2": 0.001,
+            "relative_step": false,
+            "scale_parameter": false,
+            "stochastic_rounding": true,
+            "warmup_init": false,
+            "weight_decay": 0.0
+        }
+    }
+}

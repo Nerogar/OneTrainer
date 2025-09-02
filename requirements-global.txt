@@ -5,7 +5,7 @@ pillow==11.2.1
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
-huggingface-hub==0.32.4
+huggingface-hub==0.34.4
 scipy==1.15.3
 matplotlib==3.10.3
 av==14.4.0
@@ -19,21 +19,21 @@ tensorboard==2.19.0
 pytorch-lightning==2.5.1.post0
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@73a9d58#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@9b721db#egg=diffusers
 transformers==4.52.4
 sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # model conversion
--e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@4ad235c#egg=omi_model_standards
+-e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@f14b1da#egg=omi_model_standards
 
 # other models
 pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@11ff4aa#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@0785707#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers

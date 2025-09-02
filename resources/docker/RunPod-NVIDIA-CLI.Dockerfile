@@ -3,8 +3,8 @@
 #    docker tag <image-name> <dockerhub-username>/<repository-name>:<tag>
 #    docker push <dockerhub-username>/<repository-name>:<tag>
 
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
-#the base image is barely used, pytorch 2.4 is the wrong version. However, by using
+FROM runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
+#the base image is barely used, pytorch is the wrong version. However, by using
 #a base image that is popular on RunPod, the base image likely is already available
 #in the image cache of a pod, and no download is necessary
 
