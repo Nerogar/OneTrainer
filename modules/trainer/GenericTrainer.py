@@ -70,8 +70,7 @@ class GenericTrainer(BaseTrainer):
     grad_hook_handles: list[RemovableHandle]
     _active_training_parts: set[str]
     _eta_tracker: dict[str, float | int]
-    _is_sampling_enabled: bool
-    _first_sample_done: bool
+    _eta_warmup_seconds: int
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
@@ -84,11 +83,10 @@ class GenericTrainer(BaseTrainer):
 
         self.model = None
         self.one_step_trained = False
-
         self.grad_hook_handles = []
         self._active_training_parts = set()
         self._eta_tracker = {}
-        self._first_sample_done = False
+        self._eta_warmup_seconds = 30
 
     def start(self):
         self.__save_config_to_workspace()
@@ -211,9 +209,6 @@ class GenericTrainer(BaseTrainer):
         for fun in self.sample_queue:
             fun()
         self.sample_queue = []
-
-        if self._is_sampling_enabled() and not self._first_sample_done:
-            self._first_sample_done = True
 
     def __sample_loop(
             self,
@@ -628,11 +623,15 @@ class GenericTrainer(BaseTrainer):
         if not self._eta_tracker:
             return None
 
-        if self._is_sampling_enabled() and not self._first_sample_done:
-            return None
+        # Use a time-based warmup: display "Estimating..." for the first _eta_warmup_seconds
+        # This avoids waiting eons for sampling
+        start_time = self._eta_tracker.get("start_time", 0)
+        elapsed = time.monotonic() - start_time
+        if elapsed < getattr(self, "_eta_warmup_seconds", 30):
+            return "Estimating..."
 
         steps_done = train_progress.global_step - self._eta_tracker.get("initial_step", 0)
-        if steps_done <= 10:  # wait for a few steps to get a stable estimate
+        if steps_done <= 3:
             return None
 
         time_elapsed = time.monotonic() - self._eta_tracker.get("start_time", 0)
@@ -663,9 +662,6 @@ class GenericTrainer(BaseTrainer):
             return f"{minutes}m"
 
         return None
-
-    def _is_sampling_enabled(self) -> bool:
-        return self.config.sample_after_unit != TimeUnit.NEVER
 
     def _get_training_status(self, train_progress: TrainProgress) -> TrainingStatus:
         active_parts_set = self._get_active_training_parts(train_progress)
@@ -700,7 +696,6 @@ class GenericTrainer(BaseTrainer):
             part_config.stop_training_after_unit,
             train_progress
         )
-
 
     def _update_and_log_training_status(self, train_progress: TrainProgress):
         current_active_parts = self._get_active_training_parts(train_progress)
