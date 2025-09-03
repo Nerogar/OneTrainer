@@ -2,6 +2,7 @@ import contextlib
 import copy
 import datetime
 import json
+import math
 import os
 import shutil
 import time
@@ -30,6 +31,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.memory_util import TorchMemoryRecorder
 from modules.util.time_util import get_string_timestamp
+from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -85,6 +87,9 @@ class GenericTrainer(BaseTrainer):
         self.one_step_trained = False
         self.grad_hook_handles = []
         self._active_training_parts = set()
+        self._timed_actions = TimedActionMixin()
+        timed_start_wall = getattr(self._timed_actions, "_TimedActionMixin__start_time", time.time())
+        self._monotonic_offset = time.monotonic() - timed_start_wall
         self._eta_tracker = {}
         self._eta_warmup_seconds = 30
 
@@ -582,7 +587,6 @@ class GenericTrainer(BaseTrainer):
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
-
     def _get_active_training_parts(self, train_progress: TrainProgress) -> set[str]:
         active_parts: set[str] = set()
 
@@ -623,9 +627,8 @@ class GenericTrainer(BaseTrainer):
         if not self._eta_tracker:
             return None
 
-        # Use a time-based warmup: display "Estimating..." for the first _eta_warmup_seconds
-        # This avoids waiting eons for sampling
-        start_time = self._eta_tracker.get("start_time", 0)
+        # All stored times in _eta_tracker are in monotonic clock domain
+        start_time = self._eta_tracker.get("start_time", time.monotonic())
         elapsed = time.monotonic() - start_time
         if elapsed < getattr(self, "_eta_warmup_seconds", 30):
             return "Estimating..."
@@ -634,8 +637,12 @@ class GenericTrainer(BaseTrainer):
         if steps_done <= 3:
             return None
 
-        time_elapsed = time.monotonic() - self._eta_tracker.get("start_time", 0)
+        time_elapsed = time.monotonic() - start_time
+        if time_elapsed <= 0:
+            return None
         time_per_step = time_elapsed / steps_done
+        if time_per_step <= 0 or not math.isfinite(time_per_step):
+            return None
 
         # Use current epoch length and the EMA of epoch length to compute remaining steps.
         current_epoch_len = self.data_loader.get_data_set().approximate_length()
@@ -774,15 +781,20 @@ class GenericTrainer(BaseTrainer):
 
             # avoid eta jumping
             if not self._eta_tracker:
+                timed_start_wall = getattr(self._timed_actions, "_TimedActionMixin__start_time", None)
+                if timed_start_wall is not None:
+                    start_time_monotonic = timed_start_wall + self._monotonic_offset
+                else:
+                    start_time_monotonic = time.monotonic()
                 self._eta_tracker = {
-                    "start_time": time.monotonic(),
+                    "start_time": start_time_monotonic,
                     "initial_step": train_progress.global_step,
-                    "avg_epoch_len": float(current_epoch_length)
+                    "avg_epoch_len": float(current_epoch_length),
                 }
             else:
-                prev = float(self._eta_tracker.get("avg_epoch_len", current_epoch_length))
-                ema_decay = 0.9
-                self._eta_tracker["avg_epoch_len"] = prev * ema_decay + float(current_epoch_length) * (1 - ema_decay)
+                 prev = float(self._eta_tracker.get("avg_epoch_len", current_epoch_length))
+                 ema_decay = 0.9
+                 self._eta_tracker["avg_epoch_len"] = prev * ema_decay + float(current_epoch_length) * (1 - ema_decay)
 
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
