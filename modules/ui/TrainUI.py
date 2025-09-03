@@ -11,7 +11,7 @@ from tkinter import filedialog
 
 import scripts.generate_debug_report
 from modules.trainer.CloudTrainer import CloudTrainer
-from modules.trainer.GenericTrainer import GenericTrainer
+from modules.trainer.GenericTrainer import GenericTrainer, TrainingStatus
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.CloudTab import CloudTab
@@ -157,8 +157,20 @@ class TrainUI(ctk.CTk):
 
         self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.status_label = components.label(frame, 0, 1, " ",
-                                             tooltip="Current status of the training run")
+        # Status string container (two rows)
+        self.status_frame = ctk.CTkFrame(frame, corner_radius=0, fg_color="transparent")
+        self.status_frame.grid(row=0, column=1, sticky="w")
+        self.status_frame.grid_rowconfigure(0, weight=0)
+        self.status_frame.grid_rowconfigure(1, weight=0)
+        self.status_frame.grid_columnconfigure(0, weight=1)
+
+        self.status_label_primary = ctk.CTkLabel(self.status_frame, text=" ", anchor="w")
+        self.status_label_primary.grid(row=0, column=0, sticky="w", padx=0, pady=0)
+
+        self.status_label_secondary = ctk.CTkLabel(self.status_frame, text="", anchor="w")
+        self.status_label_secondary.grid(row=1, column=0, sticky="w", padx=0, pady=0)
+        # hidden by default
+        self.status_label_secondary.grid_remove()
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
@@ -595,8 +607,20 @@ class TrainUI(ctk.CTk):
         self.set_step_progress(train_progress.epoch_step, max_sample)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
 
-    def on_update_status(self, status: str):
-        self.status_label.configure(text=status)
+    def on_update_status(self, status):
+        if isinstance(status, TrainingStatus):
+            self.status_label_primary.configure(text=status.primary)
+            if status.secondary and not status.is_error:
+                self.status_label_secondary.configure(text=status.secondary)
+                self.status_label_secondary.grid()
+            else:
+                self.status_label_secondary.configure(text="")
+                self.status_label_secondary.grid_remove()
+        else:
+            # Fallback for plain strings (existing error strings)
+            self.status_label_primary.configure(text=str(status))
+            self.status_label_secondary.configure(text="")
+            self.status_label_secondary.grid_remove()
 
     def open_dataset_tool(self):
         window = CaptionUI(self, None, False)
@@ -694,9 +718,9 @@ class TrainUI(ctk.CTk):
         torch_gc()
 
         if error_caught:
-            self.on_update_status("error: check the console for more information")
+            self.on_update_status(TrainingStatus(primary="error: check console for details", secondary=None, is_error=True))
         else:
-            self.on_update_status("stopped")
+            self.on_update_status(TrainingStatus(primary="stopped"))
 
         self.after(0, self._set_training_button_idle)
 

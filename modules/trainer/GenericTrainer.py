@@ -7,6 +7,7 @@ import shutil
 import time
 import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -43,6 +44,12 @@ import huggingface_hub
 from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
+
+@dataclass
+class TrainingStatus:
+    primary: str
+    secondary: str | None = None
+    is_error: bool = False
 
 class GenericTrainer(BaseTrainer):
     model_loader: BaseModelLoader
@@ -658,12 +665,11 @@ class GenericTrainer(BaseTrainer):
 
         return None
 
-    def _get_training_status_string(self, train_progress: TrainProgress) -> str:
+    def _get_training_status(self, train_progress: TrainProgress) -> TrainingStatus:
         active_parts_set = self._get_active_training_parts(train_progress)
 
-        status_parts = []
         if not active_parts_set:
-            status_parts.append("Training")
+            primary = "Training"
         else:
             display_parts = []
             if "Model" in active_parts_set:
@@ -672,14 +678,12 @@ class GenericTrainer(BaseTrainer):
             if te_parts:
                 te_numbers = [p.split(" ")[1] for p in te_parts]
                 display_parts.append(f"TE ({', '.join(te_numbers)})")
-            status_parts.append(f"Training: {' + '.join(display_parts)}")
+            primary = f"Training: {' + '.join(display_parts)}"
 
         eta_str = self._calculate_eta_string(train_progress)
-        if eta_str:
-            status_parts.append(f"ETA: {eta_str}")
+        secondary = f"ETA: {eta_str}" if eta_str else None
+        return TrainingStatus(primary=primary, secondary=secondary)
 
-        return " | ".join(status_parts)
-#
     def _is_model_part_training_active(self, part_config: TrainModelPartConfig, train_progress: TrainProgress) -> bool:
         if not part_config.train:
             return False
@@ -827,7 +831,7 @@ class GenericTrainer(BaseTrainer):
                     if transferred_to_temp_device:
                         self.model_setup.setup_train_device(self.model, self.config)
 
-                self.callbacks.on_update_status(self._get_training_status_string(train_progress))
+                self.callbacks.on_update_status(self._get_training_status(train_progress))
 
                 with TorchMemoryRecorder(enabled=False):
                     prior_pred_indices = [i for i in range(self.config.batch_size)
