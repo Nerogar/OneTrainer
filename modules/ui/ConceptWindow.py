@@ -1,6 +1,7 @@
 import math
 import os
 import pathlib
+import platform
 import random
 import threading
 import time
@@ -578,7 +579,8 @@ class ConceptWindow(ctk.CTkToplevel):
         download_thread = threading.Thread(target=self.__download_dataset, daemon=True)
         download_thread.start()
 
-    def _read_text_file_for_preview(self, file_path: str, empty_msg: str, missing_msg: str) -> str:
+    def _read_text_file_for_preview(self, file_path: str) -> str:
+        empty_msg = "[Empty prompt]"
         try:
             with open(file_path, "r") as f:
                 if self.preview_augmentations.get():
@@ -587,11 +589,14 @@ class ConceptWindow(ctk.CTkToplevel):
                 content = f.read().strip()
                 return content if content else empty_msg
         except FileNotFoundError:
-            return missing_msg
+            return "File not found, please check the path"
         except IsADirectoryError:
-            return "[Provided path is a directory, please correct]"
+            return "[Provided path is a directory, please correct the caption path]"
         except PermissionError:
-            return "[Permission denied, please check the file permissions]"
+            if platform.system() == "Windows":
+                return "[Permission denied, please check the file permissions or Windows Defender settings]"
+            else:
+                return "[Permission denied, please check the file permissions]"
         except UnicodeDecodeError:
             return "[Invalid file encoding. This should not happen, please report this issue]"
 
@@ -625,15 +630,18 @@ class ConceptWindow(ctk.CTkToplevel):
         else:
             mask_tensor = torch.ones((1, image_tensor.shape[1], image_tensor.shape[2]))
 
-        if self.concept.text.prompt_source == "sample":
-            caption_file_path = splitext[0] + ".txt"
-            prompt_output = self._read_text_file_for_preview(caption_file_path, "[Caption file for this image is empty]", "[No caption file found for this image]")
-        elif self.concept.text.prompt_source == "filename":
-            prompt_output = os.path.splitext(os.path.basename(preview_image_path))[0]
-        elif self.concept.text.prompt_source == "concept":
-            prompt_output = self._read_text_file_for_preview(self.concept.text.prompt_path, "[Single text (concept) prompt file is empty]", "[Single text (concept) prompt file not found, please double check the path]")
+        # get caption conditionals
+        source = self.concept.text.prompt_source
+        preview_p = pathlib.Path(preview_image_path)
+        if source == "filename":
+            prompt_output = preview_p.stem or "[Empty prompt]"
         else:
-            prompt_output = "[Unrecognized prompt source]"
+            file_map = {
+                "sample": preview_p.with_suffix(".txt"),
+                "concept": pathlib.Path(self.concept.text.prompt_path) if self.concept.text.prompt_path else None,
+            }
+            file_path = file_map.get(source)
+            prompt_output = self._read_text_file_for_preview(str(file_path)) if file_path else "[Empty prompt]"
 
         modules = []
         if self.preview_augmentations.get():
