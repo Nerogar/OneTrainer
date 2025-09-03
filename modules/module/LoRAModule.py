@@ -525,20 +525,20 @@ class LoRAModuleWrapper:
             module.to(device, dtype)
         return self
 
-    def load_state_dict(self, state_dict: dict[str, Tensor]):
+    def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
         Loads the state dict
 
         Args:
             state_dict: the state dict
+            strict: whether to strictly enforce that the keys in state_dict match the module's parameters
         """
-
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
         for name, module in self.lora_modules.items():
             try:
-                module.load_state_dict(state_dict)
+                module.load_state_dict(state_dict, strict=strict)
             except RuntimeError:  # noqa: PERF203
                 print(f"Missing key for {name}; initializing it to zero.")
 
