@@ -77,14 +77,6 @@ class SanaFineTuneSetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        # if args.rescale_noise_scheduler_to_zero_terminal_snr:
-        #     model.rescale_noise_scheduler_to_zero_terminal_snr()
-        #     model.force_v_prediction()
-        # elif args.force_v_prediction:
-        #     model.force_v_prediction()
-        # elif args.force_epsilon_prediction:
-        #     model.force_epsilon_prediction()
-
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
