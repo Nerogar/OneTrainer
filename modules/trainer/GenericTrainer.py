@@ -88,7 +88,6 @@ class GenericTrainer(BaseTrainer):
         self.grad_hook_handles = []
         self._active_training_parts = set()
         self._eta_tracker = {}
-        self._is_sampling_enabled = self.config.sample_after_unit != TimeUnit.NEVER
         self._first_sample_done = False
 
     def start(self):
@@ -213,7 +212,7 @@ class GenericTrainer(BaseTrainer):
             fun()
         self.sample_queue = []
 
-        if self._is_sampling_enabled and not self._first_sample_done:
+        if self._is_sampling_enabled() and not self._first_sample_done:
             self._first_sample_done = True
 
     def __sample_loop(
@@ -629,7 +628,7 @@ class GenericTrainer(BaseTrainer):
         if not self._eta_tracker:
             return None
 
-        if self._is_sampling_enabled and not self._first_sample_done:
+        if self._is_sampling_enabled() and not self._first_sample_done:
             return None
 
         steps_done = train_progress.global_step - self._eta_tracker.get("initial_step", 0)
@@ -664,6 +663,9 @@ class GenericTrainer(BaseTrainer):
             return f"{minutes}m"
 
         return None
+
+    def _is_sampling_enabled(self) -> bool:
+        return self.config.sample_after_unit != TimeUnit.NEVER
 
     def _get_training_status(self, train_progress: TrainProgress) -> TrainingStatus:
         active_parts_set = self._get_active_training_parts(train_progress)
