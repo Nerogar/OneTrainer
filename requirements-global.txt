@@ -11,6 +11,7 @@ matplotlib==3.10.3
 av==14.4.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
+pillow-jxl-plugin==1.3.3
 
 # pytorch
 accelerate==1.7.0
@@ -56,3 +57,10 @@ fabric==3.2.2
 # debug
 psutil==7.0.0
 requests==2.32.3
+
+# dataset tools
+einops==0.8.1 # required by moondream: https://moondream.ai/c/docs/advanced/transformers
+pyvips==3.0.0 # required by moondream: https://moondream.ai/c/docs/advanced/transformers
+pyvips-binary==8.17.0 # required by moondream: https://moondream.ai/c/docs/advanced/transformers
+pyoxipng==9.1.0 # Multithreaded PNG optimisation, used in FileOperationsWindow
+pepedpid==0.1.1 # required for DPID resizing https://dl.acm.org/doi/10.1145/2980179.2980239 https://pypi.org/project/pepedpid/

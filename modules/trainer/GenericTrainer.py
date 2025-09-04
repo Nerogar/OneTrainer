@@ -10,7 +10,10 @@ from pathlib import Path
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.BaseModelSampler import (
+    BaseModelSampler,
+    ModelSamplerOutput,
+)
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
@@ -275,39 +278,45 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
-        if not sample_params_list:
+        if sample_params_list is not None:
+            is_custom_sample = True
+        else:
             if self.config.samples is not None:
                 sample_params_list = self.config.samples
             else:
-                with open(self.config.sample_definition_file_name, 'r') as f:
-                    samples = json.load(f)
-                    for i in range(len(samples)):
-                        samples[i] = SampleConfig.default_values().from_dict(samples[i])
-                    sample_params_list = samples
-        else:
-            is_custom_sample = True
+                try:
+                    with open(self.config.sample_definition_file_name, 'r') as f:
+                        samples = json.load(f)
+                        for i in range(len(samples)):
+                            samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                        sample_params_list = samples
+                except (FileNotFoundError, json.JSONDecodeError, OSError, PermissionError) as e:
+                    print(f"Error loading sample definition file {self.config.sample_definition_file_name}: {str(e)}")
+                    print("Skipping sampling and continuing with training...")
+                    sample_params_list = [] # Ensure it's an empty list to skip sampling logic
 
-        if self.model.ema:
-            self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+        if sample_params_list: # Check if there are samples to process
+            if self.model.ema:
+                self.model.ema.copy_ema_to(self.parameters, store_temp=True)
 
-        self.__sample_loop(
-            train_progress=train_progress,
-            train_device=train_device,
-            sample_config_list=sample_params_list,
-            is_custom_sample=is_custom_sample,
-        )
-
-        if self.model.ema:
-            self.model.ema.copy_temp_to(self.parameters)
-
-        # ema-less sampling, if an ema model exists
-        if self.model.ema and not is_custom_sample and self.config.non_ema_sampling:
             self.__sample_loop(
                 train_progress=train_progress,
                 train_device=train_device,
                 sample_config_list=sample_params_list,
-                folder_postfix=" - no-ema",
+                is_custom_sample=is_custom_sample,
             )
+
+            if self.model.ema:
+                self.model.ema.copy_temp_to(self.parameters)
+
+            # ema-less sampling, if an ema model exists
+            if self.model.ema and not is_custom_sample and self.config.non_ema_sampling:
+                self.__sample_loop(
+                    train_progress=train_progress,
+                    train_device=train_device,
+                    sample_config_list=sample_params_list,
+                    folder_postfix=" - no-ema",
+                )
 
         self.model_setup.setup_train_device(self.model, self.config)
         # Special case for schedule-free optimizers.
