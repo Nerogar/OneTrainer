@@ -276,14 +276,16 @@ class GenericTrainer(BaseTrainer):
 
         is_custom_sample = False
         if not sample_params_list:
-            if self.config.samples is not None:
-                sample_params_list = self.config.samples
-            else:
+            try:
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
                     sample_params_list = samples
+            # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
+            except Exception as e:
+                print(f" Warning: Unexpected error: {e}. Skipping sampling.")
+                sample_params_list = []
         else:
             is_custom_sample = True
 
