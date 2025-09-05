@@ -1,10 +1,14 @@
 import contextlib
 import copy
+import datetime
 import json
+import math
 import os
 import shutil
+import time
 import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
@@ -19,7 +23,7 @@ from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_ro
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
@@ -28,6 +32,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.memory_util import TorchMemoryRecorder
 from modules.util.time_util import get_string_timestamp
+from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -42,6 +47,12 @@ import huggingface_hub
 from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
+
+@dataclass
+class TrainingStatus:
+    primary: str
+    secondary: str | None = None
+    is_error: bool = False
 
 class GenericTrainer(BaseTrainer):
     model_loader: BaseModelLoader
@@ -60,6 +71,9 @@ class GenericTrainer(BaseTrainer):
     tensorboard: SummaryWriter
 
     grad_hook_handles: list[RemovableHandle]
+    _active_training_parts: set[str]
+    _eta_tracker: dict[str, float | int]
+    _eta_warmup_seconds: int
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
@@ -72,8 +86,13 @@ class GenericTrainer(BaseTrainer):
 
         self.model = None
         self.one_step_trained = False
-
         self.grad_hook_handles = []
+        self._active_training_parts = set()
+        self._timed_actions = TimedActionMixin()
+        timed_start_wall = getattr(self._timed_actions, "_TimedActionMixin__start_time", time.time())
+        self._monotonic_offset = time.monotonic() - timed_start_wall
+        self._eta_tracker = {}
+        self._eta_warmup_seconds = 30
 
     def start(self):
         self.__save_config_to_workspace()
@@ -190,6 +209,9 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
+        if not self.sample_queue:
+            return
+
         for fun in self.sample_queue:
             fun()
         self.sample_queue = []
@@ -566,6 +588,136 @@ class GenericTrainer(BaseTrainer):
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
+    def _get_active_training_parts(self, train_progress: TrainProgress) -> set[str]:
+        active_parts: set[str] = set()
+
+        # UNet / main model
+        if self._is_model_part_training_active(self.config.unet, train_progress):
+            active_parts.add("Model")
+
+        te_specs = [
+            (1, self.config.text_encoder, ["text_encoder", "text_encoder_1"]),
+            (2, self.config.text_encoder_2, ["text_encoder_2"]),
+            (3, self.config.text_encoder_3, ["text_encoder_3"]),
+            (4, self.config.text_encoder_4, ["text_encoder_4"]),
+        ]
+
+        for idx, part_cfg, attr_names in te_specs:
+            if not self._is_model_part_training_active(part_cfg, train_progress):
+                continue
+
+            encoder_module = None
+            for attr in attr_names:
+                if hasattr(self.model, attr):
+                    m = getattr(self.model, attr)
+                    if m is not None:
+                        encoder_module = m
+                        break
+
+            if encoder_module is None:
+                continue  # attribute not present == not part of this architecture
+
+            # Unsure how to properly check for LoRA with text encoders training enabled.
+            has_trainable = any(p.requires_grad for p in encoder_module.parameters())
+            if has_trainable or part_cfg.train:
+                active_parts.add(f"TE {idx}")
+
+        return active_parts
+
+    def _calculate_eta_string(self, train_progress: TrainProgress) -> str | None:
+        if not self._eta_tracker:
+            return None
+
+        # All stored times in _eta_tracker are in monotonic clock domain
+        start_time = self._eta_tracker.get("start_time", time.monotonic())
+        elapsed = time.monotonic() - start_time
+        if elapsed < getattr(self, "_eta_warmup_seconds", 30):
+            return "Estimating..."
+
+        steps_done = train_progress.global_step - self._eta_tracker.get("initial_step", 0)
+        if steps_done <= 3:
+            return None
+
+        time_elapsed = time.monotonic() - start_time
+        if time_elapsed <= 0:
+            return None
+        time_per_step = time_elapsed / steps_done
+        if time_per_step <= 0 or not math.isfinite(time_per_step):
+            return None
+
+        # Use current epoch length and the EMA of epoch length to compute remaining steps.
+        current_epoch_len = self.data_loader.get_data_set().approximate_length()
+        epochs_left = max(0, self.config.epochs - train_progress.epoch - 1)
+        remaining_in_current = max(0, current_epoch_len - getattr(train_progress, "epoch_step", 0))
+        avg_epoch_len = float(self._eta_tracker.get("avg_epoch_len", current_epoch_len))
+
+        remaining_steps = remaining_in_current + epochs_left * avg_epoch_len
+        if remaining_steps <= 0:
+            return None
+
+        eta_seconds = remaining_steps * time_per_step
+        td = datetime.timedelta(seconds=eta_seconds)
+
+        days = td.days
+        hours, remainder = divmod(td.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+
+        if days > 0:
+            return f"{days}d {hours}h"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        elif minutes > 0:
+            return f"{minutes}m"
+
+        return None
+
+    def _get_training_status(self, train_progress: TrainProgress) -> TrainingStatus:
+        active_parts_set = self._get_active_training_parts(train_progress)
+
+        if not active_parts_set:
+            primary = "Training"
+        else:
+            display_parts = []
+            if "Model" in active_parts_set:
+                display_parts.append("Model")
+            te_parts = sorted(p for p in active_parts_set if p.startswith("TE"))
+            if te_parts:
+                te_numbers = [p.split(" ")[1] for p in te_parts]
+                display_parts.append(f"TE ({', '.join(te_numbers)})")
+            primary = f"Training: {' + '.join(display_parts)}"
+
+        eta_str = self._calculate_eta_string(train_progress)
+        secondary = f"ETA: {eta_str}" if eta_str else None
+        return TrainingStatus(primary=primary, secondary=secondary)
+
+    def _is_model_part_training_active(self, part_config: TrainModelPartConfig, train_progress: TrainProgress) -> bool:
+        if not part_config.train:
+            return False
+
+        if part_config.stop_training_after is None or part_config.stop_training_after_unit == TimeUnit.NEVER:
+            return True
+
+        action_name = f"stop_training_{part_config.model_name}"
+        return not self.single_action_elapsed(
+            action_name,
+            part_config.stop_training_after,
+            part_config.stop_training_after_unit,
+            train_progress
+        )
+
+    def _update_and_log_training_status(self, train_progress: TrainProgress):
+        current_active_parts = self._get_active_training_parts(train_progress)
+
+        if not self._active_training_parts and current_active_parts:
+            # Initial setup
+            print(f"Training started with: {', '.join(sorted(current_active_parts))}")
+        else:
+            # Check for deactivations
+            for part in sorted(self._active_training_parts - current_active_parts):
+                print(f"Stopping training for {part}.")
+
+        self._active_training_parts = current_active_parts
+
     def train(self):
         train_device = torch.device(self.config.train_device)
 
@@ -589,6 +741,9 @@ class GenericTrainer(BaseTrainer):
         accumulated_loss = 0.0
         ema_loss = None
         ema_loss_steps = 0
+
+        self._update_and_log_training_status(self.model.train_progress)
+
         for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -624,6 +779,24 @@ class GenericTrainer(BaseTrainer):
                 )
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
+
+            # avoid eta jumping
+            if not self._eta_tracker:
+                timed_start_wall = getattr(self._timed_actions, "_TimedActionMixin__start_time", None)
+                if timed_start_wall is not None:
+                    start_time_monotonic = timed_start_wall + self._monotonic_offset
+                else:
+                    start_time_monotonic = time.monotonic()
+                self._eta_tracker = {
+                    "start_time": start_time_monotonic,
+                    "initial_step": train_progress.global_step,
+                    "avg_epoch_len": float(current_epoch_length),
+                }
+            else:
+                 prev = float(self._eta_tracker.get("avg_epoch_len", current_epoch_length))
+                 ema_decay = 0.9
+                 self._eta_tracker["avg_epoch_len"] = prev * ema_decay + float(current_epoch_length) * (1 - ema_decay)
+
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
             for batch in step_tqdm:
@@ -668,7 +841,7 @@ class GenericTrainer(BaseTrainer):
                     if transferred_to_temp_device:
                         self.model_setup.setup_train_device(self.model, self.config)
 
-                self.callbacks.on_update_status("training")
+                self.callbacks.on_update_status(self._get_training_status(train_progress))
 
                 with TorchMemoryRecorder(enabled=False):
                     step_seed = train_progress.global_step
@@ -756,6 +929,7 @@ class GenericTrainer(BaseTrainer):
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
+                self._update_and_log_training_status(train_progress)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
