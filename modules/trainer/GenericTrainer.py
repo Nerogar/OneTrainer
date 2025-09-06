@@ -88,10 +88,8 @@ class GenericTrainer(BaseTrainer):
         self.grad_hook_handles = []
         self._active_training_parts = set()
         self._timed_actions = TimedActionMixin()
-        timed_start_wall = getattr(self._timed_actions, "_TimedActionMixin__start_time", time.time())
-        self._monotonic_offset = time.monotonic() - timed_start_wall
         self._eta_tracker = {}
-        self._eta_warmup_seconds = 30
+        self._eta_warmup_seconds = 30  # retained but no longer used for ETA gating
 
     def start(self):
         self.__save_config_to_workspace()
@@ -625,24 +623,25 @@ class GenericTrainer(BaseTrainer):
 
     def _calculate_eta_string(self, train_progress: TrainProgress) -> str | None:
         if not self._eta_tracker:
-            return None
+            return "Estimating..."
 
         # All stored times in _eta_tracker are in monotonic clock domain
         start_time = self._eta_tracker.get("start_time", time.monotonic())
-        elapsed = time.monotonic() - start_time
-        if elapsed < getattr(self, "_eta_warmup_seconds", 30):
+
+        # Delay showing numerical ETA until single_action_elapsed condition (1 minute) is met
+        if not self.single_action_elapsed("start_eta", 1, TimeUnit.MINUTE, train_progress):
             return "Estimating..."
 
         steps_done = train_progress.global_step - self._eta_tracker.get("initial_step", 0)
         if steps_done <= 3:
-            return None
+            return "Estimating..."
 
         time_elapsed = time.monotonic() - start_time
         if time_elapsed <= 0:
-            return None
+            return "Estimating..."
         time_per_step = time_elapsed / steps_done
         if time_per_step <= 0 or not math.isfinite(time_per_step):
-            return None
+            return "Estimating..."
 
         # Use current epoch length and the EMA of epoch length to compute remaining steps.
         current_epoch_len = self.data_loader.get_data_set().approximate_length()
@@ -659,7 +658,7 @@ class GenericTrainer(BaseTrainer):
 
         days = td.days
         hours, remainder = divmod(td.seconds, 3600)
-        minutes, _ = divmod(remainder, 60)
+        minutes, seconds = divmod(remainder, 60)
 
         if days > 0:
             return f"{days}d {hours}h"
@@ -667,6 +666,8 @@ class GenericTrainer(BaseTrainer):
             return f"{hours}h {minutes}m"
         elif minutes > 0:
             return f"{minutes}m"
+        elif seconds > 0:
+            return f"{seconds}s"
 
         return None
 
@@ -781,11 +782,8 @@ class GenericTrainer(BaseTrainer):
 
             # avoid eta jumping
             if not self._eta_tracker:
-                timed_start_wall = getattr(self._timed_actions, "_TimedActionMixin__start_time", None)
-                if timed_start_wall is not None:
-                    start_time_monotonic = timed_start_wall + self._monotonic_offset
-                else:
-                    start_time_monotonic = time.monotonic()
+                # initialize ETA tracker using monotonic clock directly
+                start_time_monotonic = time.monotonic()
                 self._eta_tracker = {
                     "start_time": start_time_monotonic,
                     "initial_step": train_progress.global_step,
