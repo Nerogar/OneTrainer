@@ -283,8 +283,9 @@ class GenericTrainer(BaseTrainer):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
                     sample_params_list = samples
             # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
-            except Exception as e:
-                print(f" Warning: Unexpected error: {e}. Skipping sampling.")
+            except Exception:
+                traceback.print_exc()
+                print("Error during loading the sample definition file, proceeding without sampling")
                 sample_params_list = []
         else:
             is_custom_sample = True
