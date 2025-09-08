@@ -65,6 +65,24 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 >
 > Additionally it's been reported Alpine, Arch and Xubuntuu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
+#### Docker installation
+
+OneTrainer provides a local Docker stack for running the GUI inside an isolated container. It requires Docker and an X11
+environment on the host. Also supports Podman.
+
+1. Clone OneTrainer locally: `git clone https://github.com/Nerogar/OneTrainer.git`
+2. Review `compose.yaml` and edit it to your liking
+3. Run `docker compose up` to start the container
+
+To update the Docker image, simply run:
+
+```shell
+# Update OneTrainer
+git pull
+# Rebuild the image
+docker compose build
+```
+
 ## Updating
 
 #### Automatic update
