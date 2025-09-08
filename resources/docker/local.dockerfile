@@ -2,12 +2,12 @@
 FROM python:3.12
 
 # Install system dependencies
-RUN apt update                                \
-    && apt install -y --no-install-recommends \
-        cmake                                 \
-        libgl-dev                             \
-    && apt clean                              \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        cmake \
+        libgl-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create and move to the OneTrainer directory
 WORKDIR /OneTrainer
