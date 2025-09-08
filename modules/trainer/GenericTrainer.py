@@ -275,7 +275,11 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
-        if not sample_params_list:
+        if sample_params_list:
+            is_custom_sample = True
+        elif self.config.samples is not None:
+            sample_params_list = self.config.samples
+        else:
             try:
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
@@ -287,8 +291,6 @@ class GenericTrainer(BaseTrainer):
                 traceback.print_exc()
                 print("Error during loading the sample definition file, proceeding without sampling")
                 sample_params_list = []
-        else:
-            is_custom_sample = True
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
