@@ -18,7 +18,7 @@ services:
         volumes:
             # Give X11 access to OneTrainer
             - /tmp/.X11-unix:/tmp/.X11-unix:ro
-            - ${HOME}/.Xauthority:/home/onetrainer/.Xauthority
+            - ~/.Xauthority:/home/onetrainer/.Xauthority
             # (Optional)
             # data:/data
         network_mode: host
