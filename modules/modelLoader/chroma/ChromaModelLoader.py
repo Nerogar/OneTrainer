@@ -119,17 +119,6 @@ class ChromaModelLoader(
         model.vae = vae
         model.transformer = transformer
 
-    def __load_ckpt(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-    ):
-        # TODO
-        pass
-
     def __load_safetensors(
             self,
             model: ChromaModel,

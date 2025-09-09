@@ -146,20 +146,6 @@ class StableDiffusion3ModelLoader(
         model.vae = vae
         model.transformer = transformer
 
-    def __load_ckpt(
-            self,
-            model: StableDiffusion3Model,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            include_text_encoder_1: bool,
-            include_text_encoder_2: bool,
-            include_text_encoder_3: bool,
-    ):
-        # TODO
-        pass
-
     def __load_safetensors(
             self,
             model: StableDiffusion3Model,

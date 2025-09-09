@@ -258,11 +258,13 @@ class StableDiffusionXLModelLoader(
         except Exception:
             stacktraces.append(traceback.format_exc())
 
-        try:
-            self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
-            return
-        except Exception:
-            stacktraces.append(traceback.format_exc())
+        if model_names.base_model.endswith(".ckpt"):
+            try:
+                self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+                print("Warning: Legacy code is used to load ckpt files. Some features may not be supported.")
+                return
+            except Exception:
+                stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)
