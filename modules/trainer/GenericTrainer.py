@@ -22,7 +22,7 @@ from modules.util import create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
-from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.FileType import FileType
@@ -86,10 +86,9 @@ class GenericTrainer(BaseTrainer):
         self.model = None
         self.one_step_trained = False
         self.grad_hook_handles = []
-        self._active_training_parts = set()
         self._timed_actions = TimedActionMixin()
         self._eta_tracker = {}
-        self._eta_warmup_seconds = 30  # retained but no longer used for ETA gating
+        self._eta_warmup_seconds = 30
 
     def start(self):
         self.__save_config_to_workspace()
@@ -585,42 +584,6 @@ class GenericTrainer(BaseTrainer):
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
-    def _get_active_training_parts(self, train_progress: TrainProgress) -> set[str]:
-        active_parts: set[str] = set()
-
-        # UNet / main model
-        if self._is_model_part_training_active(self.config.unet, train_progress):
-            active_parts.add("Model")
-
-        te_specs = [
-            (1, self.config.text_encoder, ["text_encoder", "text_encoder_1"]),
-            (2, self.config.text_encoder_2, ["text_encoder_2"]),
-            (3, self.config.text_encoder_3, ["text_encoder_3"]),
-            (4, self.config.text_encoder_4, ["text_encoder_4"]),
-        ]
-
-        for idx, part_cfg, attr_names in te_specs:
-            if not self._is_model_part_training_active(part_cfg, train_progress):
-                continue
-
-            encoder_module = None
-            for attr in attr_names:
-                if hasattr(self.model, attr):
-                    m = getattr(self.model, attr)
-                    if m is not None:
-                        encoder_module = m
-                        break
-
-            if encoder_module is None:
-                continue  # attribute not present == not part of this architecture
-
-            # Unsure how to properly check for LoRA with text encoders training enabled.
-            has_trainable = any(p.requires_grad for p in encoder_module.parameters())
-            if has_trainable or part_cfg.train:
-                active_parts.add(f"TE {idx}")
-
-        return active_parts
-
     def _calculate_eta_string(self, train_progress: TrainProgress) -> str | None:
         if not self._eta_tracker:
             return "Estimating..."
@@ -672,56 +635,20 @@ class GenericTrainer(BaseTrainer):
         return None
 
     def _get_training_status(self, train_progress: TrainProgress) -> TrainingStatus:
-        active_parts_set = self._get_active_training_parts(train_progress)
-
-        if not active_parts_set:
-            primary = "Training"
-        else:
-            display_parts = []
-            if "Model" in active_parts_set:
-                display_parts.append("Model")
-            te_parts = sorted(p for p in active_parts_set if p.startswith("TE"))
-            if te_parts:
-                te_numbers = [p.split(" ")[1] for p in te_parts]
-                display_parts.append(f"TE ({', '.join(te_numbers)})")
-            primary = f"Training: {' + '.join(display_parts)}"
-
         eta_str = self._calculate_eta_string(train_progress)
         secondary = f"ETA: {eta_str}" if eta_str else None
-        return TrainingStatus(primary=primary, secondary=secondary)
-
-    def _is_model_part_training_active(self, part_config: TrainModelPartConfig, train_progress: TrainProgress) -> bool:
-        if not part_config.train:
-            return False
-
-        if part_config.stop_training_after is None or part_config.stop_training_after_unit == TimeUnit.NEVER:
-            return True
-
-        action_name = f"stop_training_{part_config.model_name}"
-        return not self.single_action_elapsed(
-            action_name,
-            part_config.stop_training_after,
-            part_config.stop_training_after_unit,
-            train_progress
-        )
+        return TrainingStatus(primary="Training ...", secondary=secondary)
 
     def _update_and_log_training_status(self, train_progress: TrainProgress):
-        current_active_parts = self._get_active_training_parts(train_progress)
-
-        if not self._active_training_parts and current_active_parts:
-            # Initial setup
-            print(f"Training started with: {', '.join(sorted(current_active_parts))}")
-        else:
-            # Check for deactivations
-            for part in sorted(self._active_training_parts - current_active_parts):
-                print(f"Stopping training for {part}.")
-
-        self._active_training_parts = current_active_parts
+        with contextlib.suppress(Exception):
+            self.callbacks.on_update_status(self._get_training_status(train_progress))
 
     def train(self):
         train_device = torch.device(self.config.train_device)
 
         train_progress = self.model.train_progress
+
+        self._update_and_log_training_status(train_progress)
 
         if self.config.only_cache:
             self.callbacks.on_update_status("caching")
@@ -741,8 +668,6 @@ class GenericTrainer(BaseTrainer):
         accumulated_loss = 0.0
         ema_loss = None
         ema_loss_steps = 0
-
-        self._update_and_log_training_status(self.model.train_progress)
 
         for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
             self.callbacks.on_update_status("starting epoch/caching")
@@ -923,7 +848,6 @@ class GenericTrainer(BaseTrainer):
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
-                self._update_and_log_training_status(train_progress)
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
