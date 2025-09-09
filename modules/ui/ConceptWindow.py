@@ -825,7 +825,7 @@ class ConceptWindow(ctk.CTkToplevel):
             min_aspect_buckets = {key: val for key,val in aspect_buckets.items() if val in (min_val, min_val2)}
             min_bucket_str = ""
             for key, val in min_aspect_buckets.items():
-                min_bucket_str += f'aspect {key}: {val} img\n'
+                min_bucket_str += f'aspect {self.decimal_to_aspect_ratio(key)} : {val} img\n'
             min_bucket_str.strip()
             self.small_bucket_preview.configure(text=min_bucket_str)
 
