@@ -70,6 +70,8 @@ class TrainingTab:
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_chroma():
+            self.__setup_chroma_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_sana():
             self.__setup_sana_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hunyuan_video():
@@ -148,6 +150,18 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
+        self.__create_noise_frame(column_1, 2)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+
+    def __setup_chroma_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1)
+        self.__create_embedding_frame(column_0, 4)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)
@@ -473,8 +487,9 @@ class TrainingTab:
         components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate")
 
         # rescale noise scheduler to zero terminal SNR
-        components.label(frame, 3, 0, "Rescale Noise Scheduler",
+        rescale_label = components.label(frame, 3, 0, "Rescale Noise Scheduler + V-pred",
                          tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
+        rescale_label.configure(wraplength=130, justify="left")
         components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
     def __create_prior_frame(self, master, row):
@@ -498,7 +513,7 @@ class TrainingTab:
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
-    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False):
+    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False, supports_force_attention_mask: bool = True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -519,10 +534,11 @@ class TrainingTab:
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
-        # transformer learning rate
-        components.label(frame, 3, 0, "Force Attention Mask",
-                         tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
-        components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
+        if supports_force_attention_mask:
+            # transformer learning rate
+            components.label(frame, 3, 0, "Force Attention Mask",
+                             tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
+            components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
 
         if supports_guidance_scale:
             # guidance scale
