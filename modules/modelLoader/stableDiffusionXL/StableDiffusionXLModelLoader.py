@@ -210,7 +210,7 @@ class StableDiffusionXLModelLoader(
             )
 
         text_encoder_1 = self._convert_transformers_sub_module_to_dtype(
-            pipeline.text_encoder_1, weight_dtypes.text_encoder, weight_dtypes.train_dtype
+            pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
         )
         text_encoder_2 = self._convert_transformers_sub_module_to_dtype(
             pipeline.text_encoder_2, weight_dtypes.text_encoder_2, weight_dtypes.train_dtype
