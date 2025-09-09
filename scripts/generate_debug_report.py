@@ -25,11 +25,9 @@ except ImportError:
 
 try:
     from modules.util.config.TrainConfig import TrainConfig
-    from modules.util.enum.ModelType import ModelType
 except ImportError:
     sys.path.append(str(Path(__file__).parent.parent))
     from modules.util.config.TrainConfig import TrainConfig
-    from modules.util.enum.ModelType import ModelType
 
 import psutil
 import requests
@@ -204,38 +202,10 @@ def extract_key_from_path(path: str) -> str:
     return '.'.join(parts)
 
 def generate_default_config_file(output_dir: Path):
-    """Generates a JSON file with the default TrainConfig settings for SD1.5 Fine-Tune."""
     try:
-        logger.info("Generating default settings file for SD1.5 Fine-Tune...")
+        logger.info("Generating default settings file ...")
         default_config = TrainConfig.default_values()
-
-        # Set defaults for a standard SD1.5 Fine-Tune scenario (which is the default for TrainConfig)
-        default_config.model_type = ModelType.STABLE_DIFFUSION_15
-        default_config.training_method = 'FINE_TUNE' # Using string to avoid enum import issues here
-
-        # Enable training for components used in SD1.5 fine-tuning
-        default_config.unet.train = True
-        default_config.text_encoder.train = True
-
-        # Disable training for components not used in SD1.5
-        default_config.text_encoder_2.train = False
-        default_config.text_encoder_3.include = False
-        default_config.text_encoder_3.train = False
-        default_config.text_encoder_4.include = False
-        default_config.text_encoder_4.train = False
-        default_config.prior.train = False
-
-        # Inject default optimizer (AdamW) settings into optimizer_defaults
-        from modules.util.optimizer_util import change_optimizer
-        default_opt_cfg = change_optimizer(default_config)
-
-        default_config.optimizer = default_opt_cfg
-
-        default_config.optimizer_defaults[str(default_opt_cfg.optimizer)] = default_opt_cfg
-
-        # The to_settings_dict method provides a clean representation of the config
         default_config_dict = default_config.to_settings_dict(secrets=False)
-
         output_file = output_dir / "default_settings.json"
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(default_config_dict, f, indent=4, sort_keys=False)
