@@ -70,13 +70,13 @@ def entry(
                 return True
 
             float(value)
-            component.configure(border_color="gray50")  # Reset to default
+            component.configure(border_color="gray50")
             return True
         except (ValueError, TypeError):
-            component.configure(border_color="red")
+            component.configure(border_color="#dc3545")
             if show_error_popup:
                 messagebox.showerror("Invalid Input", f"Invalid floating-point number: {value}")
-                # Revert to the last known good value from the model
+                # Revert to the last known good
                 last_good_value = ui_state.get_value(var_name)
                 var.set("" if last_good_value is None else str(last_good_value))
                 component.configure(border_color="gray50")
