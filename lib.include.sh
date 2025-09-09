@@ -22,7 +22,7 @@ cd -- "${SCRIPT_DIR}"
 # since their script shadows "conda" as a shell-function instead of a binary!
 export OT_CONDA_CMD="${OT_CONDA_CMD:-${CONDA_EXE:-conda}}"
 export OT_CONDA_ENV="${OT_CONDA_ENV:-conda_env}"
-export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python}"
+export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python3}"
 export OT_PYTHON_VENV="${OT_PYTHON_VENV:-venv}"
 export OT_PREFER_VENV="${OT_PREFER_VENV:-false}"
 export OT_LAZY_UPDATES="${OT_LAZY_UPDATES:-false}"
