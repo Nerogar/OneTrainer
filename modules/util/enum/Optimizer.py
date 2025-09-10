@@ -16,12 +16,14 @@ class Optimizer(Enum):
 
     # 32 bit is torch and not bnb
     ADAMW = 'ADAMW'
+    ADAMW_Adv = 'ADAMW_Adv'
     ADAMW_8BIT = 'ADAMW_8BIT'
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
 
     ADOPT = 'ADOPT'
+    ADOPT_Adv = 'ADOPT_Adv'
 
     LAMB = 'LAMB'
     LAMB_8BIT = 'LAMB_8BIT'
@@ -53,6 +55,7 @@ class Optimizer(Enum):
     # Prodigy
     PRODIGY = 'PRODIGY'
     PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
+    PRODIGY_Adv = 'PRODIGY_Adv'
 
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
@@ -77,6 +80,7 @@ class Optimizer(Enum):
             self.DADAPT_LION,
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
+            self.PRODIGY_Adv,
         ]
 
     @property
@@ -94,7 +98,10 @@ class Optimizer(Enum):
             Optimizer.CAME_8BIT,
             Optimizer.ADAM,
             Optimizer.ADAMW,
+            Optimizer.ADAMW_Adv,
+            Optimizer.ADOPT_Adv,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
+            Optimizer.PRODIGY_Adv,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.
