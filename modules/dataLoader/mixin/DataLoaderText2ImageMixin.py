@@ -8,6 +8,7 @@ from modules.util.enum.DataType import DataType
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
+from mgds.pipelineModules.BatchPadding import BatchPadding
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
@@ -18,6 +19,7 @@ from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedC
 from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
+from mgds.pipelineModules.KeepAspectCalculation import KeepAspectCalculation
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.LoadVideo import LoadVideo
@@ -145,7 +147,7 @@ class DataLoaderText2ImageMixin:
     def _aspect_bucketing_in(self, config: TrainConfig, aspect_bucketing_quantization: int, frame_dim_enabled:bool=False):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
-        aspect_bucketing_quantization = AspectBucketing(
+        aspect_bucketing_calculation = AspectBucketing(
             quantization=aspect_bucketing_quantization,
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
@@ -168,10 +170,22 @@ class DataLoaderText2ImageMixin:
             possible_resolutions_out_name='possible_resolutions'
         )
 
+        keep_aspect_calculation = KeepAspectCalculation(
+            resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            quantization=16,
+        )
+
         modules = [calc_aspect]
 
-        if config.aspect_ratio_bucketing:
-            modules.append(aspect_bucketing_quantization)
+        if True:
+            modules.append(keep_aspect_calculation)
+        elif config.aspect_ratio_bucketing:
+            modules.append(aspect_bucketing_calculation)
         else:
             modules.append(single_aspect_calculation)
 
@@ -281,7 +295,11 @@ class DataLoaderText2ImageMixin:
             before_cache_fun=before_cache_image_fun,
         )
 
-        if config.latent_caching:
+        if True:
+            print("Using batch padding!")
+            batch_sorting = BatchPadding(latent_name='latent_image', mask_out_name='image_attention_mask', names=sort_names, batch_size=config.batch_size)
+            output_names += ['image_attention_mask']
+        elif config.latent_caching:
             batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
         else:
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
