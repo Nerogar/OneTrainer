@@ -275,17 +275,22 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
-        if not sample_params_list:
-            if self.config.samples is not None:
-                sample_params_list = self.config.samples
-            else:
+        if sample_params_list:
+            is_custom_sample = True
+        elif self.config.samples is not None:
+            sample_params_list = self.config.samples
+        else:
+            try:
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
                     sample_params_list = samples
-        else:
-            is_custom_sample = True
+            # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
+            except Exception:
+                traceback.print_exc()
+                print("Error during loading the sample definition file, proceeding without sampling")
+                sample_params_list = []
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
