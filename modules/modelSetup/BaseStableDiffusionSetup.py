@@ -175,7 +175,6 @@ class BaseStableDiffusionSetup(
                 config,
             )
 
-            # move it below timesteps as generalized offset noise requires the timesteps
             latent_noise = self._create_noise(
                 scaled_latent_image,
                 config,

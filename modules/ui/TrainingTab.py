@@ -558,10 +558,10 @@ class TrainingTab:
 
         if supports_generalized_offset_noise:
             # generalized offset noise weight
-            generalised_offset_label = components.label(frame, 1, 0, "Use Generalized Offset Noise",
-                            tooltip="Per-timestep 'brightness knob' instead of a fixed offset - steadier training, better starts, and improved very dark/bright images. Compatible with V-pred and Eps-pred. We reccomend starting with 0.002 at first, tweaking from there.")
+            generalised_offset_label = components.label(frame, 1, 0, "Generalized Offset Noise",
+                            tooltip="Per-timestep 'brightness knob' instead of a fixed offset - steadier training, better starts, and improved very dark/bright images. Recommend starting with 0.002 at first, tweaking from there.")
             generalised_offset_label.configure(wraplength=130, justify="left")
-            components.switch(frame, 1, 1, self.ui_state, "use_generalized_offset_noise")
+            components.switch(frame, 1, 1, self.ui_state, "generalized_offset_noise")
 
         # perturbation noise weight
         components.label(frame, 2, 0, "Perturbation Noise Weight",

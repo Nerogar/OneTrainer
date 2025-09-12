@@ -98,7 +98,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             )
             # Use the time-dependent generalized method if enabled.
             # This will only be true for Diffusion models (which uses betas)
-            if config.use_generalized_offset_noise and timestep is not None and betas is not None:
+            if config.generalized_offset_noise and timestep is not None and betas is not None:
                 psi_schedule = self._compute_and_cache_offset_noise_psi_schedule(betas).to(timestep.device)
                 psi_t = psi_schedule[timestep]
                 psi_t = psi_t.view(psi_t.shape[0], *[1 for _ in range(source_tensor.ndim - 1)])
