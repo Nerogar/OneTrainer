@@ -342,6 +342,7 @@ class TrainConfig(BaseConfig):
 
     # noise
     offset_noise_weight: float
+    generalized_offset_noise: bool
     perturbation_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
@@ -854,6 +855,7 @@ class TrainConfig(BaseConfig):
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("generalized_offset_noise", False, bool, False))
         data.append(("perturbation_noise_weight", 0.0, float, False))
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
