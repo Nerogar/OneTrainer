@@ -5,7 +5,6 @@ import json
 import math
 import os
 import shutil
-import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -70,10 +69,7 @@ class GenericTrainer(BaseTrainer):
     tensorboard: SummaryWriter
 
     grad_hook_handles: list[RemovableHandle]
-    _tqdm_remaining_seconds: float | None
-    _overall_eta_remaining_seconds: float | None  # overall (multi-epoch) ETA
-    _first_epoch_duration: float | None      # duration (seconds) of the first completed epoch
-    _epoch_start_time: float | None          # perf counter at epoch start
+    _overall_eta_remaining_seconds: float | None  # overall ETA (seconds) across all remaining epochs
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
@@ -88,10 +84,7 @@ class GenericTrainer(BaseTrainer):
         self.one_step_trained = False
         self.grad_hook_handles = []
         self._timed_actions = TimedActionMixin()
-        self._tqdm_remaining_seconds = None
         self._overall_eta_remaining_seconds = None
-        self._first_epoch_duration = None
-        self._epoch_start_time = None
 
     def start(self):
         self.__save_config_to_workspace()
@@ -588,18 +581,13 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
 
     def _calculate_eta_string(self, train_progress: TrainProgress) -> str | None:
-        overall = getattr(self, "_overall_eta_remaining_seconds", None)
-        per_epoch = getattr(self, "_tqdm_remaining_seconds", None)
-
-        remaining_seconds = None
-        if overall is not None and math.isfinite(overall) and overall > 0:
-            remaining_seconds = overall
-        elif per_epoch is not None and math.isfinite(per_epoch) and per_epoch > 0:
-            remaining_seconds = per_epoch
-
-        if remaining_seconds is None:
+        if self._training_start_time is None or (datetime.datetime.now() - self._training_start_time).total_seconds() < 30:
             return "Estimating..."
 
+
+        remaining_seconds = self._overall_eta_remaining_seconds
+        if remaining_seconds is None or not math.isfinite(remaining_seconds) or remaining_seconds <= 0:
+            return "Estimating..."
         td = datetime.timedelta(seconds=remaining_seconds)
         days = td.days
         hours, remainder = divmod(td.seconds, 3600)
@@ -624,6 +612,7 @@ class GenericTrainer(BaseTrainer):
             self.callbacks.on_update_status(self._get_training_status(train_progress))
 
     def train(self):
+        self._training_start_time = datetime.datetime.now()
         train_device = torch.device(self.config.train_device)
 
         train_progress = self.model.train_progress
@@ -650,7 +639,6 @@ class GenericTrainer(BaseTrainer):
         ema_loss_steps = 0
 
         for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
-            self._epoch_start_time = time.perf_counter()
             self.callbacks.on_update_status("starting epoch/caching")
 
             if self.config.latent_caching:
@@ -689,30 +677,13 @@ class GenericTrainer(BaseTrainer):
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step)
             for batch in step_tqdm:
+                step_rate = step_tqdm.format_dict.get('rate') if hasattr(step_tqdm, 'format_dict') else None
+                if step_rate and step_rate > 0 and step_tqdm.total:
+                    remaining_steps_current = (step_tqdm.total - step_tqdm.n)
+                    remaining_full_epochs = max(0, self.config.epochs - (train_progress.epoch + 1))
 
-                total = step_tqdm.total
-                done = step_tqdm.n
-                if total and done > 0:
-                    if self._first_epoch_duration is None:
-                        # in first epoch derive ETA from step rate
-                        elapsed_epoch = time.perf_counter() - self._epoch_start_time
-                        step_rate = done / elapsed_epoch if elapsed_epoch > 0 else None
-                        if step_rate and step_rate > 0:
-                            remaining_steps_current = total - done
-                            remaining_full_epochs = max(0, self.config.epochs - (train_progress.epoch + 1))
-                            total_remaining_steps = remaining_steps_current + (remaining_full_epochs * total)
-                            self._tqdm_remaining_seconds = remaining_steps_current / step_rate
-                            self._overall_eta_remaining_seconds = total_remaining_steps / step_rate
-                    else:
-
-                        remaining_full_epochs = max(0, self.config.epochs - (train_progress.epoch + 1))
-                        fraction_remaining_current = (total - done) / total
-
-                        overall_remaining_epochs_equiv = remaining_full_epochs + fraction_remaining_current
-                        self._overall_eta_remaining_seconds = overall_remaining_epochs_equiv * self._first_epoch_duration
-
-                        elapsed_epoch = time.perf_counter() - self._epoch_start_time
-                        self._tqdm_remaining_seconds = max(0.0, self._first_epoch_duration - elapsed_epoch)
+                    total_remaining_steps = remaining_steps_current + (remaining_full_epochs * self.data_loader.get_data_set().approximate_length())
+                    self._overall_eta_remaining_seconds = total_remaining_steps / step_rate
 
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
@@ -844,9 +815,6 @@ class GenericTrainer(BaseTrainer):
 
                 if self.commands.get_stop_command():
                     return
-
-            if self._first_epoch_duration is None and self._epoch_start_time is not None:
-                self._first_epoch_duration = time.perf_counter() - self._epoch_start_time
 
             train_progress.next_epoch()
             self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
