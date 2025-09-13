@@ -1,5 +1,6 @@
+import contextlib
 from collections.abc import Callable
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from typing import Any
 
 from modules.util.enum.TimeUnit import TimeUnit
@@ -48,7 +49,6 @@ def entry(
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
-        validation_debounce_ms: int | None = None,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -58,52 +58,102 @@ def entry(
     component = ctk.CTkEntry(master, textvariable=var, width=width)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
+    try:
+        original_border_color = component.cget("border_color")
+    except Exception:
+        original_border_color = "gray50"  # fallback
+
+    error_border_color = "#dc3545"
+
     validation_after_id = None
+    revert_after_id = None
 
-    def validate_value(value: str, show_error_popup: bool = False) -> bool:
-        """Validates if the input value is a valid float. Reverts to last known good value on failure."""
-        try:
-            # An empty string is a valid nullable value, but float() will raise a ValueError.
-            # The UIState trace handler will correctly set the model to None.
-            if value == "" and ui_state.is_nullable(var_name):
-                component.configure(border_color="gray50")
-                return True
+    DEBOUNCE_STOP_TYPING_MS = 1500
+    DEBOUNCED_INVALID_REVERT_MS = 1000
+    FOCUSOUT_INVALID_REVERT_MS = 1200
 
-            float(value)
-            component.configure(border_color="gray50")
+    # Track last valid value (start with current)
+    last_valid_value = var.get()
+
+    def validate_value(value: str, revert_delay_ms: int | None) -> bool:
+        nonlocal revert_after_id, last_valid_value
+        declared_type, nullable = ui_state.get_decl(var_name)
+
+        if revert_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(revert_after_id)
+            revert_after_id = None
+
+        def success():
+            nonlocal last_valid_value
+            component.configure(border_color=original_border_color)
+            last_valid_value = value
             return True
-        except (ValueError, TypeError):
-            component.configure(border_color="#dc3545")
-            if show_error_popup:
-                messagebox.showerror("Invalid Input", f"Invalid floating-point number: {value}")
-                # Revert to the last known good
-                last_good_value = ui_state.get_value(var_name)
-                var.set("" if last_good_value is None else str(last_good_value))
-                component.configure(border_color="gray50")
+
+        def do_revert():
+            var.set(last_valid_value)
+            component.configure(border_color=original_border_color)
+
+        def fail(reason: str):
+            nonlocal revert_after_id
+            component.configure(border_color=error_border_color)
+            if revert_delay_ms is not None:
+                revert_after_id = component.after(revert_delay_ms, do_revert)
+            else:
+                do_revert()
             return False
 
-    def schedule_validation(*_):
-        nonlocal validation_after_id
-        if validation_after_id:
-            component.after_cancel(validation_after_id)
-        validation_after_id = component.after(validation_debounce_ms, lambda: validate_value(var.get()))
+        if value == "":
+            if nullable:
+                return success()
+            if declared_type is str:
+                return fail("Value required")
 
-    if validation_debounce_ms is not None:
-        validation_trace_name = var.trace_add("write", schedule_validation)
-        component.bind("<FocusOut>", lambda e: validate_value(var.get(), show_error_popup=True))
-    else:
-        validation_trace_name = None
+        try:
+            if declared_type is int:
+                int(value)
+            elif declared_type is float:
+                float(value)
+            elif declared_type is bool:
+                if value.lower() not in ("true", "false", "0", "1"):
+                    return fail(f"Invalid bool: {value}")
+            return success()
+        except ValueError:
+            return fail(f"Invalid value for {declared_type}: {value}")
+
+    def debounced_validate(*_):
+        nonlocal validation_after_id, revert_after_id
+        if revert_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(revert_after_id)
+            revert_after_id = None
+        if validation_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(validation_after_id)
+        validation_after_id = component.after(
+            DEBOUNCE_STOP_TYPING_MS,
+            lambda: validate_value(var.get(), DEBOUNCED_INVALID_REVERT_MS)
+        )
+
+    validation_trace_name = var.trace_add("write", debounced_validate)
+    component.bind("<FocusOut>", lambda e: validate_value(var.get(), FOCUSOUT_INVALID_REVERT_MS))
 
     original_destroy = component.destroy
 
     def new_destroy():
-        # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+        nonlocal validation_after_id, revert_after_id
         if component._textvariable_callback_name:
             component._textvariable.trace_remove("write", component._textvariable_callback_name)
             component._textvariable_callback_name = ""
 
-        if validation_debounce_ms is not None and validation_trace_name is not None:
-            var.trace_remove("write", validation_trace_name)
+        if validation_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(validation_after_id)
+        if revert_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(revert_after_id)
+
+        var.trace_remove("write", validation_trace_name)
 
         if command is not None and trace_id is not None:
             ui_state.remove_var_trace(var_name, trace_id)

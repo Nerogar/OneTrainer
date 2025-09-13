@@ -35,24 +35,6 @@ class UIState:
                 state = state.get_var(name_part)
             return state
 
-    def get_value(self, name: str) -> Any:
-        """Gets a value directly from the underlying model object, handling nested names."""
-        obj = self.obj
-        for name_part in name.split('.'):
-            obj = getattr(obj, name_part)
-        return obj
-
-    def is_nullable(self, name: str) -> bool:
-        """Checks if a property is nullable, handling nested names."""
-        obj = self.obj
-        parts = name.split('.')
-        for name_part in parts[:-1]:
-            obj = getattr(obj, name_part)
-
-        if isinstance(obj, BaseConfig):
-            return obj.nullables.get(parts[-1], False)
-        return False
-
     def add_var_trace(self, name, command: Callable[[], None]) -> int:
         self.__latest_var_trace_id += 1
         self.__var_traces[name][self.__latest_var_trace_id] = command
@@ -283,3 +265,25 @@ class UIState:
                 elif isinstance(obj_var, int | float):
                     var = self.__vars[name]
                     var.set(str(obj_var))
+
+    def get_decl(self, name: str) -> tuple[type, bool]:
+        """Return (declared_type_or_runtime_type, nullable_flag) in one traversal."""
+        obj = self.obj
+        declared_type = None
+        nullable = False
+        for part in name.split('.'):
+            if isinstance(obj, BaseConfig):
+                if part in obj.types:
+                    declared_type = obj.types[part]
+                if part in obj.nullables:
+                    nullable = obj.nullables[part]
+            obj = getattr(obj, part)
+        if declared_type is None:
+            declared_type = type(obj)
+        return declared_type, nullable
+
+    def get_type(self, name: str):
+        return self.get_decl(name)[0]
+
+    def get_nullable(self, name: str) -> bool:
+        return self.get_decl(name)[1]
