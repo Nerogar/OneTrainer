@@ -162,6 +162,10 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
             'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
             'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
+            'use_orthograd': {'title': 'use_orthograd', 'tooltip': 'Prevents "naïve loss minimization" (NLM) that can lead to overfitting by removing the gradient component parallel to the weight, thus improving generalization.', 'type': 'bool'},
+            'use_atan2': {'title': 'Use Atan2', 'tooltip': 'A robust replacement for eps (no tuning required), which also incorporates gradient clipping. (If True, eps is ignored).', 'type': 'bool'},
+            'use_AdEMAMix': {'title': 'Use AdEMAMix', 'tooltip': 'Adds a second, slow-moving EMA, which is combined with the primary momentum to stabilize updates, especially during long runs of full finetuning.', 'type': 'bool'},
+            'beta3_ema': {'title': 'Beta3 EMA', 'tooltip': 'Coefficient for slow-moving EMA of AdEMAMix.', 'type': 'float'},
         }
         # @formatter:on
 

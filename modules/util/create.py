@@ -1001,6 +1001,73 @@ def create_optimizer(
                 quant_block_size=optimizer_config.quant_block_size if optimizer_config.quant_block_size is not None else 2048
             )
 
+        # ADAMW_Adv Optimizer
+        case Optimizer.ADAMW_Adv:
+            from adv_optm import AdamW_adv
+            optimizer = AdamW_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                factored=optimizer_config.factored if optimizer_config.factored is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
+                beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+            )
+
+        # ADOPT_Adv Optimizer
+        case Optimizer.ADOPT_Adv:
+            from adv_optm import Adopt_adv
+            optimizer = Adopt_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                factored=optimizer_config.factored if optimizer_config.factored is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
+                beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+            )
+
+        # PRODIGY_Adv Optimizer
+        case Optimizer.PRODIGY_Adv:
+            from adv_optm import Prodigy_adv
+            optimizer = Prodigy_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                factored=optimizer_config.factored if optimizer_config.factored is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
+                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
+                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
+                use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
+                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
+                beta3_ema=optimizer_config.beta3_ema if optimizer_config.beta3_ema is not None else 0.9999,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+            )
 
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:
