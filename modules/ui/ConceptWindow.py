@@ -630,7 +630,6 @@ class ConceptWindow(ctk.CTkToplevel):
         else:
             mask_tensor = torch.ones((1, image_tensor.shape[1], image_tensor.shape[2]))
 
-        # get caption conditionals
         source = self.concept.text.prompt_source
         preview_p = pathlib.Path(preview_image_path)
         if source == "filename":
