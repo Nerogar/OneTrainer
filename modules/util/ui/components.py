@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Callable
 from tkinter import filedialog
 from typing import Any
@@ -50,30 +51,116 @@ def entry(
         sticky: str = "new",
 ):
     var = ui_state.get_var(var_name)
+    trace_id = None
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
-    component = ctk.CTkEntry(master, textvariable=var,width=width)
+    component = ctk.CTkEntry(master, textvariable=var, width=width)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
-    def create_destroy(component):
-        orig_destroy = component.destroy
+    try:
+        original_border_color = component.cget("border_color")
+    except Exception:
+        original_border_color = "gray50"  # fallback
 
-        def destroy(self):
-            # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
-            if self._textvariable_callback_name:
-                self._textvariable.trace_remove("write", self._textvariable_callback_name)
-                self._textvariable_callback_name = ""
+    error_border_color = "#dc3545"
 
-            if command is not None:
-                ui_state.remove_var_trace(var_name, trace_id)
+    validation_after_id = None
+    revert_after_id = None
 
-            orig_destroy()
+    DEBOUNCE_STOP_TYPING_MS = 1500
+    DEBOUNCED_INVALID_REVERT_MS = 1000
+    FOCUSOUT_INVALID_REVERT_MS = 1200
 
-        return destroy
+    # Track last valid value (start with current)
+    last_valid_value = var.get()
 
-    destroy = create_destroy(component)
-    component.destroy = lambda: destroy(component)
+    def validate_value(value: str, revert_delay_ms: int | None) -> bool:
+        nonlocal revert_after_id, last_valid_value
+        declared_type, nullable = ui_state.get_decl(var_name)
+
+        if revert_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(revert_after_id)
+            revert_after_id = None
+
+        def success():
+            nonlocal last_valid_value
+            component.configure(border_color=original_border_color)
+            last_valid_value = value
+            return True
+
+        def do_revert():
+            var.set(last_valid_value)
+            component.configure(border_color=original_border_color)
+
+        def fail(reason: str):
+            nonlocal revert_after_id
+            component.configure(border_color=error_border_color)
+            if revert_delay_ms is not None:
+                revert_after_id = component.after(revert_delay_ms, do_revert)
+            else:
+                do_revert()
+            return False
+
+        if value == "":
+            if nullable:
+                return success()
+            if declared_type is str:
+                return fail("Value required")
+
+        try:
+            if declared_type is int:
+                int(value)
+            elif declared_type is float:
+                float(value)
+            elif declared_type is bool:
+                if value.lower() not in ("true", "false", "0", "1"):
+                    return fail(f"Invalid bool: {value}")
+            return success()
+        except ValueError:
+            return fail(f"Invalid value for {declared_type}: {value}")
+
+    def debounced_validate(*_):
+        nonlocal validation_after_id, revert_after_id
+        if revert_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(revert_after_id)
+            revert_after_id = None
+        if validation_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(validation_after_id)
+        validation_after_id = component.after(
+            DEBOUNCE_STOP_TYPING_MS,
+            lambda: validate_value(var.get(), DEBOUNCED_INVALID_REVERT_MS)
+        )
+
+    validation_trace_name = var.trace_add("write", debounced_validate)
+    component.bind("<FocusOut>", lambda e: validate_value(var.get(), FOCUSOUT_INVALID_REVERT_MS))
+
+    original_destroy = component.destroy
+
+    def new_destroy():
+        nonlocal validation_after_id, revert_after_id
+        if component._textvariable_callback_name:
+            component._textvariable.trace_remove("write", component._textvariable_callback_name)
+            component._textvariable_callback_name = ""
+
+        if validation_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(validation_after_id)
+        if revert_after_id:
+            with contextlib.suppress(Exception):
+                component.after_cancel(revert_after_id)
+
+        var.trace_remove("write", validation_trace_name)
+
+        if command is not None and trace_id is not None:
+            ui_state.remove_var_trace(var_name, trace_id)
+
+        original_destroy()
+
+    component.destroy = new_destroy
 
     if tooltip:
         ToolTip(component, tooltip, wide=wide_tooltip)
@@ -192,6 +279,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
 
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
+
     if tooltip:
         ToolTip(component, tooltip, x_position=25)
     return component

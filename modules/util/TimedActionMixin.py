@@ -8,7 +8,7 @@ class TimedActionMixin:
     def __init__(self):
         super().__init__()
         self.__previous_action = {}
-        self.__start_time = time.time()
+        self.__start_time = time.monotonic() # resist system clock changes
 
     def repeating_action_needed(
             self,
@@ -36,31 +36,31 @@ class TimedActionMixin:
                     return (train_progress.global_step + 1) % int(interval) == 0
             case TimeUnit.SECOND:
                 if not start_at_zero and self.__previous_action[name] < 0:
-                    self.__previous_action[name] = time.time()
+                    self.__previous_action[name] = time.monotonic()
 
-                seconds_since_previous_action = time.time() - self.__previous_action[name]
+                seconds_since_previous_action = time.monotonic() - self.__previous_action[name]
                 if seconds_since_previous_action > interval:
-                    self.__previous_action[name] = time.time()
+                    self.__previous_action[name] = time.monotonic()
                     return True
                 else:
                     return False
             case TimeUnit.MINUTE:
                 if not start_at_zero and self.__previous_action[name] < 0:
-                    self.__previous_action[name] = time.time()
+                    self.__previous_action[name] = time.monotonic()
 
-                seconds_since_previous_action = time.time() - self.__previous_action[name]
+                seconds_since_previous_action = time.monotonic() - self.__previous_action[name]
                 if seconds_since_previous_action > (interval * 60):
-                    self.__previous_action[name] = time.time()
+                    self.__previous_action[name] = time.monotonic()
                     return True
                 else:
                     return False
             case TimeUnit.HOUR:
                 if not start_at_zero and self.__previous_action[name] < 0:
-                    self.__previous_action[name] = time.time()
+                    self.__previous_action[name] = time.monotonic()
 
-                seconds_since_previous_action = time.time() - self.__previous_action[name]
+                seconds_since_previous_action = time.monotonic() - self.__previous_action[name]
                 if seconds_since_previous_action > (interval * 60 * 60):
-                    self.__previous_action[name] = time.time()
+                    self.__previous_action[name] = time.monotonic()
                     return True
                 else:
                     return False
@@ -79,7 +79,7 @@ class TimedActionMixin:
             train_progress: TrainProgress,
     ):
         if name not in self.__previous_action:
-            self.__previous_action[name] = time.time()
+            self.__previous_action[name] = time.monotonic()
 
         match unit:
             case TimeUnit.EPOCH:
@@ -87,13 +87,13 @@ class TimedActionMixin:
             case TimeUnit.STEP:
                 return (train_progress.global_step + 1) > int(delay)
             case TimeUnit.SECOND:
-                seconds_since_start = time.time() - self.__start_time
+                seconds_since_start = time.monotonic() - self.__start_time
                 return seconds_since_start > delay
             case TimeUnit.MINUTE:
-                seconds_since_start = time.time() - self.__start_time
+                seconds_since_start = time.monotonic() - self.__start_time
                 return seconds_since_start > (delay * 60)
             case TimeUnit.HOUR:
-                seconds_since_start = time.time() - self.__start_time
+                seconds_since_start = time.monotonic() - self.__start_time
                 return seconds_since_start > (delay * 60 * 60)
             case TimeUnit.NEVER:
                 return False
