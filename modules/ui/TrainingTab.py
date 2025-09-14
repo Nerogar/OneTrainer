@@ -745,7 +745,7 @@ class TrainingTab:
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
 
-        components.label(frame, 0, 0, "Layer Preset",
+        components.label(frame, 0, 0, "Layer Filter",
                          tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.")
         self.layer_selector = components.options(
             frame, 0, 1, self.presets_list, self.ui_state, "layer_filter_preset",
