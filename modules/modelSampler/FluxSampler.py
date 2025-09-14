@@ -336,15 +336,9 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            mu = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
-            latent_image = self.model.pack_latents(
-                latent_image,
-                latent_image.shape[0],
-                latent_image.shape[1],
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            latent_image = self.model.pack_latents(latent_image)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
