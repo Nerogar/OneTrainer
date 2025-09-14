@@ -10,18 +10,13 @@ import subprocess
 import sys
 import tempfile
 import textwrap
-import traceback
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-try:
-    from deepdiff import DeepDiff
-except ImportError:
-    DeepDiff = None
-    logging.warning("deepdiff is not installed. Some features will be unavailable. Install with: pip install deepdiff")
+from deepdiff import DeepDiff
 
 try:
     from modules.util.config.TrainConfig import TrainConfig
@@ -45,174 +40,120 @@ logging.basicConfig(
 # == Helper Classes ==
 
 def anonymize_config_dict(config_item):
-    """Recursively anonymize paths in the configuration dictionary."""
     if isinstance(config_item, dict):
         return {k: anonymize_config_dict(v) for k, v in config_item.items()}
-    elif isinstance(config_item, list):
+    if isinstance(config_item, list):
         return [anonymize_config_dict(i) for i in config_item]
-    elif isinstance(config_item, str):
+    if isinstance(config_item, str):
         return Utility.anonymize_path(config_item)
-    else:
-        return config_item
+    return config_item
 
 def create_debug_package(output_zip_path: str, config_json_string: str):
-    """Generates a zip file containing an anonymized config and a debug report."""
     try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
 
-            config_dict = json.loads(config_json_string)
-            anonymized_config = anonymize_config_dict(config_dict)
-            config_path = temp_path / "config.json"
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(anonymized_config, f, indent=4)
+            # Anonymized config
+            anonymized = anonymize_config_dict(json.loads(config_json_string))
+            (tmp / "config.json").write_text(json.dumps(anonymized, indent=4), encoding="utf-8")
 
-            generate_default_config_file(temp_path)
-            default_config_path = temp_path / "default_settings.json"
-            diff_path = temp_path / "config_diff.txt"
-
-            if DeepDiff and default_config_path.exists():
+            # Default + diff
+            generate_default_config_file(tmp)
+            diff_path = tmp / "config_diff.txt"
+            default_path = tmp / "default_settings.json"
+            if DeepDiff and default_path.exists():
                 try:
-                    with open(default_config_path, "r", encoding="utf-8") as f:
-                        default_config_dict = json.load(f)
-
                     diff = DeepDiff(
-                        default_config_dict,
-                        anonymized_config,
+                        json.loads(default_path.read_text(encoding="utf-8")),
+                        anonymized,
                         ignore_order=True,
                         verbose_level=2,
                         exclude_regex_paths=(
-                            r"root\['(?:optimizer_defaults|concepts|samples|sample_definition_file_name|concept_file_name)'\]"
-                            r"|root\['embedding'\]\['uuid'\]",
+                            r"root\['(?:optimizer_defaults|concepts|samples|sample_definition_file_name|concept_file_name)'\]|root\['embedding'\]\['uuid'\]",
                             r"root\['text_encoder(?:_[1-4])?'\]\['model_name'\]",
                             r"root\['unet?'\]\['model_name'\]",
                         ),
                         ignore_string_type_changes=True,
                         ignore_numeric_type_changes=True,
                     )
-
-                    diff.pop('type_changes', None)
-
-                    formatted_diff = format_diff_output(diff)
-
-                    with open(diff_path, "w", encoding="utf-8") as f:
-                        f.write(formatted_diff)
-                    logger.info("Generated config diff file.")
+                    diff.pop("type_changes", None)
+                    diff_path.write_text(format_diff_output(diff), encoding="utf-8")
                 except Exception as e:
                     logger.error(f"Could not generate config diff: {e}")
-                    with open(diff_path, "w", encoding="utf-8") as f:
-                        f.write(f"Error generating diff: {e}")
+                    diff_path.write_text(f"Error generating diff: {e}", encoding="utf-8")
             elif not DeepDiff:
-                logger.warning("deepdiff is not installed. Skipping config diff generation. `pip install deepdiff`")
+                logger.warning("deepdiff not installed. Skipping diff (`pip install deepdiff`).")
 
-
-            script_path = Path(__file__)
-            onetrainer_dir = script_path.parent.parent  # Go up from scripts/ to OneTrainer/
-
+            # Run self to generate debug_report.log
+            repo_root = Path(__file__).parent.parent
             result = subprocess.run(
-                [sys.executable, str(script_path)],
-                check=False,
-                cwd=onetrainer_dir,
+                [sys.executable, str(Path(__file__))],
+                cwd=repo_root,
                 capture_output=True,
-                text=True
+                text=True,
+                check=False,
             )
 
-            source_report = onetrainer_dir / "debug_report.log"
-            report_path = temp_path / "debug_report.log"
+            report_src = repo_root / "debug_report.log"
+            report_path = tmp / "debug_report.log"
+            if report_src.exists():
+                shutil.move(str(report_src), report_path)
 
-            if source_report.exists():
-                shutil.copy2(source_report, report_path)
-                source_report.unlink()
-
-            with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.write(config_path, arcname="config.json")
+            # Zip assembly
+            with zipfile.ZipFile(output_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.write(tmp / "config.json", "config.json")
                 if diff_path.exists():
-                    zf.write(diff_path, arcname="config_diff.txt")
+                    zf.write(diff_path, "config_diff.txt")
                 if report_path.exists():
-                    zf.write(report_path, arcname="debug_report.log")
+                    zf.write(report_path, "debug_report.log")
                 else:
-                    error_msg = f"Failed to generate debug_report.log.\nReturn code: {result.returncode}"
+                    parts = [
+                        "Failed to generate debug_report.log.",
+                        f"Return code: {result.returncode}",
+                    ]
                     if result.stderr:
-                        error_msg += f"\nError output:\n{result.stderr}"
+                        parts += ["", "stderr:", result.stderr]
                     if result.stdout:
-                        error_msg += f"\nStandard output:\n{result.stdout}"
-                    zf.writestr("debug_report.log", error_msg)
+                        parts += ["", "stdout:", result.stdout]
+                    zf.writestr("debug_report.log", "\n".join(parts))
 
         logger.info(f"Debug package saved to {Path(output_zip_path).name}")
-    except Exception as e:
-        logger.error(f"Error generating debug package: {e}")
-        traceback.print_exc()
+    except Exception:
+        logger.exception("Error generating debug package")
 
 def format_diff_output(diff) -> str:
-    """Format DeepDiff output in a more human-readable way."""
-    lines = []
-
-    # Handle values_changed
-    if 'values_changed' in diff:
-        for path, change in diff['values_changed'].items():
-            # Extract the key from the path
-            key = extract_key_from_path(path)
-            old_value = change['old_value']
-            new_value = change['new_value']
-            lines.append(f"{key}: {old_value} ⇒ {new_value}")
-
-    # Handle dictionary_item_added
-    if 'dictionary_item_added' in diff:
-        for path in diff['dictionary_item_added']:
-            key = extract_key_from_path(path)
-            value = diff['dictionary_item_added'][path]
-            lines.append(f"{key}: [ADDED] {value}")
-
-    # Handle dictionary_item_removed
-    if 'dictionary_item_removed' in diff:
-        for path in diff['dictionary_item_removed']:
-            key = extract_key_from_path(path)
-            value = diff['dictionary_item_removed'][path]
-            lines.append(f"{key}: [REMOVED] {value}")
-
-    # Handle iterable_item_added
-    if 'iterable_item_added' in diff:
-        for path, value in diff['iterable_item_added'].items():
-            key = extract_key_from_path(path)
-            lines.append(f"{key}: [ADDED] {value}")
-
-    # Handle iterable_item_removed
-    if 'iterable_item_removed' in diff:
-        for path, value in diff['iterable_item_removed'].items():
-            key = extract_key_from_path(path)
-            lines.append(f"{key}: [REMOVED] {value}")
-
-    return "\n".join(lines) if lines else "No differences found."
+    sections: list[str] = []
+    sections += [
+        f"{extract_key_from_path(p)}: {c['old_value']} ⇒ {c['new_value']}"
+        for p, c in diff.get("values_changed", {}).items()
+    ]
+    spec = [
+        ("dictionary_item_added", "[ADDED]", False),
+        ("dictionary_item_removed", "[REMOVED]", False),
+        ("iterable_item_added", "[ADDED]", True),
+        ("iterable_item_removed", "[REMOVED]", True),
+    ]
+    for key, label, mapping in spec:
+        data = diff.get(key, {} if mapping else [])
+        if mapping:
+            sections += [
+                f"{extract_key_from_path(p)}: {label} {v}" for p, v in data.items()
+            ]
+        else:
+            sections += [f"{extract_key_from_path(p)}: {label}" for p in data]
+    return "\n".join(sections) if sections else "No differences found."
 
 def extract_key_from_path(path: str) -> str:
-    """Extract a clean key path from DeepDiff path notation."""
-    # Remove 'root' and clean up the path
-    # Example: "root['training_method']" -> "training_method"
-    # Example: "root['unet']['train']" -> "unet.train"
-
-    # Remove 'root' prefix
-    clean_path = path.replace('root', '')
-
-    # Remove brackets and quotes, split by ']['
-    parts = clean_path.strip('[]').replace("'", "").replace('][', '.').split('.')
-
-    # Filter out empty parts
-    parts = [part for part in parts if part]
-
-    return '.'.join(parts)
+    return ".".join(re.findall(r"\['([^]]+)'\]", path[4:] if path.startswith("root") else path))
 
 def generate_default_config_file(output_dir: Path):
     try:
-        logger.info("Generating default settings file ...")
-        default_config = TrainConfig.default_values()
-        default_config_dict = default_config.to_settings_dict(secrets=False)
-        output_file = output_dir / "default_settings.json"
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(default_config_dict, f, indent=4, sort_keys=False)
-        logger.info(f"Default settings file saved to {output_file}")
-    except Exception as e:
-        logger.error(f"Could not generate default settings file: {e}")
-        traceback.print_exc()
+        cfg = TrainConfig.default_values().to_settings_dict(secrets=False)
+        out = output_dir / "default_settings.json"
+        out.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+        logger.info(f"Default settings file saved to {out}")
+    except Exception:
+        logger.exception("Could not generate default settings file")
 
 class Utility:
     @staticmethod
