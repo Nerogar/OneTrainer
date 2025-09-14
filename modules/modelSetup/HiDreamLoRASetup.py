@@ -4,18 +4,12 @@ from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSetup.BaseHiDreamSetup import BaseHiDreamSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
 import torch
-
-PRESETS = {
-    "attn-mlp": ["attn1", "ff_i"],
-    "attn-only": ["attn1"],
-    "full": [],
-}
 
 
 class HiDreamLoRASetup(
@@ -40,33 +34,10 @@ class HiDreamLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_1",
-                parameters=model.text_encoder_1_lora.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
-
-        if config.text_encoder_2.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_2",
-                parameters=model.text_encoder_2_lora.parameters(),
-                learning_rate=config.text_encoder_2.learning_rate,
-            ))
-
-        if config.text_encoder_3.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_3",
-                parameters=model.text_encoder_3_lora.parameters(),
-                learning_rate=config.text_encoder_3.learning_rate,
-            ))
-
-        if config.text_encoder_4.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_4",
-                parameters=model.text_encoder_4_lora.parameters(),
-                learning_rate=config.text_encoder_4.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_1_lora", model.text_encoder_1_lora, config.text_encoder)
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_2_lora", model.text_encoder_2_lora, config.text_encoder_2)
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_3_lora", model.text_encoder_3_lora, config.text_encoder_3)
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_4_lora", model.text_encoder_4_lora, config.text_encoder_4)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
@@ -93,12 +64,7 @@ class HiDreamLoRASetup(
                     "embeddings_4"
                 )
 
-        if config.prior.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="transformer",
-                parameters=model.transformer_lora.parameters(),
-                learning_rate=config.prior.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.prior)
 
         return parameter_group_collection
 
@@ -119,30 +85,11 @@ class HiDreamLoRASetup(
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        if model.text_encoder_1_lora is not None:
-            train_text_encoder_1 = config.text_encoder.train and \
-                                   not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.text_encoder_1_lora.requires_grad_(train_text_encoder_1)
-
-        if model.text_encoder_2_lora is not None:
-            train_text_encoder_2 = config.text_encoder_2.train and \
-                                   not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
-            model.text_encoder_2_lora.requires_grad_(train_text_encoder_2)
-
-        if model.text_encoder_3_lora is not None:
-            train_text_encoder_3 = config.text_encoder_3.train and \
-                                   not self.stop_text_encoder_3_training_elapsed(config, model.train_progress)
-            model.text_encoder_3_lora.requires_grad_(train_text_encoder_3)
-
-        if model.text_encoder_4_lora is not None:
-            train_text_encoder_4 = config.text_encoder_4.train and \
-                                   not self.stop_text_encoder_4_training_elapsed(config, model.train_progress)
-            model.text_encoder_4_lora.requires_grad_(train_text_encoder_4)
-
-        if model.transformer_lora is not None:
-            train_transformer = config.prior.train and \
-                         not self.stop_prior_training_elapsed(config, model.train_progress)
-            model.transformer_lora.requires_grad_(train_transformer)
+        self._setup_model_part_requires_grad("text_encoder_1_lora", model.text_encoder_1_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("text_encoder_2_lora", model.text_encoder_2_lora, config.text_encoder_2, model.train_progress)
+        self._setup_model_part_requires_grad("text_encoder_3_lora", model.text_encoder_3_lora, config.text_encoder_3, model.train_progress)
+        self._setup_model_part_requires_grad("text_encoder_4_lora", model.text_encoder_4_lora, config.text_encoder_4, model.train_progress)
+        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.prior, model.train_progress)
 
     def setup_model(
             self,
@@ -175,7 +122,7 @@ class HiDreamLoRASetup(
             ) if create_te4 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
+            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

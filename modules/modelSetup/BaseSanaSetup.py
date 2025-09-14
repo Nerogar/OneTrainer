@@ -23,6 +23,12 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn1", "attn2", "ff."],
+    "attn-only": ["attn1", "attn2"],
+    "full": [],
+}
+
 
 class BaseSanaSetup(
     BaseModelSetup,

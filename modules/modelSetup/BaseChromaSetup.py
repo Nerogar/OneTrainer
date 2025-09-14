@@ -23,6 +23,13 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn", "ff.net"],
+    "attn-only": ["attn"],
+    "blocks": ["transformer_block"],
+    "full": [],
+}
+
 
 #TODO share more code with Flux and other models
 class BaseChromaSetup(
@@ -179,7 +186,7 @@ class BaseChromaSetup(
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_output=batch['text_encoder_hidden_state'] \
                     if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
-                text_encoder_dropout_probability=config.text_encoder_2.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
 
             latent_image = batch['latent_image']
@@ -193,8 +200,6 @@ class BaseChromaSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                latent_height=scaled_latent_image.shape[-2],
-                latent_width=scaled_latent_image.shape[-1],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
@@ -218,13 +223,7 @@ class BaseChromaSetup(
                 model.train_dtype.torch_dtype()
             )
 
-            packed_latent_input = model.pack_latents(
-                latent_input,
-                latent_input.shape[0],
-                latent_input.shape[1],
-                latent_input.shape[2],
-                latent_input.shape[3],
-            )
+            packed_latent_input = model.pack_latents(latent_input)
 
             image_seq_len = packed_latent_input.shape[1]
             image_attention_mask = torch.full((packed_latent_input.shape[0], image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)

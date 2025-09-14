@@ -23,6 +23,11 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attentions"],
+    "attn-only": ["attn"],
+    "full": [],
+}
 
 class BaseStableDiffusionSetup(
     BaseModelSetup,

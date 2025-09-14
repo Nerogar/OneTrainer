@@ -1,6 +1,8 @@
 import re
 from re import Pattern
 
+from modules.util.config.TrainConfig import TrainConfig
+
 
 class ModuleFilter:
     """
@@ -15,6 +17,7 @@ class ModuleFilter:
     _compiled_regex: bool
     _compiled: Pattern[str] | None
     _used: bool
+
 
     def __init__(self, pattern: str, use_regex: bool = False):
         self._pattern = pattern.strip()
@@ -31,6 +34,14 @@ class ModuleFilter:
                 self._compiled_regex = True
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern: {self._pattern!r}: {e}") from e
+
+    @staticmethod
+    def create(config: TrainConfig):
+        return [
+            ModuleFilter(pattern, use_regex=config.layer_filter_regex)
+            for pattern in config.layer_filter.split(",")
+        ]
+
 
     def matches(self, module_name: str) -> bool:
         """
