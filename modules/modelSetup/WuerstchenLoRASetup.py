@@ -9,17 +9,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 
-# This is correct for the latest cascade, but other Wuerstchen models may have
-# different names. I honestly don't know what makes a good preset here so I'm
-# just guessing.
-PRESETS = {
-    "attn-only": ["attention"],
-    "full": [],
-    "down-blocks": ["down_blocks"],
-    "up-blocks": ["up_blocks"],
-    "mapper-only": ["mapper"],
-}
-
 
 class WuerstchenLoRASetup(
     BaseWuerstchenSetup,
@@ -86,7 +75,7 @@ class WuerstchenLoRASetup(
         ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
-            model.prior_prior, "lora_prior_unet", config, config.lora_layers.split(",")
+            model.prior_prior, "lora_prior_unet", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

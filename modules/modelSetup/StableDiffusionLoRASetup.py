@@ -9,12 +9,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 
-PRESETS = {
-    "attn-mlp": ["attentions"],
-    "attn-only": ["attn"],
-    "full": [],
-}
-
 
 class StableDiffusionLoRASetup(
     BaseStableDiffusionSetup,
@@ -77,7 +71,7 @@ class StableDiffusionLoRASetup(
         ) if create_te else None
 
         model.unet_lora = LoRAModuleWrapper(
-            model.unet, "lora_unet", config, config.lora_layers.split(",")
+            model.unet, "lora_unet", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

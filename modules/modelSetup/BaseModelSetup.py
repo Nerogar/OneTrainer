@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
@@ -29,6 +30,7 @@ class BaseModelSetup(
         self.train_device = train_device
         self.temp_device = temp_device
         self.debug_mode = debug_mode
+        self.frozen_parameters = {}
 
     @abstractmethod
     def create_parameters(
@@ -156,19 +158,44 @@ class BaseModelSetup(
             for adapter in model.adapters():
                 adapter.hook_to_module()
 
-    @staticmethod
     def _create_model_part_parameters(
+        self,
         parameter_group_collection: NamedParameterGroupCollection,
         unique_name: str,
         model: torch.nn.Module,
         config: TrainModelPartConfig,
+        freeze: list[ModuleFilter] | None = None,
+        debug: bool = False,
     ):
         if not config.train:
             return
 
+        if freeze is not None and len(freeze) > 0:
+            selected = []
+            deselected = []
+            parameters = []
+            self.frozen_parameters[unique_name] = []
+            for name, param in model.named_parameters():
+                if any(f.matches(name) for f in freeze):
+                    parameters.append(param)
+                    selected.append(name)
+                else:
+                    self.frozen_parameters[unique_name].append(param)
+                    deselected.append(name)
+
+            if debug:
+                print(f"Selected layers: {selected}")
+                print(f"Deselected layers: {deselected}")
+            else:
+                print(f"Selected layers: {len(selected)}")
+                print(f"Deselected layers: {len(deselected)}")
+                print("Note: Enable Debug mode to see the full list of layer names")
+        else:
+            parameters = model.parameters()
+
         parameter_group_collection.add_group(NamedParameterGroup(
             unique_name=unique_name,
-            parameters=model.parameters(),
+            parameters=parameters,
             learning_rate=config.learning_rate,
         ))
 
@@ -183,3 +210,9 @@ class BaseModelSetup(
             train_model_part = config.train and \
                                not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
             model.requires_grad_(train_model_part)
+
+            #even if frozen parameters are not passed to the optimizer, required_grad has to be False.
+            #otherwise, gradients accumulate in param.grad and waste vram
+            if unique_name in self.frozen_parameters:
+                for param in self.frozen_parameters[unique_name]:
+                    param.requires_grad_(False)

@@ -336,6 +336,11 @@ class TrainConfig(BaseConfig):
     learning_rate_scaler: LearningRateScaler
     clip_grad_norm: float
 
+    #layer filter
+    layer_filter: str  # comma-separated
+    layer_filter_preset: str
+    layer_filter_regex: bool
+
     # noise
     offset_noise_weight: float
     generalized_offset_noise: bool
@@ -416,9 +421,6 @@ class TrainConfig(BaseConfig):
     lora_decompose_norm_epsilon: bool
     lora_decompose_output_axis: bool
     lora_weight_dtype: DataType
-    lora_layers: str  # comma-separated
-    lora_layer_preset: str
-    lora_layers_regex: bool
     bundle_additional_embeddings: bool
 
     # optimizer
@@ -457,7 +459,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=7,
+            config_version=8,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -466,6 +468,7 @@ class TrainConfig(BaseConfig):
                 4: self.__migration_4,
                 5: self.__migration_5,
                 6: self.__migration_6,
+                7: self.__migration_7,
             }
         )
 
@@ -640,6 +643,18 @@ class TrainConfig(BaseConfig):
             and migrated_data["lora_layer_preset"] is None
         ):
             migrated_data["lora_layer_preset"] = "full"
+
+        return migrated_data
+
+    def __migration_7(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if "lora_layers" in migrated_data:
+            migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
+        if "lora_layer_preset" in migrated_data:
+            migrated_data["layer_filter_preset"] = migrated_data.pop("lora_layer_preset")
+        if "lora_layers_regex" in migrated_data:
+            migrated_data["layer_filter_regex"] = migrated_data.pop("lora_layers_regex")
 
         return migrated_data
 
@@ -958,6 +973,11 @@ class TrainConfig(BaseConfig):
         data.append(("masked_prior_preservation_weight", 0.0, float, False))
         data.append(("custom_conditioning_image", False, bool, False))
 
+        #layer filter
+        data.append(("layer_filter", "", str, False))
+        data.append(("layer_filter_preset", "full", str, False))
+        data.append(("layer_filter_regex", False, bool, False))
+
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
         data.append(("preserve_embedding_norm", False, bool, False))
@@ -977,9 +997,6 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_norm_epsilon", True, bool, False))
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
-        data.append(("lora_layers", "", str, False))
-        data.append(("lora_layer_preset", "full", str, False))
-        data.append(("lora_layers_regex", False, bool, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # optimizer

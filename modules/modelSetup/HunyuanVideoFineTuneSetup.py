@@ -2,6 +2,7 @@
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSetup.BaseHunyuanVideoSetup import BaseHunyuanVideoSetup
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -47,7 +48,8 @@ class HunyuanVideoFineTuneSetup(
                     "embeddings_2"
                 )
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior)
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior,
+                                           freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         return parameter_group_collection
 

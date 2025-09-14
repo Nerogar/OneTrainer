@@ -3,6 +3,7 @@ import copy
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSetup.BaseHiDreamSetup import BaseHiDreamSetup
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -77,7 +78,8 @@ class HiDreamFineTuneSetup(
         self._setup_model_part_requires_grad("text_encoder_2", model.text_encoder_2, config.text_encoder_2, model.train_progress)
         self._setup_model_part_requires_grad("text_encoder_3", model.text_encoder_3, config.text_encoder_3, model.train_progress)
         self._setup_model_part_requires_grad("text_encoder_4", model.text_encoder_4, config.text_encoder_4, model.train_progress)
-        self._setup_model_part_requires_grad("transformer", model.transformer, config.prior, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer, config.prior, model.train_progress,
+                                            freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         model.vae.requires_grad_(False)
 
