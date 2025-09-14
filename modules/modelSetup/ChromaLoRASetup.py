@@ -2,7 +2,7 @@ from modules.model.ChromaModel import ChromaModel
 from modules.modelSetup.BaseChromaSetup import BaseChromaSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
@@ -39,12 +39,7 @@ class ChromaLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder",
-                parameters=model.text_encoder_lora.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding and model.text_encoder is not None:
@@ -53,12 +48,7 @@ class ChromaLoRASetup(
                     "embeddings"
                 )
 
-        if config.prior.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="transformer",
-                parameters=model.transformer_lora.parameters(),
-                learning_rate=config.prior.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.prior)
 
         return parameter_group_collection
 
@@ -73,15 +63,8 @@ class ChromaLoRASetup(
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        if model.text_encoder_lora is not None:
-            train_text_encoder = config.text_encoder.train and \
-                                   not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.text_encoder_lora.requires_grad_(train_text_encoder)
-
-        if model.transformer_lora is not None:
-            train_transformer = config.prior.train and \
-                         not self.stop_prior_training_elapsed(config, model.train_progress)
-            model.transformer_lora.requires_grad_(train_transformer)
+        self._setup_model_part_requires_grad("text_encoder_lora", model.text_encoder_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.prior, model.train_progress)
 
     def setup_model(
             self,

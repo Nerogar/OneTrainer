@@ -1,7 +1,7 @@
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
@@ -30,12 +30,7 @@ class PixArtAlphaFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder",
-                parameters=model.text_encoder.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
@@ -43,12 +38,7 @@ class PixArtAlphaFineTuneSetup(
                 "embeddings"
             )
 
-        if config.prior.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="transformer",
-                parameters=model.transformer.parameters(),
-                learning_rate=config.prior.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior)
 
         return parameter_group_collection
 
@@ -57,9 +47,7 @@ class PixArtAlphaFineTuneSetup(
             model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        train_text_encoder = config.text_encoder.train and \
-                             not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-        model.text_encoder.requires_grad_(train_text_encoder)
+        self._setup_model_part_requires_grad("text_encoder", model.text_encoder, config.text_encoder, model.train_progress)
 
         for i, embedding in enumerate(model.additional_embeddings):
             embedding_config = config.additional_embeddings[i]
@@ -68,9 +56,7 @@ class PixArtAlphaFineTuneSetup(
                                                                                   model.train_progress, i)
             embedding.text_encoder_vector.requires_grad_(train_embedding)
 
-        train_prior = config.prior.train and \
-                      not self.stop_prior_training_elapsed(config, model.train_progress)
-        model.transformer.requires_grad_(train_prior)
+        self._setup_model_part_requires_grad("transformer", model.transformer, config.prior, model.train_progress)
 
         model.vae.requires_grad_(False)
 
