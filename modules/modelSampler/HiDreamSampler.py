@@ -32,19 +32,6 @@ class HiDreamSampler(BaseModelSampler):
         self.model_type = model_type
         self.pipeline = model.create_pipeline(use_original_modules=False)
 
-    def __calculate_shift(
-            self,
-            image_seq_len,
-            base_seq_len: int = 256,
-            max_seq_len: int = 4096,
-            base_shift: float = 0.5,
-            max_shift: float = 1.15,
-    ):
-        m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
-        b = base_shift - m * base_seq_len
-        mu = image_seq_len * m + b
-        return mu
-
     @torch.no_grad()
     def __sample_base(
             self,
@@ -114,11 +101,7 @@ class HiDreamSampler(BaseModelSampler):
                 dtype=torch.float32,
             )
 
-            # prepare timesteps
-            mu = self.__calculate_shift(
-                self.model.transformer.max_seq,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
 
             # denoising loop

@@ -2,9 +2,9 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
-from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -118,78 +118,6 @@ class BaseModelSetup(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
-    def stop_unet_training_elapsed(
-            self,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-    ):
-        return self.single_action_elapsed(
-            "stop_unet_training",
-            config.unet.stop_training_after,
-            config.unet.stop_training_after_unit,
-            train_progress,
-        )
-
-    def stop_prior_training_elapsed(
-            self,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-    ):
-        return self.single_action_elapsed(
-            "stop_prior_training",
-            config.prior.stop_training_after,
-            config.prior.stop_training_after_unit,
-            train_progress,
-        )
-
-    def stop_text_encoder_training_elapsed(
-            self,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-    ):
-        return self.single_action_elapsed(
-            "stop_text_encoder_training",
-            config.text_encoder.stop_training_after,
-            config.text_encoder.stop_training_after_unit,
-            train_progress,
-        )
-
-    def stop_text_encoder_2_training_elapsed(
-            self,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-    ):
-        return self.single_action_elapsed(
-            "stop_text_encoder_2_training",
-            config.text_encoder_2.stop_training_after,
-            config.text_encoder_2.stop_training_after_unit,
-            train_progress,
-        )
-
-    def stop_text_encoder_3_training_elapsed(
-            self,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-    ):
-        return self.single_action_elapsed(
-            "stop_text_encoder_3_training",
-            config.text_encoder_3.stop_training_after,
-            config.text_encoder_3.stop_training_after_unit,
-            train_progress,
-        )
-
-    def stop_text_encoder_4_training_elapsed(
-            self,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-    ):
-        return self.single_action_elapsed(
-            "stop_text_encoder_4_training",
-            config.text_encoder_4.stop_training_after,
-            config.text_encoder_4.stop_training_after_unit,
-            train_progress,
-        )
-
     def stop_embedding_training_elapsed(
             self,
             config: TrainEmbeddingConfig,
@@ -197,6 +125,19 @@ class BaseModelSetup(
     ):
         return self.single_action_elapsed(
             "stop_embedding_training_" + str(config.uuid),
+            config.stop_training_after,
+            config.stop_training_after_unit,
+            train_progress,
+        )
+
+    def __stop_model_part_training_elapsed(
+            self,
+            unique_name: str,
+            config: TrainModelPartConfig,
+            train_progress: TrainProgress,
+    ):
+        return self.single_action_elapsed(
+            "stop_" + unique_name + "_training",
             config.stop_training_after,
             config.stop_training_after_unit,
             train_progress,
@@ -214,3 +155,31 @@ class BaseModelSetup(
         finally:
             for adapter in model.adapters():
                 adapter.hook_to_module()
+
+    @staticmethod
+    def _create_model_part_parameters(
+        parameter_group_collection: NamedParameterGroupCollection,
+        unique_name: str,
+        model: torch.nn.Module,
+        config: TrainModelPartConfig,
+    ):
+        if not config.train:
+            return
+
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name=unique_name,
+            parameters=model.parameters(),
+            learning_rate=config.learning_rate,
+        ))
+
+    def _setup_model_part_requires_grad(
+        self,
+        unique_name: str,
+        model: torch.nn.Module,
+        config: TrainModelPartConfig,
+        train_progress: TrainProgress,
+    ):
+        if model is not None:
+            train_model_part = config.train and \
+                               not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
+            model.requires_grad_(train_model_part)

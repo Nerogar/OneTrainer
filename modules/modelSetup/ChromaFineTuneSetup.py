@@ -30,12 +30,7 @@ class ChromaFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder",
-                parameters=model.text_encoder.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding and model.text_encoder is not None:
@@ -64,14 +59,8 @@ class ChromaFineTuneSetup(
     ):
         self._setup_embeddings_requires_grad(model, config)
 
-        if model.text_encoder is not None:
-            train_text_encoder = config.text_encoder.train and \
-                                   not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.text_encoder.requires_grad_(train_text_encoder)
-
-        train_transformer = config.prior.train and \
-                     not self.stop_prior_training_elapsed(config, model.train_progress)
-        model.transformer.requires_grad_(train_transformer)
+        self._setup_model_part_requires_grad("text_encoder", model.text_encoder, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer, config.prior, model.train_progress)
 
         model.vae.requires_grad_(False)
 
