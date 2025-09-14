@@ -214,21 +214,21 @@ class ConceptWidget(ctk.CTkFrame):
 
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
-        glob_pattern = "**/*.*" if getattr(self.concept, 'include_subdirectories', False) else "*.*"
-
-        if getattr(self.concept, 'path', None) and os.path.isdir(self.concept.path):
-            for path in pathlib.Path(self.concept.path).glob(glob_pattern):
+        concept_path = getattr(self.concept, 'path', None)
+        if concept_path and os.path.isdir(concept_path):
+            glob_pattern = "**/*.*" if getattr(self.concept, 'include_subdirectories', False) else "*.*"
+            for path in pathlib.Path(concept_path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
-                if path.is_file() and path_util.is_supported_image_extension(extension) \
-                        and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
-                    preview_path = path_util.canonical_join(self.concept.path, path)
+                if (path.is_file()
+                        and path_util.is_supported_image_extension(extension)
+                        and not path.name.endswith("-masklabel.png")
+                        and not path.name.endswith("-condlabel.png")):
+                    preview_path = path_util.canonical_join(concept_path, path)
                     break
-
         try:
             image = load_image(preview_path, convert_mode="RGBA")
         except Exception:
             image = Image.new("RGBA", (150, 150), (200, 200, 200, 255))
-
         size = min(image.width, image.height)
         image = image.crop((
             (image.width - size) // 2,
@@ -236,8 +236,7 @@ class ConceptWidget(ctk.CTkFrame):
             (image.width - size) // 2 + size,
             (image.height - size) // 2 + size,
         ))
-        image = image.resize((150, 150), Image.Resampling.BILINEAR)
-        return image
+        return image.resize((150, 150), Image.Resampling.BILINEAR)
 
     def place_in_list(self):
         index = getattr(self, 'visible_index', self.i)
