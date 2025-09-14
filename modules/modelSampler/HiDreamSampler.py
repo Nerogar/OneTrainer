@@ -101,15 +101,7 @@ class HiDreamSampler(BaseModelSampler):
                 dtype=torch.float32,
             )
 
-            # prepare timesteps
-            mu = self._calculate_timestep_shift(
-                self.model.transformer.max_seq, #FIXME https://github.com/Nerogar/OneTrainer/issues/979
-                base_seq_len=256,
-                max_seq_len=4096,
-                base_shift=0.5,
-                max_shift=1.15,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
