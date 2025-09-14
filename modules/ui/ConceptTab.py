@@ -41,7 +41,7 @@ class ConceptTab(ConfigList):
         return ConceptConfig.default_values()
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
+        return ConceptWindow(self.master, self.train_config, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
 
     def _add_search_bar(self):
         toolbar = ctk.CTkFrame(self.top_frame, fg_color="transparent")

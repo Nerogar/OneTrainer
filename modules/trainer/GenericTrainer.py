@@ -15,6 +15,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, path_util
+from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.SampleConfig import SampleConfig
@@ -274,17 +275,22 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
-        if not sample_params_list:
-            if self.config.samples is not None:
-                sample_params_list = self.config.samples
-            else:
+        if sample_params_list:
+            is_custom_sample = True
+        elif self.config.samples is not None:
+            sample_params_list = self.config.samples
+        else:
+            try:
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
                     sample_params_list = samples
-        else:
-            is_custom_sample = True
+            # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
+            except Exception:
+                traceback.print_exc()
+                print("Error during loading the sample definition file, proceeding without sampling")
+                sample_params_list = []
 
         if self.model.ema:
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
@@ -670,6 +676,9 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("training")
 
                 with TorchMemoryRecorder(enabled=False):
+                    step_seed = train_progress.global_step
+                    bf16_stochastic_rounding_set_seed(step_seed, train_device)
+
                     prior_pred_indices = [i for i in range(self.config.batch_size)
                                           if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
                     if len(prior_pred_indices) > 0 \
@@ -795,7 +804,8 @@ class GenericTrainer(BaseTrainer):
                 dtype=self.config.output_dtype.torch_dtype()
             )
 
-        self.model.to(self.temp_device)
+        if self.model is not None:
+            self.model.to(self.temp_device)
 
         self.tensorboard.close()
 

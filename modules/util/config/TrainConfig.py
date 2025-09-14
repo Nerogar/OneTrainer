@@ -65,6 +65,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -149,6 +150,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
@@ -336,6 +338,7 @@ class TrainConfig(BaseConfig):
 
     # noise
     offset_noise_weight: float
+    generalized_offset_noise: bool
     perturbation_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
@@ -415,6 +418,7 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     lora_layers: str  # comma-separated
     lora_layer_preset: str
+    lora_layers_regex: bool
     bundle_additional_embeddings: bool
 
     # optimizer
@@ -453,7 +457,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=6,
+            config_version=7,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -461,6 +465,7 @@ class TrainConfig(BaseConfig):
                 3: self.__migration_3,
                 4: self.__migration_4,
                 5: self.__migration_5,
+                6: self.__migration_6,
             }
         )
 
@@ -623,6 +628,18 @@ class TrainConfig(BaseConfig):
             migrated_data["save_every"] = migrated_data.pop("save_after")
         if "save_after_unit" in migrated_data:
             migrated_data["save_every_unit"] = migrated_data.pop("save_after_unit")
+
+        return migrated_data
+
+    def __migration_6(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # None is not a valid value, but there was a bug that allowed it, so old config files can have it set to None:
+        if (
+            "lora_layer_preset" in migrated_data
+            and migrated_data["lora_layer_preset"] is None
+        ):
+            migrated_data["lora_layer_preset"] = "full"
 
         return migrated_data
 
@@ -834,6 +851,7 @@ class TrainConfig(BaseConfig):
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("generalized_offset_noise", False, bool, False))
         data.append(("perturbation_noise_weight", 0.0, float, False))
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
@@ -960,7 +978,8 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("lora_layers", "", str, False))
-        data.append(("lora_layer_preset", None, str, True))
+        data.append(("lora_layer_preset", "full", str, False))
+        data.append(("lora_layers_regex", False, bool, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # optimizer

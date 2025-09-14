@@ -1,12 +1,15 @@
+import fractions
 import math
 import os
 import pathlib
 import random
 import threading
 import time
+import traceback
 
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
+from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
@@ -38,6 +41,7 @@ import torch
 from torchvision.transforms import functional
 
 import customtkinter as ctk
+import huggingface_hub
 from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -69,6 +73,7 @@ class ConceptWindow(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
+            train_config: TrainConfig,
             concept: ConceptConfig,
             ui_state: UIState,
             image_ui_state: UIState,
@@ -76,6 +81,8 @@ class ConceptWindow(ctk.CTkToplevel):
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
+
+        self.train_config = train_config
 
         self.concept = concept
         self.ui_state = ui_state
@@ -140,6 +147,8 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 3, 0, "Path",
                          tooltip="Path where the training data is located")
         components.dir_entry(frame, 3, 1, self.ui_state, "path")
+        components.button(frame, 3, 2, text="download now", command=self.__download_dataset_threaded,
+                          tooltip="Download dataset from Huggingface now, for the purpose of previewing and statistics. Otherwise, it will be downloaded when you start training. Path must be a Huggingface repository.")
 
         # prompt source
         components.label(frame, 4, 0, "Prompt Source",
@@ -402,7 +411,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.mask_count_label.configure(font=ctk.CTkFont(underline=True))
         self.mask_count_preview = components.label(frame, 4, 2, pad=0, text="-")
         self.caption_count_label = components.label(frame, 3, 3, "\nTotal Captions", pad=0,
-                         tooltip="Total number of caption files, any .txt file")
+                         tooltip="Total number of caption files, any .txt file. With advanced scan, includes the total number of captions on separate lines across all files in parentheses.")
         self.caption_count_label.configure(font=ctk.CTkFont(underline=True))
         self.caption_count_preview = components.label(frame, 4, 3, pad=0, text="-")
 
@@ -488,7 +497,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
         #aspect bucket info
         self.aspect_bucket_label = components.label(frame, 17, 0, "\nAspect Bucketing", pad=0,
-                         tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (1:4 extremely wide) to 4 (4:1 extremely tall). \
+                         tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (4:1 extremely wide) to 4 (1:4 extremely tall). \
                             Images which don't match a bucket exactly are cropped to the nearest one.")
         self.aspect_bucket_label.configure(font=ctk.CTkFont(underline=True))
         self.small_bucket_label = components.label(frame, 17, 1, "\nSmallest Buckets", pad=0,
@@ -504,10 +513,11 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
-        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,2))
+        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
         self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
         self.bucket_fig.tight_layout()
+        self.bucket_fig.subplots_adjust(bottom=0.15)
 
         self.bucket_fig.set_facecolor(background_color)
         self.bucket_ax.set_facecolor(background_color)
@@ -549,17 +559,39 @@ class ConceptWindow(ctk.CTkToplevel):
         self.caption_preview.insert(index="1.0", text=caption_preview)
         self.caption_preview.configure(state="disabled")
 
+    @staticmethod
+    def get_concept_path(path: str) -> str | None:
+        if os.path.isdir(path):
+            return path
+        try:
+            #don't download, only check if available locally:
+            return huggingface_hub.snapshot_download(repo_id=path, repo_type="dataset", local_files_only=True)
+        except Exception:
+            return None
+
+    def __download_dataset(self):
+        try:
+            huggingface_hub.login(token=self.train_config.secrets.huggingface_token, new_session=False)
+            huggingface_hub.snapshot_download(repo_id=self.concept.path, repo_type="dataset")
+        except Exception:
+            traceback.print_exc()
+
+    def __download_dataset_threaded(self):
+        download_thread = threading.Thread(target=self.__download_dataset, daemon=True)
+        download_thread.start()
+
     def __get_preview_image(self):
         preview_image_path = "resources/icons/icon.png"
         file_index = -1
         glob_pattern = "**/*.*" if self.concept.include_subdirectories else "*.*"
 
-        if os.path.isdir(self.concept.path):
-            for path in pathlib.Path(self.concept.path).glob(glob_pattern):
+        concept_path = self.get_concept_path(self.concept.path)
+        if concept_path:
+            for path in pathlib.Path(concept_path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
-                    preview_image_path = path_util.canonical_join(self.concept.path, path)
+                    preview_image_path = path_util.canonical_join(concept_path, path)
                     file_index += 1
                     if file_index == self.image_preview_file_index:
                         break
@@ -721,7 +753,10 @@ class ConceptWindow(ctk.CTkToplevel):
         self.mask_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_masks"])
 
         #caption count
-        self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
+        if self.concept.concept_stats["subcaption_count"] > 0:
+            self.caption_count_preview.configure(text=f'{self.concept.concept_stats["caption_count"]} ({self.concept.concept_stats["subcaption_count"]})')
+        else:
+            self.caption_count_preview.configure(text=self.concept.concept_stats["caption_count"])
         self.caption_count_preview_unpaired.configure(text=self.concept.concept_stats["unpaired_captions"])
 
         #resolution info
@@ -790,18 +825,29 @@ class ConceptWindow(ctk.CTkToplevel):
             min_aspect_buckets = {key: val for key,val in aspect_buckets.items() if val in (min_val, min_val2)}
             min_bucket_str = ""
             for key, val in min_aspect_buckets.items():
-                min_bucket_str += f'aspect {key}: {val} img\n'
+                min_bucket_str += f'aspect {self.decimal_to_aspect_ratio(key)} : {val} img\n'
             min_bucket_str.strip()
             self.small_bucket_preview.configure(text=min_bucket_str)
 
         self.bucket_ax.cla()
         aspects = [str(x) for x in list(aspect_buckets.keys())]
+        aspect_ratios = [self.decimal_to_aspect_ratio(x) for x in list(aspect_buckets.keys())]
         counts = list(aspect_buckets.values())
-        b = self.bucket_ax.bar(aspects, counts)
+        b = self.bucket_ax.bar(aspect_ratios, counts)
         self.bucket_ax.bar_label(b, color=self.text_color)
+        sec = self.bucket_ax.secondary_xaxis(location=-0.1)
+        sec.spines["bottom"].set_linewidth(0)
+        sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["Wide", "Square", "Tall"])
+        sec.tick_params('x', length=0)
         self.canvas.draw()
 
-    def __get_concept_stats(self, advanced_checks: bool, waittime: float):
+    def decimal_to_aspect_ratio(self, value : float):
+        #find closest fraction to decimal aspect value and convert to a:b format
+        aspect_fraction = fractions.Fraction(value).limit_denominator(16)
+        aspect_string = f'{aspect_fraction.denominator}:{aspect_fraction.numerator}'
+        return aspect_string
+
+    def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
         if not os.path.isdir(self.concept.path):
             print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
             return
@@ -809,29 +855,26 @@ class ConceptWindow(ctk.CTkToplevel):
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
         self.concept_stats_tab.after(0, self.__disable_scan_buttons)
-        subfolders = [self.concept.path]
+        concept_path = self.get_concept_path(self.concept.path)
 
-        stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
+        if not concept_path:
+           print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
+           self.concept_stats_tab.after(0, self.__enable_scan_buttons)
+           return
+        subfolders = [concept_path]
+
+        stats_dict = concept_stats.init_concept_stats(advanced_checks)
         for path in subfolders:
-            stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept)
-            stats_dict["processing_time"] = time.perf_counter() - start_time
-            if self.concept.include_subdirectories:     #add all subfolders of current directory to for loop
+            if self.cancel_scan_flag.is_set() or time.perf_counter() - start_time > wait_time:
+                break
+            stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept, start_time, wait_time, self.cancel_scan_flag)
+            if self.concept.include_subdirectories and not self.cancel_scan_flag.is_set():     #add all subfolders of current directory to for loop
                 subfolders.extend([f for f in os.scandir(path) if f.is_dir()])
             self.concept.concept_stats = stats_dict
-            #cancel and set init stats if longer than waiting time or cancel flag set
-            if (time.perf_counter() - start_time) > waittime or self.cancel_scan_flag.is_set():
-                stats_dict = concept_stats.init_concept_stats(self.concept, advanced_checks)
-                stats_dict["processing_time"] = time.perf_counter() - start_time
-                self.concept.concept_stats = stats_dict
-                self.cancel_scan_flag.clear()
-                self.concept_stats_tab.after(0, self.__enable_scan_buttons)
-                break
             #update GUI approx every half second
             if time.perf_counter() > (last_update + 0.5):
                 last_update = time.perf_counter()
                 self.concept_stats_tab.after(0, self.__update_concept_stats)
-                # self.__update_concept_stats()
-                # self.concept_stats_tab.update()
 
         self.cancel_scan_flag.clear()
         self.concept_stats_tab.after(0, self.__enable_scan_buttons)
@@ -858,7 +901,8 @@ class ConceptWindow(ctk.CTkToplevel):
             if self.concept.concept_stats["file_size"] == 0:  #force rescan if empty
                 raise KeyError
         except KeyError:
-            if os.path.isdir(self.concept.path):
+            concept_path = self.get_concept_path(self.concept.path)
+            if concept_path:
                 self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
                 if self.concept.concept_stats["processing_time"] < 0.1:
                     self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s

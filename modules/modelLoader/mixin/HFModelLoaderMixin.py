@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 from abc import ABCMeta
 from itertools import repeat
 
@@ -288,3 +289,22 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             train_dtype,
             None,
         )
+
+    def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]):
+        is_local = os.path.isdir(pretrained_model_name_or_path)
+        if is_local:
+            return
+
+        diffusers_paths = [((folder + "/") if folder else "") + "diffusion_pytorch_model*" for folder in diffusers_modules]
+        transformers_paths = [((folder + "/") if folder else "") + "model*" for folder in transformers_modules]
+        transformers_paths.extend([((folder + "/") if folder else "") + "pytorch_model*" for folder in transformers_modules])
+        try:
+            huggingface_hub.snapshot_download(
+                pretrained_model_name_or_path,
+                allow_patterns=diffusers_paths + transformers_paths,
+            )
+        except huggingface_hub.errors.HFValidationError:
+            pass
+        except Exception:
+            traceback.print_exc()
+            print("Error during bulk preloading of Huggingface model repository, proceeding without preloading")
