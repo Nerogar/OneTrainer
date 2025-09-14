@@ -44,8 +44,8 @@ class ConfigList(metaclass=ABCMeta):
         self.is_full_width = is_full_width
 
         # From search-concepts
-        self.filters = {"search": "", "type": "ALL"}  # Single filter state
-        self.widgets_initialized = False  # Track if widgets are created
+        self.filters = {"search": "", "type": "ALL"}
+        self.widgets_initialized = False
 
         # From master
         self.toggle_button = None
@@ -72,12 +72,12 @@ class ConfigList(metaclass=ABCMeta):
             self.__load_current_config(getattr(self.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
-            components.button(self.top_frame, 0, 2, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=30, padx=5)
-            components.button(self.top_frame, 0, 3, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
+            components.button(self.top_frame, 0, 1, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=20, padx=5)
+            components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
         else:
             self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
             self.top_frame.grid(row=0, column=0, sticky="nsew")
-            components.button(self.top_frame, 0, 3, add_button_text, self.__add_element, width=30, padx=5)
+            components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, width=20, padx=5)
 
             self.current_config = getattr(self.train_config, self.attr_name)
 
@@ -86,7 +86,7 @@ class ConfigList(metaclass=ABCMeta):
 
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
-            self.toggle_button = components.button(self.top_frame, 0, 4, " ", self._toggle, tooltip="Disables/Enables all items in the current config", width=30, padx=5)
+            self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all items in the current config", width=30, padx=5)
             self._update_toggle_button_text()
 
 
@@ -102,6 +102,9 @@ class ConfigList(metaclass=ABCMeta):
     @abstractmethod
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
         pass
+
+    def _refresh_show_disabled_text(self):
+        return
 
     def _update_item_enabled_state(self):
         self._is_current_item_enabled = any(
@@ -125,12 +128,14 @@ class ConfigList(metaclass=ABCMeta):
             widget.ui_state.get_var(self.enable_key).set(enable_state)
         self.save_current_config()
 
+        self._update_widget_visibility()
+
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
             self.configs_dropdown.destroy()
 
         self.configs_dropdown = components.options_kv(
-            self.top_frame, 0, 1, self.configs, self.ui_state, self.attr_name, self.__load_current_config
+            self.top_frame, 0, 0, self.configs, self.ui_state, self.attr_name, self.__load_current_config
         )
         self._update_toggle_button_text()
 
@@ -147,7 +152,6 @@ class ConfigList(metaclass=ABCMeta):
         self._update_widget_visibility()
 
     def _initialize_all_widgets(self):
-        """Create all widgets once at startup"""
         self.widgets = []
         if self.element_list is not None:
             self.element_list.destroy()
@@ -169,7 +173,6 @@ class ConfigList(metaclass=ABCMeta):
             self.widgets.append(widget)
 
     def _update_widget_visibility(self):
-        """Update visibility and position of widgets based on filters"""
         visible_index = 0
 
         for i, widget in enumerate(self.widgets):
@@ -209,10 +212,8 @@ class ConfigList(metaclass=ABCMeta):
     def __add_element(self):
         new_element = self.create_new_element()
         self.current_config.append(new_element)
-
         self.widgets_initialized = False
         self._create_element_list()
-
         self.save_current_config()
 
     def __clone_element(self, clone_i, modify_element_fun=None):
@@ -220,20 +221,15 @@ class ConfigList(metaclass=ABCMeta):
 
         if modify_element_fun is not None:
             new_element = modify_element_fun(new_element)
-
         self.current_config.append(new_element)
-
         self.widgets_initialized = False
         self._create_element_list()
-
         self.save_current_config()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
-
         self.widgets_initialized = False
         self._create_element_list()
-
         self.save_current_config()
 
     def __load_current_config(self, filename):
@@ -264,18 +260,30 @@ class ConfigList(metaclass=ABCMeta):
                 )
         self._update_toggle_button_text()
 
+        if self.widgets_initialized:
+            with contextlib.suppress(Exception):
+                self._update_widget_visibility()
+
+        # let subclass refresh any show-disabled UI
+        with contextlib.suppress(Exception):
+            self._refresh_show_disabled_text()
+
     def _element_matches_filters(self, element):
-        """Override in subclasses to implement filter logic"""
-        return True  # Default: show all elements
+        return True  # Show all by default
 
     def __open_element_window(self, i, ui_state):
         if self.is_opening_window:
             return
         self.is_opening_window = True
-
-        window = self.open_element_window(i, ui_state)
-        self.master.wait_window(window)
-        self.widgets[i].configure_element()
-        self.save_current_config()
-
-        self.is_opening_window = False
+        try:
+            window = self.open_element_window(i, ui_state)
+            self.master.wait_window(window)
+            try:
+                if self.widgets is not None and 0 <= i < len(self.widgets):
+                    self.widgets[i].configure_element()
+            except Exception:
+                self.widgets_initialized = False
+                self._create_element_list()
+            self.save_current_config()
+        finally:
+            self.is_opening_window = False

@@ -44,7 +44,6 @@ class ConceptTab(ConfigList):
         return ConceptWindow(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
 
     def _add_search_bar(self):
-        """Add search and filter toolbar"""
         toolbar = ctk.CTkFrame(self.top_frame, fg_color="transparent")
         toolbar.grid(row=0, column=4, columnspan=2, padx=10, sticky="ew")
         toolbar.grid_columnconfigure(2, weight=1)
@@ -69,28 +68,28 @@ class ConceptTab(ConfigList):
 
         # Show disabled checkbox
         self.show_disabled_var = BooleanVar(value=True)
-        ctk.CTkCheckBox(toolbar, text="Show Disabled", variable=self.show_disabled_var,
-                        command=self._update_filters, width=100).grid(row=0, column=5, padx=(10,0))
+        self.show_disabled_checkbox = ctk.CTkCheckBox(toolbar, text="Show Disabled", variable=self.show_disabled_var,
+                                                      command=self._update_filters, width=100)
+        self.show_disabled_checkbox.grid(row=0, column=5, padx=(10,0))
+        self._refresh_show_disabled_text()
 
         # Clear button
         ctk.CTkButton(toolbar, text="Clear", width=50,
                       command=self._clear_filters).grid(row=0, column=6, padx=(10,0))
 
     def _update_filters(self):
-        """Update view with current filters"""
         self._create_element_list(search=self.search_var.get(),
                                   type=self.filter_var.get(),
                                   show_disabled=self.show_disabled_var.get())
+        self._refresh_show_disabled_text()
 
     def _clear_filters(self):
-        """Reset all filters"""
         self.search_var.set("")
         self.filter_var.set("ALL")
         self.show_disabled_var.set(True)
         self._update_filters()
 
     def _element_matches_filters(self, element):
-        """Combined filter matching"""
         # Check enabled status
         if not self.filters.get("show_disabled", True):
             if hasattr(element, 'enabled') and not element.enabled:
@@ -119,6 +118,18 @@ class ConceptTab(ConfigList):
             return False
 
         return True
+
+    def _refresh_show_disabled_text(self):
+        try:
+            disabled_count = sum(1 for c in getattr(self, 'current_config', []) if getattr(c, 'enabled', True) is False)
+        except Exception:
+            disabled_count = 0
+        text = f"Show Disabled ({disabled_count})" if disabled_count > 0 else "Show Disabled"
+        try:
+            if getattr(self, 'show_disabled_checkbox', None):
+                self.show_disabled_checkbox.configure(text=text)
+        except Exception:
+            pass
 
 
 class ConceptWidget(ctk.CTkFrame):
@@ -199,14 +210,13 @@ class ConceptWidget(ctk.CTkFrame):
 
     def configure_element(self):
         self.name_label.configure(text=self.__get_display_name())
-
         self.image.configure(light_image=self.__get_preview_image())
 
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
-        glob_pattern = "**/*.*" if self.concept.include_subdirectories else "*.*"
+        glob_pattern = "**/*.*" if getattr(self.concept, 'include_subdirectories', False) else "*.*"
 
-        if os.path.isdir(self.concept.path):
+        if getattr(self.concept, 'path', None) and os.path.isdir(self.concept.path):
             for path in pathlib.Path(self.concept.path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
@@ -214,7 +224,11 @@ class ConceptWidget(ctk.CTkFrame):
                     preview_path = path_util.canonical_join(self.concept.path, path)
                     break
 
-        image = load_image(preview_path, convert_mode="RGBA")
+        try:
+            image = load_image(preview_path, convert_mode="RGBA")
+        except Exception:
+            image = Image.new("RGBA", (150, 150), (200, 200, 200, 255))
+
         size = min(image.width, image.height)
         image = image.crop((
             (image.width - size) // 2,
@@ -229,5 +243,4 @@ class ConceptWidget(ctk.CTkFrame):
         index = getattr(self, 'visible_index', self.i)
         x = index % 6
         y = index // 6
-
         self.grid(row=y, column=x, pady=5, padx=5)
