@@ -33,6 +33,7 @@ class Optimizer(Enum):
 
     LION = 'LION'
     LION_8BIT = 'LION_8BIT'
+    LION_Adv = 'LION_Adv'
 
     RMSPROP = 'RMSPROP'
     RMSPROP_8BIT = 'RMSPROP_8BIT'
@@ -56,6 +57,7 @@ class Optimizer(Enum):
     PRODIGY = 'PRODIGY'
     PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
     PRODIGY_Adv = 'PRODIGY_Adv'
+    LION_PRODIGY_Adv = 'LION_PRODIGY_Adv'
 
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
@@ -81,6 +83,7 @@ class Optimizer(Enum):
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
             self.PRODIGY_Adv,
+            self.LION_PRODIGY_Adv,
         ]
 
     @property
@@ -102,6 +105,8 @@ class Optimizer(Enum):
             Optimizer.ADOPT_Adv,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
             Optimizer.PRODIGY_Adv,
+            Optimizer.LION_Adv,
+            Optimizer.LION_PRODIGY_Adv,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

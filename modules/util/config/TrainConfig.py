@@ -112,6 +112,7 @@ class TrainOptimizerConfig(BaseConfig):
     use_atan2: False
     use_AdEMAMix: False
     beta3_ema: float
+    variance_reduction: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -200,6 +201,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_atan2", False, bool, False))
         data.append(("use_AdEMAMix", False, bool, False))
         data.append(("beta3_ema", None, float, True))
+        data.append(("variance_reduction", False, bool, False))
 
         return TrainOptimizerConfig(data)
 

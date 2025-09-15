@@ -166,6 +166,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_atan2': {'title': 'Use Atan2', 'tooltip': 'A robust replacement for eps (no tuning required), which also incorporates gradient clipping. (If True, eps is ignored).', 'type': 'bool'},
             'use_AdEMAMix': {'title': 'Use AdEMAMix', 'tooltip': 'Adds a second, slow-moving EMA, which is combined with the primary momentum to stabilize updates, especially during long runs of full finetuning.', 'type': 'bool'},
             'beta3_ema': {'title': 'Beta3 EMA', 'tooltip': 'Coefficient for slow-moving EMA of AdEMAMix.', 'type': 'float'},
+            'variance_reduction': {'title': 'Variance Reduction', 'tooltip': 'Adds an additional state to store gradients from the previous step, reducing variance in momentum. This leads to faster convergence and greater stability.', 'type': 'bool'},
         }
         # @formatter:on
 
