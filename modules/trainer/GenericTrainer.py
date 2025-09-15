@@ -574,7 +574,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.only_cache:
             self.callbacks.on_update_status("caching")
-            for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
+            for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0):
                 self.data_loader.get_data_set().start_next_epoch()
             return
 
@@ -628,7 +628,7 @@ class GenericTrainer(BaseTrainer):
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
-                             initial=train_progress.epoch_step)
+                             initial=train_progress.epoch_step, smoothing=0.1)
             for batch in step_tqdm:
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs, step_tqdm.format_dict['rate'], epoch_tqdm.format_dict['rate'])
 
