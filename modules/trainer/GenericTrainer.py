@@ -567,10 +567,6 @@ class GenericTrainer(BaseTrainer):
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
 
-    def _update_and_log_training_status(self, train_progress: TrainProgress):
-        with contextlib.suppress(Exception):
-            self.callbacks.on_update_status(self._get_training_status(train_progress))
-
     def train(self):
         train_device = torch.device(self.config.train_device)
 
