@@ -21,6 +21,7 @@ class Optimizer(Enum):
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
+    Simplified_AdEMAMix = "Simplified_AdEMAMix"
 
     ADOPT = 'ADOPT'
     ADOPT_Adv = 'ADOPT_Adv'
@@ -103,6 +104,7 @@ class Optimizer(Enum):
             Optimizer.ADAMW,
             Optimizer.ADAMW_Adv,
             Optimizer.ADOPT_Adv,
+            Optimizer.Simplified_AdEMAMix,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
             Optimizer.PRODIGY_Adv,
             Optimizer.LION_Adv,

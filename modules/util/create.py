@@ -1068,6 +1068,27 @@ def create_optimizer(
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3_ema if optimizer_config.beta3_ema is not None else 0.9999,
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+            )
+
+        # Simplified_AdEMAMix Optimizer
+        case Optimizer.Simplified_AdEMAMix:
+            from adv_optm import Simplified_AdEMAMix
+            optimizer = Simplified_AdEMAMix(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.99,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                beta1_warmup=optimizer_config.beta1_warmup if optimizer_config.beta1_warmup is not None else None,
+                min_beta1=optimizer_config.min_beta1 if optimizer_config.min_beta1 is not None else 0.9,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else True,
+                factored=optimizer_config.factored if optimizer_config.factored is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
             )
 
         # LION_Adv Optimizer

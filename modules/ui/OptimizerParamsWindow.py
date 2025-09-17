@@ -167,6 +167,10 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_AdEMAMix': {'title': 'Use AdEMAMix', 'tooltip': 'Adds a second, slow-moving EMA, which is combined with the primary momentum to stabilize updates, especially during long runs of full finetuning.', 'type': 'bool'},
             'beta3_ema': {'title': 'Beta3 EMA', 'tooltip': 'Coefficient for slow-moving EMA of AdEMAMix.', 'type': 'float'},
             'variance_reduction': {'title': 'Variance Reduction', 'tooltip': 'Adds an additional state to store gradients from the previous step, reducing variance in momentum. This leads to faster convergence and greater stability.', 'type': 'bool'},
+            'alpha_grad': {'title': 'Grad α Smoothing Factor', 'tooltip': 'Controls the mixing coefficient between raw gradients and EMA gradients. Higher values (e.g., 10-100) emphasize recent gradients, suitable for small batch sizes to reduce noise. Lower values (e.g., 0-1) emphasize historical gradients, suitable for large batch sizes for stability. Setting to 0 uses only momentum gradients without raw gradient contribution.', 'type': 'float'},
+            'beta1_warmup': {'title': 'Beta1 Warmup Steps', 'tooltip': 'Number of warmup steps to gradually increase beta1 from Minimum Beta1 Value to its final value. During warmup, beta1 increases linearly. leave it empty to disable warmup and use constant beta1.', 'type': 'int'},
+            'min_beta1': {'title': 'Minimum Beta1', 'tooltip': 'Starting beta1 value for warmup scheduling. Used only when beta1 warmup is enabled. Lower values allow faster initial adaptation, while higher values provide more smoothing. The final beta1 value is specified in the beta1 parameter.', 'type': 'float'},
+            'Simplified_AdEMAMix': {'title': 'Use Simplified AdEMAMix', 'tooltip': "Enables the Simplified AdEMAMix update rule, which is often more aggressive and responsive than standard Adam. It changes the update to be a mix of the current gradient and its moving average, controlled by 'Grad α'. This mode is incompatible with and will override standard AdEMAMix, Cautious, Grams, and Atan2 methods.", 'type': 'bool'},
         }
         # @formatter:on
 
