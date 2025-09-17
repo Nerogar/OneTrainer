@@ -183,9 +183,15 @@ class BaseChromaSetup(
             )
 
             latent_image = batch['latent_image']
-            scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
+            if 'image_attention_mask' in batch:
+                image_attention_mask = batch['image_attention_mask']
+            else:
+                image_attention_mask = torch.ones(1, dtype=torch.bool, device=latent_image.device)
+                image_attention_mask = image_attention_mask.expand(latent_image.shape[0], latent_image.shape[2], latent_image.shape[3])
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
+            #even though there is no attention to masked tokens, we 0 them anyway to avoid loss values from noise:
+            scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor * image_attention_mask.unsqueeze(dim=1)
+            latent_noise = self._create_noise(scaled_latent_image, config, generator) * image_attention_mask.unsqueeze(dim=1)
 
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
@@ -218,28 +224,39 @@ class BaseChromaSetup(
                 model.train_dtype.torch_dtype()
             )
 
-            packed_latent_input = model.pack_latents(
+            (packed_latent_input, packed_image_attention_mask) = model.pack_latents(
                 latent_input,
                 latent_input.shape[0],
                 latent_input.shape[1],
                 latent_input.shape[2],
                 latent_input.shape[3],
+                mask=image_attention_mask,
             )
 
-            image_seq_len = packed_latent_input.shape[1]
-            image_attention_mask = torch.full((packed_latent_input.shape[0], image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)
-            attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
+            #prune all image tokens that are masked in all batch samples for efficiency
+            packed_predicted_flow = torch.zeros_like(packed_latent_input)
+            token_idx = packed_image_attention_mask.any(dim=0)
+            packed_image_attention_mask = packed_image_attention_mask[:, token_idx]
+            image_ids = image_ids[token_idx, :]
+            packed_latent_input = packed_latent_input[:, token_idx, :]
+            #Note: More tokens could be pruned by removing all tokens that are masked in each batch sample, not only tokens that are masked in the entire batch. However, this would
+            #      require that image_ids (which are translated to positional embeddings) can be passed to the transformer for each batch sample, not only for the entire batch.
+            #      Unfortunately, diffusers have removed that: https://github.com/huggingface/diffusers/blob/764b62473ac10afd9c52e6b3f3f528f719bc7a34/src/diffusers/models/transformers/transformer_chroma.py#L549
 
-            packed_predicted_flow = model.transformer(
+            attention_mask = torch.cat([text_attention_mask, packed_image_attention_mask], dim=1)
+
+            transformer_output = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
                 img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
                 attention_mask=attention_mask,
-                joint_attention_kwargs=None,
                 return_dict=True
             ).sample
+            packed_predicted_flow[:, token_idx, :] = transformer_output * packed_image_attention_mask.unsqueeze(-1)
+
+
 
             predicted_flow = model.unpack_latents(
                 packed_predicted_flow,

@@ -285,7 +285,6 @@ class BaseFluxSetup(
                 latent_input.shape[2],
                 latent_input.shape[3],
             )
-
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
