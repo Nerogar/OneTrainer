@@ -273,7 +273,7 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
         torch_gc()
 
-        self.callbacks.on_update_status("sampling")
+        self.callbacks.on_update_status("Sampling ...")
 
         is_custom_sample = False
         if not sample_params_list:
@@ -591,7 +591,7 @@ class GenericTrainer(BaseTrainer):
         ema_loss = None
         ema_loss_steps = 0
 
-        epoch_tqdm = tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0.1)
+        epoch_tqdm = tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0.11)
         for _epoch in epoch_tqdm:
             self.callbacks.on_update_status("starting epoch/caching")
 
@@ -673,7 +673,7 @@ class GenericTrainer(BaseTrainer):
                     if transferred_to_temp_device:
                         self.model_setup.setup_train_device(self.model, self.config)
 
-                self.callbacks.on_update_status("training")
+                self.callbacks.on_update_status("Training ...")
 
                 with TorchMemoryRecorder(enabled=False):
                     prior_pred_indices = [i for i in range(self.config.batch_size)

@@ -159,10 +159,16 @@ class TrainUI(ctk.CTk):
 
         self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.status_label = components.label(frame, 0, 1, "",
+        # status + ETA container
+        self.status_frame = ctk.CTkFrame(frame, corner_radius=0, fg_color="transparent")
+        self.status_frame.grid(row=0, column=1, sticky="w")
+        self.status_frame.grid_rowconfigure(0, weight=0)
+        self.status_frame.grid_rowconfigure(1, weight=0)
+        self.status_frame.grid_columnconfigure(0, weight=1)
+
+        self.status_label = components.label(self.status_frame, 0, 0, "", pad=0,
                                              tooltip="Current status of the training run")
-        self.eta_label = components.label(frame, 1, 1, "",
-                                             tooltip="ETA")
+        self.eta_label = components.label(self.status_frame, 1, 0, "", pad=0)
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
@@ -601,17 +607,17 @@ class TrainUI(ctk.CTk):
 
         spent_on_current_epoch = train_progress.epoch_step / step_rate if step_rate is not None else 0
         if epoch_rate is None:
-#            spent_total = spent_on_current_epoch #only needed for Estimating...
+            spent_total = spent_on_current_epoch
             total_eta = (spent_on_current_epoch / train_progress.global_step) * max_step * max_epoch - spent_on_current_epoch
         else:
             epochs_eta = (max_epoch - train_progress.epoch) / epoch_rate
             total_eta = max(epochs_eta - spent_on_current_epoch, 0)
 
-#            spent_on_done_epochs = train_progress.epoch / epoch_rate #only needed for Estimating...
-#            spent_total = spent_on_done_epochs + spent_on_current_epoch #only needed for Estimating...
+            spent_on_done_epochs = train_progress.epoch / epoch_rate
+            spent_total = spent_on_done_epochs + spent_on_current_epoch
 
-#        if spent_total is None or spent_total < 30:
-#            return "Estimating..."
+        if spent_total is None or spent_total < 30:
+            return "Estimating ..."
 
         td = datetime.timedelta(seconds=total_eta)
         days = td.days
@@ -621,15 +627,17 @@ class TrainUI(ctk.CTk):
             return f"{days}d {hours}h"
         elif hours > 0:
             return f"{hours}h {minutes}m"
-#        elif minutes > 0:
-#            return f"{minutes}m"
         elif minutes > 0:
             return f"{minutes}m {seconds}s"
         else:
             return f"{seconds}s"
 
     def set_eta_label(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None):
-        self.eta_label.configure(text=self._calculate_eta_string(train_progress, max_step, max_epoch, step_rate, epoch_rate))
+        eta_str = self._calculate_eta_string(train_progress, max_step, max_epoch, step_rate, epoch_rate)
+        if eta_str is not None:
+            self.eta_label.configure(text=f"ETA: {eta_str}")
+        else:
+            self.eta_label.configure(text="")
 
     def delete_eta_label(self):
         self.eta_label.configure(text="")
@@ -667,7 +675,6 @@ class TrainUI(ctk.CTk):
         self.profiling_window.deiconify()
 
     def generate_debug_package(self):
-        """Generates a zip file containing an anonymized config and a debug report."""
         zip_path = filedialog.askdirectory(
             initialdir=".",
             title="Select Directory to Save Debug Package"
