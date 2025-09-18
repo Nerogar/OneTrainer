@@ -738,9 +738,9 @@ class TrainUI(ctk.CTk):
         torch_gc()
 
         if error_caught:
-            self.on_update_status("error: check the console for more information")
+            self.on_update_status("Error: check the console for details")
         else:
-            self.on_update_status("stopped")
+            self.on_update_status("Stopped")
         self.delete_eta_label()
 
         # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
@@ -763,7 +763,7 @@ class TrainUI(ctk.CTk):
             self.training_thread.start()
         else:
             self._set_training_button_stopping()
-            self.on_update_status("stopping")
+            self.on_update_status("Stopping ...")
             self.training_commands.stop()
 
     def save_default(self):
