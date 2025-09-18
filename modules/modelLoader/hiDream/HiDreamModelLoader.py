@@ -64,6 +64,34 @@ class HiDreamModelLoader(
             include_text_encoder_3: bool,
             include_text_encoder_4: bool,
     ):
+        diffusers_sub = []
+        transformers_sub = []
+
+        diffusers_sub.append("transformer")
+        if include_text_encoder_1:
+            transformers_sub.append("text_encoder")
+        if include_text_encoder_2:
+            transformers_sub.append("text_encoder_2")
+        if include_text_encoder_3:
+            transformers_sub.append("text_encoder_3")
+        if include_text_encoder_4:
+            if text_encoder_4_model_name:
+                self._prepare_sub_modules(
+                    text_encoder_4_model_name,
+                    transformers_modules=[""],
+                    diffusers_modules=[],
+                )
+            else:
+                transformers_sub.append("text_encoder_4")
+        if not vae_model_name:
+            diffusers_sub.append("vae")
+
+        self._prepare_sub_modules(
+            base_model_name,
+            diffusers_modules=diffusers_sub,
+            transformers_modules=transformers_sub,
+        )
+
         tokenizer_1 = CLIPTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
@@ -177,22 +205,6 @@ class HiDreamModelLoader(
         model.text_encoder_4 = text_encoder_4
         model.vae = vae
         model.transformer = transformer
-
-    def __load_ckpt(
-            self,
-            model: HiDreamModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            text_encoder_4_model_name: str,
-            vae_model_name: str,
-            include_text_encoder_1: bool,
-            include_text_encoder_2: bool,
-            include_text_encoder_3: bool,
-            include_text_encoder_4: bool,
-    ):
-        # TODO
-        pass
 
     def __load_safetensors(
             self,
