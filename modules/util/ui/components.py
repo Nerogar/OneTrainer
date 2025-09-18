@@ -141,6 +141,8 @@ def entry(
     original_destroy = component.destroy
 
     def new_destroy():
+        # 'temporary' fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
+        # unfortunately Tom has admitted to forgetting about how to maintain CTK so this likely will never be merged
         nonlocal validation_after_id, revert_after_id
         if component._textvariable_callback_name:
             component._textvariable.trace_remove("write", component._textvariable_callback_name)
