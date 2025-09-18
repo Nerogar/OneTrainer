@@ -572,6 +572,18 @@ class GenericTrainer(BaseTrainer):
 
         train_progress = self.model.train_progress
 
+        # Abort early if no concepts are enabled or empty dataset.
+        # prevents useless caching and division by zero
+        try:
+            initial_epoch_length = self.data_loader.get_data_set().approximate_length()
+        except Exception:
+            initial_epoch_length = 0
+        if initial_epoch_length == 0:
+            self.callbacks.on_update_status(
+                "No concepts enabled or dataset is empty; aborting"
+            )
+            return
+
         if self.config.only_cache:
             self.callbacks.on_update_status("caching")
             for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):

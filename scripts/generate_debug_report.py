@@ -820,7 +820,6 @@ class SoftwareInfo:
         Retrieve Git information including repository details (user and repo name),
         the current branch, commit hash, and any modified files compared to the upstream branch.
         """
-        # Get remote repository URL info for fork detection.
         remote_url = Utility.run_command(
             ["git", "config", "--get", "remote.origin.url"]
         )
@@ -849,47 +848,29 @@ class SoftwareInfo:
             Utility.run_command(["git", "rev-parse", "HEAD"])
             or "Unavailable"
         )
-        # Insert repo info at the top, followed by branch and commit.
         git_info = f"{repo_info}\nBranch: {branch}\nCommit: {commit}"
 
-        # Check for untracked files
-        untracked_files = Utility.run_command(
-            ["git", "ls-files", "--others", "--exclude-standard"]
+        origin_ref = "origin/master"
+        origin_exists = Utility.run_command(
+            ["git", "rev-parse", "--verify", "--quiet", origin_ref]
         )
-        if untracked_files and untracked_files.strip():
-            untracked_list = "\n".join(
-                f"  {line}" for line in untracked_files.splitlines()
-            )
-            git_info += f"\nUntracked Files:\n{untracked_list}"
-        else:
-            git_info += "\nNo untracked files."
+        if origin_exists:
 
-        # Check for modified files relative to upstream
-        upstream = Utility.run_command(
-            [
-                "git",
-                "rev-parse",
-                "--abbrev-ref",
-                "--symbolic-full-name",
-                "@{u}",
-            ]
-        )
-        if upstream:
-            diff_files = (
-                Utility.run_command(["git", "diff", "--name-only", "@{u}"])
-                or ""
-            )
-            if diff_files.strip():
-                modified_files = "\n".join(
-                    f"  {line}" for line in diff_files.splitlines()
-                )
-                git_info += f"\nModified Files (differs from {upstream}):\n{modified_files}"
+            diff_output = Utility.run_command(
+                ["git", "diff", "--name-status", "--diff-filter=DMU", origin_ref]
+            ) or ""
+            if diff_output.strip():
+                files = []
+                for line in diff_output.splitlines():
+                    parts = line.split("\t")
+                    if len(parts) >= 2:
+                        files.append(parts[-1])  # path is last column
+                modified_files = "\n".join(f"  {p}" for p in files)
+                git_info += f"\nChanged files relative to {origin_ref} (D/M/U only):\n{modified_files}"
             else:
-                git_info += f"\nNo modifications relative to upstream ({upstream})."
+                git_info += f"\nNo deleted, unmerged, or modified files relative to {origin_ref}."
         else:
-            git_info += (
-                "\nNo upstream branch tracking information available."
-            )
+            git_info += f"\nNo remote tracking branch found at {origin_ref}."
 
         return git_info
 
