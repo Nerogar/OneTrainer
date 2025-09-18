@@ -743,7 +743,7 @@ class TrainUI(ctk.CTk):
             self.on_update_status("stopped")
         self.delete_eta_label()
 
-
+        # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
         self.after(0, self._set_training_button_idle)
 
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
