@@ -266,24 +266,43 @@ class UIState:
                     var = self.__vars[name]
                     var.set(str(obj_var))
 
-    def get_decl(self, name: str) -> tuple[type, bool]:
-        """Return (declared_type_or_runtime_type, nullable_flag) in one traversal."""
-        obj = self.obj
-        declared_type = None
-        nullable = False
-        for part in name.split('.'):
-            if isinstance(obj, BaseConfig):
-                if part in obj.types:
-                    declared_type = obj.types[part]
-                if part in obj.nullables:
-                    nullable = obj.nullables[part]
-            obj = getattr(obj, part)
-        if declared_type is None:
-            declared_type = type(obj)
-        return declared_type, nullable
-
     def get_type(self, name: str):
-        return self.get_decl(name)[0]
+        parent_config, field_name, obj = self.__resolve_path(name)
+        if isinstance(parent_config, BaseConfig) and field_name is not None:
+            return parent_config.types.get(field_name, type(obj))
+        return type(obj)
 
     def get_nullable(self, name: str) -> bool:
-        return self.get_decl(name)[1]
+        parent_config, field_name, _ = self.__resolve_path(name)
+        if isinstance(parent_config, BaseConfig) and field_name is not None:
+            return parent_config.nullables.get(field_name, False)
+        return False
+
+    def __resolve_path(self, name: str) -> tuple[BaseConfig | None, str | None, Any]:
+        """Resolve dotted path and return (parent_config, field_name, value).
+
+        - parent_config: last BaseConfig before field_name (or None)
+        - field_name: final attribute name (or None)
+        - value: resolved value, or last reachable object if resolution fails
+        """
+        obj: Any = self.obj
+        parent_config: BaseConfig | None = None
+        field_name: str | None = None
+        for part in name.split('.'):  # walk path
+            if isinstance(obj, BaseConfig):
+                parent_config = obj
+                field_name = part
+            try:
+                obj = getattr(obj, part)
+            except Exception:
+                try:
+                    obj = obj[part]
+                except Exception:
+                    break
+        return parent_config, field_name, obj
+
+    def get_default(self, name: str):
+        parent_config, field_name, _ = self.__resolve_path(name)
+        if isinstance(parent_config, BaseConfig) and field_name in parent_config.default_values:
+            return parent_config.default_values[field_name]
+        return None

@@ -67,6 +67,7 @@ def entry(
 
     validation_after_id = None
     revert_after_id = None
+    touched = False
 
     DEBOUNCE_STOP_TYPING_MS = 1500
     DEBOUNCED_INVALID_REVERT_MS = 1000
@@ -77,7 +78,8 @@ def entry(
 
     def validate_value(value: str, revert_delay_ms: int | None) -> bool:
         nonlocal revert_after_id, last_valid_value
-        declared_type, nullable = ui_state.get_decl(var_name)
+        declared_type = ui_state.get_type(var_name)
+        nullable = ui_state.get_nullable(var_name)
 
         if revert_after_id:
             with contextlib.suppress(Exception):
@@ -107,6 +109,9 @@ def entry(
             if nullable:
                 return success()
             if declared_type is str:
+                default_val = ui_state.get_default(var_name)
+                if default_val == "":
+                    return success()
                 return fail("Value required")
 
         try:
@@ -123,6 +128,13 @@ def entry(
 
     def debounced_validate(*_):
         nonlocal validation_after_id, revert_after_id
+        # skip validation for programmatic changes
+        if not touched:
+            if validation_after_id:
+                with contextlib.suppress(Exception):
+                    component.after_cancel(validation_after_id)
+                validation_after_id = None
+            return
         if revert_after_id:
             with contextlib.suppress(Exception):
                 component.after_cancel(revert_after_id)
@@ -136,7 +148,25 @@ def entry(
         )
 
     validation_trace_name = var.trace_add("write", debounced_validate)
-    component.bind("<FocusOut>", lambda e: validate_value(var.get(), FOCUSOUT_INVALID_REVERT_MS))
+
+    def on_focus_in(_e=None):
+        nonlocal touched
+        touched = False
+
+    def on_user_input(_e=None):
+        nonlocal touched
+        touched = True
+
+    def on_focus_out(_e=None):
+        # only validate on focus-out if the user interacted with the field.
+        if touched:
+            validate_value(var.get(), FOCUSOUT_INVALID_REVERT_MS)
+
+    component.bind("<FocusIn>", on_focus_in)
+    component.bind("<Key>", on_user_input)
+    component.bind("<<Paste>>", on_user_input)
+    component.bind("<<Cut>>", on_user_input)
+    component.bind("<FocusOut>", on_focus_out)
 
     original_destroy = component.destroy
 
