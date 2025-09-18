@@ -455,6 +455,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_coef": 1.0,
         "growth_rate": float('inf'),
         "slice_p": 11,
+        "prodigy_steps": 0,
         "use_atan2": True,
         "use_cautious": False,
         "use_grams": False,
@@ -489,7 +490,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fused_back_pass": False,
         "use_cautious": False,
         "use_orthograd": False,
-        "variance_reduction": False,
     },
     Optimizer.LION_PRODIGY_Adv: {
         "beta1": 0.9,
@@ -506,7 +506,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "slice_p": 11,
         "use_cautious": False,
         "use_orthograd": False,
-        "variance_reduction": False,
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

@@ -1061,6 +1061,7 @@ def create_optimizer(
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
                 growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
+                prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
                 use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
                 use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
@@ -1105,7 +1106,6 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
                 use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
-                variance_reduction=optimizer_config.variance_reduction if optimizer_config.variance_reduction is not None else False,
             )
 
         # LION_PRODIGY_Adv Optimizer
@@ -1127,7 +1127,6 @@ def create_optimizer(
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
                 use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
                 use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
-                variance_reduction=optimizer_config.variance_reduction if optimizer_config.variance_reduction is not None else False,
             )
 
         # ADABELIEF Optimizer
