@@ -1042,6 +1042,8 @@ def create_optimizer(
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
             )
 
         # PRODIGY_Adv Optimizer

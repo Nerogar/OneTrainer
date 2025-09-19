@@ -441,6 +441,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_AdEMAMix": False,
         "beta3_ema": 0.9999,
         "alpha": 5,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
     },
     Optimizer.PRODIGY_Adv: {
         "beta1": 0.9,
