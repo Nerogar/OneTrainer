@@ -34,6 +34,8 @@ class ModelType(Enum):
 
     CHROMA_1 = 'CHROMA_1'
 
+    QWEN = 'QWEN'
+
     def __str__(self):
         return self.value
 
@@ -78,6 +80,9 @@ class ModelType(Enum):
 
     def is_chroma(self):
         return self == ModelType.CHROMA_1
+
+    def is_qwen(self):
+        return self == ModelType.QWEN
 
     def is_sana(self):
         return self == ModelType.SANA
