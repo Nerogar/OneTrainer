@@ -470,7 +470,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
     },
     Optimizer.Simplified_AdEMAMix: {
         "beta1": 0.99,
-        "beta2": 0.999,
+        "beta2": 0.99,
         "eps": 1e-8,
         "weight_decay": 0.0,
         "alpha_grad": 100.0,
