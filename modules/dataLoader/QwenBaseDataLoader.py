@@ -219,8 +219,8 @@ class QwenBaseDataLoader(
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
-        enumerate_input = self._enumerate_input_modules(config)
-        load_input = self._load_input_modules(config, model.train_dtype)
+        enumerate_input = self._enumerate_input_modules(config, allow_videos=False) #don't allow video files, but...
+        load_input = self._load_input_modules(config, model.train_dtype, allow_video=True) #...Qwen has a video-capable VAE: convert images to video dimensions
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, 64)
         crop_modules = self._crop_modules(config)
