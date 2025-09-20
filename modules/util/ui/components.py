@@ -61,7 +61,7 @@ def entry(
     try:
         original_border_color = component.cget("border_color")
     except Exception:
-        original_border_color = "gray50"  # fallback
+        original_border_color = "gray50"
 
     error_border_color = "#dc3545"
 
@@ -73,13 +73,14 @@ def entry(
     DEBOUNCED_INVALID_REVERT_MS = 1000
     FOCUSOUT_INVALID_REVERT_MS = 1200
 
-    # Track last valid value (start with current)
     last_valid_value = var.get()
 
     def validate_value(value: str, revert_delay_ms: int | None) -> bool:
         nonlocal revert_after_id, last_valid_value
-        declared_type = ui_state.get_type(var_name)
-        nullable = ui_state.get_nullable(var_name)
+        meta = ui_state.get_field_metadata(var_name)
+        declared_type = meta.type
+        nullable = meta.nullable
+        default_val = meta.default
 
         if revert_after_id:
             with contextlib.suppress(Exception):
@@ -96,7 +97,7 @@ def entry(
             var.set(last_valid_value)
             component.configure(border_color=original_border_color)
 
-        def fail(reason: str):
+        def fail(_reason: str):
             nonlocal revert_after_id
             component.configure(border_color=error_border_color)
             if revert_delay_ms is not None:
@@ -109,7 +110,6 @@ def entry(
             if nullable:
                 return success()
             if declared_type is str:
-                default_val = ui_state.get_default(var_name)
                 if default_val == "":
                     return success()
                 return fail("Value required")
@@ -121,14 +121,13 @@ def entry(
                 float(value)
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
-                    return fail(f"Invalid bool: {value}")
+                    return fail("Invalid bool")
             return success()
         except ValueError:
-            return fail(f"Invalid value for {declared_type}: {value}")
+            return fail("Invalid value")
 
     def debounced_validate(*_):
         nonlocal validation_after_id, revert_after_id
-        # skip validation for programmatic changes
         if not touched:
             if validation_after_id:
                 with contextlib.suppress(Exception):

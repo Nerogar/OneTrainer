@@ -1,6 +1,7 @@
 import contextlib
 import tkinter as tk
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -16,6 +17,11 @@ class UIState:
     def __init__(self, master, obj):
         self.master = master
         self.obj = obj
+
+        self.__var_types: dict[str, type] = {}
+        self.__var_nullables: dict[str, bool] = {}
+        self.__var_defaults: dict[str, Any] = {}
+
         self.__vars = self.__create_vars(obj)
         self.__var_traces = {name: {} for name in self.__vars}
         self.__latest_var_trace_id = 0
@@ -167,6 +173,11 @@ class UIState:
 
         if is_config:
             for name, var_type in obj.types.items():
+                self.__var_types[name] = var_type
+                self.__var_nullables[name] = obj.nullables.get(name, False)
+                if hasattr(obj, "default_values"):
+                    self.__var_defaults[name] = obj.default_values.get(name, None)
+
                 obj_var = getattr(obj, name)
                 if issubclass_safe(var_type, BaseConfig):
                     var = UIState(self.master, obj_var)
@@ -200,6 +211,11 @@ class UIState:
             iterable = obj.items() if is_dict else vars(obj).items()
 
             for name, obj_var in iterable:
+                # store discovered runtime type & non-nullable
+                self.__var_types.setdefault(name, type(obj_var))
+                self.__var_nullables.setdefault(name, False)
+                self.__var_defaults.setdefault(name, None)
+
                 if isinstance(obj_var, str):
                     var = tk.StringVar(master=self.master)
                     var.set(obj_var)
@@ -266,43 +282,28 @@ class UIState:
                     var = self.__vars[name]
                     var.set(str(obj_var))
 
-    def get_type(self, name: str):
-        parent_config, field_name, obj = self.__resolve_path(name)
-        if isinstance(parent_config, BaseConfig) and field_name is not None:
-            return parent_config.types.get(field_name, type(obj))
-        return type(obj)
+    # metadata api
+    def _resolve_state_and_leaf(self, name: str):
+        parts = name.split('.')
+        state: UIState = self
+        for part in parts[:-1]:
+            state = state.get_var(part)
+            if not isinstance(state, UIState):
+                return None, None
+        return state, parts[-1]
 
-    def get_nullable(self, name: str) -> bool:
-        parent_config, field_name, _ = self.__resolve_path(name)
-        if isinstance(parent_config, BaseConfig) and field_name is not None:
-            return parent_config.nullables.get(field_name, False)
-        return False
+    @dataclass(frozen=True)
+    class VarMeta:
+        type: type | None
+        nullable: bool
+        default: Any
 
-    def __resolve_path(self, name: str) -> tuple[BaseConfig | None, str | None, Any]:
-        """Resolve dotted path and return (parent_config, field_name, value).
-
-        - parent_config: last BaseConfig before field_name (or None)
-        - field_name: final attribute name (or None)
-        - value: resolved value, or last reachable object if resolution fails
-        """
-        obj: Any = self.obj
-        parent_config: BaseConfig | None = None
-        field_name: str | None = None
-        for part in name.split('.'):  # walk path
-            if isinstance(obj, BaseConfig):
-                parent_config = obj
-                field_name = part
-            try:
-                obj = getattr(obj, part)
-            except Exception:
-                try:
-                    obj = obj[part]
-                except Exception:
-                    break
-        return parent_config, field_name, obj
-
-    def get_default(self, name: str):
-        parent_config, field_name, _ = self.__resolve_path(name)
-        if isinstance(parent_config, BaseConfig) and field_name in parent_config.default_values:
-            return parent_config.default_values[field_name]
-        return None
+    def get_field_metadata(self, name: str) -> "UIState.VarMeta":
+        state, leaf = self._resolve_state_and_leaf(name)
+        if state is None:
+            return UIState.VarMeta(None, False, None)
+        return UIState.VarMeta(
+            state.__var_types.get(leaf),
+            state.__var_nullables.get(leaf, False),
+            state.__var_defaults.get(leaf, None),
+        )
