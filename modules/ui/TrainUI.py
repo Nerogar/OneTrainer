@@ -1,4 +1,5 @@
 import ctypes
+import datetime
 import json
 import os
 import platform
@@ -12,6 +13,7 @@ from contextlib import suppress
 from pathlib import Path
 from tkinter import filedialog
 
+import scripts.generate_debug_report
 from modules.trainer.CloudTrainer import CloudTrainer
 from modules.trainer.GenericTrainer import GenericTrainer
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
@@ -62,6 +64,32 @@ class TrainUI(ctk.CTk):
     training_callbacks: TrainCallbacks | None
     training_commands: TrainCommands | None
 
+    _TRAIN_BUTTON_STYLES = {
+        "idle": {
+            "text": "Start Training",
+            "state": "normal",
+            "fg_color": "#198754",
+            "hover_color": "#146c43",
+            "text_color": "white",
+            "text_color_disabled": "white",
+        },
+        "running": {
+            "text": "Stop Training",
+            "state": "normal",
+            "fg_color": "#dc3545",
+            "hover_color": "#bb2d3b",
+            "text_color": "white",
+        },
+        "stopping": {
+            "text": "Stopping...",
+            "state": "disabled",
+            "fg_color": "#dc3545",
+            "hover_color": "#dc3545",
+            "text_color": "white",
+            "text_color_disabled": "white",
+        },
+    }
+
     def __init__(self):
         super().__init__()
 
@@ -83,6 +111,7 @@ class TrainUI(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
 
         self.status_label = None
+        self.eta_label = None
         self.training_button = None
         self.export_button = None
         self.tabview = None
@@ -139,22 +168,39 @@ class TrainUI(ctk.CTk):
 
         self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
-        self.status_label = components.label(frame, 0, 1, "",
+        # status + ETA container
+        self.status_frame = ctk.CTkFrame(frame, corner_radius=0, fg_color="transparent")
+        self.status_frame.grid(row=0, column=1, sticky="w")
+        self.status_frame.grid_rowconfigure(0, weight=0)
+        self.status_frame.grid_rowconfigure(1, weight=0)
+        self.status_frame.grid_columnconfigure(0, weight=1)
+
+        self.status_label = components.label(self.status_frame, 0, 0, "", pad=0,
                                              tooltip="Current status of the training run")
+        self.eta_label = components.label(self.status_frame, 1, 0, "", pad=0)
 
         # padding
         frame.grid_columnconfigure(2, weight=1)
 
-        # tensorboard button
-        components.button(frame, 0, 3, "Tensorboard", self.open_tensorboard)
-
-        # training button
-        self.training_button = components.button(frame, 0, 4, "Start Training", self.start_training)
 
         # export button
-        self.export_button = components.button(frame, 0, 5, "Export", self.export_training,
-                                               tooltip="Export the current configuration as a script to run without a UI")
+        self.export_button = components.button(frame, 0, 3, "Export", self.export_training,
+                                             width=60, padx=5, pady=(15, 0),
+                                             tooltip="Export the current configuration as a script to run without a UI")
 
+        # debug button
+        components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+                                       width=60, padx=(5, 25), pady=(15, 0),
+                                       tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+
+        # tensorboard button
+        components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
+                                             width=100, padx=(0, 5), pady=(15, 0))
+
+        # training button
+        self.training_button = components.button(frame, 0, 6, "Start Training", self.start_training,
+                                                 padx=(5, 20), pady=(15, 0))
+        self._set_training_button_style("idle")  # centralized styling
 
         return frame
 
@@ -564,11 +610,53 @@ class TrainUI(ctk.CTk):
     def open_tensorboard(self):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
-    def on_update_train_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
-        self.set_step_progress(train_progress.epoch_step, max_sample)
-        self.set_epoch_progress(train_progress.epoch, max_epoch)
+    def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None) -> str | None:
+        if epoch_rate is None and step_rate is None:
+            return None
 
-    def on_update_status(self, status: str):
+        spent_on_current_epoch = train_progress.epoch_step / step_rate if step_rate is not None else 0
+        if epoch_rate is None:
+            spent_total = spent_on_current_epoch
+            total_eta = (spent_on_current_epoch / train_progress.global_step) * max_step * max_epoch - spent_on_current_epoch
+        else:
+            epochs_eta = (max_epoch - train_progress.epoch) / epoch_rate
+            total_eta = max(epochs_eta - spent_on_current_epoch, 0)
+
+            spent_on_done_epochs = train_progress.epoch / epoch_rate
+            spent_total = spent_on_done_epochs + spent_on_current_epoch
+
+        if spent_total is None or spent_total < 30:
+            return "Estimating ..."
+
+        td = datetime.timedelta(seconds=total_eta)
+        days = td.days
+        hours, remainder = divmod(td.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if days > 0:
+            return f"{days}d {hours}h"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        elif minutes > 0:
+            return f"{minutes}m {seconds}s"
+        else:
+            return f"{seconds}s"
+
+    def set_eta_label(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None):
+        eta_str = self._calculate_eta_string(train_progress, max_step, max_epoch, step_rate, epoch_rate)
+        if eta_str is not None:
+            self.eta_label.configure(text=f"ETA: {eta_str}")
+        else:
+            self.eta_label.configure(text="")
+
+    def delete_eta_label(self):
+        self.eta_label.configure(text="")
+
+    def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None):
+        self.set_step_progress(train_progress.epoch_step, max_step)
+        self.set_epoch_progress(train_progress.epoch, max_epoch)
+        self.set_eta_label(train_progress, max_step, max_epoch, step_rate, epoch_rate)
+
+    def on_update_status(self, status):
         self.status_label.configure(text=status)
 
     def open_dataset_tool(self):
@@ -594,6 +682,28 @@ class TrainUI(ctk.CTk):
 
     def open_profiling_tool(self):
         self.profiling_window.deiconify()
+
+    def generate_debug_package(self):
+        zip_path = filedialog.askdirectory(
+            initialdir=".",
+            title="Select Directory to Save Debug Package"
+        )
+
+        if not zip_path:
+            return
+
+        zip_path = Path(zip_path) / "OneTrainer_debug_report.zip"
+
+        self.on_update_status("Generating debug package...")
+
+        try:
+            config_json_string = json.dumps(self.train_config.to_pack_dict(secrets=False))
+            scripts.generate_debug_report.create_debug_package(str(zip_path), config_json_string)
+            self.on_update_status(f"Debug package saved to {zip_path.name}")
+        except Exception as e:
+            traceback.print_exc()
+            self.on_update_status(f"Error generating debug package: {e}")
+
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
@@ -644,20 +754,21 @@ class TrainUI(ctk.CTk):
         torch_gc()
 
         if error_caught:
-            self.on_update_status("error: check the console for more information")
+            self.on_update_status("Error: check the console for details")
         else:
-            self.on_update_status("stopped")
+            self.on_update_status("Stopped")
+        self.delete_eta_label()
 
-        self.training_button.configure(text="Start Training", state="normal")
+        # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
+        self.after(0, self._set_training_button_idle)
 
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
-            self._start_always_on_tensorboard()
+            self.after(0, self._start_always_on_tensorboard)
 
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
-
-            self.training_button.configure(text="Stop Training", state="normal")
+            self._set_training_button_running()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
                 self._stop_always_on_tensorboard()
@@ -667,8 +778,8 @@ class TrainUI(ctk.CTk):
             self.training_thread = threading.Thread(target=self.__training_thread_function)
             self.training_thread.start()
         else:
-            self.training_button.configure(state="disabled")
-            self.on_update_status("stopping")
+            self._set_training_button_stopping()
+            self.on_update_status("Stopping ...")
             self.training_commands.stop()
 
     def save_default(self):
@@ -766,3 +877,20 @@ class TrainUI(ctk.CTk):
         else:
             if not (self.training_thread and self.train_config.tensorboard):
                 self._stop_always_on_tensorboard()
+
+    def _set_training_button_style(self, mode: str):
+        if not self.training_button:
+            return
+        style = self._TRAIN_BUTTON_STYLES.get(mode)
+        if not style:
+            return
+        self.training_button.configure(**style)
+
+    def _set_training_button_idle(self):
+        self._set_training_button_style("idle")
+
+    def _set_training_button_running(self):
+        self._set_training_button_style("running")
+
+    def _set_training_button_stopping(self):
+        self._set_training_button_style("stopping")

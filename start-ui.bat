@@ -31,7 +31,7 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     echo Error: Python executable not found in virtual environment
     goto :end
 )
-set PYTHON="%VENV_DIR%\Scripts\python.exe"
+set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
 if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 

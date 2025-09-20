@@ -72,7 +72,6 @@ class GenericTrainer(BaseTrainer):
 
         self.model = None
         self.one_step_trained = False
-
         self.grad_hook_handles = []
 
     def start(self):
@@ -190,6 +189,9 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
+        if not self.sample_queue:
+            return
+
         for fun in self.sample_queue:
             fun()
         self.sample_queue = []
@@ -272,7 +274,7 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
         torch_gc()
 
-        self.callbacks.on_update_status("sampling")
+        self.callbacks.on_update_status("Sampling ...")
 
         is_custom_sample = False
         if sample_params_list:
@@ -594,7 +596,9 @@ class GenericTrainer(BaseTrainer):
         accumulated_loss = 0.0
         ema_loss = None
         ema_loss_steps = 0
-        for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
+
+        epoch_tqdm = tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0.11)
+        for _epoch in epoch_tqdm:
             self.callbacks.on_update_status("starting epoch/caching")
 
             if self.config.latent_caching:
@@ -630,8 +634,10 @@ class GenericTrainer(BaseTrainer):
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
-                             initial=train_progress.epoch_step)
+                             initial=train_progress.epoch_step, smoothing=0.1)
             for batch in step_tqdm:
+                self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs, step_tqdm.format_dict['rate'], epoch_tqdm.format_dict['rate'])
+
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
@@ -673,7 +679,7 @@ class GenericTrainer(BaseTrainer):
                     if transferred_to_temp_device:
                         self.model_setup.setup_train_device(self.model, self.config)
 
-                self.callbacks.on_update_status("training")
+                self.callbacks.on_update_status("Training ...")
 
                 with TorchMemoryRecorder(enabled=False):
                     step_seed = train_progress.global_step
@@ -761,13 +767,11 @@ class GenericTrainer(BaseTrainer):
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
-                self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
                     return
 
             train_progress.next_epoch()
-            self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
             if self.commands.get_stop_command():
                 return
