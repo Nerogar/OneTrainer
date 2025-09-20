@@ -1,3 +1,4 @@
+import math
 from contextlib import nullcontext
 from random import Random
 
@@ -316,22 +317,16 @@ class FluxModel(BaseModel):
 
         return latent_image_ids.to(device=device, dtype=dtype)
 
-    def pack_latents(
-            self,
-            latents: Tensor,
-            batch_size: int,
-            num_channels_latents: int,
-            height: int,
-            width: int,
-    ) -> Tensor:
-        latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)
+    def pack_latents(self, latents: Tensor) -> Tensor:
+        batch_size, channels, height, width = latents.shape
+        latents = latents.view(batch_size, channels, height // 2, 2, width // 2, 2)
         latents = latents.permute(0, 2, 4, 1, 3, 5)
-        latents = latents.reshape(batch_size, (height // 2) * (width // 2), num_channels_latents * 4)
+        latents = latents.reshape(batch_size, (height // 2) * (width // 2), channels * 4)
 
         return latents
 
-    def unpack_latents(self, latents, height, width):
-        batch_size, num_patches, channels = latents.shape
+    def unpack_latents(self, latents, height: int, width: int):
+        batch_size, _, channels = latents.shape
 
         height = height // 2
         width = width // 2
@@ -342,3 +337,16 @@ class FluxModel(BaseModel):
         latents = latents.reshape(batch_size, channels // (2 * 2), height * 2, width * 2)
 
         return latents
+
+    def calculate_timestep_shift(self, latent_width: int, latent_height: int):
+        base_seq_len = self.noise_scheduler.config.base_image_seq_len
+        max_seq_len = self.noise_scheduler.config.max_image_seq_len
+        base_shift = self.noise_scheduler.config.base_shift
+        max_shift = self.noise_scheduler.config.max_shift
+        patch_size = 2
+
+        image_seq_len = (latent_width // patch_size) * (latent_height // patch_size)
+        m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
+        b = base_shift - m * base_seq_len
+        mu = image_seq_len * m + b
+        return math.exp(mu)

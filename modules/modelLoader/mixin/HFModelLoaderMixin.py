@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import traceback
 from abc import ABCMeta
 from itertools import repeat
@@ -118,6 +119,19 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
             sub_module._fix_state_dict_keys_on_load(state_dict)
+
+        #TODO why is it necessary to iterate by key names from the state dict?
+        #why not iterate through the object model, like replace_linear_... does?
+        #would avoid key replacements as follows.
+
+        if hasattr(sub_module, "_checkpoint_conversion_mapping"): #required for loading the text encoder of Qwen
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                new_k = k
+                for pattern, replacement in sub_module._checkpoint_conversion_mapping.items():
+                    new_k = re.sub(pattern, replacement, new_k)
+                new_state_dict[new_k] = v
+            state_dict = new_state_dict
 
         for key, value in state_dict.items():
             module = sub_module

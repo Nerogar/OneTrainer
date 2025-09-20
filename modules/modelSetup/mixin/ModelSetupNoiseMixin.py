@@ -125,9 +125,11 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
-            latent_width: int | None = None,
-            latent_height: int | None = None,
+            shift: float = None,
     ) -> Tensor:
+        if shift is None:
+            shift = config.timestep_shift
+
         if deterministic:
             # -1 is for zero-based indexing
             return torch.tensor(
@@ -139,24 +141,6 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             min_timestep = int(num_train_timesteps * config.min_noising_strength)
             max_timestep = int(num_train_timesteps * config.max_noising_strength)
             num_timestep = max_timestep - min_timestep
-
-            shift = config.timestep_shift
-            if config.dynamic_timestep_shifting:
-                if not latent_width or not latent_height:
-                    raise NotImplementedError("Dynamic timestep shifting not support by this model")
-
-                base_seq_len = 256
-                max_seq_len = 4096
-                base_shift = 0.5
-                max_shift = 1.15
-                patch_size = 2
-
-                image_seq_len = (latent_width // patch_size) * (latent_height // patch_size)
-                m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
-                b = base_shift - m * base_seq_len
-                mu = image_seq_len * m + b
-
-                shift = math.exp(mu)
 
             if config.timestep_distribution in [
                 TimestepDistribution.UNIFORM,

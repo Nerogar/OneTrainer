@@ -24,6 +24,10 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-only": ["attn"],
+    "full": [],
+}
 
 class BaseStableDiffusion3Setup(
     BaseModelSetup,

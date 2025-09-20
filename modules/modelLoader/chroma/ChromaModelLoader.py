@@ -129,7 +129,7 @@ class ChromaModelLoader(
             vae_model_name: str,
     ):
         #no single file .safetensors for Chroma available at the time of writing this code
-        raise NotImplementedError("Loading of single file Chroma models not supported. Transformer-only safetensor files can be loaded by using the diffusers base model and overriding the transformer.")
+        raise NotImplementedError("Loading of single file Chroma models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer.")
 
     def load(
             self,

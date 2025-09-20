@@ -78,7 +78,7 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         )
 
         with torch.no_grad():
-            if latent_tensor.ndim == 5:
+            if latent_tensor.ndim == 5: #remove frames dimension
                 latent_tensor = latent_tensor[:, :, 0, :, :]
 
             result = torch.nn.functional.conv2d(latent_tensor, weight)
