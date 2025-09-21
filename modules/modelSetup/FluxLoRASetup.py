@@ -9,12 +9,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 
-PRESETS = {
-    "attn-mlp": ["attn", "ff.net"],
-    "attn-only": ["attn"],
-    "full": [],
-}
-
 
 class FluxLoRASetup(
     BaseFluxSetup,
@@ -93,7 +87,7 @@ class FluxLoRASetup(
             ) if create_te2 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
+            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

@@ -23,6 +23,13 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn", "ff.net"],
+    "attn-only": ["attn"],
+    "blocks": ["transformer_block"],
+    "full": [],
+}
+
 
 #TODO share more code with Flux and other models
 class BaseChromaSetup(

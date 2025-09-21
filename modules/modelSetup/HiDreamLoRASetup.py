@@ -11,12 +11,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 
-PRESETS = {
-    "attn-mlp": ["attn1", "ff_i"],
-    "attn-only": ["attn1"],
-    "full": [],
-}
-
 
 class HiDreamLoRASetup(
     BaseHiDreamSetup,
@@ -128,7 +122,7 @@ class HiDreamLoRASetup(
             ) if create_te4 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
+            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

@@ -1,6 +1,7 @@
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
 from modules.modelSetup.BaseStableDiffusion3Setup import BaseStableDiffusion3Setup
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -53,7 +54,8 @@ class StableDiffusion3FineTuneSetup(
                     "embeddings_3"
                 )
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior)
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior,
+                                           freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         return parameter_group_collection
 

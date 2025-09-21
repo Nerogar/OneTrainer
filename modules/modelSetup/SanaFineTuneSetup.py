@@ -1,6 +1,7 @@
 from modules.model.SanaModel import SanaModel
 from modules.modelSetup.BaseSanaSetup import BaseSanaSetup
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -38,7 +39,8 @@ class SanaFineTuneSetup(
                 "embeddings"
             )
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior)
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior,
+                                           freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         return parameter_group_collection
 

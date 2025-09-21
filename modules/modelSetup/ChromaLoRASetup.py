@@ -9,13 +9,6 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 
-PRESETS = {
-    "attn-mlp": ["attn", "ff.net"],
-    "attn-only": ["attn"],
-    "blocks": ["transformer_block"],
-    "full": [],
-}
-
 
 class ChromaLoRASetup(
     BaseChromaSetup,
@@ -79,7 +72,7 @@ class ChromaLoRASetup(
             ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
+            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

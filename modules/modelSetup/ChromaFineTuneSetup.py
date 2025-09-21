@@ -1,7 +1,8 @@
 from modules.model.ChromaModel import ChromaModel
 from modules.modelSetup.BaseChromaSetup import BaseChromaSetup
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.ModuleFilter import ModuleFilter
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
@@ -39,16 +40,7 @@ class ChromaFineTuneSetup(
                     "embeddings"
                 )
 
-        if config.prior.train:
-            #TODO apply a configurable layer filter
-            filtered_parameters = [param[1] for param in model.transformer.named_parameters() if "guidance_layer" not in param[0]]
-            print("Warning: not training layers ", end='')
-            print(', '.join([param[0] for param in model.transformer.named_parameters() if "guidance_layer" in param[0]]))
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="transformer",
-                parameters=filtered_parameters,
-                learning_rate=config.prior.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior, freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         return parameter_group_collection
 
