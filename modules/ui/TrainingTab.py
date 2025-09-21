@@ -207,7 +207,7 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -622,7 +622,7 @@ class TrainingTab:
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
             components.entry(frame, 4, 1, self.ui_state, "prior.guidance_scale")
 
-    def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False):
+    def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -676,10 +676,11 @@ class TrainingTab:
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
         components.entry(frame, 8, 1, self.ui_state, "timestep_shift")
 
-        # dynamic timestep shifting
-        components.label(frame, 9, 0, "Dynamic Timestep Shifting",
-                         tooltip="Dynamically shift the timestep distribution based on resolution. Use the preview to see more details.")
-        components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
+        if supports_dynamic_timestep_shifting:
+            # dynamic timestep shifting
+            components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+                             tooltip="Dynamically shift the timestep distribution based on resolution.")
+            components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
 
