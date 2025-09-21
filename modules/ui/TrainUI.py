@@ -6,6 +6,7 @@ import platform
 import subprocess
 import sys
 import threading
+import time
 import traceback
 import webbrowser
 from collections.abc import Callable
@@ -611,7 +612,7 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None) -> str | None:
-        if epoch_rate is None and step_rate is None:
+        '''if epoch_rate is None and step_rate is None:
             return None
 
         spent_on_current_epoch = train_progress.epoch_step / step_rate if step_rate is not None else 0
@@ -623,7 +624,12 @@ class TrainUI(ctk.CTk):
             total_eta = max(epochs_eta - spent_on_current_epoch, 0)
 
             spent_on_done_epochs = train_progress.epoch / epoch_rate
-            spent_total = spent_on_done_epochs + spent_on_current_epoch
+            spent_total = spent_on_done_epochs + spent_on_current_epoch'''
+
+        spent_total = time.monotonic() - self.start_time
+        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
+        remaining_steps = (max_epoch - train_progress.epoch) * max_step + (max_step - train_progress.epoch_step)
+        total_eta = spent_total / steps_done * remaining_steps
 
         if spent_total is None or spent_total < 30:
             return "Estimating ..."
@@ -736,6 +742,7 @@ class TrainUI(ctk.CTk):
             trainer.start()
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
+            self.start_time = time.monotonic()
             trainer.train()
         except Exception:
             if self.train_config.cloud.enabled:
