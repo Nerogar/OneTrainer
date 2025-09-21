@@ -1094,8 +1094,8 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )
 
-        # LION_Adv Optimizer
-        case Optimizer.LION_Adv:
+        # LION_ADV Optimizer
+        case Optimizer.LION_ADV:
             from adv_optm import Lion_adv
             optimizer = Lion_adv(
                 params=parameters,

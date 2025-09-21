@@ -16,8 +16,8 @@ class Optimizer(Enum):
 
     # 32 bit is torch and not bnb
     ADAMW = 'ADAMW'
-    ADAMW_ADV = 'ADAMW_ADV'
     ADAMW_8BIT = 'ADAMW_8BIT'
+    ADAMW_ADV = 'ADAMW_ADV'
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
@@ -34,7 +34,7 @@ class Optimizer(Enum):
 
     LION = 'LION'
     LION_8BIT = 'LION_8BIT'
-    LION_Adv = 'LION_Adv'
+    LION_ADV = 'LION_ADV'
 
     RMSPROP = 'RMSPROP'
     RMSPROP_8BIT = 'RMSPROP_8BIT'
@@ -107,7 +107,7 @@ class Optimizer(Enum):
             Optimizer.SIMPLIFIED_AdEMAMix,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
             Optimizer.PRODIGY_ADV,
-            Optimizer.LION_Adv,
+            Optimizer.LION_ADV,
             Optimizer.LION_PRODIGY_ADV,
         ]
 

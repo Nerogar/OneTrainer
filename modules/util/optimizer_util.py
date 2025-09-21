@@ -482,7 +482,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fused_back_pass": False,
         "orthogonal_gradient": False,
     },
-    Optimizer.LION_Adv: {
+    Optimizer.LION_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,
         "weight_decay": 0.0,
