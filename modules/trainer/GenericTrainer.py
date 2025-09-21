@@ -597,7 +597,7 @@ class GenericTrainer(BaseTrainer):
         ema_loss = None
         ema_loss_steps = 0
 
-        epoch_tqdm = tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0.11)
+        epoch_tqdm = tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0.15)
         for _epoch in epoch_tqdm:
             self.callbacks.on_update_status("starting epoch/caching")
 

@@ -211,10 +211,6 @@ class UIState:
             iterable = obj.items() if is_dict else vars(obj).items()
 
             for name, obj_var in iterable:
-                # store discovered runtime type & non-nullable
-                self.__var_types.setdefault(name, type(obj_var))
-                self.__var_nullables.setdefault(name, False)
-                self.__var_defaults.setdefault(name, None)
 
                 if isinstance(obj_var, str):
                     var = tk.StringVar(master=self.master)
