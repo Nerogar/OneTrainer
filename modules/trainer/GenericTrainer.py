@@ -332,7 +332,7 @@ class GenericTrainer(BaseTrainer):
             if current_epoch_length_validation == 0:
                 return
 
-            self.callbacks.on_update_status("calculating validation loss")
+            self.callbacks.on_update_status("Calculating validation loss")
             self.model_setup.setup_train_device(self.model, self.config)
 
             torch_gc()
@@ -414,7 +414,7 @@ class GenericTrainer(BaseTrainer):
     def backup(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
         torch_gc()
 
-        self.callbacks.on_update_status("creating backup")
+        self.callbacks.on_update_status("Creating backup")
 
         backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
@@ -461,7 +461,7 @@ class GenericTrainer(BaseTrainer):
     def save(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
         torch_gc()
 
-        self.callbacks.on_update_status("saving")
+        self.callbacks.on_update_status("Saving")
 
         save_path = os.path.join(
             self.config.workspace_dir,
@@ -579,7 +579,7 @@ class GenericTrainer(BaseTrainer):
         train_progress = self.model.train_progress
 
         if self.config.only_cache:
-            self.callbacks.on_update_status("caching")
+            self.callbacks.on_update_status("Caching")
             for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
                 self.data_loader.get_data_set().start_next_epoch()
             return
@@ -599,7 +599,7 @@ class GenericTrainer(BaseTrainer):
 
         epoch_tqdm = tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch", smoothing=0.15)
         for _epoch in epoch_tqdm:
-            self.callbacks.on_update_status("starting epoch/caching")
+            self.callbacks.on_update_status("Starting epoch/caching")
 
             if self.config.latent_caching:
                 self.data_loader.get_data_set().start_next_epoch()
@@ -787,7 +787,7 @@ class GenericTrainer(BaseTrainer):
                 torch.clear_autocast_cache()
                 self.model.optimizer.eval()
 
-            self.callbacks.on_update_status("saving the final model")
+            self.callbacks.on_update_status("Saving the final model")
 
             if self.model.ema:
                 self.model.ema.copy_ema_to(self.parameters, store_temp=False)
