@@ -58,7 +58,7 @@ class Optimizer(Enum):
     PRODIGY = 'PRODIGY'
     PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
     PRODIGY_ADV = 'PRODIGY_ADV'
-    LION_PRODIGY_Adv = 'LION_PRODIGY_Adv'
+    LION_PRODIGY_ADV = 'LION_PRODIGY_ADV'
 
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
@@ -84,7 +84,7 @@ class Optimizer(Enum):
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
             self.PRODIGY_ADV,
-            self.LION_PRODIGY_Adv,
+            self.LION_PRODIGY_ADV,
         ]
 
     @property
@@ -108,7 +108,7 @@ class Optimizer(Enum):
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
             Optimizer.PRODIGY_ADV,
             Optimizer.LION_Adv,
-            Optimizer.LION_PRODIGY_Adv,
+            Optimizer.LION_PRODIGY_ADV,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

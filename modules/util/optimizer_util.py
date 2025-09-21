@@ -493,7 +493,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "cautious_mask": False,
         "orthogonal_gradient": False,
     },
-    Optimizer.LION_PRODIGY_Adv: {
+    Optimizer.LION_PRODIGY_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,
         "beta3": None,
