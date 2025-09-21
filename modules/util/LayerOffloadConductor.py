@@ -863,6 +863,12 @@ class LayerOffloadConductor:
             for module in layer.modules():
                 for parameter in module.parameters():
                     if parameter.grad is not None:
+                        #Layers to be offloaded usually do not have gradients. Model weights only have gradients in full-finetuning,
+                        #and then a fused backpass is required for offloading, which sets all gradients to None before a layer is offloaded.
+                        #There is only once exception:
+                        #In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
+                        #has not finished yet. The gradients are then set to None during the backward of one of the next layers.
+                        #Record which layers were ready to be offloaded, and offload them later:
                         self.__deferred_layers.append(layer_index)
                         return
 
