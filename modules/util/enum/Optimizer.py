@@ -16,15 +16,15 @@ class Optimizer(Enum):
 
     # 32 bit is torch and not bnb
     ADAMW = 'ADAMW'
-    ADAMW_Adv = 'ADAMW_Adv'
+    ADAMW_ADV = 'ADAMW_ADV'
     ADAMW_8BIT = 'ADAMW_8BIT'
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
-    Simplified_AdEMAMix = "Simplified_AdEMAMix"
+    SIMPLIFIED_AdEMAMix = "SIMPLIFIED_AdEMAMix"
 
     ADOPT = 'ADOPT'
-    ADOPT_Adv = 'ADOPT_Adv'
+    ADOPT_ADV = 'ADOPT_ADV'
 
     LAMB = 'LAMB'
     LAMB_8BIT = 'LAMB_8BIT'
@@ -57,7 +57,7 @@ class Optimizer(Enum):
     # Prodigy
     PRODIGY = 'PRODIGY'
     PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
-    PRODIGY_Adv = 'PRODIGY_Adv'
+    PRODIGY_ADV = 'PRODIGY_ADV'
     LION_PRODIGY_Adv = 'LION_PRODIGY_Adv'
 
     # ADAFACTOR
@@ -83,7 +83,7 @@ class Optimizer(Enum):
             self.DADAPT_LION,
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
-            self.PRODIGY_Adv,
+            self.PRODIGY_ADV,
             self.LION_PRODIGY_Adv,
         ]
 
@@ -102,11 +102,11 @@ class Optimizer(Enum):
             Optimizer.CAME_8BIT,
             Optimizer.ADAM,
             Optimizer.ADAMW,
-            Optimizer.ADAMW_Adv,
-            Optimizer.ADOPT_Adv,
-            Optimizer.Simplified_AdEMAMix,
+            Optimizer.ADAMW_ADV,
+            Optimizer.ADOPT_ADV,
+            Optimizer.SIMPLIFIED_AdEMAMix,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
-            Optimizer.PRODIGY_Adv,
+            Optimizer.PRODIGY_ADV,
             Optimizer.LION_Adv,
             Optimizer.LION_PRODIGY_Adv,
         ]

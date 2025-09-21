@@ -108,7 +108,8 @@ class TrainOptimizerConfig(BaseConfig):
     use_grams: False
     use_adopt: False
     use_focus: False
-    use_orthograd: False
+    nnmf_factor: False
+    orthogonal_gradient: False
     use_atan2: False
     use_AdEMAMix: False
     beta3_ema: float
@@ -116,6 +117,8 @@ class TrainOptimizerConfig(BaseConfig):
     beta1_warmup: int
     min_beta1: float
     Simplified_AdEMAMix: False
+    cautious_mask: False
+    grams_moment: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -200,7 +203,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
         data.append(("use_focus", False, bool, False))
-        data.append(("use_orthograd", False, bool, False))
+        data.append(("nnmf_factor", False, bool, False))
+        data.append(("orthogonal_gradient", False, bool, False))
         data.append(("use_atan2", False, bool, False))
         data.append(("use_AdEMAMix", False, bool, False))
         data.append(("beta3_ema", None, float, True))
@@ -208,6 +212,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
         data.append(("Simplified_AdEMAMix", False, bool, False))
+        data.append(("cautious_mask", False, bool, False))
+        data.append(("grams_moment", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
