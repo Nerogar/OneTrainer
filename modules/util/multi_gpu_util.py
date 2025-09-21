@@ -137,6 +137,13 @@ def parameter_divergence(params: list[torch.Tensor], train_device: torch.device)
     return diff if is_master() else None
 
 @torch.no_grad()
+def warn_parameter_divergence(params: list[torch.Tensor], train_device: torch.device):
+    divergence = parameter_divergence(params, train_device)
+    if divergence is not None and divergence > 0:
+        print(f"\n\nWARNING: Parameter divergence between GPUs of {divergence}\n\n")
+
+
+@torch.no_grad()
 def broadcast_parameters(params: list[torch.Tensor], train_device: torch.device):
     if not is_enabled():
         return

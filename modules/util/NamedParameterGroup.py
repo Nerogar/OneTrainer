@@ -30,7 +30,7 @@ class NamedParameterGroupCollection:
         self.__groups.append(group)
 
     def parameters(self) -> list[Parameter]:
-        return sum([x.parameters for x in self.__groups], [])
+        return [p for group in self.__groups for p in group.parameters]
 
     def parameters_for_optimizer(self, config: TrainConfig) -> list[dict]:
         parameters = []

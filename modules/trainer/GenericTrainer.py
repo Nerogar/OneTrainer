@@ -281,17 +281,22 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("sampling")
 
         is_custom_sample = False
-        if not sample_params_list:
-            if self.config.samples is not None:
-                sample_params_list = self.config.samples
-            else:
+        if sample_params_list:
+            is_custom_sample = True
+        elif self.config.samples is not None:
+            sample_params_list = self.config.samples
+        else:
+            try:
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
                         samples[i] = SampleConfig.default_values().from_dict(samples[i])
                     sample_params_list = samples
-        else:
-            is_custom_sample = True
+            # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
+            except Exception:
+                traceback.print_exc()
+                print("Error during loading the sample definition file, proceeding without sampling")
+                sample_params_list = []
 
         if self.model.ema:
             #the EMA model only exists in the master process, so EMA sampling is done on one GPU only
@@ -632,12 +637,8 @@ class GenericTrainer(BaseTrainer):
                     self.model_setup.setup_train_device(self.model, self.config)
                     self.data_loader.get_data_set().start_next_epoch()
 
-            #TODO either remove (if we are reasonably sure this doesn't happen), or add an interval to TrainConfig:
-            #divergence = multi.parameter_divergence(self.parameters, train_device)
-            #if multi.is_enabled() and multi.is_master():
-            #    self.tensorboard.add_scalar("parameter divergence", divergence, train_progress.global_step)
-            #    if divergence > 0:
-            #        print(f"\n\nWARNING: Parameter divergence between GPUs of {divergence}\n\n")
+            if self.config.debug_mode and multi.is_enabled():
+                multi.warn_parameter_divergence(self.parameters, train_device)
 
             # Special case for schedule-free optimizers, which need train()
             # called before training. Can and should move this to a callback
@@ -677,9 +678,11 @@ class GenericTrainer(BaseTrainer):
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )
                 if self.__needs_backup(train_progress):
+                    multi.warn_parameter_divergence(self.parameters, train_device)
                     self.commands.backup()
 
                 if self.__needs_save(train_progress):
+                    multi.warn_parameter_divergence(self.parameters, train_device)
                     self.commands.save()
 
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
@@ -830,6 +833,7 @@ class GenericTrainer(BaseTrainer):
 
             if multi.is_master():
                 self.callbacks.on_update_status("saving the final model")
+                multi.warn_parameter_divergence(self.parameters, self.train_device)
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
@@ -850,7 +854,8 @@ class GenericTrainer(BaseTrainer):
                     dtype=self.config.output_dtype.torch_dtype()
                 )
 
-        self.model.to(self.temp_device)
+        if self.model is not None:
+            self.model.to(self.temp_device)
 
         if multi.is_master():
             self.tensorboard.close()

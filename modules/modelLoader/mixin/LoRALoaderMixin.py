@@ -73,11 +73,12 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         except Exception:
             stacktraces.append(traceback.format_exc())
 
-        try:
-            self.__load_ckpt(model, model_names.lora)
-            return
-        except Exception:
-            stacktraces.append(traceback.format_exc())
+        if model_names.lora.endswith(".ckpt"):
+            try:
+                self.__load_ckpt(model, model_names.lora)
+                return
+            except Exception:
+                stacktraces.append(traceback.format_exc())
 
         try:
             self.__load_safetensors(model, model_names.lora)
