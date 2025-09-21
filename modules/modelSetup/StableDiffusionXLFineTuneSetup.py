@@ -1,7 +1,7 @@
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
@@ -30,19 +30,8 @@ class StableDiffusionXLFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_1",
-                parameters=model.text_encoder_1.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
-
-        if config.text_encoder_2.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_2",
-                parameters=model.text_encoder_2.parameters(),
-                learning_rate=config.text_encoder_2.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_1", model.text_encoder_1, config.text_encoder)
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_2", model.text_encoder_2, config.text_encoder_2)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding:
@@ -57,12 +46,7 @@ class StableDiffusionXLFineTuneSetup(
                     "embeddings_2"
                 )
 
-        if config.unet.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="unet",
-                parameters=model.unet.parameters(),
-                learning_rate=config.unet.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "unet", model.unet, config.unet)
 
         return parameter_group_collection
 
@@ -73,17 +57,9 @@ class StableDiffusionXLFineTuneSetup(
     ):
         self._setup_embeddings_requires_grad(model, config)
 
-        train_text_encoder_1 = config.text_encoder.train and \
-                               not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-        model.text_encoder_1.requires_grad_(train_text_encoder_1)
-
-        train_text_encoder_2 = config.text_encoder_2.train and \
-                               not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
-        model.text_encoder_2.requires_grad_(train_text_encoder_2)
-
-        train_unet = config.unet.train and \
-                     not self.stop_unet_training_elapsed(config, model.train_progress)
-        model.unet.requires_grad_(train_unet)
+        self._setup_model_part_requires_grad("text_encoder_1", model.text_encoder_1, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("text_encoder_2", model.text_encoder_2, config.text_encoder_2, model.train_progress)
+        self._setup_model_part_requires_grad("unet", model.unet, config.unet, model.train_progress)
 
         model.vae.requires_grad_(False)
 
