@@ -1,15 +1,5 @@
 from pathlib import Path
 
-from modules.modelSetup.ChromaLoRASetup import PRESETS as chroma_presets
-from modules.modelSetup.FluxLoRASetup import PRESETS as flux_presets
-from modules.modelSetup.HiDreamLoRASetup import PRESETS as hidream_presets
-from modules.modelSetup.HunyuanVideoLoRASetup import PRESETS as hunyuan_video_presets
-from modules.modelSetup.PixArtAlphaLoRASetup import PRESETS as pixart_presets
-from modules.modelSetup.SanaLoRASetup import PRESETS as sana_presets
-from modules.modelSetup.StableDiffusion3LoRASetup import PRESETS as sd3_presets
-from modules.modelSetup.StableDiffusionLoRASetup import PRESETS as sd_presets
-from modules.modelSetup.StableDiffusionXLLoRASetup import PRESETS as sdxl_presets
-from modules.modelSetup.WuerstchenLoRASetup import PRESETS as sc_presets
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import PeftType
@@ -27,16 +17,6 @@ class LoraTab:
         self.train_config = train_config
         self.ui_state = ui_state
 
-        self.layer_entry = None
-        self.layer_entry_fg_color = None
-        self.layer_entry_text_color = None
-        self.layer_selector = None
-        self.regex_label = None
-        self.regex_switch = None
-        self.presets = {}
-        self.presets_list = []
-        self.prior_custom = ""
-        self.prior_selected = None
         self.scroll_frame = None
         self.options_frame = None
 
@@ -47,30 +27,6 @@ class LoraTab:
             self.scroll_frame.destroy()
         self.scroll_frame = ctk.CTkFrame(self.master, fg_color="transparent")
         self.scroll_frame.grid(row=0, column=0, sticky="nsew")
-
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
-            self.presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            self.presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            self.presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            self.presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            self.presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            self.presets = flux_presets
-        elif self.train_config.model_type.is_chroma():
-            self.presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            self.presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            self.presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_hi_dream():
-            self.presets = hidream_presets
-        else:
-            self.presets = {"full": []}
-        self.presets_list = list(self.presets.keys()) + ["custom"]
 
         self.scroll_frame.grid_columnconfigure(0, weight=0)
         self.scroll_frame.grid_columnconfigure(1, weight=1)
@@ -148,81 +104,3 @@ class LoraTab:
         components.label(master, 5, 0, "Bundle Embeddings",
                          tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
         components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
-
-        components.label(master, 6, 0, "Layer Preset",
-                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.")
-        self.layer_selector = components.options(
-            master, 6, 1, self.presets_list, self.ui_state, "lora_layer_preset",
-            command=self.__preset_set_layer_choice
-        )
-
-        self.layer_entry = components.entry(
-            master, 6, 2, self.ui_state, "lora_layers",
-            tooltip=f"Comma-separated list of diffusion layers to apply the {name} to. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained"
-        )
-        self.layer_entry_fg_color = self.layer_entry.cget("fg_color")
-        self.layer_entry_text_color = self.layer_entry.cget("text_color")
-
-        self.regex_label = components.label(
-            master, 7, 0, "Use Regex for Layer Preset",
-            tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used."
-        )
-        self.regex_switch = components.switch(
-            master, 7, 1, self.ui_state, "lora_layers_regex"
-        )
-
-        # Let the user set their own layer filter
-        if self.train_config.lora_layers and self.train_config.lora_layer_preset == "custom":
-            self.prior_custom = self.train_config.lora_layers
-        else:
-            self.prior_custom = ""
-
-        self.layer_entry.grid(row=6, column=2, columnspan=3, sticky="ew")
-        # Some configs will come with the lora_layer_preset unset or wrong for
-        # the new model, so let's set it now to a reasonable default so it hits
-        # the UI correctly.
-        if self.layer_selector.get() not in self.presets_list:
-            self.layer_selector.set(self.presets_list[0])
-        self.__preset_set_layer_choice(self.layer_selector.get())
-
-
-    def __preset_set_layer_choice(self, selected: str):
-        if not selected:
-            selected = self.presets_list[0]
-
-        if selected == "custom":
-            # Restore prior custom text and allow editing + regex toggle
-            self.layer_entry.configure(state="normal", fg_color=self.layer_entry_fg_color, text_color=self.layer_entry_text_color)
-            self.layer_entry.cget('textvariable').set(self.prior_custom)
-            self.layer_entry.grid_configure(columnspan=3, sticky="ew")
-            self.regex_label.grid()
-            self.regex_switch.grid()
-        else:
-            # Preserve custom text before overwriting
-            if self.prior_selected == "custom":
-                self.prior_custom = self.layer_entry.get()
-
-            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
-            preset_def = self.presets.get(selected, [])
-            if isinstance(preset_def, dict):
-                patterns = preset_def.get("patterns", [])
-                preset_uses_regex = bool(preset_def.get("regex", False))
-            else:
-                patterns = preset_def
-                preset_uses_regex = False
-
-            disabled_color = ("gray85", "gray17")
-            disabled_text_color = ("gray30", "gray70")
-            self.layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
-            self.layer_entry.cget('textvariable').set(",".join(patterns))
-            self.layer_entry.grid_configure(columnspan=1, sticky="w")
-
-            self.train_config.lora_layers = ",".join(patterns)
-
-            self.train_config.lora_layers_regex = preset_uses_regex
-            self.ui_state.get_var("lora_layers_regex").set(preset_uses_regex)
-
-            self.regex_label.grid_remove()
-            self.regex_switch.grid_remove()
-
-        self.prior_selected = selected

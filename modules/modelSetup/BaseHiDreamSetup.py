@@ -24,6 +24,12 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn1", "ff_i"],
+    "attn-only": ["attn1"],
+    "full": [],
+}
+
 
 class BaseHiDreamSetup(
     BaseModelSetup,
