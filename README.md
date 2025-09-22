@@ -63,7 +63,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 > sudo apt-get install libgl1
 > ```
 >
-> Additionally its been reported Alpine Linux and Arch linux may be missing tkinter. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
+> Additionally, it’s been reported Alpine Linux and Arch Linux may be missing tkinter. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
 ## Updating
 
@@ -119,7 +119,7 @@ If you are on Mac or Linux, you can also read [the launch script documentation](
 
 For general troubleshooting or questions, ask in [Discussions](https://github.com/Nerogar/OneTrainer/discussions), check the [Wiki](https://github.com/Nerogar/OneTrainer/wiki) or join our [Discord](https://discord.gg/KwgcQd5scF).
 
-If you encounter a reproducible error you first must run update.bat or update.sh and confirm the issue is still able to be reproduced. Then export anonymized debug information to help us solve an issue you are facing and upload it as part of your Github Issues submission.
+If you encounter a reproducible error you first must run update.bat or update.sh and confirm the issue is still able to be reproduced. Then export anonymized debug information to help us solve an issue you are facing and upload it as part of your GitHub Issues submission.
 
 -   On Windows double click `export_debug.bat`
 -   On Unix-based systems execute `./run-cmd.sh generate_debug_report`
@@ -127,7 +127,7 @@ If you encounter a reproducible error you first must run update.bat or update.sh
 These will both create a `debug_report.log`.
 
 > [!WARNING]
-> We require this file for Github issues going forward, failure to provide it or not manually providing the necessary info will lead to the issue being closed in most circumstances
+> We require this file for GitHub issues going forward, failure to provide it or not manually providing the necessary info will lead to the issue being closed in most circumstances
 
 ## Contributing
 
