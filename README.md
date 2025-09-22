@@ -19,7 +19,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
     [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
 -   **EMA**: Train your own EMA model. Optionally keep EMA weights in CPU memory to reduce VRAM usage
 -   **Aspect Ratio Bucketing**: Automatically train on multiple aspect ratios at a time. Just select the target resolutions, buckets are created automatically
--   **Multi Resolution Training**: Train multiple resolutions at the same time
+-   **Multi-Resolution Training**: Train multiple resolutions at the same time
 -   **Dataset Tooling**: Automatically caption your dataset using BLIP, BLIP2 and WD-1.4, or create masks for masked training using ClipSeg or Rembg
 -   **Model Tooling**: Convert between different model formats from a simple UI
 -   **Sampling UI**: Sample the model during training without switching to a different application
