@@ -30,10 +30,10 @@ Caching speeds up the training, by saving intermediate data from your training i
 be created once, and can be re-used between epochs or even different training runs. If you change any data related
 settings, you should either clear the cache directory, or choose a new one.
 
-### Tensorboard
+### TensorBoard
 
-Tensorboard enables easy tracking of the training progress during training. To use it, enable Tensorboard. During the
-training run, click on the Tensorboard button at the bottom to open the web interface. This web interface will display
+TensorBoard enables easy tracking of the training progress during training. To use it, enable TensorBoard. During the
+training run, click on the TensorBoard button at the bottom to open the web interface. This web interface will display
 loss values and samples.
 
 ### Input Model Settings
@@ -42,14 +42,14 @@ Select a base model to train on. This can be a model in many different formats:
 
 1. A filename of a checkpoint either in ckpt or safetensors format
 2. A directory name of a model in diffusers format
-3. A Huggingface repository name
+3. A Hugging Face repository name
 4. A backup directory from a previous training run
 
 You also need to specify the type of the input model.
 
 ### Output Model Settings
 
-Simply specify the file- or directory name where you want to save the final model, and the output format.
+Simply specify the file or directory name where you want to save the final model, and the output format.
 The data type defines the precision for the final model. Float16 will create smaller models, but the quality can be
 reduced.
 
@@ -104,13 +104,13 @@ reduces the quality, while providing a significant speed boost.
 ### Resolution
 
 Your training images will be resized to that resolution when training. You don't need to do any manual resizing. You can
-specify multiple resolutions as a comma separated list. All resolutions will be trained at the same time.
+specify multiple resolutions as a comma-separated list. All resolutions will be trained at the same time.
 
 ### Masked training
 
 With masked training, you can instruct the model to only learn from some parts of your training images. For example, if
 you want to train a subject, but not the background, this setting will help. To enable masked training, you need to add
-a mask for every training image. This mask is a black and white image file, where white regions define what should be
+a mask for every training image. This mask is a black-and-white image file, where white regions define what should be
 included, and black regions are excluded. The files need the same name as the images, with an added "-masklabel.png"
 extension.
 

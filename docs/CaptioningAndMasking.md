@@ -10,7 +10,7 @@ keys to go to the next or previous image.
 
 ### Manual captioning
 
-In the input box at the bottom you can input your caption. To save the caption, press enter.
+In the input box at the bottom you can input your caption. To save the caption, press Enter.
 
 ### Automatic captioning
 
@@ -23,13 +23,13 @@ Depending on the model you chose, this can take a while.
 
 ### Manual masking
 
-Check the "Enable Mask Editing" checkbox at the top. Now you can draw a mask onto the image. Left click adds to the
-masked region, right click removes parts from the mask. With the mouse wheel you can increase or decrease the brush
-size. Use Ctrl+M to only show the mask. To save the mask, click into the caption input field, then press enter.
+Check the "Enable Mask Editing" checkbox at the top. Now you can draw a mask onto the image. Left-click adds to the
+masked region, Right-click removes parts from the mask. With the mouse wheel you can increase or decrease the brush
+size. Use Ctrl+M to only show the mask. To save the mask, click into the caption input field, then press Enter.
 
 ### Automatic masking
 
-Click on the "Generate Masks" button to open the batch captioning tool. Here you can choose which model to use for
-masking. Some models like ClipSeg support masking based on a Prompt. With Threshold, Smooth and Expand you need to
-experiment around to find what works best for your dataset. To generate the masks, press the "Create Masks" button. When
+Click on the "Generate Masks" button to open the batch masking tool. Here you can choose which model to use for
+masking. Some models like ClipSeg support masking based on a prompt. With Threshold, Smooth and Expand you need to
+experiment to find what works best for your dataset. To generate the masks, press the "Create Masks" button. When
 you use this for the first time, it has to download the model. Depending on the model you chose, this can take a while.

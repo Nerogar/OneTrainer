@@ -1,6 +1,6 @@
 # OneTrainer
 
-OneTrainer is a one-stop solution for all your stable diffusion training needs.
+OneTrainer is a one-stop solution for all your Stable Diffusion training needs.
 
 <a href="https://discord.gg/KwgcQd5scF"><img src="https://discord.com/api/guilds/1102003518203756564/widget.png" alt="OneTrainer Discord"/></a><br>
 
@@ -13,7 +13,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 -   **Masked Training**: Let the training focus on just certain parts of the samples
 -   **Automatic backups**: Fully back up your training progress regularly during training. This includes all information to seamlessly continue training
 -   **Image augmentation**: Apply random transforms such as rotation, brightness, contrast or saturation to each image sample to quickly create a more diverse dataset
--   **Tensorboard**: A simple tensorboard integration to track the training progress
+-   **TensorBoard**: A simple TensorBoard integration to track the training progress
 -   **Multiple prompts per image**: Train the model on multiple different prompts per image sample
 -   **Noise Scheduler Rescaling**: From the paper
     [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891)
@@ -43,7 +43,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
 2. Run:
     - Windows: Double click or execute `install.bat`
-    - Unix based systems: Execute `install.sh`
+    - Unix-based systems: Execute `install.sh`
 
 #### Manual installation
 
@@ -52,7 +52,7 @@ OneTrainer is a one-stop solution for all your stable diffusion training needs.
 3. Set up a virtual environment `python -m venv venv`
 4. Activate the new venv:
     - Windows: `venv/scripts/activate`
-    - Unix based systems: `source venv/bin/activate`
+    - Unix-based systems: `source venv/bin/activate`
 5. Install the requirements `pip install -r requirements.txt`
 
 > [!Tip]
@@ -127,7 +127,7 @@ If you encounter a reproducible error you first must run update.bat or update.sh
 These will both create a `debug_report.log`.
 
 > [!WARNING]
-> We require this file for GitHub issues going forward, failure to provide it or not manually providing the necessary info will lead to the issue being closed in most circumstances
+> We require this file for GitHub issues going forward. Failure to provide it or not manually providing the necessary info will lead to the issue being closed in most circumstances.
 
 ## Contributing
 
@@ -135,7 +135,7 @@ Contributions are always welcome in any form. You can open issues, participate i
 requests for new or improved functionality. You can find more information about contributing [here](docs/Contributing.md).
 
 Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
-For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.
+For in-depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.
 
 You also **NEED** to **install the required developer dependencies** for your current user and enable the Git commit hooks, via the following commands (works on all platforms; Windows, Linux and Mac):
 
@@ -152,7 +152,7 @@ Now all of your commits will automatically be verified for common errors and cod
 
 ## Related Projects
 
--   **[MGDS](https://github.com/Nerogar/mgds)**: A custom dataset implementation for Pytorch that is built around the idea of a node based graph.
--   **[Stability Matrix](https://github.com/LykosAI/StabilityMatrix)**: A swiss-army knife installer which wraps and installs a broad range diffusion software packages including OneTrainer
+-   **[MGDS](https://github.com/Nerogar/mgds)**: A custom dataset implementation for PyTorch that is built around the idea of a node-based graph.
+-   **[Stability Matrix](https://github.com/LykosAI/StabilityMatrix)**: A Swiss Army knife installer that wraps and installs a broad range of diffusion software packages including OneTrainer.
 -   **[Visions of Chaos](https://softology.pro/voc.htm)**: A collection of machine learning tools that also includes OneTrainer.
 -   **[StableTuner](https://github.com/devilismyfriend/StableTuner)**: A now defunct (archived) training application for Stable Diffusion. OneTrainer takes a lot of inspiration from StableTuner and wouldn't exist without it.

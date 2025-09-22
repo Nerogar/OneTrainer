@@ -10,7 +10,7 @@ usually be interchanged. Each module type has its own sub-folder in the `modules
 These are the currently supported module types:
 
 - dataLoader: A data loader is responsible for loading samples during training. OneTrainer is using
-  [MGDS](https://github.com/Nerogar/MGDS) as a library to implement these data loaders, which is a custom graph based
+  [MGDS](https://github.com/Nerogar/MGDS) as a library to implement these data loaders, which is a custom graph-based
   data loader implementation.
 - model: A model holds weights, optimizers and related data that are needed during training.
 - modelLoader: A model loader loads the model to train on into the internal representation. Model loaders support
@@ -24,12 +24,12 @@ These are the currently supported module types:
   on the model.
 - trainer: A trainer pulls everything together. It runs a model loader and model setup, then executes the training loop.
   During the training, many different steps can be taken such as regular sampling or backups.
-- ui: The ui module contains all the ui code.
+- ui: The ui module contains all the UI code.
 - util: A set of utility functions needed in different parts of the code base.
 
 ## Scripts
 
-Of course these modules don't provide any user facing functionality. Think of them as a set of tools that can be used by
+Of course these modules don't provide any user-facing functionality. Think of them as a set of tools that can be used by
 scripts to provide actual functionality for a user. Each script has exactly one purpose and can be run directly from the
 command line. Inside the scripts, no extra functionality is implemented. They should only rely on the modules for
 functionality.

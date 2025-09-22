@@ -4,7 +4,7 @@ A Dockerfile based on the `nvidia/cuda:11.8.0-devel-ubuntu22.04` is provided.
 
 This image requires `nvidia-driver-525` and `nvidia-docker2` installed on the host.
 
-## Building Image
+## Building the Image
 
 Build using:
 
@@ -12,9 +12,9 @@ Build using:
 docker build -t myuser/onetrainer:latest -f Dockerfile .
 ```
 
-## Running Image
+## Running the Image
 
-This is an example
+This is an example.
 
 ```
 docker run \
