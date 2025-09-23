@@ -84,7 +84,7 @@ class ConceptTab(ConfigList):
 
         # Clear button
         ctk.CTkButton(toolbar, text="Clear", width=50,
-                      command=self._clear_filters).grid(row=0, column=6, padx=(10,0))
+                      command=self._reset_filters).grid(row=0, column=6, padx=(10,0))
 
     def _update_filters(self):
         self._create_element_list(search=self.search_var.get(),
@@ -92,7 +92,7 @@ class ConceptTab(ConfigList):
                                   show_disabled=self.show_disabled_var.get())
         self._refresh_show_disabled_text()
 
-    def _clear_filters(self):
+    def _reset_filters(self):
         self.search_var.set("")
         self.filter_var.set("ALL")
         self.show_disabled_var.set(True)
