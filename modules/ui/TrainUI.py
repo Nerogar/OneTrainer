@@ -611,7 +611,8 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None) -> str | None:
-        if epoch_rate is None and step_rate is None:
+        if epoch_rate is None:
+            assert train_progress.global_step == 0
             return None
 
         spent_on_current_epoch = train_progress.epoch_step / step_rate if step_rate is not None else 0
@@ -625,7 +626,7 @@ class TrainUI(ctk.CTk):
             spent_on_done_epochs = train_progress.epoch / epoch_rate
             spent_total = spent_on_done_epochs + spent_on_current_epoch
 
-        if spent_total is None or spent_total < 30:
+        if train_progress.global_step <= 23 or spent_total is None: # 23 is roughly where the first ETA estimate becomes accurate
             return "Estimating ..."
 
         td = datetime.timedelta(seconds=total_eta)
