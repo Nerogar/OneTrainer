@@ -5,7 +5,6 @@ from modules.util.enum.ModelFormat import ModelFormat
 import torch
 from torch import Tensor
 
-#from omi_model_standards.convert.lora.convert_chroma_lora import convert_chroma_lora_key_sets
 from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
@@ -14,14 +13,6 @@ class QwenLoRASaver(
 ):
     def __init__(self):
         super().__init__()
-
-    @staticmethod
-    def __convert_qwen_lora_key_sets() -> list[LoraConversionKeySet]:
-        keys = []
-
-        #keys += [LoraConversionKeySet("", "lora_transformer")]
-
-        return keys
 
     def _get_convert_key_sets(self, model: QwenModel) -> list[LoraConversionKeySet] | None:
         return None

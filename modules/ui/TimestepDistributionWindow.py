@@ -133,7 +133,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
 
         # dynamic timestep shifting
         components.label(frame, 6, 0, "Dynamic Timestep Shifting",
-                         tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored.")
+                         tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Dynamic Timestep Shifting is not shown in the preview.")
         components.switch(frame, 6, 1, self.ui_state, "dynamic_timestep_shifting")
 
 

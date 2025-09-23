@@ -4,8 +4,6 @@ from pathlib import Path
 
 from modules.model.QwenModel import QwenModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
-
-#from modules.util.convert.convert_qwen_diffusers_to_ckpt import convert_qwen_diffusers_to_ckpt
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
