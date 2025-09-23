@@ -637,7 +637,7 @@ class GenericTrainer(BaseTrainer):
                     self.model_setup.setup_train_device(self.model, self.config)
                     self.data_loader.get_data_set().start_next_epoch()
 
-            if self.config.debug_mode and multi.is_enabled():
+            if self.config.debug_mode:
                 multi.warn_parameter_divergence(self.parameters, train_device)
 
             # Special case for schedule-free optimizers, which need train()
@@ -673,16 +673,17 @@ class GenericTrainer(BaseTrainer):
                 batches = self.data_loader.get_data_loader()
             for batch in batches:
                 multi.sync_commands(self.commands)
+                if self.commands.get_stop_command():
+                    multi.warn_parameter_divergence(self.parameters, train_device)
+
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )
                 if self.__needs_backup(train_progress):
-                    multi.warn_parameter_divergence(self.parameters, train_device)
                     self.commands.backup()
 
                 if self.__needs_save(train_progress):
-                    multi.warn_parameter_divergence(self.parameters, train_device)
                     self.commands.save()
 
                 sample_commands = self.commands.get_and_reset_sample_custom_commands()
@@ -833,7 +834,6 @@ class GenericTrainer(BaseTrainer):
 
             if multi.is_master():
                 self.callbacks.on_update_status("saving the final model")
-                multi.warn_parameter_divergence(self.parameters, self.train_device)
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
