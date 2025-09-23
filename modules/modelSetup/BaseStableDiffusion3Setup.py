@@ -25,6 +25,10 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-only": ["attn"],
+    "full": [],
+}
 
 class BaseStableDiffusion3Setup(
     BaseModelSetup,
@@ -299,8 +303,6 @@ class BaseStableDiffusion3Setup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                latent_height=scaled_latent_image.shape[-2],
-                latent_width=scaled_latent_image.shape[-1],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

@@ -1,5 +1,6 @@
 import copy
 import inspect
+import math
 from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
@@ -34,19 +35,6 @@ class FluxSampler(BaseModelSampler):
         self.model = model
         self.model_type = model_type
         self.pipeline = model.create_pipeline()
-
-    def __calculate_shift(
-            self,
-            image_seq_len,
-            base_seq_len: int = 256,
-            max_seq_len: int = 4096,
-            base_shift: float = 0.5,
-            max_shift: float = 1.15,
-    ):
-        m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
-        b = base_shift - m * base_seq_len
-        mu = image_seq_len * m + b
-        return mu
 
     @torch.no_grad()
     def __sample_base(
@@ -108,25 +96,11 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            latent_image = self.model.pack_latents(
-                latent_image,
-                latent_image.shape[0],
-                latent_image.shape[1],
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
-
-            image_seq_len = latent_image.shape[1]
+            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            latent_image = self.model.pack_latents(latent_image)
 
             # prepare timesteps
-            mu = self.__calculate_shift(
-                image_seq_len,
-                noise_scheduler.config.base_image_seq_len,
-                noise_scheduler.config.max_image_seq_len,
-                noise_scheduler.config.base_shift,
-                noise_scheduler.config.max_shift,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
@@ -362,25 +336,9 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            latent_image = self.model.pack_latents(
-                latent_image,
-                latent_image.shape[0],
-                latent_image.shape[1],
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
-
-            image_seq_len = latent_image.shape[1]
-
-            # prepare timesteps
-            mu = self.__calculate_shift(
-                image_seq_len,
-                noise_scheduler.config.base_image_seq_len,
-                noise_scheduler.config.max_image_seq_len,
-                noise_scheduler.config.base_shift,
-                noise_scheduler.config.max_shift,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            latent_image = self.model.pack_latents(latent_image)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
             timesteps = noise_scheduler.timesteps
 
             # denoising loop

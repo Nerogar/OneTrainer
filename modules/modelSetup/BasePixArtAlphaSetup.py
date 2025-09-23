@@ -24,6 +24,11 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn1", "attn2", "ff.net"],
+    "attn-only": ["attn1", "attn2"],
+    "full": [],
+}
 
 class BasePixArtAlphaSetup(
     BaseModelSetup,

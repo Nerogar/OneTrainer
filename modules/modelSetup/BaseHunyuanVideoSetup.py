@@ -25,6 +25,12 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn", "ff.net"],
+    "attn-only": ["attn"],
+    "full": [],
+}
+
 
 class BaseHunyuanVideoSetup(
     BaseModelSetup,
