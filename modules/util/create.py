@@ -8,6 +8,7 @@ from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
 from modules.dataLoader.HiDreamBaseDataLoader import HiDreamBaseDataLoader
 from modules.dataLoader.HunyuanVideoBaseDataLoader import HunyuanVideoBaseDataLoader
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
+from modules.dataLoader.QwenBaseDataLoader import QwenBaseDataLoader
 from modules.dataLoader.SanaBaseDataLoader import SanaBaseDataLoader
 from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3BaseDataLoader
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
@@ -31,6 +32,8 @@ from modules.modelLoader.HunyuanVideoLoRAModelLoader import HunyuanVideoLoRAMode
 from modules.modelLoader.PixArtAlphaEmbeddingModelLoader import PixArtAlphaEmbeddingModelLoader
 from modules.modelLoader.PixArtAlphaFineTuneModelLoader import PixArtAlphaFineTuneModelLoader
 from modules.modelLoader.PixArtAlphaLoRAModelLoader import PixArtAlphaLoRAModelLoader
+from modules.modelLoader.QwenFineTuneModelLoader import QwenFineTuneModelLoader
+from modules.modelLoader.QwenLoRAModelLoader import QwenLoRAModelLoader
 from modules.modelLoader.SanaEmbeddingModelLoader import SanaEmbeddingModelLoader
 from modules.modelLoader.SanaFineTuneModelLoader import SanaFineTuneModelLoader
 from modules.modelLoader.SanaLoRAModelLoader import SanaLoRAModelLoader
@@ -52,6 +55,7 @@ from modules.modelSampler.FluxSampler import FluxSampler
 from modules.modelSampler.HiDreamSampler import HiDreamSampler
 from modules.modelSampler.HunyuanVideoSampler import HunyuanVideoSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
+from modules.modelSampler.QwenSampler import QwenSampler
 from modules.modelSampler.SanaSampler import SanaSampler
 from modules.modelSampler.StableDiffusion3Sampler import StableDiffusion3Sampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
@@ -73,6 +77,8 @@ from modules.modelSaver.HunyuanVideoLoRAModelSaver import HunyuanVideoLoRAModelS
 from modules.modelSaver.PixArtAlphaEmbeddingModelSaver import PixArtAlphaEmbeddingModelSaver
 from modules.modelSaver.PixArtAlphaFineTuneModelSaver import PixArtAlphaFineTuneModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
+from modules.modelSaver.QwenFineTuneModelSaver import QwenFineTuneModelSaver
+from modules.modelSaver.QwenLoRAModelSaver import QwenLoRAModelSaver
 from modules.modelSaver.SanaEmbeddingModelSaver import SanaEmbeddingModelSaver
 from modules.modelSaver.SanaFineTuneModelSaver import SanaFineTuneModelSaver
 from modules.modelSaver.SanaLoRAModelSaver import SanaLoRAModelSaver
@@ -104,6 +110,8 @@ from modules.modelSetup.HunyuanVideoLoRASetup import HunyuanVideoLoRASetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
 from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.PixArtAlphaLoRASetup import PixArtAlphaLoRASetup
+from modules.modelSetup.QwenFineTuneSetup import QwenFineTuneSetup
+from modules.modelSetup.QwenLoRASetup import QwenLoRASetup
 from modules.modelSetup.SanaEmbeddingSetup import SanaEmbeddingSetup
 from modules.modelSetup.SanaFineTuneSetup import SanaFineTuneSetup
 from modules.modelSetup.SanaLoRASetup import SanaLoRASetup
@@ -177,6 +185,8 @@ def create_model_loader(
                 return FluxFineTuneModelLoader()
             if model_type.is_chroma():
                 return ChromaFineTuneModelLoader()
+            if model_type.is_qwen():
+                return QwenFineTuneModelLoader()
             if model_type.is_sana():
                 return SanaFineTuneModelLoader()
             if model_type.is_hunyuan_video():
@@ -201,6 +211,8 @@ def create_model_loader(
                 return FluxLoRAModelLoader()
             if model_type.is_chroma():
                 return ChromaLoRAModelLoader()
+            if model_type.is_qwen():
+                return QwenLoRAModelLoader()
             if model_type.is_sana():
                 return SanaLoRAModelLoader()
             if model_type.is_hunyuan_video():
@@ -252,6 +264,8 @@ def create_model_saver(
                 return FluxFineTuneModelSaver()
             if model_type.is_chroma():
                 return ChromaFineTuneModelSaver()
+            if model_type.is_qwen():
+                return QwenFineTuneModelSaver()
             if model_type.is_sana():
                 return SanaFineTuneModelSaver()
             if model_type.is_hunyuan_video():
@@ -274,6 +288,8 @@ def create_model_saver(
                 return FluxLoRAModelSaver()
             if model_type.is_chroma():
                 return ChromaLoRAModelSaver()
+            if model_type.is_qwen():
+                return QwenLoRAModelSaver()
             if model_type.is_sana():
                 return SanaLoRAModelSaver()
             if model_type.is_hunyuan_video():
@@ -328,6 +344,8 @@ def create_model_setup(
                 return FluxFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_chroma():
                 return ChromaFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_qwen():
+                return QwenFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -352,6 +370,8 @@ def create_model_setup(
                 return FluxLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_chroma():
                 return ChromaLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_qwen():
+                return QwenLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -406,6 +426,8 @@ def create_model_sampler(
                 return FluxSampler(train_device, temp_device, model, model_type)
             if model_type.is_chroma():
                 return ChromaSampler(train_device, temp_device, model, model_type)
+            if model_type.is_qwen():
+                return QwenSampler(train_device, temp_device, model, model_type)
             if model_type.is_sana():
                 return SanaSampler(train_device, temp_device, model, model_type)
             if model_type.is_hunyuan_video():
@@ -451,6 +473,8 @@ def create_data_loader(
                 return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_chroma():
                 return ChromaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_qwen():
+                return QwenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_sana():
                 return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_hunyuan_video():

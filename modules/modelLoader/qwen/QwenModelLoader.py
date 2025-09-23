@@ -1,7 +1,7 @@
 import os
 import traceback
 
-from modules.model.ChromaModel import ChromaModel
+from modules.model.QwenModel import QwenModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
@@ -10,14 +10,14 @@ from modules.util.ModelWeightDtypes import ModelWeightDtypes
 import torch
 
 from diffusers import (
-    AutoencoderKL,
-    ChromaTransformer2DModel,
+    AutoencoderKLQwenImage,
     FlowMatchEulerDiscreteScheduler,
+    QwenImageTransformer2DModel,
 )
-from transformers import T5EncoderModel, T5Tokenizer
+from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2Tokenizer
 
 
-class ChromaModelLoader(
+class QwenModelLoader(
     HFModelLoaderMixin,
 ):
     def __init__(self):
@@ -25,7 +25,7 @@ class ChromaModelLoader(
 
     def __load_internal(
             self,
-            model: ChromaModel,
+            model: QwenModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
@@ -41,7 +41,7 @@ class ChromaModelLoader(
 
     def __load_diffusers(
             self,
-            model: ChromaModel,
+            model: QwenModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
@@ -60,7 +60,7 @@ class ChromaModelLoader(
             transformers_modules=["text_encoder"],
         )
 
-        tokenizer = T5Tokenizer.from_pretrained(
+        tokenizer = Qwen2Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
         )
@@ -71,23 +71,23 @@ class ChromaModelLoader(
         )
 
         text_encoder = self._load_transformers_sub_module(
-            T5EncoderModel,
+            Qwen2_5_VLForConditionalGeneration,
             weight_dtypes.text_encoder,
             weight_dtypes.fallback_train_dtype,
             base_model_name,
             "text_encoder",
         )
 
-        if vae_model_name:
+        if vae_model_name: #TODO simplify
             vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
+                AutoencoderKLQwenImage,
                 weight_dtypes.vae,
                 weight_dtypes.train_dtype,
                 vae_model_name,
             )
         else:
             vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
+                AutoencoderKLQwenImage,
                 weight_dtypes.vae,
                 weight_dtypes.train_dtype,
                 base_model_name,
@@ -95,7 +95,7 @@ class ChromaModelLoader(
             )
 
         if transformer_model_name:
-            transformer = ChromaTransformer2DModel.from_single_file(
+            transformer = QwenImageTransformer2DModel.from_single_file(
                 transformer_model_name,
                 #avoid loading the transformer in float32:
                 torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
@@ -105,7 +105,7 @@ class ChromaModelLoader(
             )
         else:
             transformer = self._load_diffusers_sub_module(
-                ChromaTransformer2DModel,
+                QwenImageTransformer2DModel,
                 weight_dtypes.prior,
                 weight_dtypes.train_dtype,
                 base_model_name,
@@ -121,19 +121,19 @@ class ChromaModelLoader(
 
     def __load_safetensors(
             self,
-            model: ChromaModel,
+            model: QwenModel,
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             transformer_model_name: str,
             vae_model_name: str,
     ):
-        #no single file .safetensors for Chroma available at the time of writing this code
-        raise NotImplementedError("Loading of single file Chroma models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer.")
+        #no single file .safetensors for Qwen available at the time of writing this code
+        raise NotImplementedError("Loading of single file Qwen models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer.")
 
-    def load(
+    def load( #TODO share code between models
             self,
-            model: ChromaModel,
+            model: QwenModel,
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
