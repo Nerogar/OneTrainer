@@ -103,11 +103,13 @@ class TrainOptimizerConfig(BaseConfig):
     factored: True
     factored_fp32: True
     use_stableadamw: True
-    use_muon_pp: False
     use_cautious: False
     use_grams: False
     use_adopt: False
     use_focus: False
+    d_limiter: True
+    use_schedulefree: True
+    use_orthograd: False
     nnmf_factor: False
     orthogonal_gradient: False
     use_atan2: False
@@ -198,11 +200,13 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("factored", True, bool, False))
         data.append(("factored_fp32", True, bool, False))
         data.append(("use_stableadamw", True, bool, False))
-        data.append(("use_muon_pp", False, bool, False))
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
         data.append(("use_focus", False, bool, False))
+        data.append(("d_limiter", True, bool, True))
+        data.append(("use_schedulefree", True, bool, True))
+        data.append(("use_orthograd", False, bool, False))
         data.append(("nnmf_factor", False, bool, False))
         data.append(("orthogonal_gradient", False, bool, False))
         data.append(("use_atan2", False, bool, False))
