@@ -1,3 +1,4 @@
+import contextlib
 import os
 import pathlib
 from tkinter import BooleanVar, StringVar
@@ -10,6 +11,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 from modules.util.ui import components
+from modules.util.ui.ui_utils import DebounceTimer
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -32,7 +34,12 @@ class ConceptTab(ConfigList):
             is_full_width=False,
             show_toggle_button=True
         )
+        self._toolbar = None
+        self._toolbar_is_wrapped = False
         self._add_search_bar()
+        # wrap if too narrow
+        with contextlib.suppress(Exception):
+            self.top_frame.bind('<Configure>', lambda e: self._maybe_reposition_toolbar(e.width))
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
@@ -47,6 +54,7 @@ class ConceptTab(ConfigList):
         toolbar = ctk.CTkFrame(self.top_frame, fg_color="transparent")
         toolbar.grid(row=0, column=4, columnspan=2, padx=10, sticky="ew")
         toolbar.grid_columnconfigure(2, weight=1)
+        self._toolbar = toolbar
 
         # Search
         ctk.CTkLabel(toolbar, text="Search:").grid(row=0, column=0, padx=(0,5))
@@ -54,7 +62,8 @@ class ConceptTab(ConfigList):
         self.search_entry = ctk.CTkEntry(toolbar, textvariable=self.search_var,
                                          placeholder_text="Filter...", width=200)
         self.search_entry.grid(row=0, column=1)
-        self.search_var.trace("w", lambda *a: self._update_filters())
+        self._search_debouncer = DebounceTimer(self.search_entry, 300, lambda: self._update_filters())
+        self.search_var.trace_add("write", lambda *_: self._search_debouncer.call())
 
         # Spacer
         ctk.CTkLabel(toolbar, text="").grid(row=0, column=2, padx=5)
@@ -98,13 +107,18 @@ class ConceptTab(ConfigList):
         # Search filter
         search = self.filters.get("search", "").lower()
         if search:
-            texts = []
-            if element.name:
-                texts.append(element.name.lower())
-            if element.path:
-                texts.extend([os.path.basename(element.path).lower(),
-                              element.path.lower()])
-            if not any(search in text for text in texts):
+            if not hasattr(element, '_search_cache'):
+                cache = []
+                with contextlib.suppress(Exception):
+                    if getattr(element, 'name', None):
+                        cache.append(element.name.lower())
+                    p = getattr(element, 'path', None)
+                    if p:
+                        with contextlib.suppress(Exception):
+                            cache.append(os.path.basename(p).lower())
+                            cache.append(p.lower())
+                element._search_cache = cache
+            if not any(search in text for text in getattr(element, '_search_cache', [])):
                 return False
 
         # Type filter
@@ -114,10 +128,23 @@ class ConceptTab(ConfigList):
                 try:
                     return ConceptType(element.type).value == type_filter
                 except (ValueError, AttributeError):
-                    return True
+                    return False
             return False
 
         return True
+
+    def _maybe_reposition_toolbar(self, width):
+        if not self._toolbar:
+            return
+        threshold = 900
+        want_wrapped = width < threshold
+        if want_wrapped == self._toolbar_is_wrapped:
+            return
+        self._toolbar_is_wrapped = want_wrapped
+        if want_wrapped:
+            self._toolbar.grid_configure(row=1, column=0, columnspan=8, sticky="ew", padx=10)
+        else:
+            self._toolbar.grid_configure(row=0, column=4, columnspan=2, sticky="ew", padx=10)
 
     def _refresh_show_disabled_text(self):
         try:
@@ -211,6 +238,9 @@ class ConceptWidget(ctk.CTkFrame):
     def configure_element(self):
         self.name_label.configure(text=self.__get_display_name())
         self.image.configure(light_image=self.__get_preview_image())
+        with contextlib.suppress(Exception):
+            if hasattr(self.concept, '_search_cache'):
+                delattr(self.concept, '_search_cache')
 
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"

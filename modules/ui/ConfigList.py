@@ -44,7 +44,7 @@ class ConfigList(metaclass=ABCMeta):
         self.is_full_width = is_full_width
 
         # From search-concepts
-        self.filters = {"search": "", "type": "ALL"}
+        self.filters = {"search": "", "type": "ALL", "show_disabled": True}
         self.widgets_initialized = False
 
         # From master
@@ -105,6 +105,9 @@ class ConfigList(metaclass=ABCMeta):
 
     def _refresh_show_disabled_text(self):
         return
+
+    def _reset_filters(self):  # pragma: no cover - default noop
+        self.filters.update({"search": "", "type": "ALL", "show_disabled": True})
 
     def _update_item_enabled_state(self):
         self._is_current_item_enabled = any(
@@ -212,8 +215,21 @@ class ConfigList(metaclass=ABCMeta):
     def __add_element(self):
         new_element = self.create_new_element()
         self.current_config.append(new_element)
-        self.widgets_initialized = False
-        self._create_element_list()
+        # incremental insertion if widgets already initialized, else fall back to full rebuild
+        if self.widgets_initialized and self.element_list is not None:
+            i = len(self.current_config) - 1
+            widget = self.create_widget(
+                self.element_list, new_element, i,
+                self.__open_element_window,
+                self.__remove_element,
+                self.__clone_element,
+                self.save_current_config
+            )
+            self.widgets.append(widget)
+            self._update_widget_visibility()
+        else:
+            self.widgets_initialized = False
+            self._create_element_list()
         self.save_current_config()
 
     def __clone_element(self, clone_i, modify_element_fun=None):
@@ -222,14 +238,35 @@ class ConfigList(metaclass=ABCMeta):
         if modify_element_fun is not None:
             new_element = modify_element_fun(new_element)
         self.current_config.append(new_element)
-        self.widgets_initialized = False
-        self._create_element_list()
+        if self.widgets_initialized and self.element_list is not None:
+            i = len(self.current_config) - 1
+            widget = self.create_widget(
+                self.element_list, new_element, i,
+                self.__open_element_window,
+                self.__remove_element,
+                self.__clone_element,
+                self.save_current_config
+            )
+            self.widgets.append(widget)
+            self._update_widget_visibility()
+        else:
+            self.widgets_initialized = False
+            self._create_element_list()
         self.save_current_config()
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
-        self.widgets_initialized = False
-        self._create_element_list()
+        if self.widgets_initialized and 0 <= remove_i < len(self.widgets):
+            removed = self.widgets.pop(remove_i)
+            with contextlib.suppress(Exception):
+                removed.destroy()
+            # Reindex remaining widgets
+            for idx, widget in enumerate(self.widgets):
+                widget.i = idx
+            self._update_widget_visibility()
+        else:
+            self.widgets_initialized = False
+            self._create_element_list()
         self.save_current_config()
 
     def __load_current_config(self, filename):
@@ -243,7 +280,9 @@ class ConfigList(metaclass=ABCMeta):
                     self.current_config.append(element)
         except Exception:
             self.current_config = []
-
+        # reset filters when switching configs
+        with contextlib.suppress(Exception):
+            self._reset_filters()
         self.widgets_initialized = False
         self._create_element_list()
         self._update_toggle_button_text()
