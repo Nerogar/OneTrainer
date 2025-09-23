@@ -10,7 +10,7 @@ usually be interchanged. Each module type has its own sub-folder in the `modules
 These are the currently supported module types:
 
 - dataLoader: A data loader is responsible for loading samples during training. OneTrainer is using
-  [MGDS](https://github.com/Nerogar/MGDS) as a library to implement these data loaders, which is a custom graph based
+  [MGDS](https://github.com/Nerogar/MGDS) as a library to implement these data loaders, which is a custom graph-based
   data loader implementation.
 - model: A model holds weights, optimizers and related data that are needed during training.
 - modelLoader: A model loader loads the model to train on into the internal representation. Model loaders support
