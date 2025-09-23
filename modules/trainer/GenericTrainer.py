@@ -26,7 +26,6 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.lora_utils import check_lora_rank_alpha_match
 from modules.util.memory_util import TorchMemoryRecorder
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -124,10 +123,6 @@ class GenericTrainer(BaseTrainer):
             weight_dtypes=self.config.weight_dtypes(),
         )
         self.model.train_config = self.config
-
-        # Check if LoRA state dict matches training config (for continuing training from LoRA)
-        if hasattr(self.model, 'lora_state_dict') and self.model.lora_state_dict:
-            check_lora_rank_alpha_match(self.model, self.config)
 
         self.callbacks.on_update_status("running model setup")
 
