@@ -6,6 +6,7 @@ import platform
 import subprocess
 import sys
 import threading
+import time
 import traceback
 import webbrowser
 from collections.abc import Callable
@@ -611,22 +612,12 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int, step_rate: float | None, epoch_rate: float | None) -> str | None:
-        if epoch_rate is None and step_rate is None:
-            assert train_progress.global_step == 0
-            return None
+        spent_total = time.monotonic() - self.start_time
+        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
+        remaining_steps = (max_epoch - train_progress.epoch) * max_step + (max_step - train_progress.epoch_step)
+        total_eta = spent_total / steps_done * remaining_steps
 
-        spent_on_current_epoch = train_progress.epoch_step / step_rate if step_rate is not None else 0
-        if epoch_rate is None:
-            spent_total = spent_on_current_epoch
-            total_eta = (spent_on_current_epoch / train_progress.global_step) * max_step * max_epoch - spent_on_current_epoch
-        else:
-            epochs_eta = (max_epoch - train_progress.epoch) / epoch_rate
-            total_eta = max(epochs_eta - spent_on_current_epoch, 0)
-
-            spent_on_done_epochs = train_progress.epoch / epoch_rate
-            spent_total = spent_on_done_epochs + spent_on_current_epoch
-
-        if train_progress.global_step <= 23 or spent_total is None: # 23 is roughly where the first ETA estimate becomes accurate
+        if train_progress.global_step <= 30 or spent_total is None:
             return "Estimating ..."
 
         td = datetime.timedelta(seconds=total_eta)
@@ -737,6 +728,7 @@ class TrainUI(ctk.CTk):
             trainer.start()
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
+            self.start_time = time.monotonic()
             trainer.train()
         except Exception:
             if self.train_config.cloud.enabled:
