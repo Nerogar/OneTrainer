@@ -636,8 +636,6 @@ class GenericTrainer(BaseTrainer):
             step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
                              initial=train_progress.epoch_step, smoothing=0.1)
             for batch in step_tqdm:
-                self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs, step_tqdm.format_dict['rate'], epoch_tqdm.format_dict['rate'])
-
                 if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
@@ -767,11 +765,13 @@ class GenericTrainer(BaseTrainer):
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
+                self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs, step_tqdm.format_dict['rate'], epoch_tqdm.format_dict['rate'])
 
                 if self.commands.get_stop_command():
                     return
 
             train_progress.next_epoch()
+            self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs, step_tqdm.format_dict['rate'], epoch_tqdm.format_dict['rate'])
 
             if self.commands.get_stop_command():
                 return
