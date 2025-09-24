@@ -558,6 +558,8 @@ class LayerOffloadConductor:
 
     __is_active: bool
 
+    __deferred_layers: list[int]
+
     def __init__(
             self,
             module: nn.Module,
@@ -605,6 +607,8 @@ class LayerOffloadConductor:
         self.__keep_graph = False
 
         self.__is_active = False
+
+        self.__deferred_layers = []
 
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
@@ -740,6 +744,7 @@ class LayerOffloadConductor:
         if self.__offload_layers:
             self.__wait_layer_transfer(layer_index)
 
+            self.__schedule_deferred_layers_to_temp(except_layer=layer_index)
             for i in self.__offload_strategy.get_layers_to_offload(
                     layer_index=layer_index,
                     is_forward=self.__is_forward_pass,
@@ -853,6 +858,20 @@ class LayerOffloadConductor:
 
         allocator_fn = allocator.allocate_like if allocator is not None else None
 
+        if not is_forward and device_equals(device, self.__temp_device):
+            layer = self.__layers[layer_index]
+            for module in layer.modules():
+                for parameter in module.parameters():
+                    if parameter.grad is not None:
+                        #Layers to be offloaded usually do not have gradients. Model weights only have gradients in full-finetuning,
+                        #and then a fused backpass is required for offloading, which sets all gradients to None before a layer is offloaded.
+                        #There is only once exception:
+                        #In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
+                        #has not finished yet. The gradients are then set to None during the backward of one of the next layers.
+                        #Record which layers were ready to be offloaded, and offload them later:
+                        self.__deferred_layers.append(layer_index)
+                        return
+
         with create_stream_context(self.__layer_transfer_stream):
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
@@ -869,6 +888,18 @@ class LayerOffloadConductor:
                 log(f"schedule layer {layer_index} to {str(device)}")
 
             self.__layer_device_map[layer_index] = device
+
+    def __schedule_deferred_layers_to_temp(
+            self,
+            except_layer: int,
+    ):
+        layers = self.__deferred_layers
+        self.__deferred_layers = []
+        for layer_index in layers:
+            if layer_index == except_layer:
+                #don't offload this layer, because it is needed now #TODO can this even happen?
+                continue
+            self.__schedule_layer_to(layer_index, device=self.__temp_device, is_forward=False)
 
     def __schedule_activations_to_device(
             self,

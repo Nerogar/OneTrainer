@@ -2,18 +2,12 @@ from modules.model.SanaModel import SanaModel
 from modules.modelSetup.BaseSanaSetup import BaseSanaSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
 import torch
-
-PRESETS = {
-    "attn-mlp": ["attn1", "attn2", "ff."],
-    "attn-only": ["attn1", "attn2"],
-    "full": [],
-}
 
 
 class SanaLoRASetup(
@@ -38,12 +32,7 @@ class SanaLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_lora",
-                parameters=model.text_encoder_lora.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
@@ -51,12 +40,7 @@ class SanaLoRASetup(
                 "embeddings"
             )
 
-        if config.prior.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="transformer_lora",
-                parameters=model.transformer_lora.parameters(),
-                learning_rate=config.prior.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.prior)
 
         return parameter_group_collection
 
@@ -70,15 +54,8 @@ class SanaLoRASetup(
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        if model.text_encoder_lora is not None:
-            train_text_encoder = config.text_encoder.train and \
-                                 not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.text_encoder_lora.requires_grad_(train_text_encoder)
-
-        if model.transformer_lora is not None:
-            train_prior = config.prior.train and \
-                          not self.stop_prior_training_elapsed(config, model.train_progress)
-            model.transformer_lora.requires_grad_(train_prior)
+        self._setup_model_part_requires_grad("text_encoder_lora", model.text_encoder_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.prior, model.train_progress)
 
     def setup_model(
             self,
@@ -94,7 +71,7 @@ class SanaLoRASetup(
         ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
+            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

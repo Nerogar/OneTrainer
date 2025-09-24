@@ -17,11 +17,11 @@ goto :main
 rem --- Helpers ---
 :die
   echo.
-  echo %RED%ERROR:%RESET% %~1&
+  echo %RED%ERROR:%RESET% %~1
   echo.
   pause
   popd
-  exit /b 1
+  (echo %CMDCMDLINE% | find /I "%~nx0" >nul) && exit /b 1 || exit 1
 
 :warn_store
   echo.
@@ -229,12 +229,23 @@ set "PYTHON_VENV=%VENV_DIR%\\Scripts\\python.exe"
 if not exist "%PYTHON_VENV%" (
     call :die "Virtual environment Python executable not found at '%PYTHON_VENV%' after venv creation/check."
 )
-rem Set PYTHON to the venv python, though subsequent commands will use 'python' from activated PATH
 set "PYTHON=%PYTHON_VENV%"
 
 echo Activating virtual environment...
 call "%VENV_DIR%\Scripts\activate.bat"
 echo Virtual environment activated.
+
+rem  Check for Tkinter
+echo %CYAN%Checking for Tkinter availability...%RESET%
+python -c "import tkinter,sys; sys.exit(0 if hasattr(tkinter,'TkVersion') else 1)" >nul 2>&1
+if not errorlevel 1 goto :tk_ok
+
+echo %RED%Tkinter not found%RESET%
+call :die "Re-run the Python installer and enable 'tcl/tk and IDLE' (its enabled by default on fresh installations, re-enable/dont turn it off)"
+goto :EOF
+
+:tk_ok
+echo %GRN%Tkinter is available, proceeding ... %RESET%
 
 rem 5) Upgrade pip & install
 echo.

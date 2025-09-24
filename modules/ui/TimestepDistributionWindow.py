@@ -1,4 +1,3 @@
-import random
 
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import (
     ModelSetupNoiseMixin,
@@ -28,9 +27,6 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             noising_weight: float,
             noising_bias: float,
             timestep_shift: float,
-            dynamic_timestep_shifting: bool,
-            latent_width: int,
-            latent_height: int,
     ):
         super().__init__()
 
@@ -40,9 +36,6 @@ class TimestepGenerator(ModelSetupNoiseMixin):
         self.noising_weight = noising_weight
         self.noising_bias = noising_bias
         self.timestep_shift = timestep_shift
-        self.dynamic_timestep_shifting = dynamic_timestep_shifting
-        self.latent_width = latent_width
-        self.latent_height = latent_height
 
     def generate(self) -> Tensor:
         generator = torch.Generator()
@@ -55,7 +48,6 @@ class TimestepGenerator(ModelSetupNoiseMixin):
         config.noising_weight = self.noising_weight
         config.noising_bias = self.noising_bias
         config.timestep_shift = self.timestep_shift
-        config.dynamic_timestep_shifting = self.dynamic_timestep_shifting
 
 
         return self._get_timestep_discrete(
@@ -64,8 +56,6 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             generator=generator,
             batch_size=1000000,
             config=config,
-            latent_width=self.latent_width,
-            latent_height=self.latent_height,
         )
 
 
@@ -143,7 +133,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
 
         # dynamic timestep shifting
         components.label(frame, 6, 0, "Dynamic Timestep Shifting",
-                         tooltip="Dynamically shift the timestep distribution based on resolution. For the preview, a random resolution between 512 and 1024 is used, assuming a VAE scale factor of 8. During training, the actual resolution.")
+                         tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Dynamic Timestep Shifting is not shown in the preview.")
         components.switch(frame, 6, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
@@ -179,7 +169,6 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         return frame
 
     def __update_preview(self):
-        resolution = random.randint(512, 1024)
         generator = TimestepGenerator(
             timestep_distribution=self.config.timestep_distribution,
             min_noising_strength=self.config.min_noising_strength,
@@ -187,9 +176,6 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
             noising_weight=self.config.noising_weight,
             noising_bias=self.config.noising_bias,
             timestep_shift=self.config.timestep_shift,
-            dynamic_timestep_shifting=self.config.dynamic_timestep_shifting,
-            latent_width=resolution // 8,
-            latent_height=resolution // 8,
         )
 
         self.ax.cla()

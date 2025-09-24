@@ -1,3 +1,14 @@
+from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
+from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
+from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
+from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
+from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
+from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
+from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
+from modules.modelSetup.BaseStableDiffusion3Setup import PRESETS as sd3_presets
+from modules.modelSetup.BaseStableDiffusionSetup import PRESETS as sd_presets
+from modules.modelSetup.BaseStableDiffusionXLSetup import PRESETS as sdxl_presets
+from modules.modelSetup.BaseWuerstchenSetup import PRESETS as sc_presets
 from modules.ui.OffloadingWindow import OffloadingWindow
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
@@ -31,6 +42,18 @@ class TrainingTab:
         master.grid_rowconfigure(0, weight=1)
         master.grid_columnconfigure(0, weight=1)
 
+        #layer filter:
+        self.layer_entry = None
+        self.layer_entry_fg_color = None
+        self.layer_entry_text_color = None
+        self.layer_selector = None
+        self.regex_label = None
+        self.regex_switch = None
+        self.presets = {}
+        self.presets_list = []
+        self.prior_custom = ""
+        self.prior_selected = None
+
         self.scroll_frame = None
 
         self.refresh_ui()
@@ -58,6 +81,32 @@ class TrainingTab:
         column_2.grid(row=0, column=2, sticky="nsew")
         column_2.grid_columnconfigure(0, weight=1)
 
+        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
+            self.presets = sd_presets
+        elif self.train_config.model_type.is_stable_diffusion_xl():
+            self.presets = sdxl_presets
+        elif self.train_config.model_type.is_stable_diffusion_3():
+            self.presets = sd3_presets
+        elif self.train_config.model_type.is_wuerstchen():
+            self.presets = sc_presets
+        elif self.train_config.model_type.is_pixart():
+            self.presets = pixart_presets
+        elif self.train_config.model_type.is_flux():
+            self.presets = flux_presets
+        elif self.train_config.model_type.is_qwen():
+            self.presets = qwen_presets
+        elif self.train_config.model_type.is_chroma():
+            self.presets = chroma_presets
+        elif self.train_config.model_type.is_sana():
+            self.presets = sana_presets
+        elif self.train_config.model_type.is_hunyuan_video():
+            self.presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_hi_dream():
+            self.presets = hidream_presets
+        else:
+            self.presets = {"full": []}
+        self.presets_list = list(self.presets.keys()) + ["custom"]
+
         if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui(column_0, column_1, column_2)
         if self.train_config.model_type.is_stable_diffusion_3():
@@ -72,12 +121,15 @@ class TrainingTab:
             self.__setup_flux_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_chroma():
             self.__setup_chroma_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_qwen():
+            self.__setup_qwen_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_sana():
             self.__setup_sana_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hunyuan_video():
             self.__setup_hunyuan_video_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hi_dream():
             self.__setup_hi_dream_ui(column_0, column_1, column_2)
+
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -90,6 +142,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_stable_diffusion_3_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -104,6 +157,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -117,6 +171,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_wuerstchen_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -129,6 +184,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 0)
         self.__create_loss_frame(column_2, 1)
+        self.__create_layer_frame(column_2, 2)
 
     def __setup_pixart_alpha_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -141,6 +197,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2, supports_vb_loss=True)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_flux_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -150,10 +207,11 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_chroma_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -166,6 +224,20 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_qwen_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False)
+        self.__create_embedding_frame(column_0, 4)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_sana_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -178,6 +250,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_hunyuan_video_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -191,6 +264,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __setup_hi_dream_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
@@ -206,6 +280,7 @@ class TrainingTab:
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
 
     def __create_base_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -259,8 +334,8 @@ class TrainingTab:
         components.entry(frame, 6, 1, self.ui_state, "epochs")
 
         # batch size
-        components.label(frame, 7, 0, "Batch Size",
-                         tooltip="The batch size of one training step")
+        components.label(frame, 7, 0, "Local Batch Size",
+                         tooltip="The batch size of one training step. If you use multiple GPUs, this is the batch size of each GPU (local batch size).")
         components.entry(frame, 7, 1, self.ui_state, "batch_size")
 
         # accumulation steps
@@ -360,7 +435,7 @@ class TrainingTab:
                          tooltip="Enables circular padding for all conv layers to better train seamless images")
         components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
 
-    def __create_text_encoder_frame(self, master, row):
+    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -386,10 +461,11 @@ class TrainingTab:
                          tooltip="The learning rate of the text encoder. Overrides the base learning rate")
         components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate")
 
-        # text encoder layer skip (clip skip)
-        components.label(frame, 4, 0, "Clip Skip",
-                         tooltip="The number of additional clip layers to skip. 0 = the model default")
-        components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
+        if supports_clip_skip:
+            # text encoder layer skip (clip skip)
+            components.label(frame, 4, 0, "Clip Skip",
+                             tooltip="The number of additional clip layers to skip. 0 = the model default")
+            components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
 
     def __create_text_encoder_n_frame(
             self,
@@ -546,7 +622,7 @@ class TrainingTab:
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
             components.entry(frame, 4, 1, self.ui_state, "prior.guidance_scale")
 
-    def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False):
+    def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -600,10 +676,11 @@ class TrainingTab:
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
         components.entry(frame, 8, 1, self.ui_state, "timestep_shift")
 
-        # dynamic timestep shifting
-        components.label(frame, 9, 0, "Dynamic Timestep Shifting",
-                         tooltip="Dynamically shift the timestep distribution based on resolution. Use the preview to see more details.")
-        components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
+        if supports_dynamic_timestep_shifting:
+            # dynamic timestep shifting
+            components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+                             tooltip="Dynamically shift the timestep distribution based on resolution.")
+            components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
 
@@ -682,6 +759,87 @@ class TrainingTab:
         components.label(frame, 6, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
         components.options(frame, 6, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+
+    def __create_layer_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+
+        components.label(frame, 0, 0, "Layer Filter",
+                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.")
+        self.layer_selector = components.options(
+            frame, 0, 1, self.presets_list, self.ui_state, "layer_filter_preset",
+            command=self.__preset_set_layer_choice
+        )
+
+        self.layer_entry = components.entry(
+            frame, 1, 0, self.ui_state, "layer_filter",
+            tooltip="Comma-separated list of diffusion layers to train. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained"
+        )
+        self.layer_entry_fg_color = self.layer_entry.cget("fg_color")
+        self.layer_entry_text_color = self.layer_entry.cget("text_color")
+
+        self.regex_label = components.label(
+            frame, 2, 0, "Use Regex",
+            tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used."
+        )
+        self.regex_switch = components.switch(
+            frame, 2, 1, self.ui_state, "layer_filter_regex"
+        )
+
+        # Let the user set their own layer filter
+        if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
+            self.prior_custom = self.train_config.layer_filter
+        else:
+            self.prior_custom = ""
+
+        self.layer_entry.grid_configure(columnspan=2, sticky="ew")
+        # Some configs will come with the layer_filter_preset unset or wrong for
+        # the new model, so let's set it now to a reasonable default so it hits
+        # the UI correctly.
+        if self.layer_selector.get() not in self.presets_list:
+            self.layer_selector.set(self.presets_list[0])
+        self.__preset_set_layer_choice(self.layer_selector.get())
+
+
+    def __preset_set_layer_choice(self, selected: str):
+        if not selected:
+            selected = self.presets_list[0]
+
+        if selected == "custom":
+            # Restore prior custom text and allow editing + regex toggle
+            self.layer_entry.configure(state="normal", fg_color=self.layer_entry_fg_color, text_color=self.layer_entry_text_color)
+            self.layer_entry.cget('textvariable').set(self.prior_custom)
+            self.regex_label.grid()
+            self.regex_switch.grid()
+        else:
+            # Preserve custom text before overwriting
+            if self.prior_selected == "custom":
+                self.prior_custom = self.layer_entry.get()
+
+            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
+            preset_def = self.presets.get(selected, [])
+            if isinstance(preset_def, dict):
+                patterns = preset_def.get("patterns", [])
+                preset_uses_regex = bool(preset_def.get("regex", False))
+            else:
+                patterns = preset_def
+                preset_uses_regex = False
+
+            disabled_color = ("gray85", "gray17")
+            disabled_text_color = ("gray30", "gray70")
+            self.layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
+            self.layer_entry.cget('textvariable').set(",".join(patterns))
+
+            self.train_config.layer_filter = ",".join(patterns)
+
+            self.train_config.layer_filter_regex_regex = preset_uses_regex
+            self.ui_state.get_var("layer_filter_regex").set(preset_uses_regex)
+
+            self.regex_label.grid_remove()
+            self.regex_switch.grid_remove()
+
+        self.prior_selected = selected
 
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
