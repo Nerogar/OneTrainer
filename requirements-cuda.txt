@@ -1,9 +1,9 @@
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu128
-torch==2.7.1+cu128
-torchvision==0.22.1+cu128
+torch==2.8.0+cu128
+torchvision==0.23.0+cu128
 onnxruntime-gpu==1.22.0
-nvidia-nccl-cu12==2.26.2 #TODO upgrade to support RTX 5090 multi-GPU
+nvidia-nccl-cu12==2.27.3
 
 # optimizers
 bitsandbytes==0.46.0 # bitsandbytes for 8-bit optimizers and weight quantization
