@@ -129,6 +129,8 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.callbacks.TrainCallbacks import TrainCallbacks
+from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -150,6 +152,7 @@ from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
 from modules.util.TrainProgress import TrainProgress
+from modules.zluda import ZLUDA
 
 import torch
 from torch.nn import Parameter
@@ -1579,3 +1582,21 @@ def create_noise_scheduler(
         scheduler.set_timesteps(num_inference_timesteps)
 
     return scheduler
+
+def create_trainer(
+        config: TrainConfig,
+        callbacks: TrainCallbacks,
+        commands: TrainCommands,
+        reattach: bool = False,
+):
+    if config.cloud.enabled:
+        from modules.trainer.CloudTrainer import CloudTrainer
+        trainer = CloudTrainer(config, callbacks, commands, reattach=reattach)
+    elif config.multi_gpu:
+        from modules.trainer.MultiTrainer import MultiTrainer
+        trainer = MultiTrainer(config, callbacks, commands)
+    else:
+        ZLUDA.initialize_devices(config)
+        from modules.trainer.GenericTrainer import GenericTrainer
+        trainer = GenericTrainer(config, callbacks, commands)
+    return trainer

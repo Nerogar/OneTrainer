@@ -1,3 +1,4 @@
+import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
@@ -53,13 +54,19 @@ def init_model_parameters(
         train_device: torch.device,
 ):
     model.parameters = parameters
+    #random (LoRA) initialisation can differ, broadcast from GPU #0 to all others
+    #to be safe, do that before the optimizer is created because the optimizer could take copies
+    multi.broadcast_parameters(parameters.parameters(), train_device)
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
-    model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    if multi.is_master():
+        model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    else:
+        model.ema = None
     model.ema_state_dict = None
 
     model.param_group_mapping = parameters.unique_name_mapping

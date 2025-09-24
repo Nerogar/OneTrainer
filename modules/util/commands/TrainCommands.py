@@ -76,3 +76,15 @@ class TrainCommands:
         save_command = self.__save_command
         self.__save_command = False
         return save_command
+
+    def merge(self, other):
+        if other.get_stop_command():
+            self.stop()
+        for entry in other.get_and_reset_sample_custom_commands():
+            self.sample_custom(entry)
+        if other.get_and_reset_sample_default_command():
+            self.sample_default()
+        if other.get_and_reset_backup_command():
+            self.backup()
+        if other.get_and_reset_save_command():
+            self.save()

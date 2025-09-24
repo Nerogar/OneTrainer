@@ -14,6 +14,7 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
+from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -306,6 +307,15 @@ class TrainConfig(BaseConfig):
     validate_after_unit: TimeUnit
     continue_last_backup: bool
     include_train_config: ConfigPart
+
+    # multi-GPU
+    multi_gpu: bool
+    device_indexes: str
+    sequential_model_setup: bool
+    gradient_reduce_prevision: GradientReducePrecision
+    fused_gradient_reduce: bool
+    async_gradient_reduce: bool
+    async_gradient_reduce_buffer: int
 
     # model settings
     base_model_name: str
@@ -836,6 +846,15 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
+
+        #multi-GPU
+        data.append(("multi_gpu", False, bool, False))
+        data.append(("device_indexes", "", str, False))
+        data.append(("sequential_model_setup", False, bool, False))
+        data.append(("gradient_reduce_precision", GradientReducePrecision.FLOAT_32_STOCHASTIC, GradientReducePrecision, False))
+        data.append(("fused_gradient_reduce", True, bool, False))
+        data.append(("async_gradient_reduce", True, bool, False))
+        data.append(("async_gradient_reduce_buffer", 100, int, False))
 
         # model settings
         data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
