@@ -5,13 +5,24 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+from deepdiff import DeepDiff
+
+try:
+    from modules.util.config.TrainConfig import TrainConfig
+except ImportError:
+    sys.path.append(str(Path(__file__).parent.parent))
+    from modules.util.config.TrainConfig import TrainConfig
 
 import psutil
 import requests
@@ -23,12 +34,126 @@ import requests
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    format="[%(levelname)s] %(message)s"
 )
 
 # == Helper Classes ==
 
+def anonymize_config_dict(config_item):
+    if isinstance(config_item, dict):
+        return {k: anonymize_config_dict(v) for k, v in config_item.items()}
+    if isinstance(config_item, list):
+        return [anonymize_config_dict(i) for i in config_item]
+    if isinstance(config_item, str):
+        return Utility.anonymize_path(config_item)
+    return config_item
+
+def create_debug_package(output_zip_path: str, config_json_string: str):
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+
+            # Anonymized config
+            anonymized = anonymize_config_dict(json.loads(config_json_string))
+            (tmp / "config.json").write_text(json.dumps(anonymized, indent=4), encoding="utf-8")
+
+            # Default + diff
+            generate_default_config_file(tmp)
+            diff_path = tmp / "config_diff.txt"
+            default_path = tmp / "default_settings.json"
+            if DeepDiff and default_path.exists():
+                try:
+                    diff = DeepDiff(
+                        json.loads(default_path.read_text(encoding="utf-8")),
+                        anonymized,
+                        ignore_order=True,
+                        verbose_level=2,
+                        exclude_regex_paths=(
+                            r"root\['(?:optimizer_defaults|concepts|samples|sample_definition_file_name|concept_file_name)'\]|root\['embedding'\]\['uuid'\]",
+                            r"root\['text_encoder(?:_[1-4])?'\]\['model_name'\]",
+                            r"root\['unet?'\]\['model_name'\]",
+                        ),
+                        ignore_string_type_changes=True,
+                        ignore_numeric_type_changes=True,
+                    )
+                    diff.pop("type_changes", None)
+                    diff_path.write_text(format_diff_output(diff), encoding="utf-8")
+                except Exception as e:
+                    logger.error(f"Could not generate config diff: {e}")
+                    diff_path.write_text(f"Error generating diff: {e}", encoding="utf-8")
+            elif not DeepDiff:
+                logger.warning("deepdiff not installed. Skipping diff (`pip install deepdiff`).")
+
+            # Run self to generate debug_report.log
+            repo_root = Path(__file__).parent.parent
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__))],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            report_src = repo_root / "debug_report.log"
+            report_path = tmp / "debug_report.log"
+            if report_src.exists():
+                shutil.move(str(report_src), report_path)
+
+            # Zip assembly
+            with zipfile.ZipFile(output_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.write(tmp / "config.json", "config.json")
+                if diff_path.exists():
+                    zf.write(diff_path, "config_diff.txt")
+                if report_path.exists():
+                    zf.write(report_path, "debug_report.log")
+                else:
+                    parts = [
+                        "Failed to generate debug_report.log.",
+                        f"Return code: {result.returncode}",
+                    ]
+                    if result.stderr:
+                        parts += ["", "stderr:", result.stderr]
+                    if result.stdout:
+                        parts += ["", "stdout:", result.stdout]
+                    zf.writestr("debug_report.log", "\n".join(parts))
+
+        logger.info(f"Debug package saved to {Path(output_zip_path).name}")
+    except Exception:
+        logger.exception("Error generating debug package")
+
+def format_diff_output(diff) -> str:
+    sections: list[str] = []
+    sections += [
+        f"{extract_key_from_path(p)}: {c['old_value']} ⇒ {c['new_value']}"
+        for p, c in diff.get("values_changed", {}).items()
+    ]
+    spec = [
+        ("dictionary_item_added", "[ADDED]", False),
+        ("dictionary_item_removed", "[REMOVED]", False),
+        ("iterable_item_added", "[ADDED]", True),
+        ("iterable_item_removed", "[REMOVED]", True),
+    ]
+    for key, label, mapping in spec:
+        data = diff.get(key, {} if mapping else [])
+        if mapping:
+            sections += [
+                f"{extract_key_from_path(p)}: {label} {v}" for p, v in data.items()
+            ]
+        else:
+            sections += [f"{extract_key_from_path(p)}: {label}" for p in data]
+    return "\n".join(sections) if sections else "No differences found."
+
+def extract_key_from_path(path: str) -> str:
+    return ".".join(re.findall(r"\['([^]]+)'\]", path[4:] if path.startswith("root") else path))
+
+def generate_default_config_file(output_dir: Path):
+    try:
+        cfg = TrainConfig.default_values().to_settings_dict(secrets=False)
+        out = output_dir / "default_settings.json"
+        out.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+        logger.info(f"Default settings file saved to {out}")
+    except Exception:
+        logger.exception("Could not generate default settings file")
 
 class Utility:
     @staticmethod
@@ -695,7 +820,6 @@ class SoftwareInfo:
         Retrieve Git information including repository details (user and repo name),
         the current branch, commit hash, and any modified files compared to the upstream branch.
         """
-        # Get remote repository URL info for fork detection.
         remote_url = Utility.run_command(
             ["git", "config", "--get", "remote.origin.url"]
         )
@@ -724,47 +848,29 @@ class SoftwareInfo:
             Utility.run_command(["git", "rev-parse", "HEAD"])
             or "Unavailable"
         )
-        # Insert repo info at the top, followed by branch and commit.
         git_info = f"{repo_info}\nBranch: {branch}\nCommit: {commit}"
 
-        # Check for untracked files
-        untracked_files = Utility.run_command(
-            ["git", "ls-files", "--others", "--exclude-standard"]
+        origin_ref = "origin/master"
+        origin_exists = Utility.run_command(
+            ["git", "rev-parse", "--verify", "--quiet", origin_ref]
         )
-        if untracked_files and untracked_files.strip():
-            untracked_list = "\n".join(
-                f"  {line}" for line in untracked_files.splitlines()
-            )
-            git_info += f"\nUntracked Files:\n{untracked_list}"
-        else:
-            git_info += "\nNo untracked files."
+        if origin_exists:
 
-        # Check for modified files relative to upstream
-        upstream = Utility.run_command(
-            [
-                "git",
-                "rev-parse",
-                "--abbrev-ref",
-                "--symbolic-full-name",
-                "@{u}",
-            ]
-        )
-        if upstream:
-            diff_files = (
-                Utility.run_command(["git", "diff", "--name-only", "@{u}"])
-                or ""
-            )
-            if diff_files.strip():
-                modified_files = "\n".join(
-                    f"  {line}" for line in diff_files.splitlines()
-                )
-                git_info += f"\nModified Files (differs from {upstream}):\n{modified_files}"
+            diff_output = Utility.run_command(
+                ["git", "diff", "--name-status", "--diff-filter=DMU", origin_ref]
+            ) or ""
+            if diff_output.strip():
+                files = []
+                for line in diff_output.splitlines():
+                    parts = line.split("\t")
+                    if len(parts) >= 2:
+                        files.append(parts[-1])  # path is last column
+                modified_files = "\n".join(f"  {p}" for p in files)
+                git_info += f"\nChanged files relative to {origin_ref} (D/M/U only):\n{modified_files}"
             else:
-                git_info += f"\nNo modifications relative to upstream ({upstream})."
+                git_info += f"\nNo deleted, unmerged, or modified files relative to {origin_ref}."
         else:
-            git_info += (
-                "\nNo upstream branch tracking information available."
-            )
+            git_info += f"\nNo remote tracking branch found at {origin_ref}."
 
         return git_info
 

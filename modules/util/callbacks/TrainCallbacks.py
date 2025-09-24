@@ -29,10 +29,10 @@ class TrainCallbacks:
     ):
         self.__on_update_train_progress = on_update_train_progress
 
-    def on_update_train_progress(self, train_progress: TrainProgress, max_sample: int, max_epoch: int):
+    def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         if self.__on_update_train_progress:
             with contextlib.suppress(Exception):
-                self.__on_update_train_progress(train_progress, max_sample, max_epoch)
+                self.__on_update_train_progress(train_progress, max_step, max_epoch)
 
     # on_update_status
     def set_on_update_status(

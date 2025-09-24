@@ -75,7 +75,6 @@ class GenericTrainer(BaseTrainer):
 
         self.model = None
         self.one_step_trained = False
-
         self.grad_hook_handles = []
 
     def start(self):
@@ -195,6 +194,9 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
+        if not self.sample_queue:
+            return
+
         for fun in self.sample_queue:
             fun()
         self.sample_queue = []
@@ -278,7 +280,7 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
         torch_gc()
 
-        self.callbacks.on_update_status("sampling")
+        self.callbacks.on_update_status("Sampling ...")
 
         is_custom_sample = False
         if sample_params_list:
@@ -341,7 +343,7 @@ class GenericTrainer(BaseTrainer):
             if current_epoch_length_validation == 0:
                 return
 
-            self.callbacks.on_update_status("calculating validation loss")
+            self.callbacks.on_update_status("Calculating validation loss")
             self.model_setup.setup_train_device(self.model, self.config)
 
             torch_gc()
@@ -423,7 +425,7 @@ class GenericTrainer(BaseTrainer):
     def __backup(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
         torch_gc()
 
-        self.callbacks.on_update_status("creating backup")
+        self.callbacks.on_update_status("Creating backup")
 
         backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
@@ -470,7 +472,7 @@ class GenericTrainer(BaseTrainer):
     def __save(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
         torch_gc()
 
-        self.callbacks.on_update_status("saving")
+        self.callbacks.on_update_status("Saving")
 
         save_path = os.path.join(
             self.config.workspace_dir,
@@ -607,7 +609,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.only_cache:
             if multi.is_master():
-                self.callbacks.on_update_status("caching")
+                self.callbacks.on_update_status("Caching")
                 for _epoch in tqdm(range(train_progress.epoch, self.config.epochs, 1), desc="epoch"):
                     self.data_loader.get_data_set().start_next_epoch()
             return
@@ -626,7 +628,7 @@ class GenericTrainer(BaseTrainer):
         ema_loss_steps = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
-            self.callbacks.on_update_status("starting epoch/caching")
+            self.callbacks.on_update_status("Starting epoch/caching")
 
             #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
             for _ in multi.master_first():
@@ -711,7 +713,7 @@ class GenericTrainer(BaseTrainer):
                             self.__save(train_progress, True, step_tqdm.write)
                         self.model_setup.setup_train_device(self.model, self.config)
 
-                self.callbacks.on_update_status("training")
+                self.callbacks.on_update_status("Training ...")
 
                 with TorchMemoryRecorder(enabled=False):
                     step_seed = train_progress.global_step
@@ -833,7 +835,7 @@ class GenericTrainer(BaseTrainer):
                 self.model.optimizer.eval()
 
             if multi.is_master():
-                self.callbacks.on_update_status("saving the final model")
+                self.callbacks.on_update_status("Saving the final model")
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
