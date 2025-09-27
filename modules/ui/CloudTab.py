@@ -123,6 +123,9 @@ class CloudTab:
         components.label(self.frame, 16, 2, "Delete remote workspace",
                          tooltip="Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
         components.switch(self.frame, 16, 3, self.ui_state, "cloud.delete_workspace")
+        components.label(self.frame, 17, 2, "Transfer datasets as tar",
+                         tooltip="Compress datasets into tar.gz files before uploading to reduce transfer time and bandwidth usage.")
+        components.switch(self.frame, 17, 3, self.ui_state, "cloud.transfer_datasets_as_tar")
 
         components.label(self.frame, 1, 4, "Create cloud via API",
                          tooltip="Automatically creates a new cloud instance if both Host:Port and Cloud ID are empty. Currently supported for RUNPOD.")
