@@ -37,6 +37,8 @@ RUN useradd -m onetrainer
 
 # Install OneTrainer
 COPY . .
+# Fix "dubious ownership" git error by marking the OneTrainer directory as safe
+RUN git config --system safe.directory /OneTrainer
 
 # Move the default training presets to the persistant data volume, and overwrite the training preset directory with a
 # link pointing back to that volume.
