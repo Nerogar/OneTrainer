@@ -16,18 +16,31 @@ WORKDIR /OneTrainer
 COPY requirements.txt requirements-global.txt requirements-cuda.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create user data volume
-RUN mkdir /data && \
-    mkdir /data/debug                 && ln -s /data/debug .                 && \
-    mkdir /data/workspace             && ln -s /data/workspace .             && \
-    mkdir /data/models                && ln -s /data/models .                && \
-    mkdir /data/training_concepts     && ln -s /data/training_concepts .     && \
-    mkdir /data/training_samples      && ln -s /data/training_samples .      && \
-    mkdir /data/training_user_setting && ln -s /data/training_user_setting . && \
-    mkdir /data/external              && ln -s /data/external .              && \
-    mkdir /data/update.var            && ln -s /data/update.var .            && \
-    echo '{}' > /data/config.json     && ln -s /data/config.json .           && \
-    echo '{}' > /data/secrets.json    && ln -s /data/secrets.json .
+# Install OneTrainer
+COPY . .
+
+# Create a persistent volume for runtime and user data. This setup can be used in three ways: the first is to do
+# nothing, in which case Docker will automatically persist the volume; the second is to mount the /data directory
+# entirely (e.g., -v ./data:/data); and the third (used by compose.yaml) is to mount each directory to its local
+# counterpart.
+RUN mkdir \
+    # Regular data directories
+        /data                        \
+        /data/debug                  \
+        /data/workspace              \
+        /data/models                 \
+        /data/training_concepts      \
+        /data/training_samples       \
+        /data/training_user_settings \
+        /data/external               \
+        /data/update.var           && \
+    # training_presets directory, need to copy default presets
+    mv training_presets /data      && \
+    # Empty JSON files
+    echo '{}' > /data/config.json  && \
+    echo '{}' > /data/secrets.json && \
+    # Create symbolic links from data directories to OneTrainer installation
+    ln -s /data/* /OneTrainer
 
 VOLUME [ "/data" ]
 
@@ -35,17 +48,9 @@ VOLUME [ "/data" ]
 # tasks requiring elevated privileges.
 RUN useradd -m onetrainer
 
-# Install OneTrainer
-COPY . .
 # Fix "dubious ownership" git error by marking the OneTrainer directory as safe
 RUN git config --system safe.directory /OneTrainer
 
-# Move the default training presets to the persistant data volume, and overwrite the training preset directory with a
-# link pointing back to that volume.
-RUN mkdir /data/training_presets                 && \
-    mv training_presets/* /data/training_presets && \
-    rm -r training_presets
-RUN ln -s /data/training_presets /OneTrainer/training_presets
 # Allow OneTrainer to create temporary *.write files at runtime.
 RUN chmod 777 .
 

@@ -16,12 +16,28 @@ services:
             - UID=1000
             - GID=1000
         volumes:
-            # Give X11 access to OneTrainer
+            # Give X11 access to OneTrainer (requires X11 running on the host system)
             - /tmp/.X11-unix:/tmp/.X11-unix:ro
             - ~/.Xauthority:/home/onetrainer/.Xauthority
-            # (Optional)
-            # data:/data
+
+            # Sync user data with local files
+            - ./debug:/data/debug
+            - ./workspace:/data/workspace
+            - ./models:/data/models
+            - ./training_concepts:/data/training_concepts
+            - ./training_samples:/data/training_samples
+            - ./training_user_settings:/data/training_user_settings
+            - ./external:/data/external
+            - ./update.var:/data/update.var
+
+            # Alternatively, you may want to comment the previous lines and mount the data directory entirely (you'll
+            # need to uncomment the "volumes" section bellow too)
+            # - data:/data
+
+            # (example) Mounting datasets and models on the container
+            #- /home/user/BaseModels:/mnt/basemodels
+            #- /home/user/Datasets:/mnt/datasets
         network_mode: host
 
-volumes:
-    data:
+#volumes:
+#    data:
