@@ -44,6 +44,8 @@ RUN mkdir /data/training_presets                 && \
     mv training_presets/* /data/training_presets && \
     rm -r training_presets
 RUN ln -s /data/training_presets /OneTrainer/training_presets
+# Allow OneTrainer to create temporary *.write files at runtime.
+RUN chmod 777 .
 
 # Expose tensorboard
 EXPOSE 6006

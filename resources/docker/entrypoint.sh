@@ -16,7 +16,6 @@ fi
 # Fix file ownership
 echo "[entrypoint] Changing /data ownership..."
 chown -R onetrainer:onetrainer /data
-chmod 777 .
 
 # Add user to the /dev/nvidia* groups to ensure CUDA access. Normally, these devices belong to a single "video" group,
 # but to be safe, we add the user to each device's group individually.
