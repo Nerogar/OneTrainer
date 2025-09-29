@@ -83,6 +83,25 @@ git pull
 docker compose build
 ```
 
+##### Docker on Windows
+
+If you're using Docker on Windows via WSL, you may need additional software and configuration to support the X11
+graphical protocol.
+
+According to Microsoft, X11 support is enabled out of the box with WSL2:
+https://learn.microsoft.com/en-us/windows/wsl/tutorials/gui-apps. However, some testers reported that they had to
+install [vcxsrv](https://github.com/marchaesen/vcxsrv).
+
+
+##### TclError: couldn't connect to display ""
+
+This error means that the DISPLAY environment variable is either missing or invalid. On most X11 systems, this variable
+is set upon connection, so a reboot might solve the issue. If that doesn't work, make sure you have an X11 server
+installed and running (Windows users: see the previous section), and try to determine its DISPLAY value (the most common
+one according to testers is `host.docker.internal:0.0`).
+
+Once found, you can re-run the command as follows: `DISPLAY=<value> docker compose up`.
+
 ## Updating
 
 #### Automatic update
