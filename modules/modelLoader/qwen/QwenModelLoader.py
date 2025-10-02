@@ -97,6 +97,8 @@ class QwenModelLoader(
         if transformer_model_name:
             transformer = QwenImageTransformer2DModel.from_single_file(
                 transformer_model_name,
+                config=base_model_name,
+                subfolder="transformer",
                 #avoid loading the transformer in float32:
                 torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
             )
