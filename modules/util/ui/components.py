@@ -310,7 +310,6 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
 
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
-
     if tooltip:
         ToolTip(component, tooltip, x_position=25)
     return component
