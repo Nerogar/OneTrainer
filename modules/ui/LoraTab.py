@@ -57,7 +57,7 @@ class LoraTab:
 
         # lora model name
         components.label(master, 0, 0, f"{name} base model",
-                         tooltip=f"The base {name} to train on. Leave empty to create a new LoRA")
+                         tooltip=f"The base {name} to train on. Leave empty to create a new {name}")
         entry = components.file_entry(
             master, 0, 1, self.ui_state, "lora_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
@@ -84,7 +84,7 @@ class LoraTab:
 
         # lora rank
         components.label(master, 2, 0, f"{name} alpha",
-                         tooltip="The alpha parameter used when creating a new f{name}")
+                         tooltip=f"The alpha parameter used when creating a new {name}")
         components.entry(master, 2, 1, self.ui_state, "lora_alpha")
 
         # Dropout Percentage
