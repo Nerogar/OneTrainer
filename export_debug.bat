@@ -20,7 +20,7 @@ goto :end
 
 :activate_venv
 echo activating venv %VENV_DIR%
-set PYTHON="%VENV_DIR%\Scripts\python.exe"
+set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
 echo Using Python %PYTHON%
 
 :launch
