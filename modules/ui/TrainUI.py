@@ -679,7 +679,7 @@ class TrainUI(ctk.CTk):
         self.set_epoch_progress(train_progress.epoch, max_epoch)
         self.set_eta_label(train_progress, max_step, max_epoch)
 
-    def on_update_status(self, status):
+    def on_update_status(self, status: str):
         self.status_label.configure(text=status)
 
     def open_dataset_tool(self):
