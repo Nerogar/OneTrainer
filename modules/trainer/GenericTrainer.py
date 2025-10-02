@@ -194,9 +194,6 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
-        if not self.sample_queue:
-            return
-
         for fun in self.sample_queue:
             fun()
         self.sample_queue = []
