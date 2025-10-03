@@ -6,6 +6,7 @@ from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
 import torch
@@ -428,6 +429,7 @@ class LoRAModuleWrapper:
     orig_module: nn.Module
     rank: int
     alpha: float
+    module_filters: list[ModuleFilter]
 
     lora_modules: dict[str, PeftBase]
 
@@ -443,7 +445,12 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        self.module_filter = [x.strip() for x in module_filter] if module_filter is not None else []
+
+        self.module_filters = [
+            ModuleFilter(pattern, use_regex=config.layer_filter_regex)
+            for pattern in (module_filter or [])
+        ]
+
         weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
             if weight_decompose:
@@ -466,16 +473,40 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
 
-        self.lora_modules = self.__create_modules(orig_module)
+        self.lora_modules = self.__create_modules(orig_module, config)
 
-    def __create_modules(self, orig_module: nn.Module | None) -> dict[str, PeftBase]:
+    def __create_modules(self, orig_module: nn.Module | None, config: TrainConfig) -> dict[str, PeftBase]:
+        if orig_module is None:
+            return {}
+
         lora_modules = {}
+        selected = []
+        deselected = []
+        unsuitable = []
 
-        if orig_module is not None:
-            for name, child_module in orig_module.named_modules():
-                if len(self.module_filter) == 0 or any(x in name for x in self.module_filter):
-                    if isinstance(child_module, Linear | Conv2d):
-                        lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+        for name, child_module in orig_module.named_modules():
+            if not isinstance(child_module, Linear | Conv2d):
+                unsuitable.append(name)
+                continue
+            if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
+                lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                selected.append(name)
+            else:
+                deselected.append(name)
+
+        if len(self.module_filters) > 0:
+            if config.debug_mode:
+                print(f"Selected layers: {selected}")
+                print(f"Deselected layers: {deselected}")
+                print(f"Unsuitable for LoRA training: {unsuitable}")
+            else:
+                print(f"Selected layers: {len(selected)}")
+                print(f"Deselected layers: {len(deselected)}")
+                print("Note: Enable Debug mode to see the full list of layer names")
+
+        unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
+        if len(unused_filters) > 0:
+            raise ValueError('Custom layer filters: no modules were matched by the custom filter(s)')
 
         return lora_modules
 

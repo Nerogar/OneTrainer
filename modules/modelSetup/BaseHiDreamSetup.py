@@ -24,6 +24,12 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn1", "ff_i"],
+    "attn-only": ["attn1"],
+    "full": [],
+}
+
 
 class BaseHiDreamSetup(
     BaseModelSetup,
@@ -339,8 +345,6 @@ class BaseHiDreamSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                latent_height=scaled_latent_image.shape[-2],
-                latent_width=scaled_latent_image.shape[-1],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

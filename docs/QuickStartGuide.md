@@ -20,7 +20,7 @@ fits your needs, then change settings as you need. You can also add your own pre
 
 ### Workspaces
 
-OneTrainer uses workspaces to separate your training runs. A workspace contains all the backup, sampling and tensorboard
+OneTrainer uses workspaces to separate your training runs. A workspace contains all the backup, sampling and TensorBoard
 data of a single run. When you start a new training run, it is recommended that you select an empty directory as your
 workspace.
 
@@ -32,8 +32,8 @@ settings, you should either clear the cache directory, or choose a new one.
 
 ### Tensorboard
 
-Tensorboard enables easy tracking of the training progress during training. To use it, enable Tensorboard. During the
-training run, click on the Tensorboard button at the bottom to open the web interface. This web interface will display
+TensorBoard enables easy tracking of the training progress during training. To use it, enable Tensorboard. During the
+training run, click on the TensorBoard button at the bottom to open the web interface. This web interface will display
 loss values and samples.
 
 ### Input Model Settings
@@ -42,14 +42,14 @@ Select a base model to train on. This can be a model in many different formats:
 
 1. A filename of a checkpoint either in ckpt or safetensors format
 2. A directory name of a model in diffusers format
-3. A Huggingface repository name
+3. A Hugging Face repository name
 4. A backup directory from a previous training run
 
 You also need to specify the type of the input model.
 
 ### Output Model Settings
 
-Simply specify the file- or directory name where you want to save the final model, and the output format.
+Simply specify the file or directory name where you want to save the final model, and the output format.
 The data type defines the precision for the final model. Float16 will create smaller models, but the quality can be
 reduced.
 
@@ -68,11 +68,13 @@ version will be cached.
 ### Adding concepts.
 
 Concepts define the data you want to train on. You can first create a configuration. Then you can add as many concepts
-to that configuration as you want. After adding a concept, you can click on the new widget that appears to open the
+to that configuration as you want.
+
+After adding a concept, you can click on the new widget that appears to open the
 details window. In that window you can optionally select a name, then specify the directory where the images are saved.
-The prompt source defines where the prompts are loaded from. You can choose to load them from .txt files in the same
-directory, from the image filenames, or from a single .txt file that contains multiple lines to randomly choose from. If
-you choose to use a single .txt file, you also need to specify where that file is saved. Optionally, you can also
+The prompt source defines where the prompts are loaded from. You can choose to load them from `.txt` files in the same
+directory, from the image filenames, or from a single `.txt` file that contains multiple lines to randomly choose from. If
+you choose to use a single `.txt` file, you also need to specify where that file is saved. Optionally, you can also
 include subdirectories of the selected directory in the concept definition.
 
 On the augmentation tab, you can define how OneTrainer should modify your images before training on them. These
@@ -104,14 +106,14 @@ reduces the quality, while providing a significant speed boost.
 ### Resolution
 
 Your training images will be resized to that resolution when training. You don't need to do any manual resizing. You can
-specify multiple resolutions as a comma separated list. All resolutions will be trained at the same time.
+specify multiple resolutions as a comma-separated list. All resolutions will be trained at the same time.
 
 ### Masked training
 
 With masked training, you can instruct the model to only learn from some parts of your training images. For example, if
 you want to train a subject, but not the background, this setting will help. To enable masked training, you need to add
-a mask for every training image. This mask is a black and white image file, where white regions define what should be
-included, and black regions are excluded. The files need the same name as the images, with an added "-masklabel.png"
+a mask for every training image. This mask is binary image (black-and-white), where white regions define what should be
+included, and black regions are excluded. The files need the same name as the images, with an added `-masklabel.png`
 extension.
 
 ### Sampling
@@ -122,8 +124,12 @@ and also saved in the workspace directory.
 ### Backup and Continue
 
 On the backup tab, you can configure regular backups that will be created during the training run. These backups are
-saved in the workspace. Additionally, you can decide to create a backup at the end of the training run. A backup
-contains all the model data to continue the training run. To continue the training from a previous backup, just select
+saved in the workspace.
+
+Additionally, you can decide to create a backup at the end of the training run. They
+contain all the model data to continue the training run. To continue the training from a previous backup, just select
 the backup directory as your base model.
 
 A backup can be converted to a model file by using the model convert tool.
+
+Note: Backups are **NOT** to be used externally in tools like Forge, SwarmUI etc they will not work. Utilise saves.

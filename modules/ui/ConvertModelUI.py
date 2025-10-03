@@ -49,7 +49,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         # model type
         components.label(master, 0, 0, "Model Type",
                          tooltip="Type of the model")
-        components.options_kv(master, 0, 1, [
+        components.options_kv(master, 0, 1, [ #TODO simplify
             ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
             ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
             ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
@@ -66,6 +66,8 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Flux Dev", ModelType.FLUX_DEV_1),
             ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
             ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
+            ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
+            ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
         ], self.ui_state, "model_type")
 
         # training method

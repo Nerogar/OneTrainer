@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import traceback
 from abc import ABCMeta
 from itertools import repeat
 
@@ -117,6 +119,19 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
             sub_module._fix_state_dict_keys_on_load(state_dict)
+
+        #TODO why is it necessary to iterate by key names from the state dict?
+        #why not iterate through the object model, like replace_linear_... does?
+        #would avoid key replacements as follows.
+
+        if hasattr(sub_module, "_checkpoint_conversion_mapping"): #required for loading the text encoder of Qwen
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                new_k = k
+                for pattern, replacement in sub_module._checkpoint_conversion_mapping.items():
+                    new_k = re.sub(pattern, replacement, new_k)
+                new_state_dict[new_k] = v
+            state_dict = new_state_dict
 
         for key, value in state_dict.items():
             module = sub_module
@@ -288,3 +303,22 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             train_dtype,
             None,
         )
+
+    def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]):
+        is_local = os.path.isdir(pretrained_model_name_or_path)
+        if is_local:
+            return
+
+        diffusers_paths = [((folder + "/") if folder else "") + "diffusion_pytorch_model*" for folder in diffusers_modules]
+        transformers_paths = [((folder + "/") if folder else "") + "model*" for folder in transformers_modules]
+        transformers_paths.extend([((folder + "/") if folder else "") + "pytorch_model*" for folder in transformers_modules])
+        try:
+            huggingface_hub.snapshot_download(
+                pretrained_model_name_or_path,
+                allow_patterns=diffusers_paths + transformers_paths,
+            )
+        except huggingface_hub.errors.HFValidationError:
+            pass
+        except Exception:
+            traceback.print_exc()
+            print("Error during bulk preloading of Huggingface model repository, proceeding without preloading")

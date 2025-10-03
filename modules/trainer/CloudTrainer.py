@@ -13,7 +13,6 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudType import CloudType
-from modules.util.TrainProgress import TrainProgress
 
 
 class CloudTrainer(BaseTrainer):
@@ -148,11 +147,11 @@ class CloudTrainer(BaseTrainer):
         remote.cloud = local.cloud
         remote.secrets.cloud = local.secrets.cloud
 
-        def adjust(config,attribute : str):
+        def adjust(config, attribute: str, if_exists: bool=False):
             path=getattr(config,attribute)
             if path.startswith("cloud:"):
                 setattr(config,attribute,path.replace("cloud:","",1))
-            elif path != "":
+            elif path != "" and (not if_exists or Path(path).exists()):
                 setattr(config,"local_"+attribute,path)
                 path=CloudTrainer.__adjust_path(path,remote.cloud.remote_dir)
                 setattr(config,attribute,path)
@@ -160,11 +159,8 @@ class CloudTrainer(BaseTrainer):
         adjust(remote,"debug_dir")
         adjust(remote,"workspace_dir")
         adjust(remote,"cache_dir")
-        if Path(remote.base_model_name).exists() or remote.base_model_name.startswith("cloud:"):
-            adjust(remote,"base_model_name")
-        if Path(remote.prior.model_name).exists() or remote.prior.model_name.startswith("cloud:"):
-            adjust(remote.prior,"model_name")
-
+        adjust(remote,"base_model_name", if_exists=True)
+        adjust(remote.prior,"model_name", if_exists=True)
         adjust(remote,"output_model_destination")
         adjust(remote,"lora_model_name")
 
@@ -176,7 +172,7 @@ class CloudTrainer(BaseTrainer):
         remote.concepts = [concept for concept in remote.concepts if concept.enabled]
 
         for concept in remote.concepts:
-            adjust(concept,"path")
+            adjust(concept,"path", if_exists=True)
             adjust(concept.text,"prompt_path")
 
         if remote.train_device == "cpu":
@@ -195,10 +191,3 @@ class CloudTrainer(BaseTrainer):
             return (Path(remote_dir,"remote") / path).as_posix()
         else:
             return ""
-
-
-    def backup(self, train_progress: TrainProgress):
-        pass
-
-    def save(self, train_progress: TrainProgress):
-        pass

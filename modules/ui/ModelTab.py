@@ -40,7 +40,7 @@ class ModelTab:
         self.scroll_frame.grid_columnconfigure(3, weight=0)
         self.scroll_frame.grid_columnconfigure(4, weight=1)
 
-        if self.train_config.model_type.is_stable_diffusion():
+        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
             self.__setup_stable_diffusion_ui()
         if self.train_config.model_type.is_stable_diffusion_3():
             self.__setup_stable_diffusion_3_ui()
@@ -52,6 +52,10 @@ class ModelTab:
             self.__setup_pixart_alpha_ui()
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui()
+        elif self.train_config.model_type.is_chroma():
+            self.__setup_chroma_ui()
+        elif self.train_config.model_type.is_qwen():
+            self.__setup_qwen_ui()
         elif self.train_config.model_type.is_sana():
             self.__setup_sana_ui()
         elif self.train_config.model_type.is_hunyuan_video():
@@ -105,6 +109,40 @@ class ModelTab:
             allow_override_prior=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_chroma_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            allow_override_prior=True,
+            has_text_encoder_1=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_qwen_ui(self):
+        row = 0
+        row = self.__create_base_dtype_components(row)
+        row = self.__create_base_components(
+            row,
+            has_prior=True,
+            allow_override_prior=True,
+            has_text_encoder_1=True,
             has_vae=True,
         )
         row = self.__create_output_components(
@@ -288,8 +326,8 @@ class ModelTab:
         if has_prior:
             if allow_override_prior:
                 # prior model
-                components.label(self.scroll_frame, row, 0, "Prior Model",
-                                 tooltip="Filename, directory or Hugging Face repository of the prior model. For Flux, it must be a safetensors file that only contains the transformer.")
+                components.label(self.scroll_frame, row, 0, "Prior Model", #TODO rename; as more models support this, the name "Prior" gets confusing
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model. For Flux, Chroma or Qwen, it must be a safetensors file that only contains the transformer.")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x

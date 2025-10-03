@@ -1,5 +1,6 @@
 import copy
 import inspect
+import math
 from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
@@ -35,19 +36,6 @@ class FluxSampler(BaseModelSampler):
         self.model_type = model_type
         self.pipeline = model.create_pipeline()
 
-    def __calculate_shift(
-            self,
-            image_seq_len,
-            base_seq_len: int = 256,
-            max_seq_len: int = 4096,
-            base_shift: float = 0.5,
-            max_shift: float = 1.15,
-    ):
-        m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
-        b = base_shift - m * base_seq_len
-        mu = image_seq_len * m + b
-        return mu
-
     @torch.no_grad()
     def __sample_base(
             self,
@@ -60,11 +48,9 @@ class FluxSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
-            cfg_rescale: float = 0.7,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             text_encoder_2_sequence_length: int | None = None,
-            force_last_timestep: bool = False,
             prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
@@ -112,33 +98,12 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            latent_image = self.model.pack_latents(
-                latent_image,
-                latent_image.shape[0],
-                latent_image.shape[1],
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
-
-            image_seq_len = latent_image.shape[1]
+            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            latent_image = self.model.pack_latents(latent_image)
 
             # prepare timesteps
-            mu = self.__calculate_shift(
-                image_seq_len,
-                noise_scheduler.config.base_image_seq_len,
-                noise_scheduler.config.max_image_seq_len,
-                noise_scheduler.config.base_shift,
-                noise_scheduler.config.max_shift,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
             timesteps = noise_scheduler.timesteps
-
-            if force_last_timestep:
-                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                                * (noise_scheduler.config.num_train_timesteps - 1)
-
-                # add the final timestep to force predicting with zero snr
-                timesteps = torch.cat([last_timestep, timesteps])
 
             # denoising loop
             extra_step_kwargs = {}
@@ -231,14 +196,12 @@ class FluxSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
-            cfg_rescale: float = 0.7,
             sample_inpainting: bool = False,
             base_image_path: str = "",
             mask_image_path: str = "",
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             text_encoder_2_sequence_length: int | None = None,
-            force_last_timestep: bool = False,
             prior_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
@@ -377,33 +340,10 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            latent_image = self.model.pack_latents(
-                latent_image,
-                latent_image.shape[0],
-                latent_image.shape[1],
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
-
-            image_seq_len = latent_image.shape[1]
-
-            # prepare timesteps
-            mu = self.__calculate_shift(
-                image_seq_len,
-                noise_scheduler.config.base_image_seq_len,
-                noise_scheduler.config.max_image_seq_len,
-                noise_scheduler.config.base_shift,
-                noise_scheduler.config.max_shift,
-            )
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu)
+            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            latent_image = self.model.pack_latents(latent_image)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
             timesteps = noise_scheduler.timesteps
-
-            if force_last_timestep:
-                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                                * (noise_scheduler.config.num_train_timesteps - 1)
-
-                # add the final timestep to force predicting with zero snr
-                timesteps = torch.cat([last_timestep, timesteps])
 
             # denoising loop
             extra_step_kwargs = {}
@@ -494,14 +434,12 @@ class FluxSampler(BaseModelSampler):
                 diffusion_steps=sample_config.diffusion_steps,
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
-                cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
                 sample_inpainting=sample_config.sample_inpainting,
                 base_image_path=sample_config.base_image_path,
                 mask_image_path=sample_config.mask_image_path,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
-                force_last_timestep=sample_config.force_last_timestep,
                 prior_attention_mask=sample_config.prior_attention_mask,
                 on_update_progress=on_update_progress,
             )
@@ -516,11 +454,9 @@ class FluxSampler(BaseModelSampler):
                 diffusion_steps=sample_config.diffusion_steps,
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
-                cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
-                force_last_timestep=sample_config.force_last_timestep,
                 prior_attention_mask=sample_config.prior_attention_mask,
                 on_update_progress=on_update_progress,
             )

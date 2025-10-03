@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from random import Random
 
+import modules.util.multi_gpu_util as multi
 from modules.model.FluxModel import FluxModel, FluxModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -24,6 +25,12 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn", "ff.net"],
+    "attn-only": ["attn"],
+    "blocks": ["transformer_block"],
+    "full": [],
+}
 
 class BaseFluxSetup(
     BaseModelSetup,
@@ -201,7 +208,7 @@ class BaseFluxSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step
+            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
@@ -238,14 +245,14 @@ class BaseFluxSetup(
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
+            shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                latent_height=scaled_latent_image.shape[-2],
-                latent_width=scaled_latent_image.shape[-1],
+                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
@@ -280,13 +287,8 @@ class BaseFluxSetup(
                 model.train_dtype.torch_dtype()
             )
 
-            packed_latent_input = model.pack_latents(
-                latent_input,
-                latent_input.shape[0],
-                latent_input.shape[1],
-                latent_input.shape[2],
-                latent_input.shape[3],
-            )
+            packed_latent_input = model.pack_latents(latent_input)
+
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,

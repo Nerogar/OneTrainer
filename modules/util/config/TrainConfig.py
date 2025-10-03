@@ -14,6 +14,7 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
+from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -65,6 +66,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -102,11 +104,24 @@ class TrainOptimizerConfig(BaseConfig):
     factored: True
     factored_fp32: True
     use_stableadamw: True
-    use_muon_pp: False
     use_cautious: False
     use_grams: False
     use_adopt: False
     use_focus: False
+    d_limiter: True
+    use_schedulefree: True
+    use_orthograd: False
+    nnmf_factor: False
+    orthogonal_gradient: False
+    use_atan2: False
+    use_AdEMAMix: False
+    beta3_ema: float
+    alpha_grad: float
+    beta1_warmup: int
+    min_beta1: float
+    Simplified_AdEMAMix: False
+    cautious_mask: False
+    grams_moment: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -149,6 +164,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
@@ -185,11 +201,24 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("factored", True, bool, False))
         data.append(("factored_fp32", True, bool, False))
         data.append(("use_stableadamw", True, bool, False))
-        data.append(("use_muon_pp", False, bool, False))
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
         data.append(("use_focus", False, bool, False))
+        data.append(("d_limiter", True, bool, True))
+        data.append(("use_schedulefree", True, bool, True))
+        data.append(("use_orthograd", False, bool, False))
+        data.append(("nnmf_factor", False, bool, False))
+        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("use_atan2", False, bool, False))
+        data.append(("use_AdEMAMix", False, bool, False))
+        data.append(("beta3_ema", None, float, True))
+        data.append(("alpha_grad", None, float, True))
+        data.append(("beta1_warmup", None, int, True))
+        data.append(("min_beta1", None, float, True))
+        data.append(("Simplified_AdEMAMix", False, bool, False))
+        data.append(("cautious_mask", False, bool, False))
+        data.append(("grams_moment", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -279,6 +308,15 @@ class TrainConfig(BaseConfig):
     continue_last_backup: bool
     include_train_config: ConfigPart
 
+    # multi-GPU
+    multi_gpu: bool
+    device_indexes: str
+    sequential_model_setup: bool
+    gradient_reduce_prevision: GradientReducePrecision
+    fused_gradient_reduce: bool
+    async_gradient_reduce: bool
+    async_gradient_reduce_buffer: int
+
     # model settings
     base_model_name: str
     weight_dtype: DataType
@@ -334,8 +372,14 @@ class TrainConfig(BaseConfig):
     learning_rate_scaler: LearningRateScaler
     clip_grad_norm: float
 
+    #layer filter
+    layer_filter: str  # comma-separated
+    layer_filter_preset: str
+    layer_filter_regex: bool
+
     # noise
     offset_noise_weight: float
+    generalized_offset_noise: bool
     perturbation_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
@@ -414,8 +458,6 @@ class TrainConfig(BaseConfig):
     lora_decompose_norm_epsilon: bool
     lora_decompose_output_axis: bool
     lora_weight_dtype: DataType
-    lora_layers: str  # comma-separated
-    lora_layer_preset: str
     bundle_additional_embeddings: bool
 
     # optimizer
@@ -454,7 +496,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=6,
+            config_version=8,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -462,6 +504,8 @@ class TrainConfig(BaseConfig):
                 3: self.__migration_3,
                 4: self.__migration_4,
                 5: self.__migration_5,
+                6: self.__migration_6,
+                7: self.__migration_7,
             }
         )
 
@@ -627,6 +671,30 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_6(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # None is not a valid value, but there was a bug that allowed it, so old config files can have it set to None:
+        if (
+            "lora_layer_preset" in migrated_data
+            and migrated_data["lora_layer_preset"] is None
+        ):
+            migrated_data["lora_layer_preset"] = "full"
+
+        return migrated_data
+
+    def __migration_7(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if "lora_layers" in migrated_data:
+            migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
+        if "lora_layer_preset" in migrated_data:
+            migrated_data["layer_filter_preset"] = migrated_data.pop("lora_layer_preset")
+        if "lora_layers_regex" in migrated_data:
+            migrated_data["layer_filter_regex"] = migrated_data.pop("lora_layers_regex")
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -780,6 +848,15 @@ class TrainConfig(BaseConfig):
         data.append(("continue_last_backup", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
+        #multi-GPU
+        data.append(("multi_gpu", False, bool, False))
+        data.append(("device_indexes", "", str, False))
+        data.append(("sequential_model_setup", False, bool, False))
+        data.append(("gradient_reduce_precision", GradientReducePrecision.FLOAT_32_STOCHASTIC, GradientReducePrecision, False))
+        data.append(("fused_gradient_reduce", True, bool, False))
+        data.append(("async_gradient_reduce", True, bool, False))
+        data.append(("async_gradient_reduce_buffer", 100, int, False))
+
         # model settings
         data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
         data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
@@ -835,6 +912,7 @@ class TrainConfig(BaseConfig):
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("generalized_offset_noise", False, bool, False))
         data.append(("perturbation_noise_weight", 0.0, float, False))
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
@@ -942,6 +1020,11 @@ class TrainConfig(BaseConfig):
         data.append(("masked_prior_preservation_weight", 0.0, float, False))
         data.append(("custom_conditioning_image", False, bool, False))
 
+        #layer filter
+        data.append(("layer_filter", "", str, False))
+        data.append(("layer_filter_preset", "full", str, False))
+        data.append(("layer_filter_regex", False, bool, False))
+
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
         data.append(("preserve_embedding_norm", False, bool, False))
@@ -961,8 +1044,6 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_norm_epsilon", True, bool, False))
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
-        data.append(("lora_layers", "", str, False))
-        data.append(("lora_layer_preset", None, str, True))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # optimizer

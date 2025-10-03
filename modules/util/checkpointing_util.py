@@ -12,6 +12,7 @@ from torch.utils.checkpoint import checkpoint
 
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
+from diffusers.models.transformers.transformer_chroma import ChromaSingleTransformerBlock, ChromaTransformerBlock
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
 from diffusers.models.transformers.transformer_hidream_image import (
     HiDreamImageSingleTransformerBlock,
@@ -22,10 +23,12 @@ from diffusers.models.transformers.transformer_hunyuan_video import (
     HunyuanVideoSingleTransformerBlock,
     HunyuanVideoTransformerBlock,
 )
+from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformerBlock
 from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
 
@@ -295,6 +298,24 @@ def enable_checkpointing_for_llama_encoder_layers(
 
     return conductor
 
+def enable_checkpointing_for_qwen_encoder_layers(
+        orig_module: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    conductor = LayerOffloadConductor(orig_module, config)
+
+    layer_index = 0
+    for child_module in orig_module.modules():
+        if isinstance(child_module, Qwen2_5_VLDecoderLayer):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                [],  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    return conductor
+
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
         orig_module: nn.Module,
@@ -336,6 +357,51 @@ def enable_checkpointing_for_flux_transformer(
             child_module.forward = create_checkpointed_forward(
                 child_module, torch.device(config.train_device),
                 ["hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    return conductor
+
+def enable_checkpointing_for_chroma_transformer(
+        orig_module: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    conductor = LayerOffloadConductor(orig_module, config)
+
+    layer_index = 0
+    for child_module in orig_module.modules():
+        if isinstance(child_module, ChromaTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states", "encoder_hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    for child_module in orig_module.modules():
+        if isinstance(child_module, ChromaSingleTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states"],
+                conductor, layer_index,
+            )
+            layer_index += 1
+
+    return conductor
+
+def enable_checkpointing_for_qwen_transformer(
+        orig_module: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    conductor = LayerOffloadConductor(orig_module, config)
+
+    layer_index = 0
+    for child_module in orig_module.modules():
+        if isinstance(child_module, QwenImageTransformerBlock):
+            child_module.forward = create_checkpointed_forward(
+                child_module, torch.device(config.train_device),
+                ["hidden_states", "encoder_hidden_states"],
                 conductor, layer_index,
             )
             layer_index += 1

@@ -17,11 +17,11 @@ goto :main
 rem --- Helpers ---
 :die
   echo.
-  echo %RED%ERROR:%RESET% %~1&
+  echo %RED%ERROR:%RESET% %~1
   echo.
   pause
   popd
-  exit /b 1
+  (echo %CMDCMDLINE% | find /I "%~nx0" >nul) && exit /b 1 || exit 1
 
 :warn_store
   echo.
@@ -56,14 +56,46 @@ rem --- Main ---
 echo %CYAN%Searching for a suitable Python installation...%RESET%
 set "PYTHON="
 
-rem --- Python Detection ---
-echo %CYAN%Scanning Python installations reported by "py --list"...%RESET%
-
 if not exist "%VERSION_FILE%" (
     call :die """%VERSION_FILE%\" not found"
-    rem The :die call should exit the script, failing that go to final
     goto :final_python_failure_handling
 )
+
+rem --- Python Detection ---
+echo %CYAN%Step 1: Checking for Python in PATH (to support Conda installs)...%RESET%
+where python >nul 2>&1
+if not errorlevel 1 (
+    for /f "delims=" %%P in ('where python') do (
+        if not defined PYTHON (
+            echo   Testing Python from PATH: "%%P"
+            "%%P" "%VERSION_FILE%" %MIN_PY% %MAX_PY% >nul 2>&1
+            if not errorlevel 1 (
+                rem Check if the path is NOT under System32 to avoid the store stub
+                echo "%%P" | findstr /I /V /C:"%SystemRoot%\System32" >nul
+                if not errorlevel 1 (
+                    echo   %GRN%SELECTED Python from PATH: "%%P"%RESET%
+                    set "PYTHON=%%P"
+                ) else (
+                    echo   %YEL%Skipping system-level Python stub: "%%P"%RESET%
+                )
+            ) else (
+                echo   %YEL%Python from PATH during step one is not a suitable version.%RESET%
+            )
+        )
+    )
+) else (
+    echo %YEL%No 'python' found in PATH. Proceeding with other checks.%RESET%
+)
+
+rem If we found a valid PATH python version, we can skip the rest of the checks
+if defined PYTHON goto :py_ok
+
+
+echo.
+rem 2) Loop through ver reported by py
+echo %CYAN%Step 2: Scanning Python installations reported by "py --list"...%RESET%
+
+if defined PYTHON goto :py_ok
 
 set "PYTHON_VERSION_FROM_PY_LIST="
 for /f "tokens=2 delims=:" %%L in ('py --list 2^>nul ^| findstr /R /C:"-V:[0-9][.][0-9]"') do (
@@ -90,14 +122,12 @@ if not defined PYTHON_VERSION_FROM_PY_LIST (
     rem PYTHON remains unset, script will proceed to the next step
 )
 
-rem Check if PYTHON was set by the py --list logic. If so, go to :py_ok.
-if defined PYTHON (
-    goto :py_ok
-)
+rem Check if PYTHON was set by found_python_via_py_list logic. If so, go to :py_ok.
+if defined PYTHON goto :py_ok
 
-rem 2) If py launcher fails, search common install directories
+rem 3) If py launcher fails, search common install directories
 echo.
-echo %CYAN%Step 2: Searching for Python in common installation directories...%RESET%
+echo %CYAN%Step 3: Searching for Python in common installation directories...%RESET%
 set "SEARCH_PATHS="%ProgramFiles%\Python" "%LOCALAPPDATA%\Programs\Python""
 for %%D in (%SEARCH_PATHS%) do (
     if exist "%%~D" (
@@ -120,13 +150,13 @@ for %%D in (%SEARCH_PATHS%) do (
 )
 echo %YEL%No suitable Python found in common directories.%RESET%
 
-rem 3) Finally as a failsafe try to ask about Windows Store python, only if not found yet
+rem 4) Finally as a failsafe try to ask about Windows Store python, only if not found yet
 if not defined PYTHON (
     echo.
-    echo %CYAN%Step 3: Checking for Windows Store Python installations in PATH...%RESET%
+    echo %CYAN%Step 4: Checking for Windows Store Python installations in PATH...%RESET%
     set "STORE_PYTHON_CHECKED="
     for /f "delims=" %%P in ('where python 2^>nul ^| findstr /i "WindowsApps"') do (
-      if defined PYTHON ( goto :py_ok_check_step3 )
+      if defined PYTHON ( goto :py_ok_check_step4 )
       set "STORE_PYTHON_CHECKED=true"
       echo Found potential Windows Store Python at "%%P".
       call :warn_store
@@ -142,7 +172,7 @@ if not defined PYTHON (
         if !LAST_ERRORLEVEL! == 0 (
           echo %GRN%  ^> Using selected Store Python: "%%P"%RESET%
           set "PYTHON=%%P"
-          goto :py_ok_check_step3
+          goto :py_ok_check_step4
         ) else (
           echo %RED%  ^> Version check failed for this agreed-upon Store Python "%%P" ^(Code: !LAST_ERRORLEVEL!^).%RESET%
           call :wrong_python_version_message
@@ -154,11 +184,11 @@ if not defined PYTHON (
         )
       )
     )
-    :py_ok_check_step3
+    :py_ok_check_step4
     if defined PYTHON ( goto :py_ok )
 
     if not defined STORE_PYTHON_CHECKED (
-        echo %YEL%No Windows Store Python installations found in PATH to check in Step 3.%RESET%
+        echo %YEL%No Windows Store Python installations found in PATH during step 4.%RESET%
     )
 )
 
@@ -199,12 +229,23 @@ set "PYTHON_VENV=%VENV_DIR%\\Scripts\\python.exe"
 if not exist "%PYTHON_VENV%" (
     call :die "Virtual environment Python executable not found at '%PYTHON_VENV%' after venv creation/check."
 )
-rem Set PYTHON to the venv python, though subsequent commands will use 'python' from activated PATH
 set "PYTHON=%PYTHON_VENV%"
 
 echo Activating virtual environment...
 call "%VENV_DIR%\Scripts\activate.bat"
 echo Virtual environment activated.
+
+rem  Check for Tkinter
+echo %CYAN%Checking for Tkinter availability...%RESET%
+python -c "import tkinter,sys; sys.exit(0 if hasattr(tkinter,'TkVersion') else 1)" >nul 2>&1
+if not errorlevel 1 goto :tk_ok
+
+echo %RED%Tkinter not found%RESET%
+call :die "Re-run the Python installer and enable 'tcl/tk and IDLE' (its enabled by default on fresh installations, re-enable/dont turn it off)"
+goto :EOF
+
+:tk_ok
+echo %GRN%Tkinter is available, proceeding ... %RESET%
 
 rem 5) Upgrade pip & install
 echo.

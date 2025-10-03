@@ -3,10 +3,12 @@ import importlib
 from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
+from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
 from modules.dataLoader.HiDreamBaseDataLoader import HiDreamBaseDataLoader
 from modules.dataLoader.HunyuanVideoBaseDataLoader import HunyuanVideoBaseDataLoader
 from modules.dataLoader.PixArtAlphaBaseDataLoader import PixArtAlphaBaseDataLoader
+from modules.dataLoader.QwenBaseDataLoader import QwenBaseDataLoader
 from modules.dataLoader.SanaBaseDataLoader import SanaBaseDataLoader
 from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3BaseDataLoader
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
@@ -15,6 +17,9 @@ from modules.dataLoader.StableDiffusionXLBaseDataLoader import StableDiffusionXL
 from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
+from modules.modelLoader.ChromaEmbeddingModelLoader import ChromaEmbeddingModelLoader
+from modules.modelLoader.ChromaFineTuneModelLoader import ChromaFineTuneModelLoader
+from modules.modelLoader.ChromaLoRAModelLoader import ChromaLoRAModelLoader
 from modules.modelLoader.FluxEmbeddingModelLoader import FluxEmbeddingModelLoader
 from modules.modelLoader.FluxFineTuneModelLoader import FluxFineTuneModelLoader
 from modules.modelLoader.FluxLoRAModelLoader import FluxLoRAModelLoader
@@ -27,6 +32,8 @@ from modules.modelLoader.HunyuanVideoLoRAModelLoader import HunyuanVideoLoRAMode
 from modules.modelLoader.PixArtAlphaEmbeddingModelLoader import PixArtAlphaEmbeddingModelLoader
 from modules.modelLoader.PixArtAlphaFineTuneModelLoader import PixArtAlphaFineTuneModelLoader
 from modules.modelLoader.PixArtAlphaLoRAModelLoader import PixArtAlphaLoRAModelLoader
+from modules.modelLoader.QwenFineTuneModelLoader import QwenFineTuneModelLoader
+from modules.modelLoader.QwenLoRAModelLoader import QwenLoRAModelLoader
 from modules.modelLoader.SanaEmbeddingModelLoader import SanaEmbeddingModelLoader
 from modules.modelLoader.SanaFineTuneModelLoader import SanaFineTuneModelLoader
 from modules.modelLoader.SanaLoRAModelLoader import SanaLoRAModelLoader
@@ -43,10 +50,12 @@ from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddi
 from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTuneModelLoader
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
 from modules.modelSampler import BaseModelSampler
+from modules.modelSampler.ChromaSampler import ChromaSampler
 from modules.modelSampler.FluxSampler import FluxSampler
 from modules.modelSampler.HiDreamSampler import HiDreamSampler
 from modules.modelSampler.HunyuanVideoSampler import HunyuanVideoSampler
 from modules.modelSampler.PixArtAlphaSampler import PixArtAlphaSampler
+from modules.modelSampler.QwenSampler import QwenSampler
 from modules.modelSampler.SanaSampler import SanaSampler
 from modules.modelSampler.StableDiffusion3Sampler import StableDiffusion3Sampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
@@ -54,6 +63,9 @@ from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSam
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
 from modules.modelSampler.WuerstchenSampler import WuerstchenSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.ChromaEmbeddingModelSaver import ChromaEmbeddingModelSaver
+from modules.modelSaver.ChromaFineTuneModelSaver import ChromaFineTuneModelSaver
+from modules.modelSaver.ChromaLoRAModelSaver import ChromaLoRAModelSaver
 from modules.modelSaver.FluxEmbeddingModelSaver import FluxEmbeddingModelSaver
 from modules.modelSaver.FluxFineTuneModelSaver import FluxFineTuneModelSaver
 from modules.modelSaver.FluxLoRAModelSaver import FluxLoRAModelSaver
@@ -65,6 +77,8 @@ from modules.modelSaver.HunyuanVideoLoRAModelSaver import HunyuanVideoLoRAModelS
 from modules.modelSaver.PixArtAlphaEmbeddingModelSaver import PixArtAlphaEmbeddingModelSaver
 from modules.modelSaver.PixArtAlphaFineTuneModelSaver import PixArtAlphaFineTuneModelSaver
 from modules.modelSaver.PixArtAlphaLoRAModelSaver import PixArtAlphaLoRAModelSaver
+from modules.modelSaver.QwenFineTuneModelSaver import QwenFineTuneModelSaver
+from modules.modelSaver.QwenLoRAModelSaver import QwenLoRAModelSaver
 from modules.modelSaver.SanaEmbeddingModelSaver import SanaEmbeddingModelSaver
 from modules.modelSaver.SanaFineTuneModelSaver import SanaFineTuneModelSaver
 from modules.modelSaver.SanaLoRAModelSaver import SanaLoRAModelSaver
@@ -81,6 +95,9 @@ from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbedding
 from modules.modelSaver.WuerstchenFineTuneModelSaver import WuerstchenFineTuneModelSaver
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.ChromaEmbeddingSetup import ChromaEmbeddingSetup
+from modules.modelSetup.ChromaFineTuneSetup import ChromaFineTuneSetup
+from modules.modelSetup.ChromaLoRASetup import ChromaLoRASetup
 from modules.modelSetup.FluxEmbeddingSetup import FluxEmbeddingSetup
 from modules.modelSetup.FluxFineTuneSetup import FluxFineTuneSetup
 from modules.modelSetup.FluxLoRASetup import FluxLoRASetup
@@ -93,6 +110,8 @@ from modules.modelSetup.HunyuanVideoLoRASetup import HunyuanVideoLoRASetup
 from modules.modelSetup.PixArtAlphaEmbeddingSetup import PixArtAlphaEmbeddingSetup
 from modules.modelSetup.PixArtAlphaFineTuneSetup import PixArtAlphaFineTuneSetup
 from modules.modelSetup.PixArtAlphaLoRASetup import PixArtAlphaLoRASetup
+from modules.modelSetup.QwenFineTuneSetup import QwenFineTuneSetup
+from modules.modelSetup.QwenLoRASetup import QwenLoRASetup
 from modules.modelSetup.SanaEmbeddingSetup import SanaEmbeddingSetup
 from modules.modelSetup.SanaFineTuneSetup import SanaFineTuneSetup
 from modules.modelSetup.SanaLoRASetup import SanaLoRASetup
@@ -110,6 +129,8 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.callbacks.TrainCallbacks import TrainCallbacks
+from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -131,6 +152,7 @@ from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
 from modules.util.TrainProgress import TrainProgress
+from modules.zluda import ZLUDA
 
 import torch
 from torch.nn import Parameter
@@ -150,7 +172,7 @@ def create_model_loader(
         model_type: ModelType,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
 ) -> BaseModelLoader | None:
-    match training_method:
+    match training_method: #TODO simplify
         case TrainingMethod.FINE_TUNE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
@@ -164,6 +186,10 @@ def create_model_loader(
                 return StableDiffusion3FineTuneModelLoader()
             if model_type.is_flux():
                 return FluxFineTuneModelLoader()
+            if model_type.is_chroma():
+                return ChromaFineTuneModelLoader()
+            if model_type.is_qwen():
+                return QwenFineTuneModelLoader()
             if model_type.is_sana():
                 return SanaFineTuneModelLoader()
             if model_type.is_hunyuan_video():
@@ -186,6 +212,10 @@ def create_model_loader(
                 return StableDiffusion3LoRAModelLoader()
             if model_type.is_flux():
                 return FluxLoRAModelLoader()
+            if model_type.is_chroma():
+                return ChromaLoRAModelLoader()
+            if model_type.is_qwen():
+                return QwenLoRAModelLoader()
             if model_type.is_sana():
                 return SanaLoRAModelLoader()
             if model_type.is_hunyuan_video():
@@ -205,6 +235,8 @@ def create_model_loader(
                 return StableDiffusion3EmbeddingModelLoader()
             if model_type.is_flux():
                 return FluxEmbeddingModelLoader()
+            if model_type.is_chroma():
+                return ChromaEmbeddingModelLoader()
             if model_type.is_sana():
                 return SanaEmbeddingModelLoader()
             if model_type.is_hunyuan_video():
@@ -233,6 +265,10 @@ def create_model_saver(
                 return StableDiffusion3FineTuneModelSaver()
             if model_type.is_flux():
                 return FluxFineTuneModelSaver()
+            if model_type.is_chroma():
+                return ChromaFineTuneModelSaver()
+            if model_type.is_qwen():
+                return QwenFineTuneModelSaver()
             if model_type.is_sana():
                 return SanaFineTuneModelSaver()
             if model_type.is_hunyuan_video():
@@ -253,6 +289,10 @@ def create_model_saver(
                 return StableDiffusion3LoRAModelSaver()
             if model_type.is_flux():
                 return FluxLoRAModelSaver()
+            if model_type.is_chroma():
+                return ChromaLoRAModelSaver()
+            if model_type.is_qwen():
+                return QwenLoRAModelSaver()
             if model_type.is_sana():
                 return SanaLoRAModelSaver()
             if model_type.is_hunyuan_video():
@@ -272,6 +312,8 @@ def create_model_saver(
                 return StableDiffusion3EmbeddingModelSaver()
             if model_type.is_flux():
                 return FluxEmbeddingModelSaver()
+            if model_type.is_chroma():
+                return ChromaEmbeddingModelSaver()
             if model_type.is_sana():
                 return SanaEmbeddingModelSaver()
             if model_type.is_hunyuan_video():
@@ -303,6 +345,10 @@ def create_model_setup(
                 return StableDiffusion3FineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_flux():
                 return FluxFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_chroma():
+                return ChromaFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_qwen():
+                return QwenFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -325,6 +371,10 @@ def create_model_setup(
                 return StableDiffusion3LoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_flux():
                 return FluxLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_chroma():
+                return ChromaLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_qwen():
+                return QwenLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -344,6 +394,8 @@ def create_model_setup(
                 return StableDiffusion3EmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_flux():
                 return FluxEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_chroma():
+                return ChromaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -375,6 +427,10 @@ def create_model_sampler(
                 return StableDiffusion3Sampler(train_device, temp_device, model, model_type)
             if model_type.is_flux():
                 return FluxSampler(train_device, temp_device, model, model_type)
+            if model_type.is_chroma():
+                return ChromaSampler(train_device, temp_device, model, model_type)
+            if model_type.is_qwen():
+                return QwenSampler(train_device, temp_device, model, model_type)
             if model_type.is_sana():
                 return SanaSampler(train_device, temp_device, model, model_type)
             if model_type.is_hunyuan_video():
@@ -418,6 +474,10 @@ def create_data_loader(
                 return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_flux():
                 return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_chroma():
+                return ChromaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_qwen():
+                return QwenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_sana():
                 return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_hunyuan_video():
@@ -896,7 +956,7 @@ def create_optimizer(
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
                 use_speed=optimizer_config.use_speed if optimizer_config.use_speed is not None else False,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else None,
                 split_groups=optimizer_config.split_groups if optimizer_config.split_groups is not None else True,
                 split_groups_mean=optimizer_config.split_groups_mean if optimizer_config.split_groups_mean is not None else True,
                 factored=optimizer_config.factored if optimizer_config.factored is not None else True,
@@ -908,6 +968,9 @@ def create_optimizer(
                 use_adopt=optimizer_config.use_adopt if optimizer_config.use_adopt is not None else False,
                 use_focus=optimizer_config.use_focus if optimizer_config.use_focus is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
+                d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else True,
+                use_schedulefree=optimizer_config.use_schedulefree if optimizer_config.use_schedulefree is not None else True,
+                use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
             )
 
         # ADAFactor Optimizer
@@ -949,6 +1012,153 @@ def create_optimizer(
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_cautious=optimizer_config.use_cautious,
+            )
+
+        # CAME_8BIT Optimizer
+        case Optimizer.CAME_8BIT:
+            from modules.util.optimizer.CAME8bit import CAME8bit
+            optimizer = CAME8bit(
+                params=parameters,
+                lr=config.learning_rate,
+                eps=(optimizer_config.eps if optimizer_config.eps is not None else 1e-30,
+                     optimizer_config.eps2 if optimizer_config.eps2 is not None else 1e-16),
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999,
+                       optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 16384,
+                quant_block_size=optimizer_config.quant_block_size if optimizer_config.quant_block_size is not None else 2048
+            )
+
+        # ADAMW_ADV Optimizer
+        case Optimizer.ADAMW_ADV:
+            from adv_optm import AdamW_adv
+            optimizer = AdamW_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else True,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
+                grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
+                beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+            )
+
+        # ADOPT_ADV Optimizer
+        case Optimizer.ADOPT_ADV:
+            from adv_optm import Adopt_adv
+            optimizer = Adopt_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
+                grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
+                beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+            )
+
+        # PRODIGY_ADV Optimizer
+        case Optimizer.PRODIGY_ADV:
+            from adv_optm import Prodigy_adv
+            optimizer = Prodigy_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
+                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
+                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
+                prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
+                grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
+                beta3_ema=optimizer_config.beta3_ema if optimizer_config.beta3_ema is not None else 0.9999,
+                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+            )
+
+        # SIMPLIFIED_AdEMAMix Optimizer
+        case Optimizer.SIMPLIFIED_AdEMAMix:
+            from adv_optm import Simplified_AdEMAMix
+            optimizer = Simplified_AdEMAMix(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.99,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                beta1_warmup=optimizer_config.beta1_warmup if optimizer_config.beta1_warmup is not None else None,
+                min_beta1=optimizer_config.min_beta1 if optimizer_config.min_beta1 is not None else 0.9,
+                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else True,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+            )
+
+        # LION_ADV Optimizer
+        case Optimizer.LION_ADV:
+            from adv_optm import Lion_adv
+            optimizer = Lion_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+            )
+
+        # LION_PRODIGY_ADV Optimizer
+        case Optimizer.LION_PRODIGY_ADV:
+            from adv_optm import Lion_Prodigy_adv
+            optimizer = Lion_Prodigy_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
+                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
+                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
+                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
+                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )
 
         # ADABELIEF Optimizer
@@ -1372,3 +1582,21 @@ def create_noise_scheduler(
         scheduler.set_timesteps(num_inference_timesteps)
 
     return scheduler
+
+def create_trainer(
+        config: TrainConfig,
+        callbacks: TrainCallbacks,
+        commands: TrainCommands,
+        reattach: bool = False,
+):
+    if config.cloud.enabled:
+        from modules.trainer.CloudTrainer import CloudTrainer
+        trainer = CloudTrainer(config, callbacks, commands, reattach=reattach)
+    elif config.multi_gpu:
+        from modules.trainer.MultiTrainer import MultiTrainer
+        trainer = MultiTrainer(config, callbacks, commands)
+    else:
+        ZLUDA.initialize_devices(config)
+        from modules.trainer.GenericTrainer import GenericTrainer
+        trainer = GenericTrainer(config, callbacks, commands)
+    return trainer

@@ -1,0 +1,26 @@
+{
+    "base_model_name": "lodestones/Chroma1-HD",
+    "batch_size": 2,
+    "learning_rate": 0.0003,
+    "model_type": "CHROMA_1",
+    "resolution": "512",
+    "prior": {
+        "train": true,
+        "weight_dtype": "FLOAT_8"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "BFLOAT_16"
+    },
+    "training_method": "LORA",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "train_dtype": "BFLOAT_16",
+    "weight_dtype": "BFLOAT_16",
+    "output_dtype": "BFLOAT_16",
+    "timestep_distribution": "INVERTED_PARABOLA",
+    "noising_weight": 7.7,
+    "layer_filter": "attn,ff.net",
+    "layer_filter_preset": "attn-mlp"
+}
