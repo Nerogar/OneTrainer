@@ -23,6 +23,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -298,7 +299,7 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
-    tensorboard: bool
+    tensorboard_mode: TensorboardMode
     tensorboard_expose: bool
     tensorboard_always_on: bool
     tensorboard_port: str
@@ -685,6 +686,18 @@ class TrainConfig(BaseConfig):
     def __migration_7(self, data: dict) -> dict:
         migrated_data = data.copy()
 
+        # Migrate old tensorboard booleans to enum
+        tensorboard = migrated_data.pop("tensorboard", True)
+        tensorboard_always_on = migrated_data.pop("tensorboard_always_on", False)
+
+        if tensorboard_always_on:
+            migrated_data["tensorboard_mode"] = TensorboardMode.ALWAYS_ON
+        elif tensorboard:
+            migrated_data["tensorboard_mode"] = TensorboardMode.TRAIN_ONLY
+        else:
+            migrated_data["tensorboard_mode"] = TensorboardMode.OFF
+
+        # Migrate lora_layers to layer_filter
         if "lora_layers" in migrated_data:
             migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
         if "lora_layer_preset" in migrated_data:
@@ -837,7 +850,7 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
-        data.append(("tensorboard", True, bool, False))
+        data.append(("tensorboard_mode", TensorboardMode.ALWAYS_ON, TensorboardMode, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
