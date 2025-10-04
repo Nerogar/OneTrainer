@@ -257,15 +257,25 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
-    def __create_dtype_options(self, include_none:bool=True) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_none: bool=True, include_svd: bool=False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
-            ("float8", DataType.FLOAT_8),
+            ("float8 (W8)", DataType.FLOAT_8),
+            ("float W8A8", DataType.FLOAT_W8A8),
+            ("int W8A8", DataType.INT_W8A8),
             # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
+
+        if include_svd:
+            options += [
+                ("float8 (W8) SVDQuant", DataType.FLOAT_8_SVD),
+                ("float W8A8 SVDQuant", DataType.FLOAT_W8A8_SVD),
+                ("int W8A8 SVDQuant", DataType.INT_W8A8_SVD),
+                ("nfloat4 SVDQuant", DataType.NFLOAT_4_SVD),
+            ]
 
         if include_none:
             options.insert(0, ("", DataType.NONE))
@@ -280,8 +290,6 @@ class ModelTab:
                          wide_tooltip=True)
         components.entry(self.scroll_frame, row, 1, self.ui_state, "secrets.huggingface_token")
 
-        row += 1
-
         # base model
         components.label(self.scroll_frame, row, 0, "Base Model",
                          tooltip="Filename, directory or Hugging Face repository of the base model")
@@ -293,6 +301,7 @@ class ModelTab:
         # weight dtype
         components.label(self.scroll_frame, row, 3, "Weight Data Type",
                          tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
+
         components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(False),
                               self.ui_state, "weight_dtype")
 
@@ -336,10 +345,30 @@ class ModelTab:
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")
-            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
+            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(include_svd=True),
                                   self.ui_state, "prior.weight_dtype")
 
             row += 1
+
+        # compile
+        components.label(self.scroll_frame, row, 3, "Compile transformer blocks",
+                         tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
+        components.switch(self.scroll_frame, row, 4, self.ui_state, "compile")
+
+        row += 1
+
+        # SVDQuant
+        components.label(self.scroll_frame, row, 3, "SVDQuant Data Type",
+                         tooltip="What datatype to use for SVDQuant weights decomposition.")
+        components.options_kv(self.scroll_frame, row, 4, [("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
+                              self.ui_state, "svd_dtype")
+
+        row += 1
+        components.label(self.scroll_frame, row, 3, "SVDQuant Rank",
+                         tooltip="Rank for SVDQuant weights decomposition")
+        components.entry(self.scroll_frame, row, 4, self.ui_state, "svd_rank")
+
+        row += 1
 
         if has_text_encoder:
             # text encoder weight dtype

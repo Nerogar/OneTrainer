@@ -10,29 +10,9 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
-from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
-from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
-from diffusers.models.transformers.transformer_chroma import ChromaSingleTransformerBlock, ChromaTransformerBlock
-from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
-from diffusers.models.transformers.transformer_hidream_image import (
-    HiDreamImageSingleTransformerBlock,
-    HiDreamImageTransformerBlock,
-)
-from diffusers.models.transformers.transformer_hunyuan_video import (
-    HunyuanVideoIndividualTokenRefinerBlock,
-    HunyuanVideoSingleTransformerBlock,
-    HunyuanVideoTransformerBlock,
-)
-from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformerBlock
-from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
-from transformers.models.clip.modeling_clip import CLIPEncoderLayer
-from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
-from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
-from transformers.models.t5.modeling_t5 import T5Block
+torch._dynamo.config.cache_size_limit = 8192
 
-
-def __kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
+def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
     signature = dict(inspect.signature(fun).parameters)
     parameters = []
 
@@ -61,430 +41,277 @@ def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
 __current_call_index = 0
 
 
-def __generate_call_index() -> int:
+def _generate_call_index() -> int:
     global __current_call_index
     __current_call_index += 1
     return __current_call_index
 
 
-def create_checkpointed_forward(
+class CheckpointLayer(torch.nn.Module):
+    def __init__(self, orig: nn.Module, train_device: torch.device):
+        super().__init__()
+        self.orig = orig
+        # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
+        self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
+        #self.orig.compile(fullgraph=True)
+
+    def __checkpointing_forward(self, dummy: torch.Tensor, *args, **kwargs):
+        return self.orig(*args, **kwargs)
+
+    def forward(self, *args, **kwargs):
+        if torch.is_grad_enabled():
+            return checkpoint(
+                self.__checkpointing_forward,
+                self.dummy,
+                *args,
+                **kwargs,
+                use_reentrant=False
+            )
+        else:
+            return self.orig(*args, **kwargs)
+
+
+class OffloadCheckpointLayer(torch.nn.Module):
+    def __init__(self, orig: nn.Module, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int):
+        super().__init__()
+        self.orig = orig
+        self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
+        self.conductor = conductor
+        self.layer_index = layer_index
+
+    def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
+
+        if self.layer_index == 0 and not torch.is_grad_enabled():
+            self.conductor.start_forward(True)
+
+        args = self.conductor.before_layer(self.layer_index, call_id, args)
+        output = self.orig(*args)
+        self.conductor.after_layer(self.layer_index, call_id, args)
+
+        # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
+        assert not (torch.is_grad_enabled() and not has_grad_fn(output))
+        #TODO how can this be the case? Is there a backward that does not produce gradients wrt to any of its inputs?
+        #if it be the case, TODO check that add_dummy_grad_fn_ still works with torch.compile
+        if torch.is_grad_enabled() and not has_grad_fn(output):
+            output = add_dummy_grad_fn_(output)
+
+        return output
+
+    def forward(self, *args, **kwargs):
+        call_id = _generate_call_index()
+        args = _kwargs_to_args(self.orig.forward, args, kwargs)
+
+        if torch.is_grad_enabled():
+            return checkpoint(
+                self.__checkpointing_forward,
+                self.dummy,
+                call_id,
+                *args,
+                use_reentrant=True
+            )
+        else:
+            if self.layer_index == 0:
+                self.conductor.start_forward(False)
+
+            args = self.conductor.before_layer(self.layer_index, call_id, args)
+            output = self.orig(*args)
+            self.conductor.after_layer(self.layer_index, call_id, args)
+            return output
+
+
+def create_checkpoint(
         orig_module: nn.Module,
         train_device: torch.device,
         include_from_offload_param_names: list[str] = None,
         conductor: LayerOffloadConductor | None = None,
         layer_index: int = 0,
+        compile: bool = False,
+        enabled: bool = True,
 ) -> Callable:
-    orig_forward = orig_module.forward
     if include_from_offload_param_names is None:
         include_from_offload_param_names = []
-    included_offload_param_indices = __get_args_indices(orig_forward, include_from_offload_param_names)
+    included_offload_param_indices = __get_args_indices(orig_module.forward, include_from_offload_param_names)
 
-    bound_conductor = conductor
-    bound_layer_index = layer_index
     if conductor is not None:
         conductor.add_layer(orig_module, included_offload_param_indices)
 
     if conductor is not None and conductor.offload_activated():
-        def offloaded_custom_forward(
-                # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-                dummy: torch.Tensor,
-                call_id: int,
-                *args,
-        ):
-            if bound_layer_index == 0 and not torch.is_grad_enabled():
-                bound_conductor.start_forward(True)
-
-            args = bound_conductor.before_layer(bound_layer_index, call_id, args)
-            output = orig_forward(*args)
-            bound_conductor.after_layer(bound_layer_index, call_id, args)
-
-            # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
-            if torch.is_grad_enabled() and not has_grad_fn(output):
-                output = add_dummy_grad_fn_(output)
-
-            return output
-
-        def custom_forward(
-                call_index: int,
-                *args,
-        ):
-            if bound_layer_index == 0:
-                bound_conductor.start_forward(False)
-
-            args = bound_conductor.before_layer(bound_layer_index, call_index, args)
-            output = orig_forward(*args)
-            bound_conductor.after_layer(bound_layer_index, call_index, args)
-            return output
-
-        def forward(
-                *args,
-                **kwargs
-        ):
-            call_id = __generate_call_index()
-
-            if torch.is_grad_enabled():
-                dummy = torch.zeros((1,), device=train_device)
-                dummy.requires_grad_(True)
-
-                args = __kwargs_to_args(orig_forward, args, kwargs)
-
-                return checkpoint(
-                    offloaded_custom_forward,
-                    dummy,
-                    call_id,
-                    *args,
-                    use_reentrant=True
-                )
-            else:
-                args = __kwargs_to_args(orig_forward, args, kwargs)
-                return custom_forward(call_id, *args)
+        layer = OffloadCheckpointLayer(orig_module, train_device, conductor, layer_index)
+        if compile:
+            #don't compile the checkpointing layer - offloading cannot be compiled:
+            orig_module.compile(fullgraph=True)
     else:
-        def custom_forward(
-                # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-                dummy: torch.Tensor = None,
-                *args,
-                **kwargs,
-        ):
-            return orig_forward(
-                *args,
-                **kwargs,
+        layer = CheckpointLayer(orig_module, train_device) if enabled else orig_module
+        if compile:
+            #do compile the checkpointing layer - slightly faster
+            layer.compile(fullgraph=True)
+    return layer
+
+def _create_checkpoints_for_module_list(
+        module_list: nn.ModuleList,
+        include_from_offload_param_names: list[str],
+        conductor: LayerOffloadConductor,
+        train_device: torch.device,
+        layer_index: int,
+        compile: bool,
+) -> int:
+
+    for i, layer in enumerate(module_list):
+        module_list[i] = create_checkpoint(
+                layer, train_device,
+                include_from_offload_param_names,
+                conductor, layer_index, compile=compile,
             )
-
-        def forward(
-                *args,
-                **kwargs
-        ):
-            if torch.is_grad_enabled():
-                dummy = torch.zeros((1,), device=train_device)
-                dummy.requires_grad_(True)
-
-                return checkpoint(
-                    custom_forward,
-                    dummy,
-                    *args,
-                    **kwargs,
-                    use_reentrant=False
-                )
-            else:
-                return custom_forward(None, *args, **kwargs)
-
-    return forward
+        layer_index += 1
+    return layer_index
 
 
+def enable_checkpointing(
+        model: nn.Module,
+        config: TrainConfig,
+        compile: bool,
+        lists,
+        offload_enabled: bool = True,
+) -> LayerOffloadConductor:
+    conductor = LayerOffloadConductor(model, config)
+
+    layer_index = 0
+    for module_list, param_names in lists:
+        layer_index = _create_checkpoints_for_module_list(
+            module_list,
+            param_names,
+            conductor if offload_enabled else None,
+            torch.device(config.train_device),
+            layer_index,
+            compile = compile,
+        )
+
+    return conductor
+
+
+#TODO test all models
 def enable_checkpointing_for_basic_transformer_blocks(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
         offload_enabled: bool,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, BasicTransformerBlock):
-            if offload_enabled:
-                child_module.forward = create_checkpointed_forward(
-                    child_module, torch.device(config.train_device),
-                    [],
-                    conductor, layer_index,
-                )
-            else:
-                child_module.forward = create_checkpointed_forward(
-                    child_module, torch.device(config.train_device),
-                    [],
-                )
-            layer_index += 1
-
-    return conductor
-
+    return enable_checkpointing(model, config, config.compile, [
+            (model.transformer_blocks,        []),
+        ],
+        offload_enabled = offload_enabled,
+    )
 
 def enable_checkpointing_for_clip_encoder_layers(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ):
-    for child_module in orig_module.modules():
-        if isinstance(child_module, CLIPEncoderLayer):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],
-            )
-
+    return enable_checkpointing(model, config, False, [
+        (model.text_model.encoder.layers, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
+    ])
 
 def enable_checkpointing_for_stable_cascade_blocks(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, SDCascadeResBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],
-                conductor, layer_index,
-            )
-            layer_index += 1
-        if isinstance(child_module, SDCascadeAttnBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],
-                conductor, layer_index,
-            )
-            layer_index += 1
-        if isinstance(child_module, SDCascadeTimestepBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
-
+    return enable_checkpointing(model, config, config.compile, [
+        (model.down_blocks, []),
+        (model.up_blocks, []),
+    ])
 
 def enable_checkpointing_for_t5_encoder_layers(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, T5Block):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],  # No activation offloading, because the output might be taken from the middle of the network
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
+    return enable_checkpointing(model, config, False, [
+        (model.encoder.block, []),
+    ])
 
 
 def enable_checkpointing_for_gemma_layers(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, Gemma2DecoderLayer):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],  # No activation offloading, because the output might be taken from the middle of the network
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
+    return enable_checkpointing(model, config, False, [
+        (model.layers, []),
+    ])
 
 
 def enable_checkpointing_for_llama_encoder_layers(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, LlamaDecoderLayer):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],  # No activation offloading, because the output might be taken from the middle of the network
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
+    return enable_checkpointing(model, config, False, [
+        (model.model.layers, []),
+    ])
 
 def enable_checkpointing_for_qwen_encoder_layers(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, Qwen2_5_VLDecoderLayer):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                [],  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
-
+    return enable_checkpointing(model, config, False, [
+        (model.model.language_model.layers, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+    ])
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, JointTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states", "encoder_hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
-
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+    ])
 
 def enable_checkpointing_for_flux_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks, ["hidden_states"                         ]),
+    ])
 
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, FluxTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states", "encoder_hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    for child_module in orig_module.modules():
-        if isinstance(child_module, FluxSingleTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
 
 def enable_checkpointing_for_chroma_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks, ["hidden_states"                         ]),
+    ])
 
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, ChromaTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states", "encoder_hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    for child_module in orig_module.modules():
-        if isinstance(child_module, ChromaSingleTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
 
 def enable_checkpointing_for_qwen_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
+    ])
 
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, QwenImageTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states", "encoder_hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
 
 def enable_checkpointing_for_sana_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, SanaTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks, ["hidden_states"]),
+    ])
 
 def enable_checkpointing_for_hunyuan_video_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, HunyuanVideoIndividualTokenRefinerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    for child_module in orig_module.modules():
-        if isinstance(child_module, HunyuanVideoTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states", "encoder_hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    for child_module in orig_module.modules():
-        if isinstance(child_module, HunyuanVideoSingleTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
+    return enable_checkpointing(model, config, config.compile, [
+        (model.context_embedder.token_refiner.refiner_blocks, ["hidden_states"                         ]),
+        (model.transformer_blocks,                            ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks,                     ["hidden_states"                         ]),
+    ])
 
 def enable_checkpointing_for_hi_dream_transformer(
-        orig_module: nn.Module,
+        model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    conductor = LayerOffloadConductor(orig_module, config)
-
-    layer_index = 0
-    for child_module in orig_module.modules():
-        if isinstance(child_module, HiDreamImageTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states", "encoder_hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    for child_module in orig_module.modules():
-        if isinstance(child_module, HiDreamImageSingleTransformerBlock):
-            child_module.forward = create_checkpointed_forward(
-                child_module, torch.device(config.train_device),
-                ["hidden_states"],
-                conductor, layer_index,
-            )
-            layer_index += 1
-
-    return conductor
+    return enable_checkpointing(model, config, config.compile, [
+        (model.double_stream_blocks, ["hidden_states", "encoder_hidden_states"]),
+        (model.single_stream_blocks, ["hidden_states"                         ]),
+    ])

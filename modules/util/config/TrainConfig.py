@@ -328,6 +328,9 @@ class TrainConfig(BaseConfig):
     enable_activation_offloading: bool
     layer_offload_fraction: float
     force_circular_padding: bool
+    compile: bool
+    svd_dtype: DataType
+    svd_rank: int
 
     # data settings
     concept_file_name: str
@@ -867,6 +870,9 @@ class TrainConfig(BaseConfig):
         data.append(("enable_activation_offloading", True, bool, False))
         data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
+        data.append(("compile", True, bool, False))
+        data.append(("svd_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("svd_rank", 16, int, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
