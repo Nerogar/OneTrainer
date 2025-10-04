@@ -45,7 +45,6 @@ class ChromaSampler(BaseModelSampler):
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
             text_encoder_layer_skip: int = 0,
-            force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -90,24 +89,10 @@ class ChromaSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            latent_image = self.model.pack_latents(
-                latent_image,
-                latent_image.shape[0],
-                latent_image.shape[1],
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
+            latent_image = self.model.pack_latents(latent_image)
+
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
-
-            #TODO remove? Only set when rescale_noise_scheduler_to_zero_terminal_snr is set, but that's only available on unet models
-            #if so, also remove on other models like Flux
-            if force_last_timestep:
-                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                                * (noise_scheduler.config.num_train_timesteps - 1)
-
-                # add the final timestep to force predicting with zero snr
-                timesteps = torch.cat([last_timestep, timesteps])
 
             # denoising loop
             extra_step_kwargs = {}
@@ -194,7 +179,6 @@ class ChromaSampler(BaseModelSampler):
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
             text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
-            force_last_timestep=sample_config.force_last_timestep,
             on_update_progress=on_update_progress,
         )
 

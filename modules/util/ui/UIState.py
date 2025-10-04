@@ -1,6 +1,7 @@
 import contextlib
 import tkinter as tk
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -16,6 +17,11 @@ class UIState:
     def __init__(self, master, obj):
         self.master = master
         self.obj = obj
+
+        self.__var_types: dict[str, type] = {}
+        self.__var_nullables: dict[str, bool] = {}
+        self.__var_defaults: dict[str, Any] = {}
+
         self.__vars = self.__create_vars(obj)
         self.__var_traces = {name: {} for name in self.__vars}
         self.__latest_var_trace_id = 0
@@ -172,6 +178,11 @@ class UIState:
 
         if is_config:
             for name, var_type in obj.types.items():
+                self.__var_types[name] = var_type
+                self.__var_nullables[name] = obj.nullables.get(name, False)
+                if hasattr(obj, "default_values"):
+                    self.__var_defaults[name] = obj.default_values.get(name, None)
+
                 obj_var = getattr(obj, name)
                 if issubclass_safe(var_type, BaseConfig):
                     var = UIState(self.master, obj_var)
@@ -205,6 +216,7 @@ class UIState:
             iterable = obj.items() if is_dict else vars(obj).items()
 
             for name, obj_var in iterable:
+
                 if isinstance(obj_var, str):
                     var = tk.StringVar(master=self.master)
                     var.set(obj_var)
@@ -270,3 +282,29 @@ class UIState:
                 elif isinstance(obj_var, int | float):
                     var = self.__vars[name]
                     var.set(str(obj_var))
+
+    # metadata api
+    def _resolve_state_and_leaf(self, name: str):
+        parts = name.split('.')
+        state: UIState = self
+        for part in parts[:-1]:
+            state = state.get_var(part)
+            if not isinstance(state, UIState):
+                return None, None
+        return state, parts[-1]
+
+    @dataclass(frozen=True)
+    class VarMeta:
+        type: type | None
+        nullable: bool
+        default: Any
+
+    def get_field_metadata(self, name: str) -> "UIState.VarMeta":
+        state, leaf = self._resolve_state_and_leaf(name)
+        if state is None:
+            return UIState.VarMeta(None, False, None)
+        return UIState.VarMeta(
+            state.__var_types.get(leaf),
+            state.__var_nullables.get(leaf, False),
+            state.__var_defaults.get(leaf, None),
+        )

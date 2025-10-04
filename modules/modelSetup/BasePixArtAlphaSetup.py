@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from random import Random
 
+import modules.util.multi_gpu_util as multi
 from modules.model.PixArtAlphaModel import PixArtAlphaModel, PixArtAlphaModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -23,6 +24,11 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+PRESETS = {
+    "attn-mlp": ["attn1", "attn2", "ff.net"],
+    "attn-only": ["attn1", "attn2"],
+    "full": [],
+}
 
 class BasePixArtAlphaSetup(
     BaseModelSetup,
@@ -156,7 +162,7 @@ class BasePixArtAlphaSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step
+            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)

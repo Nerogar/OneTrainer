@@ -119,17 +119,6 @@ class ChromaModelLoader(
         model.vae = vae
         model.transformer = transformer
 
-    def __load_ckpt(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-    ):
-        # TODO
-        pass
-
     def __load_safetensors(
             self,
             model: ChromaModel,
@@ -140,7 +129,7 @@ class ChromaModelLoader(
             vae_model_name: str,
     ):
         #no single file .safetensors for Chroma available at the time of writing this code
-        raise NotImplementedError("Loading of single file Chroma models not supported. Transformer-only safetensor files can be loaded by using the diffusers base model and overriding the transformer.")
+        raise NotImplementedError("Loading of single file Chroma models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer.")
 
     def load(
             self,

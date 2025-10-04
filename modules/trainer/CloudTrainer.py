@@ -13,7 +13,6 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudType import CloudType
-from modules.util.TrainProgress import TrainProgress
 
 
 class CloudTrainer(BaseTrainer):
@@ -193,10 +192,3 @@ class CloudTrainer(BaseTrainer):
             return (Path(remote_dir,"remote") / path).as_posix()
         else:
             return ""
-
-
-    def backup(self, train_progress: TrainProgress):
-        pass
-
-    def save(self, train_progress: TrainProgress):
-        pass

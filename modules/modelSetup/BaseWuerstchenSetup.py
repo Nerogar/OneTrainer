@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from random import Random
 
+import modules.util.multi_gpu_util as multi
 from modules.model.WuerstchenModel import WuerstchenModel, WuerstchenModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -27,6 +28,16 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
+# This is correct for the latest cascade, but other Wuerstchen models may have
+# different names. I honestly don't know what makes a good preset here so I'm
+# just guessing.
+PRESETS = {
+    "attn-only": ["attention"],
+    "full": [],
+    "down-blocks": ["down_blocks"],
+    "up-blocks": ["up_blocks"],
+    "mapper-only": ["mapper"],
+}
 
 class BaseWuerstchenSetup(
     BaseModelSetup,
@@ -196,7 +207,7 @@ class BaseWuerstchenSetup(
             elif model.model_type.is_stable_cascade():
                 scaled_latent_image = latent_image
 
-            batch_seed = 0 if deterministic else train_progress.global_step
+            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)

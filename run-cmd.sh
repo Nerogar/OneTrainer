@@ -2,6 +2,11 @@
 
 set -e
 
+# Xet is buggy. Disabled by default unless already defined - https://github.com/Nerogar/OneTrainer/issues/949
+if [[ -z "${HF_HUB_DISABLE_XET+x}" ]]; then
+    export HF_HUB_DISABLE_XET=1
+fi
+
 source "${BASH_SOURCE[0]%/*}/lib.include.sh"
 
 # Fetch and validate the name of the target script.

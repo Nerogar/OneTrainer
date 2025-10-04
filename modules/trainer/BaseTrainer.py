@@ -44,10 +44,6 @@ class BaseTrainer(
     def end(self):
         pass
 
-    @abstractmethod
-    def backup(self, train_progress: TrainProgress):
-        pass
-
     def create_model_loader(self) -> BaseModelLoader:
         return create.create_model_loader(self.config.model_type, self.config.training_method)
 

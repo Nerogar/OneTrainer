@@ -40,7 +40,7 @@ class RunpodCloud(LinuxCloud):
             if secrets.id == "":
                 print("waiting for public IP...")
             else:
-                print(f"waiting for public IP... Status: https://www.runpod.io/console/pods/{secrets.id}")
+                print(f"waiting for public IP... Status: https://www.runpod.io/console/pods?id={secrets.id}")
             time.sleep(5)
 
 
