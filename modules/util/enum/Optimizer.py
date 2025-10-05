@@ -95,6 +95,15 @@ class Optimizer(Enum):
             self.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
+    @property
+    def supports_kourkoutas_beta(self) -> bool:
+        return self in [
+            Optimizer.ADAMW_ADV,
+            Optimizer.ADOPT_ADV,
+            Optimizer.SIMPLIFIED_AdEMAMix,
+            Optimizer.PRODIGY_ADV,
+        ]
+
     def supports_fused_back_pass(self):
         return self in [
             Optimizer.ADAFACTOR,

@@ -509,6 +509,19 @@ def create_optimizer(
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
 
+    kourkoutas_kwargs = {}
+    if optimizer_config.kourkoutas_beta and optimizer_config.optimizer.supports_kourkoutas_beta:
+        print("INFO: Enabling Kourkoutas-β for the optimizer.")
+        kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
+        k_logging=optimizer_config.k_logging if optimizer_config.k_logging is not None else 0
+        k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0
+        kourkoutas_kwargs = {
+            "kourkoutas_beta": kourkoutas_beta,
+            "k_warmup_steps": k_warmup_steps,
+            "k_logging": k_logging,
+            "layer_key_fn": parameter_group_collection.layer_key_fn,
+        }
+
     match config.optimizer.optimizer:
 
         # SGD Optimizer
@@ -1051,6 +1064,7 @@ def create_optimizer(
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                **kourkoutas_kwargs,
             )
 
         # ADOPT_ADV Optimizer
@@ -1074,6 +1088,7 @@ def create_optimizer(
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                **kourkoutas_kwargs,
             )
 
         # PRODIGY_ADV Optimizer
@@ -1103,6 +1118,7 @@ def create_optimizer(
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                **kourkoutas_kwargs,
             )
 
         # SIMPLIFIED_AdEMAMix Optimizer
@@ -1122,6 +1138,7 @@ def create_optimizer(
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                **kourkoutas_kwargs,
             )
 
         # LION_ADV Optimizer

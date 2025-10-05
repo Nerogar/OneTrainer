@@ -30,6 +30,10 @@ class PixArtAlphaEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
+        if config.optimizer.kourkoutas_beta and config.optimizer.optimizer.supports_kourkoutas_beta:
+            print("INFO: Creating layer keys for Kourkoutas-β optimizer.")
+            parameter_group_collection.layer_key_fn = self._create_kourkoutas_layer_key_fn(model)
+
         self._add_embedding_param_groups(
             model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
             "embeddings"

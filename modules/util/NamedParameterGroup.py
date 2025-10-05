@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from functools import cached_property
+from typing import Callable
 
 from modules.util.config.TrainConfig import TrainConfig
 
@@ -25,6 +26,7 @@ class NamedParameterGroupCollection:
 
     def __init__(self):
         self.__groups = []
+        self.layer_key_fn: Callable | None = None
 
     def add_group(self, group: NamedParameterGroup):
         self.__groups.append(group)
