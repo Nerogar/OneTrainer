@@ -50,13 +50,12 @@ def _generate_call_index() -> int:
 class CheckpointLayer(torch.nn.Module):
     def __init__(self, orig: nn.Module, train_device: torch.device):
         super().__init__()
-        self.orig = orig
+        self.checkpoint = orig
         # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
-        #self.orig.compile(fullgraph=True)
 
     def __checkpointing_forward(self, dummy: torch.Tensor, *args, **kwargs):
-        return self.orig(*args, **kwargs)
+        return self.checkpoint(*args, **kwargs)
 
     def forward(self, *args, **kwargs):
         if torch.is_grad_enabled():
@@ -68,13 +67,12 @@ class CheckpointLayer(torch.nn.Module):
                 use_reentrant=False
             )
         else:
-            return self.orig(*args, **kwargs)
-
+            return self.checkpoint(*args, **kwargs)
 
 class OffloadCheckpointLayer(torch.nn.Module):
     def __init__(self, orig: nn.Module, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int):
         super().__init__()
-        self.orig = orig
+        self.checkpoint = orig
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
         self.conductor = conductor
         self.layer_index = layer_index
@@ -85,7 +83,7 @@ class OffloadCheckpointLayer(torch.nn.Module):
             self.conductor.start_forward(True)
 
         args = self.conductor.before_layer(self.layer_index, call_id, args)
-        output = self.orig(*args)
+        output = self.checkpoint(*args)
         self.conductor.after_layer(self.layer_index, call_id, args)
 
         # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
@@ -99,7 +97,7 @@ class OffloadCheckpointLayer(torch.nn.Module):
 
     def forward(self, *args, **kwargs):
         call_id = _generate_call_index()
-        args = _kwargs_to_args(self.orig.forward, args, kwargs)
+        args = _kwargs_to_args(self.checkpoint.forward, args, kwargs)
 
         if torch.is_grad_enabled():
             return checkpoint(
@@ -114,10 +112,9 @@ class OffloadCheckpointLayer(torch.nn.Module):
                 self.conductor.start_forward(False)
 
             args = self.conductor.before_layer(self.layer_index, call_id, args)
-            output = self.orig(*args)
+            output = self.checkpoint(*args)
             self.conductor.after_layer(self.layer_index, call_id, args)
             return output
-
 
 def create_checkpoint(
         orig_module: nn.Module,
