@@ -1,6 +1,5 @@
 import os
 from collections.abc import Callable
-from contextlib import suppress
 from functools import partial
 
 from modules.module.quantized.LinearFp8 import LinearFp8
@@ -150,8 +149,7 @@ def is_quantized_parameter(
 def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
     if module is not None:
         cache_dir = config.cache_dir + "/quantization"
-        with suppress(FileExistsError):
-            os.mkdir(cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
         child_modules = list(module.modules())
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
             if isinstance(child_module, QuantizedModuleMixin):

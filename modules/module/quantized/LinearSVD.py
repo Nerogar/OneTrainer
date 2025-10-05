@@ -69,6 +69,8 @@ def make_svd_linear(linear_class):
 
             self.svd_down = Vh_r.to(svd_dtype)
             self.svd_up = (U_r * S_r.unsqueeze(0)).to(svd_dtype)
+            self.svd_down.requires_grad_(False)
+            self.svd_up.requires_grad_(False)
 
             self.weight.data = (W - (self.svd_up @ self.svd_down)).to(dtype=self.weight.dtype, device=orig_device)
             super().quantize(device)
