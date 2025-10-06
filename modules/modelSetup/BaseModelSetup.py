@@ -1,6 +1,6 @@
+import itertools
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
-import itertools
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.module.LoRAModule import LoRAModuleWrapper

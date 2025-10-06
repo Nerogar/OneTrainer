@@ -1,6 +1,5 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import cached_property
-from typing import Callable
 
 from modules.util.config.TrainConfig import TrainConfig
 
