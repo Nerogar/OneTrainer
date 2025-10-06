@@ -21,9 +21,6 @@ def _get_tensor_hash(t: torch.Tensor) -> str:
         hash_obj = hashlib.sha256(tensor_bytes)
         return hash_obj.hexdigest()
 
-
-log_obj = None
-
 def make_svd_linear(linear_class):
     class LinearSVD(
         linear_class,
