@@ -107,56 +107,55 @@ class LinearW8A8(
 
     def __init__(self, dtype, compute_dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.is_quantized = False
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
         self._dtype = dtype
         self._compute_dtype = compute_dtype
 
-        self._scale = torch.tensor(1.0, dtype=torch.float32)
-        self.register_buffer("scale", self._scale)
+        self.register_buffer("scale", None)
 
 
     def original_weight_shape(self) -> tuple[int, ...]:
         return self.weight.shape
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
-        if self._scale is not None:
-            return unquantize(self.weight.detach(), self._scale, self._compute_dtype).to(dtype)
+        if self.scale is not None:
+            return unquantize(self.weight.detach(), self.scale, self._compute_dtype).to(dtype)
         else:
             return self.weight.detach().to(dtype)
 
     def quantize(self, device: torch.device | None = None, **kwargs):
-        if self.is_quantized:
+        if self.scale is not None:
             return
-        self.is_quantized = True
 
-        self.weight.requires_grad_(False)
-        weight = self.weight.data
+        weight = self.weight.detach()
         orig_device = weight.device
-        if weight.dtype != self._dtype:
-            if device is not None:
-                weight = weight.to(device=device)
+        if device is not None:
+            weight = weight.to(device=device)
 
-            if self._dtype == torch.int8:
-                weight, self._scale = quantize_int8_tensorwise(weight)
-            else:
-                weight, self._scale = quantize_fp8_tensorwise(weight)
+        if self._dtype == torch.int8:
+            weight, scale = quantize_int8_tensorwise(weight)
+        else:
+            weight, scale = quantize_fp8_tensorwise(weight)
 
-            if device is not None:
-                weight = weight.to(device=orig_device)
-        self.weight.data = weight
+        if device is not None:
+            weight = weight.to(device=orig_device)
+            scale = scale.to(device=orig_device)
+
+        self.weight = nn.Parameter(weight, requires_grad=False)
+        self.register_buffer("scale", scale)
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
+        assert not self.weight.requires_grad
         x = x_orig.to(self._compute_dtype).reshape(-1, x_orig.shape[-1])
 
         if x.shape[0] > 16:
             if self._dtype == torch.int8:
-                y = LinearInt8Function.apply(x, self.weight, self._scale, self.bias)
+                y = LinearInt8Function.apply(x, self.weight, self.scale, self.bias)
             else:
-                y = LinearFp8Function.apply(x, self.weight, self._scale, self.bias)
+                y = LinearFp8Function.apply(x, self.weight, self.scale, self.bias)
         else:
-            w = unquantize(self.weight, self._scale, compute_dtype=self._compute_dtype)
+            w = unquantize(self.weight, self.scale, compute_dtype=self._compute_dtype)
             y = torch.nn.functional.linear(x, w, self.bias.to(self._compute_dtype))
 
         assert y.dtype == self._compute_dtype

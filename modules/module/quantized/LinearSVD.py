@@ -21,6 +21,9 @@ def _get_tensor_hash(t: torch.Tensor) -> str:
         hash_obj = hashlib.sha256(tensor_bytes)
         return hash_obj.hexdigest()
 
+
+log_obj = None
+
 def make_svd_linear(linear_class):
     class LinearSVD(
         linear_class,
@@ -67,15 +70,16 @@ def make_svd_linear(linear_class):
             S_r = S[:rank]
             Vh_r = Vh[:rank, :]
 
-            self.svd_down = Vh_r.clone().to(svd_dtype)
-            self.svd_up = (U_r * S_r.unsqueeze(0)).to(svd_dtype)
-            self.svd_down.requires_grad_(False)
-            self.svd_up.requires_grad_(False)
+            svd_down = Vh_r.clone().to(svd_dtype)
+            svd_up = (U_r * S_r.unsqueeze(0)).to(svd_dtype)
+            self.register_buffer("svd_up", svd_up)
+            self.register_buffer("svd_down", svd_down)
 
-            self.weight.data = (W - (self.svd_up @ self.svd_down)).to(dtype=self.weight.dtype, device=orig_device)
+            self.weight.data = (W - (svd_up @ svd_down)).to(dtype=self.weight.dtype, device=orig_device)
             super().quantize(device)
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
+            assert not self.svd_down.requires_grad and not self.svd_up.requires_grad
             return ((x @ self.svd_down.T) @ self.svd_up.T).to(x.dtype) + super().forward(x)
 
     return LinearSVD
