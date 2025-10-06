@@ -195,7 +195,7 @@ class BaseModelSetup(
             if isinstance(module, LoRAModuleWrapper):
                 for lora_module in module.lora_modules.values():
                     layer_key = lora_module.prefix.rstrip('.')
-                    for param_name, p in lora_module.named_parameters():
+                    for _param_name, p in lora_module.named_parameters():
                         if p.requires_grad:
                             param_map[id(p)] = layer_key
                             count += 1
@@ -230,7 +230,7 @@ class BaseModelSetup(
         print(f"[Kourkoutas-β Debug] Total trainable parameters mapped: {len(param_map)}")
         if len(param_map) > 0:
             print("[Kourkoutas-β Debug] Sample of mapped parameter names:")
-            for i, (p_id, name) in enumerate(itertools.islice(param_map.items(), 5)):
+            for _i, (_p_id, name) in enumerate(itertools.islice(param_map.items(), 5)):
                 print(f"  - Mapped to bucket key: '{name}'")
             if len(param_map) > 5:
                 print("  - ...")
