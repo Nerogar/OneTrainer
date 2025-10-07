@@ -33,7 +33,7 @@ class WuerstchenFineTuneSetup(
 
         if config.optimizer.kourkoutas_beta and config.optimizer.optimizer.supports_kourkoutas_beta:
             print("INFO: Creating layer keys for Kourkoutas-β optimizer.")
-            parameter_group_collection.layer_key_fn = self._create_kourkoutas_layer_key_fn(model)
+            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model)
 
         self._create_model_part_parameters(parameter_group_collection, "prior_text_encoder", model.prior_text_encoder, config.text_encoder)
 
