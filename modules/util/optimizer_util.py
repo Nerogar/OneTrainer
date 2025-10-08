@@ -436,7 +436,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha": 5,
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
-        "k_logging": None,
     },
     Optimizer.ADOPT_ADV: {
         "beta1": 0.9,
@@ -457,7 +456,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha_grad": 100.0,
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
-        "k_logging": None,
     },
     Optimizer.PRODIGY_ADV: {
         "beta1": 0.9,
@@ -485,7 +483,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha_grad": 100.0,
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
-        "k_logging": None,
     },
     Optimizer.SIMPLIFIED_AdEMAMix: {
         "beta1": 0.99,
@@ -502,7 +499,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
-        "k_logging": None,
     },
     Optimizer.LION_ADV: {
         "beta1": 0.9,

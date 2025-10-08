@@ -24,14 +24,14 @@ def _get_layer_key_from_name(full_name: str) -> str:
             key = full_name.split(f'.{pattern}.', 1)[0] + f'.{pattern}'
             return key
 
-    # General patterns for transformers.
+    # General patterns for transformers and other models.
     general_patterns = [
         'resnets', 'attentions', 'transformer_blocks', 'resblocks',
         'blocks', 'layers', 'layer', 'experts', 'downsample'
         'double_stream_blocks', 'single_stream_blocks', 'refiner_blocks'
         'single_blocks', 'double_blocks', 'block'
         'single_transformer_blocks', 'joint_blocks', 'context_block',
-        'x_block', 'block_',
+        'x_block', 'block_', 
     ]
 
     # Combine indexed patterns for a single regex pass

@@ -511,14 +511,11 @@ def create_optimizer(
 
     kourkoutas_kwargs = {}
     if optimizer_config.kourkoutas_beta:
-        print("INFO: Enabling Kourkoutas-β for the optimizer.")
         kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
-        k_logging=optimizer_config.k_logging if optimizer_config.k_logging is not None else 0
         k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0
         kourkoutas_kwargs = {
             "kourkoutas_beta": kourkoutas_beta,
             "k_warmup_steps": k_warmup_steps,
-            "k_logging": k_logging,
             "layer_key_fn": parameter_group_collection.layer_key_fn,
         }
 

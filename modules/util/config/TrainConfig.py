@@ -124,7 +124,6 @@ class TrainOptimizerConfig(BaseConfig):
     grams_moment: False
     kourkoutas_beta: False
     k_warmup_steps: int
-    k_logging: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -224,7 +223,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
-        data.append(("k_logging", None, int, True))
 
         return TrainOptimizerConfig(data)
 
