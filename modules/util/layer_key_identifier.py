@@ -31,7 +31,7 @@ def _get_layer_key_from_name(full_name: str) -> str:
         'double_stream_blocks', 'single_stream_blocks', 'refiner_blocks'
         'single_blocks', 'double_blocks', 'block'
         'single_transformer_blocks', 'joint_blocks', 'context_block',
-        'x_block', 'block_', 
+        'x_block', 'block_',
     ]
 
     # Combine indexed patterns for a single regex pass
