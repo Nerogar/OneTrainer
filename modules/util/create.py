@@ -510,7 +510,7 @@ def create_optimizer(
     parameters = parameter_group_collection.parameters_for_optimizer(config)
 
     kourkoutas_kwargs = {}
-    if optimizer_config.kourkoutas_beta and optimizer_config.optimizer.supports_kourkoutas_beta:
+    if optimizer_config.kourkoutas_beta:
         print("INFO: Enabling Kourkoutas-β for the optimizer.")
         kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
         k_logging=optimizer_config.k_logging if optimizer_config.k_logging is not None else 0
@@ -1109,6 +1109,7 @@ def create_optimizer(
                 growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
+                d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,

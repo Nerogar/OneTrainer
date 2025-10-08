@@ -159,7 +159,7 @@ class BaseModelSetup(
                 adapter.hook_to_module()
 
     def _create_layer_key_fn(self, model: BaseModel) -> callable:
-        from modules.util.layer_identifier import build_layer_identifier_fn
+        from modules.util.layer_key_identifier import build_layer_identifier_fn
         return build_layer_identifier_fn(model, self.debug_mode)
 
     def _create_model_part_parameters(

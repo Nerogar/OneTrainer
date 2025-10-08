@@ -473,6 +473,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "growth_rate": float('inf'),
         "slice_p": 11,
         "prodigy_steps": 0,
+        "d_limiter": False,
         "use_atan2": False,
         "cautious_mask": False,
         "grams_moment": False,
