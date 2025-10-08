@@ -1,6 +1,6 @@
 import re
 
-from modules.model.BaseModel import BaseModel, BaseModelEmbedding
+from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 
 import torch
