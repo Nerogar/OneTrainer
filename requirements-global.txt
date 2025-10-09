@@ -59,4 +59,4 @@ fabric==3.2.2
 # debug
 psutil==7.0.0
 requests==2.32.3
-deepdiff==8.5.0
+deepdiff==8.5.0 # output easy to read diff for troublshooting
