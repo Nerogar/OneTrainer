@@ -1070,7 +1070,7 @@ def create_optimizer(
             optimizer = Adopt_adv(
                 params=parameters,
                 lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
