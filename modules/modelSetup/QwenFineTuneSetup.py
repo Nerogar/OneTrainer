@@ -31,10 +31,6 @@ class QwenFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.kourkoutas_beta:
-            print("INFO: Creating layer keys for Kourkoutas-β optimizer.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model)
-
         self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder)
         self._create_model_part_parameters(parameter_group_collection,  "transformer", model.transformer,  config.prior, freeze=ModuleFilter.create(config), debug=config.debug_mode)
 

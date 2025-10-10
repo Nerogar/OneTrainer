@@ -32,10 +32,6 @@ class StableDiffusionLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.kourkoutas_beta:
-            print("INFO: Creating layer keys for Kourkoutas-β optimizer.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model)
-
         self._create_model_part_parameters(parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():

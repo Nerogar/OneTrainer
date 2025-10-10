@@ -30,10 +30,6 @@ class ChromaEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.kourkoutas_beta:
-            print("INFO: Creating layer keys for Kourkoutas-β optimizer.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model)
-
         if config.text_encoder.train_embedding and model.text_encoder is not None:
             self._add_embedding_param_groups(
                 model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,

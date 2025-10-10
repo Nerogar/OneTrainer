@@ -31,10 +31,6 @@ class FluxFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.kourkoutas_beta:
-            print("INFO: Creating layer keys for Kourkoutas-β optimizer.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model)
-
         self._create_model_part_parameters(parameter_group_collection, "text_encoder_1", model.text_encoder_1, config.text_encoder)
         self._create_model_part_parameters(parameter_group_collection, "text_encoder_2", model.text_encoder_2, config.text_encoder_2)
 
