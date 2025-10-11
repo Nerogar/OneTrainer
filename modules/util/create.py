@@ -1166,6 +1166,8 @@ def create_optimizer(
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
                 growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
+                prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
+                d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )

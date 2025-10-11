@@ -524,6 +524,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_coef": 1.0,
         "growth_rate": float('inf'),
         "slice_p": 11,
+        "prodigy_steps": 0,
+        "d_limiter": True,
         "cautious_mask": False,
         "orthogonal_gradient": False,
     },
