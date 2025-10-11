@@ -41,7 +41,8 @@ class LoRASaverMixin(
             destination: str,
             dtype: torch.dtype | None,
     ):
-        state_dict = self._get_state_dict(model)
+        state_dict_checkpointed = self._get_state_dict(model)
+        state_dict = {k.replace(".checkpoint.", "."): v for k, v in state_dict_checkpointed.items()}
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
 
         key_sets = self._get_convert_key_sets(model)
@@ -57,7 +58,8 @@ class LoRASaverMixin(
             destination: str,
             dtype: torch.dtype | None,
     ):
-        state_dict = self._get_state_dict(model)
+        state_dict_checkpointed = self._get_state_dict(model)
+        state_dict = {k.replace(".checkpoint.", "."): v for k, v in state_dict_checkpointed.items()}
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
 
         key_sets = self._get_convert_key_sets(model)
