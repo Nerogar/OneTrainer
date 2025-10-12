@@ -116,6 +116,9 @@ class StableDiffusionXLLoRASetup(
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
 
+        if config.diff2flow:
+            model.enable_diff2flow()
+
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_embeddings(model, config)

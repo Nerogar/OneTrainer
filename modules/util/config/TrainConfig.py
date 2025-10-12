@@ -384,6 +384,7 @@ class TrainConfig(BaseConfig):
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
     force_epsilon_prediction: bool
+    diff2flow: bool
     timestep_distribution: TimestepDistribution
     min_noising_strength: float
     max_noising_strength: float
@@ -916,6 +917,7 @@ class TrainConfig(BaseConfig):
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
         data.append(("force_epsilon_prediction", False, bool, False))
+        data.append(("diff2flow", False, bool, False))
         data.append(("min_noising_strength", 0.0, float, False))
         data.append(("max_noising_strength", 1.0, float, False))
         data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
