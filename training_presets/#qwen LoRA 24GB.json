@@ -5,7 +5,7 @@
     "model_type": "QWEN",
     "resolution": "512",
     "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.35,
+    "layer_offload_fraction": 0.1,
     "dataloader_threads": 1,
     "prior": {
         "train": true,
