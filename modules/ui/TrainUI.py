@@ -47,6 +47,7 @@ import torch
 
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
+from tkinterdnd2 import TkinterDnD
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
@@ -55,7 +56,7 @@ if platform.system() == "Windows":
         # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
 
-class TrainUI(ctk.CTk):
+class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
     set_step_progress: Callable[[int, int], None]
     set_epoch_progress: Callable[[int, int], None]
 
@@ -92,6 +93,7 @@ class TrainUI(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        self.TkdndVersion = TkinterDnD._require(self)
 
         self.title("OneTrainer")
         self.geometry("1100x740")

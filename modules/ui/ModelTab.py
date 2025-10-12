@@ -480,10 +480,35 @@ class ModelTab:
             allow_diffusers: bool = False,
             allow_legacy_safetensors: bool = False,
     ) -> int:
+        def get_valid_extensions() -> list[str]:
+            format_str = self.ui_state.get_var("output_model_format").get()
+
+            # Map format to extensions
+            format_extensions = {
+                "SAFETENSORS": [".safetensors"],
+                "DIFFUSERS": [".json"],
+                "LEGACY_SAFETENSORS": [".safetensors"],
+            }
+
+            return format_extensions.get(format_str, [])
+
+        def update_output_validation(_=None):
+
+            output_var = self.ui_state.get_var("output_model_destination")
+            current_value = output_var.get()
+
+            if current_value:
+                output_var.set(current_value)
+
         # output model destination
         components.label(self.scroll_frame, row, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.file_entry(self.scroll_frame, row, 1, self.ui_state, "output_model_destination", is_output=True)
+
+        components.file_entry(
+            self.scroll_frame, row, 1, self.ui_state, "output_model_destination",
+            is_output=True,
+            valid_extensions=get_valid_extensions()
+        )
 
         # output data type
         components.label(self.scroll_frame, row, 3, "Output Data Type",
@@ -509,7 +534,10 @@ class ModelTab:
 
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
-        components.options_kv(self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format")
+        components.options_kv(
+            self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format",
+            command=update_output_validation  # Trigger validation when format changes
+        )
 
         # include config
         components.label(self.scroll_frame, row, 3, "Include Config",

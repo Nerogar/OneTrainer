@@ -1,4 +1,5 @@
 import contextlib
+import os
 from collections.abc import Callable
 from tkinter import filedialog
 from typing import Any
@@ -11,8 +12,46 @@ from modules.util.ui.UIState import UIState
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 from PIL import Image
+from tkinterdnd2 import DND_FILES
 
 PAD = 10
+
+
+def _drop_enter(event):
+    event.widget.focus_force()
+    return event.action
+
+
+def _drop_leave(event):
+    return event.action
+
+
+def _create_drop_handler(entry_widget, ui_state, var_name, command=None):
+    def drop(event):
+        if event.data:
+            file_path = event.data.strip('{}')
+
+            ui_state.get_var(var_name).set(file_path)
+
+            entry_widget.focus_force()
+            entry_widget.event_generate('<FocusIn>')
+            entry_widget.event_generate('<Key>')  # mark as touched
+            entry_widget.event_generate('<FocusOut>')
+
+            if command:
+                command(file_path)
+        return event.action
+    return drop
+
+
+def _register_drop_target(entry_widget, ui_state, var_name, command=None):
+    try:
+        entry_widget.drop_target_register(DND_FILES)
+        entry_widget.dnd_bind('<<DropEnter>>', _drop_enter)
+        entry_widget.dnd_bind('<<DropLeave>>', _drop_leave)
+        entry_widget.dnd_bind('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command))
+    except Exception:
+        pass
 
 
 def app_title(master, row, column):
@@ -49,6 +88,7 @@ def entry(
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
+        custom_validator: Callable[[str], tuple[bool, str]] = None,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -122,6 +162,12 @@ def entry(
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
                     return fail("Invalid bool")
+
+            if custom_validator:
+                is_valid, error_msg = custom_validator(value)
+                if not is_valid:
+                    return fail(error_msg)
+
             return success()
         except ValueError:
             return fail("Invalid value")
@@ -206,13 +252,49 @@ def file_entry(
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] = None,
+        valid_extensions: list[str] = None,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry(frame,row=0, column=0, ui_state=ui_state, var_name=var_name)
+    def validate_file_path(value: str) -> tuple[bool, str]:
+        if not value:
+            return True, ""
+
+        if os.path.isdir(value):
+            return False, "Must be a file, not a directory"
+
+        # For output files, validate extension if specified
+        if is_output:
+            # Check if user has entered a file extension (contains a period after last path separator)
+            if '.' in os.path.basename(value):
+                if valid_extensions:
+                    file_ext = os.path.splitext(value)[1].lower()
+                    if file_ext not in valid_extensions:
+                        valid_exts_str = ', '.join(valid_extensions)
+                        return False, f"Invalid extension. Expected: {valid_exts_str}"
+
+            # Check that parent directory exists
+            parent_dir = os.path.dirname(value)
+            if parent_dir and not os.path.isdir(parent_dir):
+                return False, "Parent directory does not exist"
+            return True, ""
+
+        # For input files, verify the file exists
+        if not os.path.isfile(value):
+            return False, "File does not exist"
+
+        return True, ""
+
+    entry_widget = entry(
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        custom_validator=validate_file_path, command=command
+    )
+
+    # Register drag-and-drop support
+    _register_drop_target(entry_widget, ui_state, var_name, command)
 
     def __open_dialog():
         filetypes = [
@@ -256,7 +338,28 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
+    def validate_and_normalize_directory(value: str) -> tuple[bool, str]:
+        if not value:
+            return True, ""
+
+        # convert filepaths to dir
+        if os.path.isfile(value):
+            normalized = os.path.dirname(value)
+            ui_state.get_var(var_name).set(normalized)
+            return True, ""
+
+        # check if valid dir
+        if os.path.isdir(value):
+            return True, ""
+
+        return True, ""
+
+    entry_widget = entry(
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        custom_validator=validate_and_normalize_directory, command=command
+    )
+
+    _register_drop_target(entry_widget, ui_state, var_name, command)
 
     def __open_dialog():
         dir_path = filedialog.askdirectory()
