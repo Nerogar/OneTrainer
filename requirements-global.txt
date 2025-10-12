@@ -1,7 +1,7 @@
 # base requirements
 numpy==2.2.6
 opencv-python==4.11.0.86
-pillow==11.2.1
+pillow==11.3.0
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
