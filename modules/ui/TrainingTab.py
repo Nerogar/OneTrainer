@@ -354,6 +354,11 @@ class TrainingTab:
                          tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         components.entry(frame, 10, 1, self.ui_state, "clip_grad_norm")
 
+        # grad power
+        components.label(frame, 11, 0, "Grad Power",
+                         tooltip="Power exponent `p` for gradients. > 1.0 (e.g., 1.2) amplifies strong signals (good for small batches). < 1.0 (e.g., 0.8) compresses strong signals (good for large batches). Default: 1.0 (disabled).")
+        components.entry(frame, 11, 1, self.ui_state, "grad_power")
+
     def __create_base2_frame(self, master, row, video_training_enabled: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
