@@ -220,33 +220,6 @@ class BaseStableDiffusionXLSetup(
             latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
 
-            scaled_latent_conditioning_image = None
-            if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
-
-            timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config['num_train_timesteps'],
-                deterministic,
-                generator,
-                scaled_latent_image.shape[0],
-                config,
-            )
-
-            latent_noise = self._create_noise(
-                scaled_latent_image,
-                config,
-                generator,
-                timestep,
-                model.noise_scheduler.betas,
-            )
-
-            scaled_noisy_latent_image = self._add_noise_discrete(
-                scaled_latent_image,
-                latent_noise,
-                timestep,
-                model.noise_scheduler.betas,
-            )
-
             # original size of the image
             original_height = batch['original_resolution'][0]
             original_width = batch['original_resolution'][1]
@@ -265,42 +238,113 @@ class BaseStableDiffusionXLSetup(
             ], dim=1)
 
             add_time_ids = add_time_ids.to(
-                dtype=scaled_noisy_latent_image.dtype,
-                device=scaled_noisy_latent_image.device,
+                dtype=scaled_latent_image.dtype,
+                device=scaled_latent_image.device,
             )
-
-            if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
-                latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
-                )
-            else:
-                latent_input = scaled_noisy_latent_image
-
             added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
-            predicted_latent_noise = model.unet(
-                sample=latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep,
-                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                added_cond_kwargs=added_cond_kwargs,
-            ).sample
 
-            model_output_data = {}
+            if config.diff2flow:
+                # Sample continuous time t from U(0, 1)
+                t_continuous = torch.rand(
+                    scaled_latent_image.shape[0],
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype()
+                )
 
-            if model.noise_scheduler.config.prediction_type == 'epsilon':
+                latent_noise = self._create_noise(scaled_latent_image, config, generator)
+
+                # Ground truth velocity field: u_t(x) = x_1 - x_0
+                target_velocity = scaled_latent_image - latent_noise
+
+                # Interpolated sample: x_t = (1-t)x_0 + t*x_1
+                t_reshaped = t_continuous.reshape(-1, *([1] * (scaled_latent_image.dim() - 1)))
+                xt_flow = (1 - t_reshaped) * latent_noise + t_reshaped * scaled_latent_image
+
+                # Convert from Flow Matching (FM) space to Diffusion Model (DM) space
+                dm_t_continuous = model._df_convert_fm_t_to_dm_t(t_continuous)
+                dm_timestep = dm_t_continuous.round().long().clamp(0, model.noise_scheduler.config.num_train_timesteps - 1)
+                dm_x = model._df_convert_fm_xt_to_dm_xt(xt_flow, t_continuous)
+
+                # Predict noise/v using the UNet in diffusion space
+                predicted_from_unet = model.unet(
+                    sample=dm_x.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=dm_timestep,
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    added_cond_kwargs=added_cond_kwargs,
+                ).sample
+
+                # Convert UNet output (eps or v) back to the velocity field v_t in FM space
+                if model.noise_scheduler.config.prediction_type == 'v_prediction':
+                    predicted_velocity = model._df_get_vector_field_from_v(predicted_from_unet, dm_x, dm_timestep)
+                elif model.noise_scheduler.config.prediction_type == 'epsilon':
+                    predicted_velocity = model._df_get_vector_field_from_eps(predicted_from_unet, dm_x, dm_timestep)
+
                 model_output_data = {
                     'loss_type': 'target',
-                    'timestep': timestep,
-                    'predicted': predicted_latent_noise,
-                    'target': latent_noise,
-                }
-            elif model.noise_scheduler.config.prediction_type == 'v_prediction':
-                target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
-                model_output_data = {
-                    'loss_type': 'target',
-                    'timestep': timestep,
-                    'predicted': predicted_latent_noise,
+                    'predicted': predicted_velocity,
                     'target': target_velocity,
+                    'timestep': dm_timestep,
+                    'prediction_type': model.noise_scheduler.config.prediction_type,
                 }
+            else:
+                scaled_latent_conditioning_image = None
+                if config.model_type.has_conditioning_image_input():
+                    scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
+
+                timestep = self._get_timestep_discrete(
+                    model.noise_scheduler.config['num_train_timesteps'],
+                    deterministic,
+                    generator,
+                    scaled_latent_image.shape[0],
+                    config,
+                )
+
+                latent_noise = self._create_noise(
+                    scaled_latent_image,
+                    config,
+                    generator,
+                    timestep,
+                    model.noise_scheduler.betas,
+                )
+
+                scaled_noisy_latent_image = self._add_noise_discrete(
+                    scaled_latent_image,
+                    latent_noise,
+                    timestep,
+                    model.noise_scheduler.betas,
+                )
+
+                if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
+                    latent_input = torch.concat(
+                        [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
+                    )
+                else:
+                    latent_input = scaled_noisy_latent_image
+
+                predicted_latent_noise = model.unet(
+                    sample=latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=timestep,
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    added_cond_kwargs=added_cond_kwargs,
+                ).sample
+
+                model_output_data = {}
+
+                if model.noise_scheduler.config.prediction_type == 'epsilon':
+                    model_output_data = {
+                        'loss_type': 'target',
+                        'timestep': timestep,
+                        'predicted': predicted_latent_noise,
+                        'target': latent_noise,
+                    }
+                elif model.noise_scheduler.config.prediction_type == 'v_prediction':
+                    target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
+                    model_output_data = {
+                        'loss_type': 'target',
+                        'timestep': timestep,
+                        'predicted': predicted_latent_noise,
+                        'target': target_velocity,
+                    }
 
             if config.debug_mode:
                 with torch.no_grad():
@@ -339,23 +383,24 @@ class BaseStableDiffusionXLSetup(
                     )
 
                     # predicted image
-                    alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(config.train_device)
-                    sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
-                    sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
+                    if not config.diff2flow:
+                        alphas_cumprod = model.noise_scheduler.alphas_cumprod.to(config.train_device)
+                        sqrt_alpha_prod = alphas_cumprod[timestep] ** 0.5
+                        sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
-                    sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
+                        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
+                        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    scaled_predicted_latent_image = \
-                        (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
-                        / sqrt_alpha_prod
-                    self._save_image(
-                        self._project_latent_to_image_sdxl(scaled_predicted_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "4-predicted_image",
-                        model.train_progress.global_step,
-                        True
-                    )
+                        scaled_predicted_latent_image = \
+                            (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
+                            / sqrt_alpha_prod
+                        self._save_image(
+                            self._project_latent_to_image_sdxl(scaled_predicted_latent_image),
+                            config.debug_dir + "/training_batches",
+                            "4-predicted_image",
+                            model.train_progress.global_step,
+                            True
+                        )
 
                     # image
                     self._save_image(

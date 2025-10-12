@@ -41,8 +41,9 @@ def enable_diff2flow(model):
             sqrt_alphas_cumprod_full + sqrt_one_minus_alphas_cumprod_full)
     model.df_rectified_alphas_cumprod_full = to_torch(rectified_alphas_cumprod_full)
 
-    model.df_sqrt_recip_alphas_cumprod = to_torch(np.sqrt(1. / alphas_cumprod))
-    model.df_sqrt_recipm1_alphas_cumprod = to_torch(np.sqrt(1. / alphas_cumprod - 1))
+    if model.noise_scheduler.config.prediction_type == 'epsilon':
+        model.df_sqrt_recip_alphas_cumprod = to_torch(np.sqrt(1. / alphas_cumprod))
+        model.df_sqrt_recipm1_alphas_cumprod = to_torch(np.sqrt(1. / alphas_cumprod - 1))
 
     # Bind methods to the model instance for easy access
     model._df_convert_fm_t_to_dm_t = MethodType(_df_convert_fm_t_to_dm_t, model)
