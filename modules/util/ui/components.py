@@ -244,6 +244,26 @@ def entry(
 
     return component
 
+def register_dir_drop_target(widget, drop_callback: Callable[[str], None]):
+    def drop_handler(event):
+        if event.data:
+            path = event.data.strip('{}')
+
+            if os.path.isfile(path):
+                path = os.path.dirname(path)
+
+            if os.path.isdir(path):
+                drop_callback(path)
+
+        return event.action
+
+    try:
+        widget.drop_target_register(DND_FILES)
+        widget.dnd_bind('<<DropEnter>>', _drop_enter)
+        widget.dnd_bind('<<DropLeave>>', _drop_leave)
+        widget.dnd_bind('<<Drop>>', drop_handler)
+    except Exception:
+        pass
 
 def file_entry(
         master, row, column, ui_state: UIState, var_name: str,
