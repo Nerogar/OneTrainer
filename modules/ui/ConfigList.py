@@ -8,7 +8,7 @@ from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.path_util import write_json_atomic
-from modules.util.ui import components, dialogs
+from modules.util.ui import components, dialogs, ui_utils
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -165,7 +165,7 @@ class ConfigList(metaclass=ABCMeta):
 
             widget.place_in_list()
 
-        components.register_concept_drop_target(self.master, self.__handle_dir_drop)
+        ui_utils.register_concept_drop_target(self.master, self.__handle_dir_drop)
 
     def __handle_dir_drop(self, dir_path: str):
         if any(hasattr(el, 'path') and el.path == dir_path for el in self.current_config):
