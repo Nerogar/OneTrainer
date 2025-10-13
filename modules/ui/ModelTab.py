@@ -507,7 +507,8 @@ class ModelTab:
         components.file_entry(
             self.scroll_frame, row, 1, self.ui_state, "output_model_destination",
             is_output=True,
-            valid_extensions=get_valid_extensions()
+            valid_extensions=get_valid_extensions(),
+            path_type="file"  # Allow both file and directory paths
         )
 
         # output data type

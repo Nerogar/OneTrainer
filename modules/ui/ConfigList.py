@@ -165,7 +165,7 @@ class ConfigList(metaclass=ABCMeta):
 
             widget.place_in_list()
 
-        components.register_dir_drop_target(self.master, self.__handle_dir_drop)
+        components.register_concept_drop_target(self.master, self.__handle_dir_drop)
 
     def __handle_dir_drop(self, dir_path: str):
         if any(hasattr(el, 'path') and el.path == dir_path for el in self.current_config):

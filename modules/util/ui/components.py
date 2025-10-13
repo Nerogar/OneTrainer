@@ -1,57 +1,19 @@
 import contextlib
-import os
 from collections.abc import Callable
 from tkinter import filedialog
 from typing import Any
 
 from modules.util.enum.TimeUnit import TimeUnit
-from modules.util.path_util import supported_image_extensions
+from modules.util.path_util import supported_image_extensions, validate_file_path
 from modules.util.ui.ToolTip import ToolTip
+from modules.util.ui.ui_utils import _register_drop_target
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 from PIL import Image
-from tkinterdnd2 import DND_FILES
 
 PAD = 10
-
-
-def _drop_enter(event):
-    event.widget.focus_force()
-    return event.action
-
-
-def _drop_leave(event):
-    return event.action
-
-
-def _create_drop_handler(entry_widget, ui_state, var_name, command=None):
-    def drop(event):
-        if event.data:
-            file_path = event.data.strip('{}')
-
-            ui_state.get_var(var_name).set(file_path)
-
-            entry_widget.focus_force()
-            entry_widget.event_generate('<FocusIn>')
-            entry_widget.event_generate('<Key>')  # mark as touched
-            entry_widget.event_generate('<FocusOut>')
-
-            if command:
-                command(file_path)
-        return event.action
-    return drop
-
-
-def _register_drop_target(entry_widget, ui_state, var_name, command=None):
-    try:
-        entry_widget.drop_target_register(DND_FILES)
-        entry_widget.dnd_bind('<<DropEnter>>', _drop_enter)
-        entry_widget.dnd_bind('<<DropLeave>>', _drop_leave)
-        entry_widget.dnd_bind('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command))
-    except Exception:
-        pass
 
 
 def app_title(master, row, column):
@@ -244,76 +206,35 @@ def entry(
 
     return component
 
-def register_dir_drop_target(widget, drop_callback: Callable[[str], None]):
-    def drop_handler(event):
-        if event.data:
-            path = event.data.strip('{}')
-
-            if os.path.isfile(path):
-                path = os.path.dirname(path)
-
-            if os.path.isdir(path):
-                drop_callback(path)
-
-        return event.action
-
-    try:
-        widget.drop_target_register(DND_FILES)
-        widget.dnd_bind('<<DropEnter>>', _drop_enter)
-        widget.dnd_bind('<<DropLeave>>', _drop_leave)
-        widget.dnd_bind('<<Drop>>', drop_handler)
-    except Exception:
-        pass
 
 def file_entry(
         master, row, column, ui_state: UIState, var_name: str,
-        is_output: bool = False,
         path_modifier: Callable[[str], str] = None,
+        is_output: bool = False,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] = None,
         valid_extensions: list[str] = None,
+        path_type: str = "file",  # "file" or "directory"
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    def validate_file_path(value: str) -> tuple[bool, str]:
-        if not value:
-            return True, ""
+    # Only use metadata as fallback if is_output wasn't explicitly set
+    if not is_output:
+        meta = ui_state.get_field_metadata(var_name)
+        is_output = getattr(meta, 'is_output', False)
 
-        if os.path.isdir(value):
-            return False, "Must be a file, not a directory"
-
-        # For output files, validate extension if specified
-        if is_output:
-            # Check if user has entered a file extension (contains a period after last path separator)
-            if '.' in os.path.basename(value):
-                if valid_extensions:
-                    file_ext = os.path.splitext(value)[1].lower()
-                    if file_ext not in valid_extensions:
-                        valid_exts_str = ', '.join(valid_extensions)
-                        return False, f"Invalid extension. Expected: {valid_exts_str}"
-
-            # Check that parent directory exists
-            parent_dir = os.path.dirname(value)
-            if parent_dir and not os.path.isdir(parent_dir):
-                return False, "Parent directory does not exist"
-            return True, ""
-
-        # For input files, verify the file exists
-        if not os.path.isfile(value):
-            return False, "File does not exist"
-
-        return True, ""
+    def validate_file_path_wrapper(value: str) -> tuple[bool, str]:
+        return validate_file_path(value, is_output, valid_extensions, path_type)
 
     entry_widget = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
-        custom_validator=validate_file_path, command=command
+        custom_validator=validate_file_path_wrapper, command=command
     )
 
-    # Register drag-and-drop support
     _register_drop_target(entry_widget, ui_state, var_name, command)
 
     def __open_dialog():
@@ -358,25 +279,12 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
 
     frame.grid_columnconfigure(0, weight=1)
 
-    def validate_and_normalize_directory(value: str) -> tuple[bool, str]:
-        if not value:
-            return True, ""
-
-        # convert filepaths to dir
-        if os.path.isfile(value):
-            normalized = os.path.dirname(value)
-            ui_state.get_var(var_name).set(normalized)
-            return True, ""
-
-        # check if valid dir
-        if os.path.isdir(value):
-            return True, ""
-
-        return True, ""
+    def validate_dir_path_wrapper(value: str) -> tuple[bool, str]:
+        return validate_file_path(value, is_output=False, valid_extensions=None, path_type="directory")
 
     entry_widget = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
-        custom_validator=validate_and_normalize_directory, command=command
+        custom_validator=validate_dir_path_wrapper, command=command
     )
 
     _register_drop_target(entry_widget, ui_state, var_name, command)
