@@ -1,7 +1,7 @@
 # base requirements
 numpy==2.2.6
 opencv-python==4.11.0.86
-pillow==11.2.1
+pillow==11.3.0
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
@@ -22,8 +22,8 @@ pytorch-lightning==2.5.1.post0
 #Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
 -e git+https://github.com/huggingface/diffusers.git@9b721db#egg=diffusers
 
-transformers==4.52.4
-sentencepiece==0.2.0 # transitive dependency of transformers for tokenizer loading
+transformers==4.56.2
+sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
@@ -44,7 +44,7 @@ prodigyopt==1.1.2 # prodigy optimizer
 schedulefree==1.4.1 # schedule-free optimizers
 pytorch_optimizer==3.6.0 # pytorch optimizers
 prodigy-plus-schedule-free==2.0.0 # Prodigy plus optimizer
-adv_optm==1.0.3 # advanced optimizers
+adv_optm==1.0.6 # advanced optimizers
 
 # Profiling
 scalene==1.5.51
@@ -59,4 +59,4 @@ fabric==3.2.2
 # debug
 psutil==7.0.0
 requests==2.32.3
-deepdiff==8.5.0
+deepdiff==8.6.1 # output easy to read diff for troublshooting

@@ -7,7 +7,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 # Pull the latest changes via Git.
 echo "[OneTrainer] Updating OneTrainer to latest version from Git repository..."
-git pull
+#git pull
 
 # Load the newest version of the function library.
 source "lib.include.sh"

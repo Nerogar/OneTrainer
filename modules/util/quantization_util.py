@@ -4,7 +4,7 @@ from functools import partial
 
 from modules.module.quantized.LinearFp8 import LinearFp8
 from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
-from modules.module.quantized.LinearW8A8 import LinearW8A8
+from modules.module.quantized.LinearW8A8 import LinearW8A8, make_requant
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import TrainConfig
@@ -57,7 +57,7 @@ def __replace_linear_layers(
 
     visited_modules.add(id(parent_module))
 
-    if isinstance(parent_module, nn.ModuleList):
+    if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
         for i, module in enumerate(parent_module):
             if isinstance(module, nn.Linear):
                 quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
@@ -92,6 +92,10 @@ def __replace_linear_layers(
                     visited_modules=visited_modules,
                 )
 
+    for name, module in parent_module.named_modules():
+        #ensure that all Linear layers were replaced
+        #https://github.com/Nerogar/OneTrainer/issues/1050
+        assert not isinstance(module, nn.Linear) or isinstance(module, QuantizedLinearMixin), f"Linear layer {name} was not found in model for quantization"
 
 def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
@@ -100,7 +104,7 @@ def replace_linear_with_quantized_layers(
         copy_parameters: bool = False,
 ):
     if dtype.quantize_nf4():
-        construct_fn = make_svd_linear(LinearNf4) if dtype.quantize_svd() else LinearNf4
+        construct_fn = partial(make_svd_linear(make_requant(LinearNf4)), dtype=torch.int8, compute_dtype=torch.bfloat16) if dtype.quantize_svd() else LinearNf4
     elif dtype.quantize_int8():
         construct_fn = partial(make_svd_linear(bnb.nn.Linear8bitLt) if dtype.quantize_svd() else bnb.nn.Linear8bitLt, has_fp16_weights=False)
     elif dtype.quantize_fp8():
@@ -185,7 +189,8 @@ def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
     if isinstance(module, nn.Linear) and module.bias is not None:
         tensors += [module.bias]
     if isinstance(module, BaseLinearSVD):
-        tensors += [module.svd_up, module.svd_down]
+        tensors += [module.svd_up]
+        tensors += [module.svd_down]
 
     return tensors
 

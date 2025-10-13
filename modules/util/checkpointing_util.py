@@ -10,6 +10,24 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
+from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
+from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
+from diffusers.models.transformers.transformer_hidream_image import (
+    HiDreamImageSingleTransformerBlock,
+    HiDreamImageTransformerBlock,
+)
+from diffusers.models.transformers.transformer_hunyuan_video import (
+    HunyuanVideoIndividualTokenRefinerBlock,
+    HunyuanVideoSingleTransformerBlock,
+    HunyuanVideoTransformerBlock,
+)
+from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
+from transformers.models.clip.modeling_clip import CLIPEncoderLayer
+from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
+from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
+from transformers.models.t5.modeling_t5 import T5Block
+
 torch._dynamo.config.cache_size_limit = 8192
 
 def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
@@ -47,15 +65,24 @@ def _generate_call_index() -> int:
     return __current_call_index
 
 
-class CheckpointLayer(torch.nn.Module):
-    def __init__(self, orig: nn.Module, train_device: torch.device):
+class BaseCheckpointLayer(torch.nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class CheckpointLayer(BaseCheckpointLayer):
+    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device):
         super().__init__()
-        self.checkpoint = orig
+
+        assert (orig_module is None or orig_forward is None) and not (orig_module is None and orig_forward is None)
+        self.checkpoint = orig_module
+        self.orig_forward = orig_forward
+
         # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
 
     def __checkpointing_forward(self, dummy: torch.Tensor, *args, **kwargs):
-        return self.checkpoint(*args, **kwargs)
+        return self.orig_forward(*args, **kwargs) if self.checkpoint is None else self.checkpoint(*args, **kwargs)
 
     def forward(self, *args, **kwargs):
         if torch.is_grad_enabled():
@@ -67,12 +94,16 @@ class CheckpointLayer(torch.nn.Module):
                 use_reentrant=False
             )
         else:
-            return self.checkpoint(*args, **kwargs)
+            return self.orig_forward(*args, **kwargs) if self.checkpoint is None else self.checkpoint(*args, **kwargs)
 
-class OffloadCheckpointLayer(torch.nn.Module):
-    def __init__(self, orig: nn.Module, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int):
+class OffloadCheckpointLayer(BaseCheckpointLayer):
+    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int):
         super().__init__()
-        self.checkpoint = orig
+
+        assert (orig_module is None or orig_forward is None) and not (orig_module is None and orig_forward is None)
+        self.checkpoint = orig_module
+        self.orig_forward = orig_forward
+
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
         self.conductor = conductor
         self.layer_index = layer_index
@@ -83,7 +114,8 @@ class OffloadCheckpointLayer(torch.nn.Module):
             self.conductor.start_forward(True)
 
         args = self.conductor.before_layer(self.layer_index, call_id, args)
-        output = self.checkpoint(*args)
+        output = self.orig_forward(*args) if self.checkpoint is None else self.checkpoint(*args)
+
         self.conductor.after_layer(self.layer_index, call_id, args)
 
         # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
@@ -97,7 +129,7 @@ class OffloadCheckpointLayer(torch.nn.Module):
 
     def forward(self, *args, **kwargs):
         call_id = _generate_call_index()
-        args = _kwargs_to_args(self.checkpoint.forward, args, kwargs)
+        args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
 
         if torch.is_grad_enabled():
             return checkpoint(
@@ -112,7 +144,7 @@ class OffloadCheckpointLayer(torch.nn.Module):
                 self.conductor.start_forward(False)
 
             args = self.conductor.before_layer(self.layer_index, call_id, args)
-            output = self.checkpoint(*args)
+            output = self.orig_forward(*args) if self.checkpoint is None else self.checkpoint(*args)
             self.conductor.after_layer(self.layer_index, call_id, args)
             return output
 
@@ -123,7 +155,6 @@ def create_checkpoint(
         conductor: LayerOffloadConductor | None = None,
         layer_index: int = 0,
         compile: bool = False,
-        enabled: bool = True,
 ) -> Callable:
     if include_from_offload_param_names is None:
         include_from_offload_param_names = []
@@ -133,16 +164,26 @@ def create_checkpoint(
         conductor.add_layer(orig_module, included_offload_param_indices)
 
     if conductor is not None and conductor.offload_activated():
-        layer = OffloadCheckpointLayer(orig_module, train_device, conductor, layer_index)
         if compile:
+            layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index)
             #don't compile the checkpointing layer - offloading cannot be compiled:
             orig_module.compile(fullgraph=True)
+            return layer
+        else:
+            #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model
+            layer = OffloadCheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, conductor=conductor, layer_index=layer_index)
+            orig_module.forward = layer.forward
+            return orig_module
     else:
-        layer = CheckpointLayer(orig_module, train_device) if enabled else orig_module
         if compile:
+            layer = CheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device)
             #do compile the checkpointing layer - slightly faster
             layer.compile(fullgraph=True)
-    return layer
+            return layer
+        else:
+            layer = CheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device)
+            orig_module.forward = layer.forward
+            return orig_module
 
 def _create_checkpoints_for_module_list(
         module_list: nn.ModuleList,
@@ -154,6 +195,8 @@ def _create_checkpoints_for_module_list(
 ) -> int:
 
     for i, layer in enumerate(module_list):
+        if isinstance(module_list[i], BaseCheckpointLayer):
+            continue
         module_list[i] = create_checkpoint(
                 layer, train_device,
                 include_from_offload_param_names,
@@ -162,6 +205,10 @@ def _create_checkpoints_for_module_list(
         layer_index += 1
     return layer_index
 
+def _remove_checkpoint_keys(module, state_dict, prefix, local_metadata):
+    for k in list(state_dict.keys()):
+        if ".checkpoint." in k:
+            state_dict[k.replace(".checkpoint.", ".")] = state_dict.pop(k)
 
 def enable_checkpointing(
         model: nn.Module,
@@ -173,27 +220,43 @@ def enable_checkpointing(
     conductor = LayerOffloadConductor(model, config)
 
     layer_index = 0
-    for module_list, param_names in lists:
-        layer_index = _create_checkpoints_for_module_list(
-            module_list,
-            param_names,
-            conductor if offload_enabled else None,
-            torch.device(config.train_device),
-            layer_index,
-            compile = compile,
-        )
+    for type_or_list, param_names in lists:
 
+        assert isinstance(type_or_list, (nn.ModuleList, type))
+        if isinstance(type_or_list, nn.ModuleList):
+            module_list = type_or_list
+            layer_index = _create_checkpoints_for_module_list(
+                module_list,
+                param_names,
+                conductor if offload_enabled else None,
+                torch.device(config.train_device),
+                layer_index,
+                compile = compile,
+            )
+        else:
+            t = type_or_list
+            for child_module in model.modules():
+                if isinstance(child_module, nn.ModuleList) and isinstance(child_module[0], t):
+                    module_list = child_module
+                    assert all(isinstance(m, t) for m in child_module)
+                    layer_index = _create_checkpoints_for_module_list(
+                        module_list,
+                        param_names,
+                        conductor if offload_enabled else None,
+                        torch.device(config.train_device),
+                        layer_index,
+                        compile = compile,
+                    )
+    model._register_state_dict_hook(_remove_checkpoint_keys)
     return conductor
 
-
-#TODO test all models
 def enable_checkpointing_for_basic_transformer_blocks(
         model: nn.Module,
         config: TrainConfig,
         offload_enabled: bool,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-            (model.transformer_blocks,        []),
+            (BasicTransformerBlock  ,        []),
         ],
         offload_enabled = offload_enabled,
     )
@@ -203,7 +266,7 @@ def enable_checkpointing_for_clip_encoder_layers(
         config: TrainConfig,
 ):
     return enable_checkpointing(model, config, False, [
-        (model.text_model.encoder.layers, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
+        (CLIPEncoderLayer, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
     ])
 
 def enable_checkpointing_for_stable_cascade_blocks(
@@ -211,8 +274,9 @@ def enable_checkpointing_for_stable_cascade_blocks(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (model.down_blocks, []),
-        (model.up_blocks, []),
+        (SDCascadeResBlock, []),
+        (SDCascadeAttnBlock, []),
+        (SDCascadeTimestepBlock, []),
     ])
 
 def enable_checkpointing_for_t5_encoder_layers(
@@ -220,7 +284,7 @@ def enable_checkpointing_for_t5_encoder_layers(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, False, [
-        (model.encoder.block, []),
+        (T5Block, []),
     ])
 
 
@@ -229,7 +293,7 @@ def enable_checkpointing_for_gemma_layers(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, False, [
-        (model.layers, []),
+        (Gemma2DecoderLayer, []),
     ])
 
 
@@ -238,7 +302,7 @@ def enable_checkpointing_for_llama_encoder_layers(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, False, [
-        (model.model.layers, []),
+        (LlamaDecoderLayer, []),
     ])
 
 def enable_checkpointing_for_qwen_encoder_layers(
@@ -246,7 +310,7 @@ def enable_checkpointing_for_qwen_encoder_layers(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, False, [
-        (model.model.language_model.layers, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+        (Qwen2_5_VLDecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
     ])
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
@@ -254,7 +318,7 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (JointTransformerBlock, ["hidden_states", "encoder_hidden_states"]),
     ])
 
 def enable_checkpointing_for_flux_transformer(
@@ -291,7 +355,7 @@ def enable_checkpointing_for_sana_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (model.transformer_blocks, ["hidden_states"]),
+        (SanaTransformerBlock, ["hidden_states"]),
     ])
 
 def enable_checkpointing_for_hunyuan_video_transformer(
@@ -299,9 +363,9 @@ def enable_checkpointing_for_hunyuan_video_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (model.context_embedder.token_refiner.refiner_blocks, ["hidden_states"                         ]),
-        (model.transformer_blocks,                            ["hidden_states", "encoder_hidden_states"]),
-        (model.single_transformer_blocks,                     ["hidden_states"                         ]),
+        (HunyuanVideoIndividualTokenRefinerBlock, ["hidden_states"                         ]),
+        (HunyuanVideoTransformerBlock,            ["hidden_states", "encoder_hidden_states"]),
+        (HunyuanVideoSingleTransformerBlock,      ["hidden_states"                         ]),
     ])
 
 def enable_checkpointing_for_hi_dream_transformer(
@@ -309,6 +373,6 @@ def enable_checkpointing_for_hi_dream_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (model.double_stream_blocks, ["hidden_states", "encoder_hidden_states"]),
-        (model.single_stream_blocks, ["hidden_states"                         ]),
+        (HiDreamImageTransformerBlock,       ["hidden_states", "encoder_hidden_states"]),
+        (HiDreamImageSingleTransformerBlock, ["hidden_states"                         ]),
     ])

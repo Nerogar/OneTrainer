@@ -19,7 +19,6 @@ class LinearFp8(
         self.fp8_dtype = torch.float8_e4m3fn
         self._scale = torch.tensor(1.0, dtype=torch.float)
         self.register_buffer("scale", self._scale)
-
         self.compute_dtype = None
 
     def original_weight_shape(self) -> tuple[int, ...]:

@@ -1,44 +1,65 @@
+
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.triton_mm_8bit import mm_8bit as triton_mm_8bit
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 
 
-def quantize_int8_tensorwise(x):
+def quantize_int8(x: Tensor, scale: float | Tensor) -> Tensor:
+    q = x.float().mul(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
+    return q
+
+def quantize_int8_tensorwise_get_scale(x: Tensor) -> float:
     abs_max = x.abs().max()
     scale = (abs_max.float() / 127.0).clamp(min=1e-12)
-    q = x.float().mul_(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
+    return scale
+
+def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
+    scale = quantize_int8_tensorwise_get_scale(x)
+    q = quantize_int8(x, scale)
     return q, scale
 
-
-def quantize_int8_channelwise(x, dim=-1):
-    abs_max = x.abs().amax(dim=dim, keepdim=True)
+def quantize_int8_tokenwise_get_scale(x: Tensor) -> Tensor:
+    abs_max = x.abs().amax(dim=-1, keepdim=True)
     scale = (abs_max.float() / 127.0).clamp(min=1e-12)
-    q = x.float().mul_(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
+    return scale
+
+def quantize_int8_tokenwise(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_int8_tokenwise_get_scale(x)
+    q = quantize_int8(x, scale)
     return q, scale
 
+def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
+    q = x.float().mul(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
+    return q
 
-def quantize_fp8_tensorwise(x):
+def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
     abs_max = x.abs().max()
     scale = (abs_max.float() / 448.0).clamp(min=1e-12)
-    q = x.float().mul_(1.0 / scale).round().clamp(-448.0, 448.0).to(torch.float8_e4m3fn)
-    return q, scale
+    return scale
 
-
-def quantize_fp8_channelwise(x, dim=-1):
-    abs_max = x.abs().amax(dim=dim, keepdim=True)
+def quantize_fp8_tokenwise_get_scale(x: Tensor) -> Tensor:
+    abs_max = x.abs().amax(dim=-1, keepdim=True)
     scale = (abs_max.float() / 448.0).clamp(min=1e-12)
-    q = x.float().mul_(1.0 / scale).round_().clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
+    return scale
+
+def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
+    scale = quantize_fp8_tensorwise_get_scale(x)
+    q = quantize_fp8(x, scale)
     return q, scale
 
+def quantize_fp8_tokenwise(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_tokenwise_get_scale(x)
+    q = quantize_fp8(x, scale)
+    return q, scale
 
-def unquantize(q, scale, compute_dtype):
-    return q.to(compute_dtype).mul_(scale)
+def unquantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> Tensor:
+    return q.to(compute_dtype) * scale.to(compute_dtype)
 
-def int8_forward_channelwise(x, weight, weight_scale, bias=None):
-    x_8, x_scale = quantize_int8_channelwise(x)
+def int8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
+    x_8, x_scale = quantize_int8_tokenwise(x)
     res = torch._int_mm(x_8, weight.T)
     res_scaled = res.to(x.dtype).mul_(weight_scale * x_scale)
     if bias is not None:
@@ -46,65 +67,63 @@ def int8_forward_channelwise(x, weight, weight_scale, bias=None):
     return res_scaled
 
 
-def fp8_forward_channelwise(x, weight, weight_scale, bias=None):
-    x_8, x_scale = quantize_fp8_channelwise(x)
+def fp8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
+    x_8, x_scale = quantize_fp8_tokenwise(x)
     one = torch.ones(1, device=x.device)
-    res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=x.dtype)
+    #res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=x.dtype) #FIXME TODO test difference
+    res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=torch.float32)
     res_scaled = res.mul_(x_scale) #much faster than scaled by _scaled_mm
+
+    res_scaled = res_scaled.to(x.dtype) #FIXME
     if bias is not None:
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
 
 
-def apply_scale(mm_res, weight_scale, x_scale, compute_dtype):
-    return mm_res.to(compute_dtype).mul_(weight_scale * x_scale)
-
-def int8_backward_W_tensorwise_A_channelwise(x, weight, weight_scale):
-    x_8, x_scale = quantize_int8_channelwise(x)
+def int8_backward_W_tensorwise_A_columnwise(x: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
+    x_8, x_scale = quantize_int8_tokenwise(x)
     mm_res = triton_mm_8bit(x_8, weight)
-    return apply_scale(mm_res, weight_scale, x_scale, compute_dtype=x.dtype)
+    return mm_res.to(x.dtype).mul_(weight_scale * x_scale)
 
-def fp8_backward_W_tensorwise_A_channelwise(x, weight, weight_scale):
-    x_8, x_scale = quantize_fp8_channelwise(x)
+def fp8_backward_W_tensorwise_A_columnwise(x: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
+    x_8, x_scale = quantize_fp8_tokenwise(x)
     mm_res = triton_mm_8bit(x_8, weight)
-    return apply_scale(mm_res, weight_scale, x_scale, compute_dtype=x.dtype)
+    return mm_res.to(x.dtype).mul_(weight_scale * x_scale)
 
 
 class LinearInt8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, weight, weight_scale, bias):
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None) -> Tensor:
         ctx.save_for_backward(weight, weight_scale)
-        return int8_forward_channelwise(x, weight, weight_scale, bias)
+        return int8_forward_tokenwise(x, weight, weight_scale, bias)
 
     @staticmethod
-    def backward(ctx, x):
+    def backward(ctx, x: Tensor):
         if ctx.needs_input_grad != (True, False, False, False):
             raise NotImplementedError("Int A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        return int8_backward_W_tensorwise_A_channelwise(x, weight, weight_scale), None, None, None
+        return int8_backward_W_tensorwise_A_columnwise(x, weight, weight_scale), None, None, None
 
 class LinearFp8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, weight, weight_scale, bias):
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None) -> Tensor:
         ctx.save_for_backward(weight, weight_scale)
-        return fp8_forward_channelwise(x.bfloat16(), weight, weight_scale, bias).bfloat16()
+        return fp8_forward_tokenwise(x.bfloat16(), weight, weight_scale, bias).bfloat16()
 
     @staticmethod
-    def backward(ctx, x):
+    def backward(ctx, x: Tensor):
         if ctx.needs_input_grad != (True, False, False, False):
-            raise NotImplementedError("Float W8A8 cannot be used for full finetuning")
+            raise NotImplementedError("Float A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        return fp8_backward_W_tensorwise_A_channelwise(x, weight, weight_scale), None, None, None
+        return fp8_backward_W_tensorwise_A_columnwise(x, weight, weight_scale), None, None, None
 
 class LinearW8A8(
     nn.Linear,
     QuantizedModuleMixin,
     QuantizedLinearMixin,
 ):
-    is_quantized: bool
-
     def __init__(self, dtype, compute_dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -112,27 +131,25 @@ class LinearW8A8(
         self._dtype = dtype
         self._compute_dtype = compute_dtype
 
-        self.register_buffer("scale", None)
-
+        self.__is_quantized = False
+        self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
     def original_weight_shape(self) -> tuple[int, ...]:
         return self.weight.shape
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
-        if self.scale is not None:
-            return unquantize(self.weight.detach(), self.scale, self._compute_dtype).to(dtype)
-        else:
-            return self.weight.detach().to(dtype)
+        return unquantize(self.weight.detach(), self.scale, self._compute_dtype).to(dtype)
 
+    @torch.no_grad()
     def quantize(self, device: torch.device | None = None, **kwargs):
-        if self.scale is not None:
+        if self.__is_quantized:
             return
+        self.__is_quantized = True
 
         weight = self.weight.detach()
         orig_device = weight.device
         if device is not None:
             weight = weight.to(device=device)
-
         if self._dtype == torch.int8:
             weight, scale = quantize_int8_tensorwise(weight)
         else:
@@ -140,13 +157,20 @@ class LinearW8A8(
 
         if device is not None:
             weight = weight.to(device=orig_device)
-            scale = scale.to(device=orig_device)
 
-        self.weight = nn.Parameter(weight, requires_grad=False)
-        self.register_buffer("scale", scale)
+        self.requires_grad_(False)
+        self.weight.data = weight
+
+        self.scale.copy_(scale)
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
+        #calculate validation loss using 16 bit math:
+        #if not self.training:
+        #    w = unquantize(self.weight, self.scale, compute_dtype=x_orig.dtype)
+        #    return torch.nn.functional.linear(x_orig, w, self.bias)
+
         assert not self.weight.requires_grad
+        assert self.__is_quantized
         x = x_orig.to(self._compute_dtype).reshape(-1, x_orig.shape[-1])
 
         if x.shape[0] > 16:
@@ -159,9 +183,56 @@ class LinearW8A8(
             y = torch.nn.functional.linear(x, w, self.bias.to(self._compute_dtype))
 
         assert y.dtype == self._compute_dtype
-        return y.reshape(x_orig.shape[:-1] + (self.weight.shape[0], ))
+        return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
+
+class LinearRequantInt8Function(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x: Tensor, weight_orig: Tensor, bias: Tensor | None) -> Tensor:
+        weight, weight_scale = quantize_int8_tensorwise(weight_orig)
+        ctx.save_for_backward(weight, weight_scale)
+        return int8_forward_tokenwise(x, weight, weight_scale, bias)
+
+    @staticmethod
+    def backward(ctx, x: Tensor):
+        if ctx.needs_input_grad != (True, False, False):
+            raise NotImplementedError("NF4 cannot be used for full finetuning")
+
+        weight, weight_scale = ctx.saved_tensors
+        return int8_backward_W_tensorwise_A_columnwise(x, weight, weight_scale), None, None, None
 
 
+def make_requant(linear_class):
+    class LinearRequantA8(linear_class):
+        def __init__(self, dtype, compute_dtype, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+            assert dtype in [torch.int8, torch.float8_e4m3fn]
+            self._dtype = dtype
+            self._compute_dtype = compute_dtype
+
+        def quantize(self, device: torch.device | None = None, **kwargs):
+            super().quantize(device, **kwargs)
+
+        def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
+            #calculate validation loss using 16 bit math:
+            #if not self.training:
+            #    w = super().unquantized_weight(dtype=self._compute_dtype, device=x_orig.device)
+            #    return torch.nn.functional.linear(x_orig, w, self.bias)
+
+            assert not self.weight.requires_grad
+            x = x_orig.to(self._compute_dtype).reshape(-1, x_orig.shape[-1])
+            w = super().unquantized_weight(dtype=self._compute_dtype, device=x.device)
+            if x.shape[0] > 16:
+                if self._dtype == torch.int8:
+                    y = LinearRequantInt8Function.apply(x, w, self.bias)
+                else:
+                    raise NotImplementedError
+            else:
+                y = torch.nn.functional.linear(x, w, self.bias.to(self._compute_dtype))
+
+            assert y.dtype == self._compute_dtype
+            return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
+    return LinearRequantA8
 
 
 def run_benchmark(fn, desc, steps=10000, warmup=500):
@@ -175,9 +246,7 @@ def run_benchmark(fn, desc, steps=10000, warmup=500):
 
 
 @torch.no_grad()
-def benchmark_int8(m, k, n, device = "cuda"):
-    device = "cuda"
-
+def benchmark_int8(m, k, n, device = 'cuda'):
     x   = torch.randn(m,k, device=device, dtype=torch.bfloat16)
     x_8 = torch.ones (m,k, device=device, dtype=torch.int8)
     y   = torch.randn(m,n, device=device, dtype=torch.bfloat16)
@@ -193,12 +262,12 @@ def benchmark_int8(m, k, n, device = "cuda"):
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward int8")
     run_benchmark(lambda: triton_mm_8bit(y_8, w_8), "triton mm backward int8")
 
-    run_benchmark(lambda: int8_forward_channelwise(x, w_8, w_scale), "torch forward int")
-    run_benchmark(lambda: int8_backward_W_tensorwise_A_channelwise(y, w_8, w_scale), "triton backward int")
+    run_benchmark(lambda: int8_forward_tokenwise(x, w_8, w_scale), "torch forward int")
+    run_benchmark(lambda: int8_backward_W_tensorwise_A_columnwise(y, w_8, w_scale), "triton backward int")
 
 
 @torch.no_grad()
-def benchmark_fp8(m, k, n, device = "cuda"):
+def benchmark_fp8(m, k, n, device = 'cuda'):
     x   = torch.randn(m,k, device=device, dtype=torch.bfloat16)
     x_8 = torch.ones (m,k, device=device, dtype=torch.float8_e4m3fn)
     y   = torch.randn(m,n, device=device, dtype=torch.bfloat16)
@@ -213,8 +282,8 @@ def benchmark_fp8(m, k, n, device = "cuda"):
         torch._scaled_mm(a, b.T.contiguous().T, out_dtype=torch.bfloat16, scale_a=one_scale.float(), scale_b=w_scale.float())
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward fp8")
     run_benchmark(lambda: triton_mm_8bit(y_8, w_8), "triton mm backward fp8")
-    run_benchmark(lambda: fp8_forward_channelwise(x, w_8, w_scale), "torch forward fp8")
-    run_benchmark(lambda: fp8_backward_W_tensorwise_A_channelwise(y, w_8, w_scale), "triton backward fp8")
+    run_benchmark(lambda: fp8_forward_tokenwise(x, w_8, w_scale), "torch forward fp8")
+    run_benchmark(lambda: fp8_backward_W_tensorwise_A_columnwise(y, w_8, w_scale), "triton backward fp8")
 
 
 if __name__ == "__main__":

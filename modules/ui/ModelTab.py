@@ -274,7 +274,7 @@ class ModelTab:
                 ("float8 (W8) SVDQuant", DataType.FLOAT_8_SVD),
                 ("float W8A8 SVDQuant", DataType.FLOAT_W8A8_SVD),
                 ("int W8A8 SVDQuant", DataType.INT_W8A8_SVD),
-                ("nfloat4 SVDQuant", DataType.NFLOAT_4_SVD),
+                ("nf4 -> int W8A8 SVD", DataType.NFLOAT_4_SVD),
             ]
 
         if include_none:
