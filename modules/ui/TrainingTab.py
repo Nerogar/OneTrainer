@@ -739,6 +739,11 @@ class TrainingTab:
                          tooltip="Log - Hyperbolic cosine Error strength for custom loss settings.")
         components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength")
 
+        # Huber Strength
+        components.label(frame, 2, 0, "Huber Strength",
+                         tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE.")
+        components.entry(frame, 2, 1, self.ui_state, "huber_loss_strength")
+
         if supports_vb_loss:
             # VB Strength
             components.label(frame, 3, 0, "VB Strength",
