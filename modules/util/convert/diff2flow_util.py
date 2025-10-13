@@ -75,10 +75,18 @@ def _df_convert_fm_t_to_dm_t(self, t):
     rectified_alphas_cumprod_full = self.df_rectified_alphas_cumprod_full.clone().to(t.device)
     rectified_alphas_cumprod_full = torch.flip(rectified_alphas_cumprod_full, [0])
     right_index = torch.searchsorted(rectified_alphas_cumprod_full, t, right=True)
+    # Clamp the index to be within the valid range of the tensor.
+    # This handles the edge case where t=1.0.
+    right_index.clamp_max_(rectified_alphas_cumprod_full.shape[0] - 1)
     left_index = right_index - 1
+    # Fix t=0.0 extrapolation by clamping the lower bound of left_index.
+    left_index.clamp_min_(0)
     right_value = rectified_alphas_cumprod_full[right_index]
     left_value = rectified_alphas_cumprod_full[left_index]
-    dm_t = left_index + (t - left_value) / (right_value - left_value)
+    # Prevent division by zero when left_value == right_value (at t=0.0)
+    denominator = right_value - left_value
+    denominator = torch.where(denominator == 0, 1e-6, denominator)
+    dm_t = left_index + (t - left_value) / denominator
     dm_t = self.noise_scheduler.config.num_train_timesteps - dm_t
     return dm_t
 
