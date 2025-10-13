@@ -558,7 +558,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        if sample_config.diff2flow and sample_config.sample_inpainting:
+        if sample_config.diffusion_to_flow_matching and sample_config.sample_inpainting:
             raise NotImplementedError(
                 "Diff2Flow sampling is not currently implemented for inpainting models."
             )
