@@ -4,7 +4,7 @@ from functools import partial
 
 from modules.module.quantized.LinearFp8 import LinearFp8
 from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
-from modules.module.quantized.LinearW8A8 import LinearW8A8, make_requant
+from modules.module.quantized.LinearW8A8 import LinearW8A8
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import TrainConfig
@@ -104,7 +104,7 @@ def replace_linear_with_quantized_layers(
         copy_parameters: bool = False,
 ):
     if dtype.quantize_nf4():
-        construct_fn = partial(make_svd_linear(make_requant(LinearNf4)), dtype=torch.int8, compute_dtype=torch.bfloat16) if dtype.quantize_svd() else LinearNf4
+        construct_fn = make_svd_linear(LinearNf4) if dtype.quantize_svd() else LinearNf4
     elif dtype.quantize_int8():
         construct_fn = partial(make_svd_linear(bnb.nn.Linear8bitLt) if dtype.quantize_svd() else bnb.nn.Linear8bitLt, has_fp16_weights=False)
     elif dtype.quantize_fp8():

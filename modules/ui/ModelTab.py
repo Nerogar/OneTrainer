@@ -264,7 +264,7 @@ class ModelTab:
             ("float16", DataType.FLOAT_16),
             ("float8 (W8)", DataType.FLOAT_8),
             ("float W8A8", DataType.FLOAT_W8A8),
-            #("int W8A8", DataType.INT_W8A8),
+            #("int W8A8", DataType.INT_W8A8), #not recommended
             # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
@@ -274,7 +274,7 @@ class ModelTab:
                 ("float8 (W8) SVDQuant", DataType.FLOAT_8_SVD),
                 ("float W8A8 SVDQuant", DataType.FLOAT_W8A8_SVD),
                 ("int W8A8 SVDQuant", DataType.INT_W8A8_SVD),
-                ("nf4 -> int W8A8 SVD", DataType.NFLOAT_4_SVD),
+                ("nfloat4 SVD", DataType.NFLOAT_4_SVD),
             ]
 
         if include_none:

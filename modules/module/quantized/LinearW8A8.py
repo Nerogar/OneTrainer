@@ -70,11 +70,9 @@ def int8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: floa
 def fp8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_fp8_tokenwise(x)
     one = torch.ones(1, device=x.device)
-    #res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=x.dtype) #FIXME TODO test difference
-    res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=torch.float32)
+    res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=x.dtype)
     res_scaled = res.mul_(x_scale) #much faster than scaled by _scaled_mm
 
-    res_scaled = res_scaled.to(x.dtype) #FIXME
     if bias is not None:
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
