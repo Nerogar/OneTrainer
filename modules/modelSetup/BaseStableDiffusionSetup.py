@@ -170,13 +170,13 @@ class BaseStableDiffusionSetup(
             scaled_latent_image = latent_image * vae_scaling_factor
 
             if config.diff2flow:
-                # Sample continuous time t from U(0, 1)
-                t_continuous = torch.rand(
+                # Sample continuous time t
+                t_continuous = self._get_timestep_continuous(
+                    deterministic,
+                    generator,
                     scaled_latent_image.shape[0],
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype()
-                )
-
+                    config,
+                 )
                 latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
                 # Ground truth velocity field: u_t(x) = x_1 - x_0
