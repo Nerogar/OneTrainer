@@ -763,8 +763,9 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
     def __training_thread_function(self):
         error_caught = False
 
-        # Start Tensorboard if in TRAIN_ONLY mode
-        if self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
+        # Start Tensorboard if TRAIN_ONLY mode and not cloud tunnel
+        if (self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY and
+            not (self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel)):
             self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
 
         self.training_callbacks = TrainCallbacks(
@@ -801,12 +802,15 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             self.on_update_status("Stopped")
         self.delete_eta_label()
 
-        # Stop Tensorboard if it was in TRAIN_ONLY mode
-        if self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
+        # Stop Tensorboard if TRAIN_ONLY mode
+        if (self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY and
+            not (self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel)):
             self._stop_always_on_tensorboard()
 
-        # Restart if ALWAYS_ON mode (in case it was stopped during training)
-        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON and self.always_on_tensorboard_subprocess is None:
+        # Restart if ALWAYS_ON mode
+        if (self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON and
+            self.always_on_tensorboard_subprocess is None
+            and not (self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel)):
             self.after(0, self._start_always_on_tensorboard)
 
         self.after(0, self._set_training_button_idle)
@@ -857,6 +861,10 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             train_commands.save()
 
     def _start_always_on_tensorboard(self):
+        # stop if cloud tunnel
+        if self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel:
+            return
+
         if self.always_on_tensorboard_subprocess is None:
             self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
 

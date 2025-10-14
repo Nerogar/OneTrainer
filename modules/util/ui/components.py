@@ -1,5 +1,6 @@
 import contextlib
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog
 from typing import Any
 
@@ -283,6 +284,19 @@ def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Ca
         is_output = getattr(meta, 'is_output', False)
 
     def validate_dir_path_wrapper(value: str) -> tuple[bool, str]:
+        # trim whitespaces from the last path component, nothing else
+        if not value:
+            return validate_file_path(value, is_output=is_output, valid_extensions=None, path_type="directory")
+
+        path = Path(value)
+        trimmed_name = path.name.strip()
+
+        if trimmed_name != path.name:
+            sep = '\\' if '\\' in value else '/'
+            trimmed_path = f"{path.parent}{sep}{trimmed_name}" if str(path.parent) != '.' else trimmed_name
+            ui_state.get_var(var_name).set(trimmed_path)
+            value = trimmed_path
+
         return validate_file_path(value, is_output=is_output, valid_extensions=None, path_type="directory")
 
     entry_widget = entry(
