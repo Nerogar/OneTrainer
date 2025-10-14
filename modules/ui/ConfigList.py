@@ -8,7 +8,7 @@ from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.path_util import write_json_atomic
-from modules.util.ui import components, dialogs
+from modules.util.ui import components, dialogs, ui_utils
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -128,6 +128,14 @@ class ConfigList(metaclass=ABCMeta):
         )
         self._update_toggle_button_text()
 
+    def _create_placeholder(self):
+        placeholder = ctk.CTkLabel(
+            self.element_list,
+            text="Either click the 'Add Concept' button or drag and drop a directory here to add a new concept",
+            text_color="gray50"
+        )
+        placeholder.grid(row=0, column=0, padx=20, pady=20)
+
     def _create_element_list(self):
         if not self.from_external_file:
             self.current_config = getattr(self.train_config, self.attr_name)
@@ -142,6 +150,9 @@ class ConfigList(metaclass=ABCMeta):
         if self.is_full_width:
             self.element_list.grid_columnconfigure(0, weight=1)
 
+        if len(self.current_config) == 0:
+            self._create_placeholder()
+
         for i, element in enumerate(self.current_config):
             widget = self.create_widget(
                 self.element_list, element, i,
@@ -154,6 +165,21 @@ class ConfigList(metaclass=ABCMeta):
 
             widget.place_in_list()
 
+        ui_utils.register_concept_drop_target(self.master, self.__handle_dir_drop)
+
+    def __handle_dir_drop(self, dir_path: str):
+        if any(hasattr(el, 'path') and el.path == dir_path for el in self.current_config):
+            return
+
+        new_element = self.create_new_element()
+
+        if hasattr(new_element, 'path'):
+            new_element.path = dir_path
+
+        self.current_config.append(new_element)
+        self._create_element_list()
+        self.save_current_config()
+
     def __load_available_config_names(self):
         if os.path.isdir(self.config_dir):
             for path in os.listdir(self.config_dir):
@@ -161,6 +187,7 @@ class ConfigList(metaclass=ABCMeta):
                 if path.endswith(".json") and os.path.isfile(path):
                     name = os.path.basename(path)
                     name = os.path.splitext(name)[0]
+                    name = path_util.safe_filename(name)
                     self.configs.append((name, path))
 
         if len(self.configs) == 0:
@@ -177,11 +204,16 @@ class ConfigList(metaclass=ABCMeta):
     def __add_config(self):
         dialogs.StringInputDialog(self.master, "name", "Name", self.__create_config)
 
-    def __add_element(self):
+    def __add_element_to_list(self, new_element):
         i = len(self.current_config)
-        new_element = self.create_new_element()
+
+        # placeholder removal
+        if i == 0:
+            for child in self.element_list.winfo_children():
+                child.destroy()
 
         self.current_config.append(new_element)
+
         widget = self.create_widget(
             self.element_list, new_element, i,
             self.__open_element_window,
@@ -190,39 +222,31 @@ class ConfigList(metaclass=ABCMeta):
             self.save_current_config
         )
         self.widgets.append(widget)
-
         widget.place_in_list()
-
         self.save_current_config()
 
+    def __add_element(self):
+        new_element = self.create_new_element()
+        self.__add_element_to_list(new_element)
+
     def __clone_element(self, clone_i, modify_element_fun=None):
-        i = len(self.current_config)
         new_element = copy.deepcopy(self.current_config[clone_i])
 
         if modify_element_fun is not None:
             new_element = modify_element_fun(new_element)
 
-        self.current_config.append(new_element)
-        widget = self.create_widget(
-            self.element_list, new_element, i,
-            self.__open_element_window,
-            self.__remove_element,
-            self.__clone_element,
-            self.save_current_config
-        )
-        self.widgets.append(widget)
-
-        widget.place_in_list()
-
-        self.save_current_config()
+        self.__add_element_to_list(new_element)
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
         self.widgets.pop(remove_i).destroy()
 
-        for i, widget in enumerate(self.widgets):
-            widget.i = i
-            widget.place_in_list()
+        if len(self.current_config) == 0:
+            self._create_placeholder()
+        else:
+            for i, widget in enumerate(self.widgets):
+                widget.i = i
+                widget.place_in_list()
 
         self.save_current_config()
 
