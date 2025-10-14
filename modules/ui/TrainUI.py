@@ -1,6 +1,8 @@
+import contextlib
 import ctypes
 import datetime
 import json
+import logging
 import platform
 import threading
 import time
@@ -46,6 +48,8 @@ import torch
 
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
+
+logger = logging.getLogger(__name__)
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
@@ -131,10 +135,23 @@ class TrainUI(ctk.CTk):
 
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
-        self._initialize_tensorboard()
+        self._previous_tensorboard_mode = self.train_config.tensorboard_mode
 
-        self.workspace_dir_trace_id = self.ui_state.add_var_trace("workspace_dir", self._on_workspace_dir_change_trace)
-        self.tensorboard_mode_trace_id = self.ui_state.add_var_trace("tensorboard_mode", self._on_tensorboard_mode_change)
+        # Initialize tensorboard if needed
+        if self._previous_tensorboard_mode == TensorboardMode.ALWAYS_ON:
+            self._start_always_on_tensorboard()
+
+        # Add debounced trace for workspace_dir changes
+        self.workspace_dir_debounce_id = None
+        self.workspace_dir_trace_id = self.ui_state.add_var_trace(
+            "workspace_dir",
+            lambda: self._on_workspace_dir_change_debounced()
+        )
+
+        self.tensorboard_mode_trace_id = self.ui_state.add_var_trace(
+            "tensorboard_mode",
+            lambda: self._on_tensorboard_mode_change()
+        )
 
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
@@ -241,7 +258,8 @@ class TrainUI(ctk.CTk):
         # workspace dir
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", command=self._on_workspace_dir_change)
+        # Remove command parameter - we'll use the trace instead for debouncing
+        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir")
 
         # cache dir
         components.label(frame, 0, 2, "Cache Directory",
@@ -746,6 +764,10 @@ class TrainUI(ctk.CTk):
     def __training_thread_function(self):
         error_caught = False
 
+        # Start Tensorboard if in TRAIN_ONLY mode
+        if self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
+            self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
+
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
             on_update_status=self.on_update_status,
@@ -780,11 +802,15 @@ class TrainUI(ctk.CTk):
             self.on_update_status("Stopped")
         self.delete_eta_label()
 
-        # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
-        self.after(0, self._set_training_button_idle)
+        # Stop Tensorboard if it was in TRAIN_ONLY mode
+        if self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
+            self._stop_always_on_tensorboard()
 
-        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON and not self.always_on_tensorboard_subprocess:
+        # Restart if ALWAYS_ON mode (in case it was stopped during training)
+        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON and self.always_on_tensorboard_subprocess is None:
             self.after(0, self._start_always_on_tensorboard)
+
+        self.after(0, self._set_training_button_idle)
 
     def start_training(self):
         if self.training_thread is None:
@@ -831,46 +857,61 @@ class TrainUI(ctk.CTk):
         if train_commands:
             train_commands.save()
 
-    def _initialize_tensorboard(self):
-        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            self._start_always_on_tensorboard()
-
     def _start_always_on_tensorboard(self):
-        if not self.always_on_tensorboard_subprocess:
+        if self.always_on_tensorboard_subprocess is None:
             self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
 
     def _stop_always_on_tensorboard(self):
-        if self.always_on_tensorboard_subprocess:
+        if self.always_on_tensorboard_subprocess is not None:
             stop_tensorboard(self.always_on_tensorboard_subprocess)
             self.always_on_tensorboard_subprocess = None
 
-    def _restart_always_on_tensorboard(self):
-        """Restart always-on Tensorboard (for workspace directory changes)"""
+    def _on_workspace_dir_change_debounced(self, *args):
+        """Debounce workspace directory changes to avoid rapid restarts"""
+        if self.workspace_dir_debounce_id is not None:
+            with contextlib.suppress(Exception):
+                self.after_cancel(self.workspace_dir_debounce_id)
+        self.workspace_dir_debounce_id = self.after(1500, self._on_workspace_dir_change_actual)
+
+    def _on_workspace_dir_change_actual(self):
+        if (new := self.train_config.workspace_dir) == self.current_workspace_dir:
+            return
+        self.current_workspace_dir = new
         if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
+            logger.info("Restarting Tensorboard due to workspace change")
             self._stop_always_on_tensorboard()
             self._start_always_on_tensorboard()
 
-    def _on_tensorboard_mode_change(self, *args):
-        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            self._start_always_on_tensorboard()
-        else:
+    def _on_tensorboard_mode_change(self):
+        new_mode = self.train_config.tensorboard_mode
+        old_mode = self._previous_tensorboard_mode
+
+        if new_mode == old_mode:
+            return
+
+        logger.debug(f"Tensorboard mode changed: {old_mode} -> {new_mode}")
+
+        # If training is active, handle mode changes immediately
+        if self.training_thread is not None:
+            if new_mode == TensorboardMode.OFF:
+                # Stop tensorboard regardless of previous mode
+                self._stop_always_on_tensorboard()
+            elif old_mode == TensorboardMode.OFF:
+                # Turning it back on during training (works for both TRAIN_ONLY and ALWAYS_ON)
+                self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
+            # If switching between TRAIN_ONLY and ALWAYS_ON during training, keep running
+
+            self._previous_tensorboard_mode = new_mode
+            return
+
+        # Not training - manage normally
+        if old_mode == TensorboardMode.ALWAYS_ON:
             self._stop_always_on_tensorboard()
 
-    def _on_workspace_dir_change(self, new_workspace_dir: str):
-        if new_workspace_dir != self.current_workspace_dir:
-            self.current_workspace_dir = new_workspace_dir
-            # Restart always-on Tensorboard with new workspace directory if it's enabled
-            if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-                self._restart_always_on_tensorboard()
+        if new_mode == TensorboardMode.ALWAYS_ON:
+            self._start_always_on_tensorboard()
 
-    def _on_workspace_dir_change_trace(self, *args):
-        """Handle workspace directory changes via UI state trace"""
-        new_workspace_dir = self.train_config.workspace_dir
-        if new_workspace_dir != self.current_workspace_dir:
-            self.current_workspace_dir = new_workspace_dir
-
-            if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
+        self._previous_tensorboard_mode = new_mode
 
     def _set_training_button_style(self, mode: str):
         if not self.training_button:

@@ -10,7 +10,6 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.tensorboard_util import start_filtered_tensorboard, stop_tensorboard
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -79,18 +78,3 @@ class BaseTrainer(
             self.config.model_type,
             self.config.training_method
         )
-
-    def _start_tensorboard(self):
-        is_remote_with_tunnel = (self.config.cloud and self.config.cloud.tensorboard_tunnel)
-        if is_remote_with_tunnel:
-            print("Remote training with TensorBoard TCP tunnel enabled.")
-            self.tensorboard_subprocess = None
-        else:
-            print("Starting local TensorBoard instance.")
-            self.tensorboard_subprocess = start_filtered_tensorboard(self.config)
-
-    def _stop_tensorboard(self):
-        if self.tensorboard_subprocess:
-            print("Stopping local TensorBoard instance.")
-            stop_tensorboard(self.tensorboard_subprocess)
-            self.tensorboard_subprocess = None

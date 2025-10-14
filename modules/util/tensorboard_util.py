@@ -9,7 +9,9 @@ from modules.util.config.TrainConfig import TrainConfig
 
 
 def get_tensorboard_args(config: TrainConfig) -> list[str]:
-    """Get Tensorboard command line arguments"""
+    """
+    Generates args required to start Tensorboard
+    """
     tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
     tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
 
@@ -31,7 +33,7 @@ def get_tensorboard_args(config: TrainConfig) -> list[str]:
 
 
 def start_filtered_tensorboard(config: TrainConfig) -> subprocess.Popen | None:
-    """Start Tensorboard with filtered output"""
+    """Start Tensorboard filtering the annoying warnings Google doesnt plan to fix"""
     try:
         print("Starting Tensorboard please wait...")
         env = os.environ.copy()
@@ -75,9 +77,22 @@ def stop_tensorboard(process: subprocess.Popen | None):
     try:
         print("Stopping Tensorboard...")
         process.terminate()
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
+
+        try:
+            process.wait(timeout=5)
+            print("Tensorboard stopped.")
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(Exception):
+                process.kill()
+            try:
+                process.wait(timeout=5)
+                print("Tensorboard killed.")
+            except subprocess.TimeoutExpired:
+                print("Failed to kill Tensorboard within timeout.")
+
+    except Exception as e:
+        print(f"Error stopping Tensorboard: {e}")
+    finally:
         with contextlib.suppress(Exception):
-            process.kill()
-    except Exception:
-        pass
+            if process.stdout:
+                process.stdout.close()
