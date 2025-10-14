@@ -506,6 +506,7 @@ class TrainConfig(BaseConfig):
                 5: self.__migration_5,
                 6: self.__migration_6,
                 7: self.__migration_7,
+                8: self.__migration_8,
             }
         )
 
@@ -686,6 +687,18 @@ class TrainConfig(BaseConfig):
     def __migration_7(self, data: dict) -> dict:
         migrated_data = data.copy()
 
+        # Migrate lora_layers to layer_filter
+        if "lora_layers" in migrated_data:
+            migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
+        if "lora_layer_preset" in migrated_data:
+            migrated_data["layer_filter_preset"] = migrated_data.pop("lora_layer_preset")
+        if "lora_layers_regex" in migrated_data:
+            migrated_data["layer_filter_regex"] = migrated_data.pop("lora_layers_regex")
+
+        return migrated_data
+
+    def __migration_8(self, data: dict) -> dict:
+        migrated_data = data.copy()
         # Migrate old tensorboard booleans to enum
         tensorboard = migrated_data.pop("tensorboard", True)
         tensorboard_always_on = migrated_data.pop("tensorboard_always_on", False)
@@ -696,16 +709,6 @@ class TrainConfig(BaseConfig):
             migrated_data["tensorboard_mode"] = TensorboardMode.TRAIN_ONLY
         else:
             migrated_data["tensorboard_mode"] = TensorboardMode.OFF
-
-        # Migrate lora_layers to layer_filter
-        if "lora_layers" in migrated_data:
-            migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
-        if "lora_layer_preset" in migrated_data:
-            migrated_data["layer_filter_preset"] = migrated_data.pop("lora_layer_preset")
-        if "lora_layers_regex" in migrated_data:
-            migrated_data["layer_filter_regex"] = migrated_data.pop("lora_layers_regex")
-
-        return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
