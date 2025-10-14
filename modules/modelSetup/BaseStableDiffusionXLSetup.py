@@ -244,13 +244,13 @@ class BaseStableDiffusionXLSetup(
             added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
 
             if config.diff2flow:
-                # Sample continuous time t
-                t_continuous = self._get_timestep_continuous(
-                    deterministic,
-                    generator,
+                # Sample continuous time t from U(0, 1)
+                t_continuous = torch.rand(
                     scaled_latent_image.shape[0],
-                    config,
-                 )
+                    device=self.train_device,
+                    dtype=model.train_dtype.torch_dtype()
+                )
+
                 latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
                 # Ground truth velocity field: u_t(x) = x_1 - x_0
