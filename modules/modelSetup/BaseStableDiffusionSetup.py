@@ -170,14 +170,16 @@ class BaseStableDiffusionSetup(
             scaled_latent_image = latent_image * vae_scaling_factor
 
             if config.diff2flow:
-                # Sample continuous time t from U(0, 1)
-                t_continuous = torch.rand(
+                discrete_timestep = self._get_timestep_discrete(
+                    model.noise_scheduler.config['num_train_timesteps'],
+                    deterministic,
+                    generator,
                     scaled_latent_image.shape[0],
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype()
+                    config,
                 )
-
                 latent_noise = self._create_noise(scaled_latent_image, config, generator)
+
+                t_continuous = discrete_timestep / 1000
 
                 # Ground truth velocity field: u_t(x) = x_1 - x_0
                 target_velocity = scaled_latent_image - latent_noise
@@ -188,7 +190,7 @@ class BaseStableDiffusionSetup(
 
                 # Convert from Flow Matching (FM) space to Diffusion Model (DM) space
                 dm_t_continuous = model._df_convert_fm_t_to_dm_t(t_continuous)
-                dm_timestep = dm_t_continuous.round().long().clamp(0, model.noise_scheduler.config.num_train_timesteps - 1)
+                dm_timestep = dm_t_continuous.round().long().clamp(0, 999)
                 dm_x = model._df_convert_fm_xt_to_dm_xt(xt_flow, t_continuous)
 
                 # Predict noise/v using the UNet in diffusion space
