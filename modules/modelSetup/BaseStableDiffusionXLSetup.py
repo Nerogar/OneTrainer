@@ -266,12 +266,19 @@ class BaseStableDiffusionXLSetup(
                 dm_x = model._df_convert_fm_xt_to_dm_xt(xt_flow, t_continuous)
 
                 # Predict noise/v using the UNet in diffusion space
-                predicted_from_unet = model.unet(
-                    sample=dm_x.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep=dm_timestep,
-                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                    added_cond_kwargs=added_cond_kwargs,
-                ).sample
+                if config.model_type.has_depth_input():
+                    predicted_from_unet = model.unet(
+                        dm_x.to(dtype=model.train_dtype.torch_dtype()),
+                        dm_timestep,
+                        text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                        batch['latent_depth'].to(dtype=model.train_dtype.torch_dtype()),
+                    ).sample
+                else:
+                    predicted_from_unet = model.unet(
+                        dm_x.to(dtype=model.train_dtype.torch_dtype()),
+                        dm_timestep,
+                        text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    ).sample
 
                 # Convert UNet output (eps or v) back to the velocity field v_t in FM space
                 if model.noise_scheduler.config.prediction_type == 'v_prediction':
