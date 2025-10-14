@@ -222,7 +222,6 @@ def file_entry(
 
     frame.grid_columnconfigure(0, weight=1)
 
-    # Only use metadata as fallback if is_output wasn't explicitly set
     if not is_output:
         meta = ui_state.get_field_metadata(var_name)
         is_output = getattr(meta, 'is_output', False)
@@ -273,14 +272,18 @@ def file_entry(
     return frame
 
 
-def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None, is_output: bool = False):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
+    if not is_output:
+        meta = ui_state.get_field_metadata(var_name)
+        is_output = getattr(meta, 'is_output', False)
+
     def validate_dir_path_wrapper(value: str) -> tuple[bool, str]:
-        return validate_file_path(value, is_output=False, valid_extensions=None, path_type="directory")
+        return validate_file_path(value, is_output=is_output, valid_extensions=None, path_type="directory")
 
     entry_widget = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,

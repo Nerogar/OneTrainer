@@ -2,7 +2,6 @@ import contextlib
 import ctypes
 import datetime
 import json
-import logging
 import platform
 import threading
 import time
@@ -49,8 +48,6 @@ import torch
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
 from tkinterdnd2 import TkinterDnD
-
-logger = logging.getLogger(__name__)
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
@@ -261,12 +258,12 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
         # Remove command parameter - we'll use the trace instead for debouncing
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir")
+        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", is_output=True)
 
         # cache dir
         components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir")
+        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir", is_output=True)
 
         # continue from previous backup
         components.label(frame, 2, 0, "Continue from last backup",
@@ -285,7 +282,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
         components.label(frame, 4, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir")
+        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir", is_output=True)
 
         # tensorboard
         components.label(frame, 6, 0, "Tensorboard Mode",
@@ -880,7 +877,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             return
         self.current_workspace_dir = new
         if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            logger.info("Restarting Tensorboard due to workspace change")
+            print("Restarting Tensorboard due to workspace change")
             self._stop_always_on_tensorboard()
             self._start_always_on_tensorboard()
 
@@ -891,22 +888,18 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         if new_mode == old_mode:
             return
 
-        logger.debug(f"Tensorboard mode changed: {old_mode} -> {new_mode}")
-
-        # If training is active, handle mode changes immediately
+        # training
         if self.training_thread is not None:
             if new_mode == TensorboardMode.OFF:
-                # Stop tensorboard regardless of previous mode
                 self._stop_always_on_tensorboard()
             elif old_mode == TensorboardMode.OFF:
-                # Turning it back on during training (works for both TRAIN_ONLY and ALWAYS_ON)
+                # if user enabled during training, start it
                 self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
-            # If switching between TRAIN_ONLY and ALWAYS_ON during training, keep running
 
             self._previous_tensorboard_mode = new_mode
             return
 
-        # Not training - manage normally
+        # not training
         if old_mode == TensorboardMode.ALWAYS_ON:
             self._stop_always_on_tensorboard()
 
