@@ -140,7 +140,7 @@ class QwenModel(BaseModel):
             tokenizer_output = self.tokenizer(
                 text,
                 max_length=PROMPT_MAX_LENGTH + DEFAULT_PROMPT_TEMPLATE_CROP_START,
-                padding='longest',
+                padding='max_length',
                 truncation=True,
                 return_tensors="pt"
             )
@@ -168,9 +168,7 @@ class QwenModel(BaseModel):
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
 
-        #prune tokens that are masked in all batch samples
-        #this is still necessary even though we are using 'longest' padding, because cached
-        #encoder outputs by MGDS are always PROMPT_MAX_LENGTH
+        #prune tokens that are masked in all batch samples:
         #this is good for efficiency, but also FIXME currently required by the diffusers pipeline:
         #https://github.com/huggingface/diffusers/issues/12344
         seq_lengths = tokens_mask.sum(dim=1)
