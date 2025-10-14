@@ -710,6 +710,8 @@ class TrainConfig(BaseConfig):
         else:
             migrated_data["tensorboard_mode"] = TensorboardMode.OFF
 
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
