@@ -170,20 +170,13 @@ class BaseStableDiffusionSetup(
             scaled_latent_image = latent_image * vae_scaling_factor
 
             if config.diff2flow:
-                # Sample discrete timesteps for the diffusion model.
-                dm_timestep = self._get_timestep_discrete(
-                    model.noise_scheduler.config['num_train_timesteps'],
+                # Sample continuous time t
+                t_continuous = self._get_timestep_continuous(
                     deterministic,
                     generator,
                     scaled_latent_image.shape[0],
                     config,
-                )
-
-                # Convert discrete DM timesteps to continuous FM time `t`.
-                t_continuous = model.df_rectified_alphas_cumprod_full[dm_timestep + 1].to(
-                    dtype=scaled_latent_image.dtype
-                )
-
+                 )
                 latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
                 # Ground truth velocity field: u_t(x) = x_1 - x_0
@@ -194,6 +187,8 @@ class BaseStableDiffusionSetup(
                 xt_flow = (1 - t_reshaped) * latent_noise + t_reshaped * scaled_latent_image
 
                 # Convert from Flow Matching (FM) space to Diffusion Model (DM) space
+                dm_t_continuous = model._df_convert_fm_t_to_dm_t(t_continuous)
+                dm_timestep = dm_t_continuous.round().long().clamp(0, model.noise_scheduler.config.num_train_timesteps - 1)
                 dm_x = model._df_convert_fm_xt_to_dm_xt(xt_flow, t_continuous)
 
                 # Predict noise/v using the UNet in diffusion space
