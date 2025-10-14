@@ -1,4 +1,3 @@
-import contextlib
 import os
 import pathlib
 from tkinter import BooleanVar, StringVar
@@ -37,9 +36,8 @@ class ConceptTab(ConfigList):
         self._toolbar = None
         self._toolbar_is_wrapped = False
         self._add_search_bar()
-        # wrap if too narrow
-        with contextlib.suppress(Exception):
-            self.top_frame.bind('<Configure>', lambda e: self._maybe_reposition_toolbar(e.width))
+        # wrap toolbar if too narrow
+        self.top_frame.bind('<Configure>', lambda e: self._maybe_reposition_toolbar(e.width))
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
@@ -109,14 +107,18 @@ class ConceptTab(ConfigList):
         if search:
             if not hasattr(element, '_search_cache'):
                 cache = []
-                with contextlib.suppress(Exception):
+                try:
                     if getattr(element, 'name', None):
                         cache.append(element.name.lower())
                     p = getattr(element, 'path', None)
                     if p:
-                        with contextlib.suppress(Exception):
+                        try:
                             cache.append(os.path.basename(p).lower())
                             cache.append(p.lower())
+                        except (TypeError, AttributeError):
+                            pass
+                except (AttributeError, TypeError):
+                    pass
                 element._search_cache = cache
             if not any(search in text for text in getattr(element, '_search_cache', [])):
                 return False
@@ -149,13 +151,13 @@ class ConceptTab(ConfigList):
     def _refresh_show_disabled_text(self):
         try:
             disabled_count = sum(1 for c in getattr(self, 'current_config', []) if getattr(c, 'enabled', True) is False)
-        except Exception:
+        except (AttributeError, TypeError):
             disabled_count = 0
         text = f"Show Disabled ({disabled_count})" if disabled_count > 0 else "Show Disabled"
         try:
             if getattr(self, 'show_disabled_checkbox', None):
                 self.show_disabled_checkbox.configure(text=text)
-        except Exception:
+        except (AttributeError, RuntimeError):
             pass
 
 
@@ -238,15 +240,18 @@ class ConceptWidget(ctk.CTkFrame):
     def configure_element(self):
         self.name_label.configure(text=self.__get_display_name())
         self.image.configure(light_image=self.__get_preview_image())
-        with contextlib.suppress(Exception):
+        try:
             if hasattr(self.concept, '_search_cache'):
                 delattr(self.concept, '_search_cache')
+        except AttributeError:
+            pass
 
     def __get_preview_image(self):
         preview_path = "resources/icons/icon.png"
-        concept_path = getattr(self.concept, 'path', None)
-        if concept_path and os.path.isdir(concept_path):
-            glob_pattern = "**/*.*" if getattr(self.concept, 'include_subdirectories', False) else "*.*"
+        glob_pattern = "**/*.*" if getattr(self.concept, 'include_subdirectories', False) else "*.*"
+
+        concept_path = ConceptWindow.get_concept_path(getattr(self.concept, 'path', None))
+        if concept_path:
             for path in pathlib.Path(concept_path).glob(glob_pattern):
                 extension = os.path.splitext(path)[1]
                 if (path.is_file()
@@ -257,7 +262,7 @@ class ConceptWidget(ctk.CTkFrame):
                     break
         try:
             image = load_image(preview_path, convert_mode="RGBA")
-        except Exception:
+        except (OSError):
             image = Image.new("RGBA", (150, 150), (200, 200, 200, 255))
         size = min(image.width, image.height)
         image = image.crop((
