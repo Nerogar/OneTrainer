@@ -244,13 +244,13 @@ class BaseStableDiffusionXLSetup(
             added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
 
             if config.diff2flow:
-                # Sample continuous time t from U(0, 1)
-                t_continuous = torch.rand(
+                # Sample continuous time t
+                t_continuous = self._get_timestep_continuous(
+                    deterministic,
+                    generator,
                     scaled_latent_image.shape[0],
-                    device=self.train_device,
-                    dtype=model.train_dtype.torch_dtype()
-                )
-
+                    config,
+                 )
                 latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
                 # Ground truth velocity field: u_t(x) = x_1 - x_0
@@ -266,19 +266,12 @@ class BaseStableDiffusionXLSetup(
                 dm_x = model._df_convert_fm_xt_to_dm_xt(xt_flow, t_continuous)
 
                 # Predict noise/v using the UNet in diffusion space
-                if config.model_type.has_depth_input():
-                    predicted_from_unet = model.unet(
-                        dm_x.to(dtype=model.train_dtype.torch_dtype()),
-                        dm_timestep,
-                        text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                        batch['latent_depth'].to(dtype=model.train_dtype.torch_dtype()),
-                    ).sample
-                else:
-                    predicted_from_unet = model.unet(
-                        dm_x.to(dtype=model.train_dtype.torch_dtype()),
-                        dm_timestep,
-                        text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                    ).sample
+                predicted_from_unet = model.unet(
+                    sample=dm_x.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=dm_timestep,
+                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    added_cond_kwargs=added_cond_kwargs,
+                ).sample
 
                 # Convert UNet output (eps or v) back to the velocity field v_t in FM space
                 if model.noise_scheduler.config.prediction_type == 'v_prediction':
