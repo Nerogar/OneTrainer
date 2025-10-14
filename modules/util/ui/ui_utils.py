@@ -110,12 +110,12 @@ class DebounceTimer:
 
     def call(self, *args, **kwargs):
         if self._after_id:
-            # ignore if widget already gone.
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(tk.TclError):
                 self.widget.after_cancel(self._after_id)
 
         def fire():
             self._after_id = None
-            with contextlib.suppress(Exception):
-                self.callback(*args, **kwargs)
-        self._after_id = self.widget.after(self.delay_ms, fire)
+            self.callback(*args, **kwargs)
+
+        with contextlib.suppress(tk.TclError):
+            self._after_id = self.widget.after(self.delay_ms, fire)

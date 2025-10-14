@@ -2,6 +2,7 @@ import contextlib
 import copy
 import json
 import os
+import tkinter as tk
 from abc import ABCMeta, abstractmethod
 
 from modules.util import path_util
@@ -107,7 +108,18 @@ class ConfigList(metaclass=ABCMeta):
         return
 
     def _reset_filters(self):  # pragma: no cover - default noop
-        self.filters.update({"search": "", "type": "ALL", "show_disabled": True})
+        search_var = getattr(self, 'search_var', None)
+        filter_var = getattr(self, 'filter_var', None)
+        show_disabled_var = getattr(self, 'show_disabled_var', None)
+
+        if search_var:
+            search_var.set("")
+        if filter_var:
+            filter_var.set("ALL")
+        if show_disabled_var:
+            show_disabled_var.set(True)
+        if search_var and hasattr(self, '_update_filters'):
+            self._update_filters()
 
     def _update_item_enabled_state(self):
         self._is_current_item_enabled = any(
@@ -258,7 +270,7 @@ class ConfigList(metaclass=ABCMeta):
         self.current_config.pop(remove_i)
         if self.widgets_initialized and 0 <= remove_i < len(self.widgets):
             removed = self.widgets.pop(remove_i)
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(tk.TclError, AttributeError):
                 removed.destroy()
             # Reindex remaining widgets
             for idx, widget in enumerate(self.widgets):
@@ -278,33 +290,41 @@ class ConfigList(metaclass=ABCMeta):
                 for element_json in loaded_config_json:
                     element = self.create_new_element().from_dict(element_json)
                     self.current_config.append(element)
-        except Exception:
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Failed to load config from {filename}: {e}")
             self.current_config = []
+
         # reset filters when switching configs
-        with contextlib.suppress(Exception):
+        if hasattr(self, '_reset_filters') and self.widgets_initialized:
             self._reset_filters()
+
         self.widgets_initialized = False
         self._create_element_list()
         self._update_toggle_button_text()
 
     def save_current_config(self):
         if self.from_external_file:
-            with contextlib.suppress(Exception):
+            try:
                 if not os.path.exists(self.config_dir):
-                    os.mkdir(self.config_dir)
+                    os.makedirs(self.config_dir, exist_ok=True)
 
                 write_json_atomic(
                     getattr(self.train_config, self.attr_name),
                     [element.to_dict() for element in self.current_config]
                 )
+            except (OSError) as e:
+                print(f"Failed to save config: {e}")
+
         self._update_toggle_button_text()
 
         if self.widgets_initialized:
-            with contextlib.suppress(Exception):
+            try:
                 self._update_widget_visibility()
+            except (tk.TclError, AttributeError) as e:
+                print.debug(f"Widget visibility update failed: {e}")
 
         # let subclass refresh any show-disabled UI
-        with contextlib.suppress(Exception):
+        if hasattr(self, '_refresh_show_disabled_text'):
             self._refresh_show_disabled_text()
 
     def _element_matches_filters(self, element):

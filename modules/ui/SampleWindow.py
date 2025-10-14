@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import os
+import tkinter as tk
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import (
@@ -198,18 +199,18 @@ class SampleWindow(ctk.CTkToplevel):
             )
 
     def destroy(self):
-        """Safely destroy the window"""
         try:
-            # Clear icon reference before destruction
             if hasattr(self, "_icon_image_ref"):
                 del self._icon_image_ref
 
             # Remove any pending after callbacks
             for after_id in self.tk.call('after', 'info'):
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(tk.TclError, RuntimeError):
                     self.after_cancel(after_id)
 
-            # Call parent destroy
             super().destroy()
-        except Exception as e:
+        except (tk.TclError, RuntimeError) as e:
             print(f"Error destroying window: {e}")
+        except Exception as e:
+            print(f"Unexpected error destroying window: {e}")
+            raise

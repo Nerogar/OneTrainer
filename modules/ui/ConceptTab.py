@@ -20,6 +20,10 @@ from PIL import Image
 class ConceptTab(ConfigList):
 
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
+        self.search_var = StringVar()
+        self.filter_var = StringVar(value="ALL")
+        self.show_disabled_var = BooleanVar(value=True)
+
         super().__init__(
             master,
             train_config,
