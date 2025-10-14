@@ -786,11 +786,6 @@ class GenericTrainer(BaseTrainer):
                             })
                             self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
 
-                            if self.config.optimizer.kourkoutas_beta and hasattr(self.model.optimizer, 'kourkoutas_helper'):
-                                stats = self.model.optimizer.kourkoutas_helper.last_beta2_stats
-                                if stats:
-                                    self.tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], train_progress.global_step)
-
                         accumulated_loss = 0.0
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
