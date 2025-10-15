@@ -257,7 +257,7 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
-    def __create_dtype_options(self, include_none:bool=True) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_none:bool=True, include_gguf=False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -266,6 +266,9 @@ class ModelTab:
             # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
+
+        if include_gguf:
+            options.append(("GGUF", DataType.GGUF))
 
         if include_none:
             options.insert(0, ("", DataType.NONE))
@@ -336,7 +339,7 @@ class ModelTab:
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")
-            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
+            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(include_gguf=True),
                                   self.ui_state, "prior.weight_dtype")
 
             row += 1
