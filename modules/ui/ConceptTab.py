@@ -142,7 +142,7 @@ class ConceptTab(ConfigList):
     def _maybe_reposition_toolbar(self, width):
         if not self._toolbar:
             return
-        threshold = 1070
+        threshold = 1046
         want_wrapped = width < threshold
         if want_wrapped == self._toolbar_is_wrapped:
             return
@@ -166,9 +166,6 @@ class ConceptTab(ConfigList):
 
 
 class ConceptWidget(ctk.CTkFrame):
-    TILE_PADX = 5
-    TILE_PADY = 5
-
     def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command):
         super().__init__(
             master=master, width=150, height=170, corner_radius=10, bg_color="transparent"
@@ -280,20 +277,8 @@ class ConceptWidget(ctk.CTkFrame):
         ))
         return image.resize((150, 150), Image.Resampling.BILINEAR)
 
-    def get_tile_full_width(self):
-        try:
-            w = int(self.cget("width") or 0)
-            if w <= 0:
-                w = int(self.winfo_reqwidth() or 0)
-            if w <= 0:
-                w = 150
-        except Exception:
-            w = 150
-        return w + self.TILE_PADX * 2
-
     def place_in_list(self):
         index = getattr(self, 'visible_index', self.i)
-        columns = max(1, getattr(self.master, 'column_count', 6))
-        x = index % columns
-        y = index // columns
-        self.grid(row=y, column=x, pady=self.TILE_PADY, padx=self.TILE_PADX)
+        x = index % 6
+        y = index // 6
+        self.grid(row=y, column=x, pady=5, padx=5)

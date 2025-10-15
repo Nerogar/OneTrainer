@@ -1,7 +1,6 @@
 import ctypes
 import datetime
 import json
-import math
 import os
 import platform
 import subprocess
@@ -65,10 +64,6 @@ class TrainUI(ctk.CTk):
     training_callbacks: TrainCallbacks | None
     training_commands: TrainCommands | None
 
-    MIN_WIDTH = 690
-    MIN_HEIGHT = 400
-    DEFAULT_WIDTH = 1100
-    DEFAULT_HEIGHT = 740
     _TRAIN_BUTTON_STYLES = {
         "idle": {
             "text": "Start Training",
@@ -99,8 +94,7 @@ class TrainUI(ctk.CTk):
         super().__init__()
 
         self.title("OneTrainer")
-        self.geometry(f"{self.DEFAULT_WIDTH}x{self.DEFAULT_HEIGHT}")
-        self.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
+        self.geometry("1100x740")
 
         self.after(100, lambda: self._set_icon())
 
@@ -130,8 +124,7 @@ class TrainUI(ctk.CTk):
 
         self.top_bar_component = self.top_bar(self)
         self.content_frame(self)
-        self._responsive_component_manager = components.ResponsiveComponentManager()
-        self.bottom_bar_frame = self.bottom_bar(self)
+        self.bottom_bar(self)
 
         self.training_thread = None
         self.training_callbacks = None
@@ -145,9 +138,6 @@ class TrainUI(ctk.CTk):
 
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
-
-        # Bind resize event for responsive bottom bar
-        self.bind("<Configure>", self._on_window_resize)
 
         self.protocol("WM_DELETE_WINDOW", self.__close)
 
@@ -169,31 +159,14 @@ class TrainUI(ctk.CTk):
         )
 
     def _set_icon(self):
+        """Set the window icon safely after window is ready"""
         set_window_icon(self)
-
-    def _calculate_scale_factor(self, current_width: int) -> float:
-        current_width = max(self.MIN_WIDTH, min(self.DEFAULT_WIDTH, current_width))
-
-        normalized = (current_width - self.MIN_WIDTH) / (self.DEFAULT_WIDTH - self.MIN_WIDTH)
-        k = 6  # controls scaling, higher number = more aggressive
-        sigmoid = 1 / (1 + math.exp(-k * (normalized - 0.5)))
-        return 0.5 + 0.5 * sigmoid
-
-    def _on_window_resize(self, event=None):
-        if event and event.widget == self:
-            if hasattr(self, '_resize_after_id'):
-                self.after_cancel(self._resize_after_id)
-            self._resize_after_id = self.after(50, self._update_bottom_bar_layout)
 
     def bottom_bar(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=2, column=0, sticky="nsew")
 
-        self.set_step_progress, self.set_epoch_progress = components.double_progress(
-            frame, 0, 0, "step", "epoch",
-            progress_width=200,
-            register_callback=self._responsive_component_manager.register
-        )
+        self.set_step_progress, self.set_epoch_progress = components.double_progress(frame, 0, 0, "step", "epoch")
 
         # status + ETA container
         self.status_frame = ctk.CTkFrame(frame, corner_radius=0, fg_color="transparent")
@@ -209,43 +182,27 @@ class TrainUI(ctk.CTk):
         # padding
         frame.grid_columnconfigure(2, weight=1)
 
+
         # export button
         self.export_button = components.button(frame, 0, 3, "Export", self.export_training,
                                              width=60, padx=5, pady=(15, 0),
-                                             tooltip="Export the current configuration as a script to run without a UI",
-                                             register_callback=self._responsive_component_manager.register)
+                                             tooltip="Export the current configuration as a script to run without a UI")
 
         # debug button
-        self.debug_button = components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+        components.button(frame, 0, 4, "Debug", self.generate_debug_package,
                                        width=60, padx=(5, 25), pady=(15, 0),
-                                       tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues",
-                                       register_callback=self._responsive_component_manager.register)
+                                       tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
 
         # tensorboard button
-        self.tensorboard_button = components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
-                                             width=100, padx=(0, 5), pady=(15, 0),
-                                             tooltip="Opens the Tensorboard web interface in your browser",
-                                             register_callback=self._responsive_component_manager.register)
+        components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
+                                             width=100, padx=(0, 5), pady=(15, 0))
 
         # training button
         self.training_button = components.button(frame, 0, 6, "Start Training", self.start_training,
-                                                 width=140, padx=(5, 20), pady=(15, 0),
-                                                 register_callback=self._responsive_component_manager.register)
+                                                 padx=(5, 20), pady=(15, 0))
         self._set_training_button_style("idle")  # centralized styling
 
-        # Initial layout update
-        self.after(100, self._update_bottom_bar_layout)
-
         return frame
-
-    def _update_bottom_bar_layout(self):
-        if not hasattr(self, 'bottom_bar_frame') or not self.bottom_bar_frame.winfo_exists():
-            return
-
-        current_width = self.winfo_width()
-        scale = self._calculate_scale_factor(current_width)
-        self._responsive_component_manager.scale_components(scale)
-
 
     def content_frame(self, master):
         frame = ctk.CTkFrame(master=master, corner_radius=0)

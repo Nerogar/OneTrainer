@@ -51,53 +51,43 @@ class TopBar:
         self.frame.grid(row=0, column=0, sticky="nsew")
 
         self.training_method = None
-        self._topbar_wrapped = False
-        self._resize_pending = False
 
-        # title stays alone on the left
+        # title
         components.app_title(self.frame, 0, 0)
 
-        self.toolbar = ctk.CTkFrame(self.frame, fg_color="transparent")
-        self.toolbar.grid(row=0, column=1, sticky="nsew")
-
-        self.frame.grid_columnconfigure(1, weight=1)
-
-        # left side of toolbar
+        # dropdown
         self.configs_dropdown = None
         self.__create_configs_dropdown()
 
-        self.save_btn = components.button(
-            self.toolbar, 0, 1, "Save config", self.__save_config,
-            tooltip="Save the current configuration as a custom named preset", width=90
-        )
-        self.wiki_btn = components.button(
-            self.toolbar, 0, 2, "Wiki", self.open_wiki,
-            tooltip="Opens the OneTrainer Wiki in your web browser, please give it a read!", width=50
-        )
-        self.wiki_btn.grid_configure(padx=(0, 8))
+        # remove button
+        # TODO
+        # components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
-        # spacer inside toolbar to push right controls
-        self.toolbar.grid_columnconfigure(3, weight=1)
+        # Wiki button
+        components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50)
 
-        # right controls container (we will wrap its children)
-        self.right_controls = ctk.CTkFrame(self.toolbar, fg_color="transparent")
-        self.right_controls.grid(row=0, column=4, sticky="e")
+        # save button
+        components.button(self.frame, 0, 3, "save current config", self.__save_config,
+                          tooltip="Save the current configuration in a custom preset")
 
-        # model type inside right_controls
-        self.model_type_widget = components.options_kv(
-            master=self.right_controls,
+        # padding
+        self.frame.grid_columnconfigure(5, weight=1)
+
+        # model type
+        components.options_kv(
+            master=self.frame,
             row=0,
-            column=0,
+            column=6,
             values=[ #TODO simplify
-                ("SD1.5", ModelType.STABLE_DIFFUSION_15),
-                ("SD1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
-                ("SD2.0", ModelType.STABLE_DIFFUSION_20),
-                ("SD2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
-                ("SD2.1", ModelType.STABLE_DIFFUSION_21),
-                ("SD3", ModelType.STABLE_DIFFUSION_3),
-                ("SD3.5", ModelType.STABLE_DIFFUSION_35),
-                ("SDXL", ModelType.STABLE_DIFFUSION_XL_10_BASE),
-                ("SDXL Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+                ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
+                ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+                ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
+                ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+                ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
+                ("Stable Diffusion 3", ModelType.STABLE_DIFFUSION_3),
+                ("Stable Diffusion 3.5", ModelType.STABLE_DIFFUSION_35),
+                ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+                ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
                 ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
                 ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
@@ -114,9 +104,6 @@ class TopBar:
             var_name="model_type",
             command=self.__change_model_type,
         )
-
-        # react to size changes (use toolbar width for wrapping decision)
-        self.toolbar.bind('<Configure>', self._on_topbar_resize)
 
     def __create_training_method(self):
         if self.training_method:
@@ -153,29 +140,25 @@ class TopBar:
 
         # training method
         self.training_method = components.options_kv(
-            master=self.right_controls,
+            master=self.frame,
             row=0,
-            column=1,
+            column=7,
             values=values,
             ui_state=self.ui_state,
             var_name="training_method",
             command=self.change_training_method_callback,
-            width=105
         )
-        self._update_wrap_state()
 
     def __change_model_type(self, model_type: ModelType):
         self.change_model_type_callback(model_type)
         self.__create_training_method()
-        self._reposition_topbar_controls()
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
             self.configs_dropdown.grid_forget()
 
-        # place dropdown inside toolbar (row 0, col 0)
         self.configs_dropdown = components.options_kv(
-            self.toolbar, 0, 0, self.configs, self.config_ui_state, "config_name", self.__load_current_config
+            self.frame, 0, 1, self.configs, self.config_ui_state, "config_name", self.__load_current_config
         )
 
     def __load_available_config_names(self):
@@ -259,7 +242,7 @@ class TopBar:
             self.load_preset_callback()
         except FileNotFoundError:
             pass
-        except ctk.TclError:
+        except Exception:
             print(traceback.format_exc())
 
     def __remove_config(self):
@@ -269,73 +252,3 @@ class TopBar:
     def save_default(self):
         self.__save_to_file("#")
         self.__save_secrets("secrets.json")
-
-    def _on_topbar_resize(self, event):
-        # Re-evaluate wrap on any toolbar size change (debounced)
-        if not self._resize_pending:
-            self._resize_pending = True
-            self.toolbar.after_idle(self._update_wrap_state)
-
-    def _update_wrap_state(self):
-        """Decide wrapping based on measured widths of left-side controls and right_controls contents."""
-        try:
-            self._resize_pending = False
-            self.toolbar.update_idletasks()
-            tb = self.toolbar
-            mt = getattr(self, 'model_type_widget', None)
-            rc = getattr(self, 'right_controls', None)
-            if not (mt and rc) or not tb.winfo_ismapped():
-                return
-
-            # total width needed for right controls (side-by-side); training_method may not exist yet
-            tm = getattr(self, 'training_method', None)
-            right_needed = mt.winfo_reqwidth()
-            if tm and tm.winfo_exists():
-                right_needed += tm.winfo_reqwidth()
-            right_needed += 10  # small gap
-
-            # width used by left side (dropdown + buttons)
-            left_widgets = (
-                getattr(self, 'configs_dropdown', None),
-                getattr(self, 'save_btn', None),
-                getattr(self, 'wiki_btn', None),
-            )
-            left_needed = sum(w.winfo_reqwidth() for w in left_widgets if w)
-
-            total_width = max(1, tb.winfo_width())
-            want_wrapped = (left_needed + right_needed) > total_width
-
-            if want_wrapped != self._topbar_wrapped:
-                self._topbar_wrapped = want_wrapped
-                self._reposition_topbar_controls()
-        except Exception:
-            print(traceback.format_exc())
-
-    def _reposition_topbar_controls(self):
-        """Place right_controls either on row 0 (inline) or row 1 (below left side)."""
-        try:
-            if self._topbar_wrapped:
-                # second row, left-aligned with fixed padding
-                self.right_controls.grid_configure(
-                    row=1,
-                    column=0,
-                    columnspan=5,
-                    sticky="w",
-                    padx=(8, 0),
-                    pady=0,
-                )
-                self.model_type_widget.grid_configure(
-                    row=0, column=0, padx=(0, 20), pady=0, sticky="w"
-                )
-                if self.training_method:
-                    self.training_method.grid_configure(
-                        row=0, column=1, padx=0, pady=0, sticky="w"
-                    )
-            else:
-                # first row, right-aligned
-                self.right_controls.grid_configure(row=0, column=4, columnspan=1, sticky="e", padx=0, pady=0)
-                self.model_type_widget.grid_configure(row=0, column=0, padx=(0, 5), pady=0, sticky="e")
-                if self.training_method:
-                    self.training_method.grid_configure(row=0, column=1, padx=0, pady=0, sticky="e")
-        except Exception:
-            print(traceback.format_exc())
