@@ -32,6 +32,17 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         loss = diff + torch.nn.functional.softplus(-2.0*diff) - torch.log(torch.full(size=diff.size(), fill_value=2.0, dtype=torch.float32, device=diff.device))
         return loss
 
+    def __pseudo_huber_loss(
+            self,
+            pred: torch.Tensor,
+            target: torch.Tensor,
+            delta: torch.Tensor,
+    ) -> Tensor:
+        diff = pred - target
+        # Equation (8) from "Improving Diffusion Models's Data-Corruption Resistance using Scheduled Pseudo-Huber Loss"
+        loss = delta**2 * (torch.sqrt(1.0 + (diff / delta)**2) - 1.0)
+        return loss
+
     def __masked_losses(
             self,
             batch: dict,
@@ -96,6 +107,40 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
                 masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.log_cosh_strength
+
+        # Scheduled Pseudo-Huber Loss
+        if config.scheduled_pseudo_huber_strength != 0:
+            if self.__coefficients is not None:
+                # Diffusion model path: low timestep -> low noise
+                num_train_timesteps = self.__coefficients.num_timesteps
+                t_eff = data['timestep'].to(dtype=torch.float32)
+            else:
+                # Flow matching model path: low timestep -> high noise. Invert schedule.
+                num_train_timesteps = self.__sigmas.shape[0]
+                t_eff = num_train_timesteps - data['timestep'].to(dtype=torch.float32)
+
+            # Schedule from Eq (11) of "Improving Diffusion Models's Data-Corruption Resistance using Scheduled Pseudo-Huber Loss"
+            # delta = exp((log(delta_0) * t_eff) / num_train_timesteps) where delta_0 is the final delta value.
+            log_delta_final = torch.log(torch.tensor(config.huber_delta, device=t_eff.device))
+            delta = torch.exp((log_delta_final * t_eff) / num_train_timesteps)
+            delta = delta.view(-1, *[1 for _ in range(data['predicted'].ndim - 1)])
+
+            losses += masked_losses_with_prior(
+                losses=self.__pseudo_huber_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['target'].to(dtype=torch.float32),
+                    delta.to(dtype=torch.float32),
+                ),
+                prior_losses=self.__pseudo_huber_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    delta.to(dtype=torch.float32),
+                ) if 'prior_target' in data else None,
+                mask=batch['latent_mask'].to(dtype=torch.float32),
+                unmasked_weight=config.unmasked_weight,
+                normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
+            ).mean(mean_dim) * config.scheduled_pseudo_huber_strength
 
         # Huber Loss
         if config.huber_strength != 0:
@@ -166,6 +211,29 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32)
                 ).mean(mean_dim) * config.log_cosh_strength
+
+        # Scheduled Pseudo-Huber Loss
+        if config.scheduled_pseudo_huber_strength != 0:
+            if self.__coefficients is not None:
+                # Diffusion model path: low timestep -> low noise
+                num_train_timesteps = self.__coefficients.num_timesteps
+                t_eff = data['timestep'].to(dtype=torch.float32)
+            else:
+                # Flow matching model path: low timestep -> high noise. Invert schedule.
+                num_train_timesteps = self.__sigmas.shape[0]
+                t_eff = num_train_timesteps - data['timestep'].to(dtype=torch.float32)
+
+            # Schedule from Eq (11) of "Improving Diffusion Models's Data-Corruption Resistance using Scheduled Pseudo-Huber Loss"
+            # delta = exp((log(delta_0) * t_eff) / num_train_timesteps) where delta_0 is the final delta value.
+            log_delta_final = torch.log(torch.tensor(config.huber_delta, device=t_eff.device))
+            delta = torch.exp((log_delta_final * t_eff) / num_train_timesteps)
+            delta = delta.view(-1, *[1 for _ in range(data['predicted'].ndim - 1)])
+
+            losses += self.__pseudo_huber_loss(
+                data['predicted'].to(dtype=torch.float32),
+                data['target'].to(dtype=torch.float32),
+                delta.to(dtype=torch.float32),
+            ).mean(mean_dim) * config.scheduled_pseudo_huber_strength
 
         # Huber Loss
         if config.huber_strength != 0:
