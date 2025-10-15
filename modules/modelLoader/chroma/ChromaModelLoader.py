@@ -3,6 +3,7 @@ import traceback
 
 from modules.model.ChromaModel import ChromaModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
+from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -13,6 +14,7 @@ from diffusers import (
     AutoencoderKL,
     ChromaTransformer2DModel,
     FlowMatchEulerDiscreteScheduler,
+    GGUFQuantizationConfig,
 )
 from transformers import T5EncoderModel, T5Tokenizer
 
@@ -98,7 +100,8 @@ class ChromaModelLoader(
             transformer = ChromaTransformer2DModel.from_single_file(
                 transformer_model_name,
                 #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
+                torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.prior == DataType.GGUF else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
                 transformer, weight_dtypes.prior, weight_dtypes.train_dtype

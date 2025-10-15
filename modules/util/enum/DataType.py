@@ -18,6 +18,7 @@ class DataType(Enum):
     NFLOAT_4_SVD = 'NFLOAT_4_SVD'
     FLOAT_W8A8_SVD = 'FLOAT_W8A8_SVD'
     INT_W8A8_SVD = 'INT_W8A8_SVD'
+    GGUF = 'GGUF'
 
     def __str__(self):
         return self.value
