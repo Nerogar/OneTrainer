@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import math
 from abc import abstractmethod
@@ -526,63 +525,17 @@ class LoRAModuleWrapper:
             module.to(device, dtype)
         return self
 
-    def _validate_resumed_hparams(self, state_dict: dict[str, Tensor]):
-        """Validate that a filtered PEFT state dict matches current rank/alpha.
-
-        Assumes keys already filtered to this wrapper's prefix. Raises ValueError
-        if a mismatch is detected. No-op when state_dict is empty.
-        """
+    def _check_rank_alpha_match(self, state_dict: dict[str, Tensor]):
         if not state_dict:
             return
-        inferred_rank = None
-        rank_key_suffixes = [
-            ".lora_down.weight",    # LoRA / DoRA
-            ".hada_w1_a", ".hada_w1_b", ".hada_w2_a", ".hada_w2_b",  # LoHa
-        ]
-        module_bases: set[str] = set()
-        # Discover module bases and infer rank from the *first* rank-carrying tensor.
-        for k, t in state_dict.items():
-            for suffix in rank_key_suffixes:
-                if k.endswith(suffix):
-                    base = k[: -len(suffix)]
-                    module_bases.add(base)
-                    if inferred_rank is None:
-                        with contextlib.suppress(Exception):
-                            inferred_rank = t.shape[0]
-                    break  # stop checking suffixes for this key
 
-        # Collect alpha values only for discovered module bases to avoid
-        # colliding with unrelated '.alpha' parameters that might live in the
-        # same prefix scope.
-        alpha_values: set[float] = set()
-        for base in module_bases:
-            alpha_key = base + '.alpha'
-            if alpha_key in state_dict:
-                with contextlib.suppress(Exception):
-                    alpha_values.add(float(state_dict[alpha_key].item()))
+        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
+            if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
+                raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}.")
 
-        inferred_alpha = None
-        if len(alpha_values) == 1:
-            inferred_alpha = next(iter(alpha_values))
-        elif len(alpha_values) > 1:
-            # Extremely unlikely unless someone modified alphas manually; treat as mismatch.
-            raise ValueError(
-                f"Inconsistent per-layer alpha values detected under prefix '{self.prefix}': {sorted(alpha_values)}. "
-                f"All LoRA layers are expected to share the same alpha during resume."
-            )
-
-        if inferred_rank is not None and inferred_rank != self.rank:
-            raise ValueError(
-                f"LoRA rank mismatch for prefix '{self.prefix}': config/UI rank {self.rank} vs state dict rank {inferred_rank}. "
-                f"LoRA Rank and Alpha settings must match what the LoRA you are trying to resume was trained so far with. "
-                f"Adjust lora_rank in your configuration/UI to {inferred_rank}."
-            )
-        if inferred_alpha is not None and float(inferred_alpha) != float(self.alpha):
-            raise ValueError(
-                f"LoRA alpha mismatch for prefix '{self.prefix}': config/UI alpha {self.alpha} vs state dict alpha {inferred_alpha}. "
-                f"LoRA Rank and Alpha settings must match what the LoRA you are trying to resume was trained so far with. "
-                f"Adjust lora_alpha in your configuration/UI to {inferred_alpha}."
-            )
+        if alpha_key := next((k for k in state_dict if k.endswith(".alpha")), None):
+            if (checkpoint_alpha := float(state_dict[alpha_key].item())) != float(self.alpha):
+                raise ValueError(f"Alpha mismatch: checkpoint={checkpoint_alpha}, config={self.alpha}.")
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
@@ -596,7 +549,7 @@ class LoRAModuleWrapper:
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
         # Validate resumed LoRA hyper-parameters (rank / alpha) before loading.
-        self._validate_resumed_hparams(state_dict)
+        self._check_rank_alpha_match(state_dict)
 
         for name, module in self.lora_modules.items():
             try:
