@@ -180,6 +180,10 @@ class ConfigList(metaclass=ABCMeta):
         self.element_list = ctk.CTkScrollableFrame(self.master, fg_color="transparent")
         self.element_list.grid(row=1, column=0, sticky="nsew")
 
+        # default column count and responsive binding
+        self.element_list.column_count = 6
+        self.element_list.bind('<Configure>', self._on_element_list_resize)
+
         if self.is_full_width:
             self.element_list.grid_columnconfigure(0, weight=1)
 
@@ -352,3 +356,27 @@ class ConfigList(metaclass=ABCMeta):
             self.save_current_config()
         finally:
             self.is_opening_window = False
+
+    def _on_element_list_resize(self, event):
+        tile_width = 160
+        try:
+            first_widget = self.widgets[0] if self.widgets else None
+            if first_widget is not None:
+                if hasattr(first_widget, 'get_tile_full_width'):
+                    tile_width = max(1, int(first_widget.get_tile_full_width()))
+                else:
+                    # generic fallback: widget width + horizontal padding if exposed
+                    w = int(first_widget.cget("width") or first_widget.winfo_reqwidth() or 150)
+                    pad = int(getattr(first_widget, 'TILE_PADX', 5)) * 2
+                    tile_width = max(1, w + pad)
+        except Exception:
+            tile_width = 160
+
+        try:
+            new_cols = max(1, min(12, event.width // tile_width))
+        except (AttributeError, ZeroDivisionError):
+            new_cols = 6
+        if getattr(self.element_list, 'column_count', None) != new_cols:
+            self.element_list.column_count = new_cols
+            # reflow visible widgets
+            self._update_widget_visibility()
