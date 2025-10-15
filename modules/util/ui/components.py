@@ -1,5 +1,6 @@
 import contextlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from tkinter import filedialog
 from typing import Any
 
@@ -13,6 +14,38 @@ from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
 from PIL import Image
 
 PAD = 10
+
+@dataclass
+class ResponsiveComponentConfig:
+    widget: ctk.CTkBaseClass
+    width: int
+    padx: int | tuple[int, int] | None = None
+
+
+class ResponsiveComponentManager:
+    """Manages registration and scaling of responsive UI components"""
+
+    def __init__(self):
+        self._components: list[ResponsiveComponentConfig] = []
+
+    def register(self, widget: ctk.CTkBaseClass, width: int, padx: int | tuple[int, int] | None = None) -> None:
+        self._components.append(ResponsiveComponentConfig(widget, width, padx))
+
+    def scale_components(self, scale_factor: float) -> None:
+        """Scale all registered components by the given factor"""
+        for config in self._components:
+            if config.widget.winfo_exists():
+                new_width = int(config.width * scale_factor)
+                config.widget.configure(width=new_width)
+
+                # Only adjust padx if it was provided
+                if config.padx is not None:
+                    new_padx = (
+                        tuple(int(p * scale_factor) for p in config.padx)
+                        if isinstance(config.padx, tuple)
+                        else int(config.padx * scale_factor)
+                    )
+                    config.widget.grid_configure(padx=new_padx)
 
 
 def app_title(master, row, column):
@@ -297,21 +330,43 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
     return frame
 
 
-def icon_button(master, row, column, text, command):
+def icon_button(
+    master,
+    row,
+    column,
+    text,
+    command,
+    register_callback: Callable[[ctk.CTkButton, int, tuple[int, int] | int], None] = None,
+    **kwargs,
+):
+    padx = kwargs.pop('padx', PAD)
+    pady = kwargs.pop('pady', PAD)
+    width = kwargs.get('width', 40)
+
     component = ctk.CTkButton(master, text=text, width=40, command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
+
+
+    if register_callback and width is not None:
+        register_callback(component, width, padx)
+
     return component
 
 
-def button(master, row, column, text, command, tooltip=None, **kwargs):
+def button(master, row, column, text, command, tooltip=None, register_callback: Callable[[ctk.CTkButton, int, tuple[int, int] | int], None] = None, **kwargs):
     # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
     padx = kwargs.pop('padx', PAD)
     pady = kwargs.pop('pady', PAD)
+    width = kwargs.get('width')
 
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
     if tooltip:
         ToolTip(component, tooltip, x_position=25)
+
+    if register_callback and width is not None:
+        register_callback(component, width, padx)
+
     return component
 
 
@@ -460,7 +515,15 @@ def progress(master, row, column):
     return component
 
 
-def double_progress(master, row, column, label_1, label_2):
+def double_progress(
+    master,
+    row,
+    column,
+    label_1,
+    label_2,
+    progress_width: int = 200,
+    register_callback: Callable[[ctk.CTkProgressBar, int], None] = None,
+):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="nsew")
 
@@ -485,6 +548,10 @@ def double_progress(master, row, column, label_1, label_2):
 
     description_2_component = ctk.CTkLabel(frame, text="")
     description_2_component.grid(row=1, column=2, padx=(PAD, PAD), pady=(0, 0), sticky="sew")
+
+    if register_callback:
+        register_callback(progress_1_component, progress_width)
+        register_callback(progress_2_component, progress_width)
 
     def set_1(value, max_value):
         progress_1_component.set(value / max_value)
