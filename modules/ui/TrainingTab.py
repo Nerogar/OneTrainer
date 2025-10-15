@@ -749,6 +749,11 @@ class TrainingTab:
                          tooltip="Scheduled Pseudo-Huber Strength for custom loss settings. This loss dynamically acts like MAE (robust to outliers) in high noise and MSE (preserves fine details) in low noise.")
         components.entry(frame, 4, 1, self.ui_state, "scheduled_pseudo_huber_strength")
 
+        # Huber Delta
+        components.label(frame, 4, 0, "Huber delta",
+                         tooltip="Delta parameter for huber loss variants")
+        components.entry(frame, 4, 1, self.ui_state, "huber_delta")
+
         if supports_vb_loss:
             # VB Strength
             components.label(frame, 3, 0, "VB Strength",

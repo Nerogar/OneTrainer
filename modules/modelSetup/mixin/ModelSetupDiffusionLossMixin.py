@@ -148,12 +148,14 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 losses=F.huber_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32),
-                    reduction='none'
+                    reduction='none',
+                    delta=config.huber_delta,
                 ),
                 prior_losses=F.huber_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['prior_target'].to(dtype=torch.float32),
-                    reduction='none'
+                    reduction='none',
+                    delta=config.huber_delta,
                 ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
@@ -240,7 +242,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             losses += F.huber_loss(
                 data['predicted'].to(dtype=torch.float32),
                 data['target'].to(dtype=torch.float32),
-                reduction='none'
+                reduction='none',
+                delta=config.huber_delta,
             ).mean(mean_dim) * config.huber_strength
 
         # VB loss
