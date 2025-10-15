@@ -98,7 +98,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             ).mean(mean_dim) * config.log_cosh_strength
 
         # Huber Loss
-        if config.huber_loss_strength != 0:
+        if config.huber_strength != 0:
             losses += masked_losses_with_prior(
                 losses=F.huber_loss(
                     data['predicted'].to(dtype=torch.float32),
@@ -114,7 +114,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
                 masked_prior_preservation_weight=config.masked_prior_preservation_weight,
-            ).mean(mean_dim) * config.huber_loss_strength
+            ).mean(mean_dim) * config.huber_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data and self.__coefficients is not None:
@@ -168,12 +168,12 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 ).mean(mean_dim) * config.log_cosh_strength
 
         # Huber Loss
-        if config.huber_loss_strength != 0:
+        if config.huber_strength != 0:
             losses += F.huber_loss(
                 data['predicted'].to(dtype=torch.float32),
                 data['target'].to(dtype=torch.float32),
                 reduction='none'
-            ).mean(mean_dim) * config.huber_loss_strength
+            ).mean(mean_dim) * config.huber_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data:
