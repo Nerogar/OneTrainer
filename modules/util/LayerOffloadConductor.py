@@ -34,12 +34,12 @@ def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.clone()
 
 
-def ceil_4(number: int) -> int:
-    return number + (4 - (number % 4)) % 4
+def ceil_8(number: int) -> int:
+    return number + (8 - (number % 8)) % 8
 
 
-def floor_4(number: int) -> int:
-    return number - (number % 4)
+def floor_8(number: int) -> int:
+    return number - (number % 8)
 
 
 class StaticLayerTensorAllocator:
@@ -69,7 +69,7 @@ class StaticLayerTensorAllocator:
         total_cache_bytes = cache_tensor_size * len(self.__layer_allocator.cache_tensors)
         if self.__allocate_forward:
             cache_tensor_index = self.__allocation_end // cache_tensor_size
-            cache_tensor_allocation_end = ceil_4(self.__allocation_end % cache_tensor_size)
+            cache_tensor_allocation_end = ceil_8(self.__allocation_end % cache_tensor_size)
 
             if cache_tensor_allocation_end + num_bytes > cache_tensor_size:
                 # move to the start of the next cache tensor
@@ -100,7 +100,7 @@ class StaticLayerTensorAllocator:
                 cache_tensor_index = len(self.__layer_allocator.cache_tensors) - 1
                 cache_tensor_allocation_start = cache_tensor_size
 
-            new_allocation_start = floor_4(cache_tensor_allocation_start - num_bytes)
+            new_allocation_start = floor_8(cache_tensor_allocation_start - num_bytes)
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
             allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
@@ -284,7 +284,7 @@ class StaticActivationAllocator:
         cache_tensor = self.__cache_tensors[self.__current_cache_tensor]
         allocated_tensor = \
             cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
-        self.__current_cache_tensor_offset += ceil_4(num_bytes)
+        self.__current_cache_tensor_offset += ceil_8(num_bytes)
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
 
@@ -558,6 +558,8 @@ class LayerOffloadConductor:
 
     __is_active: bool
 
+    __deferred_layers: list[int]
+
     def __init__(
             self,
             module: nn.Module,
@@ -605,6 +607,8 @@ class LayerOffloadConductor:
         self.__keep_graph = False
 
         self.__is_active = False
+
+        self.__deferred_layers = []
 
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
@@ -740,6 +744,7 @@ class LayerOffloadConductor:
         if self.__offload_layers:
             self.__wait_layer_transfer(layer_index)
 
+            self.__schedule_deferred_layers_to_temp(except_layer=layer_index)
             for i in self.__offload_strategy.get_layers_to_offload(
                     layer_index=layer_index,
                     is_forward=self.__is_forward_pass,
@@ -853,6 +858,20 @@ class LayerOffloadConductor:
 
         allocator_fn = allocator.allocate_like if allocator is not None else None
 
+        if not is_forward and device_equals(device, self.__temp_device):
+            layer = self.__layers[layer_index]
+            for module in layer.modules():
+                for parameter in module.parameters():
+                    if parameter.grad is not None:
+                        #Layers to be offloaded usually do not have gradients. Model weights only have gradients in full-finetuning,
+                        #and then a fused backpass is required for offloading, which sets all gradients to None before a layer is offloaded.
+                        #There is only once exception:
+                        #In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
+                        #has not finished yet. The gradients are then set to None during the backward of one of the next layers.
+                        #Record which layers were ready to be offloaded, and offload them later:
+                        self.__deferred_layers.append(layer_index)
+                        return
+
         with create_stream_context(self.__layer_transfer_stream):
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
@@ -869,6 +888,18 @@ class LayerOffloadConductor:
                 log(f"schedule layer {layer_index} to {str(device)}")
 
             self.__layer_device_map[layer_index] = device
+
+    def __schedule_deferred_layers_to_temp(
+            self,
+            except_layer: int,
+    ):
+        layers = self.__deferred_layers
+        self.__deferred_layers = []
+        for layer_index in layers:
+            if layer_index == except_layer:
+                #don't offload this layer, because it is needed now #TODO can this even happen?
+                continue
+            self.__schedule_layer_to(layer_index, device=self.__temp_device, is_forward=False)
 
     def __schedule_activations_to_device(
             self,

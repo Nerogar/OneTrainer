@@ -14,7 +14,7 @@ repos:
     - id: check-yaml
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.12.12
+  rev: v0.14.0
   hooks:
     # Run the Ruff linter, but not the formatter.
     - id: ruff

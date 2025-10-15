@@ -2,6 +2,7 @@ import fractions
 import math
 import os
 import pathlib
+import platform
 import random
 import threading
 import time
@@ -580,6 +581,27 @@ class ConceptWindow(ctk.CTkToplevel):
         download_thread = threading.Thread(target=self.__download_dataset, daemon=True)
         download_thread.start()
 
+    def _read_text_file_for_preview(self, file_path: str) -> str:
+        empty_msg = "[Empty prompt]"
+        try:
+            with open(file_path, "r") as f:
+                if self.preview_augmentations.get():
+                    lines = [line.strip() for line in f if line.strip()]
+                    return random.choice(lines) if lines else empty_msg
+                content = f.read().strip()
+                return content if content else empty_msg
+        except FileNotFoundError:
+            return "File not found, please check the path"
+        except IsADirectoryError:
+            return "[Provided path is a directory, please correct the caption path]"
+        except PermissionError:
+            if platform.system() == "Windows":
+                return "[Permission denied, please check the file permissions or Windows Defender settings]"
+            else:
+                return "[Permission denied, please check the file permissions]"
+        except UnicodeDecodeError:
+            return "[Invalid file encoding. This should not happen, please report this issue]"
+
     def __get_preview_image(self):
         preview_image_path = "resources/icons/icon.png"
         file_index = -1
@@ -610,25 +632,17 @@ class ConceptWindow(ctk.CTkToplevel):
         else:
             mask_tensor = torch.ones((1, image_tensor.shape[1], image_tensor.shape[2]))
 
-        try:
-            if self.concept.text.prompt_source == "sample":
-                with open(splitext[0] + ".txt") as prompt_file:
-                    if self.preview_augmentations.get():
-                        prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
-                        prompt_output = random.choice(prompt_list)
-                    else:
-                        prompt_output = prompt_file.read()
-            elif self.concept.text.prompt_source == "filename":
-                prompt_output = os.path.splitext(os.path.basename(preview_image_path))[0]
-            elif self.concept.text.prompt_source == "concept":
-                with open(self.concept.text.prompt_path) as prompt_file:
-                    if self.preview_augmentations.get():
-                        prompt_list = [line.strip() for line in prompt_file.readlines() if len(line.strip()) > 0]
-                        prompt_output = random.choice(prompt_list)
-                    else:
-                        prompt_output = prompt_file.read()
-        except FileNotFoundError:
-            prompt_output = "No caption found."
+        source = self.concept.text.prompt_source
+        preview_p = pathlib.Path(preview_image_path)
+        if source == "filename":
+            prompt_output = preview_p.stem or "[Empty prompt]"
+        else:
+            file_map = {
+                "sample": preview_p.with_suffix(".txt"),
+                "concept": pathlib.Path(self.concept.text.prompt_path) if self.concept.text.prompt_path else None,
+            }
+            file_path = file_map.get(source)
+            prompt_output = self._read_text_file_for_preview(str(file_path)) if file_path else "[Empty prompt]"
 
         modules = []
         if self.preview_augmentations.get():

@@ -447,7 +447,7 @@ class LoRAModuleWrapper:
         self.alpha = config.lora_alpha
 
         self.module_filters = [
-            ModuleFilter(pattern, use_regex=config.lora_layers_regex)
+            ModuleFilter(pattern, use_regex=config.layer_filter_regex)
             for pattern in (module_filter or [])
         ]
 
@@ -496,13 +496,13 @@ class LoRAModuleWrapper:
 
         if len(self.module_filters) > 0:
             if config.debug_mode:
-                print(f"[LoRAModuleWrapper] Selected layers: {selected}")
-                print(f"[LoRAModuleWrapper] Deselected layers: {deselected}")
-                print(f"[LoRAModuleWrapper] Unsuitable for LoRA training: {unsuitable}")
+                print(f"Selected layers: {selected}")
+                print(f"Deselected layers: {deselected}")
+                print(f"Unsuitable for LoRA training: {unsuitable}")
             else:
-                print(f"[LoRAModuleWrapper] Selected layers: {len(selected)}")
-                print(f"[LoRAModuleWrapper] Deselected layers: {len(deselected)}")
-                print("[LoRAModuleWrapper] Note: Enable Debug mode to see the full list of layer names")
+                print(f"Selected layers: {len(selected)}")
+                print(f"Deselected layers: {len(deselected)}")
+                print("Note: Enable Debug mode to see the full list of layer names")
 
         unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
         if len(unused_filters) > 0:

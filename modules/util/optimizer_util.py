@@ -1,3 +1,4 @@
+import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
@@ -53,13 +54,19 @@ def init_model_parameters(
         train_device: torch.device,
 ):
     model.parameters = parameters
+    #random (LoRA) initialisation can differ, broadcast from GPU #0 to all others
+    #to be safe, do that before the optimizer is created because the optimizer could take copies
+    multi.broadcast_parameters(parameters.parameters(), train_device)
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
-    model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    if multi.is_master():
+        model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    else:
+        model.ema = None
     model.ema_state_dict = None
 
     model.param_group_mapping = parameters.unique_name_mapping
@@ -284,17 +291,19 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_speed": False,
         "eps": 1e-8,
         "split_groups": True,
-        "split_groups_mean": True,
+        "split_groups_mean": False,
         "factored": True,
         "factored_fp32": True,
         "fused_back_pass": False,
         "use_stableadamw": True,
-        "use_muon_pp": False,
         "use_cautious": False,
         "use_grams": False,
         "use_adopt": False,
         "use_focus": False,
+        "d_limiter": True,
         "stochastic_rounding": True,
+        "use_schedulefree": True,
+        "use_orthograd": False,
     },
     Optimizer.DADAPT_ADA_GRAD: {
         "momentum": 0,
@@ -408,6 +417,117 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fused_back_pass": False,
         "min_8bit_size": 16384,
         "quant_block_size": 2048
+    },
+    Optimizer.ADAMW_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "use_bias_correction": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "use_atan2": False,
+        "cautious_mask": False,
+        "grams_moment": False,
+        "orthogonal_gradient": False,
+        "use_AdEMAMix": False,
+        "beta3_ema": 0.9999,
+        "alpha": 5,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
+    },
+    Optimizer.ADOPT_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.9999,
+        "eps": 1e-6,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "use_atan2": False,
+        "cautious_mask": False,
+        "grams_moment": False,
+        "orthogonal_gradient": False,
+        "use_AdEMAMix": False,
+        "beta3_ema": 0.9999,
+        "alpha": 5,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
+    },
+    Optimizer.PRODIGY_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "beta3": None,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "d0": 1e-6,
+        "d_coef": 1.0,
+        "growth_rate": float('inf'),
+        "slice_p": 11,
+        "prodigy_steps": 0,
+        "d_limiter": False,
+        "use_atan2": False,
+        "cautious_mask": False,
+        "grams_moment": False,
+        "orthogonal_gradient": False,
+        "use_AdEMAMix": False,
+        "beta3_ema": 0.9999,
+        "alpha": 5,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
+    },
+    Optimizer.SIMPLIFIED_AdEMAMix: {
+        "beta1": 0.99,
+        "beta2": 0.99,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "alpha_grad": 100.0,
+        "beta1_warmup": None,
+        "min_beta1": 0.9,
+        "use_bias_correction": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "orthogonal_gradient": False,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
+    },
+    Optimizer.LION_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "weight_decay": 0.0,
+        "clip_threshold": None,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "cautious_mask": False,
+        "orthogonal_gradient": False,
+    },
+    Optimizer.LION_PRODIGY_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "beta3": None,
+        "weight_decay": 0.0,
+        "clip_threshold": None,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "d0": 1e-6,
+        "d_coef": 1.0,
+        "growth_rate": float('inf'),
+        "slice_p": 11,
+        "prodigy_steps": 0,
+        "d_limiter": True,
+        "cautious_mask": False,
+        "orthogonal_gradient": False,
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,
