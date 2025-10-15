@@ -2,6 +2,7 @@ import contextlib
 import copy
 import os
 import tkinter as tk
+import traceback
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import (
@@ -213,4 +214,4 @@ class SampleWindow(ctk.CTkToplevel):
             print(f"Error destroying window: {e}")
         except Exception as e:
             print(f"Unexpected error destroying window: {e}")
-            raise
+            traceback.print_exc()

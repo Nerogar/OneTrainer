@@ -87,7 +87,7 @@ class ConfigList(metaclass=ABCMeta):
 
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
-            self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all items in the current config", width=30, padx=5)
+            self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
             self._update_toggle_button_text()
 
 
@@ -122,8 +122,11 @@ class ConfigList(metaclass=ABCMeta):
             self._update_filters()
 
     def _update_item_enabled_state(self):
+        # Only count items that match current filters
         self._is_current_item_enabled = any(
-            item.ui_state.get_var(self.enable_key).get() for item in self.widgets
+            item.ui_state.get_var(self.enable_key).get()
+            for i, item in enumerate(self.widgets)
+            if i < len(self.current_config) and self._element_matches_filters(self.current_config[i])
         )
 
     def _update_toggle_button_text(self):
@@ -139,8 +142,10 @@ class ConfigList(metaclass=ABCMeta):
     def _toggle_items(self):
         enable_state = not self._is_current_item_enabled
 
-        for widget in self.widgets:
-            widget.ui_state.get_var(self.enable_key).set(enable_state)
+        # Only toggle items that match current filters
+        for i, widget in enumerate(self.widgets):
+            if i < len(self.current_config) and self._element_matches_filters(self.current_config[i]):
+                widget.ui_state.get_var(self.enable_key).set(enable_state)
         self.save_current_config()
 
         self._update_widget_visibility()
@@ -165,6 +170,7 @@ class ConfigList(metaclass=ABCMeta):
             self.widgets_initialized = True
 
         self._update_widget_visibility()
+        self._update_toggle_button_text()
 
     def _initialize_all_widgets(self):
         self.widgets = []
