@@ -142,7 +142,7 @@ class ConceptTab(ConfigList):
     def _maybe_reposition_toolbar(self, width):
         if not self._toolbar:
             return
-        threshold = 1046
+        threshold = 1070
         want_wrapped = width < threshold
         if want_wrapped == self._toolbar_is_wrapped:
             return

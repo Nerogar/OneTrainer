@@ -59,7 +59,7 @@ def app_title(master, row, column):
     image_label_component = ctk.CTkLabel(frame, image=image_component, text="")
     image_label_component.grid(row=0, column=0, padx=PAD, pady=PAD)
 
-    label_component = ctk.CTkLabel(frame, text="OneTrainer", font=ctk.CTkFont(size=20, weight="bold"))
+    label_component = ctk.CTkLabel(frame, text="OneTrainer", font=ctk.CTkFont(size=18, weight="bold"))
     label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
 
 
@@ -423,7 +423,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
 
 
 def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
-               command: Callable[[Any], None] = None):
+               command: Callable[[Any], None] = None, width: int = None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
 
@@ -444,7 +444,11 @@ def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIS
                 deactivate_update_var = False
                 break
 
-    component = ctk.CTkOptionMenu(master, values=keys, command=update_component)
+    kwargs = {}
+    if width is not None:
+        kwargs['width'] = width
+
+    component = ctk.CTkOptionMenu(master, values=keys, command=update_component, **kwargs)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
     def update_var():
