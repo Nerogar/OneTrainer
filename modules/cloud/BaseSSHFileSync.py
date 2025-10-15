@@ -45,65 +45,78 @@ class BaseSSHFileSync(BaseFileSync):
         self.upload_file(local_file=local,remote_file=remote)
 
 
+    def __collect_files_to_upload(
+        self,
+        local: Path,
+        remote: Path,
+        recursive: bool,
+        sync_info: dict
+    ) -> tuple[list[Path], list[Path]]:
+        # Collect files that need uploading and subdirectories to process
+        files_to_upload = []
+        subdirs_to_process = []
+
+        for local_entry in local.iterdir():
+            if local_entry.is_file():
+                remote_entry = remote / local_entry.name
+                if self.__needs_upload(local=local_entry, remote=remote_entry, sync_info=sync_info):
+                    files_to_upload.append(local_entry)
+            elif recursive and local_entry.is_dir():
+                subdirs_to_process.append(local_entry)
+
+        return files_to_upload, subdirs_to_process
+
+    def __upload_as_tar(
+        self,
+        local: Path,
+        remote: Path,
+        files_to_upload: list[Path],
+        subdirs_to_process: list[Path],
+        sync_info: dict
+    ):
+        # Upload files as a compressed tar archive.
+        with tempfile.TemporaryDirectory(prefix="onetrainer_dataset_") as temp_dir:
+            tar_path = Path(temp_dir) / f"{local.name}_sync.tar.gz"
+
+            with tarfile.open(tar_path, 'w:gz') as tar:
+                # Add files that need uploading
+                for file in files_to_upload:
+                    tar.add(file, arcname=file.name)
+
+                # Process subdirectories if recursive
+                for subdir in subdirs_to_process:
+                    self._add_dir_to_tar(tar, subdir, subdir.name, sync_info, remote / subdir.name)
+
+            # Only upload if tar has content
+            if tar_path.stat().st_size > 0:
+                remote_tar_path = remote / f".{local.name}_sync.tar.gz"
+                self.sync_up_file(local=tar_path, remote=remote_tar_path)
+                self._extract_tar_file(remote_tar_path, remote)
+
     def sync_up_dir(self,local : Path,remote: Path,recursive: bool,sync_info=None):
         if sync_info is None:
             sync_info=self.__get_sync_info(remote)
 
-        # Check if we should transfer as tar
-        if self.config.transfer_datasets_as_tar:
-            # Collect files that need to be uploaded
-            files_to_upload = []
-            dirs_to_process = []
+        # Prepare remote directory
+        self.sync_connection.open()
+        self.sync_connection.run(f'mkdir -p {shlex.quote(remote.as_posix())}',in_stream=False)
 
-            for local_entry in local.iterdir():
-                if local_entry.is_file():
-                    remote_entry = remote / local_entry.name
-                    if self.__needs_upload(local=local_entry, remote=remote_entry, sync_info=sync_info):
-                        files_to_upload.append(local_entry)
-                elif recursive and local_entry.is_dir():
-                    dirs_to_process.append(local_entry)
+        # Collect files that need to be uploaded
+        files_to_upload, subdirs_to_process = self.__collect_files_to_upload(
+            local, remote, recursive, sync_info
+        )
 
-            # If there are files to upload, create tar
-            if files_to_upload or dirs_to_process:
-                self.sync_connection.open()
-                self.sync_connection.run(f'mkdir -p {shlex.quote(remote.as_posix())}',in_stream=False)
-
-                with tempfile.TemporaryDirectory(prefix="onetrainer_dataset_") as temp_dir:
-                    tar_path = Path(temp_dir) / f"{local.name}_sync.tar.gz"
-
-                    with tarfile.open(tar_path, 'w:gz') as tar:
-                        # Add files that need uploading
-                        for file in files_to_upload:
-                            tar.add(file, arcname=file.name)
-
-                        # Process subdirectories if recursive
-                        if recursive:
-                            for subdir in dirs_to_process:
-                                # Recursively check subdirectory
-                                self._add_dir_to_tar(tar, subdir, subdir.name, sync_info, remote / subdir.name)
-
-                    # Only upload if tar has content
-                    if tar_path.stat().st_size > 0:
-                        # Upload tar file
-                        remote_tar_path = remote / f".{local.name}_sync.tar.gz"
-                        self.sync_up_file(local=tar_path, remote=remote_tar_path)
-
-                        # Extract tar file on remote
-                        self._extract_tar_file(remote_tar_path, remote)
+        # Upload using chosen strategy
+        if self.config.transfer_datasets_as_tar and (files_to_upload or subdirs_to_process):
+            self.__upload_as_tar(local, remote, files_to_upload, subdirs_to_process, sync_info)
         else:
-            # Original sync logic
-            self.sync_connection.open()
-            self.sync_connection.run(f'mkdir -p {shlex.quote(remote.as_posix())}',in_stream=False)
-            files=[]
-            for local_entry in local.iterdir():
-                if local_entry.is_file():
-                    remote_entry=remote/local_entry.name
-                    if self.__needs_upload(local=local_entry,remote=remote_entry,sync_info=sync_info):
-                        files.append(local_entry)
-                elif recursive and local_entry.is_dir():
-                    self.sync_up_dir(local=local_entry,remote=remote/local_entry.name,recursive=True,sync_info=sync_info)
+            # Upload files individually
+            if files_to_upload:
+                self.upload_files(local_files=files_to_upload,remote_dir=remote)
 
-            self.upload_files(local_files=files,remote_dir=remote)
+            # Process subdirectories recursively
+            for subdir in subdirs_to_process:
+                self.sync_up_dir(local=subdir,remote=remote/subdir.name,recursive=True,sync_info=sync_info)
 
     def sync_down_file(self,local : Path,remote : Path):
         sync_info=self.__get_sync_info(remote)
