@@ -99,7 +99,7 @@ def __replace_linear_layers(
         #ensure that all Linear layers were replaced
         #https://github.com/Nerogar/OneTrainer/issues/1050
         assert (not isinstance(module, convert_type)
-                or isinstance(module, QuantizedLinearMixin, LinearGGUFA8)), f"Linear layer {name_prefix}.{name} was not found in model for quantization"
+                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))), f"Linear layer {name_prefix}.{name} was not found in model for quantization"
 
 def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
