@@ -279,6 +279,8 @@ class ModelTab:
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
+            options.append(("GGUF A8 float", DataType.GGUF_A8_FLOAT))
+            options.append(("GGUF A8 int", DataType.GGUF_A8_INT))
 
         if include_none:
             options.insert(0, ("", DataType.NONE))

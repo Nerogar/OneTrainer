@@ -19,6 +19,8 @@ class DataType(Enum):
     FLOAT_W8A8_SVD = 'FLOAT_W8A8_SVD'
     INT_W8A8_SVD = 'INT_W8A8_SVD'
     GGUF = 'GGUF'
+    GGUF_A8_FLOAT = 'GGUF_A8_FLOAT'
+    GGUF_A8_INT = 'GGUF_A8_INT'
 
     def __str__(self):
         return self.value
@@ -55,6 +57,11 @@ class DataType(Enum):
                         DataType.FLOAT_W8A8_SVD,
                         DataType.INT_W8A8_SVD,
                         DataType.NFLOAT_4_SVD]
+
+    def is_gguf(self):
+        return self in [DataType.GGUF,
+                        DataType.GGUF_A8_FLOAT,
+                        DataType.GGUF_A8_INT]
 
     def quantize_fp8(self):
         return self == DataType.FLOAT_8 or self == DataType.FLOAT_8_SVD

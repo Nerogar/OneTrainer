@@ -3,6 +3,7 @@ from collections.abc import Callable
 from functools import partial
 
 from modules.module.quantized.LinearFp8 import LinearFp8
+from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
 from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
 from modules.module.quantized.LinearW8A8 import LinearW8A8
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
@@ -25,7 +26,6 @@ except ImportError:
 
 def __create_linear_layer(construct_fn, module: nn.Linear, copy_parameters: bool) -> nn.Module:
     bias = module.bias is not None
-
     quant_linear = construct_fn(
         in_features=module.in_features,
         out_features=module.out_features,
@@ -33,11 +33,13 @@ def __create_linear_layer(construct_fn, module: nn.Linear, copy_parameters: bool
     )
 
     if copy_parameters:
-        quant_linear.weight = type(quant_linear.weight)(module.weight)
+        quant_linear.weight = type(quant_linear.weight)(module.weight, requires_grad=False)
         if bias:
-            quant_linear.bias = type(quant_linear.bias)(module.bias)
+            quant_linear.bias = type(quant_linear.bias)(module.bias, requires_grad=False)
 
     return quant_linear
+
+from diffusers.quantizers.gguf.utils import GGUFLinear
 
 
 def __replace_linear_layers(
@@ -47,6 +49,7 @@ def __replace_linear_layers(
         copy_parameters: bool = False,
         name_prefix: str = "",
         visited_modules: set[int] | None = None,
+        convert_type = nn.Linear,
 ):
     if keep_in_fp32_modules is None:
         keep_in_fp32_modules = []
@@ -59,7 +62,7 @@ def __replace_linear_layers(
 
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
         for i, module in enumerate(parent_module):
-            if isinstance(module, nn.Linear):
+            if isinstance(module, convert_type):
                 quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
                 parent_module[i] = quant_linear
                 del module
@@ -78,7 +81,7 @@ def __replace_linear_layers(
                 continue
 
             module = getattr(parent_module, attr_name)
-            if isinstance(module, nn.Linear):
+            if isinstance(module, convert_type):
                 quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
                 setattr(parent_module, attr_name, quant_linear)
                 del module
@@ -95,7 +98,8 @@ def __replace_linear_layers(
     for name, module in parent_module.named_modules():
         #ensure that all Linear layers were replaced
         #https://github.com/Nerogar/OneTrainer/issues/1050
-        assert not isinstance(module, nn.Linear) or isinstance(module, QuantizedLinearMixin), f"Linear layer {name} was not found in model for quantization"
+        assert (not isinstance(module, convert_type)
+                or isinstance(module, QuantizedLinearMixin, LinearGGUFA8)), f"Linear layer {name_prefix}.{name} was not found in model for quantization"
 
 def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
@@ -112,7 +116,11 @@ def replace_linear_with_quantized_layers(
     elif dtype.quantize_intW8A8():
         construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.int8, compute_dtype=torch.bfloat16)
     elif dtype.quantize_fpW8A8():
-        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.float8_e4m3fn,  compute_dtype=torch.bfloat16)
+        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+    elif dtype == DataType.GGUF_A8_INT:
+        construct_fn = partial(LinearGGUFA8, dtype=torch.int8, compute_dtype=torch.bfloat16)
+    elif dtype == DataType.GGUF_A8_FLOAT:
+        construct_fn = partial(LinearGGUFA8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
     else:
         return
 
@@ -121,6 +129,7 @@ def replace_linear_with_quantized_layers(
         construct_fn=construct_fn,
         keep_in_fp32_modules=keep_in_fp32_modules,
         copy_parameters=copy_parameters,
+        convert_type = GGUFLinear if dtype.is_gguf() else nn.Linear,
     )
 
 
