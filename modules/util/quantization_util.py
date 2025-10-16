@@ -86,7 +86,7 @@ def __replace_linear_layers(
 
     visited_modules.add(id(parent_module))
 
-    if isinstance(parent_module, nn.ModuleList):
+    if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
         for i, module in enumerate(parent_module):
             if isinstance(module, nn.Linear):
                 quant_linear = convert_fn(module, copy_parameters)
@@ -121,6 +121,10 @@ def __replace_linear_layers(
                     visited_modules=visited_modules,
                 )
 
+    for name, module in parent_module.named_modules():
+        #ensure that all Linear layers were replaced
+        #https://github.com/Nerogar/OneTrainer/issues/1050
+        assert not isinstance(module, nn.Linear) or isinstance(module, QuantizedLinearMixin), f"Linear layer {name} was not found in model for quantization"
 
 def replace_linear_with_nf4_layers(
         parent_module: nn.Module,

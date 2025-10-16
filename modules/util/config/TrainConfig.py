@@ -123,6 +123,8 @@ class TrainOptimizerConfig(BaseConfig):
     Simplified_AdEMAMix: False
     cautious_mask: False
     grams_moment: False
+    kourkoutas_beta: False
+    k_warmup_steps: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -220,6 +222,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("Simplified_AdEMAMix", False, bool, False))
         data.append(("cautious_mask", False, bool, False))
         data.append(("grams_moment", False, bool, False))
+        data.append(("kourkoutas_beta", False, bool, False))
+        data.append(("k_warmup_steps", None, int, True))
 
         return TrainOptimizerConfig(data)
 

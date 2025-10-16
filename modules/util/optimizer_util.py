@@ -434,6 +434,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_AdEMAMix": False,
         "beta3_ema": 0.9999,
         "alpha": 5,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
     },
     Optimizer.ADOPT_ADV: {
         "beta1": 0.9,
@@ -452,6 +454,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha": 5,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
     },
     Optimizer.PRODIGY_ADV: {
         "beta1": 0.9,
@@ -467,6 +471,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "growth_rate": float('inf'),
         "slice_p": 11,
         "prodigy_steps": 0,
+        "d_limiter": False,
         "use_atan2": False,
         "cautious_mask": False,
         "grams_moment": False,
@@ -476,6 +481,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha": 5,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
     },
     Optimizer.SIMPLIFIED_AdEMAMix: {
         "beta1": 0.99,
@@ -490,6 +497,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "stochastic_rounding": True,
         "fused_back_pass": False,
         "orthogonal_gradient": False,
+        "kourkoutas_beta": False,
+        "k_warmup_steps": None,
     },
     Optimizer.LION_ADV: {
         "beta1": 0.9,
@@ -515,6 +524,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_coef": 1.0,
         "growth_rate": float('inf'),
         "slice_p": 11,
+        "prodigy_steps": 0,
+        "d_limiter": True,
         "cautious_mask": False,
         "orthogonal_gradient": False,
     },
