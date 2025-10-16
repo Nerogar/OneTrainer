@@ -1,14 +1,41 @@
-
-from modules.module.quantized.LinearW8A8 import (
-    LinearFp8Function,
-    LinearInt8Function,
-    quantize_fp8_tensorwise,
-    quantize_int8_tensorwise,
-)
-
+from modules.module.quantized.LinearW8A8 import quantize_fp8_axiswise, quantize_int8_axiswise, fp8_forward_tokenwise, int8_forward_tokenwise, int8_backward_W_tensorwise_A_axiswise, fp8_backward_W_tensorwise_A_axiswise
 import torch
+from torch import Tensor
 
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
+
+
+class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None) -> Tensor:
+        ctx.save_for_backward(weight)
+        #axiswise performs better than tensorwise in tests, even though
+        #it requires another requant during backward - but requant is cheap
+        weight_q, weight_scale = quantize_int8_axiswise(weight, dim=-1)
+        return int8_forward_tokenwise(x, weight_q, weight_scale.T, bias)
+
+    @staticmethod
+    def backward(ctx, x: Tensor):
+        if ctx.needs_input_grad != (True, False, False):
+            raise NotImplementedError("GGUF cannot be used for full finetuning")
+        weight, = ctx.saved_tensors
+        weight_q, weight_scale = quantize_int8_axiswise(weight, dim=0)
+        return int8_backward_W_tensorwise_A_axiswise(x, weight_q, weight_scale), None, None
+
+class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None) -> Tensor:
+        ctx.save_for_backward(weight)
+        weight_q, weight_scale = quantize_fp8_axiswise(weight, dim=-1)
+        return fp8_forward_tokenwise(x, weight_q, weight_scale, bias)
+
+    @staticmethod
+    def backward(ctx, x: Tensor):
+        if ctx.needs_input_grad != (True, False, False):
+            raise NotImplementedError("GGUF cannot be used for full finetuning")
+        weight, = ctx.saved_tensors
+        weight_q, weight_scale = quantize_fp8_axiswise(weight, dim=0)
+        return fp8_backward_W_tensorwise_A_axiswise(x, weight_q, weight_scale), None, None
 
 
 class LinearGGUFA8(GGUFLinear):
@@ -27,12 +54,9 @@ class LinearGGUFA8(GGUFLinear):
 
         if x.shape[0] > 16:
             if self._dtype == torch.int8:
-                #TODO tokenwise instead? Higher quality, but requires quantization on forward and backward
-                q, q_scale = quantize_int8_tensorwise(w)
-                y = LinearInt8Function.apply(x, q, q_scale, self.bias)
+                y = LinearGGUFIntA8RequantFunction.apply(x, w, self.bias)
             else:
-                q, q_scale = quantize_fp8_tensorwise(w)
-                y = LinearFp8Function.apply(x, q, q_scale, self.bias)
+                y = LinearGGUFFpA8RequantFunction.apply(x, w, self.bias)
         else:
             y = torch.nn.functional.linear(x, w, self.bias.to(self._compute_dtype))
 
