@@ -14,6 +14,8 @@ from modules.util.enum.DataType import DataType
 import torch
 from torch import Tensor, nn
 
+from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
+
 from tqdm import tqdm
 
 try:
@@ -39,7 +41,6 @@ def __create_linear_layer(construct_fn, module: nn.Linear, copy_parameters: bool
 
     return quant_linear
 
-from diffusers.quantizers.gguf.utils import GGUFLinear
 
 
 def __replace_linear_layers(
@@ -170,22 +171,19 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
                 child_module.quantize(device=device, cache_dir=cache_dir, svd_dtype=config.svd_dtype.torch_dtype(), rank=config.svd_rank)
 
 
-def get_unquantized_weight(module: nn.Module, dtype: torch.dtype, device: torch.device) -> Tensor:
+def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:
+    assert isinstance(module, nn.Linear)
     if isinstance(module, QuantizedLinearMixin):
         return module.unquantized_weight(dtype, device)
+    elif isinstance(module, GGUFLinear):
+        return dequantize_gguf_tensor(module.weight).to(dtype=dtype)
+    else:
+        return module.weight.detach().to(dtype=dtype)
 
-    return module.weight.detach().to(dtype=dtype)
 
-
-def get_weight_shape(module: nn.Module) -> torch.Size:
-    param = module.weight
-
-    if bnb is not None:
-        if isinstance(module, LinearNf4):
-            return module.shape
-
-    return param.shape
-
+def get_weight_shape(module: nn.Linear) -> torch.Size:
+    assert isinstance(module, nn.Linear)
+    return torch.Size((module.out_features, module.in_features))
 
 def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
     tensors = []
