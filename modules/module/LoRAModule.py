@@ -525,22 +525,29 @@ class LoRAModuleWrapper:
             module.to(device, dtype)
         return self
 
-    def load_state_dict(self, state_dict: dict[str, Tensor]):
+    def _check_rank_matches(self, state_dict: dict[str, Tensor]):
+        if not state_dict:
+            return
+
+        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
+            if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
+                raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}, please correct in the UI.")
+
+    def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
         Loads the state dict
 
         Args:
             state_dict: the state dict
+            strict: whether to strictly enforce that the keys in state_dict match the module's parameters
         """
-
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        for name, module in self.lora_modules.items():
-            try:
-                module.load_state_dict(state_dict)
-            except RuntimeError:  # noqa: PERF203
-                print(f"Missing key for {name}; initializing it to zero.")
+        self._check_rank_matches(state_dict)
+
+        for module in self.lora_modules.values():
+            module.load_state_dict(state_dict, strict=strict)
 
         # Temporarily re-create the state dict, so we can see what keys were left.
         remaining_names = set(state_dict) - set(self.state_dict())
