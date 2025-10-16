@@ -54,7 +54,7 @@ class StableDiffusion3FineTuneSetup(
                     "embeddings_3"
                 )
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior,
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.transformer,
                                            freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         return parameter_group_collection
@@ -69,7 +69,7 @@ class StableDiffusion3FineTuneSetup(
         self._setup_model_part_requires_grad("text_encoder_1", model.text_encoder_1, config.text_encoder, model.train_progress)
         self._setup_model_part_requires_grad("text_encoder_2", model.text_encoder_2, config.text_encoder_2, model.train_progress)
         self._setup_model_part_requires_grad("text_encoder_3", model.text_encoder_3, config.text_encoder_3, model.train_progress)
-        self._setup_model_part_requires_grad("transformer", model.transformer, config.prior, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer, config.transformer, model.train_progress)
 
         model.vae.requires_grad_(False)
 
@@ -139,7 +139,7 @@ class StableDiffusion3FineTuneSetup(
 
         model.vae.eval()
 
-        if config.prior.train:
+        if config.transformer.train:
             model.transformer.train()
         else:
             model.transformer.eval()

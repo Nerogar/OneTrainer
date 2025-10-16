@@ -63,7 +63,7 @@ class BaseHunyuanVideoSetup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().text_encoder_2,
             config.weight_dtypes().vae,
@@ -77,7 +77,7 @@ class BaseHunyuanVideoSetup(
                 config.train_dtype,
                 config.fallback_train_dtype,
                 [
-                    config.weight_dtypes().prior,
+                    config.weight_dtypes().transformer,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
                     config.weight_dtypes().embedding if config.train_any_embedding() else None,
                 ],
@@ -259,7 +259,7 @@ class BaseHunyuanVideoSetup(
             latent_input = scaled_noisy_latent_image
 
             if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([config.prior.guidance_scale * 1000.0], device=self.train_device)
+                guidance = torch.tensor([config.transformer.guidance_scale * 1000.0], device=self.train_device)
                 guidance = guidance.expand(latent_input.shape[0])
             else:
                 guidance = None

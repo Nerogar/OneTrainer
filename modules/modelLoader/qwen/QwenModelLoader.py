@@ -101,16 +101,16 @@ class QwenModelLoader(
                 config=base_model_name,
                 subfolder="transformer",
                 #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.prior.is_gguf() else None,
+                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype
             )
         else:
             transformer = self._load_diffusers_sub_module(
                 QwenImageTransformer2DModel,
-                weight_dtypes.prior,
+                weight_dtypes.transformer,
                 weight_dtypes.train_dtype,
                 base_model_name,
                 "transformer",
@@ -146,7 +146,7 @@ class QwenModelLoader(
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
             )
             return
         except Exception:
@@ -154,7 +154,7 @@ class QwenModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
             )
             return
         except Exception:
@@ -162,7 +162,7 @@ class QwenModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
             )
             return
         except Exception:
