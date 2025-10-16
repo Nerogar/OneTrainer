@@ -1,6 +1,8 @@
 import re
 from collections.abc import Callable
 
+from modules.dataLoader.mixin.StoreConcepts import StoreConcepts
+
 import modules.util.multi_gpu_util as multi
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
@@ -64,15 +66,17 @@ class DataLoaderText2ImageMixin:
 
         collect_paths = CollectPaths(
             concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
-            path_out_name='image_path', concept_out_name='concept',
+            path_out_name='image_path', concept_out_name='concept', concept_index_out_name='concept_index', concept_meta_out_name='concept_meta',
             extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel','-condlabel']
         )
+
+        store_concepts = StoreConcepts(config=config, concepts_meta_in_name='concept_meta')
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
         cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
-        modules = [download_datasets, collect_paths, sample_prompt_path]
+        modules = [download_datasets, collect_paths, store_concepts, sample_prompt_path]
 
         if config.masked_training:
             modules.append(mask_path)
@@ -264,11 +268,12 @@ class DataLoaderText2ImageMixin:
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
-        sort_names = output_names + ['concept']
+        sort_names = output_names + ['concept', 'concept_index']
 
         output_names = output_names + [
             ('concept.loss_weight', 'loss_weight'),
             ('concept.type', 'concept_type'),
+            'concept_index',
         ]
 
         if config.validation:

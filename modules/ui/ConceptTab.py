@@ -49,8 +49,8 @@ class ConceptTab(ConfigList):
     def create_new_element(self) -> dict:
         return ConceptConfig.default_values()
 
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return ConceptWindow(self.master, self.train_config, self.current_config[i], ui_state[0], ui_state[1], ui_state[2])
+    def open_element_window(self, i: int, ui_state: tuple[UIState, ...]) -> ctk.CTkToplevel:
+        return ConceptWindow(self.master, self.train_config, self.current_config[i], *ui_state)
 
     def _add_search_bar(self):
         toolbar = ctk.CTkFrame(self.top_frame, fg_color="transparent")
@@ -175,6 +175,7 @@ class ConceptWidget(ctk.CTkFrame):
         self.ui_state = UIState(self, concept)
         self.image_ui_state = UIState(self, concept.image)
         self.text_ui_state = UIState(self, concept.text)
+        self.noise_ui_state = UIState(self, concept.noise)
         self.i = i
 
         self.grid_rowconfigure(1, weight=1)
@@ -226,7 +227,7 @@ class ConceptWidget(ctk.CTkFrame):
 
         image_label.bind(
             "<Button-1>",
-            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
+            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state, self.noise_ui_state))
         )
 
     def __randomize_seed(self, concept: ConceptConfig):
