@@ -525,17 +525,13 @@ class LoRAModuleWrapper:
             module.to(device, dtype)
         return self
 
-    def _check_rank_alpha_match(self, state_dict: dict[str, Tensor]):
+    def _check_rank_matches(self, state_dict: dict[str, Tensor]):
         if not state_dict:
             return
 
         if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
             if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
-                raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}.")
-
-        if alpha_key := next((k for k in state_dict if k.endswith(".alpha")), None):
-            if (checkpoint_alpha := float(state_dict[alpha_key].item())) != float(self.alpha):
-                raise ValueError(f"Alpha mismatch: checkpoint={checkpoint_alpha}, config={self.alpha}.")
+                raise ValueError(f"Rank mismatch: resumed backup={checkpoint_rank}, config={self.rank}.")
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
@@ -548,14 +544,10 @@ class LoRAModuleWrapper:
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        # Validate resumed LoRA hyper-parameters (rank / alpha) before loading.
-        self._check_rank_alpha_match(state_dict)
+        self._check_rank_matches(state_dict)
 
-        for name, module in self.lora_modules.items():
-            try:
-                module.load_state_dict(state_dict, strict=strict)
-            except RuntimeError:  # noqa: PERF203
-                print(f"Missing key for {name}; initializing it to zero.")
+        for module in self.lora_modules.values():
+            module.load_state_dict(state_dict, strict=strict)
 
         # Temporarily re-create the state dict, so we can see what keys were left.
         remaining_names = set(state_dict) - set(self.state_dict())
