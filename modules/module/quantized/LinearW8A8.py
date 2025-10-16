@@ -58,7 +58,7 @@ def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
 def unquantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> Tensor:
     return q.to(compute_dtype) * scale.to(compute_dtype)
 
-def int8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
+def int8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
     res = torch._int_mm(x_8, weight.T)
     res_scaled = res.to(x.dtype).mul_(weight_scale * x_scale)
@@ -66,7 +66,7 @@ def int8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: floa
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
 
-def fp8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
+def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
     one = torch.ones(1, device=x.device)
     res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=x.dtype)
