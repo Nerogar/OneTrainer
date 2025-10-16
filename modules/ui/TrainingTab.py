@@ -750,9 +750,9 @@ class TrainingTab:
         components.entry(frame, 4, 1, self.ui_state, "scheduled_pseudo_huber_strength")
 
         # Huber Delta
-        components.label(frame, 4, 0, "Huber delta",
+        components.label(frame, 5, 0, "Huber delta",
                          tooltip="Delta parameter for huber loss variants")
-        components.entry(frame, 4, 1, self.ui_state, "huber_delta")
+        components.entry(frame, 5, 1, self.ui_state, "huber_delta")
 
         if supports_vb_loss:
             # VB Strength
