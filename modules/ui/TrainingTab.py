@@ -745,8 +745,9 @@ class TrainingTab:
         components.entry(frame, 3, 1, self.ui_state, "huber_strength")
 
         # Scheduled Pseudo-Huber Strength
-        components.label(frame, 4, 0, "Scheduled Pseudo-Huber Strength",
-                         tooltip="Scheduled Pseudo-Huber Strength for custom loss settings. This loss dynamically acts like MAE (robust to outliers) in high noise and MSE (preserves fine details) in low noise.")
+        scheduled_huber_label = components.label(frame, 4, 0, "Scheduled Pseudo-Huber Strength",
+                        tooltip="Scheduled Pseudo-Huber Strength for custom loss settings. This loss dynamically acts like MAE (robust to outliers) in high noise and MSE (preserves fine details) in low noise.")
+        scheduled_huber_label.configure(wraplength=130, justify="left")
         components.entry(frame, 4, 1, self.ui_state, "scheduled_pseudo_huber_strength")
 
         # Huber Delta
