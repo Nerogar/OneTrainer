@@ -64,7 +64,7 @@ class TopBar:
         # components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
         # Wiki button
-        components.button(self.frame, 0, 4, "Wiki", self.open_wiki)
+        components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50)
 
         # save button
         components.button(self.frame, 0, 3, "save current config", self.__save_config,
