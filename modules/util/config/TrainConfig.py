@@ -404,6 +404,9 @@ class TrainConfig(BaseConfig):
     # prior
     prior: TrainModelPartConfig
 
+    # transformer
+    transformer: TrainModelPartConfig
+
     # text encoder
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
@@ -499,7 +502,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=8,
+            config_version=9,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -509,6 +512,7 @@ class TrainConfig(BaseConfig):
                 5: self.__migration_5,
                 6: self.__migration_6,
                 7: self.__migration_7,
+                8: self.__migration_8,
             }
         )
 
@@ -698,12 +702,21 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_8(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if migrated_data["model_type"] != "STABLE_CASCADE_1" and migrated_data["model_type"] != "WUERSTCHEN_2":
+            migrated_data["transformer"] = migrated_data["prior"]
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
             self.fallback_train_dtype,
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
             self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
+            self.weight_dtype if self.transformer.weight_dtype == DataType.NONE else self.transformer.weight_dtype,
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
             self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
             self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
@@ -721,6 +734,7 @@ class TrainConfig(BaseConfig):
         return ModelNames(
             base_model=self.base_model_name,
             prior_model=self.prior.model_name,
+            transformer_model=self.transformer.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
             text_encoder_4=self.text_encoder_4.model_name,
@@ -945,6 +959,15 @@ class TrainConfig(BaseConfig):
         prior.learning_rate = None
         prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
+
+        # prior
+        transformer = TrainModelPartConfig.default_values()
+        transformer.model_name = ""
+        transformer.train = True
+        transformer.stop_training_after = 0
+        transformer.learning_rate = None
+        transformer.weight_dtype = DataType.NONE
+        data.append(("transformer", transformer, TrainModelPartConfig, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()

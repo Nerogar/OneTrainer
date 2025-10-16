@@ -87,7 +87,7 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
+            has_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_text_encoder_3=True,
@@ -105,8 +105,8 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
-            allow_override_prior=True,
+            has_transformer=True,
+            allow_override_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_vae=True,
@@ -123,8 +123,8 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
-            allow_override_prior=True,
+            has_transformer=True,
+            allow_override_transformer=True,
             has_text_encoder_1=True,
             has_vae=True,
         )
@@ -140,8 +140,8 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
-            allow_override_prior=True,
+            has_transformer=True,
+            allow_override_transformer=True,
             has_text_encoder_1=True,
             has_vae=True,
         )
@@ -193,7 +193,7 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
+            has_transformer=True,
             has_text_encoder=True,
             has_vae=True,
         )
@@ -209,7 +209,7 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
+            has_transformer=True,
             has_text_encoder=True,
             has_vae=True,
         )
@@ -225,7 +225,7 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
+            has_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_vae=True,
@@ -242,7 +242,7 @@ class ModelTab:
         row = self.__create_base_dtype_components(row)
         row = self.__create_base_components(
             row,
-            has_prior=True,
+            has_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_text_encoder_3=True,
@@ -309,6 +309,8 @@ class ModelTab:
             has_unet: bool = False,
             has_prior: bool = False,
             allow_override_prior: bool = False,
+            has_transformer: bool = False,
+            allow_override_transformer: bool = False,
             allow_override_text_encoder_4: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
@@ -329,8 +331,8 @@ class ModelTab:
         if has_prior:
             if allow_override_prior:
                 # prior model
-                components.label(self.scroll_frame, row, 0, "Prior Model", #TODO rename; as more models support this, the name "Prior" gets confusing
-                                 tooltip="Filename, directory or Hugging Face repository of the prior model. For Flux, Chroma or Qwen, it must be a safetensors file that only contains the transformer.")
+                components.label(self.scroll_frame, row, 0, "Prior Model",
+                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
@@ -339,8 +341,26 @@ class ModelTab:
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")
-            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(include_gguf=True),
+            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "prior.weight_dtype")
+
+            row += 1
+
+        if has_transformer:
+            if allow_override_transformer:
+                # transformer model
+                components.label(self.scroll_frame, row, 0, "Override Transformer / GGUF",
+                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be overridden")
+                components.file_entry(
+                    self.scroll_frame, row, 1, self.ui_state, "transformer.model_name",
+                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                )
+
+            # transformer weight dtype
+            components.label(self.scroll_frame, row, 3, "Override Transformer Data Type",
+                             tooltip="Overrides the transformer weight data type")
+            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(include_gguf=True),
+                                  self.ui_state, "transformer.weight_dtype")
 
             row += 1
 
@@ -382,7 +402,7 @@ class ModelTab:
 
         if has_text_encoder_4:
             if allow_override_text_encoder_4:
-                # prior model
+                # text encoder 4 weight dtype
                 components.label(self.scroll_frame, row, 0, "Text Encoder 4 Override",
                                  tooltip="Filename, directory or Hugging Face repository of the text encoder 4 model")
                 components.file_entry(
