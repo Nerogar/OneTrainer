@@ -21,13 +21,13 @@ def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
     q = quantize_int8(x, scale)
     return q, scale
 
-def quantize_int8_tokenwise_get_scale(x: Tensor) -> Tensor:
-    abs_max = x.abs().amax(dim=-1, keepdim=True)
+def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
+    abs_max = x.abs().amax(dim=dim, keepdim=True)
     scale = (abs_max.float() / 127.0).clamp(min=1e-12)
     return scale
 
-def quantize_int8_tokenwise(x: Tensor) -> tuple[Tensor, Tensor]:
-    scale = quantize_int8_tokenwise_get_scale(x)
+def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
+    scale = quantize_int8_axiswise_get_scale(x, dim)
     q = quantize_int8(x, scale)
     return q, scale
 
@@ -40,8 +40,8 @@ def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
     scale = (abs_max.float() / 448.0).clamp(min=1e-12)
     return scale
 
-def quantize_fp8_tokenwise_get_scale(x: Tensor) -> Tensor:
-    abs_max = x.abs().amax(dim=-1, keepdim=True)
+def quantize_fp8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
+    abs_max = x.abs().amax(dim=dim, keepdim=True)
     scale = (abs_max.float() / 448.0).clamp(min=1e-12)
     return scale
 
@@ -50,8 +50,8 @@ def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
     q = quantize_fp8(x, scale)
     return q, scale
 
-def quantize_fp8_tokenwise(x: Tensor) -> tuple[Tensor, Tensor]:
-    scale = quantize_fp8_tokenwise_get_scale(x)
+def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_axiswise_get_scale(x, dim)
     q = quantize_fp8(x, scale)
     return q, scale
 
@@ -59,16 +59,15 @@ def unquantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> 
     return q.to(compute_dtype) * scale.to(compute_dtype)
 
 def int8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
-    x_8, x_scale = quantize_int8_tokenwise(x)
+    x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
     res = torch._int_mm(x_8, weight.T)
     res_scaled = res.to(x.dtype).mul_(weight_scale * x_scale)
     if bias is not None:
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
 
-
 def fp8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
-    x_8, x_scale = quantize_fp8_tokenwise(x)
+    x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
     one = torch.ones(1, device=x.device)
     res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=x.dtype)
     res_scaled = res.mul_(x_scale) #much faster than scaled by _scaled_mm
@@ -78,15 +77,16 @@ def fp8_forward_tokenwise(x: Tensor, weight: float | Tensor, weight_scale: float
     return res_scaled
 
 
-def int8_backward_W_tensorwise_A_columnwise(x: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
-    x_8, x_scale = quantize_int8_tokenwise(x)
+def int8_backward_axiswise(x: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
+    x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
     mm_res = triton_mm_8bit(x_8, weight)
     return mm_res.to(x.dtype).mul_(weight_scale * x_scale)
 
-def fp8_backward_W_tensorwise_A_columnwise(x: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
-    x_8, x_scale = quantize_fp8_tokenwise(x)
+def fp8_backward_axiswise(x: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
+    x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
     mm_res = triton_mm_8bit(x_8, weight)
     return mm_res.to(x.dtype).mul_(weight_scale * x_scale)
+
 
 
 class LinearInt8Function(torch.autograd.Function):
@@ -101,7 +101,7 @@ class LinearInt8Function(torch.autograd.Function):
             raise NotImplementedError("Int A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        return int8_backward_W_tensorwise_A_columnwise(x, weight, weight_scale), None, None, None
+        return int8_backward_axiswise(x, weight, weight_scale), None, None, None
 
 class LinearFp8Function(torch.autograd.Function):
     @staticmethod
@@ -115,7 +115,7 @@ class LinearFp8Function(torch.autograd.Function):
             raise NotImplementedError("Float A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        return fp8_backward_W_tensorwise_A_columnwise(x, weight, weight_scale), None, None, None
+        return fp8_backward_axiswise(x, weight, weight_scale), None, None, None
 
 class LinearW8A8(
     nn.Linear,
@@ -206,7 +206,7 @@ def benchmark_int8(m, k, n, device = 'cuda'):
     run_benchmark(lambda: triton_mm_8bit(y_8, w_8), "triton mm backward int8")
 
     run_benchmark(lambda: int8_forward_tokenwise(x, w_8, w_scale), "torch forward int")
-    run_benchmark(lambda: int8_backward_W_tensorwise_A_columnwise(y, w_8, w_scale), "triton backward int")
+    run_benchmark(lambda: int8_backward_axiswise(y, w_8, w_scale), "triton backward int")
 
 
 @torch.no_grad()
@@ -226,7 +226,7 @@ def benchmark_fp8(m, k, n, device = 'cuda'):
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward fp8")
     run_benchmark(lambda: triton_mm_8bit(y_8, w_8), "triton mm backward fp8")
     run_benchmark(lambda: fp8_forward_tokenwise(x, w_8, w_scale), "torch forward fp8")
-    run_benchmark(lambda: fp8_backward_W_tensorwise_A_columnwise(y, w_8, w_scale), "triton backward fp8")
+    run_benchmark(lambda: fp8_backward_axiswise(y, w_8, w_scale), "triton backward fp8")
 
 
 if __name__ == "__main__":
