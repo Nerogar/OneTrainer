@@ -192,7 +192,7 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 2)
 
         self.__create_base2_frame(column_1, 0)
-        self.__create_prior_frame(column_1, 1)
+        self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)
@@ -245,7 +245,7 @@ class TrainingTab:
         self.__create_embedding_frame(column_0, 2)
 
         self.__create_base2_frame(column_1, 0)
-        self.__create_prior_frame(column_1, 1)
+        self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
         self.__create_masked_frame(column_2, 1)
@@ -597,30 +597,30 @@ class TrainingTab:
         # train transformer
         components.label(frame, 0, 0, "Train Transformer",
                          tooltip="Enables training the Transformer model")
-        components.switch(frame, 0, 1, self.ui_state, "prior.train")
+        components.switch(frame, 0, 1, self.ui_state, "transformer.train")
 
         # train transformer epochs
         components.label(frame, 1, 0, "Stop Training After",
                          tooltip="When to stop training the Transformer")
-        components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
+        components.time_entry(frame, 1, 1, self.ui_state, "transformer.stop_training_after", "transformer.stop_training_after_unit",
                               supports_time_units=False)
 
         # transformer learning rate
         components.label(frame, 2, 0, "Transformer Learning Rate",
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "transformer.learning_rate")
 
         if supports_force_attention_mask:
             # transformer learning rate
             components.label(frame, 3, 0, "Force Attention Mask",
                              tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
-            components.switch(frame, 3, 1, self.ui_state, "prior.attention_mask")
+            components.switch(frame, 3, 1, self.ui_state, "transformer.attention_mask")
 
         if supports_guidance_scale:
             # guidance scale
             components.label(frame, 4, 0, "Guidance Scale",
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
-            components.entry(frame, 4, 1, self.ui_state, "prior.guidance_scale")
+            components.entry(frame, 4, 1, self.ui_state, "transformer.guidance_scale")
 
     def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

@@ -22,7 +22,7 @@ class SampleConfig(BaseConfig):
     text_encoder_2_layer_skip: int
     text_encoder_3_layer_skip: int
     text_encoder_4_layer_skip: int
-    prior_attention_mask: bool
+    transformer_attention_mask: bool
     force_last_timestep: bool
 
     sample_inpainting: bool
@@ -37,7 +37,7 @@ class SampleConfig(BaseConfig):
         self.text_encoder_2_layer_skip = train_config.text_encoder_2_layer_skip
         self.text_encoder_3_layer_skip = train_config.text_encoder_3_layer_skip
         self.text_encoder_4_layer_skip = train_config.text_encoder_4_layer_skip
-        self.prior_attention_mask = train_config.prior.attention_mask
+        self.transformer_attention_mask = train_config.transformer.attention_mask
         self.force_last_timestep = train_config.rescale_noise_scheduler_to_zero_terminal_snr
 
     @staticmethod
@@ -61,7 +61,7 @@ class SampleConfig(BaseConfig):
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_3_layer_skip", 0, int, False))
         data.append(("text_encoder_4_layer_skip", 0, int, False))
-        data.append(("prior_attention_mask", False, bool, False))
+        data.append(("transformer_attention_mask", False, bool, False))
         data.append(("force_last_timestep", False, bool, False))
 
         data.append(("sample_inpainting", False, bool, False))
