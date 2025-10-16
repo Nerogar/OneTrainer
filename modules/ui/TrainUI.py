@@ -36,7 +36,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.tensorboard_util import start_filtered_tensorboard, stop_tensorboard
+from modules.util.tensorboard_util import TensorboardManager
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
@@ -132,13 +132,12 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.training_callbacks = None
         self.training_commands = None
 
-        self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
-        self._previous_tensorboard_mode = self.train_config.tensorboard_mode
+        self.tensorboard_manager = TensorboardManager()
 
         # Initialize tensorboard if needed
-        if self._previous_tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            self._start_always_on_tensorboard()
+        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
+            self.tensorboard_manager.start(self.train_config)
 
         # Add debounced trace for workspace_dir changes
         self.workspace_dir_debounce_id = None
@@ -159,7 +158,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def __close(self):
         self.top_bar_component.save_default()
-        self._stop_always_on_tensorboard()
+        self.tensorboard_manager.stop()
         if hasattr(self, 'workspace_dir_trace_id'):
             self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
         if hasattr(self, 'tensorboard_mode_trace_id'):
@@ -763,10 +762,9 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
     def __training_thread_function(self):
         error_caught = False
 
-        # Start Tensorboard if TRAIN_ONLY mode and not cloud tunnel
-        if (self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY and
-            not (self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel)):
-            self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
+        # Use centralized manager
+        self.tensorboard_manager.handle_training_start(self.train_config)
+
 
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
@@ -802,16 +800,8 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             self.on_update_status("Stopped")
         self.delete_eta_label()
 
-        # Stop Tensorboard if TRAIN_ONLY mode
-        if (self.train_config.tensorboard_mode == TensorboardMode.TRAIN_ONLY and
-            not (self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel)):
-            self._stop_always_on_tensorboard()
-
-        # Restart if ALWAYS_ON mode
-        if (self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON and
-            self.always_on_tensorboard_subprocess is None
-            and not (self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel)):
-            self.after(0, self._start_always_on_tensorboard)
+        # Use centralized manager
+        self.tensorboard_manager.handle_training_end(self.train_config)
 
         self.after(0, self._set_training_button_idle)
 
@@ -860,19 +850,6 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         if train_commands:
             train_commands.save()
 
-    def _start_always_on_tensorboard(self):
-        # stop if cloud tunnel
-        if self.train_config.cloud.enabled and self.train_config.cloud.tensorboard_tunnel:
-            return
-
-        if self.always_on_tensorboard_subprocess is None:
-            self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
-
-    def _stop_always_on_tensorboard(self):
-        if self.always_on_tensorboard_subprocess is not None:
-            stop_tensorboard(self.always_on_tensorboard_subprocess)
-            self.always_on_tensorboard_subprocess = None
-
     def _on_workspace_dir_change_debounced(self, *args):
         """Debounce workspace directory changes to avoid rapid restarts"""
         if self.workspace_dir_debounce_id is not None:
@@ -884,37 +861,13 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         if (new := self.train_config.workspace_dir) == self.current_workspace_dir:
             return
         self.current_workspace_dir = new
-        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            print("Restarting Tensorboard due to workspace change")
-            self._stop_always_on_tensorboard()
-            self._start_always_on_tensorboard()
+        self.tensorboard_manager.handle_workspace_change(self.train_config)
 
     def _on_tensorboard_mode_change(self):
-        new_mode = self.train_config.tensorboard_mode
-        old_mode = self._previous_tensorboard_mode
-
-        if new_mode == old_mode:
-            return
-
-        # training
-        if self.training_thread is not None:
-            if new_mode == TensorboardMode.OFF:
-                self._stop_always_on_tensorboard()
-            elif old_mode == TensorboardMode.OFF:
-                # if user enabled during training, start it
-                self.always_on_tensorboard_subprocess = start_filtered_tensorboard(self.train_config)
-
-            self._previous_tensorboard_mode = new_mode
-            return
-
-        # not training
-        if old_mode == TensorboardMode.ALWAYS_ON:
-            self._stop_always_on_tensorboard()
-
-        if new_mode == TensorboardMode.ALWAYS_ON:
-            self._start_always_on_tensorboard()
-
-        self._previous_tensorboard_mode = new_mode
+        self.tensorboard_manager.handle_mode_change(
+            self.train_config,
+            is_training=self.training_thread is not None
+        )
 
     def _set_training_button_style(self, mode: str):
         if not self.training_button:
