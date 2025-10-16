@@ -295,6 +295,8 @@ class ModelTab:
                          wide_tooltip=True)
         components.entry(self.scroll_frame, row, 1, self.ui_state, "secrets.huggingface_token")
 
+        row += 1
+
         # base model
         components.label(self.scroll_frame, row, 0, "Base Model",
                          tooltip="Filename, directory or Hugging Face repository of the base model")
