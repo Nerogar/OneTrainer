@@ -531,7 +531,7 @@ class LoRAModuleWrapper:
 
         if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
             if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
-                raise ValueError(f"Rank mismatch: resumed backup={checkpoint_rank}, config={self.rank}.")
+                raise ValueError(f"Rank mismatch: config={checkpoint_rank}, config={self.rank}, please correct in the UI.")
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
