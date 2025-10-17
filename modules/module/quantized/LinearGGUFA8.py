@@ -19,7 +19,7 @@ def int8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> 
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
 
-def fp8_forward_both_axiswise(x: Tensor, weight: float | Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
+def fp8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
     w_8, w_scale = quantize_fp8_axiswise(weight, dim=-1)
     one = torch.ones(1, device=x.device)
