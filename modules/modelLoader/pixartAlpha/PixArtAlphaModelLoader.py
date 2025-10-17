@@ -74,7 +74,7 @@ class PixArtAlphaModelLoader(
 
         transformer = self._load_diffusers_sub_module(
             Transformer2DModel,
-            weight_dtypes.prior,
+            weight_dtypes.transformer,
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",

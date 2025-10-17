@@ -61,7 +61,7 @@ class BaseHiDreamSetup(
                     enable_checkpointing_for_llama_encoder_layers(model.text_encoder_4, config)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().text_encoder_2,
             config.weight_dtypes().text_encoder_3,
@@ -90,7 +90,7 @@ class BaseHiDreamSetup(
                 config.train_dtype,
                 config.fallback_train_dtype,
                 [
-                    config.weight_dtypes().prior,
+                    config.weight_dtypes().transformer,
                     config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
                     config.weight_dtypes().embedding if config.train_any_embedding() else None,
                 ],
@@ -326,7 +326,7 @@ class BaseHiDreamSetup(
                     text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
                     text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability,
                     text_encoder_4_dropout_probability=config.text_encoder_4.dropout_probability,
-                    apply_attention_mask=config.prior.attention_mask,
+                    apply_attention_mask=config.transformer.attention_mask,
                 ))
 
             latent_image = batch['latent_image']

@@ -385,7 +385,6 @@ class DoRAModule(LoRAModule):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-
         A = self.lora_down.weight
         B = self.lora_up.weight
         orig_weight = get_unquantized_weight(self.orig_module, A.dtype, self.train_device)
