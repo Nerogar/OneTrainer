@@ -726,26 +726,26 @@ class TrainingTab:
 
         # MSE Strength
         components.label(frame, 0, 0, "MSE Strength",
-                         tooltip="Mean Squared Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+                         tooltip="Mean Squared Error strength for custom loss settings. Strengths should generally sum to 1.")
         components.entry(frame, 0, 1, self.ui_state, "mse_strength")
 
         # MAE Strength
         components.label(frame, 1, 0, "MAE Strength",
-                         tooltip="Mean Absolute Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+                         tooltip="Mean Absolute Error strength for custom loss settings. Strengths should generally sum to 1.")
         components.entry(frame, 1, 1, self.ui_state, "mae_strength")
 
         # log-cosh Strength
         components.label(frame, 2, 0, "log-cosh Strength",
-                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings.")
+                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings. Strengths should generally sum to 1.")
         components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength")
 
         # Huber Strength
         components.label(frame, 3, 0, "Huber Strength",
-                         tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE.")
+                         tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE. Strengths should generally sum to 1.")
         components.entry(frame, 3, 1, self.ui_state, "huber_strength")
 
         # Huber Delta
-        components.label(frame, 4, 0, "Huber delta",
+        components.label(frame, 4, 0, "Huber Delta",
                          tooltip="Delta parameter for huber loss")
         components.entry(frame, 4, 1, self.ui_state, "huber_delta")
 
