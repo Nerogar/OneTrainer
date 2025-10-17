@@ -62,7 +62,7 @@ class BaseChromaSetup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
@@ -82,9 +82,9 @@ class BaseChromaSetup(
                 config.enable_autocast_cache,
             )
 
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
             self,
@@ -225,11 +225,12 @@ class BaseChromaSetup(
             )
 
             packed_latent_input = model.pack_latents(latent_input)
-
             image_seq_len = packed_latent_input.shape[1]
+            text_seq_len = text_encoder_output.shape[1]
             image_attention_mask = torch.full((packed_latent_input.shape[0], image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
 
+            assert image_seq_len % 16 == 0 and (image_seq_len + text_seq_len) % 16 == 0
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
@@ -329,5 +330,5 @@ class BaseChromaSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()

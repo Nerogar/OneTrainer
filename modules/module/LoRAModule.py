@@ -385,7 +385,6 @@ class DoRAModule(LoRAModule):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-
         A = self.lora_down.weight
         B = self.lora_up.weight
         orig_weight = get_unquantized_weight(self.orig_module, A.dtype, self.train_device)
@@ -485,6 +484,7 @@ class LoRAModuleWrapper:
         unsuitable = []
 
         for name, child_module in orig_module.named_modules():
+            name = name.replace(".checkpoint.", ".")
             if not isinstance(child_module, Linear | Conv2d):
                 unsuitable.append(name)
                 continue

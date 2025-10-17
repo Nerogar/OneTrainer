@@ -8,9 +8,7 @@ from itertools import repeat
 from modules.util.enum.DataType import DataType
 from modules.util.quantization_util import (
     is_quantized_parameter,
-    replace_linear_with_fp8_layers,
-    replace_linear_with_int8_layers,
-    replace_linear_with_nf4_layers,
+    replace_linear_with_quantized_layers,
 )
 
 import torch
@@ -42,12 +40,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             keep_in_fp32_modules = []
 
         with accelerate.init_empty_weights():
-            if dtype.quantize_nf4():
-                replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
-            elif dtype.quantize_int8():
-                replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
-            elif dtype.quantize_fp8():
-                replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
+            replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, copy_parameters=False)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -247,17 +240,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        if dtype.quantize_nf4():
-            replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
-        elif dtype.quantize_int8():
-            replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
-        elif dtype.quantize_fp8():
-            replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, copy_parameters=True)
 
         for module_name, module in sub_module.named_modules():
             param_iter = [(x, y[0], y[1]) for x, y in zip(repeat(False), module._parameters.items(), strict=False)]
             buffer_iter = [(x, y[0], y[1]) for x, y in zip(repeat(True), module._buffers.items(), strict=False)]
-
             for is_buffer, tensor_name, value in param_iter + buffer_iter:
                 if value is not None and torch.is_floating_point(value):
                     old_type = type(value)

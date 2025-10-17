@@ -129,7 +129,7 @@ class StableDiffusion3ModelLoader(
 
         transformer = self._load_diffusers_sub_module(
             SD3Transformer2DModel,
-            weight_dtypes.prior,
+            weight_dtypes.transformer,
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
@@ -220,7 +220,7 @@ class StableDiffusion3ModelLoader(
             print("text encoder 3 (t5) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype
         )
 
         model.model_type = model_type
