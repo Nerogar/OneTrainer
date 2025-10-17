@@ -60,7 +60,6 @@ def __replace_linear_layers(
         visited_modules = set()
 
     visited_modules.add(id(parent_module))
-
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
         for i, module in enumerate(parent_module):
             if isinstance(module, convert_type):
@@ -96,12 +95,6 @@ def __replace_linear_layers(
                     visited_modules=visited_modules,
                 )
 
-    for name, module in parent_module.named_modules():
-        #ensure that all Linear layers were replaced
-        #https://github.com/Nerogar/OneTrainer/issues/1050
-        assert (not isinstance(module, convert_type)
-                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))), f"Linear layer {name_prefix}.{name} was not found in model for quantization"
-
 def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
         dtype: DataType,
@@ -125,13 +118,22 @@ def replace_linear_with_quantized_layers(
     else:
         return
 
+    convert_type = GGUFLinear if dtype.is_gguf() else nn.Linear
     __replace_linear_layers(
         parent_module=parent_module,
         construct_fn=construct_fn,
         keep_in_fp32_modules=keep_in_fp32_modules,
         copy_parameters=copy_parameters,
-        convert_type = GGUFLinear if dtype.is_gguf() else nn.Linear,
+        convert_type = convert_type,
     )
+
+    #ensure that all Linear layers were replaced
+    #https://github.com/Nerogar/OneTrainer/issues/1050
+    for name, module in parent_module.named_modules():
+        assert (not isinstance(module, convert_type)
+                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))
+                or any(s in name.split('.') for s in keep_in_fp32_modules)
+               ), f"Linear layer {name} was not found in model for quantization"
 
 
 def is_quantized_parameter(
