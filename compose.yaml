@@ -12,6 +12,7 @@ services:
                 - capabilities: [gpu]
         environment:
             # Allow X11 access
+            # Windows may need DISPLAY=host.docker.internal:0.0 instead
             - DISPLAY=${DISPLAY}
             - UID=1000
             - GID=1000
