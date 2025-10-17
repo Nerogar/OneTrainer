@@ -370,7 +370,6 @@ class TrainConfig(BaseConfig):
     log_cosh_strength: float
     huber_strength: float
     huber_delta: float
-    scheduled_pseudo_huber_strength: float
     vb_loss_strength: float
     loss_weight_fn: LossWeight
     loss_weight_strength: float
@@ -910,7 +909,6 @@ class TrainConfig(BaseConfig):
         data.append(("log_cosh_strength", 0.0, float, False))
         data.append(("huber_strength", 0.0, float, False))
         data.append(("huber_delta", 0.1, float, False))
-        data.append(("scheduled_pseudo_huber_strength", 0.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
         data.append(("loss_weight_strength", 5.0, float, False))

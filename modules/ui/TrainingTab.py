@@ -744,37 +744,31 @@ class TrainingTab:
                          tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE.")
         components.entry(frame, 3, 1, self.ui_state, "huber_strength")
 
-        # Scheduled Pseudo-Huber Strength
-        scheduled_huber_label = components.label(frame, 4, 0, "Scheduled Pseudo-Huber Strength",
-                        tooltip="Scheduled Pseudo-Huber Strength for custom loss settings. This loss dynamically acts like MAE (robust to outliers) in high noise and MSE (preserves fine details) in low noise.")
-        scheduled_huber_label.configure(wraplength=130, justify="left")
-        components.entry(frame, 4, 1, self.ui_state, "scheduled_pseudo_huber_strength")
-
         # Huber Delta
-        components.label(frame, 5, 0, "Huber delta",
-                         tooltip="Delta parameter for huber loss variants")
-        components.entry(frame, 5, 1, self.ui_state, "huber_delta")
+        components.label(frame, 4, 0, "Huber delta",
+                         tooltip="Delta parameter for huber loss")
+        components.entry(frame, 4, 1, self.ui_state, "huber_delta")
 
         if supports_vb_loss:
             # VB Strength
-            components.label(frame, 6, 0, "VB Strength",
+            components.label(frame, 5, 0, "VB Strength",
                              tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
-            components.entry(frame, 6, 1, self.ui_state, "vb_loss_strength")
+            components.entry(frame, 5, 1, self.ui_state, "vb_loss_strength")
 
         # Loss Weight function
-        components.label(frame, 7, 0, "Loss Weight Function",
+        components.label(frame, 6, 0, "Loss Weight Function",
                          tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
-        components.options(frame, 7, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
+        components.options(frame, 6, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
 
         # Loss weight strength
-        components.label(frame, 8, 0, "Gamma",
+        components.label(frame, 7, 0, "Gamma",
                          tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
-        components.entry(frame, 8, 1, self.ui_state, "loss_weight_strength")
+        components.entry(frame, 7, 1, self.ui_state, "loss_weight_strength")
 
         # Loss Scaler
-        components.label(frame, 9, 0, "Loss Scaler",
+        components.label(frame, 8, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
-        components.options(frame, 9, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+        components.options(frame, 8, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __create_layer_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
