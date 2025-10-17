@@ -147,7 +147,6 @@ class TopBar:
             ui_state=self.ui_state,
             var_name="training_method",
             command=self.change_training_method_callback,
-            width=105
         )
 
     def __change_model_type(self, model_type: ModelType):
