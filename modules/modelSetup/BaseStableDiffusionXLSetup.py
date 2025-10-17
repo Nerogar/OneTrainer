@@ -199,6 +199,14 @@ class BaseStableDiffusionXLSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
+            # debug print
+            print()
+            batch_concepts = [config.concepts[i] for i in batch['concept_index']]
+            for i, (path, concept) in enumerate(zip(batch['image_path'], batch_concepts)):
+                noise_cfg = concept.noise if concept.noise.enable_timestep_distribution_override else config
+                noise_cfg_override = ", concept override" if concept.noise.enable_timestep_distribution_override else ""
+                print(f"[{i}]: {concept.name:14} tsteps: {noise_cfg.min_noising_strength:.2f}-{noise_cfg.max_noising_strength:.2f}{noise_cfg_override} ({path})")
+
             text_encoder_output, pooled_text_encoder_2_output = model.combine_text_encoder_output(*model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],
@@ -224,17 +232,21 @@ class BaseStableDiffusionXLSetup(
             if config.model_type.has_conditioning_image_input():
                 scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
-            timestep = self._get_timestep_discrete(
+            timestep = self._get_timestep_discrete_per_concept(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                batch['concept_index']
             )
+            print(f"timesteps: {timestep.tolist()}")
+            # timestep (torch.Size([4])): tensor([677, 275, 170, 897], device='cuda:0', dtype=torch.int32)
 
-            latent_noise = self._create_noise(
+            latent_noise = self._create_noise_per_concept(
                 scaled_latent_image,
                 config,
+                batch['concept_index'],
                 generator,
                 timestep,
                 model.noise_scheduler.betas,

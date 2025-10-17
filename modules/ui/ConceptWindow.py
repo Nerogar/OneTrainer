@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 
+from modules.ui.TimestepDistributionWindow import TimestepDistributionFrame
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
@@ -79,6 +80,7 @@ class ConceptWindow(ctk.CTkToplevel):
             ui_state: UIState,
             image_ui_state: UIState,
             text_ui_state: UIState,
+            noise_ui_state: UIState,
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
@@ -89,6 +91,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.ui_state = ui_state
         self.image_ui_state = image_ui_state
         self.text_ui_state = text_ui_state
+        self.noise_ui_state = noise_ui_state
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
 
@@ -105,6 +108,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.general_tab = self.__general_tab(tabview.add("general"), concept)
         self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
+        self.noise_tab = self.__noise_tab(tabview.add("noise"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
         #automatic concept scan
@@ -372,6 +376,53 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 8, 2, "Probability",
                          tooltip="Probability to randomize capitialization of each tag, from 0 to 1.")
         components.entry(frame, 8, 3, self.text_ui_state, "caps_randomize_probability")
+
+        frame.pack(fill="both", expand=1)
+        return frame
+
+    def __noise_tab(self, master):
+        col0_size = 230
+
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0, minsize=col0_size)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure(2, weight=0)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
+
+        # noise override
+        components.label(frame, 0, 0, "Noise Override",
+                         tooltip="Use custom noise settings for this concept and enable overriding of the global noise settings")
+        components.switch(frame, 0, 1, self.noise_ui_state, "enable_noise_override")
+
+        # offset noise weight
+        components.label(frame, 1, 0, "Offset Noise Weight",
+                         tooltip="The weight of offset noise added to each training step")
+        components.entry(frame, 1, 1, self.noise_ui_state, "offset_noise_weight")
+
+        # generalized offset noise weight
+        generalised_offset_label = components.label(frame, 1, 2, "Generalized Offset Noise",
+            tooltip="Per-timestep 'brightness knob' instead of a fixed offset - steadier training, better starts, and improved very dark/bright images. Compatible with V-pred and Eps-pred. Start with 0.02 and adjust as needed.")
+        generalised_offset_label.configure(wraplength=130, justify="left")
+        components.switch(frame, 1, 3, self.noise_ui_state, "generalized_offset_noise")
+
+        # perturbation noise weight
+        components.label(frame, 2, 0, "Perturbation Noise Weight",
+                         tooltip="The weight of perturbation noise added to each training step")
+        components.entry(frame, 2, 1, self.noise_ui_state, "perturbation_noise_weight")
+
+        frame.grid_rowconfigure(3, minsize=20)
+
+        # timestep distribution override
+        components.label(frame, 4, 0, "Timestep Distribution Override",
+                         tooltip="Use a custom timestep distribution for this concept and enable overriding of the global timestep distribution")
+        components.switch(frame, 4, 1, self.noise_ui_state, "enable_timestep_distribution_override")
+
+        # timestep distribution settings and plot
+        frame.grid_rowconfigure(5, weight=1)
+        timestep_distribution_frame = TimestepDistributionFrame(frame, self.concept.noise, self.noise_ui_state)
+        timestep_distribution_frame.grid(row=5, column=0, columnspan=5, sticky='nsew')
+        timestep_distribution_frame.grid_columnconfigure(0, weight=0, minsize=col0_size)
 
         frame.pack(fill="both", expand=1)
         return frame

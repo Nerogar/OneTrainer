@@ -21,10 +21,9 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
-        concepts = config.concepts
-        if concepts is None:
-            with open(config.concept_file_name, 'r') as f:
-                concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
+        # always reload concepts
+        with open(config.concept_file_name, 'r') as f:
+            concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
 
         # choose all validation concepts, or none of them, depending on is_validation
         concepts = [concept for concept in concepts if (ConceptType(concept.type) == ConceptType.VALIDATION) == is_validation]

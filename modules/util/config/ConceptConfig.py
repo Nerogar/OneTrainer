@@ -4,6 +4,7 @@ from typing import Any
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.enum.ConceptType import ConceptType
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 
 class ConceptImageConfig(BaseConfig):
@@ -98,7 +99,6 @@ class ConceptTextConfig(BaseConfig):
     caps_randomize_mode: str
     caps_randomize_lowercase: bool
 
-
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
 
@@ -125,6 +125,51 @@ class ConceptTextConfig(BaseConfig):
         return ConceptTextConfig(data)
 
 
+class ConceptNoiseConfig(BaseConfig):
+    enable_noise_override: bool
+
+    offset_noise_weight: float
+    generalized_offset_noise: bool
+    perturbation_noise_weight: float
+
+    enable_timestep_distribution_override: bool
+
+    timestep_distribution: TimestepDistribution
+    min_noising_strength: float
+    max_noising_strength: float
+    noising_weight: float
+    noising_bias: float
+
+    timestep_shift: float
+    dynamic_timestep_shifting: bool
+
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super().__init__(data)
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        data.append(("enable_noise_override", False, bool, False))
+
+        data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("generalized_offset_noise", False, bool, False))
+        data.append(("perturbation_noise_weight", 0.0, float, False))
+
+        data.append(("enable_timestep_distribution_override", False, bool, False))
+
+        data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
+        data.append(("min_noising_strength", 0.0, float, False))
+        data.append(("max_noising_strength", 1.0, float, False))
+        data.append(("noising_weight", 0.0, float, False))
+        data.append(("noising_bias", 0.0, float, False))
+
+        data.append(("timestep_shift", 1.0, float, False))
+        data.append(("dynamic_timestep_shifting", False, bool, False))
+
+        return ConceptNoiseConfig(data)
+
+
 class ConceptConfig(BaseConfig):
     name: str
     path: str
@@ -140,6 +185,7 @@ class ConceptConfig(BaseConfig):
 
     image: ConceptImageConfig
     text: ConceptTextConfig
+    noise: ConceptNoiseConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
@@ -175,6 +221,7 @@ class ConceptConfig(BaseConfig):
         as_dict = super().to_dict()
         as_dict['image'] = self.image.to_dict()
         as_dict['text'] = self.text.to_dict()
+        as_dict['noise'] = self.noise.to_dict()
         return as_dict
 
     @staticmethod
@@ -183,6 +230,7 @@ class ConceptConfig(BaseConfig):
 
         data.append(("image", ConceptImageConfig.default_values(), ConceptImageConfig, False))
         data.append(("text", ConceptTextConfig.default_values(), ConceptTextConfig, False))
+        data.append(("noise", ConceptNoiseConfig.default_values(), ConceptNoiseConfig, False))
 
         data.append(("name", "", str, False))
         data.append(("path", "", str, False))
