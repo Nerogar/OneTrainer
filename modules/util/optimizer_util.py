@@ -529,6 +529,16 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "cautious_mask": False,
         "orthogonal_gradient": False,
     },
+    Optimizer.MUON_ADV: {
+        "beta1": 0.9,
+        "weight_decay": 0.0,
+        "ns_steps": 5,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "nesterov": True,
+        "vector_reshape_muon": True,
+        "fused_back_pass": False,
+    },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,
         "beta2": 0.999,

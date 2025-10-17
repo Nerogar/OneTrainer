@@ -67,6 +67,9 @@ class Optimizer(Enum):
     CAME = 'CAME'
     CAME_8BIT = 'CAME_8BIT'
 
+    # MUON
+    MUON_ADV = 'MUON_ADV'
+
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
     TIGER = 'TIGER'
@@ -109,6 +112,7 @@ class Optimizer(Enum):
             Optimizer.PRODIGY_ADV,
             Optimizer.LION_ADV,
             Optimizer.LION_PRODIGY_ADV,
+            Optimizer.MUON_ADV,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

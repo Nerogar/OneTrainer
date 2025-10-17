@@ -1172,6 +1172,21 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )
 
+        # MUON_ADV Optimizer
+        case Optimizer.MUON_ADV:
+            from adv_optm import Muon_adv
+            optimizer = Muon_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else True,
+            )
+
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:
             from timm.optim.adabelief import AdaBelief

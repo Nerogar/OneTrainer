@@ -177,6 +177,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'alpha_grad': {'title': 'Grad α', 'tooltip': 'Controls the mixing coefficient between raw gradients and momentum gradients in Simplified AdEMAMix. Higher values (e.g., 10-100) emphasize recent gradients, suitable for small batch sizes to reduce noise. Lower values (e.g., 0-1) emphasize historical gradients, suitable for large batch sizes for stability. Setting to 0 uses only momentum gradients without raw gradient contribution.', 'type': 'float'},
             'kourkoutas_beta': {'title': 'Kourkoutas Beta', 'tooltip': 'Enables a layer-wise dynamic β₂ adaptation. This feature makes the optimizer more responsive to "spiky" gradients by lowering β₂ during periods of high variance, and more stable during calm periods by raising β₂ towards its maximum. It can significantly improve training stability and final loss.', 'type': 'bool'},
             'k_warmup_steps': {'title': 'K-β Warmup Steps ', 'tooltip': 'When using Kourkoutas Beta, the number of initial training steps during which the dynamic β₂ logic is held off. In this period, β₂ is set to its fixed value to allow for initial training stability before the adaptive mechanism activates.', 'type': 'int'},
+            'ns_steps': {'title': 'Newton-Schulz Iterations', 'tooltip': 'Controls the number of iterations for update orthogonalization. Higher values improve the updates quality but make each step slower. Lower values are faster per step but may be less effective.', 'type': 'int'},
+            'vector_reshape_muon': {'title': '1D Vector Reshape', 'tooltip': 'whether to reshape 1D vectors into 2D matrices for Muon.', 'type': 'bool'},
         }
         # @formatter:on
 
