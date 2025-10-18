@@ -4,7 +4,7 @@
     "learning_rate": 1e-5,
     "model_type": "CHROMA_1",
     "resolution": "512",
-    "prior": {
+    "transformer": {
         "train": true,
         "weight_dtype": "BFLOAT_16"
     },
