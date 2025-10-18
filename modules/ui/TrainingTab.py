@@ -568,6 +568,12 @@ class TrainingTab:
         rescale_label.configure(wraplength=130, justify="left")
         components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
+        # Diff2Flow
+        rescale_diff_label = components.label(frame, 4, 0, "Diff2Flow",
+                         tooltip="Enables finetuning with the Diff2Flow objective. Instead of predicting noise (epsilon), this method adapts the UNet to predict a velocity field for flow matching. This alignment can significantly speed up training convergence and allows for high-quality generation while preserving the model pre-train knowledge.")
+        rescale_diff_label.configure(wraplength=130, justify="left")
+        components.switch(frame, 4, 1, self.ui_state, "diff2flow")
+
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")

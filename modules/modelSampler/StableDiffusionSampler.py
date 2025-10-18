@@ -36,6 +36,84 @@ class StableDiffusionSampler(BaseModelSampler):
         self.pipeline = model.create_pipeline()
 
     @torch.no_grad()
+    def __sample_diff2flow(
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            text_encoder_layer_skip: int = 0,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+    ) -> ModelSamplerOutput:
+        """
+        Generates an image using the Diff2Flow (Euler ODE) sampling method.
+        """
+        with self.model.autocast_context:
+            generator = torch.Generator(device=self.train_device)
+            if random_seed:
+                generator.seed()
+            else:
+                generator.manual_seed(seed)
+
+            # Prompt Encoding
+            self.model.text_encoder_to(self.train_device)
+            prompt_embedding = self.model.encode_text(
+                text=prompt, train_device=self.train_device, text_encoder_layer_skip=text_encoder_layer_skip
+            )
+            negative_prompt_embedding = self.model.encode_text(
+                text=negative_prompt, train_device=self.train_device, text_encoder_layer_skip=text_encoder_layer_skip
+            )
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]).to(dtype=self.model.train_dtype.torch_dtype())
+            self.model.text_encoder_to(self.temp_device)
+            torch_gc()
+
+            unet = self.pipeline.unet
+            vae = self.pipeline.vae
+            vae_scale_factor = self.pipeline.vae_scale_factor
+
+            # Initial Latent
+            latent_image = torch.randn(
+                size=(1, unet.config.in_channels, height // vae_scale_factor, width // vae_scale_factor),
+                generator=generator, device=self.train_device, dtype=self.model.train_dtype.torch_dtype(),
+            )
+
+            # Euler Integration Loop
+            self.model.unet_to(self.train_device)
+            timesteps = torch.linspace(0, 1, diffusion_steps + 1, device=self.train_device)[:-1]
+            dt = 1 / diffusion_steps
+
+            for i, t in enumerate(tqdm(timesteps, desc="sampling (diff2flow)")):
+                latent_model_input = torch.cat([latent_image] * 2)
+                t_batch = torch.full((2,), t.item(), device=self.train_device, dtype=self.model.train_dtype.torch_dtype())
+
+                velocity_pred = self.model.get_diff2flow_velocity(
+                    latent_model_input, t_batch,
+                    encoder_hidden_states=combined_prompt_embedding
+                )
+
+                velocity_uncond, velocity_cond = velocity_pred.chunk(2)
+                velocity = velocity_uncond + cfg_scale * (velocity_cond - velocity_uncond)
+                latent_image = latent_image + dt * velocity
+                on_update_progress(i + 1, diffusion_steps)
+
+            self.model.unet_to(self.temp_device)
+            torch_gc()
+
+            # Decode
+            self.model.vae_to(self.train_device)
+            latent_image = latent_image.to(dtype=vae.dtype)
+            image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
+            image = self.pipeline.image_processor.postprocess(image, output_type='pil', do_denormalize=[True] * image.shape[0])
+            self.model.vae_to(self.temp_device)
+            torch_gc()
+
+            return ModelSamplerOutput(file_type=FileType.IMAGE, data=image[0])
+
+    @torch.no_grad()
     def __sample_base(
             self,
             prompt: str,
@@ -50,8 +128,18 @@ class StableDiffusionSampler(BaseModelSampler):
             cfg_rescale: float = 0.7,
             text_encoder_layer_skip: int = 0,
             force_last_timestep: bool = False,
+            diffusion_to_flow_matching: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
+        # Dispatch to Diff2Flow sampler if requested
+        if diffusion_to_flow_matching:
+            return self.__sample_diff2flow(
+                prompt=prompt, negative_prompt=negative_prompt, height=height, width=width,
+                seed=seed, random_seed=random_seed, diffusion_steps=diffusion_steps,
+                cfg_scale=cfg_scale, text_encoder_layer_skip=text_encoder_layer_skip,
+                on_update_progress=on_update_progress
+            )
+
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
             if random_seed:
@@ -387,6 +475,11 @@ class StableDiffusionSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
+        if sample_config.diffusion_to_flow_matching and sample_config.sample_inpainting:
+            raise NotImplementedError(
+                "Diff2Flow sampling is not currently implemented for inpainting models."
+            )
+
         if self.model_type.has_conditioning_image_input():
             sampler_output = self.__sample_inpainting(
                 prompt=sample_config.prompt,
@@ -420,6 +513,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
                 text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
                 force_last_timestep=sample_config.force_last_timestep,
+                diffusion_to_flow_matching=sample_config.diffusion_to_flow_matching,
                 on_update_progress=on_update_progress,
             )
 
