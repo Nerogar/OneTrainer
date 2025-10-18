@@ -51,6 +51,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
         # This is a large map, copied from OptimizerParamsWindow for simplicity.
         # @formatter:off
         KEY_DETAIL_MAP = {
+            'alpha': {'title': 'Alpha', 'tooltip': 'Smoothing parameter for RMSprop and others.', 'type': 'float'},
             'beta1': {'title': 'Beta1', 'tooltip': 'optimizer_momentum term.', 'type': 'float'},
             'beta2': {'title': 'Beta2', 'tooltip': 'Coefficients for computing running averages of gradient.', 'type': 'float'},
             'eps': {'title': 'EPS', 'tooltip': 'A small value to prevent division by zero.', 'type': 'float'},
