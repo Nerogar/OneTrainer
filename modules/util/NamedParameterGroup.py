@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import cached_property
 
 from modules.util.config.TrainConfig import TrainConfig
@@ -25,6 +25,7 @@ class NamedParameterGroupCollection:
 
     def __init__(self):
         self.__groups = []
+        self.layer_key_fn: Callable | None = None
 
     def add_group(self, group: NamedParameterGroup):
         self.__groups.append(group)
@@ -42,6 +43,7 @@ class NamedParameterGroupCollection:
 
             # Create a parameter group for the text encoder
             parameters.append({
+                'name': group.display_name,
                 'params': list(group.parameters),
                 'lr': lr,
                 'initial_lr': lr,
