@@ -69,7 +69,7 @@ def __create_fp8_linear_layer(module: nn.Linear, copy_parameters: bool) -> nn.Mo
     return quant_linear
 
 
-def __replace_linear_layers(
+def __replace_linear_layers_recursive(
         parent_module: nn.Module,
         convert_fn: Callable[[nn.Linear, bool], nn.Module],
         keep_in_fp32_modules: list[str] | None = None,
@@ -85,15 +85,14 @@ def __replace_linear_layers(
         visited_modules = set()
 
     visited_modules.add(id(parent_module))
-
-    if isinstance(parent_module, nn.ModuleList):
+    if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
         for i, module in enumerate(parent_module):
             if isinstance(module, nn.Linear):
                 quant_linear = convert_fn(module, copy_parameters)
                 parent_module[i] = quant_linear
                 del module
             elif id(module) not in visited_modules:
-                __replace_linear_layers(
+                __replace_linear_layers_recursive(
                     parent_module=module,
                     convert_fn=convert_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
@@ -112,7 +111,7 @@ def __replace_linear_layers(
                 setattr(parent_module, attr_name, quant_linear)
                 del module
             elif isinstance(module, nn.Module) and id(module) not in visited_modules:
-                __replace_linear_layers(
+                __replace_linear_layers_recursive(
                     parent_module=module,
                     convert_fn=convert_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
@@ -121,6 +120,21 @@ def __replace_linear_layers(
                     visited_modules=visited_modules,
                 )
 
+def __replace_linear_layers(
+        parent_module: nn.Module,
+        convert_fn: Callable[[nn.Linear, bool], nn.Module],
+        keep_in_fp32_modules: list[str] | None = None,
+        copy_parameters: bool = False,
+):
+    __replace_linear_layers_recursive(parent_module, convert_fn, keep_in_fp32_modules, copy_parameters)
+
+    #ensure that all Linear layers were replaced
+    #https://github.com/Nerogar/OneTrainer/issues/1050
+    for name, module in parent_module.named_modules():
+        assert (not isinstance(module, nn.Linear)
+                or isinstance(module, QuantizedLinearMixin)
+                or any(s in name.split('.') for s in keep_in_fp32_modules)
+               ), f"Linear layer {name} was not found in model for quantization"
 
 def replace_linear_with_nf4_layers(
         parent_module: nn.Module,

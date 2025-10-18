@@ -732,39 +732,49 @@ class TrainingTab:
 
         # MSE Strength
         components.label(frame, 0, 0, "MSE Strength",
-                         tooltip="Mean Squared Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+                         tooltip="Mean Squared Error strength for custom loss settings. Strengths should generally sum to 1.")
         components.entry(frame, 0, 1, self.ui_state, "mse_strength")
 
         # MAE Strength
         components.label(frame, 1, 0, "MAE Strength",
-                         tooltip="Mean Absolute Error strength for custom loss settings. MAE + MSE Strengths generally should sum to 1.")
+                         tooltip="Mean Absolute Error strength for custom loss settings. Strengths should generally sum to 1.")
         components.entry(frame, 1, 1, self.ui_state, "mae_strength")
 
         # log-cosh Strength
         components.label(frame, 2, 0, "log-cosh Strength",
-                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings.")
+                         tooltip="Log - Hyperbolic cosine Error strength for custom loss settings. Strengths should generally sum to 1.")
         components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength")
+
+        # Huber Strength
+        components.label(frame, 3, 0, "Huber Strength",
+                         tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE. Strengths should generally sum to 1.")
+        components.entry(frame, 3, 1, self.ui_state, "huber_strength")
+
+        # Huber Delta
+        components.label(frame, 4, 0, "Huber Delta",
+                         tooltip="Delta parameter for huber loss")
+        components.entry(frame, 4, 1, self.ui_state, "huber_delta")
 
         if supports_vb_loss:
             # VB Strength
-            components.label(frame, 3, 0, "VB Strength",
+            components.label(frame, 5, 0, "VB Strength",
                              tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
-            components.entry(frame, 3, 1, self.ui_state, "vb_loss_strength")
+            components.entry(frame, 5, 1, self.ui_state, "vb_loss_strength")
 
         # Loss Weight function
-        components.label(frame, 4, 0, "Loss Weight Function",
+        components.label(frame, 6, 0, "Loss Weight Function",
                          tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
-        components.options(frame, 4, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
+        components.options(frame, 6, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
 
         # Loss weight strength
-        components.label(frame, 5, 0, "Gamma",
+        components.label(frame, 7, 0, "Gamma",
                          tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
-        components.entry(frame, 5, 1, self.ui_state, "loss_weight_strength")
+        components.entry(frame, 7, 1, self.ui_state, "loss_weight_strength")
 
         # Loss Scaler
-        components.label(frame, 6, 0, "Loss Scaler",
+        components.label(frame, 8, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
-        components.options(frame, 6, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+        components.options(frame, 8, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __create_layer_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
