@@ -74,22 +74,27 @@ class UIState:
         return update
 
     def __set_enum_var(self, obj, is_dict, name, var, var_type, nullable):
-        if is_dict:
-            def update(_0, _1, _2):
-                string_var = var.get()
-                if (string_var == "" or string_var == "None") and nullable:
-                    obj[name] = None
-                else:
-                    obj[name] = var_type[string_var]
-                self.__call_var_traces(name)
-        else:
-            def update(_0, _1, _2):
-                string_var = var.get()
-                if (string_var == "" or string_var == "None") and nullable:
-                    setattr(obj, name, None)
-                else:
-                    setattr(obj, name, var_type[string_var])
-                self.__call_var_traces(name)
+        def update(_0, _1, _2):
+            string_var = var.get()
+            value_to_set = None
+
+            if not ((string_var == "" or string_var == "None") and nullable):
+                try:
+                    # Try to set by value first (for StrEnum)
+                    value_to_set = var_type(string_var)
+                except ValueError:
+                    try:
+                        # Fallback to setting by name for other Enum types
+                        value_to_set = var_type[string_var]
+                    except KeyError:
+                        print(f"Could not set {name} as {string_var}")
+
+            if is_dict:
+                obj[name] = value_to_set
+            else:
+                setattr(obj, name, value_to_set)
+
+            self.__call_var_traces(name)
 
         return update
 

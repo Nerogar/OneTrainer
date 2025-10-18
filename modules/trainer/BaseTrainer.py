@@ -1,6 +1,4 @@
-import os
 import subprocess
-import sys
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
@@ -23,7 +21,7 @@ class BaseTrainer(
     metaclass=ABCMeta,
 ):
 
-    tensorboard_subprocess: subprocess.Popen
+    tensorboard_subprocess: subprocess.Popen = None
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__()
@@ -80,23 +78,3 @@ class BaseTrainer(
             self.config.model_type,
             self.config.training_method
         )
-    def _start_tensorboard(self):
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
-        tensorboard_log_dir = os.path.join(self.config.workspace_dir, "tensorboard")
-
-        tensorboard_args = [
-            tensorboard_executable,
-            "--logdir",
-            tensorboard_log_dir,
-            "--port",
-            str(self.config.tensorboard_port),
-            "--samples_per_plugin=images=100,scalars=10000",
-        ]
-
-        if self.config.tensorboard_expose:
-            tensorboard_args.append("--bind_all")
-
-        self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
-
-    def _stop_tensorboard(self):
-        self.tensorboard_subprocess.kill()

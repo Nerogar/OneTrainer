@@ -1,11 +1,13 @@
 import contextlib
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog
 from typing import Any
 
 from modules.util.enum.TimeUnit import TimeUnit
-from modules.util.path_util import supported_image_extensions
+from modules.util.path_util import supported_image_extensions, validate_file_path
 from modules.util.ui.ToolTip import ToolTip
+from modules.util.ui.ui_utils import _register_drop_target
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -49,6 +51,7 @@ def entry(
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
+        custom_validator: Callable[[str], tuple[bool, str]] = None,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -122,6 +125,12 @@ def entry(
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
                     return fail("Invalid bool")
+
+            if custom_validator:
+                is_valid, error_msg = custom_validator(value)
+                if not is_valid:
+                    return fail(error_msg)
+
             return success()
         except ValueError:
             return fail("Invalid value")
@@ -201,18 +210,32 @@ def entry(
 
 def file_entry(
         master, row, column, ui_state: UIState, var_name: str,
-        is_output: bool = False,
         path_modifier: Callable[[str], str] = None,
+        is_output: bool = False,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] = None,
+        valid_extensions: list[str] = None,
+        path_type: str = "file",  # "file" or "directory"
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry(frame,row=0, column=0, ui_state=ui_state, var_name=var_name)
+    if not is_output:
+        meta = ui_state.get_field_metadata(var_name)
+        is_output = getattr(meta, 'is_output', False)
+
+    def validate_file_path_wrapper(value: str) -> tuple[bool, str]:
+        return validate_file_path(value, is_output, valid_extensions, path_type)
+
+    entry_widget = entry(
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        custom_validator=validate_file_path_wrapper, command=command
+    )
+
+    _register_drop_target(entry_widget, ui_state, var_name, command)
 
     def __open_dialog():
         filetypes = [
@@ -250,13 +273,38 @@ def file_entry(
     return frame
 
 
-def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None, is_output: bool = False):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
+    if not is_output:
+        meta = ui_state.get_field_metadata(var_name)
+        is_output = getattr(meta, 'is_output', False)
+
+    def validate_dir_path_wrapper(value: str) -> tuple[bool, str]:
+        # trim whitespaces from the last path component, nothing else
+        if not value:
+            return validate_file_path(value, is_output=is_output, valid_extensions=None, path_type="directory")
+
+        path = Path(value)
+        trimmed_name = path.name.strip()
+
+        if trimmed_name != path.name:
+            sep = '\\' if '\\' in value else '/'
+            trimmed_path = f"{path.parent}{sep}{trimmed_name}" if str(path.parent) != '.' else trimmed_name
+            ui_state.get_var(var_name).set(trimmed_path)
+            value = trimmed_path
+
+        return validate_file_path(value, is_output=is_output, valid_extensions=None, path_type="directory")
+
+    entry_widget = entry(
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        custom_validator=validate_dir_path_wrapper, command=command
+    )
+
+    _register_drop_target(entry_widget, ui_state, var_name, command)
 
     def __open_dialog():
         dir_path = filedialog.askdirectory()
