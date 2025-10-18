@@ -1172,11 +1172,59 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )
 
-        # MUON_ADV Optimizer
+         # MUON_ADV Optimizer
         case Optimizer.MUON_ADV:
+            import inspect
+            from copy import deepcopy
+
             from adv_optm import Muon_adv
+
+            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None else False
+            layer_key_fn = parameter_group_collection.layer_key_fn
+
+            adam_kwargs = {}
+            if MuonWithAuxAdam and optimizer_config.muon_adam_config:
+                from adv_optm import AdamW_adv
+
+                adam_config = optimizer_config.muon_adam_config
+                adam_config_dict = adam_config.to_dict()
+
+                # Get valid parameter names from AdamW_adv constructor, excluding 'self', 'params', 'lr', 'betas'
+                valid_adam_keys = set(inspect.signature(AdamW_adv.__init__).parameters.keys()) - {'self', 'params', 'lr', 'betas'}
+
+                adam_kwargs = {
+                    key: value for key, value in adam_config_dict.items() if key in valid_adam_keys and value is not None
+                }
+
+                beta1 = adam_config.beta1 if adam_config.beta1 is not None else 0.9
+                beta2 = adam_config.beta2 if adam_config.beta2 is not None else 0.999
+                adam_kwargs['betas'] = (beta1, beta2)
+
+            optimizer_params = parameters
+            if MuonWithAuxAdam and layer_key_fn is not None:
+                # Split parameter groups for different learning rates
+                new_param_groups = []
+                adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
+
+                for group in parameters:
+                    adam_params = [p for p in group['params'] if layer_key_fn(p) == 'adam' and p.requires_grad]
+                    muon_params = [p for p in group['params'] if layer_key_fn(p) != 'adam' and p.requires_grad]
+
+                    if muon_params:
+                        muon_group = deepcopy(group)
+                        muon_group['params'] = muon_params
+                        new_param_groups.append(muon_group)
+
+                    if adam_params:
+                        adam_group = deepcopy(group)
+                        adam_group['params'] = adam_params
+                        adam_group['lr'] = adam_lr
+                        adam_group['initial_lr'] = adam_lr
+                        new_param_groups.append(adam_group)
+                optimizer_params = new_param_groups
+
             optimizer = Muon_adv(
-                params=parameters,
+                params=optimizer_params,
                 lr=config.learning_rate,
                 beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
@@ -1185,7 +1233,11 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else True,
-            )
+                MuonWithAuxAdam=MuonWithAuxAdam,
+                layer_key_fn=layer_key_fn,
+                muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
+                adam_kwargs=adam_kwargs or None,
+                )
 
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:

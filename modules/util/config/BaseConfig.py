@@ -35,7 +35,7 @@ class BaseConfig:
         for name in self.types:
             value = getattr(self, name)
             if issubclass_safe(self.types[name], BaseConfig):
-                data[name] = value.to_dict()
+                data[name] = value.to_dict() if value is not None else None
             elif self.types[name] is list or get_origin(self.types[name]) is list:
                 if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[0], BaseConfig):
                     data[name] = [le.to_dict() for le in value] if value is not None else None
@@ -74,8 +74,16 @@ class BaseConfig:
 
         for name in self.types:
             try:
+                if name not in data:
+                    continue
+
                 if issubclass_safe(self.types[name], BaseConfig):
-                    getattr(self, name).from_dict(data[name])
+                    if data[name] is None:
+                        setattr(self, name, None)
+                    else:
+                        if getattr(self, name) is None:
+                            setattr(self, name, self.types[name].default_values())
+                        getattr(self, name).from_dict(data[name])
                 elif self.types[name] is list or get_origin(self.types[name]) is list:
                     if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[0], BaseConfig):
                         list_type = get_args(self.types[name])[0]

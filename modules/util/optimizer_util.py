@@ -538,6 +538,11 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "nesterov": True,
         "vector_reshape_muon": True,
         "fused_back_pass": False,
+        "MuonWithAuxAdam": False,
+        "non_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

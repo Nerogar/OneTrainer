@@ -1,7 +1,8 @@
 import contextlib
 from tkinter import TclError
 
-from modules.util.config.TrainConfig import TrainConfig
+from modules.ui.MuonAdamWindow import MuonAdamWindow
+from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
     OPTIMIZER_DEFAULT_PARAMETERS,
@@ -11,6 +12,7 @@ from modules.util.optimizer_util import (
 )
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 
@@ -30,6 +32,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.ui_state = ui_state
         self.optimizer_ui_state = ui_state.get_var("optimizer")
         self.protocol("WM_DELETE_WINDOW", self.on_window_close)
+        self.muon_adam_button = None
 
         self.title("Optimizer Settings")
         self.geometry("800x500")
@@ -179,6 +182,10 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'k_warmup_steps': {'title': 'K-β Warmup Steps ', 'tooltip': 'When using Kourkoutas Beta, the number of initial training steps during which the dynamic β₂ logic is held off. In this period, β₂ is set to its fixed value to allow for initial training stability before the adaptive mechanism activates.', 'type': 'int'},
             'ns_steps': {'title': 'Newton-Schulz Iterations', 'tooltip': 'Controls the number of iterations for update orthogonalization. Higher values improve the updates quality but make each step slower. Lower values are faster per step but may be less effective.', 'type': 'int'},
             'vector_reshape_muon': {'title': '1D Vector Reshape', 'tooltip': 'whether to reshape 1D vectors into 2D matrices for Muon.', 'type': 'bool'},
+            'MuonWithAuxAdam': {'title': 'MuonWithAuxAdam', 'tooltip': 'whatever to use the standard way of Muon, Non hidden layers fallback to ADAMW_ADV and Muon takes the rest (when 1D Vector Reshape is false, Adam will also take the 1D tensors).', 'type': 'bool'},
+            'non_hidden_layers': {'title': 'Non Hidden Layers', 'tooltip': 'Comma-separated list of non hidden layers to train using ADAMW_ADV. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained using ADAMW_ADV. If None is provided it will default to using automatic way of finding non-hidden layers.', 'type': 'str'},
+            'muon_adam_regex': {'title': 'Use Regex', 'tooltip': 'Whatever to use regular expressions for non hidden layers.', 'type': 'bool'},
+            'muon_adam_lr': {'title': 'Auxiliary Adam LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer. If empty, it will use the main learning rate.', 'type': 'float'},
         }
         # @formatter:on
 
@@ -189,6 +196,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         # Extract the keys for the selected optimizer
         for index, key in enumerate(OPTIMIZER_DEFAULT_PARAMETERS[selected_optimizer].keys()):
+            if key not in KEY_DETAIL_MAP:
+                continue
             arg_info = KEY_DETAIL_MAP[key]
 
             title = arg_info['title']
@@ -200,7 +209,20 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
             components.label(master, row, col, title, tooltip=tooltip)
 
-            if type != 'bool':
+            if key == 'MuonWithAuxAdam':
+                frame = ctk.CTkFrame(master, fg_color="transparent")
+                frame.grid(row=row, column=col + 1, columnspan=2, sticky="ew", padx=0, pady=0)
+                frame.grid_columnconfigure(0, weight=0)
+                frame.grid_columnconfigure(1, weight=0)
+
+                components.switch(frame, 0, 0, self.optimizer_ui_state, key, command=self.update_user_pref)
+
+                self.muon_adam_button = components.button(
+                    frame, 0, 1, "...", self.open_muon_adam_window,
+                    tooltip="Configure the auxiliary AdamW_adv optimizer",
+                    width=20, padx=5                )
+                self.toggle_muon_adam_button()
+            elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,
                                  command=self.update_user_pref)
             else:
@@ -209,6 +231,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def update_user_pref(self, *args):
         update_optimizer_config(self.train_config)
+        if self.train_config.optimizer.optimizer == Optimizer.MUON_ADV:
+            self.toggle_muon_adam_button()
 
     def on_optimizer_change(self, *args):
         optimizer_config = change_optimizer(self.train_config)
@@ -223,3 +247,19 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def on_window_close(self):
         self.destroy()
+
+    def toggle_muon_adam_button(self):
+        if self.muon_adam_button and self.muon_adam_button.winfo_exists():
+            muon_with_adam = self.optimizer_ui_state.get_var("MuonWithAuxAdam").get()
+            self.muon_adam_button.configure(state="normal" if muon_with_adam else "disabled")
+
+    def open_muon_adam_window(self):
+        if self.train_config.optimizer.muon_adam_config is None:
+            adam_config = TrainOptimizerConfig.default_values()
+            adam_config.from_dict(OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV])
+            adam_config.optimizer = Optimizer.ADAMW_ADV
+            self.train_config.optimizer.muon_adam_config = adam_config
+
+        temp_adam_ui_state = UIState(self, self.train_config.optimizer.muon_adam_config)
+        window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state)
+        self.wait_window(window)

@@ -126,6 +126,11 @@ class TrainOptimizerConfig(BaseConfig):
     k_warmup_steps: int
     ns_steps: int
     vector_reshape_muon: False
+    MuonWithAuxAdam: False
+    non_hidden_layers: str
+    muon_adam_regex: False
+    muon_adam_lr: float
+    muon_adam_config: 'TrainOptimizerConfig'
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -227,6 +232,11 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("k_warmup_steps", None, int, True))
         data.append(("ns_steps", None, int, True))
         data.append(("vector_reshape_muon", False, bool, False))
+        data.append(("MuonWithAuxAdam", False, bool, False))
+        data.append(("non_hidden_layers", None, str, True))
+        data.append(("muon_adam_regex", False, bool, False))
+        data.append(("muon_adam_lr", None, float, True))
+        data.append(("muon_adam_config", None, TrainOptimizerConfig, True))
 
         return TrainOptimizerConfig(data)
 
