@@ -302,7 +302,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_limiter": True,
         "stochastic_rounding": True,
         "use_schedulefree": True,
-        "schedulefree_c"=0,
+        "schedulefree_c"=0.0,
         "use_orthograd": False,
     },
     Optimizer.DADAPT_ADA_GRAD: {
