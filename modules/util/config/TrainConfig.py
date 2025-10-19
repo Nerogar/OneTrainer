@@ -107,7 +107,6 @@ class TrainOptimizerConfig(BaseConfig):
     use_cautious: False
     use_grams: False
     use_adopt: False
-    use_focus: False
     d_limiter: True
     use_schedulefree: True
     use_orthograd: False
@@ -124,6 +123,7 @@ class TrainOptimizerConfig(BaseConfig):
     grams_moment: False
     kourkoutas_beta: False
     k_warmup_steps: int
+    schedulefree_c: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -206,7 +206,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
-        data.append(("use_focus", False, bool, False))
         data.append(("d_limiter", True, bool, True))
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
@@ -223,6 +222,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
+        data.append(("schedulefree_c", None, int, True))
 
         return TrainOptimizerConfig(data)
 
