@@ -186,6 +186,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'non_hidden_layers': {'title': 'Non Hidden Layers', 'tooltip': 'Comma-separated list of non hidden layers to train using ADAMW_ADV. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained using ADAMW_ADV. If None is provided it will default to using automatic way of finding non-hidden layers.', 'type': 'str'},
             'muon_adam_regex': {'title': 'Use Regex', 'tooltip': 'Whatever to use regular expressions for non hidden layers.', 'type': 'bool'},
             'muon_adam_lr': {'title': 'Auxiliary Adam LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer. If empty, it will use the main learning rate.', 'type': 'float'},
+            'muon_te1_adam_lr': {'title': 'AuxAdam TE1 LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer for the first text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
+            'muon_te2_adam_lr': {'title': 'AuxAdam TE2 LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer for the second text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
         }
         # @formatter:on
 

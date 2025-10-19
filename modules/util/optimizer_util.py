@@ -69,7 +69,18 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    model.param_group_mapping = parameters.unique_name_mapping
+    if model.train_config.optimizer.MuonWithAuxAdam and model.optimizer is not None:
+        new_param_group_mapping = []
+        for group in model.optimizer.param_groups:
+            original_name = group.get('name')
+
+            first_param = group['params'][0]
+            optim_type = model.optimizer.helper.get_optimizer_type(first_param)
+            unique_name = f"{original_name}_{optim_type}"
+            new_param_group_mapping.append(unique_name)
+        model.param_group_mapping = new_param_group_mapping
+    else:
+        model.param_group_mapping = parameters.unique_name_mapping
 
 
 # Optimizer Key map with defaults
@@ -542,6 +553,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "non_hidden_layers": None,
         "muon_adam_regex": False,
         "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
         "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {

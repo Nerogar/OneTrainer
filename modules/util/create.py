@@ -1204,7 +1204,11 @@ def create_optimizer(
             if MuonWithAuxAdam and layer_key_fn is not None:
                 # Split parameter groups for different learning rates
                 new_param_groups = []
-                adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
+
+                # Get all potential LRs from config
+                base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
+                te1_adam_lr = optimizer_config.muon_te1_adam_lr
+                te2_adam_lr = optimizer_config.muon_te2_adam_lr
 
                 for group in parameters:
                     adam_params = [p for p in group['params'] if layer_key_fn(p) == 'adam' and p.requires_grad]
@@ -1218,6 +1222,15 @@ def create_optimizer(
                     if adam_params:
                         adam_group = deepcopy(group)
                         adam_group['params'] = adam_params
+
+                        group_name = group.get('name')
+                        adam_lr = base_adam_lr
+
+                        if group_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
+                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
+                        if group_name in ('text_encoder_2', 'text_encoder_2_lora'):
+                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
+
                         adam_group['lr'] = adam_lr
                         adam_group['initial_lr'] = adam_lr
                         new_param_groups.append(adam_group)
@@ -1338,7 +1351,17 @@ def create_optimizer(
             old_group_optimizer_mapping = state_dict['param_group_optimizer_mapping']
 
             new_param_groups = optimizer.state_dict()['param_groups']
-            new_group_mapping = parameter_group_collection.unique_name_mapping
+            if config.optimizer.MuonWithAuxAdam:
+                new_group_mapping = []
+                for group in new_param_groups:
+                    original_name = group.get('name')
+
+                    first_param = group['params'][0]
+                    optim_type = optimizer.helper.get_optimizer_type(first_param)
+                    unique_name = f"{original_name}_{optim_type}"
+                    new_group_mapping.append(unique_name)
+            else:
+                new_group_mapping = parameter_group_collection.unique_name_mapping
 
             state = {}
             param_groups = []

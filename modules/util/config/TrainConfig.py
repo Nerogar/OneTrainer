@@ -130,6 +130,8 @@ class TrainOptimizerConfig(BaseConfig):
     non_hidden_layers: str
     muon_adam_regex: False
     muon_adam_lr: float
+    muon_te1_adam_lr: float
+    muon_te2_adam_lr: float
     muon_adam_config: 'TrainOptimizerConfig'
 
     def __init__(self, data: list[(str, Any, type, bool)]):
@@ -236,6 +238,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("non_hidden_layers", None, str, True))
         data.append(("muon_adam_regex", False, bool, False))
         data.append(("muon_adam_lr", None, float, True))
+        data.append(("muon_te1_adam_lr", None, float, True))
+        data.append(("muon_te2_adam_lr", None, float, True))
         data.append(("muon_adam_config", None, TrainOptimizerConfig, True))
 
         return TrainOptimizerConfig(data)
