@@ -969,7 +969,7 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else True,
                 use_schedulefree=optimizer_config.use_schedulefree if optimizer_config.use_schedulefree is not None else True,
-                schedulefree_c=optimizer_config.schedulefree_c if optimizer_config.schedulefree_c is not None else 0,
+                schedulefree_c=optimizer_config.schedulefree_c if optimizer_config.schedulefree_c is not None else 0.0,
                 use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
             )
 
