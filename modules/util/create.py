@@ -1245,7 +1245,7 @@ def create_optimizer(
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
-                vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else True,
+                vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else False,
                 MuonWithAuxAdam=MuonWithAuxAdam,
                 layer_key_fn=layer_key_fn,
                 muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
