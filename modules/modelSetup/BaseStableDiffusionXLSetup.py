@@ -264,28 +264,27 @@ class BaseStableDiffusionXLSetup(
 
                 # Convert from Flow Matching (FM) space to Diffusion Model (DM) space
                 dm_t_continuous = model._df_convert_fm_t_to_dm_t(t_continuous)
-                dm_timestep = dm_t_continuous.round().long().clamp(0, 999)
                 dm_x = model._df_convert_fm_xt_to_dm_xt(xt_flow, t_continuous)
 
                 # Predict noise/v using the UNet in diffusion space
                 predicted_from_unet = model.unet(
                     sample=dm_x.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep=dm_timestep,
+                    timestep=dm_t_continuous,
                     encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     added_cond_kwargs=added_cond_kwargs,
                 ).sample
 
                 # Convert UNet output (eps or v) back to the velocity field v_t in FM space
                 if model.noise_scheduler.config.prediction_type == 'v_prediction':
-                    predicted_velocity = model._df_get_vector_field_from_v(predicted_from_unet, dm_x, dm_timestep)
+                    predicted_velocity = model._df_get_vector_field_from_v(predicted_from_unet, dm_x, dm_t_continuous)
                 elif model.noise_scheduler.config.prediction_type == 'epsilon':
-                    predicted_velocity = model._df_get_vector_field_from_eps(predicted_from_unet, dm_x, dm_timestep)
+                    predicted_velocity = model._df_get_vector_field_from_eps(predicted_from_unet, dm_x, dm_t_continuous)
 
                 model_output_data = {
                     'loss_type': 'target',
                     'predicted': predicted_velocity,
                     'target': target_velocity,
-                    'timestep': dm_timestep,
+                    'timestep': t_continuous,
                     'prediction_type': model.noise_scheduler.config.prediction_type,
                 }
             else:
