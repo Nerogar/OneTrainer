@@ -69,6 +69,7 @@ class Optimizer(Enum):
 
     # MUON
     MUON_ADV = 'MUON_ADV'
+    ADAMUON_ADV = 'ADAMUON_ADV'
 
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
@@ -113,6 +114,7 @@ class Optimizer(Enum):
             Optimizer.LION_ADV,
             Optimizer.LION_PRODIGY_ADV,
             Optimizer.MUON_ADV,
+            Optimizer.ADAMUON_ADV,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

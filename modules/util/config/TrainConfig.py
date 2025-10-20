@@ -133,6 +133,7 @@ class TrainOptimizerConfig(BaseConfig):
     muon_te1_adam_lr: float
     muon_te2_adam_lr: float
     muon_adam_config: 'TrainOptimizerConfig'
+    rms_target: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -241,6 +242,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("muon_te1_adam_lr", None, float, True))
         data.append(("muon_te2_adam_lr", None, float, True))
         data.append(("muon_adam_config", None, TrainOptimizerConfig, True))
+        data.append(("rms_target", None, float, True))
 
         return TrainOptimizerConfig(data)
 

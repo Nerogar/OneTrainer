@@ -136,10 +136,16 @@ class BaseModelSetup(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
-        if config.optimizer.kourkoutas_beta and hasattr(model.optimizer, 'kourkoutas_helper'):
-            stats = model.optimizer.kourkoutas_helper.last_beta2_stats
-            if stats:
-                tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
+        for helper_name, tag_suffix in [
+            ('kourkoutas_helper', 'kourkoutas'),
+            ('_kourkoutas_helper', 'kourkoutas_AdaMuon'),
+        ]:
+            if hasattr(model.optimizer, helper_name):
+                helper = getattr(model.optimizer, helper_name)
+                stats = getattr(helper, 'last_beta2_stats', None)
+                if stats:
+                    tag = f"{tag_suffix}/beta2_mean"
+                    tensorboard.add_scalar(tag, stats['mean'], model.train_progress.global_step)
 
     def stop_embedding_training_elapsed(
             self,

@@ -1252,6 +1252,94 @@ def create_optimizer(
                 adam_kwargs=adam_kwargs or None,
             )
 
+        # ADAMUON_ADV Optimizer
+        case Optimizer.ADAMUON_ADV:
+            import inspect
+            from copy import deepcopy
+
+            from adv_optm import AdaMuon_adv
+
+            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None else False
+            layer_key_fn = parameter_group_collection.layer_key_fn
+
+            adam_kwargs = {}
+            if MuonWithAuxAdam and optimizer_config.muon_adam_config:
+                from adv_optm import AdamW_adv
+
+                adam_config = optimizer_config.muon_adam_config
+                adam_config_dict = adam_config.to_dict()
+
+                # Get valid parameter names from AdamW_adv constructor, excluding 'self', 'params', 'lr', 'betas'
+                valid_adam_keys = set(inspect.signature(AdamW_adv.__init__).parameters.keys()) - {'self', 'params', 'lr', 'betas'}
+
+                adam_kwargs = {
+                    key: value for key, value in adam_config_dict.items() if key in valid_adam_keys and value is not None
+                }
+
+                beta1 = adam_config.beta1 if adam_config.beta1 is not None else 0.9
+                beta2 = adam_config.beta2 if adam_config.beta2 is not None else 0.999
+                adam_kwargs['betas'] = (beta1, beta2)
+
+            optimizer_params = parameters
+            if MuonWithAuxAdam and layer_key_fn is not None:
+                # Split parameter groups for different learning rates
+                new_param_groups = []
+
+                # Get all potential LRs from config
+                base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
+                te1_adam_lr = optimizer_config.muon_te1_adam_lr
+                te2_adam_lr = optimizer_config.muon_te2_adam_lr
+
+                for group in parameters:
+                    adam_params = [p for p in group['params'] if layer_key_fn(p) == 'adam' and p.requires_grad]
+                    muon_params = [p for p in group['params'] if layer_key_fn(p) != 'adam' and p.requires_grad]
+
+                    if muon_params:
+                        muon_group = deepcopy(group)
+                        muon_group['params'] = muon_params
+                        new_param_groups.append(muon_group)
+
+                    if adam_params:
+                        adam_group = deepcopy(group)
+                        adam_group['params'] = adam_params
+
+                        group_name = group.get('name')
+                        adam_lr = base_adam_lr
+
+                        if group_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
+                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
+                        if group_name in ('text_encoder_2', 'text_encoder_2_lora'):
+                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
+
+                        adam_group['lr'] = adam_lr
+                        adam_group['initial_lr'] = adam_lr
+                        new_param_groups.append(adam_group)
+                optimizer_params = new_param_groups
+
+            optimizer = AdaMuon_adv(
+                params=optimizer_params,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
+                rms_target=optimizer_config.rms_target if optimizer_config.rms_target is not None else 0.2,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else False,
+                MuonWithAuxAdam=MuonWithAuxAdam,
+                layer_key_fn=layer_key_fn,
+                muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
+                adam_kwargs=adam_kwargs or None,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
+                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+            )
+
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:
             from timm.optim.adabelief import AdaBelief

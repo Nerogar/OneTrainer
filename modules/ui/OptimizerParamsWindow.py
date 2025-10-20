@@ -188,6 +188,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'muon_adam_lr': {'title': 'Auxiliary Adam LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer. If empty, it will use the main learning rate.', 'type': 'float'},
             'muon_te1_adam_lr': {'title': 'AuxAdam TE1 LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer for the first text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
             'muon_te2_adam_lr': {'title': 'AuxAdam TE2 LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer for the second text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
+            'rms_target': {'title': 'RMS Rescaling', 'tooltip': 'The target Root-Mean-Square value for the final update vector, used for RMS-aligned rescaling. Allows for the reuse of existing Adam learning rate schedules.', 'type': 'float'},
         }
         # @formatter:on
 
