@@ -1353,7 +1353,7 @@ def create_optimizer(
             new_param_groups = optimizer.state_dict()['param_groups']
             if config.optimizer.MuonWithAuxAdam:
                 new_group_mapping = []
-                for group in new_param_groups:
+                for group in optimizer.param_groups:
                     original_name = group.get('name')
 
                     first_param = group['params'][0]
