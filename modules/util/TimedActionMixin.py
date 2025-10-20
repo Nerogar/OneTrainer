@@ -23,7 +23,7 @@ class TimedActionMixin:
 
         match unit:
             case TimeUnit.EPOCH:
-                if interval == 0:
+                if int(interval) == 0:
                     return False
                 if start_at_zero:
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0
@@ -32,7 +32,7 @@ class TimedActionMixin:
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
                         and train_progress.epoch > 0
             case TimeUnit.STEP:
-                if interval == 0:
+                if int(interval) == 0:
                     return False
                 if start_at_zero:
                     return train_progress.global_step % int(interval) == 0
