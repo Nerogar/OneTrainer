@@ -289,6 +289,12 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         # Apply timestep based loss weighting.
         if 'timestep' in data:
+            # Continuous-time models like Diff2Flow use float timesteps, but SNR-based weighting
+            # requires discrete integer timesteps for indexing. We round to discrete timestep equivalent.
+            if torch.is_floating_point(data['timestep']):
+                num_timesteps = self.__coefficients.betas.shape[0]
+                data['timestep'] = torch.clamp(data['timestep'].round(), 0, num_timesteps - 1).long()
+
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
                 case LossWeight.MIN_SNR_GAMMA:
