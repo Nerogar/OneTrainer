@@ -5,13 +5,11 @@ from pathlib import Path
 from modules.cloud.BaseFileSync import BaseFileSync
 from modules.util.config.CloudConfig import CloudConfig, CloudSecretsConfig
 
-import fabric
-
 
 class BaseSSHFileSync(BaseFileSync):
     def __init__(self, config: CloudConfig, secrets: CloudSecretsConfig):
         super().__init__(config, secrets)
-        self.sync_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+        self.sync_connection = secrets.create_connection()
 
     def close(self):
         if self.sync_connection:
