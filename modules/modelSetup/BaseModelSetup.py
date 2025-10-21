@@ -136,7 +136,7 @@ class BaseModelSetup(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
-        if hasattr(model.optimizer, 'kourkoutas_helper'):
+        if hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
             stats = model.optimizer.kourkoutas_helper.last_beta2_stats
             if stats:
                 tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
