@@ -571,6 +571,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "eps": 1e-8,
         "weight_decay": 0.0,
         "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
         "rms_target": 0.2,
         "nnmf_factor": False,
         "stochastic_rounding": True,
@@ -585,8 +587,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_atan2": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
-        "kourkoutas_beta": False,
-        "k_warmup_steps": None,
         "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {

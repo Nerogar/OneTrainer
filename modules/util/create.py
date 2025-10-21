@@ -1341,8 +1341,8 @@ def create_optimizer(
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
-                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
-                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
+                ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
             )
 
         # ADABELIEF Optimizer

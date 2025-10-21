@@ -37,7 +37,10 @@ def build_muon_adam_key_fn(
             'norm', # Catches LayerNorm, final norms like 'norm_out', 'txt_norm', etc.
             'emb', 'embed', # General embedding layers
             'pos_encoding', 'positional_embedding',
-            'dora_scale'
+            'dora_scale',
+            'img_mod', 'txt_mod',
+            'guidance_embedder',
+            'ff_context',
         ]
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]
         if True:
