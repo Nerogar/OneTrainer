@@ -79,8 +79,8 @@ class DataLoaderText2ImageMixin:
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
         cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
-        sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
         json_path = ModifyPath(in_name='image_path', out_name='json_path', postfix='', extension='.json')
+        sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
         modules = [download_datasets, collect_paths, concept_config_override, sample_prompt_path, json_path]
 
@@ -107,6 +107,7 @@ class DataLoaderText2ImageMixin:
 
         load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='custom_conditioning_image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
 
+        # prompt
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
         load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
         filename_prompt = GetFilename(path_in_name='image_path', filename_out_name='filename_prompt', include_extension=False)
@@ -117,9 +118,15 @@ class DataLoaderText2ImageMixin:
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
-        load_json = LoadJson(path_in_name='json_path', json_out_name='json')
-        per_file_config_override = FileConfigOverride(json_in_name='json', json_key_in_name='concept.per_file_config_key', enabled_in_name='concept.enable_per_file_config', config_overrides_name='config_overrides')
+        # per-sample config override
+        load_sample_config_json = LoadJson(path_in_name='json_path', key_in_name='concept.per_sample_config_key', data_out_name='per_sample_config_json')
+        select_sample_config_input = SelectInput(setting_name='concept.per_sample_config_source', out_name='per_sample_config', setting_to_in_name_map={
+            'disabled': None,
+            'json': 'per_sample_config_json',
+        })
+        sample_config_override = FileConfigOverride(file_config_in_name='per_sample_config', config_overrides_name='config_overrides')
 
+        # build module list
         modules = [load_image, load_video]
 
         if allow_video:
@@ -127,7 +134,7 @@ class DataLoaderText2ImageMixin:
 
         modules.extend([
             load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text,
-            load_json, per_file_config_override,
+            load_sample_config_json, select_sample_config_input, sample_config_override,
         ])
 
         if config.masked_training:

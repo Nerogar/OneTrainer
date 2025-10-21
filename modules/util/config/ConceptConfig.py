@@ -181,10 +181,9 @@ class ConceptConfig(BaseConfig):
     text_variations: int
     repeats: float
     loss_weight: float
+    per_sample_config_source: str
+    per_sample_config_key: str
     concept_stats: dict
-
-    enable_per_file_config: bool
-    per_file_config_key: str
 
     image: ConceptImageConfig
     text: ConceptTextConfig
@@ -246,9 +245,8 @@ class ConceptConfig(BaseConfig):
         data.append(("balancing", 1.0, float, False))
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
+        data.append(("per_sample_config_source", "disabled", str, False))
+        data.append(("per_sample_config_key", "", str, False))
         data.append(("concept_stats", {}, dict, False))
-
-        data.append(("enable_per_file_config", False, bool, False))
-        data.append(("per_file_config_key", "", str, False))
 
         return ConceptConfig(data)
