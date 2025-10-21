@@ -199,14 +199,6 @@ class BaseStableDiffusionXLSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            # debug print
-            print()
-            batch_concepts = [config.concepts[i] for i in batch['concept_index']]
-            for i, (path, concept) in enumerate(zip(batch['image_path'], batch_concepts)):
-                noise_cfg = concept.noise if concept.noise.enable_timestep_distribution_override else config
-                noise_cfg_override = ", concept override" if concept.noise.enable_timestep_distribution_override else ""
-                print(f"[{i}]: {concept.name:14} tsteps: {noise_cfg.min_noising_strength:.2f}-{noise_cfg.max_noising_strength:.2f}{noise_cfg_override} ({path})")
-
             text_encoder_output, pooled_text_encoder_2_output = model.combine_text_encoder_output(*model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],
@@ -232,25 +224,30 @@ class BaseStableDiffusionXLSetup(
             if config.model_type.has_conditioning_image_input():
                 scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
-            timestep = self._get_timestep_discrete_per_concept(
+            timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                batch['concept_index']
+                config_overrides=batch['config_overrides'],
             )
-            print(f"timesteps: {timestep.tolist()}")
-            # timestep (torch.Size([4])): tensor([677, 275, 170, 897], device='cuda:0', dtype=torch.int32)
 
-            latent_noise = self._create_noise_per_concept(
+            latent_noise = self._create_noise(
                 scaled_latent_image,
                 config,
-                batch['concept_index'],
                 generator,
                 timestep,
                 model.noise_scheduler.betas,
+                config_overrides=batch['config_overrides'],
             )
+
+            # debug: print config overrides for noise and timestep distribution
+            if config.debug_mode:
+                from modules.util.config.ConfigOverride import ConfigOverride, ConfigOverrideSection
+                ConfigOverride.batch_debug_print(config, batch['config_overrides'], batch['image_path'], ConfigOverrideSection.noise)
+                ConfigOverride.batch_debug_print(config, batch['config_overrides'], batch['image_path'], ConfigOverrideSection.timestep_distribution)
+                print(f"timesteps: {timestep.tolist()}")
 
             scaled_noisy_latent_image = self._add_noise_discrete(
                 scaled_latent_image,

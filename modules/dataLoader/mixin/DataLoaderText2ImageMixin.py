@@ -1,7 +1,8 @@
 import re
 from collections.abc import Callable
 
-from modules.dataLoader.mixin.StoreConcepts import StoreConcepts
+from modules.dataLoader.mixin.ConceptConfigOverride import ConceptConfigOverride
+from modules.dataLoader.mixin.FileConfigOverride import FileConfigOverride
 
 import modules.util.multi_gpu_util as multi
 from modules.util import path_util
@@ -24,6 +25,7 @@ from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.InlineDistributedSampler import InlineDistributedSampler
 from mgds.pipelineModules.LoadImage import LoadImage
+from mgds.pipelineModules.LoadJson import LoadJson
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.LoadVideo import LoadVideo
 from mgds.pipelineModules.ModifyPath import ModifyPath
@@ -70,13 +72,17 @@ class DataLoaderText2ImageMixin:
             extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel','-condlabel']
         )
 
-        store_concepts = StoreConcepts(config=config, concepts_meta_in_name='concept_meta')
+        concept_config_override = ConceptConfigOverride(
+            concept_index_in_name="concept_index", concepts_meta_in_name='concept_meta',
+            config_overrides_out_name="config_overrides"
+        )
 
         mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
         cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
+        json_path = ModifyPath(in_name='image_path', out_name='json_path', postfix='', extension='.json')
 
-        modules = [download_datasets, collect_paths, store_concepts, sample_prompt_path]
+        modules = [download_datasets, collect_paths, concept_config_override, sample_prompt_path, json_path]
 
         if config.masked_training:
             modules.append(mask_path)
@@ -111,12 +117,18 @@ class DataLoaderText2ImageMixin:
         }, default_in_name='sample_prompts')
         select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
 
+        load_json = LoadJson(path_in_name='json_path', json_out_name='json')
+        per_file_config_override = FileConfigOverride(json_in_name='json', json_key_in_name='concept.per_file_config_key', enabled_in_name='concept.enable_per_file_config', config_overrides_name='config_overrides')
+
         modules = [load_image, load_video]
 
         if allow_video:
             modules.append(image_to_video)
 
-        modules.extend([load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text])
+        modules.extend([
+            load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text,
+            load_json, per_file_config_override,
+        ])
 
         if config.masked_training:
             modules.append(generate_mask)
@@ -268,12 +280,11 @@ class DataLoaderText2ImageMixin:
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
-        sort_names = output_names + ['concept', 'concept_index']
+        sort_names = output_names + ['concept']
 
         output_names = output_names + [
             ('concept.loss_weight', 'loss_weight'),
             ('concept.type', 'concept_type'),
-            'concept_index',
         ]
 
         if config.validation:
