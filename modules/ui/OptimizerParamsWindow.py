@@ -181,7 +181,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'kourkoutas_beta': {'title': 'Kourkoutas Beta', 'tooltip': 'Enables a layer-wise dynamic β₂ adaptation. This feature makes the optimizer more responsive to "spiky" gradients by lowering β₂ during periods of high variance, and more stable during calm periods by raising β₂ towards its maximum. It can significantly improve training stability and final loss.', 'type': 'bool'},
             'k_warmup_steps': {'title': 'K-β Warmup Steps ', 'tooltip': 'When using Kourkoutas Beta, the number of initial training steps during which the dynamic β₂ logic is held off. In this period, β₂ is set to its fixed value to allow for initial training stability before the adaptive mechanism activates.', 'type': 'int'},
             'ns_steps': {'title': 'Newton-Schulz Iterations', 'tooltip': 'Controls the number of iterations for update orthogonalization. Higher values improve the updates quality but make each step slower. Lower values are faster per step but may be less effective.', 'type': 'int'},
-            'vector_reshape_muon': {'title': '1D Vector Reshape', 'tooltip': 'whether to reshape 1D vectors into 2D matrices for Muon.', 'type': 'bool'},
             'MuonWithAuxAdam': {'title': 'MuonWithAuxAdam', 'tooltip': 'whatever to use the standard way of Muon, Non hidden layers fallback to ADAMW_ADV and Muon takes the rest (when 1D Vector Reshape is false, Adam will also take the 1D tensors).', 'type': 'bool'},
             'non_hidden_layers': {'title': 'Non Hidden Layers', 'tooltip': 'Comma-separated list of non hidden layers to train using ADAMW_ADV. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained using ADAMW_ADV. If None is provided it will default to using automatic way of finding non-hidden layers.', 'type': 'str'},
             'muon_adam_regex': {'title': 'Use Regex', 'tooltip': 'Whatever to use regular expressions for non hidden layers.', 'type': 'bool'},
@@ -189,6 +188,13 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'muon_te1_adam_lr': {'title': 'AuxAdam TE1 LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer for the first text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
             'muon_te2_adam_lr': {'title': 'AuxAdam TE2 LR', 'tooltip': 'Learning rate for the auxiliary AdamW_adv optimizer for the second text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
             'rms_target': {'title': 'RMS Rescaling', 'tooltip': 'The target Root-Mean-Square value for the final update vector, used for RMS-aligned rescaling. Allows for the reuse of existing Adam learning rate schedules.', 'type': 'float'},
+            'normuon_variant': {'title': 'NorMuon Variant', 'tooltip': 'Enable a neuron-wise normalized variant of Muon that balances per-neuron update magnitudes while preserving orthogonalization benefits. This should make the optimizer have the same LR range as Adam with neuron-wise second-moment estimator.', 'type': 'bool'},
+            'beta2_normuon': {'title': 'NorMuon Beta2', 'tooltip': 'Exponential decay rate for the neuron-wise second-moment estimator in NorMuon (analogous to Adams beta2). Controls how past squared updates influence current normalization.', 'type': 'float'},
+            'normuon_eps': {'title': 'NorMuon EPS', 'tooltip': 'Epsilon for NorMuon normalization stability.', 'type': 'float'},
+            'normuon_lr_scale': {'title': 'NorMuon LR scale', 'tooltip': 'Scaling factor for the NorMuon learning rate.', 'type': 'float'},
+            'normuon_atan2': {'title': 'NorMuon Atan2', 'tooltip': 'whether to use the atan2 for NorMuon. Replacing the Epsilon and bounding the update.', 'type': 'bool'},
+            'low_rank_ortho': {'title': 'Low-rank Orthogonalization', 'tooltip': 'Use low-rank orthogonalization to accelerate Muon by orthogonalizing only in a low-dimensional subspace, improving speed and noise robustness.', 'type': 'bool'},
+            'ortho_rank': {'title': 'Ortho Rank', 'tooltip': 'Target rank for low-rank orthogonalization. Controls the dimensionality of the subspace used for efficient and noise-robust orthogonalization.', 'type': 'int'},
         }
         # @formatter:on
 

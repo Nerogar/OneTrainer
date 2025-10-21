@@ -1245,11 +1245,17 @@ def create_optimizer(
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
-                vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else False,
                 MuonWithAuxAdam=MuonWithAuxAdam,
                 layer_key_fn=layer_key_fn,
                 muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
                 adam_kwargs=adam_kwargs or None,
+                normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
+                beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
+                normuon_eps=optimizer_config.normuon_eps if optimizer_config.normuon_eps is not None else 1e-8,
+                normuon_lr_scale=optimizer_config.normuon_lr_scale if optimizer_config.normuon_lr_scale is not None else 0.2,
+                normuon_atan2=optimizer_config.normuon_atan2 if optimizer_config.normuon_atan2 is not None else False,
+                low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
+                ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
             )
 
         # ADAMUON_ADV Optimizer
@@ -1328,7 +1334,6 @@ def create_optimizer(
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
-                vector_reshape_muon=optimizer_config.vector_reshape_muon if optimizer_config.vector_reshape_muon is not None else False,
                 MuonWithAuxAdam=MuonWithAuxAdam,
                 layer_key_fn=layer_key_fn,
                 muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
