@@ -160,14 +160,7 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
         prompt_path_entry = components.file_entry(frame, 4, 2, self.text_ui_state, "prompt_path")
 
-        def set_prompt_path_entry_enabled(option: str):
-            if option == 'concept':
-                for child in prompt_path_entry.children.values():
-                    child.configure(state="normal")
-            else:
-                for child in prompt_path_entry.children.values():
-                    child.configure(state="disabled")
-
+        set_prompt_path_entry_enabled = self.create_enabled_state_update_command(prompt_path_entry, ['concept'])
         components.options_kv(frame, 4, 1, [
             ("From text file per sample", 'sample'),
             ("From single text file", 'concept'),
@@ -175,31 +168,46 @@ class ConceptWindow(ctk.CTkToplevel):
         ], self.text_ui_state, "prompt_source", command=set_prompt_path_entry_enabled)
         set_prompt_path_entry_enabled(concept.text.prompt_source)
 
+        # per-sample config source
+        components.label(frame, 5, 0, "Per-Sample Config",
+                         tooltip="The source for per-sample config overrides")
+        per_sample_config_key_entry = components.entry(frame, 5, 2, self.ui_state, "per_sample_config_key",
+                                                       tooltip="When \"json file per sample\" is selected as the source of per-sample config overrides, enter here the key to the config dict inside the json files.\n"
+                                                       "To traverse several dicts, separate the keys with \".\" (dot).\n"
+                                                       "When left empty, key/value pairs are expected inside a top-level dict.")
+
+        set_per_sample_config_key_entry_enabled = self.create_enabled_state_update_command(per_sample_config_key_entry, ['json'])
+        components.options_kv(frame, 5, 1, [
+            ("Disabled", 'disabled'),
+            ("From json file per sample", 'json'),
+        ], self.ui_state, "per_sample_config_source", command=set_per_sample_config_key_entry_enabled)
+        set_per_sample_config_key_entry_enabled(concept.per_sample_config_source)
+
         # include subdirectories
-        components.label(frame, 5, 0, "Include Subdirectories",
+        components.label(frame, 6, 0, "Include Subdirectories",
                          tooltip="Includes images from subdirectories into the dataset")
-        components.switch(frame, 5, 1, self.ui_state, "include_subdirectories")
+        components.switch(frame, 6, 1, self.ui_state, "include_subdirectories")
 
         # image variations
-        components.label(frame, 6, 0, "Image Variations",
+        components.label(frame, 7, 0, "Image Variations",
                          tooltip="The number of different image versions to cache if latent caching is enabled.")
-        components.entry(frame, 6, 1, self.ui_state, "image_variations")
+        components.entry(frame, 7, 1, self.ui_state, "image_variations")
 
         # text variations
-        components.label(frame, 7, 0, "Text Variations",
+        components.label(frame, 8, 0, "Text Variations",
                          tooltip="The number of different text versions to cache if latent caching is enabled.")
-        components.entry(frame, 7, 1, self.ui_state, "text_variations")
+        components.entry(frame, 8, 1, self.ui_state, "text_variations")
 
         # balancing
-        components.label(frame, 8, 0, "Balancing",
+        components.label(frame, 9, 0, "Balancing",
                          tooltip="The number of samples used during training. Use repeats to multiply the concept, or samples to specify an exact number of samples used in each epoch.")
-        components.entry(frame, 8, 1, self.ui_state, "balancing")
-        components.options(frame, 8, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
+        components.entry(frame, 9, 1, self.ui_state, "balancing")
+        components.options(frame, 9, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
 
         # loss weight
-        components.label(frame, 9, 0, "Loss Weight",
+        components.label(frame, 10, 0, "Loss Weight",
                          tooltip="The loss multiplyer for this concept.")
-        components.entry(frame, 9, 1, self.ui_state, "loss_weight")
+        components.entry(frame, 10, 1, self.ui_state, "loss_weight")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -593,6 +601,16 @@ class ConceptWindow(ctk.CTkToplevel):
 
         frame.pack(fill="both", expand=1)
         return frame
+
+
+    @staticmethod
+    def create_enabled_state_update_command(target_widget, enabled_options: list[str]):
+        def update_widget_state(option: str):
+            state = "normal" if option in enabled_options else "disabled"
+            for child in target_widget.children.values():
+                child.configure(state=state)
+
+        return update_widget_state
 
     def __prev_image_preview(self):
         self.image_preview_file_index = max(self.image_preview_file_index - 1, 0)
