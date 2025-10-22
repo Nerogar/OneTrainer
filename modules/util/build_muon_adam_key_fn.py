@@ -128,7 +128,7 @@ def build_muon_adam_key_fn(
             return 'adam'
 
         # Rule 2: For everything else, apply the standard μP logic.
-        return 'muon' if p.ndim >= 2 else 'adam'
+        return 'muon' if len(p.shape) >= 2 else 'adam'
 
     # Module-based iteration & parameter mapping
     sub_modules_to_check = [
