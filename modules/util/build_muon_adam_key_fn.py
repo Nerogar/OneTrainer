@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from modules.model.BaseModel import BaseModel, TrainConfig
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.enum.ModelType import ModelType
 from modules.util.ModuleFilter import ModuleFilter
 
 import torch
@@ -30,21 +31,94 @@ def build_muon_adam_key_fn(
         if True:
             print(f"[MuonWithAuxAdam] Using custom non-hidden layer patterns: {patterns_list}")
     else:
-        # Default list of "non-hidden" parts. These are simple substrings.
-        default_patterns = [
-            'time_embed', 'label_emb', 'context_embedder', 'x_embedder',
-            'proj_in', 'proj_out', 'img_in', 'txt_in', 'time_text_embed',
-            'norm', # Catches LayerNorm, final norms like 'norm_out', 'txt_norm', etc.
-            'emb', 'embed', # General embedding layers
-            'pos_encoding', 'positional_embedding',
-            'dora_scale',
-            'img_mod', 'txt_mod',
-            'guidance_embedder',
-            'ff_context',
-        ]
+        # Default list of "non-hidden" parts.
+        match model.model_type:
+            case ModelType.STABLE_DIFFUSION_15 | ModelType.STABLE_DIFFUSION_15_INPAINTING | ModelType.STABLE_DIFFUSION_20_BASE | ModelType.STABLE_DIFFUSION_20_INPAINTING | ModelType.STABLE_DIFFUSION_20 | ModelType.STABLE_DIFFUSION_21 | ModelType.STABLE_DIFFUSION_21_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING :
+                default_patterns = [
+                    'conv_in', 'conv_norm_out', 'conv_out',
+                    'add_embedding.linear_', 'time_embedding.linear_', 'label_emb', # UNet
+                    'text_model.embeddings', 'text_projection', 'position_embedding', # TEs (CLIPS)
+                    'quant_conv', 'post_quant_conv', # VAE
+                ]
+            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35:
+                default_patterns = [
+                    'x_embedder',
+                    'y_embedder',
+                    't_embedder',
+                    'pos_embed',
+                    'context_embedder',
+                    'final_layer',
+                    'token_embedding',
+                    'ln_final',
+                    'text_projection',
+                    'position_embedding',
+                    'final_layer_norm',
+                ]
+            case ModelType.SANA:
+                default_patterns = [
+                    'patch_embed.proj',
+                    'time_embed',
+                    'caption_norm.weight',
+                    'caption_projection.linear',
+                    'proj_out',
+                    'scale_shift_table',
+                ]
+            case ModelType.STABLE_CASCADE_1 | ModelType.WUERSTCHEN_2:
+                default_patterns = [
+                    'vquantizer.codebook.weight',
+                    'embedding.1',
+                    'clf.1',
+                    'clip_img_mapper',
+                    'clip_txt_mapper',
+                    'clip_txt_pooled_mapper',
+                    'down_downscalers.1.1.blocks.0',
+                    'up_upscalers.0.1.blocks.1',
+                    'clip_mapper',
+                    'down_downscalers',
+                    'effnet_mapper',
+                    'pixels_mapper',
+                    'up_repeat_mappers',
+                    'up_upscalers',
+                ]
+            case ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA:
+                default_patterns = [
+                    'pos_embed.proj',
+                    'adaln_single',
+                    'caption_projection',
+                    'proj_out',
+                    'scale_shift_table',
+                ]
+            case ModelType.FLUX_DEV_1 | ModelType.CHROMA_1:
+                default_patterns = [
+                    'context_embedder',
+                    'time_text_embed',
+                    'x_embedder',
+                    'norm_out.linear',
+                    'proj_out',
+                    'img_in',
+                    'txt_in',
+                    'txt_norm',
+                ]
+            case ModelType.HI_DREAM_FULL:
+                default_patterns = [
+                    'p_embedder',
+                    't_embedder',
+                    'x_embedder',
+                    'caption_projection',
+                    'final_layer',
+                ]
+            case ModelType.QWEN:
+                default_patterns = [
+                    'time_text_embed',
+                    'img_in',
+                    'norm_out',
+                    'proj_out',
+                    'txt_in',
+                    'txt_norm',
+                ]
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]
         if True:
-            print("[MuonWithAuxAdam] Using default non-hidden layer patterns.")
+            print(f"[MuonWithAuxAdam] Using default non-hidden layer patterns for {model.model_type}.")
 
 
     def get_optim_type(param_name: str, p: torch.nn.Parameter) -> str:
