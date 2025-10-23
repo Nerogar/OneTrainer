@@ -1,3 +1,6 @@
+# Note: AMD requirements might be outdated. If you can provide information about running OneTrainer on AMD,
+# please open an issue or pull request on github
+
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/rocm6.3
 torch==2.7.1+rocm6.3
