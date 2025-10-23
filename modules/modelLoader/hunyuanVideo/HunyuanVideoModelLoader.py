@@ -129,7 +129,7 @@ class HunyuanVideoModelLoader(
 
         transformer = self._load_diffusers_sub_module(
             HunyuanVideoTransformer3DModel,
-            weight_dtypes.prior,
+            weight_dtypes.transformer,
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
@@ -192,7 +192,7 @@ class HunyuanVideoModelLoader(
             print("text encoder 2 (clip l) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype
         )
 
         model.model_type = model_type

@@ -50,7 +50,7 @@ class FluxSampler(BaseModelSampler):
             noise_scheduler: NoiseScheduler,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
-            prior_attention_mask: bool = False,
+            transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -75,7 +75,7 @@ class FluxSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                apply_attention_mask=prior_attention_mask,
+                apply_attention_mask=transformer_attention_mask,
             )
 
             self.model.text_encoder_to(self.temp_device)
@@ -199,7 +199,7 @@ class FluxSampler(BaseModelSampler):
             mask_image_path: str = "",
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
-            prior_attention_mask: bool = False,
+            transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -315,7 +315,7 @@ class FluxSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                apply_attention_mask=prior_attention_mask,
+                apply_attention_mask=transformer_attention_mask,
             )
 
             self.model.text_encoder_to(self.temp_device)
@@ -435,7 +435,7 @@ class FluxSampler(BaseModelSampler):
                 mask_image_path=sample_config.mask_image_path,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
-                prior_attention_mask=sample_config.prior_attention_mask,
+                transformer_attention_mask=sample_config.transformer_attention_mask,
                 on_update_progress=on_update_progress,
             )
         else:
@@ -451,7 +451,7 @@ class FluxSampler(BaseModelSampler):
                 noise_scheduler=sample_config.noise_scheduler,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
-                prior_attention_mask=sample_config.prior_attention_mask,
+                transformer_attention_mask=sample_config.transformer_attention_mask,
                 on_update_progress=on_update_progress,
             )
 
