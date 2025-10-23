@@ -98,7 +98,7 @@ class OFTRotationModule(nn.Module):
                     R.add_(Q_squared, alpha=2.0)
 
                     Q_power = Q_squared
-                    for i in range(3, num_neumann_terms):
+                    for _i in range(3, num_neumann_terms):
                         Q_power = torch.bmm(Q_power, Q_skew)
                         R.add_(Q_power, alpha=2.0)
         else:
@@ -115,15 +115,15 @@ class OFTRotationModule(nn.Module):
         oft_R = self._pytorch_skew_symmetric(Q, self.block_size)
         # scaling factor for each of the smaller block matrix
         eps = eps * 1 / torch.sqrt(torch.tensor(oft_R.shape[0]))
-        I = (
+        origin_matrix = (
             torch.zeros((oft_R.size(1), oft_R.size(1)), device=oft_R.device, dtype=oft_R.dtype)
             .unsqueeze(0)
             .expand_as(oft_R)
         )
-        diff = oft_R - I
-        norm_diff = torch.norm(oft_R - I, dim=(1, 2), keepdim=True)
+        diff = oft_R - origin_matrix
+        norm_diff = torch.norm(oft_R - origin_matrix, dim=(1, 2), keepdim=True)
         mask = (norm_diff <= eps).bool()
-        out = torch.where(mask, oft_R, I + eps * (diff / norm_diff))
+        out = torch.where(mask, oft_R, origin_matrix + eps * (diff / norm_diff))
 
         return self._pytorch_skew_symmetric_inv(out, self.block_size)
 
