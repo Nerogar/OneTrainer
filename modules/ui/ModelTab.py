@@ -350,7 +350,7 @@ class ModelTab:
             if allow_override_transformer:
                 # transformer model
                 components.label(self.scroll_frame, row, 0, "Override Transformer / GGUF",
-                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be overridden")
+                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "transformer.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
