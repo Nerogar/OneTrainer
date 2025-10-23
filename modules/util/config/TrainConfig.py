@@ -468,6 +468,12 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     bundle_additional_embeddings: bool
 
+    # oft
+    oft_block_size: int
+    oft_coft: bool
+    oft_eps: float
+    oft_block_share: bool
+
     # optimizer
     optimizer: TrainOptimizerConfig
     optimizer_defaults: dict[str, TrainOptimizerConfig]
@@ -1074,6 +1080,12 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
+
+        # oft
+        data.append(("oft_block_size", 0, int, False))
+        data.append(("oft_coft", False, bool, False))
+        data.append(("oft_eps", 6e-5, float, False))
+        data.append(("oft_block_share", False, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

@@ -1,5 +1,6 @@
 import copy
 import math
+import warnings
 from abc import abstractmethod
 from collections.abc import Mapping
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.ModuleFilter import ModuleFilter
+from modules.util.oft_utils import OFTRotationModule
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
 import torch
@@ -332,6 +334,126 @@ class LoRAModule(PeftBase):
         pass
 
 
+class OFTModule(PeftBase):
+    oft_R: OFTRotationModule | None
+    rank: int
+    oft_block_size: int
+    coft: bool
+    eps: float
+    block_share: bool
+    dropout_probability: float
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, coft: bool, eps: float, block_share: bool, **kwargs):
+        """
+        Note: The 'rank' parameter for OFTModule is interpreted as the 'oft_block_size'.
+        The actual rank (number of blocks) is calculated during initialization.
+        """
+        super().__init__(prefix, orig_module)
+        self.oft_block_size = rank
+        self.rank = 0
+        self.coft = coft
+        self.eps = eps
+        self.block_share = block_share
+        self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
+        self.oft_R = None
+
+
+        if orig_module is not None:
+            self.initialize_weights()
+
+    def adjust_oft_parameters(self, in_features, params):
+        """
+        Adjust the OFT parameters to be divisible by the in_features dimension.
+        """
+        if params < in_features:
+            higher_params = params
+            while higher_params <= in_features and in_features % higher_params != 0:
+                higher_params += 1
+        else:
+            return in_features
+
+        lower_params = params
+        while lower_params > 1 and in_features % lower_params != 0:
+            lower_params -= 1
+
+        if (params - lower_params) <= (higher_params - params):
+            return lower_params
+        else:
+            return higher_params
+
+    def initialize_weights(self):
+        self._initialized = True
+
+        if isinstance(self.orig_module, nn.Linear):
+            in_features = self.orig_module.in_features
+        elif isinstance(self.orig_module, nn.Conv2d):
+            if self.orig_module.dilation[0] > 1 or self.orig_module.dilation[1] > 1:
+                raise ValueError("Conv2d with dilation > 1 is not supported by OFT.")
+            in_features = self.orig_module.in_channels * self.orig_module.kernel_size[0] * self.orig_module.kernel_size[1]
+        else:
+            raise NotImplementedError("Unsupported layer type for OFT")
+
+        oft_block_size = self.oft_block_size
+        if oft_block_size <= 0:
+            raise ValueError("Rank must be a positive.")
+
+        # Adjust oft_block_size to be a divisor of in_features
+        if in_features % oft_block_size != 0 or oft_block_size > in_features:
+            old_oft_block_size = oft_block_size
+            oft_block_size = self.adjust_oft_parameters(in_features, oft_block_size)
+            warnings.warn(f"Invalid `rank` (oft_block_size) ({old_oft_block_size}) for layer {self.prefix}! Adjusted `oft_block_size` to ({oft_block_size}).")
+
+        # Calculate the number of blocks 'r'
+        r = in_features // oft_block_size
+
+        # Store the final, potentially adjusted values
+        self.rank = r
+        self.oft_block_size = oft_block_size
+
+        n_elements = self.oft_block_size * (self.oft_block_size - 1) // 2
+
+        kernel_size = (0, 0)
+        if isinstance(self.orig_module, nn.Conv2d):
+            kernel_size = self.orig_module.kernel_size
+
+        self.oft_R = OFTRotationModule(
+            r=self.rank if not self.block_share else 1,
+            n_elements=n_elements,
+            block_size=self.oft_block_size,
+            in_features=in_features,
+            coft=self.coft,
+            eps=self.eps,
+            block_share=self.block_share,
+            kernel_size=kernel_size,
+            use_cayley_neumann=True,
+            num_cayley_neumann_terms=5,
+            dropout_probability=self.dropout_probability,
+        )
+
+        nn.init.zeros_(self.oft_R.weight)
+
+    def forward(self, x, *args, **kwargs):
+        self.check_initialized()
+        rotated_x = self.oft_R(x)
+        return self.orig_forward(rotated_x, *args, **kwargs)
+
+    def apply_to_module(self):
+        # TODO
+        pass
+
+    def extract_from_module(self, base_module: nn.Module):
+        # TODO
+        pass
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.oft_R is not None
+
+    @property
+    def dropout(self):
+        return self.oft_R.dropout
+
+
 class DoRAModule(LoRAModule):
     """Weight-decomposed low rank adaptation.
 
@@ -422,6 +544,7 @@ class DoRAModule(LoRAModule):
 DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
+DummyOFTModule = OFTModule.make_dummy()
 
 
 class LoRAModuleWrapper:
@@ -471,6 +594,18 @@ class LoRAModuleWrapper:
             self.dummy_klass = DummyLoHaModule
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
+        elif self.peft_type == PeftType.OFT:
+            self.klass = OFTModule
+            self.dummy_klass = DummyOFTModule
+            self.additional_args = [
+                self.rank,
+                config.oft_coft,
+                config.oft_eps,
+                config.oft_block_share,
+            ]
+            self.additional_kwargs = {
+                'dropout_probability': config.dropout_probability,
+            }
 
         self.lora_modules = self.__create_modules(orig_module, config)
 
@@ -528,7 +663,11 @@ class LoRAModuleWrapper:
         if not state_dict:
             return
 
-        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
+        # For OFT, the comparison is not straightforward, so we skip it.
+        if self.peft_type == PeftType.OFT:
+            return
+
+        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a", ".oft_R.weight"))), None):
             if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
                 raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}, please correct in the UI.")
 
