@@ -135,7 +135,6 @@ def replace_linear_with_quantized_layers(
                 or any(s in name.split('.') for s in keep_in_fp32_modules)
                ), f"Linear layer {name} was not found in model for quantization"
 
-
 def is_quantized_parameter(
         module: nn.Module,
         parameter_name: str,

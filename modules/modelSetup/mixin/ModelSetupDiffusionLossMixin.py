@@ -97,6 +97,27 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.log_cosh_strength
 
+        # Huber Loss
+        if config.huber_strength != 0:
+            losses += masked_losses_with_prior(
+                losses=F.huber_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['target'].to(dtype=torch.float32),
+                    reduction='none',
+                    delta=config.huber_delta,
+                ),
+                prior_losses=F.huber_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    reduction='none',
+                    delta=config.huber_delta,
+                ) if 'prior_target' in data else None,
+                mask=batch['latent_mask'].to(dtype=torch.float32),
+                unmasked_weight=config.unmasked_weight,
+                normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
+            ).mean(mean_dim) * config.huber_strength
+
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data and self.__coefficients is not None:
             losses += masked_losses(
@@ -147,6 +168,15 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32)
                 ).mean(mean_dim) * config.log_cosh_strength
+
+        # Huber Loss
+        if config.huber_strength != 0:
+            losses += F.huber_loss(
+                data['predicted'].to(dtype=torch.float32),
+                data['target'].to(dtype=torch.float32),
+                reduction='none',
+                delta=config.huber_delta,
+            ).mean(mean_dim) * config.huber_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data:

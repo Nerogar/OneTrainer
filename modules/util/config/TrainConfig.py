@@ -107,7 +107,6 @@ class TrainOptimizerConfig(BaseConfig):
     use_cautious: False
     use_grams: False
     use_adopt: False
-    use_focus: False
     d_limiter: True
     use_schedulefree: True
     use_orthograd: False
@@ -124,6 +123,7 @@ class TrainOptimizerConfig(BaseConfig):
     grams_moment: False
     kourkoutas_beta: False
     k_warmup_steps: int
+    schedulefree_c: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -206,7 +206,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
-        data.append(("use_focus", False, bool, False))
         data.append(("d_limiter", True, bool, True))
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
@@ -223,6 +222,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
+        data.append(("schedulefree_c", None, float, True))
 
         return TrainOptimizerConfig(data)
 
@@ -371,6 +371,8 @@ class TrainConfig(BaseConfig):
     mse_strength: float
     mae_strength: float
     log_cosh_strength: float
+    huber_strength: float
+    huber_delta: float
     vb_loss_strength: float
     loss_weight_fn: LossWeight
     loss_weight_strength: float
@@ -925,6 +927,8 @@ class TrainConfig(BaseConfig):
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))
+        data.append(("huber_strength", 0.0, float, False))
+        data.append(("huber_delta", 0.1, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
         data.append(("loss_weight_strength", 5.0, float, False))

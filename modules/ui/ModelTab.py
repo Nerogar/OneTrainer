@@ -257,7 +257,7 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
-    def __create_dtype_options(self, include_none:bool=True, include_gguf=False, include_svd: bool=False) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_none: bool=True, include_gguf: bool=False, include_svd: bool=False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -336,7 +336,7 @@ class ModelTab:
             # unet weight dtype
             components.label(self.scroll_frame, row, 3, "Override UNet Data Type",
                              tooltip="Overrides the unet weight data type")
-            components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(),
+            components.options_kv(self.scroll_frame, row, 4, self.__create_dtype_options(include_svd=True),
                                   self.ui_state, "unet.weight_dtype")
 
             row += 1
@@ -354,7 +354,7 @@ class ModelTab:
             # prior weight dtype
             components.label(self.scroll_frame, row, 3, "Override Prior Data Type",
                              tooltip="Overrides the prior weight data type")
-            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(),
+            components.options_kv(self.scroll_frame, row, 4,  self.__create_dtype_options(include_svd=True),
                                   self.ui_state, "prior.weight_dtype")
 
             row += 1
@@ -363,7 +363,7 @@ class ModelTab:
             if allow_override_transformer:
                 # transformer model
                 components.label(self.scroll_frame, row, 0, "Override Transformer / GGUF",
-                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be overridden")
+                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
                 components.file_entry(
                     self.scroll_frame, row, 1, self.ui_state, "transformer.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
