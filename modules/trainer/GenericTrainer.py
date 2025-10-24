@@ -563,12 +563,16 @@ class GenericTrainer(BaseTrainer):
                     if scaler:
                         def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
                             scaler.unscale_parameter_(tensor, self.model.optimizer)
+                            if self.config.grad_power is not None and self.config.grad_power != 1.0:
+                                tensor.copy_(tensor.sign().mul_(tensor.abs().pow(self.config.grad_power)))
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                             scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
                             tensor.grad = None
                     else:
                         def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
+                            if self.config.grad_power is not None and self.config.grad_power != 1.0:
+                                tensor.copy_(tensor.sign().mul_(tensor.abs().pow(self.config.grad_power)))
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                             self.model.optimizer.step_parameter(tensor, param_group, i)
@@ -757,11 +761,23 @@ class GenericTrainer(BaseTrainer):
                             scaler.update()
                         elif scaler:
                             scaler.unscale_(self.model.optimizer)
+                            if self.config.grad_power is not None and self.config.grad_power != 1.0:
+                                for p in self.parameters:
+                                    if p.grad is not None:
+                                        p.grad.copy_(
+                                            p.grad.sign().mul_(p.grad.abs().pow(self.config.grad_power))
+                                        )
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             scaler.step(self.model.optimizer)
                             scaler.update()
                         else:
+                            if self.config.grad_power is not None and self.config.grad_power != 1.0:
+                                for p in self.parameters:
+                                    if p.grad is not None:
+                                        p.grad.copy_(
+                                            p.grad.sign().mul_(p.grad.abs().pow(self.config.grad_power))
+                                        )
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             self.model.optimizer.step()
