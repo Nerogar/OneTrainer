@@ -114,9 +114,7 @@ class BaseModelSetup(
 
                 # For MuonWithAuxAdam, parameter groups are split for Muon and Adam,
                 # but might retain the same base name (e.g., 'unet').
-                # We use the optimizer's helper to distinguish them.
-                first_param = group['params'][0]
-                optim_type = model.optimizer.helper.get_optimizer_type(first_param)  # 'muon' or 'adam'
+                optim_type = group['optim_type']  # 'muon' or 'adam'
 
                 unique_name = f"{name}_{optim_type}"
                 if unique_name not in reported_learning_rates:

@@ -1217,11 +1217,13 @@ def create_optimizer(
                     if muon_params:
                         muon_group = deepcopy(group)
                         muon_group['params'] = muon_params
+                        muon_group['optim_type'] = 'muon'
                         new_param_groups.append(muon_group)
 
                     if adam_params:
                         adam_group = deepcopy(group)
                         adam_group['params'] = adam_params
+                        adam_group['optim_type'] = 'adam'
 
                         group_name = group.get('name')
                         adam_lr = base_adam_lr
@@ -1246,7 +1248,6 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 MuonWithAuxAdam=MuonWithAuxAdam,
-                layer_key_fn=layer_key_fn,
                 muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
                 adam_kwargs=adam_kwargs or None,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
@@ -1303,11 +1304,13 @@ def create_optimizer(
                     if muon_params:
                         muon_group = deepcopy(group)
                         muon_group['params'] = muon_params
+                        muon_group['optim_type'] = 'muon'
                         new_param_groups.append(muon_group)
 
                     if adam_params:
                         adam_group = deepcopy(group)
                         adam_group['params'] = adam_params
+                        adam_group['optim_type'] = 'adam'
 
                         group_name = group.get('name')
                         adam_lr = base_adam_lr
@@ -1335,7 +1338,6 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 MuonWithAuxAdam=MuonWithAuxAdam,
-                layer_key_fn=layer_key_fn,
                 muon_adam_lr=optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate,
                 adam_kwargs=adam_kwargs or None,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
