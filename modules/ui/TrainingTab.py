@@ -531,7 +531,7 @@ class TrainingTab:
         if supports_sequence_length:
             # text encoder sequence length
             components.label(frame, row, 0, f"Text Encoder {i} Sequence Length",
-                             tooltip="Overrides the number of tokens used for captions. If empty, the model default is used, which is 512 on many models. 77 is the default only for backwards compatibility.")
+                             tooltip="Overrides the number of tokens used for captions. If empty, the model default is used, which is 512 on Flux. Comfy samples with 256 tokens though. 77 is the default only for backwards compatibility.")
             components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_sequence_length")
             row += 1
 
