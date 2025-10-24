@@ -966,10 +966,10 @@ def create_optimizer(
                 use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
                 use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
                 use_adopt=optimizer_config.use_adopt if optimizer_config.use_adopt is not None else False,
-                use_focus=optimizer_config.use_focus if optimizer_config.use_focus is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else True,
                 use_schedulefree=optimizer_config.use_schedulefree if optimizer_config.use_schedulefree is not None else True,
+                schedulefree_c=optimizer_config.schedulefree_c if optimizer_config.schedulefree_c is not None else 0.0,
                 use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
             )
 

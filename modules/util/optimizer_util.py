@@ -309,10 +309,10 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_cautious": False,
         "use_grams": False,
         "use_adopt": False,
-        "use_focus": False,
         "d_limiter": True,
         "stochastic_rounding": True,
         "use_schedulefree": True,
+        "schedulefree_c": 0.0,
         "use_orthograd": False,
     },
     Optimizer.DADAPT_ADA_GRAD: {

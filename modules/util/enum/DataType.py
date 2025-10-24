@@ -12,6 +12,7 @@ class DataType(Enum):
     TFLOAT_32 = 'TFLOAT_32'
     INT_8 = 'INT_8'
     NFLOAT_4 = 'NFLOAT_4'
+    GGUF = 'GGUF'
 
     def __str__(self):
         return self.value
