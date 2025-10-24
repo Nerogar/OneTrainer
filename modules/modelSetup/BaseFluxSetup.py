@@ -63,7 +63,7 @@ class BaseFluxSetup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().text_encoder_2,
             config.weight_dtypes().vae,
@@ -232,7 +232,7 @@ class BaseFluxSetup(
                     if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
                 text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
                 text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
-                apply_attention_mask=config.prior.attention_mask,
+                apply_attention_mask=config.transformer.attention_mask,
             )
 
             latent_image = batch['latent_image']
@@ -270,7 +270,7 @@ class BaseFluxSetup(
                 latent_input = scaled_noisy_latent_image
 
             if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([config.prior.guidance_scale], device=self.train_device)
+                guidance = torch.tensor([config.transformer.guidance_scale], device=self.train_device)
                 guidance = guidance.expand(latent_input.shape[0])
             else:
                 guidance = None
