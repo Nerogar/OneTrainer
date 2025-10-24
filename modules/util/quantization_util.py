@@ -207,7 +207,6 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
                 child_module.compute_dtype = train_dtype.torch_dtype()
                 child_module.quantize(device)
 
-
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:
     assert isinstance(module, nn.Linear)
     if isinstance(module, QuantizedLinearMixin):
@@ -216,7 +215,6 @@ def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.
         return dequantize_gguf_tensor(module.weight).to(dtype=dtype)
     else:
         return module.weight.detach().to(dtype=dtype)
-
 
 def get_weight_shape(module: nn.Linear) -> torch.Size:
     assert isinstance(module, nn.Linear)
