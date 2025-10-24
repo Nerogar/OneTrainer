@@ -18,7 +18,6 @@
         "train": false,
         "weight_dtype": "NFLOAT_4"
     },
-    "text_encoder_2_sequence_length": null,
     "training_method": "LORA",
     "vae": {
         "weight_dtype": "FLOAT_32"
