@@ -38,10 +38,16 @@ class LoraTab:
         components.options_kv(self.scroll_frame, 0, 1, [
             ("LoRA", PeftType.LORA),
             ("LoHa", PeftType.LOHA),
+            ("OFT", PeftType.OFT),
         ], self.ui_state, "peft_type", command=self.setup_lora)
 
     def setup_lora(self, peft_type: PeftType):
-        name = "LoHa" if peft_type == PeftType.LOHA else "LoRA"
+        if peft_type == PeftType.LOHA:
+            name = "LoHa"
+        elif peft_type == PeftType.OFT:
+            name = "OFT"
+        else:
+            name = "LoRA"
 
         if self.options_frame:
             self.options_frame.destroy()
@@ -81,6 +87,19 @@ class LoraTab:
             components.label(master, 3, 3, "Apply on output axis (DoRA Only)",
                              tooltip="Apply the weight decomposition on the output axis instead of the input axis.")
             components.switch(master, 3, 4, self.ui_state, "lora_decompose_output_axis")
+
+        elif peft_type == PeftType.OFT:
+            components.label(master, 1, 3, "Constrained OFT (COFT)",
+                             tooltip="Use the constrained variant of OFT. This constrains the learned rotation to stay very close to the identity matrix, limiting adaptation to only small changes. This improves training stability, helps prevent overfitting on small datasets, and better preserves the base models original knowledge but it may lack expressiveness for tasks requiring substantial adaptation and introduces an additional hyperparameter (COFT Epsilon) that needs tuning.")
+            components.switch(master, 1, 4, self.ui_state, "oft_coft")
+
+            components.label(master, 2, 3, "COFT Epsilon",
+                             tooltip="The control strength of COFT. Only has an effect if COFT is enabled.")
+            components.entry(master, 2, 4, self.ui_state, "oft_eps")
+
+            components.label(master, 3, 3, "Block Share",
+                             tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
+            components.switch(master, 3, 4, self.ui_state, "oft_block_share")
 
         # lora rank
         components.label(master, 2, 0, f"{name} alpha",
