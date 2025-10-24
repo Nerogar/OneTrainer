@@ -94,7 +94,7 @@ class BaseModelSampler(metaclass=ABCMeta):
             image.save(destination + image_format.extension(), format=image_format.pil_format())
         elif sampler_output.file_type == FileType.VIDEO:
             if video_format is None:
-                raise ValueError("Video format required for sampling an image")
+                raise ValueError("Video format required for sampling a video")
             write_video(destination + video_format.extension(), options={"crf": "17"}, video_array=sampler_output.data, fps=24)
         elif sampler_output.file_type == FileType.AUDIO:
             pass # TODO
