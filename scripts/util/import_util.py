@@ -4,12 +4,6 @@ def script_imports(allow_zluda: bool = True):
     import sys
     from pathlib import Path
 
-    # Filter out the Triton warning on startup.
-    # xformers is not installed anymore, but might still exist for some installations.
-    logging \
-        .getLogger("xformers") \
-        .addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
-
     # Insert ourselves as the highest-priority library path, so our modules are
     # always found without any risk of being shadowed by another import path.
     # 3 .parent calls to navigate from /scripts/util/import_util.py to the main directory
