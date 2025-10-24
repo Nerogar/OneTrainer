@@ -1175,7 +1175,6 @@ def create_optimizer(
         # MUON_ADV Optimizer
         case Optimizer.MUON_ADV:
             import inspect
-            from copy import deepcopy
 
             from adv_optm import Muon_adv
 
@@ -1202,41 +1201,47 @@ def create_optimizer(
 
             optimizer_params = parameters
             if MuonWithAuxAdam and layer_key_fn is not None:
-                # Split parameter groups for different learning rates
-                new_param_groups = []
-
-                # Get all potential LRs from config
-                base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
-                te1_adam_lr = optimizer_config.muon_te1_adam_lr
-                te2_adam_lr = optimizer_config.muon_te2_adam_lr
+                # Bucket all unique parameters by their target group.
+                param_buckets = {}
+                original_group_map = {g.get('name'): g for g in parameters}
 
                 for group in parameters:
-                    adam_params = [p for p in group['params'] if layer_key_fn(p) == 'adam' and p.requires_grad]
-                    muon_params = [p for p in group['params'] if layer_key_fn(p) != 'adam' and p.requires_grad]
+                    original_name = group.get('name')
+                    for p in group['params']:
+                        if p.requires_grad:
+                            optim_type = layer_key_fn(p)
+                            bucket_key = (original_name, optim_type)
+                            if bucket_key not in param_buckets:
+                                param_buckets[bucket_key] = set()
+                            param_buckets[bucket_key].add(p)
 
-                    if muon_params:
-                        muon_group = deepcopy(group)
-                        muon_group['params'] = muon_params
-                        muon_group['optim_type'] = 'muon'
-                        new_param_groups.append(muon_group)
+                # Create the final list of param_groups from the buckets.
+                new_param_groups = []
 
-                    if adam_params:
-                        adam_group = deepcopy(group)
-                        adam_group['params'] = adam_params
-                        adam_group['optim_type'] = 'adam'
+                for (original_name, optim_type), params_set in sorted(param_buckets.items()):
+                    if not params_set:
+                        continue
 
-                        group_name = group.get('name')
+                    original_group = original_group_map[original_name]
+                    new_group = original_group.copy()
+                    new_group['params'] = list(params_set)
+                    new_group['optim_type'] = optim_type
+
+                    if optim_type == 'adam':
+                        base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
+                        te1_adam_lr = optimizer_config.muon_te1_adam_lr
+                        te2_adam_lr = optimizer_config.muon_te2_adam_lr
                         adam_lr = base_adam_lr
+                        if original_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
+                                adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
+                        if original_name in ('text_encoder_2', 'text_encoder_2_lora'):
+                                adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
 
-                        if group_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
-                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
-                        if group_name in ('text_encoder_2', 'text_encoder_2_lora'):
-                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
+                        new_group['lr'] = adam_lr
+                        new_group['initial_lr'] = adam_lr
 
-                        adam_group['lr'] = adam_lr
-                        adam_group['initial_lr'] = adam_lr
-                        new_param_groups.append(adam_group)
-                optimizer_params = new_param_groups
+                    new_param_groups.append(new_group)
+                    optimizer_params = new_param_groups
 
             optimizer = Muon_adv(
                 params=optimizer_params,
@@ -1262,7 +1267,6 @@ def create_optimizer(
         # ADAMUON_ADV Optimizer
         case Optimizer.ADAMUON_ADV:
             import inspect
-            from copy import deepcopy
 
             from adv_optm import AdaMuon_adv
 
@@ -1289,41 +1293,46 @@ def create_optimizer(
 
             optimizer_params = parameters
             if MuonWithAuxAdam and layer_key_fn is not None:
-                # Split parameter groups for different learning rates
-                new_param_groups = []
-
-                # Get all potential LRs from config
-                base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
-                te1_adam_lr = optimizer_config.muon_te1_adam_lr
-                te2_adam_lr = optimizer_config.muon_te2_adam_lr
+                # Bucket all unique parameters by their target group.
+                param_buckets = {}
+                original_group_map = {g.get('name'): g for g in parameters}
 
                 for group in parameters:
-                    adam_params = [p for p in group['params'] if layer_key_fn(p) == 'adam' and p.requires_grad]
-                    muon_params = [p for p in group['params'] if layer_key_fn(p) != 'adam' and p.requires_grad]
+                    original_name = group.get('name')
+                    for p in group['params']:
+                        if p.requires_grad:
+                            optim_type = layer_key_fn(p)
+                            bucket_key = (original_name, optim_type)
+                            if bucket_key not in param_buckets:
+                                param_buckets[bucket_key] = set()
+                            param_buckets[bucket_key].add(p)
 
-                    if muon_params:
-                        muon_group = deepcopy(group)
-                        muon_group['params'] = muon_params
-                        muon_group['optim_type'] = 'muon'
-                        new_param_groups.append(muon_group)
+                # Create the final list of param_groups from the buckets.
+                new_param_groups = []
 
-                    if adam_params:
-                        adam_group = deepcopy(group)
-                        adam_group['params'] = adam_params
-                        adam_group['optim_type'] = 'adam'
+                for (original_name, optim_type), params_set in sorted(param_buckets.items()):
+                    if not params_set:
+                        continue
 
-                        group_name = group.get('name')
+                    original_group = original_group_map[original_name]
+                    new_group = original_group.copy()
+                    new_group['params'] = list(params_set)
+                    new_group['optim_type'] = optim_type
+
+                    if optim_type == 'adam':
+                        base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
+                        te1_adam_lr = optimizer_config.muon_te1_adam_lr
+                        te2_adam_lr = optimizer_config.muon_te2_adam_lr
                         adam_lr = base_adam_lr
+                        if original_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
+                                adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
+                        if original_name in ('text_encoder_2', 'text_encoder_2_lora'):
+                                adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
 
-                        if group_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
-                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
-                        if group_name in ('text_encoder_2', 'text_encoder_2_lora'):
-                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
-
-                        adam_group['lr'] = adam_lr
-                        adam_group['initial_lr'] = adam_lr
-                        new_param_groups.append(adam_group)
-                optimizer_params = new_param_groups
+                        new_group['lr'] = adam_lr
+                        new_group['initial_lr'] = adam_lr
+                    new_param_groups.append(new_group)
+                    optimizer_params = new_param_groups
 
             optimizer = AdaMuon_adv(
                 params=optimizer_params,
