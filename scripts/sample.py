@@ -6,6 +6,7 @@ from modules.util import create
 from modules.util.args.SampleArgs import SampleArgs
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -26,10 +27,12 @@ def main():
     model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
 
     print("Loading model " + args.base_model_name)
+    weight_dtypes = args.weight_dtypes()
+    weight_dtypes.vae = DataType.FLOAT_32
     model = model_loader.load(
         model_type=args.model_type,
         model_names=ModelNames(base_model=args.base_model_name),
-        weight_dtypes=args.weight_dtypes(),
+        weight_dtypes=weight_dtypes
     )
     model.train_config = train_config
 

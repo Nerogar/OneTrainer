@@ -81,16 +81,20 @@ class BaseModelSampler(metaclass=ABCMeta):
     def save_sampler_output(
             sampler_output: ModelSamplerOutput,
             destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
+            image_format: ImageFormat | None,
+            video_format: VideoFormat | None,
+            audio_format: AudioFormat | None,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
         if sampler_output.file_type == FileType.IMAGE:
+            if image_format is None:
+                raise ValueError("Image format required for sampling an image")
             image = sampler_output.data
             image.save(destination + image_format.extension(), format=image_format.pil_format())
         elif sampler_output.file_type == FileType.VIDEO:
+            if video_format is None:
+                raise ValueError("Video format required for sampling a video")
             write_video(destination + video_format.extension(), options={"crf": "17"}, video_array=sampler_output.data, fps=24)
         elif sampler_output.file_type == FileType.AUDIO:
             pass # TODO
