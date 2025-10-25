@@ -73,15 +73,11 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    if model.train_config.optimizer.optimizer in (Optimizer.MUON_ADV, Optimizer.ADAMUON_ADV) and model.train_config.optimizer.MuonWithAuxAdam and model.optimizer is not None:
+    if isinstance(model.optimizer, list):
         new_param_group_mapping = []
         all_param_groups = []
-        if isinstance(model.optimizer, list):
-            for opt in model.optimizer:
-                all_param_groups.extend(opt.param_groups)
-        else:
-            # This case should ideally not be hit if MuonWithAuxAdam is true, but as a fallback:
-            all_param_groups = model.optimizer.param_groups
+        for opt in model.optimizer:
+            all_param_groups.extend(opt.param_groups)
 
         for group in all_param_groups:
             original_name = group.get('name')

@@ -112,13 +112,12 @@ class BaseModelSetup(
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
-        if config.optimizer.MuonWithAuxAdam:
+
+        if isinstance(model.optimizer, list):
             all_param_groups = []
-            if isinstance(model.optimizer, list):
-                for opt in model.optimizer:
-                    all_param_groups.extend(opt.param_groups)
-            else:
-                all_param_groups = model.optimizer.param_groups
+
+            for opt in model.optimizer:
+                all_param_groups.extend(opt.param_groups)
 
             for group in all_param_groups:
                 name = group.get('name')

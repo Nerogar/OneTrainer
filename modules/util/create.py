@@ -1178,8 +1178,17 @@ def create_optimizer(
 
             from adv_optm import AdamW_adv, Muon_adv
 
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None else False
             layer_key_fn = parameter_group_collection.layer_key_fn
+            has_adam_params = False
+            if layer_key_fn:
+                for group in parameters:
+                    for p in group['params']:
+                        if p.requires_grad and layer_key_fn(p) == 'adam':
+                            has_adam_params = True
+                            break
+                    if has_adam_params:
+                        break
+            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None and has_adam_params else False 
 
             if not MuonWithAuxAdam:
                 optimizer = Muon_adv(
@@ -1211,20 +1220,20 @@ def create_optimizer(
                             optim_type = layer_key_fn(p)
                             bucket_key = (original_name, optim_type)
                             if bucket_key not in param_buckets:
-                                param_buckets[bucket_key] = set()
-                            param_buckets[bucket_key].add(p)
+                                param_buckets[bucket_key] = []
+                            param_buckets[bucket_key].append(p)
 
                 # Create the final list of param_groups from the buckets.
                 muon_param_groups = []
                 adam_param_groups = []
 
-                for (original_name, optim_type), params_set in sorted(param_buckets.items()):
-                    if not params_set:
-                        continue
+                for (original_name, optim_type), params_list in sorted(param_buckets.items()):
+                    if not params_list:
+                         continue
 
                     original_group = original_group_map[original_name]
                     new_group = original_group.copy()
-                    new_group['params'] = list(params_set)
+                    new_group['params'] = params_list
                     new_group['optim_type'] = optim_type
 
                     if optim_type == 'adam':
@@ -1283,8 +1292,17 @@ def create_optimizer(
 
             from adv_optm import AdaMuon_adv, AdamW_adv
 
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None else False
             layer_key_fn = parameter_group_collection.layer_key_fn
+            has_adam_params = False
+            if layer_key_fn:
+                for group in parameters:
+                    for p in group['params']:
+                        if p.requires_grad and layer_key_fn(p) == 'adam':
+                            has_adam_params = True
+                            break
+                    if has_adam_params:
+                        break
+            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None and has_adam_params else False 
 
             if not MuonWithAuxAdam or layer_key_fn is None:
                 optimizer = AdaMuon_adv(
@@ -1317,20 +1335,20 @@ def create_optimizer(
                             optim_type = layer_key_fn(p)
                             bucket_key = (original_name, optim_type)
                             if bucket_key not in param_buckets:
-                                param_buckets[bucket_key] = set()
-                            param_buckets[bucket_key].add(p)
+                                param_buckets[bucket_key] = []
+                            param_buckets[bucket_key].append(p)
 
                 # Create the final list of param_groups from the buckets.
                 muon_param_groups = []
                 adam_param_groups = []
 
-                for (original_name, optim_type), params_set in sorted(param_buckets.items()):
-                    if not params_set:
-                        continue
+                for (original_name, optim_type), params_list in sorted(param_buckets.items()):
+                    if not params_list:
+                         continue
 
                     original_group = original_group_map[original_name]
                     new_group = original_group.copy()
-                    new_group['params'] = list(params_set)
+                    new_group['params'] = params_list
                     new_group['optim_type'] = optim_type
 
                     if optim_type == 'adam':
