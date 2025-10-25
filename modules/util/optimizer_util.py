@@ -60,7 +60,11 @@ def init_model_parameters(
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
     if model.optimizer is not None:
-        optimizer_to_device_(model.optimizer, train_device)
+        if isinstance(model.optimizer, list):
+            for opt in model.optimizer:
+                optimizer_to_device_(opt, train_device)
+        else:
+            optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
     if multi.is_master():
@@ -69,9 +73,17 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    if model.train_config.optimizer.MuonWithAuxAdam and model.optimizer is not None:
+    if model.train_config.optimizer.optimizer in (Optimizer.MUON_ADV, Optimizer.ADAMUON_ADV) and model.train_config.optimizer.MuonWithAuxAdam and model.optimizer is not None:
         new_param_group_mapping = []
-        for group in model.optimizer.param_groups:
+        all_param_groups = []
+        if isinstance(model.optimizer, list):
+            for opt in model.optimizer:
+                all_param_groups.extend(opt.param_groups)
+        else:
+            # This case should ideally not be hit if MuonWithAuxAdam is true, but as a fallback:
+            all_param_groups = model.optimizer.param_groups
+
+        for group in all_param_groups:
             original_name = group.get('name')
 
             optim_type = group['optim_type']

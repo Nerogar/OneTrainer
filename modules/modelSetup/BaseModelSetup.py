@@ -102,12 +102,25 @@ class BaseModelSetup(
             scheduler: LRScheduler,
             tensorboard: SummaryWriter,
     ):
-        lrs = scheduler.get_last_lr()
+        lrs = []
+        if isinstance(scheduler, list):
+            for s in scheduler:
+                lrs.extend(s.get_last_lr())
+        else:
+            lrs = scheduler.get_last_lr()
+
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
         if config.optimizer.MuonWithAuxAdam:
-            for group in model.optimizer.param_groups:
+            all_param_groups = []
+            if isinstance(model.optimizer, list):
+                for opt in model.optimizer:
+                    all_param_groups.extend(opt.param_groups)
+            else:
+                all_param_groups = model.optimizer.param_groups
+
+            for group in all_param_groups:
                 name = group.get('name')
                 if not name or not group['params']:
                     continue
@@ -127,15 +140,25 @@ class BaseModelSetup(
                 if name not in reported_learning_rates:
                     reported_learning_rates[name] = lr
 
-        reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
+        optimizer_for_reporting = model.optimizer[1] if isinstance(model.optimizer, list) else model.optimizer
+        reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, optimizer_for_reporting)
 
         for name, lr in reported_learning_rates.items():
             tensorboard.add_scalar(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
-        if hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
-            stats = model.optimizer.kourkoutas_helper.last_beta2_stats
+        kourkoutas_helper = None
+        if isinstance(model.optimizer, list):
+            for opt in model.optimizer:
+                if hasattr(opt, 'kourkoutas_helper') and opt.kourkoutas_helper is not None:
+                    kourkoutas_helper = opt.kourkoutas_helper
+                    break
+        elif hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
+            kourkoutas_helper = model.optimizer.kourkoutas_helper
+
+        if kourkoutas_helper:
+            stats = kourkoutas_helper.last_beta2_stats
             if stats:
                 tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
 
