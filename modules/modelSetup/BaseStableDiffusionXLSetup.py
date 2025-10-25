@@ -284,7 +284,7 @@ class BaseStableDiffusionXLSetup(
                     'loss_type': 'target',
                     'predicted': predicted_velocity,
                     'target': target_velocity,
-                    'timestep': t_continuous,
+                    'timestep': discrete_timestep,
                     'prediction_type': model.noise_scheduler.config.prediction_type,
                 }
             else:
