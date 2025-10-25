@@ -34,12 +34,12 @@ def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.clone()
 
 
-def ceil_8(number: int) -> int:
-    return number + (8 - (number % 8)) % 8
+def ceil_16(number: int) -> int:
+    return number + (16 - (number % 16)) % 16
 
 
-def floor_8(number: int) -> int:
-    return number - (number % 8)
+def floor_16(number: int) -> int:
+    return number - (number % 16)
 
 
 class StaticLayerTensorAllocator:
@@ -69,7 +69,7 @@ class StaticLayerTensorAllocator:
         total_cache_bytes = cache_tensor_size * len(self.__layer_allocator.cache_tensors)
         if self.__allocate_forward:
             cache_tensor_index = self.__allocation_end // cache_tensor_size
-            cache_tensor_allocation_end = ceil_8(self.__allocation_end % cache_tensor_size)
+            cache_tensor_allocation_end = ceil_16(self.__allocation_end % cache_tensor_size)
 
             if cache_tensor_allocation_end + num_bytes > cache_tensor_size:
                 # move to the start of the next cache tensor
@@ -100,7 +100,7 @@ class StaticLayerTensorAllocator:
                 cache_tensor_index = len(self.__layer_allocator.cache_tensors) - 1
                 cache_tensor_allocation_start = cache_tensor_size
 
-            new_allocation_start = floor_8(cache_tensor_allocation_start - num_bytes)
+            new_allocation_start = floor_16(cache_tensor_allocation_start - num_bytes)
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
             allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
@@ -284,7 +284,7 @@ class StaticActivationAllocator:
         cache_tensor = self.__cache_tensors[self.__current_cache_tensor]
         allocated_tensor = \
             cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
-        self.__current_cache_tensor_offset += ceil_8(num_bytes)
+        self.__current_cache_tensor_offset += ceil_16(num_bytes)
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
 
@@ -793,7 +793,7 @@ class LayerOffloadConductor:
         sub_module_parameters = set(sum([list(x.parameters()) for x in self.__layers], []))
 
         def convert(t):
-            if t in sub_module_parameters:
+            if t in sub_module_parameters or t.is_meta:
                 return t
 
             return t.to(device=device)
