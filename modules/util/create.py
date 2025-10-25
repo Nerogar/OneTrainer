@@ -1188,7 +1188,7 @@ def create_optimizer(
                             break
                     if has_adam_params:
                         break
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None and has_adam_params else False 
+            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None and has_adam_params else False
 
             if not MuonWithAuxAdam:
                 optimizer = Muon_adv(
@@ -1302,7 +1302,7 @@ def create_optimizer(
                             break
                     if has_adam_params:
                         break
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None and has_adam_params else False 
+            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam if optimizer_config.MuonWithAuxAdam is not None and has_adam_params else False
 
             if not MuonWithAuxAdam or layer_key_fn is None:
                 optimizer = AdaMuon_adv(
