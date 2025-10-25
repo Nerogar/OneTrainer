@@ -555,23 +555,36 @@ class GenericTrainer(BaseTrainer):
         elif not fused_reduce:
             return
 
-        for param_group in self.model.optimizer.param_groups:
+        param_group_to_optimizer = {}
+        all_param_groups = []
+        if isinstance(self.model.optimizer, list):
+            for opt in self.model.optimizer:
+                for pg in opt.param_groups:
+                    param_group_to_optimizer[id(pg)] = opt
+                all_param_groups.extend(opt.param_groups)
+        else:
+            for pg in self.model.optimizer.param_groups:
+                param_group_to_optimizer[id(pg)] = self.model.optimizer
+            all_param_groups = self.model.optimizer.param_groups
+
+        for param_group in all_param_groups:
+            optimizer_for_group = param_group_to_optimizer[id(param_group)]
             for i, parameter in enumerate(param_group["params"]):
                 # TODO: Find a better check instead of "parameter.requires_grad".
                 #       This will break if the some parameters don't require grad during the first training step.
                 if parameter.requires_grad:
                     if scaler:
-                        def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
-                            scaler.unscale_parameter_(tensor, self.model.optimizer)
+                        def __optimizer_step(tensor: Tensor, param_group=param_group, i=i, optimizer=optimizer_for_group):
+                            scaler.unscale_parameter_(tensor, optimizer)
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
-                            scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
+                            scaler.maybe_opt_step_parameter(tensor, param_group, i, optimizer)
                             tensor.grad = None
                     else:
-                        def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
+                        def __optimizer_step(tensor: Tensor, param_group=param_group, i=i, optimizer=optimizer_for_group):
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
-                            self.model.optimizer.step_parameter(tensor, param_group, i)
+                            optimizer.step_parameter(tensor, param_group, i)
                             tensor.grad = None
 
                     def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
@@ -649,19 +662,36 @@ class GenericTrainer(BaseTrainer):
             torch_gc()
 
             if lr_scheduler is None:
-                lr_scheduler = create.create_lr_scheduler(
-                    config=self.config,
-                    optimizer=self.model.optimizer,
-                    learning_rate_scheduler=self.config.learning_rate_scheduler,
-                    warmup_steps=self.config.learning_rate_warmup_steps,
-                    num_cycles=self.config.learning_rate_cycles,
-                    min_factor=self.config.learning_rate_min_factor,
-                    num_epochs=self.config.epochs,
-                    approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
-                    batch_size=self.config.batch_size,
-                    gradient_accumulation_steps=self.config.gradient_accumulation_steps,
-                    global_step=train_progress.global_step
-                )
+                if isinstance(self.model.optimizer, list):
+                    lr_scheduler = []
+                    for opt in self.model.optimizer:
+                        lr_scheduler.append(create.create_lr_scheduler(
+                            config=self.config,
+                            optimizer=opt,
+                            learning_rate_scheduler=self.config.learning_rate_scheduler,
+                            warmup_steps=self.config.learning_rate_warmup_steps,
+                            num_cycles=self.config.learning_rate_cycles,
+                            min_factor=self.config.learning_rate_min_factor,
+                            num_epochs=self.config.epochs,
+                            approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
+                            batch_size=self.config.batch_size,
+                            gradient_accumulation_steps=self.config.gradient_accumulation_steps,
+                            global_step=train_progress.global_step
+                        ))
+                else:
+                    lr_scheduler = create.create_lr_scheduler(
+                        config=self.config,
+                        optimizer=self.model.optimizer,
+                        learning_rate_scheduler=self.config.learning_rate_scheduler,
+                        warmup_steps=self.config.learning_rate_warmup_steps,
+                        num_cycles=self.config.learning_rate_cycles,
+                        min_factor=self.config.learning_rate_min_factor,
+                        num_epochs=self.config.epochs,
+                        approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
+                        batch_size=self.config.batch_size,
+                        gradient_accumulation_steps=self.config.gradient_accumulation_steps,
+                        global_step=train_progress.global_step
+                    )
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
 
@@ -764,10 +794,24 @@ class GenericTrainer(BaseTrainer):
                         else:
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
-                            self.model.optimizer.step()
+                            if isinstance(self.model.optimizer, list):
+                                for opt in self.model.optimizer:
+                                    opt.step()
+                            else:
+                                self.model.optimizer.step()
 
-                        lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
-                        self.model.optimizer.zero_grad(set_to_none=True)
+                        if isinstance(lr_scheduler, list):
+                            for sch in lr_scheduler:
+                                sch.step()
+                        else:
+                            lr_scheduler.step() # done before zero_grad, because some lr schedulers need gradients
+
+                        if isinstance(self.model.optimizer, list):
+                            for opt in self.model.optimizer:
+                                opt.zero_grad(set_to_none=True)
+                        else:
+                            self.model.optimizer.zero_grad(set_to_none=True)
+
                         has_gradient = False
 
                         if multi.is_master():

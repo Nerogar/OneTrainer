@@ -60,7 +60,11 @@ def init_model_parameters(
 
     model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
     if model.optimizer is not None:
-        optimizer_to_device_(model.optimizer, train_device)
+        if isinstance(model.optimizer, list):
+            for opt in model.optimizer:
+                optimizer_to_device_(opt, train_device)
+        else:
+            optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
     if multi.is_master():
@@ -69,7 +73,21 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    model.param_group_mapping = parameters.unique_name_mapping
+    if isinstance(model.optimizer, list):
+        new_param_group_mapping = []
+        all_param_groups = []
+        for opt in model.optimizer:
+            all_param_groups.extend(opt.param_groups)
+
+        for group in all_param_groups:
+            original_name = group.get('name')
+
+            optim_type = group['optim_type']
+            unique_name = f"{original_name}_{optim_type}"
+            new_param_group_mapping.append(unique_name)
+        model.param_group_mapping = new_param_group_mapping
+    else:
+        model.param_group_mapping = parameters.unique_name_mapping
 
 
 # Optimizer Key map with defaults
@@ -528,6 +546,55 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_limiter": True,
         "cautious_mask": False,
         "orthogonal_gradient": False,
+    },
+    Optimizer.MUON_ADV: {
+        "beta1": 0.9,
+        "weight_decay": 0.0,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "non_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": True,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": False,
+        "beta2_normuon": 0.95,
+        "normuon_eps": 1e-8,
+        "normuon_lr_scale": 0.2,
+        "normuon_atan2": False,
+        "muon_adam_config": None,
+    },
+    Optimizer.ADAMUON_ADV: {
+        "beta1": 0.95,
+        "beta2": 0.95,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_target": 0.2,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "non_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": False,
+        "use_atan2": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

@@ -102,26 +102,62 @@ class BaseModelSetup(
             scheduler: LRScheduler,
             tensorboard: SummaryWriter,
     ):
-        lrs = scheduler.get_last_lr()
+        lrs = []
+        if isinstance(scheduler, list):
+            for s in scheduler:
+                lrs.extend(s.get_last_lr())
+        else:
+            lrs = scheduler.get_last_lr()
+
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
-        for lr, parameter in zip(lrs, parameters, strict=True):
-            # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
-            name = parameter.split('/')[0]
 
-            if name not in reported_learning_rates:
-                reported_learning_rates[name] = lr
+        if isinstance(model.optimizer, list):
+            all_param_groups = []
 
-        reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
+            for opt in model.optimizer:
+                all_param_groups.extend(opt.param_groups)
+
+            for group in all_param_groups:
+                name = group.get('name')
+                if not name or not group['params']:
+                    continue
+
+                # For MuonWithAuxAdam, parameter groups are split for Muon and Adam,
+                # but might retain the same base name (e.g., 'unet').
+                optim_type = group['optim_type']  # 'muon' or 'adam'
+
+                unique_name = f"{name}_{optim_type}"
+                if unique_name not in reported_learning_rates:
+                    reported_learning_rates[unique_name] = group['lr']
+        else:
+            for lr, parameter in zip(lrs, parameters, strict=True):
+                # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
+                name = parameter.split('/')[0]
+
+                if name not in reported_learning_rates:
+                    reported_learning_rates[name] = lr
+
+        optimizer_for_reporting = model.optimizer[1] if isinstance(model.optimizer, list) else model.optimizer
+        reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, optimizer_for_reporting)
 
         for name, lr in reported_learning_rates.items():
             tensorboard.add_scalar(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
-        if config.optimizer.kourkoutas_beta and hasattr(model.optimizer, 'kourkoutas_helper'):
-            stats = model.optimizer.kourkoutas_helper.last_beta2_stats
+        kourkoutas_helper = None
+        if isinstance(model.optimizer, list):
+            for opt in model.optimizer:
+                if hasattr(opt, 'kourkoutas_helper') and opt.kourkoutas_helper is not None:
+                    kourkoutas_helper = opt.kourkoutas_helper
+                    break
+        elif hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
+            kourkoutas_helper = model.optimizer.kourkoutas_helper
+
+        if kourkoutas_helper:
+            stats = kourkoutas_helper.last_beta2_stats
             if stats:
                 tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
 
@@ -162,6 +198,10 @@ class BaseModelSetup(
         finally:
             for adapter in model.adapters():
                 adapter.hook_to_module()
+
+    def _create_layer_key_fn(self, model: BaseModel, config: TrainConfig) -> callable:
+        from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
+        return build_muon_adam_key_fn(model, config, self.debug_mode)
 
     def _create_model_part_parameters(
         self,
