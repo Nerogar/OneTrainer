@@ -113,6 +113,7 @@ class BaseFluxSetup(
                         model.text_encoder_2,
                         lambda text: model.encode_text(
                             text=text,
+                            text_encoder_2_sequence_length = config.text_encoder_2_sequence_length,
                             train_device=self.temp_device,
                         )[0][0][1:],
                     )
@@ -224,6 +225,7 @@ class BaseFluxSetup(
                 tokens_mask_2=batch.get("tokens_mask_2"),
                 text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                text_encoder_2_sequence_length=config.text_encoder_2_sequence_length,
                 pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
                     if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
