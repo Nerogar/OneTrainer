@@ -469,6 +469,21 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     bundle_additional_embeddings: bool
 
+    # lokr
+    lokr_dim: int
+    lokr_decompose_both: bool
+    lokr_decompose_factor: int
+    lokr_use_tucker: bool
+    lokr_rank_dropout: float
+    lokr_module_dropout: float
+    lokr_use_scalar: bool
+    lokr_rank_dropout_scale: bool
+    lokr_weight_decompose: bool
+    lokr_dora_on_output: bool
+    lokr_unbalanced_factorization: bool
+    lokr_rs_lora: bool
+    lokr_full_matrix: bool
+
     # optimizer
     optimizer: TrainOptimizerConfig
     optimizer_defaults: dict[str, TrainOptimizerConfig]
@@ -1076,6 +1091,21 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
+
+        # lokr
+        data.append(("lokr_dim", 16, int, False))
+        data.append(("lokr_decompose_both", False, bool, False))
+        data.append(("lokr_decompose_factor", -1, int, False))
+        data.append(("lokr_use_tucker", False, bool, False))
+        data.append(("lokr_rank_dropout", 0.0, float, False))
+        data.append(("lokr_module_dropout", 0.0, float, False))
+        data.append(("lokr_use_scalar", False, bool, False))
+        data.append(("lokr_rank_dropout_scale", False, bool, False))
+        data.append(("lokr_weight_decompose", False, bool, False))
+        data.append(("lokr_dora_on_output", True, bool, False))
+        data.append(("lokr_unbalanced_factorization", False, bool, False))
+        data.append(("lokr_rs_lora", False, bool, False))
+        data.append(("lokr_full_matrix", False, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

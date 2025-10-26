@@ -137,6 +137,7 @@ class ModelType(Enum):
 class PeftType(Enum):
     LORA = 'LORA'
     LOHA = 'LOHA'
+    LOKR = 'LOKR'
 
     def __str__(self):
         return self.value

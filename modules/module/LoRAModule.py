@@ -6,6 +6,7 @@ from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
+from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
@@ -281,6 +282,214 @@ class LoHaModule(PeftBase):
         pass
 
 
+class LoKrModule(PeftBase):
+    """Implementation of LoKr from Lycoris."""
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, rank_dropout: float, module_dropout: float, use_scalar: bool, rank_dropout_scale: bool, weight_decompose: bool, dora_on_output: bool, unbalanced_factorization: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device):
+        super().__init__(prefix, orig_module)
+        self.rank = dim  # LoKr uses 'dim' as its rank parameter
+        self.register_buffer("alpha", torch.tensor(alpha))
+
+        self.rank_dropout = rank_dropout
+        self.module_dropout = module_dropout
+        self.rank_dropout_scale = rank_dropout_scale
+
+        self.decompose_both = decompose_both
+        self.decompose_factor = int(decompose_factor)
+        self.use_tucker = use_tucker
+        self.use_scalar = use_scalar
+        self.weight_decompose = weight_decompose
+        self.dora_on_output = dora_on_output
+        self.unbalanced_factorization = unbalanced_factorization
+        self.train_device = train_device
+        self.rs_lora = rs_lora
+        self.full_matrix = full_matrix
+
+        self.use_w1 = False
+        self.use_w2 = False
+        self.tucker = False
+        self.lokr_dora_scale = None
+
+        if orig_module is not None:
+            self.initialize_weights()
+            self.alpha = self.alpha.to(orig_module.weight.device)
+        self.alpha.requires_grad_(False)
+
+    def initialize_weights(self):
+        self._initialized = True
+        lokr_dim = self.rank
+        device = self.orig_module.weight.device
+
+        match self.orig_module:
+            case nn.Linear():
+                in_dim, out_dim = self.orig_module.in_features, self.orig_module.out_features
+                in_m, in_n = factorization(in_dim, self.decompose_factor)
+                out_l, out_k = factorization(out_dim, self.decompose_factor)
+                if self.unbalanced_factorization:
+                    out_l, out_k = out_k, out_l
+                shape = ((out_l, out_k), (in_m, in_n))
+
+                # Create w1, or w1_a and w1_b
+                if self.decompose_both and lokr_dim < max(shape[0][0], shape[1][0]) / 2:
+                    self.lokr_w1_a = Parameter(torch.empty(shape[0][0], lokr_dim, device=device))
+                    self.lokr_w1_b = Parameter(torch.empty(lokr_dim, shape[1][0], device=device))
+                else:
+                    self.use_w1 = True
+                    self.lokr_w1 = Parameter(torch.empty(shape[0][0], shape[1][0], device=device))
+
+                # Create w2, or w2_a and w2_b
+                if not self.full_matrix and lokr_dim < max(shape[0][1], shape[1][1]) / 2:
+                    self.lokr_w2_a = Parameter(torch.empty(shape[0][1], lokr_dim, device=device))
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
+                else:
+                    if not self.full_matrix:
+                        warnings.warn(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.", stacklevel=2)
+                    self.use_w2 = True
+                    self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], device=device))
+
+            case nn.Conv2d():
+                in_dim, out_dim = self.orig_module.in_channels, self.orig_module.out_channels
+                k_size = self.orig_module.kernel_size
+                in_m, in_n = factorization(in_dim, self.decompose_factor)
+                out_l, out_k = factorization(out_dim, self.decompose_factor)
+                if self.unbalanced_factorization:
+                    out_l, out_k = out_k, out_l
+                shape = ((out_l, out_k), (in_m, in_n), *k_size)
+                self.tucker = self.use_tucker and any(i != 1 for i in k_size)
+
+                # Create w1, or w1_a and w1_b
+                if self.decompose_both and lokr_dim < max(shape[0][0], shape[1][0]) / 2:
+                    self.lokr_w1_a = Parameter(torch.empty(shape[0][0], lokr_dim, device=device))
+                    self.lokr_w1_b = Parameter(torch.empty(lokr_dim, shape[1][0], device=device))
+                else:
+                    self.use_w1 = True
+                    self.lokr_w1 = Parameter(torch.empty(shape[0][0], shape[1][0], device=device))
+
+                # Create w2, or decomposed/tucker variants
+                if self.full_matrix or lokr_dim >= max(shape[0][1], shape[1][1]) / 2:
+                    if not self.full_matrix:
+                        warnings.warn(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.", stacklevel=2)
+                    self.use_w2 = True
+                    self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], *k_size, device=device))
+                elif self.tucker:
+                    self.lokr_t2 = Parameter(torch.empty(lokr_dim, lokr_dim, *shape[2:], device=device))
+                    self.lokr_w2_a = Parameter(torch.empty(lokr_dim, shape[0][1], device=device))
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
+                else:
+                    self.lokr_w2_a = Parameter(torch.empty(shape[0][1], lokr_dim, device=device))
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1] * torch.tensor(shape[2:]).prod().item(), device=device))
+            case _:
+                raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+
+        # Scalar
+        if self.use_scalar:
+            self.scalar = Parameter(torch.tensor(0.0))
+        else:
+            self.register_buffer("scalar", torch.tensor(1.0), persistent=False)
+
+        # Initialize weights
+        if self.use_w1:
+            nn.init.kaiming_uniform_(self.lokr_w1, a=math.sqrt(5))
+        else:
+            nn.init.kaiming_uniform_(self.lokr_w1_a, a=math.sqrt(5))
+            nn.init.kaiming_uniform_(self.lokr_w1_b, a=math.sqrt(5))
+
+        if self.use_w2:
+            if self.use_scalar:
+                nn.init.kaiming_uniform_(self.lokr_w2, a=math.sqrt(5))
+            else:
+                nn.init.constant_(self.lokr_w2, 0)
+        else:
+            if self.tucker:
+                nn.init.kaiming_uniform_(self.lokr_t2, a=math.sqrt(5))
+            nn.init.kaiming_uniform_(self.lokr_w2_a, a=math.sqrt(5))
+            if self.use_scalar:
+                nn.init.kaiming_uniform_(self.lokr_w2_b, a=math.sqrt(5))
+            else:
+                nn.init.constant_(self.lokr_w2_b, 0)
+
+    def get_weight(self):
+        """Computes the LoKr delta weight."""
+        w1 = self.lokr_w1 if self.use_w1 else self.lokr_w1_a @ self.lokr_w1_b
+
+        if self.use_w2:
+            w2 = self.lokr_w2
+        elif self.tucker:
+            w2 = rebuild_tucker(self.lokr_t2, self.lokr_w2_a, self.lokr_w2_b)
+        else:
+            w2 = self.lokr_w2_a @ self.lokr_w2_b
+
+        weight = make_kron(w1, w2.to(w1.dtype))
+        weight = weight.view(self.shape)
+
+        if self.training and self.rank_dropout > 0:
+            drop = (torch.rand(weight.size(0), device=weight.device) > self.rank_dropout).to(weight.dtype)
+            drop = drop.view(-1, *[1] * (weight.dim() - 1))
+            if self.rank_dropout_scale:
+                drop /= drop.mean()
+            weight *= drop
+
+        return weight * self.scalar
+
+    def forward(self, x, *args, **kwargs):
+        self.check_initialized()
+
+        if self.training and self.module_dropout > 0 and torch.rand(1) < self.module_dropout:
+            return self.orig_forward(x, *args, **kwargs)
+
+        r_factor = self.rank
+        if self.rs_lora:
+            r_factor = math.sqrt(r_factor)
+        scale = self.alpha.item() / r_factor
+
+        # DoRA for LoKr
+        if self.weight_decompose:
+            if self.lokr_dora_scale is None:
+                if isinstance(self.orig_module, nn.Linear):
+                    orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+                else:
+                    orig_weight = self.orig_module.weight.detach().float()
+
+                dora_num_dims = orig_weight.dim() - 1
+                if self.dora_on_output:
+                    dora_scale_val = torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True).reshape(orig_weight.shape[0], *[1] * dora_num_dims)
+                else:
+                    dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
+
+                self.lokr_dora_scale = Parameter(dora_scale_val).to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
+                del orig_weight
+
+            if isinstance(self.orig_module, nn.Linear):
+                orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+            else:
+                orig_weight = self.orig_module.weight.detach().float()
+
+            delta_w = self.get_weight() * scale
+            wp = orig_weight + delta_w
+            del orig_weight
+
+            eps = torch.finfo(wp.dtype).eps
+            if self.dora_on_output:
+                norm = wp.detach().reshape(wp.shape[0], -1).norm(dim=1).reshape(wp.shape[0], *[1] * (wp.dim() - 1)) + eps
+            else:
+                norm = wp.detach().transpose(0, 1).reshape(wp.shape[1], -1).norm(dim=1, keepdim=True).reshape(wp.shape[1], *[1] * (wp.dim() - 1)).transpose(0, 1) + eps
+
+            wp = self.lokr_dora_scale * (wp / norm)
+
+            return self.op(x, wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
+        else:
+            w = self.get_weight() * scale
+            return self.orig_forward(x) + self.op(x, w.to(x.dtype), bias=None, **self.layer_kwargs)
+
+    def apply_to_module(self):
+        # TODO
+        pass
+
+    def extract_from_module(self, base_module: nn.Module):
+        # TODO
+        pass
+
+
 class LoRAModule(PeftBase):
     lora_down: nn.Module | None
     lora_up: nn.Module | None
@@ -432,6 +641,7 @@ class DoRAModule(LoRAModule):
 DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
+DummyLoKrModule = LoKrModule.make_dummy()
 
 
 class LoRAModuleWrapper:
@@ -441,6 +651,7 @@ class LoRAModuleWrapper:
     module_filters: list[ModuleFilter]
 
     lora_modules: dict[str, PeftBase]
+    lokr_dim: int
 
     def __init__(
             self,
@@ -454,15 +665,15 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
+        self.lokr_dim = config.lokr_dim
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)
             for pattern in (module_filter or [])
         ]
 
-        weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
-            if weight_decompose:
+            if config.lora_decompose:
                 self.klass = DoRAModule
                 self.dummy_klass = DummyDoRAModule
                 self.additional_args = [self.rank, self.alpha]
@@ -481,6 +692,25 @@ class LoRAModuleWrapper:
             self.dummy_klass = DummyLoHaModule
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
+        elif self.peft_type == PeftType.LOKR:
+            self.klass = LoKrModule
+            self.dummy_klass = DummyLoKrModule
+            self.additional_args = [self.lokr_dim, self.alpha]
+            self.additional_kwargs = {
+                'decompose_both': config.lokr_decompose_both,
+                'decompose_factor': config.lokr_decompose_factor,
+                'use_tucker': config.lokr_use_tucker,
+                'rank_dropout': config.lokr_rank_dropout,
+                'module_dropout': config.lokr_module_dropout,
+                'use_scalar': config.lokr_use_scalar,
+                'rank_dropout_scale': config.lokr_rank_dropout_scale,
+                'weight_decompose': config.lokr_weight_decompose,
+                'dora_on_output': config.lokr_dora_on_output,
+                'unbalanced_factorization': config.lokr_unbalanced_factorization,
+                'rs_lora': config.lokr_rs_lora,
+                'full_matrix': config.lokr_full_matrix,
+                'train_device': torch.device(config.train_device),
+            }
 
         self.lora_modules = self.__create_modules(orig_module, config)
 
@@ -538,9 +768,21 @@ class LoRAModuleWrapper:
         if not state_dict:
             return
 
-        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
-            if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
-                raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}, please correct in the UI.")
+        rank_keys = {
+            PeftType.LORA: ".lora_down.weight",
+            PeftType.LOHA: ".hada_w1_a",
+            PeftType.LOKR: ".lokr_w1_a",
+        }
+        key_suffix = rank_keys.get(self.peft_type)
+        if not key_suffix:
+            return
+
+        if rank_key := next((k for k in state_dict if k.endswith(key_suffix)), None):
+            checkpoint_rank = state_dict[rank_key].shape[1] if self.peft_type == PeftType.LOKR else state_dict[rank_key].shape[0]
+            config_rank = self.lokr_dim if self.peft_type == PeftType.LOKR else self.rank
+
+            if checkpoint_rank != config_rank:
+                raise ValueError(f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI.")
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
@@ -628,7 +870,12 @@ class LoRAModuleWrapper:
         """
         Sets the dropout probability
         """
-        if dropout_probability < 0 or dropout_probability > 1:
+        if not 0 <= dropout_probability <= 1:
             raise ValueError("Dropout probability must be in [0, 1]")
         for module in self.lora_modules.values():
-            module.dropout.p = dropout_probability
+            if isinstance(module, LoKrModule):
+                # LoKr handles its own complex dropout internally, so we set its probabilities directly.
+                module.module_dropout = dropout_probability
+            elif hasattr(module, 'dropout'):
+                # Other modules (LoRA, LoHa) have a standard dropout layer.
+                module.dropout.p = dropout_probability
