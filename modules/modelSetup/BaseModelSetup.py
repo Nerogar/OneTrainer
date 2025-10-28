@@ -106,18 +106,16 @@ class BaseModelSetup(
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
-        if config.optimizer.MuonWithAuxAdam:
+
+        # Handle MuonWithAuxAdam's split parameter groups
+        if any('optim_type' in g for g in model.optimizer.param_groups):
             for group in model.optimizer.param_groups:
                 name = group.get('name')
                 if not name or not group['params']:
                     continue
-
                 # For MuonWithAuxAdam, parameter groups are split for Muon and Adam,
                 # but might retain the same base name (e.g., 'unet').
-                # We use the optimizer's helper to distinguish them.
-                first_param = group['params'][0]
-                optim_type = model.optimizer.helper.get_optimizer_type(first_param)  # 'muon' or 'adam'
-
+                optim_type = group.get('optim_type', 'unknown')
                 unique_name = f"{name}_{optim_type}"
                 if unique_name not in reported_learning_rates:
                     reported_learning_rates[unique_name] = group['lr']

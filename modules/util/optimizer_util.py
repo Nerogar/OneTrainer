@@ -74,8 +74,7 @@ def init_model_parameters(
         for group in model.optimizer.param_groups:
             original_name = group.get('name')
 
-            first_param = group['params'][0]
-            optim_type = model.optimizer.helper.get_optimizer_type(first_param)
+            optim_type = group.get('optim_type', 'unknown')
             unique_name = f"{original_name}_{optim_type}"
             new_param_group_mapping.append(unique_name)
         model.param_group_mapping = new_param_group_mapping
