@@ -9,6 +9,10 @@ from torch import Tensor
 
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 
+import gguf
+
+UNQUANTIZED_TYPES = [gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16]
+
 
 def int8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
@@ -69,28 +73,28 @@ class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
         weight, = ctx.saved_tensors
         return fp8_backward_both_axiswise(x, weight), None, None
 
-
 class LinearGGUFA8(GGUFLinear):
-    def __init__(self, dtype, compute_dtype, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
         self._dtype = dtype
-        self._compute_dtype = compute_dtype
-
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad
-        x = x_orig.to(self._compute_dtype).reshape(-1, x_orig.shape[-1])
+        x = x_orig.to(self.compute_dtype).reshape(-1, x_orig.shape[-1])
         w = dequantize_gguf_tensor(self.weight)
 
-        if x.shape[0] > 16:
+        if x.shape[0] > 16 and self.weight.quant_type not in UNQUANTIZED_TYPES:
             if self._dtype == torch.int8:
                 y = LinearGGUFIntA8RequantFunction.apply(x, w, self.bias)
             else:
                 y = LinearGGUFFpA8RequantFunction.apply(x, w, self.bias)
         else:
-            y = torch.nn.functional.linear(x, w, self.bias.to(self._compute_dtype))
+            x = x.to(self.compute_dtype)
+            w = w.to(self.compute_dtype)
+            bias = self.bias.to(self.compute_dtype) if self.bias is not None else None
+            y = torch.nn.functional.linear(x, w, bias)
 
-        assert y.dtype == self._compute_dtype
+        assert y.dtype == self.compute_dtype
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
