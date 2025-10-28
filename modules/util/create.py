@@ -1175,6 +1175,7 @@ def create_optimizer(
         # MUON_ADV Optimizer
         case Optimizer.MUON_ADV:
             import inspect
+
             from adv_optm import Muon_adv
 
             layer_key_fn = parameter_group_collection.layer_key_fn
@@ -1187,7 +1188,7 @@ def create_optimizer(
                             break
                     if has_adam_params:
                         break
-            
+
             MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
 
             # Prepare parameters for the unified optimizer
@@ -1220,7 +1221,7 @@ def create_optimizer(
                         adam_group['lr'] = adam_lr
                         adam_group['initial_lr'] = adam_lr
                         final_param_groups.append(adam_group)
-                
+
                 params_for_optimizer = final_param_groups
             else:
                 # If not using AuxAdam, just use the original parameter groups
@@ -1232,8 +1233,8 @@ def create_optimizer(
                 adam_config_dict = optimizer_config.muon_adam_config.to_dict()
                 valid_adam_keys = {k for k in inspect.signature(Muon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
-                    key: adam_config_dict[key.removeprefix('adam_')] 
-                    for key in valid_adam_keys 
+                    key: adam_config_dict[key.removeprefix('adam_')]
+                    for key in valid_adam_keys
                     if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
                 }
 
@@ -1259,6 +1260,7 @@ def create_optimizer(
         # ADAMUON_ADV Optimizer
         case Optimizer.ADAMUON_ADV:
             import inspect
+
             from adv_optm import AdaMuon_adv
 
             layer_key_fn = parameter_group_collection.layer_key_fn
@@ -1271,7 +1273,7 @@ def create_optimizer(
                             break
                     if has_adam_params:
                         break
-            
+
             MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
 
             # Prepare parameters for the unified optimizer
@@ -1304,7 +1306,7 @@ def create_optimizer(
                         adam_group['lr'] = adam_lr
                         adam_group['initial_lr'] = adam_lr
                         final_param_groups.append(adam_group)
-                
+
                 params_for_optimizer = final_param_groups
             else:
                 # If not using AuxAdam, just use the original parameter groups
@@ -1316,8 +1318,8 @@ def create_optimizer(
                 adam_config_dict = optimizer_config.muon_adam_config.to_dict()
                 valid_adam_keys = {k for k in inspect.signature(AdaMuon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
-                    key: adam_config_dict[key.removeprefix('adam_')] 
-                    for key in valid_adam_keys 
+                    key: adam_config_dict[key.removeprefix('adam_')]
+                    for key in valid_adam_keys
                     if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
                 }
             optimizer = AdaMuon_adv(
