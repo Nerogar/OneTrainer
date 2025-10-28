@@ -45,7 +45,7 @@ class SanaLoRASetup(
                 "embeddings"
             )
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.prior)
+        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.transformer)
 
         return parameter_group_collection
 
@@ -60,7 +60,7 @@ class SanaLoRASetup(
         model.vae.requires_grad_(False)
 
         self._setup_model_part_requires_grad("text_encoder_lora", model.text_encoder_lora, config.text_encoder, model.train_progress)
-        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.prior, model.train_progress)
+        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
             self,
@@ -124,7 +124,7 @@ class SanaLoRASetup(
 
         model.vae.eval()
 
-        if config.prior.train:
+        if config.transformer.train:
             model.transformer.train()
         else:
             model.transformer.eval()

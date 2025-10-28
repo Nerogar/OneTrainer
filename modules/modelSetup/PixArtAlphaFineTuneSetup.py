@@ -44,7 +44,7 @@ class PixArtAlphaFineTuneSetup(
                 "embeddings"
             )
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.prior,
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.transformer,
                                            freeze=ModuleFilter.create(config), debug=config.debug_mode)
 
         return parameter_group_collection
@@ -63,7 +63,7 @@ class PixArtAlphaFineTuneSetup(
                                                                                   model.train_progress, i)
             embedding.text_encoder_vector.requires_grad_(train_embedding)
 
-        self._setup_model_part_requires_grad("transformer", model.transformer, config.prior, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer, config.transformer, model.train_progress)
 
         model.vae.requires_grad_(False)
 
@@ -104,7 +104,7 @@ class PixArtAlphaFineTuneSetup(
 
         model.vae.eval()
 
-        if config.prior.train:
+        if config.transformer.train:
             model.transformer.train()
         else:
             model.transformer.eval()

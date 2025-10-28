@@ -40,7 +40,7 @@ class PeftBase(nn.Module):
                     self.shape = get_weight_shape(orig_module)
                 case nn.Conv2d():
                     self.op = F.conv2d
-                    self.shape = get_weight_shape(orig_module)
+                    self.shape = orig_module.weight.shape
                     self.layer_kwargs.setdefault("stride", orig_module.stride)
                     self.layer_kwargs.setdefault("padding", orig_module.padding)
                     self.layer_kwargs.setdefault("dilation", orig_module.dilation)
@@ -353,7 +353,11 @@ class DoRAModule(LoRAModule):
     def initialize_weights(self):
         super().initialize_weights()
 
-        orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        if isinstance(self.orig_module, nn.Linear):
+            orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        else:
+            assert isinstance(self.orig_module, nn.Conv2d)
+            orig_weight = self.orig_module.weight.detach().float()
 
         # Thanks to KohakuBlueLeaf once again for figuring out the shape
         # wrangling that works for both Linear and Convolutional layers. If you
@@ -385,10 +389,15 @@ class DoRAModule(LoRAModule):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-
         A = self.lora_down.weight
         B = self.lora_up.weight
-        orig_weight = get_unquantized_weight(self.orig_module, A.dtype, self.train_device)
+
+        if isinstance(self.orig_module, nn.Linear):
+            orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        else:
+            assert isinstance(self.orig_module, nn.Conv2d)
+            orig_weight = self.orig_module.weight.detach().float()
+
         WP = orig_weight + (self.make_weight(A, B) * (self.alpha / self.rank))
         del orig_weight
         # A norm should never really end up zero at any point, but epsilon just

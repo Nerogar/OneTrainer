@@ -38,7 +38,7 @@ class QwenLoRASetup(
 
 
         self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder_lora, config.text_encoder)
-        self._create_model_part_parameters(parameter_group_collection, "transformer",  model.transformer_lora,  config.prior)
+        self._create_model_part_parameters(parameter_group_collection, "transformer",  model.transformer_lora,  config.transformer)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             raise NotImplementedError("Embeddings not implemented for Qwen")
@@ -56,7 +56,7 @@ class QwenLoRASetup(
         model.vae.requires_grad_(False)
 
         self._setup_model_part_requires_grad("text_encoder", model.text_encoder_lora, config.text_encoder, model.train_progress)
-        self._setup_model_part_requires_grad("transformer", model.transformer_lora, config.prior, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
             self,
@@ -115,7 +115,7 @@ class QwenLoRASetup(
 
         model.vae.eval()
 
-        if config.prior.train:
+        if config.transformer.train:
             model.transformer.train()
         else:
             model.transformer.eval()

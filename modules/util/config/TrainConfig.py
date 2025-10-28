@@ -107,7 +107,6 @@ class TrainOptimizerConfig(BaseConfig):
     use_cautious: False
     use_grams: False
     use_adopt: False
-    use_focus: False
     d_limiter: True
     use_schedulefree: True
     use_orthograd: False
@@ -124,6 +123,7 @@ class TrainOptimizerConfig(BaseConfig):
     grams_moment: False
     kourkoutas_beta: False
     k_warmup_steps: int
+    schedulefree_c: float
     ns_steps: int
     MuonWithAuxAdam: False
     non_hidden_layers: str
@@ -222,7 +222,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
-        data.append(("use_focus", False, bool, False))
         data.append(("d_limiter", True, bool, True))
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
@@ -239,6 +238,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
+        data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
         data.append(("MuonWithAuxAdam", False, bool, False))
         data.append(("non_hidden_layers", None, str, True))
@@ -438,6 +438,9 @@ class TrainConfig(BaseConfig):
     # prior
     prior: TrainModelPartConfig
 
+    # transformer
+    transformer: TrainModelPartConfig
+
     # text encoder
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
@@ -445,6 +448,7 @@ class TrainConfig(BaseConfig):
     # text encoder 2
     text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
+    text_encoder_2_sequence_length: int
 
     # text encoder 3
     text_encoder_3: TrainModelPartConfig
@@ -533,7 +537,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=8,
+            config_version=9,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -543,6 +547,7 @@ class TrainConfig(BaseConfig):
                 5: self.__migration_5,
                 6: self.__migration_6,
                 7: self.__migration_7,
+                8: self.__migration_8,
             }
         )
 
@@ -732,12 +737,21 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_8(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if migrated_data["model_type"] != "STABLE_CASCADE_1" and migrated_data["model_type"] != "WUERSTCHEN_2":
+            migrated_data["transformer"] = migrated_data["prior"]
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
             self.fallback_train_dtype,
             self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
             self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
+            self.weight_dtype if self.transformer.weight_dtype == DataType.NONE else self.transformer.weight_dtype,
             self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
             self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
             self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
@@ -755,6 +769,7 @@ class TrainConfig(BaseConfig):
         return ModelNames(
             base_model=self.base_model_name,
             prior_model=self.prior.model_name,
+            transformer_model=self.transformer.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
             text_encoder_4=self.text_encoder_4.model_name,
@@ -982,6 +997,15 @@ class TrainConfig(BaseConfig):
         prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
 
+        # prior
+        transformer = TrainModelPartConfig.default_values()
+        transformer.model_name = ""
+        transformer.train = True
+        transformer.stop_training_after = 0
+        transformer.learning_rate = None
+        transformer.weight_dtype = DataType.NONE
+        data.append(("transformer", transformer, TrainModelPartConfig, False))
+
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()
         text_encoder.train = True
@@ -1001,6 +1025,7 @@ class TrainConfig(BaseConfig):
         text_encoder_2.weight_dtype = DataType.NONE
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
+        data.append(("text_encoder_2_sequence_length", 77, int, True))
 
         # text encoder 3
         text_encoder_3 = TrainModelPartConfig.default_values()
