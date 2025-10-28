@@ -7,7 +7,7 @@
     "gradient_checkpointing": "CPU_OFFLOADED",
     "layer_offload_fraction": 0.75,
     "dataloader_threads": 1,
-    "prior": {
+    "transformer": {
         "train": true,
         "weight_dtype": "BFLOAT_16"
     },

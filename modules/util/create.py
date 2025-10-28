@@ -966,10 +966,10 @@ def create_optimizer(
                 use_cautious=optimizer_config.use_cautious if optimizer_config.use_cautious is not None else False,
                 use_grams=optimizer_config.use_grams if optimizer_config.use_grams is not None else False,
                 use_adopt=optimizer_config.use_adopt if optimizer_config.use_adopt is not None else False,
-                use_focus=optimizer_config.use_focus if optimizer_config.use_focus is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding if optimizer_config.stochastic_rounding is not None else True,
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else True,
                 use_schedulefree=optimizer_config.use_schedulefree if optimizer_config.use_schedulefree is not None else True,
+                schedulefree_c=optimizer_config.schedulefree_c if optimizer_config.schedulefree_c is not None else 0.0,
                 use_orthograd=optimizer_config.use_orthograd if optimizer_config.use_orthograd is not None else False,
             )
 
@@ -1051,6 +1051,8 @@ def create_optimizer(
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
+                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
             )
 
         # ADOPT_ADV Optimizer
@@ -1059,7 +1061,7 @@ def create_optimizer(
             optimizer = Adopt_adv(
                 params=parameters,
                 lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
@@ -1074,6 +1076,8 @@ def create_optimizer(
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
+                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
             )
 
         # PRODIGY_ADV Optimizer
@@ -1094,6 +1098,7 @@ def create_optimizer(
                 growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
+                d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
@@ -1103,6 +1108,8 @@ def create_optimizer(
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
+                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
             )
 
         # SIMPLIFIED_AdEMAMix Optimizer
@@ -1122,6 +1129,8 @@ def create_optimizer(
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
+                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
             )
 
         # LION_ADV Optimizer
@@ -1157,6 +1166,8 @@ def create_optimizer(
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
                 growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
                 slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
+                prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
+                d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )

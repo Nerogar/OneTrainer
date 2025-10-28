@@ -160,7 +160,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_cautious': {'title': 'use_cautious', 'tooltip': 'Use cautious method', 'type': 'bool'},
             'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
             'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
-            'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
             'd_limiter': {'title': 'd_limiter', 'tooltip': 'Prevent over-estimated LRs when gradients and EMA are still stabilizing', 'type': 'bool'},
             'use_schedulefree': {'title': 'use_schedulefree', 'tooltip': 'Use Schedulefree method', 'type': 'bool'},
             'use_orthograd': {'title': 'use_orthograd', 'tooltip': 'Use orthograd method', 'type': 'bool'},
@@ -175,6 +174,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'min_beta1': {'title': 'Minimum Beta1', 'tooltip': 'Starting beta1 value for warmup scheduling. Used only when beta1 warmup is enabled. Lower values allow faster initial adaptation, while higher values provide more smoothing. The final beta1 value is specified in the beta1 parameter.', 'type': 'float'},
             'Simplified_AdEMAMix': {'title': 'Simplified AdEMAMix', 'tooltip': "Enables a simplified, single-EMA variant of AdEMAMix. Instead of blending two moving averages (fast and slow momentum), this version combines the raw current gradient (controlled by 'Grad α') directly with a single theory-based momentum. This makes the optimizer highly responsive to recent gradient information, which can accelerate training in all batch size scenarios when tuned correctly.", 'type': 'bool'},
             'alpha_grad': {'title': 'Grad α', 'tooltip': 'Controls the mixing coefficient between raw gradients and momentum gradients in Simplified AdEMAMix. Higher values (e.g., 10-100) emphasize recent gradients, suitable for small batch sizes to reduce noise. Lower values (e.g., 0-1) emphasize historical gradients, suitable for large batch sizes for stability. Setting to 0 uses only momentum gradients without raw gradient contribution.', 'type': 'float'},
+            'kourkoutas_beta': {'title': 'Kourkoutas Beta', 'tooltip': 'Enables a layer-wise dynamic β₂ adaptation. This feature makes the optimizer more responsive to "spiky" gradients by lowering β₂ during periods of high variance, and more stable during calm periods by raising β₂ towards its maximum. It can significantly improve training stability and final loss.', 'type': 'bool'},
+            'k_warmup_steps': {'title': 'K-β Warmup Steps ', 'tooltip': 'When using Kourkoutas Beta, the number of initial training steps during which the dynamic β₂ logic is held off. In this period, β₂ is set to its fixed value to allow for initial training stability before the adaptive mechanism activates.', 'type': 'int'},
+            'schedulefree_c': {'title': 'Schedule free averaging strength', 'tooltip': 'Larger values = more responsive (shorter averaging window); smaller values = smoother (longer window). Set to 0 to disable and use the original Schedule-Free rule. Short small batches (≈6-12); long/large-batch (≈50-200).', 'type': 'float'},
         }
         # @formatter:on
 
