@@ -124,6 +124,23 @@ class TrainOptimizerConfig(BaseConfig):
     kourkoutas_beta: False
     k_warmup_steps: int
     schedulefree_c: float
+    ns_steps: int
+    MuonWithAuxAdam: False
+    non_hidden_layers: str
+    muon_adam_regex: False
+    muon_adam_lr: float
+    muon_te1_adam_lr: float
+    muon_te2_adam_lr: float
+    muon_adam_config: 'TrainOptimizerConfig'
+    rms_target: float
+    normuon_variant: False
+    beta2_normuon: float
+    normuon_eps: float
+    normuon_lr_scale: float
+    normuon_atan2: False
+    low_rank_ortho: False
+    ortho_rank: int
+    compiled_optimizer: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -223,6 +240,23 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
         data.append(("schedulefree_c", None, float, True))
+        data.append(("ns_steps", None, int, True))
+        data.append(("MuonWithAuxAdam", False, bool, False))
+        data.append(("non_hidden_layers", None, str, True))
+        data.append(("muon_adam_regex", False, bool, False))
+        data.append(("muon_adam_lr", None, float, True))
+        data.append(("muon_te1_adam_lr", None, float, True))
+        data.append(("muon_te2_adam_lr", None, float, True))
+        data.append(("muon_adam_config", None, TrainOptimizerConfig, True))
+        data.append(("rms_target", None, float, True))
+        data.append(("normuon_variant", False, bool, False))
+        data.append(("beta2_normuon", None, float, True))
+        data.append(("normuon_eps", None, float, True))
+        data.append(("normuon_lr_scale", None, float, True))
+        data.append(("normuon_atan2", False, bool, False))
+        data.append(("low_rank_ortho", False, bool, False))
+        data.append(("ortho_rank", None, int, True))
+        data.append(("compiled_optimizer", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
