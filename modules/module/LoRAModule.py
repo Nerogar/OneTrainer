@@ -437,8 +437,28 @@ class OFTModule(PeftBase):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-        rotated_x = self.oft_R(x)
-        return self.orig_forward(rotated_x, *args, **kwargs)
+
+        # For Linear layers, rotating the input is mathematically equivalent to rotating the weights.
+        if isinstance(self.orig_module, nn.Linear):
+            rotated_x = self.oft_R(x)
+            return self.orig_forward(rotated_x, *args, **kwargs)
+
+        # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
+        orth_rotate = self.oft_R._cayley_batch(
+            self.oft_R.weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+        )
+        orth_rotate = self.oft_R.dropout(orth_rotate)
+
+        if self.block_share:
+            orth_rotate = orth_rotate.repeat(self.rank, 1, 1)
+
+        weight = self.orig_module.weight
+        weight_reshaped = weight.reshape(weight.shape[0], self.rank, self.oft_block_size)
+        rotated_weight_reshaped = torch.einsum("ork,rkc->orc", weight_reshaped, orth_rotate)
+
+        rotated_weight = rotated_weight_reshaped.reshape(weight.shape)
+
+        return self.op(x, rotated_weight, self.orig_module.bias, **self.layer_kwargs)
 
     def apply_to_module(self):
         # TODO
