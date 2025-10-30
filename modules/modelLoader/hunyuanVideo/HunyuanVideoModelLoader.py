@@ -1,13 +1,14 @@
 import copy
 import os
 import traceback
-import torch
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+
+import torch
 
 from diffusers import (
     AutoencoderKLHunyuanVideo,
