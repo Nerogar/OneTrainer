@@ -114,7 +114,7 @@ class LoraTab:
                             tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
-        # OFT 
+        # OFT
         elif peft_type == PeftType.OFT:
             # Block Size
             components.label(master, 1, 0, f"{name} Block Size",
