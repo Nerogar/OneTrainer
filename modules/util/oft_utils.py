@@ -42,7 +42,6 @@ class OFTRotationModule(nn.Module):
         coft=False,
         eps=6e-5,
         block_share=False,
-        kernel_size=(0, 0),
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
@@ -56,8 +55,6 @@ class OFTRotationModule(nn.Module):
         self.coft = coft
         self.eps = eps
         self.block_share = block_share
-        # Conv2d specific parameters
-        self.kernel_size = kernel_size
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         # Create indices for upper triangle (excluding diagonal)
@@ -127,63 +124,6 @@ class OFTRotationModule(nn.Module):
 
         return self._pytorch_skew_symmetric_inv(out, self.block_size)
 
-    def _unfold(self, x):
-        """
-        Unfold with stride=1, padding=0 to preserve spatial dimensions. Only use kernel_size from base layer to define
-        patch size.
-        """
-        batch_size, in_channels, in_height, in_width = x.shape
-
-        if isinstance(self.kernel_size, int):
-            kernel_height, kernel_width = self.kernel_size, self.kernel_size
-        else:
-            kernel_height, kernel_width = self.kernel_size
-
-        stride_h = stride_w = 1
-        pad_h = pad_w = 0
-
-        # output dimensions
-        out_height = (in_height + 2 * pad_h - kernel_height) // stride_h + 1
-        out_width = (in_width + 2 * pad_w - kernel_width) // stride_w + 1
-
-        # Reshape input from [B, C, H, W] to [B, C, H_out, W_out, K_H, K_W]
-        x_unfolded = x.unfold(2, kernel_height, stride_h).unfold(3, kernel_width, stride_w)
-        x_unfolded = x_unfolded.permute(0, 2, 3, 1, 4, 5).contiguous()
-        x_unfolded = x_unfolded.view(batch_size * out_height * out_width, -1)
-
-        return x_unfolded
-
-    def _fold(self, x_unfolded, orig_shape):
-        """
-        Fold back to preserve spatial dimensions.
-        """
-        batch_size, in_channels, in_height, in_width = orig_shape
-
-        if isinstance(self.kernel_size, int):
-            kernel_height, kernel_width = self.kernel_size, self.kernel_size
-        else:
-            kernel_height, kernel_width = self.kernel_size
-
-        # With stride=1, padding=0:
-        out_height = in_height - kernel_height + 1
-        out_width = in_width - kernel_width + 1
-
-        # Reshape: [B*H_out*W_out, C*K_H*K_W] -> [B, H_out, W_out, C, K_H, K_W]
-        x_reshaped = x_unfolded.view(batch_size, out_height, out_width, in_channels, kernel_height, kernel_width)
-
-        # Permute to: [B, C, H_out, W_out, K_H, K_W]
-        x_reshaped = x_reshaped.permute(0, 3, 1, 2, 4, 5).contiguous()
-
-        # Use F.fold to reconstruct 4D tensor
-        x_folded = F.fold(
-            x_reshaped.view(batch_size, in_channels * kernel_height * kernel_width, out_height * out_width),
-            output_size=(in_height, in_width),
-            kernel_size=(kernel_height, kernel_width),
-            stride=(1, 1),
-        )
-
-        return x_folded
-
     def forward(self, x):
         required_dtype = x.dtype
         if required_dtype != self.weight.dtype:
@@ -200,11 +140,6 @@ class OFTRotationModule(nn.Module):
         )
         orth_rotate = self.dropout(orth_rotate)
 
-        # Unfold the input for Conv2d layer
-        if len(orig_shape) == 4:
-            x = self._unfold(x)
-
-        folded_shape = x.shape
         rank = self.in_features // self.block_size if self.block_share else self.r
         batch_dims = x.shape[:-1]
         x_reshaped = x.reshape(*batch_dims, rank, self.block_size)
@@ -215,9 +150,6 @@ class OFTRotationModule(nn.Module):
         else:
             x_rotated_reshaped = torch.einsum("...rk,rkc->...rc", x_reshaped, orth_rotate)
 
-        x_rotated = x_rotated_reshaped.reshape(*folded_shape)
-
-        if len(orig_shape) == 4:
-            x_rotated = self._fold(x_rotated, orig_shape)
+        x_rotated = x_rotated_reshaped.reshape(*orig_shape)
 
         return x_rotated.to(required_dtype)
