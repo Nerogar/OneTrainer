@@ -226,6 +226,7 @@ class ModelTab:
         row = self.__create_base_components(
             row,
             has_transformer=True,
+            allow_override_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
             has_vae=True,
