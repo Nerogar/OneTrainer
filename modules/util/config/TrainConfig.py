@@ -1084,7 +1084,7 @@ class TrainConfig(BaseConfig):
         # oft
         data.append(("oft_block_size", 0, int, False))
         data.append(("oft_coft", False, bool, False))
-        data.append(("oft_eps", 6e-5, float, False))
+        data.append(("oft_eps", 1e-4, float, False))
         data.append(("oft_block_share", False, bool, False))
 
         # optimizer

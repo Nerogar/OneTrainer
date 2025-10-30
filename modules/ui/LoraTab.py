@@ -70,12 +70,8 @@ class LoraTab:
         )
         entry.grid(row=0, column=1, columnspan=4)
 
-        # lora rank
-        components.label(master, 1, 0, f"{name} rank",
-                         tooltip=f"The rank parameter used when creating a new {name}")
-        components.entry(master, 1, 1, self.ui_state, "lora_rank")
 
-        # decomposition
+        # LoRA decomposition
         if peft_type == PeftType.LORA:
             components.label(master, 1, 3, "Decompose Weights (DoRA)",
                              tooltip="Decompose LoRA Weights (aka, DoRA).")
@@ -88,7 +84,44 @@ class LoraTab:
                              tooltip="Apply the weight decomposition on the output axis instead of the input axis.")
             components.switch(master, 3, 4, self.ui_state, "lora_decompose_output_axis")
 
+        # LoRA and LoHA shared settings
+        if peft_type == PeftType.LORA or peft_type == PeftType.LOHA:
+            # rank
+            components.label(master, 1, 0, f"{name} rank",
+                            tooltip=f"The rank parameter used when creating a new {name}")
+            components.entry(master, 1, 1, self.ui_state, "lora_rank")
+
+            # alpha
+            components.label(master, 2, 0, f"{name} alpha",
+                            tooltip=f"The alpha parameter used when creating a new {name}")
+            components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+
+            # Dropout Percentage
+            components.label(master, 3, 0, "Dropout Probability",
+                            tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+            components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+
+            # weight dtype
+            components.label(master, 4, 0, f"{name} Weight Data Type",
+                            tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
+            components.options_kv(master, 4, 1, [
+                ("float32", DataType.FLOAT_32),
+                ("bfloat16", DataType.BFLOAT_16),
+            ], self.ui_state, "lora_weight_dtype")
+
+            # For use with additional embeddings.
+            components.label(master, 5, 0, "Bundle Embeddings",
+                            tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
+            components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
+
+        # OFT 
         elif peft_type == PeftType.OFT:
+            # Block Size
+            components.label(master, 1, 0, f"{name} Block Size",
+                            tooltip=f"The block size parameter used when creating a new {name}")
+            components.entry(master, 1, 1, self.ui_state, "lora_rank")
+
+            # COFT
             components.label(master, 1, 3, "Constrained OFT (COFT)",
                              tooltip="Use the constrained variant of OFT. This constrains the learned rotation to stay very close to the identity matrix, limiting adaptation to only small changes. This improves training stability, helps prevent overfitting on small datasets, and better preserves the base models original knowledge but it may lack expressiveness for tasks requiring substantial adaptation and introduces an additional hyperparameter (COFT Epsilon) that needs tuning.")
             components.switch(master, 1, 4, self.ui_state, "oft_coft")
@@ -97,29 +130,25 @@ class LoraTab:
                              tooltip="The control strength of COFT. Only has an effect if COFT is enabled.")
             components.entry(master, 2, 4, self.ui_state, "oft_eps")
 
+            # Block Share
             components.label(master, 3, 3, "Block Share",
                              tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
             components.switch(master, 3, 4, self.ui_state, "oft_block_share")
 
-        # lora rank
-        components.label(master, 2, 0, f"{name} alpha",
-                         tooltip=f"The alpha parameter used when creating a new {name}")
-        components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+            # Dropout Percentage
+            components.label(master, 2, 0, "Dropout Probability",
+                            tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
+            components.entry(master, 2, 1, self.ui_state, "dropout_probability")
 
-        # Dropout Percentage
-        components.label(master, 3, 0, "Dropout Probability",
-                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+            # lora weight dtype
+            components.label(master, 3, 0, f"{name} Weight Data Type",
+                            tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
+            components.options_kv(master, 3, 1, [
+                ("float32", DataType.FLOAT_32),
+                ("bfloat16", DataType.BFLOAT_16),
+            ], self.ui_state, "lora_weight_dtype")
 
-        # lora weight dtype
-        components.label(master, 4, 0, f"{name} Weight Data Type",
-                         tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(master, 4, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "lora_weight_dtype")
-
-        # For use with additional embeddings.
-        components.label(master, 5, 0, "Bundle Embeddings",
-                         tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
-        components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
+            # For use with additional embeddings.
+            components.label(master, 4, 0, "Bundle Embeddings",
+                            tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
+            components.switch(master, 4, 1, self.ui_state, "bundle_additional_embeddings")
