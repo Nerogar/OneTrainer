@@ -244,7 +244,8 @@ class BaseStableDiffusionXLSetup(
             added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
 
             if config.diff2flow:
-                discrete_timestep = self._get_timestep_discrete(
+                # Reverse OT timesteps to align with diff2flow logic
+                discrete_timestep = 999 - self._get_timestep_discrete(
                     model.noise_scheduler.config['num_train_timesteps'],
                     deterministic,
                     generator,

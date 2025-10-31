@@ -170,7 +170,8 @@ class BaseStableDiffusionSetup(
             scaled_latent_image = latent_image * vae_scaling_factor
 
             if config.diff2flow:
-                discrete_timestep = self._get_timestep_discrete(
+                # Reverse OT timesteps to align with diff2flow logic
+                discrete_timestep = 999 - self._get_timestep_discrete(
                     model.noise_scheduler.config['num_train_timesteps'],
                     deterministic,
                     generator,
