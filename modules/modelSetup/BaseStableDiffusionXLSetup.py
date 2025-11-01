@@ -252,7 +252,13 @@ class BaseStableDiffusionXLSetup(
                     scaled_latent_image.shape[0],
                     config,
                 )
-                latent_noise = self._create_noise(scaled_latent_image, config, generator)
+                latent_noise = self._create_noise(
+                    scaled_latent_image,
+                    config,
+                    generator,
+                    discrete_timestep,
+                    model.noise_scheduler.betas,
+                )
 
                 t_continuous = discrete_timestep / 1000
 
