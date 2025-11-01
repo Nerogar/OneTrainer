@@ -494,6 +494,7 @@ class LoRAModuleWrapper:
         unsuitable = []
 
         for name, child_module in orig_module.named_modules():
+            name = name.replace(".checkpoint.", ".")
             if not isinstance(child_module, Linear | Conv2d):
                 unsuitable.append(name)
                 continue

@@ -217,6 +217,11 @@ class ChromaModel(BaseModel):
         #prune tokens that are masked in all batch samples:
         seq_lengths = bool_attention_mask.sum(dim=1)
         max_seq_length = seq_lengths.max().item()
+
+        if max_seq_length % 16 > 0:
+            #attention processors and/or torch.compile can have issues with uneven sequence length:
+            max_seq_length += (16 - max_seq_length % 16)
+
         text_encoder_output = text_encoder_output[:, :max_seq_length, :]
         bool_attention_mask = bool_attention_mask[:, :max_seq_length]
 
