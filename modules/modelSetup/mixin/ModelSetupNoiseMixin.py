@@ -2,6 +2,8 @@ import math
 from abc import ABCMeta
 
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.ConfigOverride import ConfigOverride, ConfigOverrideSection
+
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 import torch
@@ -81,13 +83,47 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             timestep: Tensor | None = None,
             betas: Tensor | None = None,
+            config_overrides: list[dict] | None = None,
     ) -> Tensor:
-        noise = torch.randn(
-            source_tensor.shape,
-            generator=generator,
-            device=config.train_device,
-            dtype=source_tensor.dtype
-        )
+        override_configs = ConfigOverride.batch_apply(config, config_overrides, ConfigOverrideSection.noise)
+        if override_configs:
+            noise = torch.randn(
+                source_tensor.shape,
+                generator=generator,
+                device=config.train_device,
+                dtype=source_tensor.dtype
+            )
+
+            for i, override_cfg in enumerate(override_configs):
+                self.__create_noise_impl(
+                    source_tensor[i:i+1],
+                    override_cfg,
+                    generator,
+                    timestep[i:i+1] if timestep is not None else None,
+                    betas,
+                    noise=noise[i:i+1]
+                )
+        else:
+            noise = self.__create_noise_impl(source_tensor, config, generator, timestep, betas)
+
+        return noise
+
+    def __create_noise_impl(
+            self,
+            source_tensor: Tensor,
+            config: TrainConfig,
+            generator: Generator,
+            timestep: Tensor | None = None,
+            betas: Tensor | None = None,
+            noise: Tensor | None = None,
+    ) -> Tensor:
+        if noise is None:
+            noise = torch.randn(
+                source_tensor.shape,
+                generator=generator,
+                device=config.train_device,
+                dtype=source_tensor.dtype
+            )
 
         if config.offset_noise_weight > 0:
             offset_noise = torch.randn(
@@ -103,9 +139,9 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 psi_t = psi_schedule[timestep]
                 psi_t = psi_t.view(psi_t.shape[0], *[1 for _ in range(source_tensor.ndim - 1)])
                 # Scale by the time-dependent psi_t factor
-                noise = noise + (psi_t * config.offset_noise_weight * offset_noise)
+                noise += (psi_t * config.offset_noise_weight * offset_noise) # in-place
             else: # Otherwise, use the normal offset noise.
-                noise = noise + (config.offset_noise_weight * offset_noise)
+                noise += (config.offset_noise_weight * offset_noise) # in-place
 
         if config.perturbation_noise_weight > 0:
             perturbation_noise = torch.randn(
@@ -114,11 +150,35 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 device=config.train_device,
                 dtype=source_tensor.dtype
             )
-            noise = noise + (config.perturbation_noise_weight * perturbation_noise)
+            noise += (config.perturbation_noise_weight * perturbation_noise) # in-place
 
         return noise
 
+
     def _get_timestep_discrete(
+            self,
+            num_train_timesteps: int,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            config: TrainConfig,
+            config_overrides: list[dict] | None = None,
+            shift: float = None,
+    ) -> Tensor:
+        override_configs = None if deterministic else \
+            ConfigOverride.batch_apply(config, config_overrides, ConfigOverrideSection.timestep_distribution)
+
+        if override_configs:
+            return torch.cat([
+                self.__get_timestep_discrete_impl(num_train_timesteps, False, generator, 1, override_cfg, shift)
+                for override_cfg in override_configs
+            ])
+        else:
+            return self.__get_timestep_discrete_impl(
+                num_train_timesteps, deterministic, generator, batch_size, config, shift
+            )
+
+    def __get_timestep_discrete_impl(
             self,
             num_train_timesteps: int,
             deterministic: bool,
@@ -206,6 +266,9 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weights = torch.clamp(-weight * ((linspace - bias) ** 2) + 2, min=0.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
+                else:
+                    raise ValueError(f"Unknown timestep distribution type: {config.timestep_distribution}")
+
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
                 timestep = samples.to(dtype=torch.long, device=generator.device)
 
@@ -217,6 +280,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
+            config_overrides: list[dict] | None = None,
     ) -> Tensor:
         if deterministic:
             return torch.full(
@@ -232,6 +296,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 generator=generator,
                 batch_size=batch_size,
                 config=config,
+                config_overrides=config_overrides
             ) + 1
 
             continuous = (discrete.float() / discrete_timesteps)

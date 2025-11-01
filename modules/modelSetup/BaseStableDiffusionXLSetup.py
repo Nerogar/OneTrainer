@@ -230,6 +230,7 @@ class BaseStableDiffusionXLSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                config_overrides=batch['config_overrides'],
             )
 
             latent_noise = self._create_noise(
@@ -238,7 +239,15 @@ class BaseStableDiffusionXLSetup(
                 generator,
                 timestep,
                 model.noise_scheduler.betas,
+                config_overrides=batch['config_overrides'],
             )
+
+            # debug: print config overrides for noise and timestep distribution
+            if config.debug_mode:
+                from modules.util.config.ConfigOverride import ConfigOverride, ConfigOverrideSection
+                ConfigOverride.batch_debug_print(config, batch['config_overrides'], batch['image_path'], ConfigOverrideSection.noise)
+                ConfigOverride.batch_debug_print(config, batch['config_overrides'], batch['image_path'], ConfigOverrideSection.timestep_distribution)
+                print(f"timesteps: {timestep.tolist()}")
 
             scaled_noisy_latent_image = self._add_noise_discrete(
                 scaled_latent_image,

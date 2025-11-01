@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 
+from modules.ui.TimestepDistributionWindow import TimestepDistributionFrame
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
@@ -79,6 +80,7 @@ class ConceptWindow(ctk.CTkToplevel):
             ui_state: UIState,
             image_ui_state: UIState,
             text_ui_state: UIState,
+            noise_ui_state: UIState,
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
@@ -89,6 +91,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.ui_state = ui_state
         self.image_ui_state = image_ui_state
         self.text_ui_state = text_ui_state
+        self.noise_ui_state = noise_ui_state
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
 
@@ -105,6 +108,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.general_tab = self.__general_tab(tabview.add("general"), concept)
         self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
+        self.noise_tab = self.__noise_tab(tabview.add("noise"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
         #automatic concept scan
@@ -156,14 +160,7 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
         prompt_path_entry = components.file_entry(frame, 4, 2, self.text_ui_state, "prompt_path")
 
-        def set_prompt_path_entry_enabled(option: str):
-            if option == 'concept':
-                for child in prompt_path_entry.children.values():
-                    child.configure(state="normal")
-            else:
-                for child in prompt_path_entry.children.values():
-                    child.configure(state="disabled")
-
+        set_prompt_path_entry_enabled = self.create_enabled_state_update_command(prompt_path_entry, ['concept'])
         components.options_kv(frame, 4, 1, [
             ("From text file per sample", 'sample'),
             ("From single text file", 'concept'),
@@ -171,31 +168,46 @@ class ConceptWindow(ctk.CTkToplevel):
         ], self.text_ui_state, "prompt_source", command=set_prompt_path_entry_enabled)
         set_prompt_path_entry_enabled(concept.text.prompt_source)
 
+        # per-sample config source
+        components.label(frame, 5, 0, "Per-Sample Config",
+                         tooltip="The source for per-sample config overrides")
+        per_sample_config_key_entry = components.entry(frame, 5, 2, self.ui_state, "per_sample_config_key",
+                                                       tooltip="When \"json file per sample\" is selected as the source of per-sample config overrides, enter here the key to the config dict inside the json files.\n"
+                                                       "To traverse several dicts, separate the keys with \".\" (dot).\n"
+                                                       "When left empty, key/value pairs are expected inside a top-level dict.")
+
+        set_per_sample_config_key_entry_enabled = self.create_enabled_state_update_command(per_sample_config_key_entry, ['json'])
+        components.options_kv(frame, 5, 1, [
+            ("Disabled", 'disabled'),
+            ("From json file per sample", 'json'),
+        ], self.ui_state, "per_sample_config_source", command=set_per_sample_config_key_entry_enabled)
+        set_per_sample_config_key_entry_enabled(concept.per_sample_config_source)
+
         # include subdirectories
-        components.label(frame, 5, 0, "Include Subdirectories",
+        components.label(frame, 6, 0, "Include Subdirectories",
                          tooltip="Includes images from subdirectories into the dataset")
-        components.switch(frame, 5, 1, self.ui_state, "include_subdirectories")
+        components.switch(frame, 6, 1, self.ui_state, "include_subdirectories")
 
         # image variations
-        components.label(frame, 6, 0, "Image Variations",
+        components.label(frame, 7, 0, "Image Variations",
                          tooltip="The number of different image versions to cache if latent caching is enabled.")
-        components.entry(frame, 6, 1, self.ui_state, "image_variations")
+        components.entry(frame, 7, 1, self.ui_state, "image_variations")
 
         # text variations
-        components.label(frame, 7, 0, "Text Variations",
+        components.label(frame, 8, 0, "Text Variations",
                          tooltip="The number of different text versions to cache if latent caching is enabled.")
-        components.entry(frame, 7, 1, self.ui_state, "text_variations")
+        components.entry(frame, 8, 1, self.ui_state, "text_variations")
 
         # balancing
-        components.label(frame, 8, 0, "Balancing",
+        components.label(frame, 9, 0, "Balancing",
                          tooltip="The number of samples used during training. Use repeats to multiply the concept, or samples to specify an exact number of samples used in each epoch.")
-        components.entry(frame, 8, 1, self.ui_state, "balancing")
-        components.options(frame, 8, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
+        components.entry(frame, 9, 1, self.ui_state, "balancing")
+        components.options(frame, 9, 2, [str(x) for x in list(BalancingStrategy)], self.ui_state, "balancing_strategy")
 
         # loss weight
-        components.label(frame, 9, 0, "Loss Weight",
+        components.label(frame, 10, 0, "Loss Weight",
                          tooltip="The loss multiplyer for this concept.")
-        components.entry(frame, 9, 1, self.ui_state, "loss_weight")
+        components.entry(frame, 10, 1, self.ui_state, "loss_weight")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -376,6 +388,53 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.pack(fill="both", expand=1)
         return frame
 
+    def __noise_tab(self, master):
+        col0_size = 230
+
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0, minsize=col0_size)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure(2, weight=0)
+        frame.grid_columnconfigure(3, weight=0)
+        frame.grid_columnconfigure(4, weight=1)
+
+        # noise override
+        components.label(frame, 0, 0, "Noise Override",
+                         tooltip="Use custom noise settings for this concept and enable overriding of the global noise settings")
+        components.switch(frame, 0, 1, self.noise_ui_state, "enable_noise_override")
+
+        # offset noise weight
+        components.label(frame, 1, 0, "Offset Noise Weight",
+                         tooltip="The weight of offset noise added to each training step")
+        components.entry(frame, 1, 1, self.noise_ui_state, "offset_noise_weight")
+
+        # generalized offset noise weight
+        generalised_offset_label = components.label(frame, 1, 2, "Generalized Offset Noise",
+            tooltip="Per-timestep 'brightness knob' instead of a fixed offset - steadier training, better starts, and improved very dark/bright images. Compatible with V-pred and Eps-pred. Start with 0.02 and adjust as needed.")
+        generalised_offset_label.configure(wraplength=130, justify="left")
+        components.switch(frame, 1, 3, self.noise_ui_state, "generalized_offset_noise")
+
+        # perturbation noise weight
+        components.label(frame, 2, 0, "Perturbation Noise Weight",
+                         tooltip="The weight of perturbation noise added to each training step")
+        components.entry(frame, 2, 1, self.noise_ui_state, "perturbation_noise_weight")
+
+        frame.grid_rowconfigure(3, minsize=20)
+
+        # timestep distribution override
+        components.label(frame, 4, 0, "Timestep Distribution Override",
+                         tooltip="Use a custom timestep distribution for this concept and enable overriding of the global timestep distribution")
+        components.switch(frame, 4, 1, self.noise_ui_state, "enable_timestep_distribution_override")
+
+        # timestep distribution settings and plot
+        frame.grid_rowconfigure(5, weight=1)
+        timestep_distribution_frame = TimestepDistributionFrame(frame, self.concept.noise, self.noise_ui_state)
+        timestep_distribution_frame.grid(row=5, column=0, columnspan=5, sticky='nsew')
+        timestep_distribution_frame.grid_columnconfigure(0, weight=0, minsize=col0_size)
+
+        frame.pack(fill="both", expand=1)
+        return frame
+
     def __concept_stats_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         frame.grid_columnconfigure(0, weight=0, minsize=150)
@@ -542,6 +601,16 @@ class ConceptWindow(ctk.CTkToplevel):
 
         frame.pack(fill="both", expand=1)
         return frame
+
+
+    @staticmethod
+    def create_enabled_state_update_command(target_widget, enabled_options: list[str]):
+        def update_widget_state(option: str):
+            state = "normal" if option in enabled_options else "disabled"
+            for child in target_widget.children.values():
+                child.configure(state=state)
+
+        return update_widget_state
 
     def __prev_image_preview(self):
         self.image_preview_file_index = max(self.image_preview_file_index - 1, 0)
