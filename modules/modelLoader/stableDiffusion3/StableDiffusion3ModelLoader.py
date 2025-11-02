@@ -6,6 +6,7 @@ from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.ModuleFilter import ModuleFilter
 
 from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, SD3Transformer2DModel, StableDiffusion3Pipeline
 from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5Tokenizer
@@ -27,11 +28,12 @@ class StableDiffusion3ModelLoader(
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
+            quant_filters: list[ModuleFilter],
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, vae_model_name,
-                include_text_encoder_1, include_text_encoder_2, include_text_encoder_3,
+                include_text_encoder_1, include_text_encoder_2, include_text_encoder_3, quant_filters,
             )
         else:
             raise Exception("not an internal model")
@@ -46,6 +48,7 @@ class StableDiffusion3ModelLoader(
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
+            quant_filters: list[ModuleFilter],
     ):
         #no call to self._prepare_sub_modules, because SAI polluted their sd3 / sd3.5 medium repo text encoders with fp16 files
 
@@ -133,6 +136,7 @@ class StableDiffusion3ModelLoader(
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
+            quant_filters,
         )
 
         model.model_type = model_type
@@ -156,6 +160,7 @@ class StableDiffusion3ModelLoader(
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
+            quant_filters: list[ModuleFilter],
     ):
         pipeline = StableDiffusion3Pipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -220,7 +225,7 @@ class StableDiffusion3ModelLoader(
             print("text encoder 3 (t5) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quant_filters,
         )
 
         model.model_type = model_type
@@ -240,6 +245,7 @@ class StableDiffusion3ModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quant_filters: list[ModuleFilter] | None = None,
     ):
         stacktraces = []
 
@@ -247,7 +253,7 @@ class StableDiffusion3ModelLoader(
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                 model_names.include_text_encoder_3,
+                 model_names.include_text_encoder_3, quant_filters,
             )
             return
         except Exception:
@@ -257,7 +263,7 @@ class StableDiffusion3ModelLoader(
             self.__load_diffusers(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
+                model_names.include_text_encoder_3, quant_filters,
             )
             return
         except Exception:
@@ -267,7 +273,7 @@ class StableDiffusion3ModelLoader(
             self.__load_safetensors(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
+                model_names.include_text_encoder_3, quant_filters,
             )
             return
         except Exception:
