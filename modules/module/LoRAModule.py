@@ -556,8 +556,11 @@ class LoRAModuleWrapper:
 
         self._check_rank_matches(state_dict)
 
-        for module in self.lora_modules.values():
-            module.load_state_dict(state_dict, strict=strict)
+        try:
+            for module in self.lora_modules.values():
+                module.load_state_dict(state_dict, strict=strict)
+        except RuntimeError as e:
+            raise RuntimeError(f"Error during loading of module key \"{module.prefix}\"") from e
 
         # Temporarily re-create the state dict, so we can see what keys were left.
         remaining_names = set(state_dict) - set(self.state_dict())
