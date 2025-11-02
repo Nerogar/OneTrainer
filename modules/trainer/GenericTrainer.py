@@ -164,7 +164,7 @@ class GenericTrainer(BaseTrainer):
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
         os.makedirs(Path(path).absolute(), exist_ok=True)
-        path = path_util.canonical_join(path, f"{get_string_timestamp()}.json")
+        path = path_util.canonical_join(path, f"{self.config.save_filename_prefix}{get_string_timestamp()}.json")
         with open(path, "w") as f:
             json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
 
