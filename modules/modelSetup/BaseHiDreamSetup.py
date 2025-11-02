@@ -27,6 +27,7 @@ from torch import Tensor
 PRESETS = {
     "attn-mlp": ["attn1", "ff_i"],
     "attn-only": ["attn1"],
+    "blocks": ["stream_block"],
     "full": [],
 }
 

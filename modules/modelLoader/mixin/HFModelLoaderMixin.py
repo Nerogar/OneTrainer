@@ -6,6 +6,7 @@ from abc import ABCMeta
 from itertools import repeat
 
 from modules.util.enum.DataType import DataType
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.quantization_util import (
     is_quantized_parameter,
     replace_linear_with_quantized_layers,
@@ -30,6 +31,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype: DataType,
             train_dtype: DataType,
             keep_in_fp32_modules: list[str] | None,
+            quant_filters: list[ModuleFilter] | None,
             pretrained_model_name_or_path: str,
             subfolder: str | None,
             model_filename: str,
@@ -40,7 +42,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             keep_in_fp32_modules = []
 
         with accelerate.init_empty_weights():
-            replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, copy_parameters=False)
+            replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quant_filters, copy_parameters=False)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -188,6 +190,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype=dtype,
             train_dtype=train_dtype,
             keep_in_fp32_modules=module_type._keep_in_fp32_modules,
+            quant_filters=None,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
             model_filename="model.safetensors",
@@ -202,6 +205,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             train_dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str | None = None,
+            quant_filters: list[ModuleFilter] | None = None,
     ):
         user_agent = {
             "file_type": "model",
@@ -223,6 +227,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype=dtype,
             train_dtype=train_dtype,
             keep_in_fp32_modules=module_type._keep_in_fp32_modules,
+            quant_filters=quant_filters,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
             model_filename="diffusion_pytorch_model.safetensors",
@@ -236,11 +241,12 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype: DataType,
             train_dtype: DataType,
             keep_in_fp32_modules: list[str] | None,
+            quant_filters: list[ModuleFilter] | None,
     ):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, copy_parameters=True)
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quant_filters, copy_parameters=True)
 
         for module_name, module in sub_module.named_modules():
             param_iter = [(x, y[0], y[1]) for x, y in zip(repeat(False), module._parameters.items(), strict=False)]
@@ -268,6 +274,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             sub_module: nn.Module,
             dtype: DataType,
             train_dtype: DataType,
+            quant_filters: list[ModuleFilter] | None = None,
     ):
         module_type = type(sub_module)
 
@@ -276,6 +283,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype,
             train_dtype,
             module_type._keep_in_fp32_modules,
+            quant_filters,
         )
 
     def _convert_diffusers_sub_module_to_dtype(
@@ -283,12 +291,14 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             sub_module: nn.Module,
             dtype: DataType,
             train_dtype: DataType,
+            quant_filters: list[ModuleFilter] | None = None,
     ):
         return self.__convert_sub_module_to_dtype(
             sub_module,
             dtype,
             train_dtype,
             None,
+            quant_filters,
         )
 
     def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]):

@@ -10,6 +10,7 @@ from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearM
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.ModuleFilter import ModuleFilter
 
 import torch
 from torch import Tensor, nn
@@ -47,11 +48,14 @@ def __replace_linear_layers(
         parent_module: nn.Module,
         construct_fn,
         keep_in_fp32_modules: list[str] | None = None,
+        filters: list[ModuleFilter] | None = None,
         copy_parameters: bool = False,
         name_prefix: str = "",
         visited_modules: set[int] | None = None,
         convert_type = nn.Linear,
 ):
+    #both 'keep_in_fp32_modules' and 'filters' are layer filters: keep_in_fp32_modules is set by diffusers, 'filters' is set by the user.
+    #Apply both. 'keep_in_fp32_modules' only looks at attr_name, 'filters' looks at the entire key at the leafs:
     if keep_in_fp32_modules is None:
         keep_in_fp32_modules = []
 
@@ -60,9 +64,13 @@ def __replace_linear_layers(
         visited_modules = set()
 
     visited_modules.add(id(parent_module))
+
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
         for i, module in enumerate(parent_module):
             if isinstance(module, convert_type):
+                if filters is not None and len(filters) > 0 and not any(f.matches(name_prefix) for f in filters):
+                    continue
+
                 quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
                 parent_module[i] = quant_linear
                 del module
@@ -71,6 +79,7 @@ def __replace_linear_layers(
                     parent_module=module,
                     construct_fn=construct_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
+                    filters=filters,
                     copy_parameters=copy_parameters,
                     name_prefix=f"{name_prefix}[{i}]",
                     visited_modules=visited_modules,
@@ -82,6 +91,10 @@ def __replace_linear_layers(
 
             module = getattr(parent_module, attr_name)
             if isinstance(module, convert_type):
+                key_name = attr_name if name_prefix == "" else f"{name_prefix}.{attr_name}"
+                if filters is not None and len(filters) > 0 and not any(f.matches(key_name) for f in filters):
+                    continue
+
                 quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
                 setattr(parent_module, attr_name, quant_linear)
                 del module
@@ -90,8 +103,9 @@ def __replace_linear_layers(
                     parent_module=module,
                     construct_fn=construct_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
+                    filters=filters,
                     copy_parameters=copy_parameters,
-                    name_prefix=f"{name_prefix}.{attr_name}",
+                    name_prefix=attr_name if name_prefix == "" else f"{name_prefix}.{attr_name}",
                     visited_modules=visited_modules,
                 )
 
@@ -99,6 +113,7 @@ def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
         dtype: DataType,
         keep_in_fp32_modules: list[str] | None = None,
+        filters: list[ModuleFilter] | None = None,
         copy_parameters: bool = False,
 ):
     if dtype.quantize_nf4():
@@ -123,8 +138,9 @@ def replace_linear_with_quantized_layers(
         parent_module=parent_module,
         construct_fn=construct_fn,
         keep_in_fp32_modules=keep_in_fp32_modules,
+        filters=filters,
         copy_parameters=copy_parameters,
-        convert_type = convert_type,
+        convert_type=convert_type,
     )
 
     #ensure that all Linear layers were replaced
@@ -133,6 +149,7 @@ def replace_linear_with_quantized_layers(
         assert (not isinstance(module, convert_type)
                 or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))
                 or any(s in name.split('.') for s in keep_in_fp32_modules)
+                or (filters is not None and len(filters) > 0 and not any(f.matches(name) for f in filters))
                ), f"Linear layer {name} was not found in model for quantization"
 
 def is_quantized_parameter(

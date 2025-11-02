@@ -1062,6 +1062,11 @@ class TrainConfig(BaseConfig):
         data.append(("layer_filter_preset", "full", str, False))
         data.append(("layer_filter_regex", False, bool, False))
 
+        #quantization layer filter
+        data.append(("quantization_layer_filter", "", str, False))
+        data.append(("quantization_layer_filter_preset", "full", str, False))
+        data.append(("quantization_layer_filter_regex", False, bool, False))
+
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
         data.append(("preserve_embedding_norm", False, bool, False))

@@ -7,6 +7,7 @@ from modules.modelLoader.wuerstchen.WuerstchenModelLoader import WuerstchenModel
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.ModuleFilter import ModuleFilter
 
 
 class WuerstchenFineTuneModelLoader(
@@ -34,6 +35,7 @@ class WuerstchenFineTuneModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quant_filters: list[ModuleFilter] | None = None,
     ) -> WuerstchenModel | None:
         base_model_loader = WuerstchenModelLoader()
         embedding_loader = WuerstchenEmbeddingLoader()
@@ -43,7 +45,7 @@ class WuerstchenFineTuneModelLoader(
         self._load_internal_data(model, model_names.base_model)
         model.model_spec = self._load_default_model_spec(model_type)
 
-        base_model_loader.load(model, model_type, model_names, weight_dtypes)
+        base_model_loader.load(model, model_type, model_names, weight_dtypes, quant_filters)
         embedding_loader.load(model, model_names.base_model, model_names)
 
         return model
