@@ -596,6 +596,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_atan2": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
+        "normuon_variant": False,
         "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
