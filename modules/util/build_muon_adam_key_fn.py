@@ -56,7 +56,7 @@ def build_muon_adam_key_fn(
     def get_optim_type(param_name: str, p: torch.nn.Parameter) -> str:
         """Applies the simplified rule hierarchy to a single parameter."""
         # Rule 1: Check against the exclusion filters first.
-        if any(f.matches(param_name) for f in filters) and not len(p.shape) == 1:
+        if any(f.matches(param_name) for f in filters) and len(p.shape) != 1:
             return 'muon'
 
         # Rule 2: For everything else, use Adam
