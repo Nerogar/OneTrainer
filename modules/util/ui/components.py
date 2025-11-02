@@ -357,8 +357,8 @@ def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: 
             layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
             layer_entry.cget('textvariable').set(",".join(patterns))
 
-            ui_state.get_var("layer_filter").set(",".join(patterns))
-            ui_state.get_var("layer_filter_regex").set(preset_uses_regex)
+            ui_state.get_var(entry_var_name).set(",".join(patterns))
+            ui_state.get_var(regex_var_name).set(preset_uses_regex)
 
             regex_label.grid_remove()
             regex_switch.grid_remove()
