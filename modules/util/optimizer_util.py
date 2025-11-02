@@ -542,6 +542,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
     Optimizer.MUON_ADV: {
         "beta1": 0.9,
         "weight_decay": 0.0,
+        "accelerated_ns": False,
         "ns_steps": 5,
         "low_rank_ortho": False,
         "ortho_rank": 128,
@@ -569,6 +570,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta2": 0.95,
         "eps": 1e-8,
         "weight_decay": 0.0,
+        "accelerated_ns": False,
         "ns_steps": 5,
         "low_rank_ortho": False,
         "ortho_rank": 128,
@@ -586,6 +588,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_atan2": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
+        "normuon_variant": False,
         "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
