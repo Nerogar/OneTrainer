@@ -179,7 +179,7 @@ class BaseModelSetup(
 
     def _create_layer_key_fn(self, model: BaseModel, config: TrainConfig) -> callable:
         from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
-        return build_muon_adam_key_fn(model, config, self.debug_mode)
+        return build_muon_adam_key_fn(model, config)
 
     def _create_model_part_parameters(
         self,

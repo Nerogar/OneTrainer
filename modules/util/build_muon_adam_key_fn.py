@@ -11,7 +11,6 @@ import torch
 def build_muon_adam_key_fn(
     model: BaseModel,
     config: TrainConfig,
-    debug_mode: bool,
 ) -> Callable:
     """
     Creates a function that maps a parameter to its designated optimizer type,
@@ -24,99 +23,30 @@ def build_muon_adam_key_fn(
     filters: list[ModuleFilter]
 
     # Use user-provided patterns if they exist, otherwise use the hardcoded default.
-    if config.optimizer.non_hidden_layers is not None:
+    if config.optimizer.muon_hidden_layers is not None:
         # Create filters from the user's configuration string
-        patterns_list = [p.strip() for p in config.optimizer.non_hidden_layers.split(',') if p.strip()]
+        patterns_list = [p.strip() for p in config.optimizer.muon_hidden_layers.split(',') if p.strip()]
         filters = [ModuleFilter(p, use_regex=config.optimizer.muon_adam_regex) for p in patterns_list]
         if True:
             print(f"[MuonWithAuxAdam] Using custom non-hidden layer patterns: {patterns_list}")
     else:
-        # Default list of "non-hidden" parts.
+        # Default list of "hidden" parts.
         match model.model_type:
-            case ModelType.STABLE_DIFFUSION_15 | ModelType.STABLE_DIFFUSION_15_INPAINTING | ModelType.STABLE_DIFFUSION_20_BASE | ModelType.STABLE_DIFFUSION_20_INPAINTING | ModelType.STABLE_DIFFUSION_20 | ModelType.STABLE_DIFFUSION_21 | ModelType.STABLE_DIFFUSION_21_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING :
+            case ModelType.STABLE_DIFFUSION_15 | ModelType.STABLE_DIFFUSION_15_INPAINTING | ModelType.STABLE_DIFFUSION_20_BASE | ModelType.STABLE_DIFFUSION_20_INPAINTING | ModelType.STABLE_DIFFUSION_20 | ModelType.STABLE_DIFFUSION_21 | ModelType.STABLE_DIFFUSION_21_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING | ModelType.STABLE_CASCADE_1 | ModelType.WUERSTCHEN_2:
                 default_patterns = [
-                    'conv_in', 'conv_norm_out', 'conv_out',
-                    'add_embedding.linear_', 'time_embedding.linear_', 'label_emb', # UNet
-                    'text_model.embeddings', 'text_projection', 'position_embedding', # TEs (CLIPS)
-                    'quant_conv', 'post_quant_conv', # VAE
+                    'block', # UNet
+                    'text_model.encoder.layers', # TEs (CLIPs)
                 ]
-            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35:
+            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA  | ModelType.FLUX_DEV_1  | ModelType.CHROMA_1  | ModelType.QWEN  | ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA:
                 default_patterns = [
-                    'x_embedder',
-                    'y_embedder',
-                    't_embedder',
-                    'pos_embed',
-                    'context_embedder',
-                    'final_layer',
-                    'token_embedding',
-                    'ln_final',
-                    'text_projection',
-                    'position_embedding',
-                    'final_layer_norm',
-                ]
-            case ModelType.SANA:
-                default_patterns = [
-                    'patch_embed.proj',
-                    'time_embed',
-                    'caption_norm.weight',
-                    'caption_projection.linear',
-                    'proj_out',
-                    'scale_shift_table',
-                ]
-            case ModelType.STABLE_CASCADE_1 | ModelType.WUERSTCHEN_2:
-                default_patterns = [
-                    'vquantizer.codebook.weight',
-                    'embedding.1',
-                    'clf.1',
-                    'clip_img_mapper',
-                    'clip_txt_mapper',
-                    'clip_txt_pooled_mapper',
-                    'down_downscalers.1.1.blocks.0',
-                    'up_upscalers.0.1.blocks.1',
-                    'clip_mapper',
-                    'down_downscalers',
-                    'effnet_mapper',
-                    'pixels_mapper',
-                    'up_repeat_mappers',
-                    'up_upscalers',
-                ]
-            case ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA:
-                default_patterns = [
-                    'pos_embed.proj',
-                    'adaln_single',
-                    'caption_projection',
-                    'proj_out',
-                    'scale_shift_table',
-                ]
-            case ModelType.FLUX_DEV_1 | ModelType.CHROMA_1:
-                default_patterns = [
-                    'context_embedder',
-                    'guidance_layer',
-                    'time_text_embed',
-                    'x_embedder',
-                    'norm_out.linear',
-                    'proj_out',
-                    'img_in',
-                    'txt_in',
-                    'txt_norm',
-                    'final_layer_norm',
+                    'transformer_blocks',
+                    'encoder.block', # TE (T5)
                 ]
             case ModelType.HI_DREAM_FULL:
                 default_patterns = [
-                    'p_embedder',
-                    't_embedder',
-                    'x_embedder',
                     'caption_projection',
-                    'final_layer',
-                ]
-            case ModelType.QWEN:
-                default_patterns = [
-                    'time_text_embed',
-                    'img_in',
-                    'norm_out',
-                    'proj_out',
-                    'txt_in',
-                    'txt_norm',
+                    'double_stream_blocks',
+                    'single_stream_blocks',
                 ]
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]
         if True:
@@ -126,11 +56,11 @@ def build_muon_adam_key_fn(
     def get_optim_type(param_name: str, p: torch.nn.Parameter) -> str:
         """Applies the simplified rule hierarchy to a single parameter."""
         # Rule 1: Check against the exclusion filters first.
-        if any(f.matches(param_name) for f in filters):
-            return 'adam'
+        if any(f.matches(param_name) for f in filters) and not len(p.shape) == 1:
+            return 'muon'
 
-        # Rule 2: For everything else, apply the standard μP logic.
-        return 'muon' if len(p.shape) >= 2 else 'adam'
+        # Rule 2: For everything else, use Adam
+        return 'adam'
 
     # Module-based iteration & parameter mapping
     sub_modules_to_check = [
@@ -191,10 +121,9 @@ def build_muon_adam_key_fn(
             if unassigned_params_count > 0:
                 print(f"INFO: {unassigned_params_count} trainable tensor(s) were not in checked modules and defaulted to AdamW.")
 
-            if config.optimizer.non_hidden_layers is not None:
-                unused_filters = [f._pattern for f in filters if not f.was_used()]
-                if unused_filters:
-                    print(f"WARNING: The following non-hidden layer patterns did not match any parameters: {unused_filters}")
+            unused_filters = [f._pattern for f in filters if not f.was_used()]
+            if unused_filters:
+                print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
 
             print("----------------------------------------------\n")
         else:

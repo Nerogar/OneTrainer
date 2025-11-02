@@ -126,7 +126,7 @@ class TrainOptimizerConfig(BaseConfig):
     schedulefree_c: float
     ns_steps: int
     MuonWithAuxAdam: False
-    non_hidden_layers: str
+    muon_hidden_layers: str
     muon_adam_regex: False
     muon_adam_lr: float
     muon_te1_adam_lr: float
@@ -242,7 +242,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
         data.append(("MuonWithAuxAdam", False, bool, False))
-        data.append(("non_hidden_layers", None, str, True))
+        data.append(("muon_hidden_layers", None, str, True))
         data.append(("muon_adam_regex", False, bool, False))
         data.append(("muon_adam_lr", None, float, True))
         data.append(("muon_te1_adam_lr", None, float, True))
