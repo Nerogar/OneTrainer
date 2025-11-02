@@ -91,6 +91,7 @@ def build_muon_adam_key_fn(
             case ModelType.FLUX_DEV_1 | ModelType.CHROMA_1:
                 default_patterns = [
                     'context_embedder',
+                    'guidance_layer',
                     'time_text_embed',
                     'x_embedder',
                     'norm_out.linear',
@@ -98,6 +99,7 @@ def build_muon_adam_key_fn(
                     'img_in',
                     'txt_in',
                     'txt_norm',
+                    'final_layer_norm',
                 ]
             case ModelType.HI_DREAM_FULL:
                 default_patterns = [

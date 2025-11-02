@@ -1347,6 +1347,8 @@ def create_optimizer(
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 compiled_optimizer=optimizer_config.compiled_optimizer if optimizer_config.compiled_optimizer is not None else False,
+                normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
+                accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 **adam_kwargs
             )
 
