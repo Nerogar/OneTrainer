@@ -31,8 +31,6 @@ class WuerstchenFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-
-
         self._create_model_part_parameters(parameter_group_collection, "prior_text_encoder", model.prior_text_encoder, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():

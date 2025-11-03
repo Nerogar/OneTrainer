@@ -31,8 +31,6 @@ class QwenFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-
-
         self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder)
         self._create_model_part_parameters(parameter_group_collection,  "transformer", model.transformer,  config.transformer, freeze=ModuleFilter.create(config), debug=config.debug_mode)
 

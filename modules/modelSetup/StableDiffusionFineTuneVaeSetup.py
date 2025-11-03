@@ -30,8 +30,6 @@ class StableDiffusionFineTuneVaeSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-
-
         parameter_group_collection.add_group(NamedParameterGroup(
             unique_name="vae",
             parameters=model.vae.decoder.parameters(),

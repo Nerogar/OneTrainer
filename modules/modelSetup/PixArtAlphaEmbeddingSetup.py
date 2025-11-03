@@ -30,8 +30,6 @@ class PixArtAlphaEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-
-
         self._add_embedding_param_groups(
             model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
             "embeddings"

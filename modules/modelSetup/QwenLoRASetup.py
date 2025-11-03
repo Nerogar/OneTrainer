@@ -32,8 +32,6 @@ class QwenLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-
-
         self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder_lora, config.text_encoder)
         self._create_model_part_parameters(parameter_group_collection, "transformer",  model.transformer_lora,  config.transformer)
 
