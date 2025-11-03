@@ -13,7 +13,7 @@ def quantize_int8(x: Tensor, scale: float | Tensor) -> Tensor:
 
 def quantize_int8_tensorwise_get_scale(x: Tensor) -> float:
     abs_max = x.abs().max()
-    scale = (abs_max.float() / 127.0).clamp(min=1e-12)
+    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
     return scale
 
 def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
@@ -23,7 +23,7 @@ def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
 
 def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
     abs_max = x.abs().amax(dim=dim, keepdim=True)
-    scale = (abs_max.float() / 127.0).clamp(min=1e-12)
+    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
     return scale
 
 def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
@@ -37,12 +37,12 @@ def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
 
 def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
     abs_max = x.abs().max()
-    scale = (abs_max.float() / 448.0).clamp(min=1e-12)
+    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
     return scale
 
 def quantize_fp8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
     abs_max = x.abs().amax(dim=dim, keepdim=True)
-    scale = (abs_max.float() / 448.0).clamp(min=1e-12)
+    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
     return scale
 
 def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
