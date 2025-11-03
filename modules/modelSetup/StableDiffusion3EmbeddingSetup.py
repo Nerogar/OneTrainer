@@ -30,7 +30,6 @@ class StableDiffusion3EmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
             self._add_embedding_param_groups(
                 model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
