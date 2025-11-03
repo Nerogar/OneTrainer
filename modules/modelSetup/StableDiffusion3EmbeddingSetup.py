@@ -30,9 +30,6 @@ class StableDiffusion3EmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.MuonWithAuxAdam:
-            print("INFO: Creating layer keys for MuonWithAuxAdam.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model, config)
 
 
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:

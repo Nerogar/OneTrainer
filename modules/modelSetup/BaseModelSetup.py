@@ -177,10 +177,6 @@ class BaseModelSetup(
             for adapter in model.adapters():
                 adapter.hook_to_module()
 
-    def _create_layer_key_fn(self, model: BaseModel, config: TrainConfig) -> callable:
-        from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
-        return build_muon_adam_key_fn(model, config)
-
     def _create_model_part_parameters(
         self,
         parameter_group_collection: NamedParameterGroupCollection,

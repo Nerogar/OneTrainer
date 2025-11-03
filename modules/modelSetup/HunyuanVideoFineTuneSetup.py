@@ -32,9 +32,6 @@ class HunyuanVideoFineTuneSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.MuonWithAuxAdam:
-            print("INFO: Creating layer keys for MuonWithAuxAdam.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model, config)
 
 
         self._create_model_part_parameters(parameter_group_collection, "text_encoder_1", model.text_encoder_1, config.text_encoder)

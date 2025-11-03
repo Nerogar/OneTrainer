@@ -1,6 +1,6 @@
 import ast
 import importlib
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
@@ -129,6 +129,7 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.build_muon_adam_key_fn import split_parameters_for_muon
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -495,6 +496,7 @@ def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
+        layer_key_fn: Callable | None = None,
 ) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
@@ -1178,54 +1180,7 @@ def create_optimizer(
 
             from adv_optm import Muon_adv
 
-            layer_key_fn = parameter_group_collection.layer_key_fn
-            has_adam_params = False
-            if layer_key_fn:
-                for group in parameters:
-                    for p in group['params']:
-                        if p.requires_grad and layer_key_fn(p) == 'adam':
-                            has_adam_params = True
-                            break
-                    if has_adam_params:
-                        break
-
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
-
-            # Prepare parameters for the unified optimizer
-            if MuonWithAuxAdam and layer_key_fn:
-                final_param_groups = []
-                for group in parameters:
-                    muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']
-                    adam_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'adam']
-
-                    if muon_params:
-                        muon_group = group.copy()
-                        muon_group['params'] = muon_params
-                        muon_group['optim_type'] = 'muon'
-                        final_param_groups.append(muon_group)
-
-                    if adam_params:
-                        adam_group = group.copy()
-                        adam_group['params'] = adam_params
-                        adam_group['optim_type'] = 'adam'
-                        # Set Adam-specific LR
-                        base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
-                        te1_adam_lr = optimizer_config.muon_te1_adam_lr
-                        te2_adam_lr = optimizer_config.muon_te2_adam_lr
-                        adam_lr = base_adam_lr
-                        original_name = group.get('name')
-                        if original_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
-                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
-                        if original_name in ('text_encoder_2', 'text_encoder_2_lora'):
-                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
-                        adam_group['lr'] = adam_lr
-                        adam_group['initial_lr'] = adam_lr
-                        final_param_groups.append(adam_group)
-
-                params_for_optimizer = final_param_groups
-            else:
-                # If not using AuxAdam, just use the original parameter groups
-                params_for_optimizer = parameters
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -1264,54 +1219,7 @@ def create_optimizer(
 
             from adv_optm import AdaMuon_adv
 
-            layer_key_fn = parameter_group_collection.layer_key_fn
-            has_adam_params = False
-            if layer_key_fn:
-                for group in parameters:
-                    for p in group['params']:
-                        if p.requires_grad and layer_key_fn(p) == 'adam':
-                            has_adam_params = True
-                            break
-                    if has_adam_params:
-                        break
-
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
-
-            # Prepare parameters for the unified optimizer
-            if MuonWithAuxAdam and layer_key_fn:
-                final_param_groups = []
-                for group in parameters:
-                    muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']
-                    adam_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'adam']
-
-                    if muon_params:
-                        muon_group = group.copy()
-                        muon_group['params'] = muon_params
-                        muon_group['optim_type'] = 'muon'
-                        final_param_groups.append(muon_group)
-
-                    if adam_params:
-                        adam_group = group.copy()
-                        adam_group['params'] = adam_params
-                        adam_group['optim_type'] = 'adam'
-                        # Set Adam-specific LR
-                        base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
-                        te1_adam_lr = optimizer_config.muon_te1_adam_lr
-                        te2_adam_lr = optimizer_config.muon_te2_adam_lr
-                        adam_lr = base_adam_lr
-                        original_name = group.get('name')
-                        if original_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
-                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
-                        if original_name in ('text_encoder_2', 'text_encoder_2_lora'):
-                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
-                        adam_group['lr'] = adam_lr
-                        adam_group['initial_lr'] = adam_lr
-                        final_param_groups.append(adam_group)
-
-                params_for_optimizer = final_param_groups
-            else:
-                # If not using AuxAdam, just use the original parameter groups
-                params_for_optimizer = parameters
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}

@@ -1,6 +1,7 @@
 import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
+from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
@@ -58,7 +59,15 @@ def init_model_parameters(
     #to be safe, do that before the optimizer is created because the optimizer could take copies
     multi.broadcast_parameters(parameters.parameters(), train_device)
 
-    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    layer_key_fn = None
+    if model.train_config.optimizer.MuonWithAuxAdam:
+        print("INFO: Creating layer keys for MuonWithAuxAdam.")
+        layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
+
+    model.optimizer = create.create_optimizer(
+        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+    )
+
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
