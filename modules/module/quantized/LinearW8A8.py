@@ -107,7 +107,7 @@ class LinearFp8Function(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None) -> Tensor:
         ctx.save_for_backward(weight, weight_scale)
-        return fp8_forward_tokenwise(x.bfloat16(), weight, weight_scale, bias).bfloat16()
+        return fp8_forward_tokenwise(x, weight, weight_scale, bias)
 
     @staticmethod
     def backward(ctx, x: Tensor):
