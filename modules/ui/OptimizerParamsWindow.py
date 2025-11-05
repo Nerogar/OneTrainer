@@ -192,7 +192,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'beta2_normuon': {'title': 'NorMuon Beta2', 'tooltip': 'Exponential decay rate for the neuron-wise second-moment estimator in NorMuon (analogous to Adams beta2). Controls how past squared updates influence current normalization.', 'type': 'float'},
             'normuon_eps': {'title': 'NorMuon EPS', 'tooltip': 'Epsilon for NorMuon normalization stability.', 'type': 'float'},
             'normuon_lr_scale': {'title': 'NorMuon LR scale', 'tooltip': 'Scaling factor for the NorMuon learning rate.', 'type': 'float'},
-            'normuon_atan2': {'title': 'NorMuon Atan2', 'tooltip': 'whether to use the atan2 for NorMuon. Replacing the Epsilon and bounding the update.', 'type': 'bool'},
             'low_rank_ortho': {'title': 'Low-rank Orthogonalization', 'tooltip': 'Use low-rank orthogonalization to accelerate Muon by orthogonalizing only in a low-dimensional subspace, improving speed and noise robustness.', 'type': 'bool'},
             'ortho_rank': {'title': 'Ortho Rank', 'tooltip': 'Target rank for low-rank orthogonalization. Controls the dimensionality of the subspace used for efficient and noise-robust orthogonalization.', 'type': 'int'},
             'accelerated_ns': {'title': 'Accelerated Newton-Schulz', 'tooltip': 'Applies an enhanced Newton-Schulz variant that replaces heuristic coefficients with optimal coefficients derived at each step. This improves performance and convergence by reducing the number of required operations.', 'type': 'bool'},

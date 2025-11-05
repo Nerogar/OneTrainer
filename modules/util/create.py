@@ -1206,10 +1206,10 @@ def create_optimizer(
                 beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
                 normuon_eps=optimizer_config.normuon_eps if optimizer_config.normuon_eps is not None else 1e-8,
                 normuon_lr_scale=optimizer_config.normuon_lr_scale if optimizer_config.normuon_lr_scale is not None else 0.2,
-                normuon_atan2=optimizer_config.normuon_atan2 if optimizer_config.normuon_atan2 is not None else False,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 **adam_kwargs
             )
 
@@ -1250,6 +1250,7 @@ def create_optimizer(
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 **adam_kwargs
             )
 
