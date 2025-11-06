@@ -142,7 +142,7 @@ def split_parameters_for_muon(
 ) -> tuple[list[dict], bool]:
     """
     Splits parameter groups into 'muon' and 'adam' subgroups for MuonWithAuxAdam.
-    If MuonWithAuxAdam is not active, returns the original parameters.
+    If MuonWithAuxAdam is not active, it configures all groups for Muon.
     """
     optimizer_config = config.optimizer
 
@@ -156,12 +156,21 @@ def split_parameters_for_muon(
             if has_adam_params:
                 break
 
-    MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
+    use_aux_adam = optimizer_config.MuonWithAuxAdam and has_adam_params
 
-    # If not using AuxAdam, just use the original parameter groups
-    if not (MuonWithAuxAdam and layer_key_fn):
-        return parameters, MuonWithAuxAdam
+    if not use_aux_adam:
+        # "Original Muon" mode. All params are muon.
+        final_param_groups = []
+        for group in parameters:
+            muon_group = group.copy()
+            muon_group['params'] = [p for p in group['params'] if p.requires_grad]
+            if not muon_group['params']:
+                continue
+            muon_group['optim_type'] = 'muon'
+            final_param_groups.append(muon_group)
+        return final_param_groups, False
 
+    # MuonWithAuxAdam mode
     final_param_groups = []
     for group in parameters:
         muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']
@@ -191,4 +200,4 @@ def split_parameters_for_muon(
             adam_group['initial_lr'] = adam_lr
             final_param_groups.append(adam_group)
 
-    return final_param_groups, MuonWithAuxAdam
+    return final_param_groups, True

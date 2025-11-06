@@ -78,7 +78,7 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    if model.train_config.optimizer.MuonWithAuxAdam and model.optimizer is not None:
+    if model.optimizer is not None and any('optim_type' in g for g in model.optimizer.param_groups):
         new_param_group_mapping = []
         for group in model.optimizer.param_groups:
             original_name = group.get('name')
@@ -150,6 +150,23 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "percentile_clipping": 100,
         "block_wise": True,
         "is_paged": False,
+    },
+    Optimizer.MUON: {
+        "momentum": 0.95,
+        "weight_decay": 0.0,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 3e-4,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "muon_adam_config": None,
+    },
+    Optimizer.MUON_AUXADAM: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
     },
     Optimizer.AdEMAMix_8BIT: {
         "beta1": 0.9,

@@ -1254,6 +1254,54 @@ def create_optimizer(
                 **adam_kwargs
             )
 
+        # MUON Optimizer
+        case Optimizer.MUON:
+            import torch.distributed as dist
+
+            from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
+
+            params_for_optimizer, ___ = split_parameters_for_muon(parameters, layer_key_fn, config)
+
+            final_param_groups  = []
+            for group in params_for_optimizer:
+                is_muon = group.get('optim_type') == 'muon'
+
+                if is_muon:
+                    final_group = {
+                        'params': group['params'],
+                        'lr': group['lr'],
+                        'use_muon': True,
+                        'momentum': optimizer_config.momentum if optimizer_config.momentum is not None else 0.95,
+                        'weight_decay': optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                    }
+                else:  # is adam
+                    adam_config = optimizer_config.muon_adam_config
+
+                    final_group = {
+                        'params': group['params'],
+                        'lr': group['lr'],
+                        'use_muon': False,
+                        'betas': (adam_config.beta1 if adam_config.beta1 is not None else 0.9,
+                                    adam_config.beta2 if adam_config.beta2 is not None else 0.95),
+                        'eps': adam_config.eps if adam_config.eps is not None else 1e-10,
+                        'weight_decay': adam_config.weight_decay if adam_config.weight_decay is not None else 0.0,
+                    }
+                final_param_groups.append(final_group)
+
+            # check the distributed status
+            is_distributed = dist.is_initialized() and dist.get_world_size() > 1
+
+            OptimizerClass = MuonWithAuxAdam if is_distributed else SingleDeviceMuonWithAuxAdam
+            optimizer = OptimizerClass(param_groups=final_param_groups )
+
+            # Add metadata back to the optimizer's param_groups for the framework to use.
+            for i, group in enumerate(optimizer.param_groups):
+                original_group = params_for_optimizer[i]
+                group['initial_lr'] = original_group.get('initial_lr', original_group['lr'])
+                group['name'] = original_group.get('name')
+                group['optim_type'] = original_group.get('optim_type')
+
+
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:
             from timm.optim.adabelief import AdaBelief

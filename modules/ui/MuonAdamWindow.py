@@ -14,6 +14,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
             parent,
             train_config: TrainConfig,
             ui_state: UIState,
+            adam_optimizer_type: Optimizer,
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
@@ -21,8 +22,13 @@ class MuonAdamWindow(ctk.CTkToplevel):
         self.parent = parent
         self.train_config = train_config
         self.adam_ui_state = ui_state
+        self.adam_optimizer_type = adam_optimizer_type
 
-        self.title("Muon's Auxiliary AdamW_adv Settings")
+        if self.adam_optimizer_type == Optimizer.MUON_AUXADAM:
+            self.title("Muon's Auxiliary AdamW Settings")
+        elif self.adam_optimizer_type == Optimizer.ADAMW_ADV:
+            self.title("Muon_adv's Auxiliary AdamW_adv Settings")
+
         self.geometry("800x500")
         self.resizable(True, True)
 
@@ -74,9 +80,9 @@ class MuonAdamWindow(ctk.CTkToplevel):
         }
         # @formatter:on
 
-        adamw_adv_params = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
+        adam_params = OPTIMIZER_DEFAULT_PARAMETERS[self.adam_optimizer_type]
 
-        for index, key in enumerate(adamw_adv_params.keys()):
+        for index, key in enumerate(adam_params.keys()):
             if key not in KEY_DETAIL_MAP:
                 continue
 
