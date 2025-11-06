@@ -27,6 +27,7 @@ from torch import Tensor
 
 PRESETS = {
     "attn-only": ["attn"],
+    "blocks": ["transformer_block"],
     "full": [],
 }
 
