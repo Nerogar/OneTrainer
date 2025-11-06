@@ -195,6 +195,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'ortho_rank': {'title': 'Ortho Rank', 'tooltip': 'Target rank for low-rank orthogonalization. Controls the dimensionality of the subspace used for efficient and noise-robust orthogonalization.', 'type': 'int'},
             'accelerated_ns': {'title': 'Accelerated Newton-Schulz', 'tooltip': 'Applies an enhanced Newton-Schulz variant that replaces heuristic coefficients with optimal coefficients derived at each step. This improves performance and convergence by reducing the number of required operations.', 'type': 'bool'},
             'compiled_optimizer': {'title': 'Compiled Optimizer', 'tooltip': 'Enables PyTorch compilation for the optimizer internal step logic. This is intended to improve performance by allowing PyTorch to fuse operations and optimize the computational graph.', 'type': 'bool'},
+            'cautious_wd': {'title': 'Cautious Weight Decay', 'tooltip': 'Applies weight decay only to parameter coordinates whose signs align with the optimizer update direction. This preserves the original optimization objective while still benefiting from regularization effects, leading to improved convergence and better final performance.', 'type': 'bool'},
         }
         # @formatter:on
 
