@@ -31,3 +31,6 @@ def script_imports(allow_zluda: bool = True):
             from modules.zluda import ZLUDA
 
             ZLUDA.initialize()
+
+    from modules.util.attn.flash_attn_win import register as register_flash_attn_win
+    register_flash_attn_win()
