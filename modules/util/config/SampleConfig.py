@@ -24,6 +24,8 @@ class SampleConfig(BaseConfig):
     text_encoder_4_layer_skip: int
     prior_attention_mask: bool
     force_last_timestep: bool
+    generalized_offset_noise: bool
+    offset_noise_weight: float
 
     sample_inpainting: bool
     base_image_path: str
@@ -39,6 +41,8 @@ class SampleConfig(BaseConfig):
         self.text_encoder_4_layer_skip = train_config.text_encoder_4_layer_skip
         self.prior_attention_mask = train_config.prior.attention_mask
         self.force_last_timestep = train_config.rescale_noise_scheduler_to_zero_terminal_snr
+        self.generalized_offset_noise = train_config.generalized_offset_noise
+        self.offset_noise_weight = train_config.offset_noise_weight
 
     @staticmethod
     def default_values():
@@ -63,6 +67,8 @@ class SampleConfig(BaseConfig):
         data.append(("text_encoder_4_layer_skip", 0, int, False))
         data.append(("prior_attention_mask", False, bool, False))
         data.append(("force_last_timestep", False, bool, False))
+        data.append(("generalized_offset_noise", False, bool, False))
+        data.append(("offset_noise_weight", 0.0, float, False))
 
         data.append(("sample_inpainting", False, bool, False))
         data.append(("base_image_path", "", str, False))

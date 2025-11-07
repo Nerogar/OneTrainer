@@ -51,6 +51,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             force_last_timestep: bool = False,
+            generalized_offset_noise: bool = False,
+            offset_noise_weight: float = 0.0,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -130,6 +132,17 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 device=self.train_device,
                 dtype=self.model.train_dtype.torch_dtype(),
             ) * noise_scheduler.init_noise_sigma
+
+            # Apply Generalized Offset Noise if enabled
+            if generalized_offset_noise and offset_noise_weight > 0:
+                offset_noise_shape = (latent_image.shape[0], 1, 1, 1)
+                offset_noise = torch.randn(
+                    offset_noise_shape,
+                    generator=generator,
+                    device=self.train_device,
+                    dtype=self.model.train_dtype.torch_dtype(),
+                ) * offset_noise_weight
+                latent_image = latent_image + offset_noise
 
             added_cond_kwargs = {
                 "text_embeds": torch.concat([negative_pooled_text_encoder_2_output, pooled_text_encoder_2_output], dim=0),
@@ -492,6 +505,8 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 force_last_timestep=sample_config.force_last_timestep,
+                generalized_offset_noise=sample_config.generalized_offset_noise,
+                offset_noise_weight=sample_config.offset_noise_weight,
                 on_update_progress=on_update_progress,
             )
 
