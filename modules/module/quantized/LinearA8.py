@@ -60,6 +60,8 @@ class LinearInt8Function(torch.autograd.Function):
         ctx.save_for_backward(x, weight)
         #axiswise performs better than tensorwise in tests, even though
         #it requires another quant during backward - but quant is cheap
+
+        # x @ weight.T + bias
         return int8_forward_axiswise(x, weight, bias)
 
     @staticmethod
@@ -68,7 +70,7 @@ class LinearInt8Function(torch.autograd.Function):
 
         grad_x, grad_weight, grad_bias = None, None, None
         if ctx.needs_input_grad[0]:
-            # grad_output @ weight.T
+            # grad_output @ weight
             grad_x = int8_backward_act_axiswise(grad_output, weight)
         if ctx.needs_input_grad[1]:
             # grad_output.T @ x
@@ -90,7 +92,7 @@ class LinearFp8Function(torch.autograd.Function):
 
         grad_x, grad_weight, grad_bias = None, None, None
         if ctx.needs_input_grad[0]:
-            # grad_output @ weight.T
+            # grad_output @ weight
             grad_x = fp8_backward_act_axiswise(grad_output, weight)
         if ctx.needs_input_grad[1]:
             # grad_output.T @ x
