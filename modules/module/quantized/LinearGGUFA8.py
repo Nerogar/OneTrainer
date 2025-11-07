@@ -14,7 +14,7 @@ import gguf
 UNQUANTIZED_TYPES = [gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16]
 
 
-def int8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
+def int8_forward_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
     w_8, w_scale = quantize_int8_axiswise(weight, dim=-1)
     res = torch._int_mm(x_8, w_8.T)
@@ -23,7 +23,7 @@ def int8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> 
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
 
-def fp8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
+def fp8_forward_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
     w_8, w_scale = quantize_fp8_axiswise(weight, dim=-1)
     one = torch.ones(1, device=x.device)
@@ -33,17 +33,17 @@ def fp8_forward_both_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> T
         res_scaled.add_(bias.to(x.dtype))
     return res_scaled
 
-def int8_backward_both_axiswise(x: Tensor, weight: Tensor) -> Tensor:
-    x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
+def int8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
+    output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_int8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(x_8, w_8)
-    return mm_res.to(x.dtype).mul_(w_scale).mul_(x_scale)
+    mm_res = triton_mm_8bit(output_8, w_8)
+    return mm_res.to(output.dtype).mul_(w_scale).mul_(output_scale)
 
-def fp8_backward_both_axiswise(x: Tensor, weight: Tensor) -> Tensor:
-    x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
+def fp8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
+    output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_fp8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(x_8, w_8)
-    return mm_res.to(x.dtype).mul_(w_scale).mul_(x_scale)
+    mm_res = triton_mm_8bit(output_8, w_8)
+    return mm_res.to(output.dtype).mul_(w_scale).mul_(output_scale)
 
 class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
     @staticmethod
@@ -51,27 +51,27 @@ class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
         ctx.save_for_backward(weight)
         #axiswise performs better than tensorwise in tests, even though
         #it requires another requant during backward - but requant is cheap
-        return int8_forward_both_axiswise(x, weight, bias)
+        return int8_forward_axiswise(x, weight, bias)
 
     @staticmethod
-    def backward(ctx, x: Tensor):
+    def backward(ctx, output: Tensor):
         if ctx.needs_input_grad != (True, False, False):
             raise NotImplementedError("GGUF cannot be used for full finetuning")
         weight, = ctx.saved_tensors
-        return int8_backward_both_axiswise(x, weight), None, None
+        return int8_backward_axiswise(output, weight), None, None
 
 class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None) -> Tensor:
         ctx.save_for_backward(weight)
-        return fp8_forward_both_axiswise(x, weight, bias)
+        return fp8_forward_axiswise(x, weight, bias)
 
     @staticmethod
-    def backward(ctx, x: Tensor):
+    def backward(ctx, output: Tensor):
         if ctx.needs_input_grad != (True, False, False):
             raise NotImplementedError("GGUF cannot be used for full finetuning")
         weight, = ctx.saved_tensors
-        return fp8_backward_both_axiswise(x, weight), None, None
+        return fp8_backward_axiswise(output, weight), None, None
 
 class LinearGGUFA8(GGUFLinear):
     def __init__(self, dtype: torch.dtype, *args, **kwargs):
