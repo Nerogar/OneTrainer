@@ -28,7 +28,7 @@ def build_muon_adam_key_fn(
         patterns_list = [p.strip() for p in config.optimizer.muon_hidden_layers.split(',') if p.strip()]
         filters = [ModuleFilter(p, use_regex=config.optimizer.muon_adam_regex) for p in patterns_list]
         if True:
-            print(f"[MuonWithAuxAdam] Using custom non-hidden layer patterns: {patterns_list}")
+            print(f"[MuonWithAuxAdam] Using custom hidden layer patterns: {patterns_list}")
     else:
         # Default list of "hidden" parts.
         match model.model_type:
@@ -48,9 +48,11 @@ def build_muon_adam_key_fn(
                     'double_stream_blocks',
                     'single_stream_blocks',
                 ]
+            case _: # Unmatched cases
+                raise NotImplementedError(f"Default hidden layer patterns are not defined for model type: {model.model_type}")
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]
         if True:
-            print(f"[MuonWithAuxAdam] Using default non-hidden layer patterns for {model.model_type}.")
+            print(f"[MuonWithAuxAdam] Using default hidden layer patterns for {model.model_type}.")
 
 
     def get_optim_type(param_name: str, p: torch.nn.Parameter) -> str:
