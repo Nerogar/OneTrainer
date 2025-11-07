@@ -47,7 +47,8 @@ def check_flash_causal_non_square_seqlens(query: torch.Tensor,
                                           key: torch.Tensor,
                                           is_causal: bool):
     # FlashAttention does not support the is_causal flag when seqlen_q != seqlen_k
-    return not (is_causal and not query.is_nested and not key.is_nested and query.shape[-2] != key.shape[-2])
+    # Flash attention layout is (N, S, H, E), so sequence length is at index -3
+    return not (is_causal and not query.is_nested and not key.is_nested and query.shape[-3] != key.shape[-3])
 
 
 def has_for_nested_inputs(query: torch.Tensor,
@@ -67,9 +68,10 @@ def check_grouped_query_attention(query: torch.Tensor,
                                   value: torch.Tensor,
                                   requires_same_num_heads: bool = True) -> bool:
     """Check if grouped query attention configuration is valid."""
-    q_num_heads = query.size(-3)
-    k_num_heads = key.size(-3)
-    v_num_heads = value.size(-3)
+    # Flash attention layout is (N, S, H, E), so num_heads is at index -2
+    q_num_heads = query.size(-2)
+    k_num_heads = key.size(-2)
+    v_num_heads = value.size(-2)
     same_kv_heads = k_num_heads == v_num_heads
 
     if requires_same_num_heads and not same_kv_heads:
@@ -96,9 +98,10 @@ def check_batch_size_and_num_heads_dense(query: torch.Tensor,
 
     same_batch_size = (q_batch_size == k_batch_size and q_batch_size == v_batch_size)
 
-    q_num_heads = query.size(-3)
-    k_num_heads = key.size(-3)
-    v_num_heads = value.size(-3)
+    # Flash attention layout is (N, S, H, E), so num_heads is at index -2
+    q_num_heads = query.size(-2)
+    k_num_heads = key.size(-2)
+    v_num_heads = value.size(-2)
 
     same_num_heads = (q_num_heads == k_num_heads and q_num_heads == v_num_heads)
 
@@ -119,8 +122,9 @@ def check_nonzero_sequence_lengths_dense(query: torch.Tensor,
     """Check that sequence lengths are non-zero for dense tensors."""
     # In some cases people will pass in 0 sized tensors, this will
     # cause the fused path to error with unaligned mask
-    zero_seq_len_q = query.size(-2) == 0
-    zero_seq_len_k = key.size(-2) == 0
+    # Flash attention layout is (N, S, H, E), so sequence length is at index -3
+    zero_seq_len_q = query.size(-3) == 0
+    zero_seq_len_k = key.size(-3) == 0
     return not (zero_seq_len_q or zero_seq_len_k)
 
 
