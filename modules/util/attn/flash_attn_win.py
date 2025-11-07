@@ -1,8 +1,9 @@
 import sys
-from diffusers.utils import is_flash_attn_available
-from diffusers.models.attention_dispatch import _AttentionBackendRegistry, AttentionBackendName
+
 import torch
-from typing import Optional
+
+from diffusers.models.attention_dispatch import AttentionBackendName, _AttentionBackendRegistry
+from diffusers.utils import is_flash_attn_available
 
 
 def all_tensors_on_device(query: torch.Tensor,
@@ -12,7 +13,7 @@ def all_tensors_on_device(query: torch.Tensor,
     return query.is_cuda and key.is_cuda and value.is_cuda
 
 
-def check_for_attn_mask(attn_mask: Optional[torch.Tensor]):
+def check_for_attn_mask(attn_mask: torch.Tensor | None):
     # Flash Attention does not support non-null attn_mask
     return attn_mask is None
 
@@ -46,10 +47,7 @@ def check_flash_causal_non_square_seqlens(query: torch.Tensor,
                                           key: torch.Tensor,
                                           is_causal: bool):
     # FlashAttention does not support the is_causal flag when seqlen_q != seqlen_k
-    if is_causal and not query.is_nested and not key.is_nested and query.shape[-2] != key.shape[-2]:
-        return False
-
-    return True
+    return not (is_causal and not query.is_nested and not key.is_nested and query.shape[-2] != key.shape[-2])
 
 
 def has_for_nested_inputs(query: torch.Tensor,
@@ -78,10 +76,7 @@ def check_grouped_query_attention(query: torch.Tensor,
         return False
 
     # Check if grouped query attention is supported and validate the number of heads
-    if q_num_heads % k_num_heads != 0 or (not requires_same_num_heads and q_num_heads % v_num_heads != 0):
-        return False
-
-    return True
+    return not (q_num_heads % k_num_heads != 0 or (not requires_same_num_heads and q_num_heads % v_num_heads != 0))
 
 
 def check_batch_size_and_num_heads_dense(query: torch.Tensor,
@@ -115,11 +110,7 @@ def check_batch_size_and_num_heads_dense(query: torch.Tensor,
         return check_grouped_query_attention(query, key, value, requires_same_num_heads)
 
     # same num heads condition for non-gqa case
-    if not same_num_heads:
-        return False
-
-    # If all checks pass, return true
-    return True
+    return same_num_heads
 
 
 def check_nonzero_sequence_lengths_dense(query: torch.Tensor,
@@ -130,15 +121,13 @@ def check_nonzero_sequence_lengths_dense(query: torch.Tensor,
     # cause the fused path to error with unaligned mask
     zero_seq_len_q = query.size(-2) == 0
     zero_seq_len_k = key.size(-2) == 0
-    if zero_seq_len_q or zero_seq_len_k:
-        return False
-    return True
+    return not (zero_seq_len_q or zero_seq_len_k)
 
 
 def check_last_dim_stride_equals_1_dense(query: torch.Tensor,
                                          key: torch.Tensor,
                                          value: torch.Tensor,
-                                         attn_mask: Optional[torch.Tensor] = None,
+                                         attn_mask: torch.Tensor | None = None,
                                          ignore_singleton_dim: bool = True) -> bool:
     """Check that the last dimension of inputs has stride 1.
 
@@ -161,20 +150,19 @@ def check_last_dim_stride_equals_1_dense(query: torch.Tensor,
     mask_stride_equal_1 = attn_mask.stride(-1) == 1 if attn_mask is not None else True
     mask_stride_valid = True if is_cpu else mask_stride_equal_1
 
-    if not (qkv_strides_equal_1 and mask_stride_valid):
-        return False
+    return qkv_strides_equal_1 and mask_stride_valid
 
-    return True
 
 def check_dtypes_low_precision(query: torch.Tensor,
                        key: torch.Tensor,
                        value: torch.Tensor):
     return query.dtype == key.dtype and query.dtype == value.dtype and query.dtype in [torch.float16, torch.bfloat16]
 
+
 def can_use_flash_attn(query: torch.Tensor,
                        key: torch.Tensor,
                        value: torch.Tensor,
-                       attn_mask: Optional[torch.Tensor] = None,
+                       attn_mask: torch.Tensor | None = None,
                        is_causal: bool = False,
                        enable_gqa: bool = False):
     # Define gate functions that determine if a flash kernel can be ran
@@ -200,8 +188,10 @@ def can_use_flash_attn(query: torch.Tensor,
 
     return True
 
+
 def supports_flash_attention_in_sdp():
     return torch.cuda.is_available() and torch.backends.cuda.is_flash_attention_available()
+
 
 def register():
     if sys.platform == "win32" and is_flash_attn_available() and not supports_flash_attention_in_sdp():
@@ -211,10 +201,10 @@ def register():
                 query: torch.Tensor,
                 key: torch.Tensor,
                 value: torch.Tensor,
-                attn_mask: Optional[torch.Tensor] = None,
+                attn_mask: torch.Tensor | None = None,
                 dropout_p: float = 0.0,
                 is_causal: bool = False,
-                scale: Optional[float] = None,
+                scale: float | None = None,
                 enable_gqa: bool = False
         ) -> torch.Tensor:
             # Determine if we can use flash attention
