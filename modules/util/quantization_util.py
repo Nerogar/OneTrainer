@@ -242,3 +242,54 @@ def offload_quantized(
             new_tensor = allocator(tensor)
             new_tensor.copy_(tensor.data, non_blocking=non_blocking)
             tensor.data = new_tensor
+
+def quantize_int8(x: Tensor, scale: float | Tensor) -> Tensor:
+    q = x.float().mul(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
+    return q
+
+def quantize_int8_tensorwise_get_scale(x: Tensor) -> float:
+    abs_max = x.abs().max()
+    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
+    return scale
+
+def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
+    scale = quantize_int8_tensorwise_get_scale(x)
+    q = quantize_int8(x, scale)
+    return q, scale
+
+def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
+    abs_max = x.abs().amax(dim=dim, keepdim=True)
+    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
+    return scale
+
+def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
+    scale = quantize_int8_axiswise_get_scale(x, dim)
+    q = quantize_int8(x, scale)
+    return q, scale
+
+def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
+    q = x.float().mul(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
+    return q
+
+def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
+    abs_max = x.abs().max()
+    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
+    return scale
+
+def quantize_fp8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
+    abs_max = x.abs().amax(dim=dim, keepdim=True)
+    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
+    return scale
+
+def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
+    scale = quantize_fp8_tensorwise_get_scale(x)
+    q = quantize_fp8(x, scale)
+    return q, scale
+
+def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_axiswise_get_scale(x, dim)
+    q = quantize_fp8(x, scale)
+    return q, scale
+
+def dequantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> Tensor:
+    return q.to(compute_dtype) * scale.to(compute_dtype)

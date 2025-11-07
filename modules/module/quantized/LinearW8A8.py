@@ -1,62 +1,18 @@
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
+from modules.util.quantization_util import (
+    dequantize,
+    quantize_fp8_axiswise,
+    quantize_fp8_tensorwise,
+    quantize_int8_axiswise,
+    quantize_int8_tensorwise,
+)
 from modules.util.triton_mm_8bit import mm_8bit as triton_mm_8bit
 
 import torch
 from torch import Tensor, nn
 
-
-def quantize_int8(x: Tensor, scale: float | Tensor) -> Tensor:
-    q = x.float().mul(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
-    return q
-
-def quantize_int8_tensorwise_get_scale(x: Tensor) -> float:
-    abs_max = x.abs().max()
-    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
-    return scale
-
-def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
-    scale = quantize_int8_tensorwise_get_scale(x)
-    q = quantize_int8(x, scale)
-    return q, scale
-
-def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
-    abs_max = x.abs().amax(dim=dim, keepdim=True)
-    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
-    return scale
-
-def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
-    scale = quantize_int8_axiswise_get_scale(x, dim)
-    q = quantize_int8(x, scale)
-    return q, scale
-
-def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
-    q = x.float().mul(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
-    return q
-
-def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
-    abs_max = x.abs().max()
-    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
-    return scale
-
-def quantize_fp8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
-    abs_max = x.abs().amax(dim=dim, keepdim=True)
-    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
-    return scale
-
-def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
-    scale = quantize_fp8_tensorwise_get_scale(x)
-    q = quantize_fp8(x, scale)
-    return q, scale
-
-def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
-    scale = quantize_fp8_axiswise_get_scale(x, dim)
-    q = quantize_fp8(x, scale)
-    return q, scale
-
-def dequantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> Tensor:
-    return q.to(compute_dtype) * scale.to(compute_dtype)
 
 def int8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor=None) -> Tensor:
     x_8, x_scale = quantize_int8_axiswise(x, dim=-1)

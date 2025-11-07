@@ -1,4 +1,4 @@
-from modules.module.quantized.LinearW8A8 import (
+from modules.util.quantization_util import (
     quantize_fp8_axiswise,
     quantize_int8_axiswise,
 )
