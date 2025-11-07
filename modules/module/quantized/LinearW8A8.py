@@ -33,12 +33,13 @@ def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: 
 
 def int8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
     output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
-    mm_res = triton_mm_8bit(output_8, weight)
+    #almost always, grad outputs are already contiguous and this is a no-op. But there are some grad outputs from SDXL that are non-contiguous:
+    mm_res = triton_mm_8bit(output_8.contiguous(), weight)
     return mm_res.to(output.dtype).mul_(weight_scale * output_scale)
 
 def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
-    mm_res = triton_mm_8bit(output_8, weight)
+    mm_res = triton_mm_8bit(output_8.contiguous(), weight)
     return mm_res.to(output.dtype).mul_(weight_scale * output_scale)
 
 

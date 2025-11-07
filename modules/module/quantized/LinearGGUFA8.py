@@ -36,13 +36,13 @@ def fp8_forward_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor
 def int8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
     output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_int8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(output_8, w_8)
+    mm_res = triton_mm_8bit(output_8.contiguous(), w_8)
     return mm_res.to(output.dtype).mul_(w_scale).mul_(output_scale)
 
 def fp8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_fp8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(output_8, w_8)
+    mm_res = triton_mm_8bit(output_8.contiguous(), w_8)
     return mm_res.to(output.dtype).mul_(w_scale).mul_(output_scale)
 
 class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
