@@ -370,6 +370,10 @@ class ModelTab:
             ("float W8A8", DataType.FLOAT_W8A8),
             ("int W8A8", DataType.INT_W8A8),
             # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
+            ("bfloat16 A8 int", DataType.BFLOAT_16_A8_INT),
+            ("bfloat16 A8 float", DataType.BFLOAT_16_A8_FLOAT),
+            ("float16 A8 int", DataType.FLOAT_16_A8_INT),
+            ("float16 A8 float", DataType.FLOAT_16_A8_FLOAT),
             ("nfloat4", DataType.NFLOAT_4),
         ]
 

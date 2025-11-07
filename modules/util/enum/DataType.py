@@ -21,6 +21,10 @@ class DataType(Enum):
     GGUF = 'GGUF'
     GGUF_A8_FLOAT = 'GGUF_A8_FLOAT'
     GGUF_A8_INT = 'GGUF_A8_INT'
+    FLOAT_16_A8_FLOAT = 'FLOAT_16 A8_FLOAT'
+    FLOAT_16_A8_INT = 'FLOAT_16 A8_INT'
+    BFLOAT_16_A8_FLOAT = 'BFLOAT_16_A8_FLOAT'
+    BFLOAT_16_A8_INT = 'BFLOAT_16_A8_INT'
 
     def __str__(self):
         return self.value

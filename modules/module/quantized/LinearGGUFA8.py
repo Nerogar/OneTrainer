@@ -1,8 +1,9 @@
-from modules.util.quantization_util import (
-    quantize_fp8_axiswise,
-    quantize_int8_axiswise,
+from modules.module.quantized.LinearA8 import (
+    fp8_backward_act_axiswise,
+    fp8_forward_axiswise,
+    int8_backward_act_axiswise,
+    int8_forward_axiswise,
 )
-from modules.util.triton_mm_8bit import mm_8bit as triton_mm_8bit
 
 import torch
 from torch import Tensor
@@ -12,38 +13,6 @@ from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 import gguf
 
 UNQUANTIZED_TYPES = [gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16]
-
-
-def int8_forward_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
-    x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
-    w_8, w_scale = quantize_int8_axiswise(weight, dim=-1)
-    res = torch._int_mm(x_8, w_8.T)
-    res_scaled = res.to(x.dtype).mul_(w_scale.T).mul_(x_scale)
-    if bias is not None:
-        res_scaled.add_(bias.to(x.dtype))
-    return res_scaled
-
-def fp8_forward_axiswise(x: Tensor, weight: Tensor, bias: Tensor=None) -> Tensor:
-    x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
-    w_8, w_scale = quantize_fp8_axiswise(weight, dim=-1)
-    one = torch.ones(1, device=x.device)
-    res = torch._scaled_mm(x_8, w_8.T, scale_a=one, scale_b=one, out_dtype=x.dtype)
-    res_scaled = res.mul_(w_scale.T).mul_(x_scale) #much faster than scaled by _scaled_mm
-    if bias is not None:
-        res_scaled.add_(bias.to(x.dtype))
-    return res_scaled
-
-def int8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
-    output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
-    w_8, w_scale = quantize_int8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(output_8.contiguous(), w_8)
-    return mm_res.to(output.dtype).mul_(w_scale).mul_(output_scale)
-
-def fp8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
-    output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
-    w_8, w_scale = quantize_fp8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(output_8.contiguous(), w_8)
-    return mm_res.to(output.dtype).mul_(w_scale).mul_(output_scale)
 
 class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
     @staticmethod
@@ -58,7 +27,7 @@ class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
         if ctx.needs_input_grad != (True, False, False):
             raise NotImplementedError("GGUF cannot be used for full finetuning")
         weight, = ctx.saved_tensors
-        return int8_backward_axiswise(output, weight), None, None
+        return int8_backward_act_axiswise(output, weight), None, None
 
 class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
     @staticmethod
@@ -71,7 +40,7 @@ class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
         if ctx.needs_input_grad != (True, False, False):
             raise NotImplementedError("GGUF cannot be used for full finetuning")
         weight, = ctx.saved_tensors
-        return fp8_backward_axiswise(output, weight), None, None
+        return fp8_backward_act_axiswise(output, weight), None, None
 
 class LinearGGUFA8(GGUFLinear):
     def __init__(self, dtype: torch.dtype, *args, **kwargs):

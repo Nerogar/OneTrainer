@@ -75,6 +75,7 @@ def dequantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> 
     return q.to(compute_dtype) * scale.to(compute_dtype)
 
 
+from modules.module.quantized.LinearA8 import LinearA8
 from modules.module.quantized.LinearFp8 import LinearFp8
 from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
 from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
@@ -177,13 +178,17 @@ def replace_linear_with_quantized_layers(
     elif dtype.quantize_fp8():
         construct_fn = make_svd_linear(LinearFp8) if dtype.quantize_svd() else LinearFp8
     elif dtype.quantize_intW8A8():
-        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.int8, compute_dtype=torch.bfloat16)
+        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.int8, compute_dtype=torch.bfloat16) #FIXME
     elif dtype.quantize_fpW8A8():
-        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16) #FIXME
     elif dtype == DataType.GGUF_A8_INT:
-        construct_fn = partial(LinearGGUFA8, dtype=torch.int8, compute_dtype=torch.bfloat16)
+        construct_fn = partial(LinearGGUFA8, dtype=torch.int8, compute_dtype=torch.bfloat16)  #FIXME
     elif dtype == DataType.GGUF_A8_FLOAT:
-        construct_fn = partial(LinearGGUFA8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+        construct_fn = partial(LinearGGUFA8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)  #FIXME
+    elif dtype == DataType.BFLOAT_16_A8_INT or dtype == DataType.FLOAT_16_A8_INT:
+        construct_fn = partial(LinearA8, dtype=torch.int8)
+    elif dtype == DataType.BFLOAT_16_A8_FLOAT or dtype == DataType.FLOAT_16_A8_FLOAT:
+        construct_fn = partial(LinearA8, dtype=torch.float8_e4m3fn)
     else:
         return
 
@@ -201,7 +206,7 @@ def replace_linear_with_quantized_layers(
     #https://github.com/Nerogar/OneTrainer/issues/1050
     for name, module in parent_module.named_modules():
         assert (not isinstance(module, convert_type)
-                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))
+                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8, LinearA8))
                 or any(s in name.split('.') for s in keep_in_fp32_modules)
                 or (filters is not None and len(filters) > 0 and not any(f.matches(name) for f in filters))
                ), f"Linear layer {name} was not found in model for quantization"
