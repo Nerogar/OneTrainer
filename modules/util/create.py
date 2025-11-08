@@ -1,6 +1,6 @@
 import ast
 import importlib
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
@@ -129,6 +129,7 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.build_muon_adam_key_fn import split_parameters_for_muon
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -495,6 +496,7 @@ def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
+        layer_key_fn: Callable | None = None,
 ) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
@@ -1184,54 +1186,7 @@ def create_optimizer(
 
             from adv_optm import Muon_adv
 
-            layer_key_fn = parameter_group_collection.layer_key_fn
-            has_adam_params = False
-            if layer_key_fn:
-                for group in parameters:
-                    for p in group['params']:
-                        if p.requires_grad and layer_key_fn(p) == 'adam':
-                            has_adam_params = True
-                            break
-                    if has_adam_params:
-                        break
-
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
-
-            # Prepare parameters for the unified optimizer
-            if MuonWithAuxAdam and layer_key_fn:
-                final_param_groups = []
-                for group in parameters:
-                    muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']
-                    adam_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'adam']
-
-                    if muon_params:
-                        muon_group = group.copy()
-                        muon_group['params'] = muon_params
-                        muon_group['optim_type'] = 'muon'
-                        final_param_groups.append(muon_group)
-
-                    if adam_params:
-                        adam_group = group.copy()
-                        adam_group['params'] = adam_params
-                        adam_group['optim_type'] = 'adam'
-                        # Set Adam-specific LR
-                        base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
-                        te1_adam_lr = optimizer_config.muon_te1_adam_lr
-                        te2_adam_lr = optimizer_config.muon_te2_adam_lr
-                        adam_lr = base_adam_lr
-                        original_name = group.get('name')
-                        if original_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
-                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
-                        if original_name in ('text_encoder_2', 'text_encoder_2_lora'):
-                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
-                        adam_group['lr'] = adam_lr
-                        adam_group['initial_lr'] = adam_lr
-                        final_param_groups.append(adam_group)
-
-                params_for_optimizer = final_param_groups
-            else:
-                # If not using AuxAdam, just use the original parameter groups
-                params_for_optimizer = parameters
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -1250,16 +1205,17 @@ def create_optimizer(
                 beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                rms_rescaling=optimizer_config.rms_rescaling if optimizer_config.rms_rescaling is not None else True,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
                 normuon_eps=optimizer_config.normuon_eps if optimizer_config.normuon_eps is not None else 1e-8,
-                normuon_lr_scale=optimizer_config.normuon_lr_scale if optimizer_config.normuon_lr_scale is not None else 0.2,
-                normuon_atan2=optimizer_config.normuon_atan2 if optimizer_config.normuon_atan2 is not None else False,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
+                accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 compiled_optimizer=optimizer_config.compiled_optimizer if optimizer_config.compiled_optimizer is not None else False,
                 **adam_kwargs
             )
@@ -1270,54 +1226,7 @@ def create_optimizer(
 
             from adv_optm import AdaMuon_adv
 
-            layer_key_fn = parameter_group_collection.layer_key_fn
-            has_adam_params = False
-            if layer_key_fn:
-                for group in parameters:
-                    for p in group['params']:
-                        if p.requires_grad and layer_key_fn(p) == 'adam':
-                            has_adam_params = True
-                            break
-                    if has_adam_params:
-                        break
-
-            MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
-
-            # Prepare parameters for the unified optimizer
-            if MuonWithAuxAdam and layer_key_fn:
-                final_param_groups = []
-                for group in parameters:
-                    muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']
-                    adam_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'adam']
-
-                    if muon_params:
-                        muon_group = group.copy()
-                        muon_group['params'] = muon_params
-                        muon_group['optim_type'] = 'muon'
-                        final_param_groups.append(muon_group)
-
-                    if adam_params:
-                        adam_group = group.copy()
-                        adam_group['params'] = adam_params
-                        adam_group['optim_type'] = 'adam'
-                        # Set Adam-specific LR
-                        base_adam_lr = optimizer_config.muon_adam_lr if optimizer_config.muon_adam_lr is not None else config.learning_rate
-                        te1_adam_lr = optimizer_config.muon_te1_adam_lr
-                        te2_adam_lr = optimizer_config.muon_te2_adam_lr
-                        adam_lr = base_adam_lr
-                        original_name = group.get('name')
-                        if original_name in ('text_encoder', 'text_encoder_1', 'text_encoder_lora', 'text_encoder_1_lora'):
-                            adam_lr = te1_adam_lr if te1_adam_lr is not None else base_adam_lr
-                        if original_name in ('text_encoder_2', 'text_encoder_2_lora'):
-                            adam_lr = te2_adam_lr if te2_adam_lr is not None else base_adam_lr
-                        adam_group['lr'] = adam_lr
-                        adam_group['initial_lr'] = adam_lr
-                        final_param_groups.append(adam_group)
-
-                params_for_optimizer = final_param_groups
-            else:
-                # If not using AuxAdam, just use the original parameter groups
-                params_for_optimizer = parameters
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -1336,7 +1245,7 @@ def create_optimizer(
                     optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
-                rms_target=optimizer_config.rms_target if optimizer_config.rms_target is not None else 0.2,
+                rms_rescaling=optimizer_config.rms_rescaling if optimizer_config.rms_rescaling is not None else True,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
@@ -1346,6 +1255,9 @@ def create_optimizer(
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
+                normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
+                accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 compiled_optimizer=optimizer_config.compiled_optimizer if optimizer_config.compiled_optimizer is not None else False,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,

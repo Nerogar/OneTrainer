@@ -1,6 +1,7 @@
 import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
+from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
@@ -58,7 +59,15 @@ def init_model_parameters(
     #to be safe, do that before the optimizer is created because the optimizer could take copies
     multi.broadcast_parameters(parameters.parameters(), train_device)
 
-    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    layer_key_fn = None
+    if model.train_config.optimizer.MuonWithAuxAdam:
+        print("INFO: Creating layer keys for MuonWithAuxAdam.")
+        layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
+
+    model.optimizer = create.create_optimizer(
+        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+    )
+
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
@@ -552,12 +561,13 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "ns_steps": 5,
         "low_rank_ortho": False,
         "ortho_rank": 128,
+        "rms_rescaling": True,
         "nnmf_factor": False,
         "stochastic_rounding": True,
         "compiled_optimizer": False,
         "fused_back_pass": False,
         "MuonWithAuxAdam": True,
-        "non_hidden_layers": None,
+        "muon_hidden_layers": None,
         "muon_adam_regex": False,
         "muon_adam_lr": 1e-6,
         "muon_te1_adam_lr": None,
@@ -568,8 +578,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "normuon_variant": False,
         "beta2_normuon": 0.95,
         "normuon_eps": 1e-8,
-        "normuon_lr_scale": 0.2,
-        "normuon_atan2": False,
+        "orthogonal_gradient": False,
         "muon_adam_config": None,
     },
     Optimizer.ADAMUON_ADV: {
@@ -581,13 +590,13 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "ns_steps": 5,
         "low_rank_ortho": False,
         "ortho_rank": 128,
-        "rms_target": 0.2,
+        "rms_rescaling": True,
         "nnmf_factor": False,
         "stochastic_rounding": True,
         "compiled_optimizer": False,
         "fused_back_pass": False,
         "MuonWithAuxAdam": True,
-        "non_hidden_layers": None,
+        "muon_hidden_layers": None,
         "muon_adam_regex": False,
         "muon_adam_lr": 1e-6,
         "muon_te1_adam_lr": None,
@@ -597,6 +606,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
         "normuon_variant": False,
+        "orthogonal_gradient": False,
         "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {

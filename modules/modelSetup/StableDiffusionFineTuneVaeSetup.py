@@ -30,11 +30,6 @@ class StableDiffusionFineTuneVaeSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.optimizer.MuonWithAuxAdam:
-            print("INFO: Creating layer keys for MuonWithAuxAdam.")
-            parameter_group_collection.layer_key_fn = self._create_layer_key_fn(model, config)
-
-
         parameter_group_collection.add_group(NamedParameterGroup(
             unique_name="vae",
             parameters=model.vae.decoder.parameters(),
