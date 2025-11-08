@@ -398,7 +398,7 @@ class ModelTab:
         if has_vae:
             # base model
             components.label(self.scroll_frame, row, 0, "VAE Override",
-                             tooltip="Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. Using a safetensor VAE file will cause an error that the model cannot be loaded.")
+                             tooltip="Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. \n\n Using a safetensor VAE file will cause an error that the model cannot be loaded.")
             components.file_entry(
                 self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
@@ -480,35 +480,15 @@ class ModelTab:
             allow_diffusers: bool = False,
             allow_legacy_safetensors: bool = False,
     ) -> int:
-        def get_valid_extensions() -> list[str]:
-            format_str = self.ui_state.get_var("output_model_format").get()
-
-            # Map format to extensions
-            format_extensions = {
-                "SAFETENSORS": [".safetensors"],
-                "DIFFUSERS": [".json"],
-                "LEGACY_SAFETENSORS": [".safetensors"],
-            }
-
-            return format_extensions.get(format_str, [])
-
-        def update_output_validation(_=None):
-
-            output_var = self.ui_state.get_var("output_model_destination")
-            current_value = output_var.get()
-
-            if current_value:
-                output_var.set(current_value)
-
         # output model destination
         components.label(self.scroll_frame, row, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
+                         tooltip="Filename or directory where the *final* epoch output model is saved")
 
-        components.file_entry(
-            self.scroll_frame, row, 1, self.ui_state, "output_model_destination",
-            is_output=True,
-            valid_extensions=get_valid_extensions(),
-            path_type="file"  # Allow both file and directory paths
+        components.model_output_entry(
+            self.scroll_frame, row, 1, self.ui_state,
+            var_name="output_model_destination",
+            format_var_name="output_model_format",
+            method_var_name="training_method",
         )
 
         # output data type
@@ -536,8 +516,7 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(
-            self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format",
-            command=update_output_validation  # Trigger validation when format changes
+            self.scroll_frame, row, 1, formats, self.ui_state, "output_model_format"
         )
 
         # include config

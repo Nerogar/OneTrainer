@@ -313,6 +313,11 @@ class TrainConfig(BaseConfig):
     continue_last_backup: bool
     include_train_config: ConfigPart
 
+    # validation settings
+    validation_auto_correct: bool
+    validation_show_tooltips: bool
+    use_friendly_names: bool
+
     # multi-GPU
     multi_gpu: bool
     device_indexes: str
@@ -868,6 +873,11 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
+
+        # validation settings
+        data.append(("validation_auto_correct", True, bool, False))
+        data.append(("validation_show_tooltips", True, bool, False))
+        data.append(("use_friendly_names", False, bool, False))
 
         #multi-GPU
         data.append(("multi_gpu", False, bool, False))
