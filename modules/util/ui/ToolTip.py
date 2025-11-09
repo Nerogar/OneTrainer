@@ -5,7 +5,6 @@ import customtkinter as ctk
 
 class ToolTip:
     MAX_TOOLTIP_LENGTH = 350
-    EDGE_MARGIN = 10
 
     def __init__(self, widget, text='widget info', x_position=20, wide=False,
                  hover_only=True, track_movement=False):
@@ -48,15 +47,17 @@ class ToolTip:
             self.widget.after_cancel(self.id)
             self.id = None
 
-    def show(self, text=None, color=None, duration_ms=None, fg_color="#2b2b2b"):
-        if text:
-            self.text = text[:self.MAX_TOOLTIP_LENGTH] + ("..." if len(text) > self.MAX_TOOLTIP_LENGTH else "")
-
+    def _cancel_scheduled_hide(self):
         if self._after_id:
             with contextlib.suppress(Exception):
                 self.widget.after_cancel(self._after_id)
             self._after_id = None
 
+    def show(self, text=None, color=None, duration_ms=None, fg_color="#2b2b2b"):
+        if text:
+            self.text = text[:self.MAX_TOOLTIP_LENGTH] + ("..." if len(text) > self.MAX_TOOLTIP_LENGTH else "")
+
+        self._cancel_scheduled_hide()
         self.hide()
 
         self.tw = ctk.CTkToplevel(self.widget)
@@ -65,7 +66,7 @@ class ToolTip:
             self.tw.attributes("-topmost", True)
 
         frame = ctk.CTkFrame(self.tw, fg_color=fg_color, corner_radius=6)
-        frame.pack(padx=0, pady=0)
+        frame.pack()
 
         label = ctk.CTkLabel(
             frame,
@@ -117,16 +118,11 @@ class ToolTip:
             self._position()
 
     def hide(self, _evt=None):
-        if self._after_id:
-            with contextlib.suppress(Exception):
-                self.widget.after_cancel(self._after_id)
-            self._after_id = None
+        self._cancel_scheduled_hide()
 
         if self.tw and self.tw.winfo_exists():
             self.tw.destroy()
         self.tw = None
-
-    hidetip = hide
 
     def show_error(self, message: str, duration_ms: int | None = 7000):
         self.show(message, color="#ff6b6b", duration_ms=duration_ms)
