@@ -218,10 +218,11 @@ class ChromaModel(BaseModel):
         seq_lengths = bool_attention_mask.sum(dim=1)
         max_seq_length = seq_lengths.max().item()
 
-        #TODO disabled because of https://github.com/Nerogar/OneTrainer/pull/1109, but it could trigger https://github.com/pytorch/pytorch/issues/165506 again
-        #if max_seq_length % 16 > 0:
-            #attention processors and/or torch.compile can have issues with uneven sequence length:
-        #    max_seq_length += (16 - max_seq_length % 16)
+        #pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
+        #TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
+        #is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
+        if max_seq_length % 16 > 0 and (seq_lengths != max_seq_length).any():
+            max_seq_length += (16 - max_seq_length % 16)
 
         text_encoder_output = text_encoder_output[:, :max_seq_length, :]
         bool_attention_mask = bool_attention_mask[:, :max_seq_length]
