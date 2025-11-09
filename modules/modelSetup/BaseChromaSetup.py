@@ -229,10 +229,6 @@ class BaseChromaSetup(
             image_attention_mask = torch.full((packed_latent_input.shape[0], image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1) if not torch.all(text_attention_mask) else None
 
-            #TODO disabled because of https://github.com/Nerogar/OneTrainer/pull/1109, but it could trigger https://github.com/pytorch/pytorch/issues/165506 again
-            #text_seq_len = text_encoder_output.shape[1]
-            #assert image_seq_len % 16 == 0 and (image_seq_len + text_seq_len) % 16 == 0
-
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
