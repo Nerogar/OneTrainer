@@ -45,7 +45,7 @@ class HiDreamSampler(BaseModelSampler):
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
             text_encoder_3_layer_skip: int = 0,
-            prior_attention_mask: bool = False,
+            transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -71,7 +71,7 @@ class HiDreamSampler(BaseModelSampler):
                         text=prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                        apply_attention_mask=prior_attention_mask,
+                        apply_attention_mask=transformer_attention_mask,
                     ))
 
             negative_text_encoder_3_prompt_embedding, negative_text_encoder_4_prompt_embedding, negative_pooled_prompt_embedding = \
@@ -80,7 +80,7 @@ class HiDreamSampler(BaseModelSampler):
                         text=negative_prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                        apply_attention_mask=prior_attention_mask,
+                        apply_attention_mask=transformer_attention_mask,
                     ))
 
             combined_text_encoder_3_prompt_embedding = torch.cat(
@@ -164,9 +164,9 @@ class HiDreamSampler(BaseModelSampler):
             self,
             sample_config: SampleConfig,
             destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
@@ -181,7 +181,7 @@ class HiDreamSampler(BaseModelSampler):
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
             text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
-            prior_attention_mask=sample_config.prior_attention_mask,
+            transformer_attention_mask=sample_config.transformer_attention_mask,
             on_update_progress=on_update_progress,
         )
 

@@ -67,8 +67,8 @@ class TopBar:
         components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50)
 
         # save button
-        components.button(self.frame, 0, 3, "save current config", self.__save_config,
-                          tooltip="Save the current configuration in a custom preset")
+        components.button(self.frame, 0, 3, "Save config", self.__save_config,
+                          tooltip="Save the current configuration in a custom preset", width=90)
 
         # padding
         self.frame.grid_columnconfigure(5, weight=1)
@@ -79,15 +79,15 @@ class TopBar:
             row=0,
             column=6,
             values=[ #TODO simplify
-                ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
-                ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
-                ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
-                ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
-                ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
-                ("Stable Diffusion 3", ModelType.STABLE_DIFFUSION_3),
-                ("Stable Diffusion 3.5", ModelType.STABLE_DIFFUSION_35),
-                ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
-                ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+                ("SD1.5", ModelType.STABLE_DIFFUSION_15),
+                ("SD1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+                ("SD2.0", ModelType.STABLE_DIFFUSION_20),
+                ("SD2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+                ("SD2.1", ModelType.STABLE_DIFFUSION_21),
+                ("SD3", ModelType.STABLE_DIFFUSION_3),
+                ("SD3.5", ModelType.STABLE_DIFFUSION_35),
+                ("SDXL", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+                ("SDXL Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
                 ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
                 ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
