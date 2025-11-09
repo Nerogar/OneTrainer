@@ -507,9 +507,11 @@ class ModelTab:
         components.label(self.scroll_frame, row, 0, "Model Output Destination",
                          tooltip="Filename or directory where the *final* epoch output model is saved")
 
-        components.model_output_entry(
+        components.path_entry(
             self.scroll_frame, row, 1, self.ui_state,
             var_name="output_model_destination",
+            is_output=True,
+            use_model_validator=True,
             format_var_name="output_model_format",
             method_var_name="training_method",
         )

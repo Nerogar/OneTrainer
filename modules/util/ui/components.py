@@ -386,62 +386,6 @@ def entry(
     return component
 
 
-def model_output_entry(
-        master,
-        row,
-        column,
-        ui_state: UIState,
-        var_name: str = "output_model_destination",
-        format_var_name: str = "output_model_format",
-        method_var_name: str = "training_method",
-        prefix_var_name: str = "save_filename_prefix",
-        command: Callable[[str], None] = None,
-):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
-    frame.grid_columnconfigure(0, weight=1)
-
-    var = ui_state.get_var(var_name)
-
-    validator = ModelOutputValidator(
-        var=var,
-        ui_state=ui_state,
-        format_var_name=format_var_name,
-        method_var_name=method_var_name,
-        prefix_var_name=prefix_var_name,
-    )
-
-    entry_widget = entry(
-        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
-        custom_validator=validator.validate,
-        validation_state=validator.state,
-        enable_hover_validation=True,
-        command=command
-    )
-    validator.setup_traces()
-    original_destroy = entry_widget.destroy
-
-    def new_destroy():
-        validator.cleanup_traces()
-        original_destroy()
-
-    entry_widget.destroy = new_destroy
-
-    _register_drop_target(entry_widget, ui_state, var_name, command)
-
-    def open_dialog():
-        selected_path = filedialog.asksaveasfilename(filetypes=MODEL_FILETYPES)
-        if selected_path:
-            var.set(selected_path)
-            if command:
-                command(selected_path)
-
-    button_component = ctk.CTkButton(frame, text="...", width=40, command=open_dialog)
-    button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
-
-    return frame
-
-
 def path_entry(
         master,
         row,
@@ -455,6 +399,10 @@ def path_entry(
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         valid_extensions: list[str] = None,
+        use_model_validator: bool = False,
+        format_var_name: str = "output_model_format",
+        method_var_name: str = "training_method",
+        prefix_var_name: str = "save_filename_prefix",
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
@@ -467,25 +415,54 @@ def path_entry(
 
     var = ui_state.get_var(var_name)
 
-    # Simple path validation with auto-trimming for directories
-    def simple_path_validator(value: str) -> ValidationResult:
-        # Auto-trim whitespace from directory names
-        if value and path_type == "directory":
-            path = Path(value)
-            trimmed_name = path.name.strip()
-            if trimmed_name != path.name:
-                sep = '\\' if '\\' in value else '/'
-                trimmed_path = f"{path.parent}{sep}{trimmed_name}" if str(path.parent) != '.' else trimmed_name
-                var.set(trimmed_path)
-                value = trimmed_path
+    # Set up validator and validation state
+    if use_model_validator:
+        validator = ModelOutputValidator(
+            var=var, ui_state=ui_state,
+            format_var_name=format_var_name,
+            method_var_name=method_var_name,
+            prefix_var_name=prefix_var_name,
+        )
+        validation_state = validator.state
+        custom_validator = validator.validate
+    else:
+        validator = None
+        validation_state = None
 
-        return validate_file_path(value, is_output, valid_extensions, path_type)
+        def simple_path_validator(value: str) -> ValidationResult:
+            if value and path_type == "directory":
+                path = Path(value)
+                trimmed_name = path.name.strip()
+                if trimmed_name != path.name:
+                    sep = '\\' if '\\' in value else '/'
+                    parent_str = str(path.parent)
+                    trimmed_path = f"{parent_str}{sep}{trimmed_name}" if parent_str != '.' else trimmed_name
+                    var.set(trimmed_path)
+                    value = trimmed_path
+            return validate_file_path(value, is_output, valid_extensions, path_type)
+
+        custom_validator = simple_path_validator
 
     # Create entry with validation
     entry_widget = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
-        custom_validator=simple_path_validator, command=command
+        custom_validator=custom_validator,
+        validation_state=validation_state,
+        enable_hover_validation=bool(validator),
+        command=command
     )
+
+    # Set up validator traces and cleanup
+    if validator:
+        validator.setup_traces()
+    original_destroy = entry_widget.destroy
+
+    def new_destroy():
+        if validator:
+            validator.cleanup_traces()
+        original_destroy()
+
+    entry_widget.destroy = new_destroy
 
     # Enable drag-and-drop
     _register_drop_target(entry_widget, ui_state, var_name, command)
@@ -496,23 +473,18 @@ def path_entry(
             selected_path = filedialog.askdirectory()
         else:
             filetypes = [("All Files", "*.*")]
-
             if allow_model_files:
-                filetypes.extend(MODEL_FILETYPES[1:])  # Skip "All Files" since we already added it
+                filetypes.extend(MODEL_FILETYPES[1:])
             if allow_image_files:
                 filetypes.append(("Image", ' '.join(f"*.{x}" for x in supported_image_extensions())))
 
-            if is_output:
-                selected_path = filedialog.asksaveasfilename(filetypes=filetypes)
-            else:
-                selected_path = filedialog.askopenfilename(filetypes=filetypes)
+            selected_path = (filedialog.asksaveasfilename(filetypes=filetypes) if is_output
+                             else filedialog.askopenfilename(filetypes=filetypes))
 
         if selected_path:
             if path_modifier:
                 selected_path = path_modifier(selected_path)
-
             var.set(selected_path)
-
             if command:
                 command(selected_path)
 
