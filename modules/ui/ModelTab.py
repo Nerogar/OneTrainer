@@ -288,7 +288,7 @@ class ModelTab:
         # base model
         components.label(self.scroll_frame, row, 0, "Base Model",
                          tooltip="Filename, directory or Hugging Face repository of the base model")
-        components.file_entry(
+        components.path_entry(
             self.scroll_frame, row, 1, self.ui_state, "base_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
@@ -333,7 +333,7 @@ class ModelTab:
                 # prior model
                 components.label(self.scroll_frame, row, 0, "Prior Model",
                                  tooltip="Filename, directory or Hugging Face repository of the prior model")
-                components.file_entry(
+                components.path_entry(
                     self.scroll_frame, row, 1, self.ui_state, "prior.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
                 )
@@ -351,7 +351,7 @@ class ModelTab:
                 # transformer model
                 components.label(self.scroll_frame, row, 0, "Override Transformer / GGUF",
                                  tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
-                components.file_entry(
+                components.path_entry(
                     self.scroll_frame, row, 1, self.ui_state, "transformer.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
                 )
@@ -405,7 +405,7 @@ class ModelTab:
                 # text encoder 4 weight dtype
                 components.label(self.scroll_frame, row, 0, "Text Encoder 4 Override",
                                  tooltip="Filename, directory or Hugging Face repository of the text encoder 4 model")
-                components.file_entry(
+                components.path_entry(
                     self.scroll_frame, row, 1, self.ui_state, "text_encoder_4.model_name",
                     path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
                 )
@@ -422,7 +422,7 @@ class ModelTab:
             # base model
             components.label(self.scroll_frame, row, 0, "VAE Override",
                              tooltip="Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. \n\n Using a safetensor VAE file will cause an error that the model cannot be loaded.")
-            components.file_entry(
+            components.path_entry(
                 self.scroll_frame, row, 1, self.ui_state, "vae.model_name",
                 path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
             )
@@ -441,7 +441,7 @@ class ModelTab:
         # effnet encoder model
         components.label(self.scroll_frame, row, 0, "Effnet Encoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
-        components.file_entry(
+        components.path_entry(
             self.scroll_frame, row, 1, self.ui_state, "effnet_encoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
@@ -464,7 +464,7 @@ class ModelTab:
         # decoder model
         components.label(self.scroll_frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
-        components.file_entry(
+        components.path_entry(
             self.scroll_frame, row, 1, self.ui_state, "decoder.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )

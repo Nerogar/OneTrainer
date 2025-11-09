@@ -257,12 +257,12 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
         # Remove command parameter - we'll use the trace instead for debouncing
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", is_output=True)
+        components.path_entry(frame, 0, 1, self.ui_state, "workspace_dir", is_output=True, path_type="directory")
 
         # cache dir
         components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir", is_output=True)
+        components.path_entry(frame, 0, 3, self.ui_state, "cache_dir", is_output=True, path_type="directory")
 
         # continue from previous backup
         components.label(frame, 2, 0, "Continue from last backup",
@@ -281,7 +281,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
         components.label(frame, 4, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir", is_output=True)
+        components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", is_output=True, path_type="directory")
 
         # tensorboard
         components.label(frame, 6, 0, "Tensorboard Mode",
@@ -514,7 +514,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         # lora model name
         components.label(frame, 0, 0, "LoRA base model",
                          tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.file_entry(
+        components.path_entry(
             frame, 0, 1, self.ui_state, "lora_model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
@@ -561,7 +561,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         # embedding model name
         components.label(frame, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
-        components.file_entry(
+        components.path_entry(
             frame, 0, 1, self.ui_state, "embedding.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
