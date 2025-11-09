@@ -6,7 +6,6 @@ patching PyTorch's scaled_dot_product_attention when native support is unavailab
 """
 
 import sys
-from functools import cache
 
 import torch
 import torch.nn.functional as F
@@ -14,16 +13,19 @@ import torch.nn.functional as F
 from diffusers.utils import is_flash_attn_available
 
 ALLOWED_TYPES = {torch.float16, torch.bfloat16}
+SUPPORTED_DEVICES = {}
 
-
-@cache
-def is_supported_hardware(device):
+def is_supported_hardware(device: torch.device) -> bool:
     """
     Check if the given device supports Flash Attention based on its compute capability.
     """
     # FlashAttention-2 only supports Ampere (sm_80) and newer GPUs
-    properties = torch.cuda.get_device_properties(device)
-    return properties.major >= 8
+    index = device.index
+    supported = SUPPORTED_DEVICES.get(index)
+    if supported is None:
+        supported = torch.cuda.get_device_properties(index).major >= 8
+        SUPPORTED_DEVICES[index] = supported
+    return supported
 
 
 def can_use_flash_attn(query: torch.Tensor,
@@ -31,7 +33,7 @@ def can_use_flash_attn(query: torch.Tensor,
                        value: torch.Tensor,
                        attn_mask: torch.Tensor | None = None,
                        is_causal: bool = False,
-                       enable_gqa: bool = False):
+                       enable_gqa: bool = False) -> bool:
     """
     Check if Flash Attention can be used for the given tensors.
 
