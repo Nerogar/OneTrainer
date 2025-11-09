@@ -24,11 +24,6 @@ class StableDiffusionXLLoRAModelSaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        # Ensure the output destination has the correct file extension
-        output_model_destination = self._ensure_correct_extension(
-            output_model_format,
-            output_model_destination
-        )
 
         lora_model_saver = StableDiffusionXLLoRASaver()
         embedding_model_saver = StableDiffusionXLEmbeddingSaver()

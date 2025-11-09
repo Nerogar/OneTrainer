@@ -84,10 +84,6 @@ def _check_parent_exists(path: Path) -> ValidationResult | None:
 def _has_extension(path: str | Path, extension: str) -> bool:
     return str(path).lower().endswith(extension.lower())
 
-def _get_extension(path: str | Path) -> str | None:
-    match = ENDS_WITH_EXT.search(str(path))
-    return match.group(0).lower() if match else None
-
 def _is_partial_match(current: str, required: str) -> bool:
     return len(current) > 3 and required.startswith(current)
 
