@@ -107,7 +107,6 @@ def _drop_enter(event):
     event.widget.focus_force()
     return event.action
 
-
 def _drop_leave(event):
     return event.action
 
@@ -141,27 +140,28 @@ def _parse_dropped_paths(event_data: str) -> list[str]:
             in_braces = True
         elif char == '}':
             in_braces = False
-            if current_path:
-                paths.append(current_path)
-                current_path = ""
         elif char == ' ' and not in_braces:
-            if current_path:
-                paths.append(current_path)
-                current_path = ""
+            pass  # Will append below
         else:
             current_path += char
+            continue
+
+        # Common path appending logic for '}' and ' '
+        if current_path:
+            paths.append(current_path)
+            current_path = ""
 
     if current_path:
         paths.append(current_path)
 
     return [p.strip() for p in paths if p.strip()]
 
-def _register_drop_target(entry_widget, ui_state, var_name, command=None):
+def register_drop_target(entry_widget, ui_state, var_name, command=None):
     try:
         entry_widget.drop_target_register(DND_FILES)
-        entry_widget.dnd_bind('<<DropEnter>>', _drop_enter)
-        entry_widget.dnd_bind('<<DropLeave>>', _drop_leave)
-        entry_widget.dnd_bind('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command))
+        for event, handler in [('<<DropEnter>>', _drop_enter), ('<<DropLeave>>', _drop_leave),
+                               ('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command))]:
+            entry_widget.dnd_bind(event, handler)
     except Exception:
         pass
 
@@ -173,12 +173,9 @@ def register_concept_drop_target(widget, drop_callback: Callable[[str], None], a
         paths = _parse_dropped_paths(event.data)
 
         for path in paths:
-            if os.path.isfile(path):
-                path = os.path.dirname(path)
-
+            path = os.path.dirname(path) if os.path.isfile(path) else path
             if os.path.isdir(path):
                 drop_callback(path)
-
                 if not allow_multiple:
                     break
 
@@ -191,6 +188,7 @@ def register_concept_drop_target(widget, drop_callback: Callable[[str], None], a
         widget.dnd_bind('<<Drop>>', drop_handler)
     except Exception:
         pass
+
 class DebounceTimer:
     def __init__(self, widget, delay_ms: int, callback: Callable[..., Any]):
         self.widget = widget

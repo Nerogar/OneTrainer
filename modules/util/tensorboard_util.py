@@ -10,7 +10,6 @@ from modules.util.enum.TensorboardMode import TensorboardMode
 
 
 class TensorboardManager:
-    """Singleton manager for Tensorboard processes across GUI, CLI, and Cloud training"""
 
     _instance = None
     _lock = threading.Lock()
@@ -32,37 +31,26 @@ class TensorboardManager:
         self._previous_mode = None
         self._initialized = True
 
+    def _is_cloud_tunnel_enabled(self, config: TrainConfig) -> bool:
+        return config.cloud.enabled and config.cloud.tensorboard_tunnel
+
     def should_start(self, config: TrainConfig, is_training: bool = False) -> bool:
-        """Determine if tensorboard should start based on mode and context"""
-        # Skip if cloud tunnel is enabled
-        if config.cloud.enabled and config.cloud.tensorboard_tunnel:
+        if self._is_cloud_tunnel_enabled(config):
             return False
 
         mode = config.tensorboard_mode
-
         if mode == TensorboardMode.OFF:
             return False
-        elif mode == TensorboardMode.ALWAYS_ON:
-            return not is_training  # Start only if not already running during training
-        elif mode == TensorboardMode.TRAIN_ONLY:
-            return is_training
-
-        return False
+        if mode == TensorboardMode.ALWAYS_ON:
+            return not is_training
+        return mode == TensorboardMode.TRAIN_ONLY and is_training
 
     def start(self, config: TrainConfig, mode: TensorboardMode | None = None) -> bool:
-        """Start tensorboard if not already running"""
         if self._process is not None:
-            return False  # Already running
-
-        # Use provided mode or config's mode
-        effective_mode = mode or config.tensorboard_mode
-
-        # Check if we should start based on mode
-        if effective_mode == TensorboardMode.OFF:
             return False
 
-        # Skip if cloud tunnel is enabled
-        if config.cloud.enabled and config.cloud.tensorboard_tunnel:
+        effective_mode = mode or config.tensorboard_mode
+        if effective_mode == TensorboardMode.OFF or self._is_cloud_tunnel_enabled(config):
             return False
 
         self._process = start_filtered_tensorboard(config)
@@ -72,7 +60,6 @@ class TensorboardManager:
         return self._process is not None
 
     def stop(self) -> bool:
-        """Stop tensorboard if running"""
         if self._process is None:
             return False
 
@@ -83,48 +70,35 @@ class TensorboardManager:
         return True
 
     def restart(self, config: TrainConfig) -> bool:
-        """Restart tensorboard with new config"""
         self.stop()
         return self.start(config)
 
     def is_running(self) -> bool:
-        """Check if tensorboard is currently running"""
         return self._process is not None
 
     def get_mode(self) -> TensorboardMode | None:
-        """Get current tensorboard mode"""
         return self._mode
 
     def handle_training_start(self, config: TrainConfig):
-        """Handle tensorboard when training starts"""
-        # If TRAIN_ONLY mode, start it
         if config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
-            if not (config.cloud.enabled and config.cloud.tensorboard_tunnel):
+            if not self._is_cloud_tunnel_enabled(config):
                 self.start(config)
 
     def handle_training_end(self, config: TrainConfig):
-        """Handle tensorboard when training ends"""
-        # If TRAIN_ONLY mode, stop it
         if config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
             self.stop()
-
-        # If ALWAYS_ON mode, restart it (in case it was stopped)
         elif config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            if not (config.cloud.enabled and config.cloud.tensorboard_tunnel):
-                if not self.is_running():
-                    self.start(config)
+            if not self._is_cloud_tunnel_enabled(config) and not self.is_running():
+                self.start(config)
 
     def handle_mode_change(self, config: TrainConfig, is_training: bool = False):
-        """Handle tensorboard mode changes"""
         new_mode = config.tensorboard_mode
 
-        # Initialize previous mode on first call
         if self._previous_mode is None:
             self._previous_mode = new_mode
-            # Start if ALWAYS_ON and not training
-            if new_mode == TensorboardMode.ALWAYS_ON and not is_training:
-                if not (config.cloud.enabled and config.cloud.tensorboard_tunnel):
-                    self.start(config)
+            if (new_mode == TensorboardMode.ALWAYS_ON and not is_training
+                and not self._is_cloud_tunnel_enabled(config)):
+                self.start(config)
             return
 
         old_mode = self._previous_mode
@@ -132,13 +106,11 @@ class TensorboardManager:
         if new_mode == old_mode:
             return
 
-        # Skip if cloud tunnel
-        if config.cloud.enabled and config.cloud.tensorboard_tunnel:
+        if self._is_cloud_tunnel_enabled(config):
             self.stop()
             self._previous_mode = new_mode
             return
 
-        # During training
         if is_training:
             if new_mode == TensorboardMode.OFF:
                 self.stop()
@@ -157,17 +129,13 @@ class TensorboardManager:
         self._previous_mode = new_mode
 
     def handle_workspace_change(self, config: TrainConfig):
-        """Handle workspace directory changes"""
         if config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            if not (config.cloud.enabled and config.cloud.tensorboard_tunnel):
+            if not self._is_cloud_tunnel_enabled(config):
                 print("Restarting Tensorboard due to workspace change")
                 self.restart(config)
 
 
 def get_tensorboard_args(config: TrainConfig) -> list[str]:
-    """
-    Generates args required to start Tensorboard
-    """
     tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
     tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
 
@@ -189,7 +157,7 @@ def get_tensorboard_args(config: TrainConfig) -> list[str]:
 
 
 def start_filtered_tensorboard(config: TrainConfig) -> subprocess.Popen | None:
-    """Start Tensorboard filtering the annoying warnings Google doesnt plan to fix"""
+    """Start Tensorboard, filtering the annoying warnings Google doesnt plan to fix"""
     try:
         print("Starting Tensorboard please wait...")
         env = os.environ.copy()
@@ -211,7 +179,7 @@ def start_filtered_tensorboard(config: TrainConfig) -> subprocess.Popen | None:
                     "pkg_resources" in line_lower or
                     "installation not found" in line_lower
                 ):
-                    continue  # Skip these lines
+                    continue
 
                 if line.strip():
                     print(line, end='')
@@ -226,7 +194,6 @@ def start_filtered_tensorboard(config: TrainConfig) -> subprocess.Popen | None:
 
 
 def stop_tensorboard(process: subprocess.Popen | None):
-    """Gracefully stop the Tensorboard subprocess"""
     if not process:
         return
 

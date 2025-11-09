@@ -11,7 +11,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
-from modules.util.ui.ui_utils import _register_drop_target
+from modules.util.ui.ui_utils import register_drop_target
 from modules.util.ui.UIState import UIState
 from modules.util.ui.validation import ValidationResult, validate_basic_type, validate_destination, validate_file_path
 
@@ -465,7 +465,7 @@ def path_entry(
     entry_widget.destroy = new_destroy
 
     # Enable drag-and-drop
-    _register_drop_target(entry_widget, ui_state, var_name, command)
+    register_drop_target(entry_widget, ui_state, var_name, command)
 
     # Browse button
     def open_dialog():
