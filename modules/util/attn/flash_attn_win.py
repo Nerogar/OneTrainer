@@ -6,6 +6,7 @@ patching PyTorch's scaled_dot_product_attention when native support is unavailab
 """
 
 import sys
+from functools import cache
 
 import torch
 import torch.nn.functional as F
@@ -13,6 +14,16 @@ import torch.nn.functional as F
 from diffusers.utils import is_flash_attn_available
 
 ALLOWED_TYPES = {torch.float16, torch.bfloat16}
+
+
+@cache
+def is_supported_hardware(device):
+    """
+    Check if the given device supports Flash Attention based on its compute capability.
+    """
+    # FlashAttention-2 only supports Ampere (sm_80) and newer GPUs
+    properties = torch.cuda.get_device_properties(device)
+    return properties.major >= 8
 
 
 def can_use_flash_attn(query: torch.Tensor,
@@ -45,6 +56,10 @@ def can_use_flash_attn(query: torch.Tensor,
         or query.dim() != 4 or key.dim() != 4 or value.dim() != 4  # Expect rank-4 (B, H, L, D)
         or query.is_nested or key.is_nested or value.is_nested  # Nested tensors unsupported, keep our use-case simple
     ):
+        return False
+
+    # Hardware capability check
+    if not is_supported_hardware(query.device):
         return False
 
     # Unpack shapes once.
