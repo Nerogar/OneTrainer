@@ -458,9 +458,11 @@ def path_entry(
         format_var_name: str = "output_model_format",
         method_var_name: str = "training_method",
         prefix_var_name: str = "save_filename_prefix",
+        width: int = 140,
+        sticky: str = "new",
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
+    frame.grid(row=row, column=column, padx=0, pady=0, sticky=sticky)
     frame.grid_columnconfigure(0, weight=1)
 
     if not is_output:
@@ -501,7 +503,9 @@ def path_entry(
         custom_validator=custom_validator,
         validation_state=validation_state,
         enable_hover_validation=bool(validator),
-        command=command
+        command=command,
+        width=width,
+        sticky="ew",
     )
 
     if validator:
@@ -560,22 +564,26 @@ def app_title(master, row, column):
     label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
 
 
-def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, wraplength=0):
-    component = ctk.CTkLabel(master, text=text, wraplength=wraplength)
+def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, wraplength=0, font=None):
+    kwargs = {"text": text, "wraplength": wraplength}
+    if font is not None:
+        kwargs["font"] = font
+    component = ctk.CTkLabel(master, **kwargs)
     component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
     if tooltip:
         ToolTip(component, tooltip, wide=wide_tooltip)
     return component
 
 
-def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name, supports_time_units: bool = True):
+def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name, supports_time_units: bool = True,
+               width: int = 50, unit_width: int = 100, sticky: str = "new"):
     frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
+    frame.grid(row=row, column=column, padx=0, pady=0, sticky=sticky)
 
     frame.grid_columnconfigure(0, weight=0)
     frame.grid_columnconfigure(1, weight=1)
 
-    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name, width=50)
+    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name, width=width, sticky="nw")
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
@@ -585,9 +593,9 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
         frame,
         values=values,
         variable=ui_state.get_var(unit_var_name),
-        width=100,
+        width=unit_width,
     )
-    unit_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="new")
+    unit_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nw")
 
     return frame
 
@@ -610,9 +618,10 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     return component
 
 
-def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
-    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None,
+            width: int = 140, sticky: str = "new"):
+    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command, width=width)
+    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky=sticky)
 
     _wrap_dropdown_destroy(component)
 
@@ -641,7 +650,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
 
 
 def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
-               command: Callable[[Any], None] = None):
+               command: Callable[[Any], None] = None, width: int = 140, sticky: str = "new"):
     var = ui_state.get_var(var_name)
 
     if var.get() not in [str(value) for key, value in values] and values:
@@ -660,8 +669,8 @@ def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIS
                 deactivate_update_var = False
                 break
 
-    component = ctk.CTkOptionMenu(master, values=[key for key, _ in values], command=update_component)
-    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+    component = ctk.CTkOptionMenu(master, values=[key for key, _ in values], command=update_component, width=width)
+    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky=sticky)
 
     def update_var():
         if not deactivate_update_var:
@@ -708,6 +717,44 @@ def switch(
 
     return component
 
+
+def labeled_switch(
+        master,
+        row,
+        column,
+        ui_state: UIState,
+        var_name: str,
+        label_text: str,
+        command: Callable[[], None] = None,
+        tooltip: str = "",
+        wide_tooltip: bool = False,
+        layout: Literal["row", "column"] = "row",
+        label_pad: tuple[int, int] = (10, 5),
+        switch_pad: tuple[int, int] = (10, 5),
+        frame_pad: tuple[int, int] = (0, 0),
+        sticky: str = "new",
+        columnspan: int = 1,
+):
+    # For horizontal (row) layout: place directly into parent grid (no wrapper frame)
+    if layout == "row":
+        label_component = label(master, row, column, label_text,
+                                pad=label_pad, tooltip=tooltip, wide_tooltip=wide_tooltip)
+        switch_component = switch(master, row, column + 1, ui_state, var_name, command=command)
+        return None, {'label': label_component, 'switch': switch_component}
+
+    # Column layout keeps wrapper frame
+    frame = ctk.CTkFrame(master, fg_color="transparent")
+    frame.grid(row=row, column=column, columnspan=columnspan,
+               padx=frame_pad[0], pady=frame_pad[1], sticky=sticky)
+
+    frame.grid_rowconfigure(0, weight=0)
+    frame.grid_rowconfigure(1, weight=0)
+
+    label_component = label(frame, 0, 0, label_text,
+                            pad=label_pad, tooltip=tooltip, wide_tooltip=wide_tooltip)
+    switch_component = switch(frame, 1, 0, ui_state, var_name, command=command)
+
+    return frame, {'label': label_component, 'switch': switch_component}
 
 def progress(master, row, column):
     component = ctk.CTkProgressBar(master)

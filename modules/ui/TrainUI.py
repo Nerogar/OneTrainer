@@ -96,7 +96,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.TkdndVersion = TkinterDnD._require(self)
 
         self.title("OneTrainer")
-        self.geometry("1100x740")
+        self.geometry("1100x760")
 
         self.after(100, lambda: self._set_icon())
 
@@ -163,6 +163,8 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
         if hasattr(self, 'tensorboard_mode_trace_id'):
             self.ui_state.remove_var_trace("tensorboard_mode", self.tensorboard_mode_trace_id)
+        if hasattr(self, 'multi_gpu_trace_id'):
+            self.ui_state.remove_var_trace("multi_gpu", self.multi_gpu_trace_id)
         self.quit()
 
     def top_bar(self, master):
@@ -246,136 +248,223 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
         return frame
 
+    def _create_section(self, parent, row, column, title, columnspan=1, padx=(10, 5), pady=(10, 5), **grid_kwargs):
+        """Helper to create a labeled section frame"""
+        section = ctk.CTkFrame(parent, corner_radius=6)
+        section.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=padx, pady=pady, **grid_kwargs)
+        section.grid_columnconfigure(0, weight=0)
+        section.grid_columnconfigure(1, weight=0)
+        section.grid_columnconfigure(2, weight=1)
+
+        if title:
+            components.label(section, 0, 0, title, font=("", 14, "bold"), pad=(10, 5))
+
+        return section
+
     def create_general_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
+        frame.grid_columnconfigure(0, weight=1, minsize=400)
+        frame.grid_columnconfigure(1, weight=1, minsize=400)
 
-        # workspace dir
-        components.label(frame, 0, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run are saved")
-        # Remove command parameter - we'll use the trace instead for debouncing
-        components.path_entry(frame, 0, 1, self.ui_state, "workspace_dir", is_output=True, path_type="directory")
+        # Left column
+        general_section = self._create_section(frame, 0, 0, None)
+        components.label(general_section, 0, 0, "Main", font=("", 16, "bold"), pad=(10, 5))
 
-        # cache dir
-        components.label(frame, 0, 2, "Cache Directory",
-                         tooltip="The directory where cached data is saved")
-        components.path_entry(frame, 0, 3, self.ui_state, "cache_dir", is_output=True, path_type="directory")
+        # Main settings with list comprehension for clarity
+        main_settings = [
+            (1, "Workspace Directory", "workspace_dir", "The directory where all files of this training run are saved"),
+            (2, "Cache Directory", "cache_dir", "The directory where cached data is saved"),
+        ]
 
-        # continue from previous backup
-        components.label(frame, 2, 0, "Continue from last backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
-        components.switch(frame, 2, 1, self.ui_state, "continue_last_backup")
+        for row, label_text, var_name, tooltip in main_settings:
+            components.label(general_section, row, 0, label_text, tooltip=tooltip, pad=(10, 5))
+            components.path_entry(general_section, row, 1, self.ui_state, var_name, is_output=True,
+                                path_type="directory", sticky="ew")
 
-        # only cache
-        components.label(frame, 2, 2, "Only Cache",
-                         tooltip="Only populate the cache, without any training")
-        components.switch(frame, 2, 3, self.ui_state, "only_cache")
+        # Switches in a more compact way
+        switches_frame = ctk.CTkFrame(general_section, fg_color="transparent")
+        switches_frame.grid(row=3, column=0, columnspan=2, sticky="w", pady=(0, 5))
+        switches_frame.grid_columnconfigure(0, weight=0)
+        switches_frame.grid_columnconfigure(2, weight=0)
 
-        # debug
-        components.label(frame, 4, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
-        components.switch(frame, 4, 1, self.ui_state, "debug_mode")
+        switch_configs = [
+            (0, "continue_last_backup", "Continue last backup",
+            "Automatically continues training from the last backup saved in <workspace>/backup"),
+            (2, "only_cache", "Only Cache",
+            "Only populate the cache, without any training"),
+        ]
 
-        components.label(frame, 4, 2, "Debug Directory",
-                         tooltip="The directory where debug data is saved")
-        components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", is_output=True, path_type="directory")
+        for col, var_name, label, tooltip in switch_configs:
+            components.labeled_switch(switches_frame, 0, col, self.ui_state, var_name,
+                                    label_text=label, tooltip=tooltip, layout="row")
 
-        # tensorboard
-        components.label(frame, 6, 0, "Tensorboard Mode",
-                        tooltip="Off: Disabled.\nTrain Only: Active only during training.\nAlways On: Always available.")
-        components.options_kv(frame, 6, 1, [
-            ("Off", TensorboardMode.OFF),
-            ("Train only", TensorboardMode.TRAIN_ONLY),
-            ("Always on", TensorboardMode.ALWAYS_ON),
-        ], self.ui_state, "tensorboard_mode")
+        # Debugging section
+        components.label(general_section, 4, 0, "Debugging", font=("", 14, "bold"), pad=(10, 5))
+        components.label(general_section, 5, 0, "Debug mode",
+                        tooltip="Save debug information during the training into the debug directory", pad=(10, 5))
+        components.switch(general_section, 5, 1, self.ui_state, "debug_mode")
+        components.label(general_section, 6, 0, "Debug Directory",
+                        tooltip="The directory where debug data is saved", pad=(10, 5))
+        components.path_entry(general_section, 6, 1, self.ui_state, "debug_dir", is_output=True, path_type="directory")
 
-        components.label(frame, 7, 0, "Tensorboard Port",
-                         tooltip="Port to use for Tensorboard link")
-        components.entry(frame, 7, 1, self.ui_state, "tensorboard_port")
+        # Tensorboard section
+        self._create_tensorboard_section(general_section)
 
-        components.label(frame, 7, 2, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-        components.switch(frame, 7, 3, self.ui_state, "tensorboard_expose")
+        # Right column
+        right_container = ctk.CTkFrame(frame, fg_color="transparent")
+        right_container.grid(row=0, column=1, sticky="new", padx=(5, 10), pady=(10, 5))
+        right_container.grid_columnconfigure(0, weight=1)
 
-        # validation
-        components.label(frame, 8, 0, "Validation",
-                         tooltip="Enable validation steps and add new graph in tensorboard")
-        components.switch(frame, 8, 1, self.ui_state, "validation")
-
-        components.label(frame, 8, 2, "Validate after",
-                         tooltip="The interval used when validate training")
-        components.time_entry(frame, 8, 3, self.ui_state, "validate_after", "validate_after_unit")
-
-        # input validation settings
-        components.label(frame, 9, 0, "Auto-correct Input",
-                         tooltip="Automatically correct file paths and extensions where possible")
-        components.switch(frame, 9, 1, self.ui_state, "validation_auto_correct")
-
-        components.label(frame, 9, 2, "Show Validation Tooltips",
-                         tooltip="Show tooltips with validation messages for errors and warnings")
-        components.switch(frame, 9, 3, self.ui_state, "validation_show_tooltips")
-
-        components.label(frame, 10, 0, "Use Friendly Names",
-                         tooltip="Use friendly names instead of timestamps for auto-corrected/generated filenames")
-        components.switch(frame, 10, 1, self.ui_state, "use_friendly_names")
-
-        components.label(frame, 10, 2, "Prevent Overwrite",
-                         tooltip="Automatically append a number or word to filenames that would overwrite existing files (requires Auto-correct Input)")
-        components.switch(frame, 10, 3, self.ui_state, "prevent_overwrite")
-
-        components.label(frame, 11, 0, "Auto-prefix",
-                         tooltip="Automatically prefix manually-entered filenames with the Save Filename Prefix (requires Auto-correct Input)")
-        components.switch(frame, 11, 1, self.ui_state, "auto_prefix")
-
-        # device
-        components.label(frame, 11, 2, "Dataloader Threads",
-                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 11, 3, self.ui_state, "dataloader_threads")
-
-        components.label(frame, 12, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
-        components.entry(frame, 12, 1, self.ui_state, "train_device")
-
-        components.label(frame, 13, 0, "Multi-GPU",
-                         tooltip="Enable multi-GPU training")
-        components.switch(frame, 13, 1, self.ui_state, "multi_gpu")
-        components.label(frame, 13, 2, "Device Indexes",
-                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
-        components.entry(frame, 13, 3, self.ui_state, "device_indexes")
-
-        components.label(frame, 14, 0, "Sequential model setup",
-                         tooltip="Multi-GPU: If enabled, loading and setting up the model is done for each GPU one after the other. This is slower, but can reduce peak RAM usage.")
-        components.switch(frame, 14, 1, self.ui_state, "sequential_model_setup")
-
-        components.label(frame, 15, 0, "Gradient Reduce Precision",
-                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
-                                 "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
-                                 "FLOAT_32: Reduce gradients in float32\n"
-                                 "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
-                         wide_tooltip=True)
-        components.options(frame, 15, 1, [str(x) for x in list(GradientReducePrecision)], self.ui_state,
-                           "gradient_reduce_precision")
-
-        components.label(frame, 15, 2, "Fused Gradient Reduce",
-                         tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
-        components.switch(frame, 15, 3, self.ui_state, "fused_gradient_reduce")
-
-        components.label(frame, 16, 0, "Async Gradient Reduce",
-                         tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
-        components.switch(frame, 16, 1, self.ui_state, "async_gradient_reduce")
-        components.label(frame, 16, 2, "Buffer size (MB)",
-                         tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
-        components.entry(frame, 16, 3, self.ui_state, "async_gradient_reduce_buffer")
-
-        components.label(frame, 17, 0, "Temp Device",
-                         tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 17, 1, self.ui_state, "temp_device")
+        self._create_validation_and_device_sections(right_container)
+        self._create_multi_gpu_section(right_container)
+        self._create_input_validation_section(right_container)
 
         frame.pack(fill="both", expand=1)
         return frame
+
+    def _create_tensorboard_section(self, parent):
+        """Extract tensorboard section creation"""
+        components.label(parent, 7, 0, "Tensorboard", font=("", 14, "bold"), pad=(10, 5))
+        components.label(parent, 8, 0, "Tensorboard Mode",
+                        tooltip="Off: Disabled.\nTrain Only: Active only during training.\nAlways On: Always available.",
+                        pad=(10, 5))
+        components.options_kv(parent, 8, 1, [
+            ("Off", TensorboardMode.OFF),
+            ("Train only", TensorboardMode.TRAIN_ONLY),
+            ("Always on", TensorboardMode.ALWAYS_ON),
+        ], self.ui_state, "tensorboard_mode", width=100, sticky="nw")
+
+        components.label(parent, 9, 0, "Tensorboard Port",
+                        tooltip="Port to use for Tensorboard link", pad=(10, 5))
+        components.entry(parent, 9, 1, self.ui_state, "tensorboard_port", width=50, sticky="nw")
+
+        components.label(parent, 10, 0, "Expose Tensorboard",
+                        tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)",
+                        pad=(10, 5))
+        components.switch(parent, 10, 1, self.ui_state, "tensorboard_expose")
+
+    def _create_validation_and_device_sections(self, parent):
+        """Extract validation and device settings sections"""
+        settings_container = ctk.CTkFrame(parent, corner_radius=6, fg_color="transparent")
+        settings_container.grid(row=0, column=0, sticky="ew", pady=(0, 5))
+        settings_container.grid_columnconfigure(0, weight=1)
+        settings_container.grid_columnconfigure(1, weight=1)
+
+        # Validation Loss
+        validation_section = self._create_section(settings_container, 0, 0, "Validation Loss", padx=(0, 0), pady=(0, 0))
+        components.label(validation_section, 1, 0, "Enable",
+                        tooltip="Enable validation loss and add new graph in tensorboard", pad=(10, 5))
+        components.switch(validation_section, 1, 1, self.ui_state, "validation")
+        components.label(validation_section, 2, 0, "Validate after",
+                        tooltip="The interval used when validate training", pad=(10, 5))
+        components.time_entry(validation_section, 2, 1, self.ui_state, "validate_after", "validate_after_unit",
+                            width=60, unit_width=90, sticky="nw")
+
+        # Device Settings
+        device_section = self._create_section(settings_container, 0, 1, "Device Settings", padx=(5, 0), pady=(0, 0))
+
+        device_settings = [
+            (1, "Dataloader Threads", "dataloader_threads", 36,
+            "Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching."),
+            (2, "Train Device", "train_device", 66,
+            'The device used for training. Can be "cuda", "cuda:0", "cuda:1" etc. Default:"cuda". Must be "cuda" for multi-GPU training.'),
+            (3, "Temp Device", "temp_device", 66,
+            'The device used to temporarily offload models while they are not used. Default:"cpu"'),
+        ]
+
+        for row, label_text, var_name, width, tooltip in device_settings:
+            components.label(device_section, row, 0, label_text, tooltip=tooltip, pad=(10, 5))
+            components.entry(device_section, row, 1, self.ui_state, var_name, width=width, sticky="nw")
+
+    def _create_multi_gpu_section(self, parent):
+        """Extract multi-GPU section creation"""
+        self.multi_gpu_section = self._create_section(parent, 1, 0, "Multi-GPU", padx=(0, 0), pady=(0, 0))
+
+        components.label(self.multi_gpu_section, 1, 0, "Enable Multi-GPU",
+                        tooltip="Enable multi-GPU training. Only intended for if you have multiple supported and identical devices.",
+                        pad=(10, 5))
+        components.switch(self.multi_gpu_section, 1, 1, self.ui_state, "multi_gpu")
+
+        self.multi_gpu_details_frame = ctk.CTkFrame(self.multi_gpu_section, fg_color="transparent")
+        self.multi_gpu_details_frame.grid(row=2, column=0, columnspan=3, sticky="ew")
+        self.multi_gpu_details_frame.grid_columnconfigure(0, weight=0)
+        self.multi_gpu_details_frame.grid_columnconfigure(1, weight=0)
+        self.multi_gpu_details_frame.grid_columnconfigure(2, weight=1)
+
+        # Device Indexes and settings
+        components.label(self.multi_gpu_details_frame, 0, 0, "Device Indexes",
+                        tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.",
+                        pad=(10, 5))
+        components.entry(self.multi_gpu_details_frame, 0, 1, self.ui_state, "device_indexes", sticky="nw", width=250)
+
+        components.label(self.multi_gpu_details_frame, 1, 0, "Sequential model setup",
+                        tooltip="Multi-GPU: If enabled, loading and setting up the model is done for each GPU one after the other. This is slower, but can reduce peak RAM usage.",
+                        pad=(10, 5))
+        components.switch(self.multi_gpu_details_frame, 1, 1, self.ui_state, "sequential_model_setup")
+
+        components.label(self.multi_gpu_details_frame, 2, 0, "Gradient Reduce Precision",
+                        tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
+                                "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
+                                "FLOAT_32: Reduce gradients in float32\n"
+                                "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
+                        wide_tooltip=True, pad=(10, 5))
+        components.options(self.multi_gpu_details_frame, 2, 1, [str(x) for x in list(GradientReducePrecision)],
+                        self.ui_state, "gradient_reduce_precision", width=250, sticky="nw")
+
+        # Gradient switches
+        gradient_switches_frame = ctk.CTkFrame(self.multi_gpu_details_frame, fg_color="transparent")
+        gradient_switches_frame.grid(row=3, column=0, columnspan=3, sticky="w", pady=(0, 5))
+        gradient_switches_frame.grid_columnconfigure(0, weight=0)
+        gradient_switches_frame.grid_columnconfigure(2, weight=0)
+
+        components.labeled_switch(gradient_switches_frame, 0, 0, self.ui_state, "fused_gradient_reduce",
+                                label_text="Fused Gradient Reduce",
+                                tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce",
+                                layout="row")
+        components.labeled_switch(gradient_switches_frame, 0, 2, self.ui_state, "async_gradient_reduce",
+                                label_text="Async Gradient Reduce",
+                                tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.",
+                                layout="row")
+
+        components.label(self.multi_gpu_details_frame, 4, 0, "Buffer size (MB)",
+                        tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"",
+                        pad=(10, 5))
+        components.entry(self.multi_gpu_details_frame, 4, 1, self.ui_state, "async_gradient_reduce_buffer",
+                        sticky="nw", width=70)
+
+        self.multi_gpu_trace_id = self.ui_state.add_var_trace("multi_gpu", lambda: self._toggle_multi_gpu_details())
+        self._toggle_multi_gpu_details()
+
+    def _create_input_validation_section(self, parent):
+        """Extract input validation section creation"""
+        validation_section = self._create_section(parent, 2, 0, "Input Validation", padx=(0, 0), pady=(5, 0))
+
+        validation_settings = [
+            (1, "Auto-correct Input", "validation_auto_correct",
+            "Automatically correct file paths and extensions where possible"),
+            (2, "Show Validation Tooltips", "validation_show_tooltips",
+            "Show tooltips with validation messages for errors and warnings"),
+            (3, "Use Friendly Names", "use_friendly_names",
+            "Use friendly names instead of timestamps for auto-corrected/generated filenames"),
+            (4, "Prevent Overwrite", "prevent_overwrite",
+            "Automatically append a number or word to filenames that would overwrite existing files (requires Auto-correct Input)"),
+            (5, "Auto-prefix", "auto_prefix",
+            "Automatically prefix manually-entered filenames with the Save Filename Prefix (requires Auto-correct Input)"),
+        ]
+
+        for row, label_text, var_name, tooltip in validation_settings:
+            components.label(validation_section, row, 0, label_text, tooltip=tooltip, pad=(10, 5))
+            components.switch(validation_section, row, 1, self.ui_state, var_name)
+
+    def _toggle_multi_gpu_details(self):
+        # Use after_idle to batch the geometry update and reduce lag
+        def do_toggle():
+            if self.train_config.multi_gpu:
+                self.multi_gpu_details_frame.grid()
+            else:
+                self.multi_gpu_details_frame.grid_remove()
+
+        self.after_idle(do_toggle)
 
     def create_model_tab(self, master):
         return ModelTab(master, self.train_config, self.ui_state)
