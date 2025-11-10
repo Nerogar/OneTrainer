@@ -103,7 +103,10 @@ class EntryValidationHandler:
         self.component.configure(border_color=self.original_border_color)
 
     def should_show_tooltip(self) -> bool:
-        return _safe_bool(self.ui_state.get_var("validation_show_tooltips"))
+        try:
+            return _safe_bool(self.ui_state.get_var("validation_show_tooltips"))
+        except (KeyError, AttributeError):
+            return True
 
     def _show_validation_tooltip(self):
         if not self.should_show_tooltip() or not self.validation_state:
@@ -423,11 +426,15 @@ def entry(
         component.bind(event, validation_handler.on_user_input)
 
     if enable_hover_validation and validation_state:
-        show_tooltips_var = ui_state.get_var("validation_show_tooltips")
+        try:
+            show_tooltips_var = ui_state.get_var("validation_show_tooltips")
+        except (KeyError, AttributeError):
+            show_tooltips_var = None
+
         validation_tooltip = validation_handler.validation_tooltip
 
         def on_hover_enter(_e=None):
-            if not _safe_bool(show_tooltips_var):
+            if show_tooltips_var and not _safe_bool(show_tooltips_var):
                 return
 
             if validation_state.status == 'error':
