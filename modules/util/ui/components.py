@@ -233,6 +233,7 @@ class ModelOutputValidator:
         self.friendly_names_var = ui_state.get_var("use_friendly_names")
         self.prevent_overwrite_var = ui_state.get_var("prevent_overwrite")
         self.auto_prefix_var = ui_state.get_var("auto_prefix")
+        self.show_tooltips_var = ui_state.get_var("validation_show_tooltips")
 
         self.state = ValidationState()
         self._trace_ids: dict[str, str] = {}
@@ -245,7 +246,7 @@ class ModelOutputValidator:
             return type(default_enum)[var.get()]
         return default_enum
 
-    def validate(self, value: str, skip_overwrite_protection: bool = False) -> ValidationResult:
+    def validate(self, value: str, skip_overwrite_protection: bool = False, readonly: bool = False) -> ValidationResult:
         value = value.strip()
         if not value:
             self.state.clear()
@@ -256,12 +257,12 @@ class ModelOutputValidator:
             value,
             output_format=self._get_enum_value(self.format_var, ModelFormat.SAFETENSORS),
             training_method=self._get_enum_value(self.method_var, TrainingMethod.FINE_TUNE),
-            autocorrect=_safe_bool(self.autocorrect_var),
+            autocorrect=False if readonly else _safe_bool(self.autocorrect_var),
             prefix=self.prefix_var.get() if self.prefix_var else "",
             use_friendly_names=_safe_bool(self.friendly_names_var, default=False),
             is_output=True,
-            prevent_overwrite=_safe_bool(self.prevent_overwrite_var, default=False),
-            auto_prefix=_safe_bool(self.auto_prefix_var, default=False),
+            prevent_overwrite=False if readonly else _safe_bool(self.prevent_overwrite_var, default=False),
+            auto_prefix=False if readonly else _safe_bool(self.auto_prefix_var, default=False),
             skip_overwrite_protection=skip_overwrite_protection,
         )
 
@@ -270,7 +271,8 @@ class ModelOutputValidator:
         else:
             self.state.clear()
 
-        if result.corrected and result.corrected != value:
+        # Only apply corrections if not in readonly mode
+        if not readonly and result.corrected and result.corrected != value:
             self.var.set(result.corrected)
 
         return result
@@ -353,8 +355,30 @@ class ModelOutputValidator:
                     var.trace_remove("write", trace_id)
         self._trace_ids.clear()
 
+    def _perform_initial_validation(self):
+        """Perform initial readonly validation on load without any corrections."""
+        current_value = self.var.get().strip()
+        if not current_value or not self._tk_widget:
+            return
+
+        # Perform readonly validation - no corrections, just check and show status
+        self.validate(current_value, skip_overwrite_protection=True, readonly=True)
+
+        # Apply visual feedback based on validation state
+        if self.state.status == 'error':
+            self._tk_widget.configure(border_color="#dc3545")
+            if hasattr(self._tk_widget, '_validation_tooltip'):
+                self._tk_widget._validation_tooltip.show_error(self.state.message, duration_ms=5000)
+        elif self.state.status == 'warning':
+            self._tk_widget.configure(border_color="#ff9500")
+            if hasattr(self._tk_widget, '_validation_tooltip'):
+                self._tk_widget._validation_tooltip.show_warning(self.state.message, duration_ms=5000)
+
     def set_widget(self, widget):
         self._tk_widget = widget
+        # Perform initial readonly validation if tooltips are enabled
+        if _safe_bool(self.show_tooltips_var):
+            self._perform_initial_validation()
 
 
 # UI components
