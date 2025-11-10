@@ -317,6 +317,8 @@ class TrainConfig(BaseConfig):
     validation_auto_correct: bool
     validation_show_tooltips: bool
     use_friendly_names: bool
+    prevent_overwrite: bool
+    auto_prefix: bool
 
     # multi-GPU
     multi_gpu: bool
@@ -895,6 +897,8 @@ class TrainConfig(BaseConfig):
         data.append(("validation_auto_correct", True, bool, False))
         data.append(("validation_show_tooltips", True, bool, False))
         data.append(("use_friendly_names", False, bool, False))
+        data.append(("prevent_overwrite", True, bool, False))
+        data.append(("auto_prefix", False, bool, False))
 
         #multi-GPU
         data.append(("multi_gpu", False, bool, False))

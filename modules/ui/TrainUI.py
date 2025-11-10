@@ -322,10 +322,18 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
                          tooltip="Use friendly names instead of timestamps for auto-corrected/generated filenames")
         components.switch(frame, 10, 1, self.ui_state, "use_friendly_names")
 
+        components.label(frame, 10, 2, "Prevent Overwrite",
+                         tooltip="Automatically append a number or word to filenames that would overwrite existing files (requires Auto-correct Input)")
+        components.switch(frame, 10, 3, self.ui_state, "prevent_overwrite")
+
+        components.label(frame, 11, 0, "Auto-prefix",
+                         tooltip="Automatically prefix manually-entered filenames with the Save Filename Prefix (requires Auto-correct Input)")
+        components.switch(frame, 11, 1, self.ui_state, "auto_prefix")
+
         # device
-        components.label(frame, 11, 0, "Dataloader Threads",
+        components.label(frame, 11, 2, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 11, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 11, 3, self.ui_state, "dataloader_threads")
 
         components.label(frame, 12, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")

@@ -9,6 +9,25 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TensorboardMode import TensorboardMode
 
 
+def get_tensorboard_run_name(config: TrainConfig) -> str:
+    """Extract run name from output_model_destination, falling back to prefix."""
+    if not config.output_model_destination or not config.output_model_destination.strip():
+        return config.save_filename_prefix
+
+    path = Path(config.output_model_destination)
+    name = path.name
+
+    # remove extension
+    if path.suffix:
+        name = path.stem
+
+    # fall back to prefix if no name could be extracted
+    if not name:
+        return config.save_filename_prefix
+
+    return name
+
+
 class TensorboardManager:
 
     _instance = None

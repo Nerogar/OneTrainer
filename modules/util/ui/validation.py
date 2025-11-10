@@ -24,6 +24,8 @@ SETTINGS = ValidationSettings()
 ONLY_WHITESPACE = re.compile(r"^\s+$")
 TRAILING_SLASH_RE = re.compile(r"[\\/]$")
 ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
+INVALID_NAMES = {"", "."}
+GENERIC_MODEL_NAMES = {"lora", "embedding", "embeddings", "model", "finetune"}
 
 INVALID_CHARS_WIN = set('<>:"|?*')
 INVALID_NAMES = {"", "."}
@@ -87,6 +89,15 @@ def _has_extension(path: str | Path, extension: str) -> bool:
 def _is_partial_match(current: str, required: str) -> bool:
     return len(current) > 3 and required.startswith(current)
 
+def _has_prefix(stem: str, prefix: str) -> bool:
+    """Check if stem already contains the prefix (case-insensitive)."""
+    if not prefix:
+        return False
+    stem_lower, prefix_lower = stem.lower(), prefix.lower()
+    # Exact match or prefix followed by separator
+    return (stem_lower == prefix_lower or
+            stem_lower.startswith((f"{prefix_lower}-", f"{prefix_lower}_")))
+
 def generate_default_filename(
     training_method: TrainingMethod,
     prefix: str = "",
@@ -101,6 +112,33 @@ def generate_default_filename(
         timestamp = datetime.now().strftime(SETTINGS.datetime_format)
         name = f"{prefix}_{timestamp}" if prefix else f"{method_str}_{timestamp}"
     return f"{name}{extension}"
+
+def make_unique_filename(base_path: Path, use_friendly_names: bool = False) -> Path:
+    """Generate a unique filename by appending a word or number if the path exists."""
+    if not base_path.exists():
+        return base_path
+
+    stem = base_path.stem
+    suffix = base_path.suffix
+    parent = base_path.parent
+
+    if use_friendly_names:
+        # Try 5 words before falling back to numbers
+        for _ in range(5):
+            word = generate_friendly(1, separator="")
+            new_path = parent / f"{stem}_{word}{suffix}"
+            if not new_path.exists():
+                return new_path
+
+    # Number-based approach (including friendly word fallback)
+    counter = 1
+    while counter <= 9999:
+        new_path = parent / f"{stem}_{counter}{suffix}"
+        if not new_path.exists():
+            return new_path
+        counter += 1
+
+    return base_path
 
 def get_allowed_formats_for_method(training_method: TrainingMethod) -> set[ModelFormat]:
     if training_method in (TrainingMethod.EMBEDDING, TrainingMethod.LORA):
@@ -118,6 +156,8 @@ class ValidationContext:
     use_friendly_names: bool
     is_output: bool
     separator: str
+    prevent_overwrite: bool
+    auto_prefix: bool
 
 
 def _validate_basic_input(ctx: ValidationContext) -> ValidationResult | None:
@@ -194,8 +234,33 @@ def _validate_single_file_path(ctx: ValidationContext) -> ValidationResult:
             return _result(True, new_path, "Removed trailing period(s).")
         return _result(False, None, "Filename cannot end with a period.")
 
+    # Handle generic model names and auto-prefix
+    stem_lower = path.stem.lower()
+
+    # Check for generic names that should be prefixed
+    if stem_lower in GENERIC_MODEL_NAMES and ctx.prefix and ctx.autocorrect:
+        new_stem = f"{ctx.prefix}_{path.stem}"
+        new_path = _format_path(path.with_name(new_stem + path.suffix), ctx.separator)
+        return _result(True, new_path, f"Added prefix to generic name '{path.stem}'.", 'warning')
+    elif stem_lower in GENERIC_MODEL_NAMES and ctx.prefix:
+        return _result(True, None, f"WARNING: Generic filename '{path.stem}' may cause confusion. Consider adding a prefix.", 'warning')
+
+    # Auto-prefix: add prefix to manually-entered filenames
+    if ctx.auto_prefix and ctx.prefix and ctx.autocorrect and not _has_prefix(path.stem, ctx.prefix):
+        new_stem = f"{ctx.prefix}-{path.stem}"
+        new_path = _format_path(path.with_name(new_stem + path.suffix), ctx.separator)
+        return _result(True, new_path, f"Added prefix '{ctx.prefix}' to filename.", 'warning')
+
     if _has_extension(base, required_ext):
+        # Check if file exists and handle overwrite prevention
         if path.exists():
+            if ctx.prevent_overwrite and ctx.autocorrect:
+                # Generate a unique filename
+                unique_path = make_unique_filename(path, ctx.use_friendly_names)
+                if unique_path != path:
+                    corrected = _format_path(unique_path, ctx.separator)
+                    suffix_added = unique_path.stem[len(path.stem):]  # Get what was added
+                    return _result(True, corrected, f"File exists. Added '{suffix_added}' to prevent overwrite.")
             return _result(True, None, "WARNING: File already exists and will be overwritten.", 'warning')
         return _result(True, None, "")
 
@@ -241,6 +306,9 @@ def validate_destination(
     prefix: str = "",
     use_friendly_names: bool = False,
     is_output: bool = True,
+    prevent_overwrite: bool = False,
+    auto_prefix: bool = False,
+    skip_overwrite_protection: bool = False,
 ) -> ValidationResult:
     """
     Validate and optionally auto-correct a model output destination path.
@@ -252,6 +320,7 @@ def validate_destination(
     - File extension validation and correction
     - Parent directory existence
     - Existing file warnings
+    - Automatic overwrite prevention
 
     Args:
         raw: Raw user input string
@@ -261,6 +330,9 @@ def validate_destination(
         prefix: Optional prefix for auto-generated filenames
         use_friendly_names: Use friendly names instead of timestamps
         is_output: Whether this is an output path (True) or input path (False)
+        prevent_overwrite: Automatically make filename unique if it would overwrite
+        auto_prefix: Automatically add prefix to manually-entered filenames
+        skip_overwrite_protection: Skip overwrite protection (used when validation triggered by settings changes)
 
     Returns:
         ValidationResult with ok status, optional corrected value, and message
@@ -274,7 +346,9 @@ def validate_destination(
         prefix=prefix,
         use_friendly_names=use_friendly_names,
         is_output=is_output,
-        separator='/' if '/' in raw else '\\'
+        separator='/' if '/' in raw else '\\',
+        prevent_overwrite=prevent_overwrite and not skip_overwrite_protection,
+        auto_prefix=auto_prefix,
     )
 
     if basic_check := _validate_basic_input(ctx):

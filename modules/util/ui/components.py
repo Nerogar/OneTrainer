@@ -82,14 +82,10 @@ class EntryValidationHandler:
         self.custom_validator = custom_validator
         self.validation_state = validation_state
 
-        # Get border colors
         try:
             self.original_border_color = component.cget("border_color")
         except Exception:
             self.original_border_color = "gray50"
-
-        self.error_border_color = "#dc3545"
-        self.warning_border_color = "#ff9500"
 
         self.validation_after_id = None
         self.revert_after_id = None
@@ -119,10 +115,8 @@ class EntryValidationHandler:
 
     def validate_value(self, value: str, revert_delay_ms: int | None) -> bool:
         self._cancel_after(self.revert_after_id)
-
         meta = self.ui_state.get_field_metadata(self.var_name)
 
-        # Perform basic type validation
         basic_result = validate_basic_type(
             value=value,
             declared_type=meta.type,
@@ -130,11 +124,9 @@ class EntryValidationHandler:
             default_val=meta.default
         )
 
-        # If basic validation fails, handle failure
         if not basic_result.ok:
             return self._fail(basic_result.message, revert_delay_ms)
 
-        # Custom validation
         if self.custom_validator:
             result = self.custom_validator(value)
 
@@ -153,7 +145,7 @@ class EntryValidationHandler:
         return True
 
     def _warning(self, reason: str, value: str) -> bool:
-        self.component.configure(border_color=self.warning_border_color)
+        self.component.configure(border_color="#ff9500")
         if self.should_show_tooltip():
             self.validation_tooltip.show_warning(reason)
         self.last_valid_value = value
@@ -164,7 +156,7 @@ class EntryValidationHandler:
         return True
 
     def _fail(self, reason: str, revert_delay_ms: int | None) -> bool:
-        self.component.configure(border_color=self.error_border_color)
+        self.component.configure(border_color="#dc3545")
         if self.should_show_tooltip():
             self.validation_tooltip.show_error(reason)
 
@@ -239,38 +231,38 @@ class ModelOutputValidator:
         self.prefix_var = ui_state.get_var(prefix_var_name)
         self.autocorrect_var = ui_state.get_var("validation_auto_correct")
         self.friendly_names_var = ui_state.get_var("use_friendly_names")
+        self.prevent_overwrite_var = ui_state.get_var("prevent_overwrite")
+        self.auto_prefix_var = ui_state.get_var("auto_prefix")
 
         self.state = ValidationState()
         self._trace_ids: dict[str, str] = {}
+        self._debounce_after_id = None
+        self._tk_widget = None
+        self._last_prefix = self.prefix_var.get() if self.prefix_var else ""
 
     def _get_enum_value(self, var, default_enum):
         with contextlib.suppress(KeyError, ValueError):
             return type(default_enum)[var.get()]
         return default_enum
 
-    def validate(self, value: str) -> ValidationResult:
-
+    def validate(self, value: str, skip_overwrite_protection: bool = False) -> ValidationResult:
         value = value.strip()
         if not value:
             self.state.clear()
             return ValidationResult(ok=True, corrected=None, message="", status='success')
 
-        output_format = self._get_enum_value(self.format_var, ModelFormat.SAFETENSORS)
-        training_method = self._get_enum_value(self.method_var, TrainingMethod.FINE_TUNE)
-
-        autocorrect = _safe_bool(self.autocorrect_var)
-        prefix = self.prefix_var.get() if self.prefix_var else ""
-        use_friendly_names = _safe_bool(self.friendly_names_var, default=False)
-
         # Use validation logic from validation.py
         result = validate_destination(
             value,
-            output_format,
-            training_method,
-            autocorrect=autocorrect,
-            prefix=prefix,
-            use_friendly_names=use_friendly_names,
-            is_output=True
+            output_format=self._get_enum_value(self.format_var, ModelFormat.SAFETENSORS),
+            training_method=self._get_enum_value(self.method_var, TrainingMethod.FINE_TUNE),
+            autocorrect=_safe_bool(self.autocorrect_var),
+            prefix=self.prefix_var.get() if self.prefix_var else "",
+            use_friendly_names=_safe_bool(self.friendly_names_var, default=False),
+            is_output=True,
+            prevent_overwrite=_safe_bool(self.prevent_overwrite_var, default=False),
+            auto_prefix=_safe_bool(self.auto_prefix_var, default=False),
+            skip_overwrite_protection=skip_overwrite_protection,
         )
 
         if result.status:
@@ -283,23 +275,86 @@ class ModelOutputValidator:
 
         return result
 
+    def _remove_old_prefix_if_needed(self):
+        current_value = self.var.get().strip()
+        if not current_value or not self._last_prefix:
+            return
+
+        path = Path(current_value)
+        filename = path.name
+        old_prefix_pattern = f"{self._last_prefix}-"
+
+        if filename.startswith(old_prefix_pattern):
+            new_filename = filename[len(old_prefix_pattern):]
+            new_value = str(path.parent / new_filename) if path.parent != Path('.') else new_filename
+            self.var.set(new_value)
+
+    def _schedule_validation(self, skip_overwrite: bool = False):
+        if not self._tk_widget:
+            return
+
+        if self._debounce_after_id:
+            with contextlib.suppress(Exception):
+                self._tk_widget.after_cancel(self._debounce_after_id)
+
+        self._debounce_after_id = self._tk_widget.after(
+            COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
+            lambda: self.validate(self.var.get(), skip_overwrite_protection=skip_overwrite)
+        )
+
+    def _schedule_prefix_change_validation(self):
+        if not self._tk_widget:
+            return
+
+        if self._debounce_after_id:
+            with contextlib.suppress(Exception):
+                self._tk_widget.after_cancel(self._debounce_after_id)
+
+        def on_prefix_change():
+            self._remove_old_prefix_if_needed()
+            self._last_prefix = self.prefix_var.get() if self.prefix_var else ""
+            self.validate(self.var.get(), skip_overwrite_protection=False)
+
+        self._debounce_after_id = self._tk_widget.after(
+            COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
+            on_prefix_change
+        )
+
     def setup_traces(self):
-        trace_vars = [
-            ('format', self.format_var),
-            ('method', self.method_var),
-            ('prefix', self.prefix_var),
-            ('friendly_names', self.friendly_names_var),
+        trace_config = [
+            ('format', self.format_var, False, True, False),
+            ('method', self.method_var, False, True, False),
+            ('prefix', self.prefix_var, True, False, True),
+            ('friendly_names', self.friendly_names_var, False, True, False),
+            ('prevent_overwrite', self.prevent_overwrite_var, False, True, False),
+            ('auto_prefix', self.auto_prefix_var, False, True, False),
         ]
-        for key, var in trace_vars:
-            self._trace_ids[key] = var.trace_add("write", lambda *_: self.validate(self.var.get()))
+
+        def make_callback(debounce: bool, skip_overwrite: bool, is_prefix: bool):
+            if is_prefix:
+                return lambda *_: self._schedule_prefix_change_validation()
+            elif debounce:
+                return lambda *_: self._schedule_validation(skip_overwrite)
+            return lambda *_: self.validate(self.var.get(), skip_overwrite_protection=skip_overwrite)
+
+        for key, var, debounce, skip_overwrite, is_prefix in trace_config:
+            self._trace_ids[key] = var.trace_add("write", make_callback(debounce, skip_overwrite, is_prefix))
 
     def cleanup_traces(self):
+        if self._debounce_after_id and self._tk_widget:
+            with contextlib.suppress(Exception):
+                self._tk_widget.after_cancel(self._debounce_after_id)
+            self._debounce_after_id = None
+
         for key, trace_id in self._trace_ids.items():
             var = getattr(self, f"{key}_var", None)
             if var:
                 with contextlib.suppress(Exception):
                     var.trace_remove("write", trace_id)
         self._trace_ids.clear()
+
+    def set_widget(self, widget):
+        self._tk_widget = widget
 
 
 # UI components
@@ -338,11 +393,11 @@ def entry(
     )
     validation_trace_name = var.trace_add("write", validation_handler.debounced_validate)
 
-    # Bind focus and input events
     component.bind("<FocusIn>", validation_handler.on_focus_in)
     component.bind("<FocusOut>", validation_handler.on_focus_out)
     for event in ("<Key>", "<<Paste>>", "<<Cut>>"):
         component.bind(event, validation_handler.on_user_input)
+
     if enable_hover_validation and validation_state:
         show_tooltips_var = ui_state.get_var("validation_show_tooltips")
         validation_tooltip = validation_handler.validation_tooltip
@@ -408,14 +463,12 @@ def path_entry(
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
     frame.grid_columnconfigure(0, weight=1)
 
-    # Determine if this is an output path
     if not is_output:
         meta = ui_state.get_field_metadata(var_name)
         is_output = getattr(meta, 'is_output', False)
 
     var = ui_state.get_var(var_name)
 
-    # Set up validator and validation state
     if use_model_validator:
         validator = ModelOutputValidator(
             var=var, ui_state=ui_state,
@@ -443,7 +496,6 @@ def path_entry(
 
         custom_validator = simple_path_validator
 
-    # Create entry with validation
     entry_widget = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
         custom_validator=custom_validator,
@@ -452,9 +504,10 @@ def path_entry(
         command=command
     )
 
-    # Set up validator traces and cleanup
     if validator:
+        validator.set_widget(entry_widget)
         validator.setup_traces()
+
     original_destroy = entry_widget.destroy
 
     def new_destroy():
@@ -464,7 +517,6 @@ def path_entry(
 
     entry_widget.destroy = new_destroy
 
-    # Enable drag-and-drop
     register_drop_target(entry_widget, ui_state, var_name, command)
 
     # Browse button
@@ -615,7 +667,7 @@ def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIS
         if not deactivate_update_var:
             for key, value in values:
                 if var.get() == str(value):
-                    if component.winfo_exists():  # the component could already be destroyed
+                    if component.winfo_exists():
                         component.set(key)
                         if command:
                             command(value)
