@@ -11,7 +11,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
-from modules.util.ui.ui_utils import register_drop_target
+from modules.util.ui.ui_utils import DebounceTimer, register_drop_target
 from modules.util.ui.UIState import UIState
 from modules.util.ui.validation import ValidationResult, validate_basic_type, validate_destination, validate_file_path
 
@@ -87,7 +87,16 @@ class EntryValidationHandler:
         except Exception:
             self.original_border_color = "gray50"
 
-        self.validation_after_id = None
+        # Replace manual debounce logic with DebounceTimer
+        self.debounce_timer = DebounceTimer(
+            widget=component,
+            delay_ms=COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
+            callback=lambda: self.validate_value(
+                self.var.get(),
+                COMPONENT_VALIDATION_SETTINGS.debounced_invalid_revert_ms
+            )
+        )
+
         self.revert_after_id = None
         self.touched = False
         self.last_valid_value = var.get()
@@ -179,22 +188,15 @@ class EntryValidationHandler:
 
     def debounced_validate(self, *_):
         if not self.touched:
-            self._cancel_after(self.validation_after_id)
             return
 
         self.validation_tooltip.hide()
         self._reset_border()
 
         self._cancel_after(self.revert_after_id)
-        self._cancel_after(self.validation_after_id)
 
-        self.validation_after_id = self.component.after(
-            COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
-            lambda: self.validate_value(
-                self.var.get(),
-                COMPONENT_VALIDATION_SETTINGS.debounced_invalid_revert_ms
-            )
-        )
+        # Use DebounceTimer instead of manual after() calls
+        self.debounce_timer.call()
 
     def on_focus_in(self, _e=None):
         self.touched = False
@@ -213,8 +215,8 @@ class EntryValidationHandler:
             )
 
     def cleanup(self):
-        for after_id in (self.validation_after_id, self.revert_after_id):
-            self._cancel_after(after_id)
+        self._cancel_after(self.revert_after_id)
+        # No need to cancel debounce_timer - it handles its own cleanup
 
 
 class ModelOutputValidator:
@@ -240,7 +242,9 @@ class ModelOutputValidator:
 
         self.state = ValidationState()
         self._trace_ids: dict[str, str] = {}
-        self._debounce_after_id = None
+
+        # Replace manual debounce with DebounceTimer
+        self._debounce_timer = None
         self._tk_widget = None
         self._last_prefix = self.prefix_var.get() if self.prefix_var else ""
 
@@ -298,32 +302,32 @@ class ModelOutputValidator:
         if not self._tk_widget:
             return
 
-        if self._debounce_after_id:
-            with contextlib.suppress(Exception):
-                self._tk_widget.after_cancel(self._debounce_after_id)
+        if not self._debounce_timer:
+            self._debounce_timer = DebounceTimer(
+                widget=self._tk_widget,
+                delay_ms=COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
+                callback=lambda: self.validate(self.var.get(), skip_overwrite_protection=skip_overwrite)
+            )
 
-        self._debounce_after_id = self._tk_widget.after(
-            COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
-            lambda: self.validate(self.var.get(), skip_overwrite_protection=skip_overwrite)
-        )
+        self._debounce_timer.call()
 
     def _schedule_prefix_change_validation(self):
         if not self._tk_widget:
             return
-
-        if self._debounce_after_id:
-            with contextlib.suppress(Exception):
-                self._tk_widget.after_cancel(self._debounce_after_id)
 
         def on_prefix_change():
             self._remove_old_prefix_if_needed()
             self._last_prefix = self.prefix_var.get() if self.prefix_var else ""
             self.validate(self.var.get(), skip_overwrite_protection=False)
 
-        self._debounce_after_id = self._tk_widget.after(
-            COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
-            on_prefix_change
-        )
+        if not self._debounce_timer:
+            self._debounce_timer = DebounceTimer(
+                widget=self._tk_widget,
+                delay_ms=COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
+                callback=on_prefix_change
+            )
+
+        self._debounce_timer.call()
 
     def setup_traces(self):
         trace_config = [
@@ -346,11 +350,6 @@ class ModelOutputValidator:
             self._trace_ids[key] = var.trace_add("write", make_callback(debounce, skip_overwrite, is_prefix))
 
     def cleanup_traces(self):
-        if self._debounce_after_id and self._tk_widget:
-            with contextlib.suppress(Exception):
-                self._tk_widget.after_cancel(self._debounce_after_id)
-            self._debounce_after_id = None
-
         for key, trace_id in self._trace_ids.items():
             var = getattr(self, f"{key}_var", None)
             if var:
