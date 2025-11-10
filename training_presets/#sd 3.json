@@ -4,7 +4,7 @@
     "output_dtype": "FLOAT_16",
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
-    "prior": {
+    "transformer": {
         "weight_dtype": "FLOAT_32"
     },
     "resolution": "1024",

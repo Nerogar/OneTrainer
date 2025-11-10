@@ -47,7 +47,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             text_encoder_3_layer_skip: int = 0,
-            prior_attention_mask: bool = False,
+            transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -73,7 +73,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
                     text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                     text_encoder_2_layer_skip=text_encoder_2_layer_skip,
                     text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                    apply_attention_mask=prior_attention_mask,
+                    apply_attention_mask=transformer_attention_mask,
                 ))
 
             negative_prompt_embedding, negative_pooled_prompt_embedding = self.model.combine_text_encoder_output(
@@ -83,7 +83,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
                     text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                     text_encoder_2_layer_skip=text_encoder_2_layer_skip,
                     text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                    apply_attention_mask=prior_attention_mask,
+                    apply_attention_mask=transformer_attention_mask,
                 ))
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding], dim=0)
@@ -161,9 +161,9 @@ class StableDiffusion3Sampler(BaseModelSampler):
             self,
             sample_config: SampleConfig,
             destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
@@ -180,7 +180,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
             text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
             text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
-            prior_attention_mask=sample_config.prior_attention_mask,
+            transformer_attention_mask=sample_config.transformer_attention_mask,
             on_update_progress=on_update_progress,
         )
 

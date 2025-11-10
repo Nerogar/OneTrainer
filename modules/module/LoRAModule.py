@@ -40,7 +40,7 @@ class PeftBase(nn.Module):
                     self.shape = get_weight_shape(orig_module)
                 case nn.Conv2d():
                     self.op = F.conv2d
-                    self.shape = get_weight_shape(orig_module)
+                    self.shape = orig_module.weight.shape
                     self.layer_kwargs.setdefault("stride", orig_module.stride)
                     self.layer_kwargs.setdefault("padding", orig_module.padding)
                     self.layer_kwargs.setdefault("dilation", orig_module.dilation)
@@ -353,7 +353,11 @@ class DoRAModule(LoRAModule):
     def initialize_weights(self):
         super().initialize_weights()
 
-        orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        if isinstance(self.orig_module, nn.Linear):
+            orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        else:
+            assert isinstance(self.orig_module, nn.Conv2d)
+            orig_weight = self.orig_module.weight.detach().float()
 
         # Thanks to KohakuBlueLeaf once again for figuring out the shape
         # wrangling that works for both Linear and Convolutional layers. If you
@@ -385,10 +389,15 @@ class DoRAModule(LoRAModule):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-
         A = self.lora_down.weight
         B = self.lora_up.weight
-        orig_weight = get_unquantized_weight(self.orig_module, A.dtype, self.train_device)
+
+        if isinstance(self.orig_module, nn.Linear):
+            orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+        else:
+            assert isinstance(self.orig_module, nn.Conv2d)
+            orig_weight = self.orig_module.weight.detach().float()
+
         WP = orig_weight + (self.make_weight(A, B) * (self.alpha / self.rank))
         del orig_weight
         # A norm should never really end up zero at any point, but epsilon just
@@ -525,22 +534,32 @@ class LoRAModuleWrapper:
             module.to(device, dtype)
         return self
 
-    def load_state_dict(self, state_dict: dict[str, Tensor]):
+    def _check_rank_matches(self, state_dict: dict[str, Tensor]):
+        if not state_dict:
+            return
+
+        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
+            if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
+                raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}, please correct in the UI.")
+
+    def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
         Loads the state dict
 
         Args:
             state_dict: the state dict
+            strict: whether to strictly enforce that the keys in state_dict match the module's parameters
         """
-
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        for name, module in self.lora_modules.items():
-            try:
-                module.load_state_dict(state_dict)
-            except RuntimeError:  # noqa: PERF203
-                print(f"Missing key for {name}; initializing it to zero.")
+        self._check_rank_matches(state_dict)
+
+        try:
+            for module in self.lora_modules.values():
+                module.load_state_dict(state_dict, strict=strict)
+        except RuntimeError as e:
+            raise RuntimeError(f"Error during loading of module key \"{module.prefix}\"") from e
 
         # Temporarily re-create the state dict, so we can see what keys were left.
         remaining_names = set(state_dict) - set(self.state_dict())
