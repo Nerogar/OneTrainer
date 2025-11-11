@@ -618,7 +618,7 @@ class LoRAModuleWrapper:
             self.dummy_klass = DummyLoHaModule
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
-        elif self.peft_type == PeftType.OFT:
+        elif self.peft_type == PeftType.OFT_2:
             self.klass = OFTModule
             self.dummy_klass = DummyOFTModule
             self.additional_args = [
@@ -688,7 +688,7 @@ class LoRAModuleWrapper:
             return
 
         # For OFT, the comparison is not straightforward, so we skip it.
-        if self.peft_type == PeftType.OFT:
+        if self.peft_type == PeftType.OFT_2:
             return
 
         if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
