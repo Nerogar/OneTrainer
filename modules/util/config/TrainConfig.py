@@ -1084,7 +1084,7 @@ class TrainConfig(BaseConfig):
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # oft
-        data.append(("oft_block_size", 0, int, False))
+        data.append(("oft_block_size", 32, int, False))
         data.append(("oft_coft", False, bool, False))
         data.append(("coft_eps", 1e-4, float, False))
         data.append(("oft_block_share", False, bool, False))

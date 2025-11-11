@@ -119,7 +119,7 @@ class LoraTab:
             # Block Size
             components.label(master, 1, 0, f"{name} Block Size",
                             tooltip=f"The block size parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "lora_rank")
+            components.entry(master, 1, 1, self.ui_state, "oft_block_size")
 
             # COFT
             components.label(master, 1, 3, "Constrained OFT (COFT)",

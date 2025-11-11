@@ -338,20 +338,16 @@ class OFTModule(PeftBase):
     rank: int
     oft_block_size: int
     coft: bool
-    eps: float
+    coft_eps: float
     block_share: bool
     dropout_probability: float
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, coft: bool, eps: float, block_share: bool, **kwargs):
-        """
-        Note: The 'rank' parameter for OFTModule is interpreted as the 'oft_block_size'.
-        The actual rank (number of blocks) is calculated during initialization.
-        """
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
         super().__init__(prefix, orig_module)
-        self.oft_block_size = rank
+        self.oft_block_size = oft_block_size
         self.rank = 0
         self.coft = coft
-        self.eps = eps
+        self.coft_eps = coft_eps
         self.block_share = block_share
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
@@ -417,7 +413,7 @@ class OFTModule(PeftBase):
             block_size=self.oft_block_size,
             in_features=in_features,
             coft=self.coft,
-            eps=self.eps,
+            coft_eps=self.coft_eps,
             block_share=self.block_share,
             use_cayley_neumann=True,
             num_cayley_neumann_terms=5,
@@ -622,7 +618,7 @@ class LoRAModuleWrapper:
             self.klass = OFTModule
             self.dummy_klass = DummyOFTModule
             self.additional_args = [
-                self.rank,
+                config.oft_block_size,
                 config.oft_coft,
                 config.coft_eps,
                 config.oft_block_share,
