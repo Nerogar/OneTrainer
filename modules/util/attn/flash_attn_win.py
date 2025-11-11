@@ -99,20 +99,33 @@ def can_use_flash_attn(query: torch.Tensor,
 
     return True
 
+_scaled_dot_product_attention = None
+
+def enable_flash_attn_win():
+    """Enable Flash Attention fallback on Windows."""
+    _register()
+
+def disable_flash_attn_win():
+    """Disable Flash Attention fallback on Windows."""
+    global _scaled_dot_product_attention
+    if _scaled_dot_product_attention is not None:
+        F.scaled_dot_product_attention = _scaled_dot_product_attention
+        _scaled_dot_product_attention = None
 
 def supports_flash_attention_in_sdp():
     """Check if Flash Attention is natively supported in scaled_dot_product."""
     return torch.cuda.is_available() and torch.backends.cuda.is_flash_attention_available()
 
 
-def register():
+def _register():
     """
     Register Flash Attention fallback on Windows when native support is unavailable.
 
     Patches F.scaled_dot_product_attention to use flash_attn_func when conditions allow,
     falling back to the original implementation otherwise.
     """
-    if sys.platform == "win32" and is_flash_attn_available() and not supports_flash_attention_in_sdp():
+    global _scaled_dot_product_attention
+    if _scaled_dot_product_attention is None and sys.platform == "win32" and is_flash_attn_available() and not supports_flash_attention_in_sdp():
         try:
             from flash_attn.flash_attn_interface import flash_attn_func
         except Exception:
