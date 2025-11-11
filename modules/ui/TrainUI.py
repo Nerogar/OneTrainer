@@ -97,6 +97,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
         self.title("OneTrainer")
         self.geometry("1100x760")
+        self.minsize(860, 450) #width, height
 
         self.after(100, lambda: self._set_icon())
 
