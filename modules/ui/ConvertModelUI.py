@@ -131,6 +131,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                         base_model=self.convert_model_args.input_name,
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
+                    #TODO quantization layer filter
                 )
             elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
                 model = model_loader.load(
@@ -140,6 +141,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                         embedding=EmbeddingName(str(uuid4()), self.convert_model_args.input_name),
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
+                    #TODO quantization layer filter
                 )
             else:
                 raise Exception("could not load model: " + self.convert_model_args.input_name)

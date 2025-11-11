@@ -82,9 +82,9 @@ class BasePixArtAlphaSetup(
             config.enable_autocast_cache,
         )
 
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
             self,
@@ -340,5 +340,5 @@ class BasePixArtAlphaSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
+            betas=model.noise_scheduler.betas,
         ).mean()
