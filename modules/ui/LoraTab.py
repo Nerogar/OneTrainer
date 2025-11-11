@@ -128,7 +128,7 @@ class LoraTab:
 
             components.label(master, 2, 3, "COFT Epsilon",
                              tooltip="The control strength of COFT. Only has an effect if COFT is enabled.")
-            components.entry(master, 2, 4, self.ui_state, "oft_eps")
+            components.entry(master, 2, 4, self.ui_state, "coft_eps")
 
             # Block Share
             components.label(master, 3, 3, "Block Share",

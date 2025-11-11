@@ -624,7 +624,7 @@ class LoRAModuleWrapper:
             self.additional_args = [
                 self.rank,
                 config.oft_coft,
-                config.oft_eps,
+                config.coft_eps,
                 config.oft_block_share,
             ]
             self.additional_kwargs = {
