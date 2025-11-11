@@ -8,7 +8,7 @@ import threading
 import time
 import traceback
 
-from modules.ui.TimestepDistributionWindow import TimestepDistributionFrame
+from modules.ui.TimestepDistributionWindow import TimestepDistributionPlot
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
@@ -389,48 +389,79 @@ class ConceptWindow(ctk.CTkToplevel):
         return frame
 
     def __noise_tab(self, master):
-        col0_size = 230
-
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0, minsize=col0_size)
+        frame.grid_columnconfigure(0, weight=0)
         frame.grid_columnconfigure(1, weight=0)
         frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
+        frame.grid_columnconfigure(3, weight=1)
 
-        # noise override
-        components.label(frame, 0, 0, "Noise Override",
-                         tooltip="Use custom noise settings for this concept and enable overriding of the global noise settings")
-        components.switch(frame, 0, 1, self.noise_ui_state, "enable_noise_override")
+        components.label(frame, 0, 1, "Global",
+                         tooltip="This column shows the global settings.")
+        components.label(frame, 0, 2, "Override",
+                         tooltip="Override settings for this concept,\nor leave the fields empty to use global settings.",
+                         wide_tooltip=True)
 
         # offset noise weight
         components.label(frame, 1, 0, "Offset Noise Weight",
-                         tooltip="The weight of offset noise added to each training step")
-        components.entry(frame, 1, 1, self.noise_ui_state, "offset_noise_weight")
-
-        # generalized offset noise weight
-        generalised_offset_label = components.label(frame, 1, 2, "Generalized Offset Noise",
-            tooltip="Per-timestep 'brightness knob' instead of a fixed offset - steadier training, better starts, and improved very dark/bright images. Compatible with V-pred and Eps-pred. Start with 0.02 and adjust as needed.")
-        generalised_offset_label.configure(wraplength=130, justify="left")
-        components.switch(frame, 1, 3, self.noise_ui_state, "generalized_offset_noise")
+                         tooltip="The weight of offset noise added to each training step.\nLeave empty to use global settings.")
+        components.label(frame, 1, 1, str(self.train_config.offset_noise_weight))
+        components.entry(frame, 1, 2, self.noise_ui_state, "offset_noise_weight")
 
         # perturbation noise weight
         components.label(frame, 2, 0, "Perturbation Noise Weight",
-                         tooltip="The weight of perturbation noise added to each training step")
-        components.entry(frame, 2, 1, self.noise_ui_state, "perturbation_noise_weight")
+                         tooltip="The weight of perturbation noise added to each training step.\nLeave empty to use global settings.")
+        components.label(frame, 2, 1, str(self.train_config.perturbation_noise_weight))
+        components.entry(frame, 2, 2, self.noise_ui_state, "perturbation_noise_weight")
 
-        frame.grid_rowconfigure(3, minsize=20)
+        frame.grid_rowconfigure(3, minsize=24) # spacing
 
-        # timestep distribution override
-        components.label(frame, 4, 0, "Timestep Distribution Override",
-                         tooltip="Use a custom timestep distribution for this concept and enable overriding of the global timestep distribution")
-        components.switch(frame, 4, 1, self.noise_ui_state, "enable_timestep_distribution_override")
+        # timestep distribution
+        components.label(frame, 4, 0, "Timestep Distribution",
+                         tooltip="Will always use global setting for the timestep distribution function.")
+        timestep_distribution_label = components.label(frame, 4, 1, str(self.train_config.timestep_distribution))
+        timestep_distribution_label.grid(columnspan=2)
 
-        # timestep distribution settings and plot
-        frame.grid_rowconfigure(5, weight=1)
-        timestep_distribution_frame = TimestepDistributionFrame(frame, self.concept.noise, self.noise_ui_state)
-        timestep_distribution_frame.grid(row=5, column=0, columnspan=5, sticky='nsew')
-        timestep_distribution_frame.grid_columnconfigure(0, weight=0, minsize=col0_size)
+        # min noising strength
+        components.label(frame, 5, 0, "Min Noising Strength",
+                         tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained.\nLeave empty to use global settings.")
+        components.label(frame, 5, 1, str(self.train_config.min_noising_strength))
+        components.entry(frame, 5, 2, self.noise_ui_state, "min_noising_strength")
+
+        # max noising strength
+        components.label(frame, 6, 0, "Max Noising Strength",
+                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition.\nLeave empty to use global settings.")
+        components.label(frame, 6, 1, str(self.train_config.max_noising_strength))
+        components.entry(frame, 6, 2, self.noise_ui_state, "max_noising_strength")
+
+        # noising weight
+        components.label(frame, 7, 0, "Noising Weight",
+                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.\nLeave empty to use global settings.")
+        components.label(frame, 7, 1, str(self.train_config.noising_weight))
+        components.entry(frame, 7, 2, self.noise_ui_state, "noising_weight")
+
+        # noising bias
+        components.label(frame, 8, 0, "Noising Bias",
+                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.\nLeave empty to use global settings.")
+        components.label(frame, 8, 1, str(self.train_config.noising_bias))
+        components.entry(frame, 8, 2, self.noise_ui_state, "noising_bias")
+
+        # timestep shift
+        global_timestep_shift = "dynamic" if self.train_config.dynamic_timestep_shifting \
+            else str(self.train_config.timestep_shift)
+
+        components.label(frame, 9, 0, "Timestep Shift",
+                         tooltip="Shift the timestep distribution. Use the preview to see more details.\nThe value has no effect when dynamic timestep shifting is enabled (and the model supports dynamic shifting).\nLeave empty to use global settings.")
+        components.label(frame, 9, 1, global_timestep_shift)
+        components.entry(frame, 9, 2, self.noise_ui_state, "timestep_shift")
+
+        # timestep distribution plot
+        plot = TimestepDistributionPlot(frame, self.train_config, self.concept.noise)
+        plot.get_tk_widget().grid(row=0, column=3, rowspan=11)
+        frame.grid_rowconfigure(10, weight=1)
+
+        # plot update button
+        update_button = components.button(frame, 10, 0, "Update Preview", command=plot.update_preview)
+        update_button.grid(columnspan=3)
 
         frame.pack(fill="both", expand=1)
         return frame

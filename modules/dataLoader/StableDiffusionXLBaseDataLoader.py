@@ -55,7 +55,7 @@ class StableDiffusionXLBaseDataLoader(
             train_progress=train_progress,
             is_validation=is_validation,
         )
-        self.__dl = TrainDataLoader(self.__ds, config.batch_size, collate_bypass_keys=["config_overrides"])
+        self.__dl = TrainDataLoader(self.__ds, config.batch_size)
 
     def get_data_set(self) -> MGDS:
         return self.__ds
@@ -116,7 +116,7 @@ class StableDiffusionXLBaseDataLoader(
         sort_names = image_aggregate_names + image_split_names + [
             'prompt_1', 'tokens_1', 'text_encoder_1_hidden_state',
             'prompt_2', 'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
-            'concept', 'config_overrides'
+            'concept', 'config'
         ]
 
         if not config.train_text_encoder_or_embedding():
@@ -178,7 +178,6 @@ class StableDiffusionXLBaseDataLoader(
             'prompt_1', 'prompt_2',
             'tokens_1', 'tokens_2',
             'original_resolution', 'crop_resolution', 'crop_offset',
-            'config_overrides', # bypasses the batch collate function
         ]
 
         if config.masked_training or config.model_type.has_mask_input():

@@ -4,7 +4,6 @@ from typing import Any
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.BalancingStrategy import BalancingStrategy
 from modules.util.enum.ConceptType import ConceptType
-from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 
 class ConceptImageConfig(BaseConfig):
@@ -126,22 +125,14 @@ class ConceptTextConfig(BaseConfig):
 
 
 class ConceptNoiseConfig(BaseConfig):
-    enable_noise_override: bool
-
     offset_noise_weight: float
-    generalized_offset_noise: bool
     perturbation_noise_weight: float
 
-    enable_timestep_distribution_override: bool
-
-    timestep_distribution: TimestepDistribution
     min_noising_strength: float
     max_noising_strength: float
     noising_weight: float
     noising_bias: float
-
     timestep_shift: float
-    dynamic_timestep_shifting: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -150,22 +141,14 @@ class ConceptNoiseConfig(BaseConfig):
     def default_values():
         data = []
 
-        data.append(("enable_noise_override", False, bool, False))
+        data.append(("offset_noise_weight", None, float, True))
+        data.append(("perturbation_noise_weight", None, float, True))
 
-        data.append(("offset_noise_weight", 0.0, float, False))
-        data.append(("generalized_offset_noise", False, bool, False))
-        data.append(("perturbation_noise_weight", 0.0, float, False))
-
-        data.append(("enable_timestep_distribution_override", False, bool, False))
-
-        data.append(("timestep_distribution", TimestepDistribution.UNIFORM, TimestepDistribution, False))
-        data.append(("min_noising_strength", 0.0, float, False))
-        data.append(("max_noising_strength", 1.0, float, False))
-        data.append(("noising_weight", 0.0, float, False))
-        data.append(("noising_bias", 0.0, float, False))
-
-        data.append(("timestep_shift", 1.0, float, False))
-        data.append(("dynamic_timestep_shifting", False, bool, False))
+        data.append(("min_noising_strength", None, float, True))
+        data.append(("max_noising_strength", None, float, True))
+        data.append(("noising_weight", None, float, True))
+        data.append(("noising_bias", None, float, True))
+        data.append(("timestep_shift", None, float, True))
 
         return ConceptNoiseConfig(data)
 

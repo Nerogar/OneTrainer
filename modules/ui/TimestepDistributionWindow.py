@@ -1,6 +1,4 @@
-
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-
 from modules.util.config.ConceptConfig import ConceptNoiseConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
@@ -43,12 +41,15 @@ class TimestepGenerator(ModelSetupNoiseMixin):
 
         config = TrainConfig.default_values()
         config.timestep_distribution = self.timestep_distribution
-        config.min_noising_strength = self.min_noising_strength
-        config.max_noising_strength = self.max_noising_strength
-        config.noising_weight = self.noising_weight
-        config.noising_bias = self.noising_bias
-        config.timestep_shift = self.timestep_shift
 
+        batch_config = {
+            "min_noising_strength": self.min_noising_strength,
+            "max_noising_strength": self.max_noising_strength,
+            "noising_weight": self.noising_weight,
+            "noising_bias": self.noising_bias,
+            "timestep_shift": self.timestep_shift,
+        }
+        batch_config = {k: torch.tensor(v).unsqueeze(0) for k, v in batch_config.items()}
 
         return self._get_timestep_discrete(
             num_train_timesteps=1000,
@@ -56,109 +57,8 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             generator=generator,
             batch_size=1000000,
             config=config,
+            batch_config=batch_config,
         )
-
-
-class TimestepDistributionFrame(ctk.CTkFrame):
-    def __init__(self,
-            parent,
-            config: TrainConfig | ConceptNoiseConfig,
-            ui_state: UIState,
-            *args, **kwargs
-    ):
-        super().__init__(parent, *args, fg_color="transparent", **kwargs)
-
-        self.train_config = config
-        self.ui_state = ui_state
-        self.ax = None
-        self.canvas = None
-
-        self.__create_frame()
-
-    def __create_frame(self):
-        self.grid_columnconfigure(0, weight=0)
-        self.grid_columnconfigure(1, weight=0)
-        self.grid_columnconfigure(2, weight=0)
-        self.grid_columnconfigure(3, weight=1)
-        self.grid_rowconfigure(8, weight=1)
-
-        # timestep distribution
-        components.label(self, 0, 0, "Timestep Distribution",
-                         tooltip="Selects the function to sample timesteps during training",
-                         wide_tooltip=True)
-        components.options(self, 0, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state,
-                           "timestep_distribution")
-
-        # min noising strength
-        components.label(self, 1, 0, "Min Noising Strength",
-                         tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        components.entry(self, 1, 1, self.ui_state, "min_noising_strength")
-
-        # max noising strength
-        components.label(self, 2, 0, "Max Noising Strength",
-                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(self, 2, 1, self.ui_state, "max_noising_strength")
-
-        # noising weight
-        components.label(self, 3, 0, "Noising Weight",
-                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(self, 3, 1, self.ui_state, "noising_weight")
-
-        # noising bias
-        components.label(self, 4, 0, "Noising Bias",
-                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(self, 4, 1, self.ui_state, "noising_bias")
-
-        # timestep shift
-        components.label(self, 5, 0, "Timestep Shift",
-                         tooltip="Shift the timestep distribution. Use the preview to see more details.")
-        components.entry(self, 5, 1, self.ui_state, "timestep_shift")
-
-        # dynamic timestep shifting
-        components.label(self, 6, 0, "Dynamic Timestep Shifting",
-                         tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Dynamic Timestep Shifting is not shown in the preview.")
-        components.switch(self, 6, 1, self.ui_state, "dynamic_timestep_shifting")
-
-        # update button
-        update_button = components.button(self, 7, 0, "Update Preview", command=self.update_preview)
-        update_button.grid(columnspan=2)
-
-        # plot
-        appearance_mode = AppearanceModeTracker.get_mode()
-        background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
-        text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
-        background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
-        text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
-
-        fig, ax = plt.subplots()
-        self.ax = ax
-        self.canvas = FigureCanvasTkAgg(fig, master=self)
-        self.canvas.get_tk_widget().grid(row=0, column=3, rowspan=9)
-
-        fig.set_facecolor(background_color)
-        ax.set_facecolor(background_color)
-        ax.spines['bottom'].set_color(text_color)
-        ax.spines['left'].set_color(text_color)
-        ax.spines['top'].set_color(text_color)
-        ax.spines['right'].set_color(text_color)
-        ax.tick_params(axis='x', colors=text_color, which="both")
-        ax.tick_params(axis='y', colors=text_color, which="both")
-        ax.xaxis.label.set_color(text_color)
-        ax.yaxis.label.set_color(text_color)
-
-    def update_preview(self):
-        generator = TimestepGenerator(
-            timestep_distribution=self.train_config.timestep_distribution,
-            min_noising_strength=self.train_config.min_noising_strength,
-            max_noising_strength=self.train_config.max_noising_strength,
-            noising_weight=self.train_config.noising_weight,
-            noising_bias=self.train_config.noising_bias,
-            timestep_shift=self.train_config.timestep_shift,
-        )
-
-        self.ax.cla()
-        self.ax.hist(generator.generate(), bins=1000, range=(0, 999))
-        self.canvas.draw()
 
 
 class TimestepDistributionWindow(ctk.CTkToplevel):
@@ -175,11 +75,14 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         self.geometry("900x600")
         self.resizable(True, True)
 
+        self.config = config
+        self.ui_state = ui_state
+
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        frame = TimestepDistributionFrame(self, config, ui_state)
-        frame.grid(row=0, column=0, sticky='nsew')
 
+        frame = self.__content_frame(self)
+        frame.grid(row=0, column=0, sticky='nsew')
         components.button(self, 1, 0, "ok", self.__ok)
 
         self.wait_visibility()
@@ -187,7 +90,114 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
 
-        frame.update_preview()
+    def __content_frame(self, master):
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure(2, weight=1)
+        frame.grid_rowconfigure(7, weight=1)
+
+        # timestep distribution
+        components.label(frame, 0, 0, "Timestep Distribution",
+                         tooltip="Selects the function to sample timesteps during training",
+                         wide_tooltip=True)
+        components.options(frame, 0, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state,
+                           "timestep_distribution")
+
+        # min noising strength
+        components.label(frame, 1, 0, "Min Noising Strength",
+                         tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
+        components.entry(frame, 1, 1, self.ui_state, "min_noising_strength")
+
+        # max noising strength
+        components.label(frame, 2, 0, "Max Noising Strength",
+                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
+        components.entry(frame, 2, 1, self.ui_state, "max_noising_strength")
+
+        # noising weight
+        components.label(frame, 3, 0, "Noising Weight",
+                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
+        components.entry(frame, 3, 1, self.ui_state, "noising_weight")
+
+        # noising bias
+        components.label(frame, 4, 0, "Noising Bias",
+                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
+        components.entry(frame, 4, 1, self.ui_state, "noising_bias")
+
+        # timestep shift
+        components.label(frame, 5, 0, "Timestep Shift",
+                         tooltip="Shift the timestep distribution. Use the preview to see more details.")
+        components.entry(frame, 5, 1, self.ui_state, "timestep_shift")
+
+        # dynamic timestep shifting
+        components.label(frame, 6, 0, "Dynamic Timestep Shifting",
+                         tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Dynamic Timestep Shifting is not shown in the preview.")
+        components.switch(frame, 6, 1, self.ui_state, "dynamic_timestep_shifting")
+
+        # plot
+        plot = TimestepDistributionPlot(frame, self.config)
+        plot.get_tk_widget().grid(row=0, column=2, rowspan=8)
+        plot.update_preview()
+
+        # update button
+        update_button = components.button(frame, 7, 0, "Update Preview", command=plot.update_preview)
+        update_button.grid(columnspan=2)
+
+        frame.pack(fill="both", expand=1)
+        return frame
 
     def __ok(self):
         self.destroy()
+
+
+class TimestepDistributionPlot(FigureCanvasTkAgg):
+    def __init__(
+            self,
+            parent,
+            config: TrainConfig,
+            config_override: ConceptNoiseConfig | None = None
+    ):
+        fig, ax = plt.subplots()
+
+        super().__init__(fig, parent)
+        self.ax = ax
+        self._config = config
+        self._config_override = config_override
+
+        appearance_mode = AppearanceModeTracker.get_mode()
+        background_color = parent.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
+        text_color = parent.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
+        background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
+        text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
+
+        fig.set_facecolor(background_color)
+        ax.set_facecolor(background_color)
+        ax.spines['bottom'].set_color(text_color)
+        ax.spines['left'].set_color(text_color)
+        ax.spines['top'].set_color(text_color)
+        ax.spines['right'].set_color(text_color)
+        ax.tick_params(axis='x', colors=text_color, which="both")
+        ax.tick_params(axis='y', colors=text_color, which="both")
+        ax.xaxis.label.set_color(text_color)
+        ax.yaxis.label.set_color(text_color)
+
+    def update_preview(self):
+        generator = TimestepGenerator(
+            timestep_distribution=self._config.timestep_distribution,
+            min_noising_strength=self.__get_config_value('min_noising_strength'),
+            max_noising_strength=self.__get_config_value('max_noising_strength'),
+            noising_weight=self.__get_config_value('noising_weight'),
+            noising_bias=self.__get_config_value('noising_bias'),
+            timestep_shift=self.__get_config_value('timestep_shift'),
+        )
+
+        self.ax.cla()
+        self.ax.hist(generator.generate(), bins=1000, range=(0, 999))
+        self.draw()
+
+    def __get_config_value(self, attr: str):
+        if self._config_override is not None:
+            value = getattr(self._config_override, attr)
+            if value is not None:
+                return value
+        return getattr(self._config, attr)

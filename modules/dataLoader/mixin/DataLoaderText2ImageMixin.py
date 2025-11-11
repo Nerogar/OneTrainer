@@ -1,10 +1,8 @@
 import re
 from collections.abc import Callable
 
-from modules.dataLoader.mixin.ConceptConfigOverride import ConceptConfigOverride
-from modules.dataLoader.mixin.FileConfigOverride import FileConfigOverride
-
 import modules.util.multi_gpu_util as multi
+from modules.dataLoader.mixin.PrepareBatchConfig import ConceptConfigOverride, FileConfigOverride, PrepareBatchConfig
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
@@ -126,6 +124,8 @@ class DataLoaderText2ImageMixin:
         })
         sample_config_override = FileConfigOverride(file_config_in_name='per_sample_config', config_overrides_name='config_overrides')
 
+        prepare_batch_config = PrepareBatchConfig(config, config_overrides_in_name='config_overrides', config_out_name='config')
+
         # build module list
         modules = [load_image, load_video]
 
@@ -134,7 +134,7 @@ class DataLoaderText2ImageMixin:
 
         modules.extend([
             load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text,
-            load_sample_config_json, select_sample_config_input, sample_config_override,
+            load_sample_config_json, select_sample_config_input, sample_config_override, prepare_batch_config,
         ])
 
         if config.masked_training:
@@ -287,11 +287,12 @@ class DataLoaderText2ImageMixin:
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
-        sort_names = output_names + ['concept']
+        sort_names = output_names + ['concept', 'config']
 
         output_names = output_names + [
             ('concept.loss_weight', 'loss_weight'),
             ('concept.type', 'concept_type'),
+            'config',
         ]
 
         if config.validation:
