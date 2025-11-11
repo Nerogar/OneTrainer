@@ -131,10 +131,10 @@ class BaseQwenSetup(
             latent_input = scaled_noisy_latent_image
             packed_latent_input = model.pack_latents(latent_input)
 
-            txt_seq_lens = text_attention_mask.sum(dim=1).tolist()
             #FIXME this is the only case that the transformer accepts:
             #see https://github.com/huggingface/diffusers/issues/12344
-            assert max(txt_seq_lens) == text_encoder_output.shape[1]
+            #actual text sequence lengths can be shorter,but they might be padded and masked
+            txt_seq_lens = [text_encoder_output.shape[1]] * text_encoder_output.shape[0]
 
             #FIXME list of lists is not according to type hint, but according to diffusers code:
             #https://github.com/huggingface/diffusers/issues/12295
@@ -250,5 +250,5 @@ class BaseQwenSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()
