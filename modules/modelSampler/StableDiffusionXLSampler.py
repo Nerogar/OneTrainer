@@ -135,7 +135,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
 
             # Apply Generalized Offset Noise if enabled
             if generalized_offset_noise and offset_noise_weight > 0:
-                offset_noise_shape = (latent_image.shape[0], 1, 1, 1)
+                offset_noise_shape = (latent_image.shape[0], latent_image.shape[1], 1, 1)
                 offset_noise = torch.randn(
                     offset_noise_shape,
                     generator=generator,
