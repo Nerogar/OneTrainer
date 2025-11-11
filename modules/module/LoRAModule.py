@@ -8,7 +8,7 @@ from typing import Any
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.ModuleFilter import ModuleFilter
-from modules.util.oft_utils import OFTRotationModule
+from modules.module.oft_utils import OFTRotationModule
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
 import torch
