@@ -1,6 +1,5 @@
 import copy
 import math
-import warnings
 from abc import abstractmethod
 from collections.abc import Mapping
 from typing import Any
@@ -401,10 +400,7 @@ class OFTModule(PeftBase):
         if in_features % oft_block_size != 0 or oft_block_size > in_features:
             old_oft_block_size = oft_block_size
             oft_block_size = self.adjust_oft_parameters(in_features, oft_block_size)
-            warnings.warn(
-                f"Invalid OFT Block Size ({old_oft_block_size}) for layer {self.prefix}! Adjusted OFT Block Size to ({oft_block_size}).",
-                stacklevel=2,
-                )
+            print(f"Invalid OFT Block Size ({old_oft_block_size}) for layer {self.prefix}! Adjusted OFT Block Size to ({oft_block_size}).")
 
         # Calculate the number of blocks 'r'
         r = in_features // oft_block_size
