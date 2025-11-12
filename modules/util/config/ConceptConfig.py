@@ -124,7 +124,7 @@ class ConceptTextConfig(BaseConfig):
         return ConceptTextConfig(data)
 
 
-class ConceptNoiseConfig(BaseConfig):
+class ConceptOverridesConfig(BaseConfig):
     offset_noise_weight: float
     perturbation_noise_weight: float
 
@@ -150,7 +150,7 @@ class ConceptNoiseConfig(BaseConfig):
         data.append(("noising_bias", None, float, True))
         data.append(("timestep_shift", None, float, True))
 
-        return ConceptNoiseConfig(data)
+        return ConceptOverridesConfig(data)
 
 
 class ConceptConfig(BaseConfig):
@@ -164,13 +164,11 @@ class ConceptConfig(BaseConfig):
     text_variations: int
     repeats: float
     loss_weight: float
-    per_sample_config_source: str
-    per_sample_config_key: str
     concept_stats: dict
 
     image: ConceptImageConfig
     text: ConceptTextConfig
-    noise: ConceptNoiseConfig
+    overrides: ConceptOverridesConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
@@ -206,7 +204,7 @@ class ConceptConfig(BaseConfig):
         as_dict = super().to_dict()
         as_dict['image'] = self.image.to_dict()
         as_dict['text'] = self.text.to_dict()
-        as_dict['noise'] = self.noise.to_dict()
+        as_dict['overrides'] = self.overrides.to_dict()
         return as_dict
 
     @staticmethod
@@ -215,7 +213,7 @@ class ConceptConfig(BaseConfig):
 
         data.append(("image", ConceptImageConfig.default_values(), ConceptImageConfig, False))
         data.append(("text", ConceptTextConfig.default_values(), ConceptTextConfig, False))
-        data.append(("noise", ConceptNoiseConfig.default_values(), ConceptNoiseConfig, False))
+        data.append(("overrides", ConceptOverridesConfig.default_values(), ConceptOverridesConfig, False))
 
         data.append(("name", "", str, False))
         data.append(("path", "", str, False))
@@ -228,8 +226,6 @@ class ConceptConfig(BaseConfig):
         data.append(("balancing", 1.0, float, False))
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
-        data.append(("per_sample_config_source", "disabled", str, False))
-        data.append(("per_sample_config_key", "", str, False))
         data.append(("concept_stats", {}, dict, False))
 
         return ConceptConfig(data)

@@ -1,5 +1,5 @@
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.util.config.ConceptConfig import ConceptNoiseConfig
+from modules.util.config.ConceptConfig import ConceptOverridesConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.ui import components
@@ -155,14 +155,14 @@ class TimestepDistributionPlot(FigureCanvasTkAgg):
             self,
             parent,
             config: TrainConfig,
-            config_override: ConceptNoiseConfig | None = None
+            config_overrides: ConceptOverridesConfig | None = None
     ):
         fig, ax = plt.subplots()
 
         super().__init__(fig, parent)
         self.ax = ax
         self._config = config
-        self._config_override = config_override
+        self._config_overrides = config_overrides
 
         appearance_mode = AppearanceModeTracker.get_mode()
         background_color = parent.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
@@ -196,8 +196,8 @@ class TimestepDistributionPlot(FigureCanvasTkAgg):
         self.draw()
 
     def __get_config_value(self, attr: str):
-        if self._config_override is not None:
-            value = getattr(self._config_override, attr)
+        if self._config_overrides is not None:
+            value = getattr(self._config_overrides, attr)
             if value is not None:
                 return value
         return getattr(self._config, attr)

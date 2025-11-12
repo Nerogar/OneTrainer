@@ -116,7 +116,7 @@ class StableDiffusionXLBaseDataLoader(
         sort_names = image_aggregate_names + image_split_names + [
             'prompt_1', 'tokens_1', 'text_encoder_1_hidden_state',
             'prompt_2', 'tokens_2', 'text_encoder_2_hidden_state', 'text_encoder_2_pooled_state',
-            'concept', 'config'
+            'concept'
         ]
 
         if not config.train_text_encoder_or_embedding():

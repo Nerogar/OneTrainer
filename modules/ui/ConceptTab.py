@@ -175,7 +175,7 @@ class ConceptWidget(ctk.CTkFrame):
         self.ui_state = UIState(self, concept)
         self.image_ui_state = UIState(self, concept.image)
         self.text_ui_state = UIState(self, concept.text)
-        self.noise_ui_state = UIState(self, concept.noise)
+        self.overrides_ui_state = UIState(self, concept.overrides)
         self.i = i
 
         self.grid_rowconfigure(1, weight=1)
@@ -227,7 +227,7 @@ class ConceptWidget(ctk.CTkFrame):
 
         image_label.bind(
             "<Button-1>",
-            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state, self.noise_ui_state))
+            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state, self.overrides_ui_state))
         )
 
     def __randomize_seed(self, concept: ConceptConfig):
