@@ -1,6 +1,7 @@
 import copy
 import math
 from abc import abstractmethod
+from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
@@ -341,6 +342,7 @@ class OFTModule(PeftBase):
     coft_eps: float
     block_share: bool
     dropout_probability: float
+    adjustment_info: tuple[int, int] | None # for reporting
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
         super().__init__(prefix, orig_module)
@@ -351,6 +353,7 @@ class OFTModule(PeftBase):
         self.block_share = block_share
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
+        self.adjustment_info = None
 
 
         if orig_module is not None:
@@ -396,7 +399,7 @@ class OFTModule(PeftBase):
         if in_features % oft_block_size != 0 or oft_block_size > in_features:
             old_oft_block_size = oft_block_size
             oft_block_size = self.adjust_oft_parameters(in_features, oft_block_size)
-            print(f"Invalid OFT Block Size ({old_oft_block_size}) for layer {self.prefix}! Adjusted OFT Block Size to ({oft_block_size}).")
+            self.adjustment_info = (old_oft_block_size, oft_block_size)
 
         # Calculate the number of blocks 'r'
         r = in_features // oft_block_size
@@ -637,16 +640,35 @@ class LoRAModuleWrapper:
         selected = []
         deselected = []
         unsuitable = []
+        oft_adjustments = []
 
         for name, child_module in orig_module.named_modules():
             if not isinstance(child_module, Linear | Conv2d):
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                lora_module = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                lora_modules[name] = lora_module
+                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
+                    old, new = lora_module.adjustment_info
+                    oft_adjustments.append({'old': old, 'new': new})
                 selected.append(name)
             else:
                 deselected.append(name)
+
+        if oft_adjustments:
+            summary = defaultdict(int)
+            for adj in oft_adjustments:
+                summary[(adj['old'], adj['new'])] += 1
+
+            sorted_summary = sorted(summary.items(), key=lambda item: (item[0][0], item[0][1]))
+
+            summary_lines = [
+                f"  - {count} layer{'s' if count > 1 else ''} from {old} to {new}"
+                for (old, new), count in sorted_summary
+            ]
+            print(f"OFT Block Size automatically adjusted for {len(oft_adjustments)} layers. Changes:")
+            print("\n".join(summary_lines))
 
         if len(self.module_filters) > 0:
             if config.debug_mode:
