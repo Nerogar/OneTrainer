@@ -259,7 +259,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         weights *= linspace_derivative
 
         if num_timestep != num_train_timesteps:
-            weights_padded = torch.zeros((num_train_timesteps,), dtype=torch.float64)
+            weights_padded = torch.zeros(num_train_timesteps, dtype=torch.float64)
             weights_padded[min_timestep:max_timestep] = weights
             weights = weights_padded
 

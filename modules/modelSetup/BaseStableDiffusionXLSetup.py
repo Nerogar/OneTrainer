@@ -242,16 +242,6 @@ class BaseStableDiffusionXLSetup(
                 model.noise_scheduler.betas,
             )
 
-            # debug: print per-sample settings for noise and timestep distribution
-            if config.debug_mode:
-                print()
-                print("Sample Config:")
-                for i, path in enumerate(batch['image_path']):
-                    print(f"[{i}] {path}")
-                for k, v in batch["config"].items():
-                    print(f"  {k:27} = {v.tolist()}")
-                print(f"timesteps: {timestep.tolist()}")
-
             scaled_noisy_latent_image = self._add_noise_discrete(
                 scaled_latent_image,
                 latent_noise,

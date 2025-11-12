@@ -295,7 +295,7 @@ class BaseStableDiffusion3Setup(
                 scaled_latent_conditioning_image = \
                     (batch['latent_conditioning_image'] - vae_shift_factor) * vae_scaling_factor
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, batch['config'], generator)
 
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
@@ -303,6 +303,7 @@ class BaseStableDiffusion3Setup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                batch['config'],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
