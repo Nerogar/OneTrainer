@@ -146,7 +146,8 @@ def _register():
                                                         dropout_p: float = 0.0,
                                                         is_causal: bool = False,
                                                         scale: float | None = None,
-                                                        enable_gqa: bool = False):
+                                                        enable_gqa: bool = False,
+                                                        _fallback_sdpa = _scaled_dot_product_attention):
             if can_use_flash_attn(query, key, value, attn_mask, is_causal, enable_gqa):
                 # transpose(1,2) is equivalent to permute(0,2,1,3) for (B,H,L,D) -> (B,L,H,D)
                 q = query.transpose(1, 2)
@@ -161,7 +162,7 @@ def _register():
                 return out.transpose(1, 2)
 
             # Fallback
-            return _scaled_dot_product_attention(
+            return _fallback_sdpa(
                 query=query, key=key, value=value,
                 attn_mask=attn_mask, dropout_p=dropout_p,
                 is_causal=is_causal, scale=scale, enable_gqa=enable_gqa)

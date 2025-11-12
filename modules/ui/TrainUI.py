@@ -29,6 +29,7 @@ from modules.ui.TopBar import TopBar
 from modules.ui.TrainingTab import TrainingTab
 from modules.ui.VideoToolUI import VideoToolUI
 from modules.util import create
+from modules.util.attn.flash_attn_win import disable_flash_attn_win, enable_flash_attn_win
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -133,6 +134,7 @@ class TrainUI(ctk.CTk):
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
         self._check_start_always_on_tensorboard()
+        self._flash_attn_fallback_toggle()
 
         self.workspace_dir_trace_id = self.ui_state.add_var_trace("workspace_dir", self._on_workspace_dir_change_trace)
 
@@ -334,6 +336,10 @@ class TrainUI(ctk.CTk):
         components.label(frame, 16, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
         components.entry(frame, 16, 1, self.ui_state, "temp_device")
+
+        components.label(frame, 17, 0, "Use Flash-Attention Fallback",
+                         tooltip="Enables Flash-Attention fallback on Windows if native support is not available in PyTorch for a performance improvement during training/sampling.")
+        components.switch(frame, 17, 1, self.ui_state, "use_flash_attn_fallback", command=self._flash_attn_fallback_toggle)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -913,3 +919,9 @@ class TrainUI(ctk.CTk):
 
     def _set_training_button_stopping(self):
         self._set_training_button_style("stopping")
+
+    def _flash_attn_fallback_toggle(self):
+        if self.train_config.use_flash_attn_fallback:
+            enable_flash_attn_win()
+        else:
+            disable_flash_attn_win()
