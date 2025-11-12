@@ -13,19 +13,21 @@ import torch.nn.functional as F
 from diffusers.utils import is_flash_attn_available
 
 ALLOWED_TYPES = {torch.float16, torch.bfloat16}
-SUPPORTED_DEVICES = {}
+SUPPORTED_DEVICES = []
+
+if torch.cuda.is_available():
+    device_count = torch.cuda.device_count()
+    SUPPORTED_DEVICES = [False] * device_count
+    for i in range(device_count):
+        SUPPORTED_DEVICES[i] = torch.cuda.get_device_properties(i).major >= 8
+
 
 def is_supported_hardware(device: torch.device) -> bool:
     """
     Check if the given device supports Flash Attention based on its compute capability.
     """
     # FlashAttention-2 only supports Ampere (sm_80) and newer GPUs
-    index = device.index
-    supported = SUPPORTED_DEVICES.get(index)
-    if supported is None:
-        supported = torch.cuda.get_device_properties(index).major >= 8
-        SUPPORTED_DEVICES[index] = supported
-    return supported
+    return SUPPORTED_DEVICES[device.index]
 
 
 def can_use_flash_attn(query: torch.Tensor,
@@ -99,11 +101,14 @@ def can_use_flash_attn(query: torch.Tensor,
 
     return True
 
+
 _scaled_dot_product_attention = None
+
 
 def enable_flash_attn_win():
     """Enable Flash Attention fallback on Windows."""
     _register()
+
 
 def disable_flash_attn_win():
     """Disable Flash Attention fallback on Windows."""
@@ -111,6 +116,7 @@ def disable_flash_attn_win():
     if _scaled_dot_product_attention is not None:
         F.scaled_dot_product_attention = _scaled_dot_product_attention
         _scaled_dot_product_attention = None
+
 
 def supports_flash_attention_in_sdp():
     """Check if Flash Attention is natively supported in scaled_dot_product."""
