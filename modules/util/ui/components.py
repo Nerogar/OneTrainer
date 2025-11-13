@@ -369,7 +369,7 @@ def entry(
         tooltip: str = "",
         wide_tooltip: bool = False,
         width: int = 140,
-        sticky: str = "new",
+        sticky: str = "ew",
         custom_validator: Callable[[str], ValidationResult] | None = None,
         validation_state: ValidationState = None,
         enable_hover_validation: bool = False,
@@ -462,7 +462,7 @@ def path_entry(
         sticky: str = "new",
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky=sticky)
+    frame.grid(row=row, column=column, padx=1, pady=1, sticky=sticky)
     frame.grid_columnconfigure(0, weight=1)
 
     if not is_output:

@@ -13,6 +13,7 @@ from pathlib import Path
 from tkinter import filedialog
 
 import scripts.generate_debug_report
+from modules.ui import GeneralTab
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.CloudTab import CloudTab
@@ -31,7 +32,6 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
-from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TensorboardMode import TensorboardMode
@@ -55,6 +55,39 @@ if platform.system() == "Windows":
     with suppress(Exception):
         # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+
+class WindowSizeNotifier:
+    def __init__(self, window, size_dict):
+        self.window = window
+        self.size_dict = size_dict
+        self.current_breakpoint = None
+        self.window.bind('<Configure>', self.check_size)
+        # set min size based on smallest breakpoint
+        min_breakpoint = min(self.size_dict.keys(), key=lambda x: x if isinstance(x, int) else x[0])
+        min_width = min_breakpoint if isinstance(min_breakpoint, int) else min_breakpoint[0]
+        min_height = min_breakpoint[1] if isinstance(min_breakpoint, tuple) else 100
+        self.window.minsize(min_width, min_height)
+
+    def check_size(self, event):
+        if event.widget == self.window:
+
+            # Temporary debug print
+            print(f"Window size: {event.width}x{event.height}")
+            # Check for breakpoints with height requirement
+            for bp in self.size_dict:
+                if isinstance(bp, tuple):
+                    if event.width >= bp[0] and event.height >= bp[1]:
+                        if bp != self.current_breakpoint:
+                            self.current_breakpoint = bp
+                            self.size_dict[bp]()
+                        return
+
+            # Check for width-only breakpoints
+            breakpoint = max((bp for bp in self.size_dict if isinstance(bp, int) and event.width >= bp), default=None)
+            if breakpoint != self.current_breakpoint and breakpoint is not None:
+                self.current_breakpoint = breakpoint
+                self.size_dict[breakpoint]()
+
 
 class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
     set_step_progress: Callable[[int, int], None]
@@ -108,9 +141,9 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.train_config = TrainConfig.default_values()
         self.ui_state = UIState(self, self.train_config)
 
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=0)
+        self.grid_rowconfigure(0, weight=0) # top bar
+        self.grid_rowconfigure(1, weight=1) # central content frame
+        self.grid_rowconfigure(2, weight=0) # bottom bar
         self.grid_columnconfigure(0, weight=1)
 
         self.status_label = None
@@ -249,223 +282,35 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
         return frame
 
-    def _create_section(self, parent, row, column, title, columnspan=1, padx=(10, 5), pady=(10, 5), **grid_kwargs):
-        """Helper to create a labeled section frame"""
-        section = ctk.CTkFrame(parent, corner_radius=6)
-        section.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=padx, pady=pady, **grid_kwargs)
-        section.grid_columnconfigure(0, weight=0)
-        section.grid_columnconfigure(1, weight=0)
-        section.grid_columnconfigure(2, weight=1)
+    def _reset_layout(self):
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
 
-        if title:
-            components.label(section, 0, 0, title, font=("", 14, "bold"), pad=(10, 5))
+        for col in range(10):
+            self.scrollable_frame.grid_columnconfigure(col, weight=0, minsize=0, uniform='')
 
+        for row in range(10):
+            self.scrollable_frame.grid_rowconfigure(row, weight=0, minsize=0)
+
+    def _create_section(self, parent, title):
+        """Create a section frame with title label"""
+        section = ctk.CTkFrame(parent)
+
+        title_label = ctk.CTkLabel(section, text=title, font=ctk.CTkFont(weight="bold", size=14))
+        title_label.grid(row=0, column=0, sticky='w', padx=10, pady=(10, 5))
         return section
 
     def create_general_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=1, minsize=400)
-        frame.grid_columnconfigure(1, weight=1, minsize=400)
+        self.scrollable_frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        self.scrollable_frame.pack(fill="both", expand=1)
 
-        # Left column
-        general_section = self._create_section(frame, 0, 0, None)
-        components.label(general_section, 0, 0, "Main", font=("", 16, "bold"), pad=(10, 5))
+        WindowSizeNotifier(self, {
+            # 1400: lambda: GeneralTab.create_large_layout(self),
+            1100: lambda: GeneralTab.create_regular_layout(self),
+            890: lambda: GeneralTab.create_small_layout(self),
+        })
 
-        # Main settings with list comprehension for clarity
-        main_settings = [
-            (1, "Workspace Directory", "workspace_dir", "The directory where all files of this training run are saved"),
-            (2, "Cache Directory", "cache_dir", "The directory where cached data is saved"),
-        ]
-
-        for row, label_text, var_name, tooltip in main_settings:
-            components.label(general_section, row, 0, label_text, tooltip=tooltip, pad=(10, 5))
-            components.path_entry(general_section, row, 1, self.ui_state, var_name, is_output=True,
-                                path_type="directory", sticky="ew")
-
-        # Switches in a more compact way
-        switches_frame = ctk.CTkFrame(general_section, fg_color="transparent")
-        switches_frame.grid(row=3, column=0, columnspan=2, sticky="w", pady=(0, 5))
-        switches_frame.grid_columnconfigure(0, weight=0)
-        switches_frame.grid_columnconfigure(2, weight=0)
-
-        switch_configs = [
-            (0, "continue_last_backup", "Continue last backup",
-            "Automatically continues training from the last backup saved in <workspace>/backup"),
-            (2, "only_cache", "Only Cache",
-            "Only populate the cache, without any training"),
-        ]
-
-        for col, var_name, label, tooltip in switch_configs:
-            components.labeled_switch(switches_frame, 0, col, self.ui_state, var_name,
-                                    label_text=label, tooltip=tooltip, layout="row")
-
-        # Debugging section
-        components.label(general_section, 4, 0, "Debugging", font=("", 14, "bold"), pad=(10, 5))
-        components.label(general_section, 5, 0, "Debug mode",
-                        tooltip="Save debug information during the training into the debug directory", pad=(10, 5))
-        components.switch(general_section, 5, 1, self.ui_state, "debug_mode")
-        components.label(general_section, 6, 0, "Debug Directory",
-                        tooltip="The directory where debug data is saved", pad=(10, 5))
-        components.path_entry(general_section, 6, 1, self.ui_state, "debug_dir", is_output=True, path_type="directory")
-
-        # Tensorboard section
-        self._create_tensorboard_section(general_section)
-
-        # Right column
-        right_container = ctk.CTkFrame(frame, fg_color="transparent")
-        right_container.grid(row=0, column=1, sticky="new", padx=(5, 10), pady=(10, 5))
-        right_container.grid_columnconfigure(0, weight=1)
-
-        self._create_validation_and_device_sections(right_container)
-        self._create_multi_gpu_section(right_container)
-        self._create_input_validation_section(right_container)
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def _create_tensorboard_section(self, parent):
-        """Extract tensorboard section creation"""
-        components.label(parent, 7, 0, "Tensorboard", font=("", 14, "bold"), pad=(10, 5))
-        components.label(parent, 8, 0, "Tensorboard Mode",
-                        tooltip="Off: Disabled.\nTrain Only: Active only during training.\nAlways On: Always available.",
-                        pad=(10, 5))
-        components.options_kv(parent, 8, 1, [
-            ("Off", TensorboardMode.OFF),
-            ("Train only", TensorboardMode.TRAIN_ONLY),
-            ("Always on", TensorboardMode.ALWAYS_ON),
-        ], self.ui_state, "tensorboard_mode", width=100, sticky="nw")
-
-        components.label(parent, 9, 0, "Tensorboard Port",
-                        tooltip="Port to use for Tensorboard link", pad=(10, 5))
-        components.entry(parent, 9, 1, self.ui_state, "tensorboard_port", width=50, sticky="nw")
-
-        components.label(parent, 10, 0, "Expose Tensorboard",
-                        tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)",
-                        pad=(10, 5))
-        components.switch(parent, 10, 1, self.ui_state, "tensorboard_expose")
-
-    def _create_validation_and_device_sections(self, parent):
-        """Extract validation and device settings sections"""
-        settings_container = ctk.CTkFrame(parent, corner_radius=6, fg_color="transparent")
-        settings_container.grid(row=0, column=0, sticky="ew", pady=(0, 5))
-        settings_container.grid_columnconfigure(0, weight=1)
-        settings_container.grid_columnconfigure(1, weight=1)
-
-        # Validation Loss
-        validation_section = self._create_section(settings_container, 0, 0, "Validation Loss", padx=(0, 0), pady=(0, 0))
-        components.label(validation_section, 1, 0, "Enable",
-                        tooltip="Enable validation loss and add new graph in tensorboard", pad=(10, 5))
-        components.switch(validation_section, 1, 1, self.ui_state, "validation")
-        components.label(validation_section, 2, 0, "Validate after",
-                        tooltip="The interval used when validate training", pad=(10, 5))
-        components.time_entry(validation_section, 2, 1, self.ui_state, "validate_after", "validate_after_unit",
-                            width=60, unit_width=90, sticky="nw")
-
-        # Device Settings
-        device_section = self._create_section(settings_container, 0, 1, "Device Settings", padx=(5, 0), pady=(0, 0))
-
-        device_settings = [
-            (1, "Dataloader Threads", "dataloader_threads", 36,
-            "Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching."),
-            (2, "Train Device", "train_device", 66,
-            'The device used for training. Can be "cuda", "cuda:0", "cuda:1" etc. Default:"cuda". Must be "cuda" for multi-GPU training.'),
-            (3, "Temp Device", "temp_device", 66,
-            'The device used to temporarily offload models while they are not used. Default:"cpu"'),
-        ]
-
-        for row, label_text, var_name, width, tooltip in device_settings:
-            components.label(device_section, row, 0, label_text, tooltip=tooltip, pad=(10, 5))
-            components.entry(device_section, row, 1, self.ui_state, var_name, width=width, sticky="nw")
-
-    def _create_multi_gpu_section(self, parent):
-        """Extract multi-GPU section creation"""
-        self.multi_gpu_section = self._create_section(parent, 1, 0, "Multi-GPU", padx=(0, 0), pady=(0, 0))
-
-        components.label(self.multi_gpu_section, 1, 0, "Enable Multi-GPU",
-                        tooltip="Enable multi-GPU training. Only intended for if you have multiple supported and identical devices.",
-                        pad=(10, 5))
-        components.switch(self.multi_gpu_section, 1, 1, self.ui_state, "multi_gpu")
-
-        self.multi_gpu_details_frame = ctk.CTkFrame(self.multi_gpu_section, fg_color="transparent")
-        self.multi_gpu_details_frame.grid(row=2, column=0, columnspan=3, sticky="ew")
-        self.multi_gpu_details_frame.grid_columnconfigure(0, weight=0)
-        self.multi_gpu_details_frame.grid_columnconfigure(1, weight=0)
-        self.multi_gpu_details_frame.grid_columnconfigure(2, weight=1)
-
-        # Device Indexes and settings
-        components.label(self.multi_gpu_details_frame, 0, 0, "Device Indexes",
-                        tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.",
-                        pad=(10, 5))
-        components.entry(self.multi_gpu_details_frame, 0, 1, self.ui_state, "device_indexes", sticky="nw", width=250)
-
-        components.label(self.multi_gpu_details_frame, 1, 0, "Sequential model setup",
-                        tooltip="Multi-GPU: If enabled, loading and setting up the model is done for each GPU one after the other. This is slower, but can reduce peak RAM usage.",
-                        pad=(10, 5))
-        components.switch(self.multi_gpu_details_frame, 1, 1, self.ui_state, "sequential_model_setup")
-
-        components.label(self.multi_gpu_details_frame, 2, 0, "Gradient Reduce Precision",
-                        tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
-                                "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
-                                "FLOAT_32: Reduce gradients in float32\n"
-                                "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
-                        wide_tooltip=True, pad=(10, 5))
-        components.options(self.multi_gpu_details_frame, 2, 1, [str(x) for x in list(GradientReducePrecision)],
-                        self.ui_state, "gradient_reduce_precision", width=250, sticky="nw")
-
-        # Gradient switches
-        gradient_switches_frame = ctk.CTkFrame(self.multi_gpu_details_frame, fg_color="transparent")
-        gradient_switches_frame.grid(row=3, column=0, columnspan=3, sticky="w", pady=(0, 5))
-        gradient_switches_frame.grid_columnconfigure(0, weight=0)
-        gradient_switches_frame.grid_columnconfigure(2, weight=0)
-
-        components.labeled_switch(gradient_switches_frame, 0, 0, self.ui_state, "fused_gradient_reduce",
-                                label_text="Fused Gradient Reduce",
-                                tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce",
-                                layout="row")
-        components.labeled_switch(gradient_switches_frame, 0, 2, self.ui_state, "async_gradient_reduce",
-                                label_text="Async Gradient Reduce",
-                                tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.",
-                                layout="row")
-
-        components.label(self.multi_gpu_details_frame, 4, 0, "Buffer size (MB)",
-                        tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"",
-                        pad=(10, 5))
-        components.entry(self.multi_gpu_details_frame, 4, 1, self.ui_state, "async_gradient_reduce_buffer",
-                        sticky="nw", width=70)
-
-        self.multi_gpu_trace_id = self.ui_state.add_var_trace("multi_gpu", lambda: self._toggle_multi_gpu_details())
-        self._toggle_multi_gpu_details()
-
-    def _create_input_validation_section(self, parent):
-        """Extract input validation section creation"""
-        validation_section = self._create_section(parent, 2, 0, "Input Validation", padx=(0, 0), pady=(5, 0))
-
-        validation_settings = [
-            (1, "Auto-correct Input", "validation_auto_correct",
-            "Automatically correct file paths and extensions where possible"),
-            (2, "Show Validation Tooltips", "validation_show_tooltips",
-            "Show tooltips with validation messages for errors and warnings"),
-            (3, "Use Friendly Names", "use_friendly_names",
-            "Use friendly names instead of timestamps for auto-corrected/generated filenames"),
-            (4, "Prevent Overwrite", "prevent_overwrite",
-            "Automatically append a number or word to filenames that would overwrite existing files (requires Auto-correct Input)"),
-            (5, "Auto-prefix", "auto_prefix",
-            "Automatically prefix manually-entered filenames with the Save Filename Prefix (requires Auto-correct Input)"),
-        ]
-
-        for row, label_text, var_name, tooltip in validation_settings:
-            components.label(validation_section, row, 0, label_text, tooltip=tooltip, pad=(10, 5))
-            components.switch(validation_section, row, 1, self.ui_state, var_name)
-
-    def _toggle_multi_gpu_details(self):
-        # Use after_idle to batch the geometry update and reduce lag
-        def do_toggle():
-            if self.train_config.multi_gpu:
-                self.multi_gpu_details_frame.grid()
-            else:
-                self.multi_gpu_details_frame.grid_remove()
-
-        self.after_idle(do_toggle)
+        return self.scrollable_frame
 
     def create_model_tab(self, master):
         return ModelTab(master, self.train_config, self.ui_state)
@@ -597,53 +442,6 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         components.label(frame, 5, 0, "Save Filename Prefix",
                          tooltip="The prefix for filenames used when saving the model during training")
         components.entry(frame, 5, 1, self.ui_state, "save_filename_prefix")
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def lora_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
-
-        # lora model name
-        components.label(frame, 0, 0, "LoRA base model",
-                         tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.path_entry(
-            frame, 0, 1, self.ui_state, "lora_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # lora rank
-        components.label(frame, 1, 0, "LoRA rank",
-                         tooltip="The rank parameter used when creating a new LoRA")
-        components.entry(frame, 1, 1, self.ui_state, "lora_rank")
-
-        # lora rank
-        components.label(frame, 2, 0, "LoRA alpha",
-                         tooltip="The alpha parameter used when creating a new LoRA")
-        components.entry(frame, 2, 1, self.ui_state, "lora_alpha")
-
-        # Dropout Percentage
-        components.label(frame, 3, 0, "Dropout Probability",
-                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
-
-        # lora weight dtype
-        components.label(frame, 4, 0, "LoRA Weight Data Type",
-                         tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "lora_weight_dtype")
-
-        # For use with additional embeddings.
-        components.label(frame, 5, 0, "Bundle Embeddings",
-                         tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
-        components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -855,7 +653,6 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         except Exception as e:
             traceback.print_exc()
             self.on_update_status(f"Error generating debug package: {e}")
-
 
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
