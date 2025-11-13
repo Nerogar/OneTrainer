@@ -99,6 +99,11 @@ class ToolTip:
             y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
 
             self.tw.update_idletasks()
+
+            # Check again after update_idletasks in case tooltip was destroyed
+            if not self.tw or not self.tw.winfo_exists():
+                return
+
             tip_width = self.tw.winfo_reqwidth()
             tip_height = self.tw.winfo_reqheight()
             screen_width = self.widget.winfo_screenwidth()
@@ -111,7 +116,9 @@ class ToolTip:
 
             y = max(10, y)
 
-        self.tw.wm_geometry(f"+{x}+{y}")
+        # Final check before setting geometry
+        if self.tw and self.tw.winfo_exists():
+            self.tw.wm_geometry(f"+{x}+{y}")
 
     def _on_move(self, _evt=None):
         if self.tw and self.tw.winfo_exists():

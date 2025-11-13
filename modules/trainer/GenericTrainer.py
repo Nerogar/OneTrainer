@@ -28,7 +28,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.memory_util import TorchMemoryRecorder
+from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
 from modules.util.tensorboard_util import get_tensorboard_run_name
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -120,6 +120,7 @@ class GenericTrainer(BaseTrainer):
                 )
 
         self.callbacks.on_update_status("loading the model")
+
         self.model = self.model_loader.load(
             model_type=self.config.model_type,
             model_names=model_names,
@@ -620,10 +621,11 @@ class GenericTrainer(BaseTrainer):
         has_gradient = False
 
         lr_scheduler = None
-        accumulated_loss = 0.0
+        accumulated_loss = torch.tensor(0.0, device=train_device)
         ema_loss = None
         ema_loss_steps = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
+
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
             self.callbacks.on_update_status("Starting epoch/caching")
 
@@ -712,7 +714,7 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("Training ...")
 
-                with TorchMemoryRecorder(enabled=False):
+                with TorchMemoryRecorder(enabled=False), TorchProfiler(enabled=False, filename=f"step{train_progress.global_step}.json"):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
 
@@ -744,7 +746,7 @@ class GenericTrainer(BaseTrainer):
                     has_gradient = True
                     detached_loss = loss.detach()
                     multi.reduce_tensor_mean(detached_loss)
-                    accumulated_loss += detached_loss.item()
+                    accumulated_loss += detached_loss
 
                     if self.__is_update_step(train_progress):
                         if self.config.fused_gradient_reduce:
@@ -775,13 +777,14 @@ class GenericTrainer(BaseTrainer):
                                 self.model, self.config, lr_scheduler, self.tensorboard
                             )
 
-                            self.tensorboard.add_scalar("loss/train_step", accumulated_loss, train_progress.global_step)
-                            ema_loss = ema_loss or accumulated_loss
+                            accumulated_loss_cpu = accumulated_loss.item()
+                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
+                            ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1
                             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
-                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss * (1 - ema_loss_decay))
+                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss_cpu * (1 - ema_loss_decay))
                             step_tqdm.set_postfix({
-                                'loss': accumulated_loss,
+                                'loss': accumulated_loss_cpu,
                                 'smooth loss': ema_loss,
                             })
                             self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
