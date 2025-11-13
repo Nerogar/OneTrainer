@@ -297,6 +297,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
                 case LossWeight.P2:
                     losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
+                case _:
+                    raise NotImplementedError(f"Loss weight function {config.loss_weight_fn} not implemented for diffusion models")
 
         return losses
 
@@ -331,5 +333,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             match config.loss_weight_fn:
                 case LossWeight.SIGMA:
                     losses *= self.__sigma_loss_weight(data['timestep'], losses.device)
+                case _:
+                    raise NotImplementedError(f"Loss weight function {config.loss_weight_fn} not implemented for flow matching models")
 
         return losses
