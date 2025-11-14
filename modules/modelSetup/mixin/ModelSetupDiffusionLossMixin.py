@@ -291,6 +291,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         if 'timestep' in data:
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
+                case LossWeight.CONSTANT:
+                    pass
                 case LossWeight.MIN_SNR_GAMMA:
                     losses *= self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
                 case LossWeight.DEBIASED_ESTIMATION:
@@ -331,6 +333,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         # Apply timestep based loss weighting.
         if 'timestep' in data:
             match config.loss_weight_fn:
+                case LossWeight.CONSTANT:
+                    pass
                 case LossWeight.SIGMA:
                     losses *= self.__sigma_loss_weight(data['timestep'], losses.device)
                 case _:
