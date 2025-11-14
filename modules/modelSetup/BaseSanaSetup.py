@@ -208,6 +208,7 @@ class BaseSanaSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                betas=model.noise_scheduler.betas,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

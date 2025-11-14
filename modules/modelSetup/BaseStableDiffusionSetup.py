@@ -179,6 +179,7 @@ class BaseStableDiffusionSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                betas=model.noise_scheduler.betas,
             )
 
             latent_noise = self._create_noise(
