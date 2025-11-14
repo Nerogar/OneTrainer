@@ -452,9 +452,9 @@ class ModelTab:
             row += 1
 
         # compile
-        components.label(self.scroll_frame, row, 3, "Compile transformer blocks",
+        components.label(frame, row, 3, "Compile transformer blocks",
                          tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
-        components.switch(self.scroll_frame, row, 4, self.ui_state, "compile")
+        components.switch(frame, row, 4, self.ui_state, "compile")
 
         row += 1
 
