@@ -766,7 +766,8 @@ class TrainingTab:
         # Loss Weight function
         components.label(frame, 6, 0, "Loss Weight Function",
                          tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
-        components.options(frame, 6, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
+        components.options(frame, 6, 1, [str(x) for x in list(LossWeight)
+                                         if x.supports_flow_matching() == self.train_config.model_type.is_flow_matching() or x == LossWeight.CONSTANT], self.ui_state, "loss_weight_fn")
 
         # Loss weight strength
         components.label(frame, 7, 0, "Gamma",
