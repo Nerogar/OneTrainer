@@ -19,7 +19,10 @@ if torch.cuda.is_available():
     device_count = torch.cuda.device_count()
     SUPPORTED_DEVICES = [False] * device_count
     for i in range(device_count):
-        SUPPORTED_DEVICES[i] = torch.cuda.get_device_properties(i).major >= 8
+        try:
+            SUPPORTED_DEVICES[i] = torch.cuda.get_device_properties(i).major >= 8
+        except Exception:
+            continue
 
 
 def is_supported_hardware(device: torch.device) -> bool:
