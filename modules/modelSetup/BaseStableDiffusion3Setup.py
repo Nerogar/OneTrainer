@@ -304,6 +304,7 @@ class BaseStableDiffusion3Setup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                sigmas=model.noise_scheduler.sigmas,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
