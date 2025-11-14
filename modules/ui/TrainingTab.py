@@ -42,18 +42,6 @@ class TrainingTab:
         master.grid_rowconfigure(0, weight=1)
         master.grid_columnconfigure(0, weight=1)
 
-        #layer filter:
-        self.layer_entry = None
-        self.layer_entry_fg_color = None
-        self.layer_entry_text_color = None
-        self.layer_selector = None
-        self.regex_label = None
-        self.regex_switch = None
-        self.presets = {}
-        self.presets_list = []
-        self.prior_custom = ""
-        self.prior_selected = None
-
         self.scroll_frame = None
 
         self.refresh_ui()
@@ -80,32 +68,6 @@ class TrainingTab:
         column_2 = ctk.CTkFrame(master=self.scroll_frame, corner_radius=0, fg_color="transparent")
         column_2.grid(row=0, column=2, sticky="nsew")
         column_2.grid_columnconfigure(0, weight=1)
-
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
-            self.presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            self.presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            self.presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            self.presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            self.presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            self.presets = flux_presets
-        elif self.train_config.model_type.is_qwen():
-            self.presets = qwen_presets
-        elif self.train_config.model_type.is_chroma():
-            self.presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            self.presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            self.presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_hi_dream():
-            self.presets = hidream_presets
-        else:
-            self.presets = {"full": []}
-        self.presets_list = list(self.presets.keys()) + ["custom"]
 
         if self.train_config.model_type.is_stable_diffusion():
             self.__setup_stable_diffusion_ui(column_0, column_1, column_2)
@@ -779,85 +741,40 @@ class TrainingTab:
         components.options(frame, 8, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
 
     def __create_layer_frame(self, master, row):
-        frame = ctk.CTkFrame(master=master, corner_radius=5)
-        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-
-        components.label(frame, 0, 0, "Layer Filter",
-                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.")
-        self.layer_selector = components.options(
-            frame, 0, 1, self.presets_list, self.ui_state, "layer_filter_preset",
-            command=self.__preset_set_layer_choice
-        )
-
-        self.layer_entry = components.entry(
-            frame, 1, 0, self.ui_state, "layer_filter",
-            tooltip="Comma-separated list of diffusion layers to train. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained"
-        )
-        self.layer_entry_fg_color = self.layer_entry.cget("fg_color")
-        self.layer_entry_text_color = self.layer_entry.cget("text_color")
-
-        self.regex_label = components.label(
-            frame, 2, 0, "Use Regex",
-            tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used."
-        )
-        self.regex_switch = components.switch(
-            frame, 2, 1, self.ui_state, "layer_filter_regex"
-        )
-
-        # Let the user set their own layer filter
-        if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
-            self.prior_custom = self.train_config.layer_filter
+        presets = []
+        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
+            presets = sd_presets
+        elif self.train_config.model_type.is_stable_diffusion_xl():
+            presets = sdxl_presets
+        elif self.train_config.model_type.is_stable_diffusion_3():
+            presets = sd3_presets
+        elif self.train_config.model_type.is_wuerstchen():
+            presets = sc_presets
+        elif self.train_config.model_type.is_pixart():
+            presets = pixart_presets
+        elif self.train_config.model_type.is_flux():
+            presets = flux_presets
+        elif self.train_config.model_type.is_qwen():
+            presets = qwen_presets
+        elif self.train_config.model_type.is_chroma():
+            presets = chroma_presets
+        elif self.train_config.model_type.is_sana():
+            presets = sana_presets
+        elif self.train_config.model_type.is_hunyuan_video():
+            presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_hi_dream():
+            presets = hidream_presets
         else:
-            self.prior_custom = ""
-
-        self.layer_entry.grid_configure(columnspan=2, sticky="ew")
-        # Some configs will come with the layer_filter_preset unset or wrong for
-        # the new model, so let's set it now to a reasonable default so it hits
-        # the UI correctly.
-        if self.layer_selector.get() not in self.presets_list:
-            self.layer_selector.set(self.presets_list[0])
-        self.__preset_set_layer_choice(self.layer_selector.get())
-
-
-    def __preset_set_layer_choice(self, selected: str):
-        if not selected:
-            selected = self.presets_list[0]
-
-        if selected == "custom":
-            # Restore prior custom text and allow editing + regex toggle
-            self.layer_entry.configure(state="normal", fg_color=self.layer_entry_fg_color, text_color=self.layer_entry_text_color)
-            self.layer_entry.cget('textvariable').set(self.prior_custom)
-            self.regex_label.grid()
-            self.regex_switch.grid()
-        else:
-            # Preserve custom text before overwriting
-            if self.prior_selected == "custom":
-                self.prior_custom = self.layer_entry.get()
-
-            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
-            preset_def = self.presets.get(selected, [])
-            if isinstance(preset_def, dict):
-                patterns = preset_def.get("patterns", [])
-                preset_uses_regex = bool(preset_def.get("regex", False))
-            else:
-                patterns = preset_def
-                preset_uses_regex = False
-
-            disabled_color = ("gray85", "gray17")
-            disabled_text_color = ("gray30", "gray70")
-            self.layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
-            self.layer_entry.cget('textvariable').set(",".join(patterns))
-
-            self.train_config.layer_filter = ",".join(patterns)
-
-            self.train_config.layer_filter_regex_regex = preset_uses_regex
-            self.ui_state.get_var("layer_filter_regex").set(preset_uses_regex)
-
-            self.regex_label.grid_remove()
-            self.regex_switch.grid_remove()
-
-        self.prior_selected = selected
+            presets = {"full": []}
+        components.layer_filter_entry(master, row, 0, self.ui_state,
+            preset_var_name="layer_filter_preset", presets=presets,
+            preset_label="Layer Filter",
+            preset_tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.",
+            entry_var_name="layer_filter",
+            entry_tooltip="Comma-separated list of diffusion layers to train. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained",
+            regex_var_name="layer_filter_regex",
+            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
+        )
 
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
