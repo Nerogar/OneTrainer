@@ -16,6 +16,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, path_util
+from modules.util.attn.flash_attn_win import disable_flash_attn_win, enable_flash_attn_win
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -87,6 +88,8 @@ class GenericTrainer(BaseTrainer):
         if self.config.train_dtype.enable_tf():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
+
+        self.__apply_flash_attn_fallback()
 
         self.model_loader = self.create_model_loader()
         self.model_setup = self.create_model_setup()
@@ -599,6 +602,14 @@ class GenericTrainer(BaseTrainer):
         if self.config.optimizer.optimizer.is_schedule_free:
             torch.clear_autocast_cache()
             self.model.optimizer.eval()
+
+
+    def __apply_flash_attn_fallback(self):
+        if self.config.use_flash_attn_fallback:
+            enable_flash_attn_win()
+        else:
+            disable_flash_attn_win()
+
 
     def train(self):
         train_device = torch.device(self.config.train_device)
