@@ -357,5 +357,5 @@ class BaseHunyuanVideoSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas ,
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()

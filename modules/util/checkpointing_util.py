@@ -118,10 +118,10 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
 
         self.conductor.after_layer(self.layer_index, call_id, args)
 
-        # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
-        assert not (torch.is_grad_enabled() and not has_grad_fn(output))
         #TODO how can this be the case? Is there a backward that does not produce gradients wrt to any of its inputs?
-        #if it be the case, TODO check that add_dummy_grad_fn_ still works with torch.compile
+        #despite many tests, this assert was never triggered
+        assert not (torch.is_grad_enabled() and not has_grad_fn(output))
+        # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
         if torch.is_grad_enabled() and not has_grad_fn(output):
             output = add_dummy_grad_fn_(output)
 
@@ -170,7 +170,7 @@ def create_checkpoint(
             orig_module.compile(fullgraph=True)
             return layer
         else:
-            #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model
+            #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
             layer = OffloadCheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, conductor=conductor, layer_index=layer_index)
             orig_module.forward = layer.forward
             return orig_module
