@@ -15,21 +15,24 @@ from diffusers.utils import is_flash_attn_available
 ALLOWED_TYPES = {torch.float16, torch.bfloat16}
 SUPPORTED_DEVICES = []
 
+
+def _check_device_capability(device_index: int) -> bool:
+    """Check if a specific CUDA device supports Flash Attention (compute capability >= 8.0, ie. Ampere GPUs onwards)."""
+    try:
+        return torch.cuda.get_device_properties(device_index).major >= 8
+    except Exception:
+        return False
+
+
 if torch.cuda.is_available():
     device_count = torch.cuda.device_count()
-    SUPPORTED_DEVICES = [False] * device_count
-    for i in range(device_count):
-        try:
-            SUPPORTED_DEVICES[i] = torch.cuda.get_device_properties(i).major >= 8
-        except Exception:
-            continue
+    SUPPORTED_DEVICES = [_check_device_capability(i) for i in range(device_count)]
 
 
 def is_supported_hardware(device: torch.device) -> bool:
     """
-    Check if the given device supports Flash Attention based on its compute capability.
+    Check if the given device supports Flash Attention.
     """
-    # FlashAttention-2 only supports Ampere (sm_80) and newer GPUs
     return SUPPORTED_DEVICES[device.index]
 
 
