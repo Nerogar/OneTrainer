@@ -1,7 +1,5 @@
-
-from modules.modelSetup.mixin.ModelSetupNoiseMixin import (
-    ModelSetupNoiseMixin,
-)
+from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.util.config.ConceptConfig import ConceptOverridesConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.ui import components
@@ -43,12 +41,15 @@ class TimestepGenerator(ModelSetupNoiseMixin):
 
         config = TrainConfig.default_values()
         config.timestep_distribution = self.timestep_distribution
-        config.min_noising_strength = self.min_noising_strength
-        config.max_noising_strength = self.max_noising_strength
-        config.noising_weight = self.noising_weight
-        config.noising_bias = self.noising_bias
-        config.timestep_shift = self.timestep_shift
 
+        batch_config = {
+            "min_noising_strength": self.min_noising_strength,
+            "max_noising_strength": self.max_noising_strength,
+            "noising_weight": self.noising_weight,
+            "noising_bias": self.noising_bias,
+            "timestep_shift": self.timestep_shift,
+        }
+        batch_config = {k: torch.tensor(v).unsqueeze(0) for k, v in batch_config.items()}
 
         return self._get_timestep_discrete(
             num_train_timesteps=1000,
@@ -56,6 +57,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             generator=generator,
             batch_size=1000000,
             config=config,
+            batch_config=batch_config,
         )
 
 
@@ -75,9 +77,6 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
 
         self.config = config
         self.ui_state = ui_state
-        self.image_preview_file_index = 0
-        self.ax = None
-        self.canvas = None
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -95,8 +94,7 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         frame.grid_columnconfigure(0, weight=0)
         frame.grid_columnconfigure(1, weight=0)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
+        frame.grid_columnconfigure(2, weight=1)
         frame.grid_rowconfigure(7, weight=1)
 
         # timestep distribution
@@ -136,18 +134,41 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
                          tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Dynamic Timestep Shifting is not shown in the preview.")
         components.switch(frame, 6, 1, self.ui_state, "dynamic_timestep_shifting")
 
-
         # plot
+        plot = TimestepDistributionPlot(frame, self.config)
+        plot.get_tk_widget().grid(row=0, column=2, rowspan=8)
+        plot.update_preview()
+
+        # update button
+        update_button = components.button(frame, 7, 0, "Update Preview", command=plot.update_preview)
+        update_button.grid(columnspan=2)
+
+        frame.pack(fill="both", expand=1)
+        return frame
+
+    def __ok(self):
+        self.destroy()
+
+
+class TimestepDistributionPlot(FigureCanvasTkAgg):
+    def __init__(
+            self,
+            parent,
+            config: TrainConfig,
+            config_overrides: ConceptOverridesConfig | None = None
+    ):
+        fig, ax = plt.subplots()
+
+        super().__init__(fig, parent)
+        self.ax = ax
+        self._config = config
+        self._config_overrides = config_overrides
+
         appearance_mode = AppearanceModeTracker.get_mode()
-        background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
-        text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
+        background_color = parent.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
+        text_color = parent.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
         background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
         text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
-
-        fig, ax = plt.subplots()
-        self.ax = ax
-        self.canvas = FigureCanvasTkAgg(fig, master=frame)
-        self.canvas.get_tk_widget().grid(row=0, column=3, rowspan=8)
 
         fig.set_facecolor(background_color)
         ax.set_facecolor(background_color)
@@ -160,27 +181,23 @@ class TimestepDistributionWindow(ctk.CTkToplevel):
         ax.xaxis.label.set_color(text_color)
         ax.yaxis.label.set_color(text_color)
 
-        self.__update_preview()
-
-        # update button
-        components.button(frame, 8, 3, "Update Preview", command=self.__update_preview)
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def __update_preview(self):
+    def update_preview(self):
         generator = TimestepGenerator(
-            timestep_distribution=self.config.timestep_distribution,
-            min_noising_strength=self.config.min_noising_strength,
-            max_noising_strength=self.config.max_noising_strength,
-            noising_weight=self.config.noising_weight,
-            noising_bias=self.config.noising_bias,
-            timestep_shift=self.config.timestep_shift,
+            timestep_distribution=self._config.timestep_distribution,
+            min_noising_strength=self.__get_config_value('min_noising_strength'),
+            max_noising_strength=self.__get_config_value('max_noising_strength'),
+            noising_weight=self.__get_config_value('noising_weight'),
+            noising_bias=self.__get_config_value('noising_bias'),
+            timestep_shift=self.__get_config_value('timestep_shift'),
         )
 
         self.ax.cla()
         self.ax.hist(generator.generate(), bins=1000, range=(0, 999))
-        self.canvas.draw()
+        self.draw()
 
-    def __ok(self):
-        self.destroy()
+    def __get_config_value(self, attr: str):
+        if self._config_overrides is not None:
+            value = getattr(self._config_overrides, attr)
+            if value is not None:
+                return value
+        return getattr(self._config, attr)
