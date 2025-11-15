@@ -335,6 +335,10 @@ class TrainUI(ctk.CTk):
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
         components.entry(frame, 16, 1, self.ui_state, "temp_device")
 
+        components.label(frame, 17, 0, "Use Flash-Attention Fallback",
+                         tooltip="Enables Flash-Attention fallback on Windows if native support is not available in PyTorch for a performance improvement during training/sampling.")
+        components.switch(frame, 17, 1, self.ui_state, "use_flash_attn_fallback")
+
         frame.pack(fill="both", expand=1)
         return frame
 
