@@ -1,6 +1,7 @@
 import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
+from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
@@ -58,7 +59,15 @@ def init_model_parameters(
     #to be safe, do that before the optimizer is created because the optimizer could take copies
     multi.broadcast_parameters(parameters.parameters(), train_device)
 
-    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    layer_key_fn = None
+    if model.train_config.optimizer.MuonWithAuxAdam:
+        print("INFO: Creating layer keys for MuonWithAuxAdam.")
+        layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
+
+    model.optimizer = create.create_optimizer(
+        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+    )
+
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
@@ -69,7 +78,17 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    model.param_group_mapping = parameters.unique_name_mapping
+    if model.train_config.optimizer.MuonWithAuxAdam and model.optimizer is not None:
+        new_param_group_mapping = []
+        for group in model.optimizer.param_groups:
+            original_name = group.get('name')
+
+            optim_type = group.get('optim_type', 'unknown')
+            unique_name = f"{original_name}_{optim_type}"
+            new_param_group_mapping.append(unique_name)
+        model.param_group_mapping = new_param_group_mapping
+    else:
+        model.param_group_mapping = parameters.unique_name_mapping
 
 
 # Optimizer Key map with defaults
@@ -528,6 +547,59 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_limiter": True,
         "cautious_mask": False,
         "orthogonal_gradient": False,
+    },
+    Optimizer.MUON_ADV: {
+        "beta1": 0.9,
+        "weight_decay": 0.0,
+        "accelerated_ns": False,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_rescaling": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": True,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": False,
+        "beta2_normuon": 0.95,
+        "normuon_eps": 1e-8,
+        "orthogonal_gradient": False,
+        "muon_adam_config": None,
+    },
+    Optimizer.ADAMUON_ADV: {
+        "beta1": 0.95,
+        "beta2": 0.95,
+        "eps": 1e-8,
+        "weight_decay": 0.0,
+        "accelerated_ns": False,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_rescaling": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": False,
+        "use_atan2": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": False,
+        "orthogonal_gradient": False,
+        "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,
