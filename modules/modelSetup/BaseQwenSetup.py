@@ -148,6 +148,7 @@ class BaseQwenSetup(
             image_attention_mask=torch.ones((packed_latent_input.shape[0], packed_latent_input.shape[1]), dtype=torch.bool, device=latent_image.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
             attention_mask_2d = attention_mask[:, None, None, :] if not torch.all(text_attention_mask) else None
+            print("attention mask: ", attention_mask_2d.shape if attention_mask_2d is not None else "None")
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),

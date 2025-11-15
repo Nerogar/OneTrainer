@@ -167,7 +167,7 @@ def create_checkpoint(
         if compile:
             layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index)
             #don't compile the checkpointing layer - offloading cannot be compiled:
-            orig_module.compile(fullgraph=True)
+            orig_module.compile(fullgraph=True, dynamic=True)
             return layer
         else:
             #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
@@ -178,7 +178,7 @@ def create_checkpoint(
         if compile:
             layer = CheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device)
             #do compile the checkpointing layer - slightly faster
-            layer.compile(fullgraph=True)
+            layer.compile(fullgraph=True, dynamic=True)
             return layer
         else:
             layer = CheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device)
