@@ -20,7 +20,7 @@ pytorch-lightning==2.5.1.post0
 
 # diffusion models
 #Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
--e git+https://github.com/huggingface/diffusers.git@9b721db205729d5a6e97a72312c3a0f4534064f1#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@9b721db#egg=diffusers
 gguf==0.17.1
 transformers==4.56.2
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
@@ -28,14 +28,14 @@ omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # model conversion
--e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@f14b1da606811d2004f9241c3463c240eaf09ac5#egg=omi_model_standards
+-e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@f14b1da#egg=omi_model_standards
 
 # other models
 pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@40190b7683a4f2e974d34d48dcd65902f25b4cc4#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@40190b7#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
