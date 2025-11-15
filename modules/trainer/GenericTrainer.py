@@ -29,6 +29,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
+from modules.util.tensorboard_util import get_tensorboard_run_name
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -69,9 +70,8 @@ class GenericTrainer(BaseTrainer):
         if multi.is_master():
             tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
             os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
-            if config.tensorboard and not config.tensorboard_always_on:
-                super()._start_tensorboard()
+            run_name = get_tensorboard_run_name(config)
+            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{run_name}_{get_string_timestamp()}"))
 
         self.model = None
         self.one_step_trained = False
@@ -861,9 +861,6 @@ class GenericTrainer(BaseTrainer):
 
         if multi.is_master():
             self.tensorboard.close()
-
-            if self.config.tensorboard and not self.config.tensorboard_always_on:
-                super()._stop_tensorboard()
 
         for handle in self.grad_hook_handles:
             handle.remove()
