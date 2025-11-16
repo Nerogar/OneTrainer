@@ -728,17 +728,26 @@ class TrainingTab:
         # Loss Weight function
         components.label(frame, 6, 0, "Loss Weight Function",
                          tooltip="Choice of loss weight function. Can help the model learn details more accurately.")
-        components.options(frame, 6, 1, [str(x) for x in list(LossWeight)], self.ui_state, "loss_weight_fn")
+        components.options(frame, 6, 1, [str(x) for x in list(LossWeight)
+                                         if x.supports_flow_matching() == self.train_config.model_type.is_flow_matching()
+                                            or x == LossWeight.CONSTANT
+                                        ],
+                                        self.ui_state, "loss_weight_fn")
+
+        row = 7
 
         # Loss weight strength
-        components.label(frame, 7, 0, "Gamma",
-                         tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
-        components.entry(frame, 7, 1, self.ui_state, "loss_weight_strength")
+        if not self.train_config.model_type.is_flow_matching():
+            components.label(frame, row, 0, "Gamma",
+                             tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
+            components.entry(frame, row, 1, self.ui_state, "loss_weight_strength")
+            row += 1
 
         # Loss Scaler
-        components.label(frame, 8, 0, "Loss Scaler",
+        components.label(frame, row, 0, "Loss Scaler",
                          tooltip="Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection")
-        components.options(frame, 8, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+        components.options(frame, row, 1, [str(x) for x in list(LossScaler)], self.ui_state, "loss_scaler")
+        row += 1
 
     def __create_layer_frame(self, master, row):
         presets = []

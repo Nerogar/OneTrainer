@@ -60,7 +60,9 @@ class OFTRotationModule(nn.Module):
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         # Create indices for upper triangle (excluding diagonal)
-        self.rows, self.cols = torch.triu_indices(block_size, block_size, 1)
+        rows, cols = torch.triu_indices(block_size, block_size, 1)
+        self.register_buffer("rows", rows, persistent=False)
+        self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
 
 
@@ -97,9 +99,11 @@ class OFTRotationModule(nn.Module):
                     R.add_(Q_squared, alpha=2.0)
 
                     Q_power = Q_squared
-                    for _i in range(3, num_neumann_terms):
+                    for _ in range(3, num_neumann_terms - 1):
                         Q_power = torch.bmm(Q_power, Q_skew)
                         R.add_(Q_power, alpha=2.0)
+                    Q_power = torch.bmm(Q_power, Q_skew)
+                    R.add_(Q_power)
         else:
             id_mat = (
                 torch.eye(Q_skew.shape[-1], device=Q_skew.device)
