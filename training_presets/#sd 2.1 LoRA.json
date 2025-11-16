@@ -1,6 +1,6 @@
 {
     "backup_after": 10,
-    "base_model_name": "stabilityai/stable-diffusion-2-1",
+    "base_model_name": "",
     "batch_size": 4,
     "learning_rate": 0.0003,
     "model_type": "STABLE_DIFFUSION_21",
