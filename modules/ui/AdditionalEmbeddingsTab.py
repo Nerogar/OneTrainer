@@ -24,6 +24,10 @@ class AdditionalEmbeddingsTab(ConfigList):
         )
 
     def refresh_ui(self):
+        if self.element_list is not None:
+            self.element_list.destroy()
+            self.element_list = None
+        self.widgets_initialized = False
         self._create_element_list()
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):

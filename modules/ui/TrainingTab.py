@@ -53,6 +53,10 @@ class TrainingTab:
         self.presets_list = []
         self.prior_custom = ""
         self.prior_selected = None
+        self.layer_filter_trace_id = self.ui_state.add_var_trace(
+            "layer_filter_preset",
+            self.__on_layer_filter_preset_change,
+        )
 
         self.scroll_frame = None
 
@@ -793,7 +797,7 @@ class TrainingTab:
         frame.grid_columnconfigure(0, weight=1)
 
         components.label(frame, 0, 0, "Layer Filter",
-                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.")
+                         tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. \n \n A blank custom field or 'Full' will train all layers. Custom/Full is not necessarily recommended nor supported, intended for advanced users.")
         self.layer_selector = components.options(
             frame, 0, 1, self.presets_list, self.ui_state, "layer_filter_preset",
             command=self.__preset_set_layer_choice
@@ -835,6 +839,7 @@ class TrainingTab:
 
         if selected == "custom":
             # Restore prior custom text and allow editing + regex toggle
+            self.__show_layer_entry()
             self.layer_entry.configure(state="normal", fg_color=self.layer_entry_fg_color, text_color=self.layer_entry_text_color)
             self.layer_entry.cget('textvariable').set(self.prior_custom)
             self.regex_label.grid()
@@ -866,7 +871,26 @@ class TrainingTab:
             self.regex_label.grid_remove()
             self.regex_switch.grid_remove()
 
+            if selected == "full" and not patterns:
+                self.__hide_layer_entry()
+            else:
+                self.__show_layer_entry()
+
         self.prior_selected = selected
+
+    def __on_layer_filter_preset_change(self):
+        if not self.layer_selector:
+            return
+        selected = self.ui_state.get_var("layer_filter_preset").get()
+        self.__preset_set_layer_choice(selected)
+
+    def __hide_layer_entry(self):
+        if self.layer_entry and self.layer_entry.winfo_manager():
+            self.layer_entry.grid_remove()
+
+    def __show_layer_entry(self):
+        if self.layer_entry and not self.layer_entry.winfo_manager():
+            self.layer_entry.grid()
 
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
