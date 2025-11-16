@@ -30,6 +30,12 @@ from transformers.models.t5.modeling_t5 import T5Block
 
 torch._dynamo.config.cache_size_limit = 8192
 
+#workaround for https://github.com/huggingface/diffusers/issues/12668
+#TODO enable fullgraph for Qwen below once this bug is fixed
+from diffusers.models.transformers import transformer_qwenimage
+
+transformer_qwenimage.apply_rotary_emb_qwen = torch.compiler.disable(transformer_qwenimage.apply_rotary_emb_qwen)
+
 def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
     signature = dict(inspect.signature(fun).parameters)
     parameters = []
@@ -155,6 +161,7 @@ def create_checkpoint(
         conductor: LayerOffloadConductor | None = None,
         layer_index: int = 0,
         compile: bool = False,
+        fullgraph: bool = True,
 ) -> Callable:
     if include_from_offload_param_names is None:
         include_from_offload_param_names = []
@@ -167,7 +174,7 @@ def create_checkpoint(
         if compile:
             layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index)
             #don't compile the checkpointing layer - offloading cannot be compiled:
-            orig_module.compile(fullgraph=True)
+            orig_module.compile(fullgraph=fullgraph)
             return layer
         else:
             #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
@@ -178,7 +185,7 @@ def create_checkpoint(
         if compile:
             layer = CheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device)
             #do compile the checkpointing layer - slightly faster
-            layer.compile(fullgraph=True)
+            layer.compile(fullgraph=fullgraph)
             return layer
         else:
             layer = CheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device)
@@ -192,6 +199,7 @@ def _create_checkpoints_for_module_list(
         train_device: torch.device,
         layer_index: int,
         compile: bool,
+        fullgraph: bool,
 ) -> int:
 
     for i, layer in enumerate(module_list):
@@ -200,7 +208,7 @@ def _create_checkpoints_for_module_list(
         module_list[i] = create_checkpoint(
                 layer, train_device,
                 include_from_offload_param_names,
-                conductor, layer_index, compile=compile,
+                conductor, layer_index, compile=compile, fullgraph=fullgraph
             )
         layer_index += 1
     return layer_index
@@ -216,6 +224,7 @@ def enable_checkpointing(
         compile: bool,
         lists,
         offload_enabled: bool = True,
+        fullgraph: bool = True,
 ) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(model, config)
 
@@ -231,7 +240,7 @@ def enable_checkpointing(
                 conductor if offload_enabled else None,
                 torch.device(config.train_device),
                 layer_index,
-                compile = compile,
+                compile=compile, fullgraph=fullgraph,
             )
         else:
             t = type_or_list
@@ -245,7 +254,7 @@ def enable_checkpointing(
                         conductor if offload_enabled else None,
                         torch.device(config.train_device),
                         layer_index,
-                        compile = compile,
+                        compile=compile, fullgraph=fullgraph,
                     )
     model._register_state_dict_hook(_remove_checkpoint_keys)
     return conductor
@@ -347,7 +356,7 @@ def enable_checkpointing_for_qwen_transformer(
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
         (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
-    ])
+    ], fullgraph=False)
 
 
 def enable_checkpointing_for_sana_transformer(
