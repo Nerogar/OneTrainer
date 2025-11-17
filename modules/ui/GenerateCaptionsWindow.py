@@ -1,3 +1,5 @@
+import contextlib
+import tkinter as tk
 from tkinter import filedialog
 
 from modules.util.ui.ui_utils import set_window_icon
@@ -123,3 +125,12 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
             include_subdirectories=self.include_subdirectories_var.get(),
         )
         self.parent.load_image()
+
+    def destroy(self):
+        if hasattr(self.parent, "release_captioning_model"):
+            self.parent.release_captioning_model()
+
+        with contextlib.suppress(tk.TclError):
+            self.grab_release()
+
+        super().destroy()

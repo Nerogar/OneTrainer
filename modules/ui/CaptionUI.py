@@ -15,7 +15,7 @@ from modules.ui.GenerateCaptionsWindow import GenerateCaptionsWindow
 from modules.ui.GenerateMasksWindow import GenerateMasksWindow
 from modules.util import path_util
 from modules.util.image_util import load_image
-from modules.util.torch_util import default_device
+from modules.util.torch_util import default_device, torch_gc
 from modules.util.ui import components
 from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
 from modules.util.ui.UIState import UIState
@@ -39,7 +39,7 @@ class CaptionUI(ctk.CTkToplevel):
             **kwargs,
     ) -> None:
         super().__init__(parent, *args, **kwargs)
-
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.dir = initial_dir
         self.config_ui_data = {"include_subdirectories": initial_include_subdirectories}
@@ -514,7 +514,7 @@ class CaptionUI(ctk.CTkToplevel):
             traceback.print_exc()
 
     def load_masking_model(self, model):
-        self.captioning_model = None
+        self.release_captioning_model()
 
         if model == "ClipSeg":
             if self.masking_model is None or not isinstance(self.masking_model, ClipSegModel):
@@ -533,7 +533,7 @@ class CaptionUI(ctk.CTkToplevel):
                 self.masking_model = MaskByColor(default_device, torch.float32)
 
     def load_captioning_model(self, model):
-        self.masking_model = None
+        self.release_masking_model()
 
         if model == "Blip":
             if self.captioning_model is None or not isinstance(self.captioning_model, BlipModel):
@@ -550,3 +550,27 @@ class CaptionUI(ctk.CTkToplevel):
 
     def print_help(self):
         print(self.help_text)
+
+    def release_captioning_model(self):
+        self._release_models(release_captioning=True, release_masking=False)
+
+    def release_masking_model(self):
+        self._release_models(release_captioning=False, release_masking=True)
+
+    def _release_models(self, release_captioning: bool = True, release_masking: bool = True):
+        freed = False
+        if release_captioning and self.captioning_model is not None:
+            self.captioning_model = None
+            freed = True
+        if release_masking and self.masking_model is not None:
+            self.masking_model = None
+            freed = True
+        if freed:
+            torch_gc()
+
+    def _on_close(self):
+        self.destroy()
+
+    def destroy(self):
+        self._release_models()
+        super().destroy()
