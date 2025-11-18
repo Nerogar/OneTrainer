@@ -514,61 +514,57 @@ class CaptionUI(ctk.CTkToplevel):
             traceback.print_exc()
 
     def load_masking_model(self, model):
-        self.release_captioning_model()
+        model_type = type(self.masking_model).__name__ if self.masking_model else None
 
-        if model == "ClipSeg":
-            if self.masking_model is None or not isinstance(self.masking_model, ClipSegModel):
-                print("loading ClipSeg model, this may take a while")
-                self.masking_model = ClipSegModel(default_device, torch.float32)
-        elif model == "Rembg":
-            if self.masking_model is None or not isinstance(self.masking_model, RembgModel):
-                print("loading Rembg model, this may take a while")
-                self.masking_model = RembgModel(default_device, torch.float32)
-        elif model == "Rembg-Human":
-            if self.masking_model is None or not isinstance(self.masking_model, RembgHumanModel):
-                print("loading Rembg-Human model, this may take a while")
-                self.masking_model = RembgHumanModel(default_device, torch.float32)
-        elif model == "Hex Color":
-            if self.masking_model is None or not isinstance(self.masking_model, MaskByColor):
-                self.masking_model = MaskByColor(default_device, torch.float32)
+        if model == "ClipSeg" and model_type != "ClipSegModel":
+            self._release_models()
+            print("loading ClipSeg model, this may take a while")
+            self.masking_model = ClipSegModel(default_device, torch.float32)
+        elif model == "Rembg" and model_type != "RembgModel":
+            self._release_models()
+            print("loading Rembg model, this may take a while")
+            self.masking_model = RembgModel(default_device, torch.float32)
+        elif model == "Rembg-Human" and model_type != "RembgHumanModel":
+            self._release_models()
+            print("loading Rembg-Human model, this may take a while")
+            self.masking_model = RembgHumanModel(default_device, torch.float32)
+        elif model == "Hex Color" and model_type != "MaskByColor":
+            self._release_models()
+            self.masking_model = MaskByColor(default_device, torch.float32)
 
     def load_captioning_model(self, model):
-        self.release_masking_model()
+        model_type = type(self.captioning_model).__name__ if self.captioning_model else None
 
-        if model == "Blip":
-            if self.captioning_model is None or not isinstance(self.captioning_model, BlipModel):
-                print("loading Blip model, this may take a while")
-                self.captioning_model = BlipModel(default_device, torch.float16)
-        elif model == "Blip2":
-            if self.captioning_model is None or not isinstance(self.captioning_model, Blip2Model):
-                print("loading Blip2 model, this may take a while")
-                self.captioning_model = Blip2Model(default_device, torch.float16)
-        elif model == "WD14 VIT v2":
-            if self.captioning_model is None or not isinstance(self.captioning_model, WDModel):
-                print("loading WD14_VIT_v2 model, this may take a while")
-                self.captioning_model = WDModel(default_device, torch.float16)
+        if model == "Blip" and model_type != "BlipModel":
+            self._release_models()
+            print("loading Blip model, this may take a while")
+            self.captioning_model = BlipModel(default_device, torch.float16)
+        elif model == "Blip2" and model_type != "Blip2Model":
+            self._release_models()
+            print("loading Blip2 model, this may take a while")
+            self.captioning_model = Blip2Model(default_device, torch.float16)
+        elif model == "WD14 VIT v2" and model_type != "WDModel":
+            self._release_models()
+            print("loading WD14_VIT_v2 model, this may take a while")
+            self.captioning_model = WDModel(default_device, torch.float16)
 
     def print_help(self):
         print(self.help_text)
 
-    def release_captioning_model(self):
-        self._release_models(release_captioning=True, release_masking=False)
-
-    def release_masking_model(self):
-        self._release_models(release_captioning=False, release_masking=True)
-
-    def _release_models(self, release_captioning: bool = True, release_masking: bool = True):
+    def _release_models(self):
+        """Release all models from VRAM"""
         freed = False
-        if release_captioning and self.captioning_model is not None:
+        if self.captioning_model is not None:
             self.captioning_model = None
             freed = True
-        if release_masking and self.masking_model is not None:
+        if self.masking_model is not None:
             self.masking_model = None
             freed = True
         if freed:
             torch_gc()
 
     def _on_close(self):
+        self._release_models()
         self.destroy()
 
     def destroy(self):

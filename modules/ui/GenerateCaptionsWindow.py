@@ -127,9 +127,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.parent.load_image()
 
     def destroy(self):
-        if hasattr(self.parent, "release_captioning_model"):
-            self.parent.release_captioning_model()
-
         with contextlib.suppress(tk.TclError):
             self.grab_release()
 
