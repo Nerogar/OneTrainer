@@ -789,6 +789,7 @@ class TrainUI(ctk.CTk):
                 self._stop_always_on_tensorboard()
 
             self.training_commands = TrainCommands()
+            torch_gc()
 
             self.training_thread = threading.Thread(target=self.__training_thread_function)
             self.training_thread.start()
