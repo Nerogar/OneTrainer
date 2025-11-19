@@ -8,5 +8,9 @@ class LossWeight(Enum):
     DEBIASED_ESTIMATION = 'DEBIASED_ESTIMATION'
     SIGMA = 'SIGMA'
 
+    def supports_flow_matching(self) -> bool:
+        return self == LossWeight.CONSTANT \
+            or self == LossWeight.SIGMA
+
     def __str__(self):
         return self.value

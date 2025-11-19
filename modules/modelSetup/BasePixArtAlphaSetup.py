@@ -27,6 +27,7 @@ from torch import Tensor
 PRESETS = {
     "attn-mlp": ["attn1", "attn2", "ff.net"],
     "attn-only": ["attn1", "attn2"],
+    "blocks": ["transformer_block"],
     "full": [],
 }
 
@@ -339,5 +340,5 @@ class BasePixArtAlphaSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
+            betas=model.noise_scheduler.betas,
         ).mean()

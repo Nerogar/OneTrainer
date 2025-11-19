@@ -28,6 +28,7 @@ from torch import Tensor
 PRESETS = {
     "attn-mlp": ["attn", "ff.net"],
     "attn-only": ["attn"],
+    "blocks": ["transformer_block"],
     "full": [],
 }
 
@@ -356,5 +357,5 @@ class BaseHunyuanVideoSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()

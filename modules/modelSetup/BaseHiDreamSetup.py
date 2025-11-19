@@ -27,6 +27,7 @@ from torch import Tensor
 PRESETS = {
     "attn-mlp": ["attn1", "ff_i"],
     "attn-only": ["attn1"],
+    "blocks": ["stream_block"],
     "full": [],
 }
 
@@ -474,5 +475,5 @@ class BaseHiDreamSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()
