@@ -1197,14 +1197,19 @@ def create_optimizer(
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
             if MuonWithAuxAdam:
-                adam_config_dict = optimizer_config.muon_adam_config.to_dict()
+                adam_config = optimizer_config.muon_adam_config
+                adam_config_dict = adam_config.to_dict()
                 valid_adam_keys = {k for k in inspect.signature(Muon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
                     key: adam_config_dict[key.removeprefix('adam_')]
                     for key in valid_adam_keys
                     if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
                 }
-
+                # Manually construct adam_betas from beta1 and beta2
+                adam_kwargs['adam_betas'] = (
+                    adam_config.beta1 if adam_config.beta1 is not None else 0.9,
+                    adam_config.beta2 if adam_config.beta2 is not None else 0.99
+                )
             optimizer = Muon_adv(
                 params=params_for_optimizer,
                 lr=config.learning_rate,
@@ -1238,13 +1243,19 @@ def create_optimizer(
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
             if MuonWithAuxAdam:
-                adam_config_dict = optimizer_config.muon_adam_config.to_dict()
+                adam_config = optimizer_config.muon_adam_config
+                adam_config_dict = adam_config.to_dict()
                 valid_adam_keys = {k for k in inspect.signature(AdaMuon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
                     key: adam_config_dict[key.removeprefix('adam_')]
                     for key in valid_adam_keys
                     if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
                 }
+                # Manually construct adam_betas from beta1 and beta2
+                adam_kwargs['adam_betas'] = (
+                    adam_config.beta1 if adam_config.beta1 is not None else 0.9,
+                    adam_config.beta2 if adam_config.beta2 is not None else 0.99
+                )
             optimizer = AdaMuon_adv(
                 params=params_for_optimizer,
                 lr=config.learning_rate,
