@@ -1,5 +1,5 @@
 {
-    "base_model_name": "",
+    "base_model_name": "sd2-community/stable-diffusion-2-inpainting",
     "batch_size": 4,
     "model_type": "STABLE_DIFFUSION_20_INPAINTING",
     "output_model_destination": "models/model.safetensors",
