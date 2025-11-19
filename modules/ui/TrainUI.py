@@ -719,6 +719,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             self._set_training_button_running()
 
             self.training_commands = TrainCommands()
+            torch_gc()
 
             self.training_thread = threading.Thread(target=self.__training_thread_function)
             self.training_thread.start()
