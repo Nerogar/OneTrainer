@@ -558,14 +558,29 @@ def path_entry(
         if path_type == "directory":
             selected_path = filedialog.askdirectory()
         else:
-            filetypes = [("All Files", "*.*")]
+            filetypes = []
+
+            if valid_extensions:
+                ext_patterns = ' '.join(f"*{ext}" for ext in valid_extensions)
+                ext_name = valid_extensions[0].lstrip('.').upper() if len(valid_extensions) == 1 else "Supported Files"
+                filetypes.append((ext_name, ext_patterns))
+
             if allow_model_files:
                 filetypes.extend(MODEL_FILETYPES[1:])
             if allow_image_files:
                 filetypes.append(("Image", ' '.join(f"*.{x}" for x in supported_image_extensions())))
 
-            selected_path = (filedialog.asksaveasfilename(filetypes=filetypes) if is_output
-                             else filedialog.askopenfilename(filetypes=filetypes))
+            filetypes.append(("All Files", "*.*"))
+
+            default_ext = valid_extensions[0] if valid_extensions else None
+
+            if is_output:
+                kwargs = {"filetypes": filetypes}
+                if default_ext:
+                    kwargs["defaultextension"] = default_ext
+                selected_path = filedialog.asksaveasfilename(**kwargs)
+            else:
+                selected_path = filedialog.askopenfilename(filetypes=filetypes)
 
         if selected_path:
             if path_modifier:

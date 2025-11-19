@@ -22,6 +22,7 @@ from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.LoraTab import LoraTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
+from modules.ui.QueueTrainingUI import QueueTrainingUI
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -528,6 +529,10 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
                          tooltip="Open the profiling tools.")
         components.button(frame, 4, 1, "Open", self.open_profiling_tool)
 
+        components.label(frame, 5, 0, "Queue Training",
+                 tooltip="Build batch/sweep scripts that call the CLI with multiple configs")
+        components.button(frame, 5, 1, "Open", self.open_queue_training_tool)
+
         frame.pack(fill="both", expand=1)
         return frame
 
@@ -632,6 +637,10 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def open_profiling_tool(self):
         self.profiling_window.deiconify()
+
+    def open_queue_training_tool(self):
+        window = QueueTrainingUI(self)
+        self.wait_window(window)
 
     def generate_debug_package(self):
         zip_path = filedialog.askdirectory(
