@@ -24,6 +24,7 @@ class StableDiffusionXLLoRAModelSaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
+
         lora_model_saver = StableDiffusionXLLoRASaver()
         embedding_model_saver = StableDiffusionXLEmbeddingSaver()
 
