@@ -106,6 +106,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
         self.train_config = TrainConfig.default_values()
         self.ui_state = UIState(self, self.train_config)
+        self.cloud_state = self.ui_state.get_var("cloud")
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -151,6 +152,15 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             lambda: self._on_tensorboard_mode_change()
         )
 
+        self.cloud_enabled_trace_id = self.cloud_state.add_var_trace(
+            "enabled",
+            lambda: self._on_cloud_settings_change()
+        )
+        self.cloud_tunnel_trace_id = self.cloud_state.add_var_trace(
+            "tensorboard_tunnel",
+            lambda: self._on_cloud_settings_change()
+        )
+
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
 
@@ -163,6 +173,10 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
         if hasattr(self, 'tensorboard_mode_trace_id'):
             self.ui_state.remove_var_trace("tensorboard_mode", self.tensorboard_mode_trace_id)
+        if hasattr(self, 'cloud_enabled_trace_id'):
+            self.cloud_state.remove_var_trace("enabled", self.cloud_enabled_trace_id)
+        if hasattr(self, 'cloud_tunnel_trace_id'):
+            self.cloud_state.remove_var_trace("tensorboard_tunnel", self.cloud_tunnel_trace_id)
         self.quit()
 
     def top_bar(self, master):
@@ -885,6 +899,12 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tensorboard_manager.handle_workspace_change(self.train_config)
 
     def _on_tensorboard_mode_change(self):
+        self.tensorboard_manager.handle_mode_change(
+            self.train_config,
+            is_training=self.training_thread is not None
+        )
+
+    def _on_cloud_settings_change(self):
         self.tensorboard_manager.handle_mode_change(
             self.train_config,
             is_training=self.training_thread is not None

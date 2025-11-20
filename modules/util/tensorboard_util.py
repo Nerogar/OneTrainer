@@ -14,20 +14,52 @@ class TensorboardManager:
     def __init__(self):
         self._process = None
         self._previous_mode = None
+        self._cloud_tunnel_active = False
 
     def _is_cloud_tunnel_enabled(self, config: TrainConfig) -> bool:
         return config.cloud.enabled and config.cloud.tensorboard_tunnel
+
+    def _should_run(self, config: TrainConfig, is_training: bool) -> bool:
+        if self._is_cloud_tunnel_enabled(config):
+            return False
+
+        mode = config.tensorboard_mode
+        if mode == TensorboardMode.OFF:
+            return False
+        if mode == TensorboardMode.TRAIN_ONLY:
+            return is_training
+        return mode == TensorboardMode.ALWAYS_ON
+
+    def _sync_state(self, config: TrainConfig, is_training: bool):
+        cloud_tunnel_enabled = self._is_cloud_tunnel_enabled(config)
+
+        if cloud_tunnel_enabled != self._cloud_tunnel_active:
+            self._cloud_tunnel_active = cloud_tunnel_enabled
+            if cloud_tunnel_enabled and self.is_running():
+                self.stop()
+
+        should_run = self._should_run(config, is_training)
+
+        if should_run and not self.is_running():
+            self.start(config)
+        elif not should_run and self.is_running():
+            self.stop()
+
+        self._previous_mode = config.tensorboard_mode
 
     def start(self, config: TrainConfig, mode: TensorboardMode | None = None) -> bool:
         if self._process is not None:
             return False
 
         effective_mode = mode or config.tensorboard_mode
-        if effective_mode == TensorboardMode.OFF or self._is_cloud_tunnel_enabled(config):
+        cloud_tunnel_enabled = self._is_cloud_tunnel_enabled(config)
+        self._previous_mode = effective_mode
+        self._cloud_tunnel_active = cloud_tunnel_enabled
+
+        if effective_mode == TensorboardMode.OFF or cloud_tunnel_enabled:
             return False
 
         self._process = start_filtered_tensorboard(config)
-        self._previous_mode = effective_mode
         return self._process is not None
 
     def stop(self) -> bool:
@@ -46,53 +78,13 @@ class TensorboardManager:
         return self._process is not None
 
     def handle_training_start(self, config: TrainConfig):
-        if config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
-            if not self._is_cloud_tunnel_enabled(config):
-                self.start(config)
+        self._sync_state(config, is_training=True)
 
     def handle_training_end(self, config: TrainConfig):
-        if config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
-            self.stop()
-        elif config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
-            if not self._is_cloud_tunnel_enabled(config) and not self.is_running():
-                self.start(config)
+        self._sync_state(config, is_training=False)
 
     def handle_mode_change(self, config: TrainConfig, is_training: bool = False):
-        new_mode = config.tensorboard_mode
-
-        if self._previous_mode is None:
-            self._previous_mode = new_mode
-            if (new_mode == TensorboardMode.ALWAYS_ON and not is_training
-                and not self._is_cloud_tunnel_enabled(config)):
-                self.start(config)
-            return
-
-        old_mode = self._previous_mode
-
-        if new_mode == old_mode:
-            return
-
-        if self._is_cloud_tunnel_enabled(config):
-            self.stop()
-            self._previous_mode = new_mode
-            return
-
-        if is_training:
-            if new_mode == TensorboardMode.OFF:
-                self.stop()
-            elif old_mode == TensorboardMode.OFF and new_mode in (TensorboardMode.TRAIN_ONLY, TensorboardMode.ALWAYS_ON):
-                self.start(config)
-            self._previous_mode = new_mode
-            return
-
-        # Not training
-        if old_mode == TensorboardMode.ALWAYS_ON:
-            self.stop()
-
-        if new_mode == TensorboardMode.ALWAYS_ON:
-            self.start(config)
-
-        self._previous_mode = new_mode
+        self._sync_state(config, is_training=is_training)
 
     def handle_workspace_change(self, config: TrainConfig):
         if config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
