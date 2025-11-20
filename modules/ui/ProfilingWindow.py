@@ -44,8 +44,13 @@ class ProfilingWindow(ctk.CTkToplevel):
 
     def _end_profiler(self):
         scalene_profiler.stop()
+        try:
+            scalene_profiler.Scalene.output_profile()
+            self._message_label.configure(text='Profile dumped to profile.json/html')
+        except Exception as e:
+            print(f"Error dumping profile: {e}")
+            self._message_label.configure(text='Error dumping profile')
 
-        self._message_label.configure(text='Inactive')
         self._profile_button.configure(text='Start Profiling')
         self._profile_button.configure(command=self._start_profiler)
 

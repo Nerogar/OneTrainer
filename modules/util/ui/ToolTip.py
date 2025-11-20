@@ -19,17 +19,13 @@ class ToolTip:
         self.id = None
         self.tw = None
         self._after_id = None
+        self._root = None
+        self._bound = False
 
         if hover_only:
             self.widget.bind("<Enter>", self.enter)
             self.widget.bind("<Leave>", self.leave)
             self.widget.bind("<ButtonPress>", self.leave)
-
-        if track_movement:
-            self._root = widget.winfo_toplevel()
-            self._root.bind("<Configure>", self._on_move, add="+")
-            self._root.bind("<FocusOut>", self.hide, add="+")
-            self._root.bind("<Unmap>", self.hide, add="+")
 
     def enter(self, event=None):
         self.schedule()
@@ -59,6 +55,13 @@ class ToolTip:
 
         self._cancel_scheduled_hide()
         self.hide()
+
+        if self.track_movement and not self._bound:
+            self._root = self.widget.winfo_toplevel()
+            self._root.bind("<Configure>", self._on_move, add="+")
+            self._root.bind("<FocusOut>", self.hide, add="+")
+            self._root.bind("<Unmap>", self.hide, add="+")
+            self._bound = True
 
         self.tw = ctk.CTkToplevel(self.widget)
         self.tw.wm_overrideredirect(True)

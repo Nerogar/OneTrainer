@@ -369,12 +369,8 @@ class ModelOutputValidator:
         # Apply visual feedback based on validation state
         if self.state.status == 'error':
             self._tk_widget.configure(border_color="#dc3545")
-            if hasattr(self._tk_widget, '_validation_tooltip'):
-                self._tk_widget._validation_tooltip.show_error(self.state.message, duration_ms=5000)
         elif self.state.status == 'warning':
             self._tk_widget.configure(border_color="#ff9500")
-            if hasattr(self._tk_widget, '_validation_tooltip'):
-                self._tk_widget._validation_tooltip.show_warning(self.state.message, duration_ms=5000)
 
     def set_widget(self, widget):
         self._tk_widget = widget

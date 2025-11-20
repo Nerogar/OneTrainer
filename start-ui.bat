@@ -32,7 +32,8 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     goto :end
 )
 set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
-if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
+set LAUNCH_CMD=%PYTHON%
+if defined PROFILE (set LAUNCH_CMD=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 
 REM Disable HF_HUB_DISABLE_XET, buggy; default disables Xet (set to 0 to enable) - https://github.com/Nerogar/OneTrainer/issues/949
@@ -60,7 +61,7 @@ if errorlevel 1 (
 
 :launch
 echo Starting UI...
-%PYTHON% scripts\train_ui.py
+%LAUNCH_CMD% scripts\train_ui.py
 if errorlevel 1 (
     echo Error: UI script exited with code %ERRORLEVEL%
 )
