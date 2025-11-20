@@ -13,6 +13,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudType import CloudType
+from modules.util.tensorboard_util import TensorboardManager
 
 
 class CloudTrainer(BaseTrainer):
@@ -29,8 +30,8 @@ class CloudTrainer(BaseTrainer):
 
         tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-        if config.tensorboard and not config.cloud.tensorboard_tunnel and not config.tensorboard_always_on:
-            super()._start_tensorboard()
+
+        TensorboardManager().handle_training_start(config)
 
         match config.cloud.type:
             case CloudType.RUNPOD:
@@ -113,8 +114,7 @@ class CloudTrainer(BaseTrainer):
 
     def end(self):
         try:
-            if self.config.tensorboard and not self.config.cloud.tensorboard_tunnel and not self.config.tensorboard_always_on:
-                super()._stop_tensorboard()
+            TensorboardManager().handle_training_end(self.config)
 
             if self.config.cloud.delete_workspace and not self.error_caught and not self.commands.get_stop_command():
                 self.callbacks.on_update_status("Deleting remote workspace")

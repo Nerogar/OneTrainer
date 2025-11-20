@@ -108,11 +108,18 @@ class BaseConfig:
                     else:
                         setattr(self, name, str(data[name]))
                 elif issubclass_safe(self.types[name], Enum):
-                    if isinstance(data[name], str):
-                        if self.nullables[name]:
-                            setattr(self, name, None if data[name] is None else self.types[name][data[name]])
-                        else:
-                            setattr(self, name, self.types[name][data[name]])
+                    if data[name] is None and self.nullables[name]:
+                        setattr(self, name, None)
+                    elif isinstance(data[name], str):
+                        try:
+                            # Try to set by value first (for StrEnum)
+                            setattr(self, name, self.types[name](data[name]))
+                        except ValueError:
+                            try:
+                                # Fallback to setting by name for other Enum types
+                                setattr(self, name, self.types[name][data[name]])
+                            except KeyError:
+                                print(f"Could not set {name} as {str(data[name])}")
                     else:
                         setattr(self, name, data[name])
                 elif self.types[name] is bool:

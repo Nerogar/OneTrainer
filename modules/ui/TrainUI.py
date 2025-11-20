@@ -1,10 +1,8 @@
+import contextlib
 import ctypes
 import datetime
 import json
-import os
 import platform
-import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -15,6 +13,7 @@ from pathlib import Path
 from tkinter import filedialog
 
 import scripts.generate_debug_report
+from modules.ui import GeneralTab
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
 from modules.ui.CaptionUI import CaptionUI
 from modules.ui.CloudTab import CloudTab
@@ -23,6 +22,7 @@ from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.LoraTab import LoraTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
+from modules.ui.QueueTrainingUI import QueueTrainingUI
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -33,10 +33,11 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
-from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.tensorboard_util import TensorboardManager
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
@@ -47,6 +48,7 @@ import torch
 
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
+from tkinterdnd2 import TkinterDnD
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
@@ -55,7 +57,40 @@ if platform.system() == "Windows":
         # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
 
-class TrainUI(ctk.CTk):
+class WindowSizeNotifier:
+    def __init__(self, window, size_dict):
+        self.window = window
+        self.size_dict = size_dict
+        self.current_breakpoint = None
+        self.window.bind('<Configure>', self.check_size)
+        # set min size based on smallest breakpoint
+        min_breakpoint = min(self.size_dict.keys(), key=lambda x: x if isinstance(x, int) else x[0])
+        min_width = min_breakpoint if isinstance(min_breakpoint, int) else min_breakpoint[0]
+        min_height = min_breakpoint[1] if isinstance(min_breakpoint, tuple) else 100
+        self.window.minsize(min_width, min_height)
+
+    def check_size(self, event):
+        if event.widget == self.window:
+
+            # Temporary debug print
+            print(f"Window size: {event.width}x{event.height}")
+            # Check for breakpoints with height requirement
+            for bp in self.size_dict:
+                if isinstance(bp, tuple):
+                    if event.width >= bp[0] and event.height >= bp[1]:
+                        if bp != self.current_breakpoint:
+                            self.current_breakpoint = bp
+                            self.size_dict[bp]()
+                        return
+
+            # Check for width-only breakpoints
+            breakpoint = max((bp for bp in self.size_dict if isinstance(bp, int) and event.width >= bp), default=None)
+            if breakpoint != self.current_breakpoint and breakpoint is not None:
+                self.current_breakpoint = breakpoint
+                self.size_dict[breakpoint]()
+
+
+class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
     set_step_progress: Callable[[int, int], None]
     set_epoch_progress: Callable[[int, int], None]
 
@@ -92,9 +127,11 @@ class TrainUI(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        self.TkdndVersion = TkinterDnD._require(self)
 
         self.title("OneTrainer")
-        self.geometry("1100x740")
+        self.geometry("1100x760")
+        self.minsize(890, 450) #width, height
 
         self.after(100, lambda: self._set_icon())
 
@@ -105,9 +142,9 @@ class TrainUI(ctk.CTk):
         self.train_config = TrainConfig.default_values()
         self.ui_state = UIState(self, self.train_config)
 
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=0)
+        self.grid_rowconfigure(0, weight=0) # top bar
+        self.grid_rowconfigure(1, weight=1) # central content frame
+        self.grid_rowconfigure(2, weight=0) # bottom bar
         self.grid_columnconfigure(0, weight=1)
 
         self.status_label = None
@@ -130,11 +167,24 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
-        self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
-        self._check_start_always_on_tensorboard()
+        self.tensorboard_manager = TensorboardManager()
 
-        self.workspace_dir_trace_id = self.ui_state.add_var_trace("workspace_dir", self._on_workspace_dir_change_trace)
+        # Initialize tensorboard if needed
+        if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
+            self.tensorboard_manager.start(self.train_config)
+
+        # Add debounced trace for workspace_dir changes
+        self.workspace_dir_debounce_id = None
+        self.workspace_dir_trace_id = self.ui_state.add_var_trace(
+            "workspace_dir",
+            lambda: self._on_workspace_dir_change_debounced()
+        )
+
+        self.tensorboard_mode_trace_id = self.ui_state.add_var_trace(
+            "tensorboard_mode",
+            lambda: self._on_tensorboard_mode_change()
+        )
 
         # Persistent profiling window.
         self.profiling_window = ProfilingWindow(self)
@@ -143,9 +193,13 @@ class TrainUI(ctk.CTk):
 
     def __close(self):
         self.top_bar_component.save_default()
-        self._stop_always_on_tensorboard()
+        self.tensorboard_manager.stop()
         if hasattr(self, 'workspace_dir_trace_id'):
             self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
+        if hasattr(self, 'tensorboard_mode_trace_id'):
+            self.ui_state.remove_var_trace("tensorboard_mode", self.tensorboard_mode_trace_id)
+        if hasattr(self, 'multi_gpu_trace_id'):
+            self.ui_state.remove_var_trace("multi_gpu", self.multi_gpu_trace_id)
         self.quit()
 
     def top_bar(self, master):
@@ -229,114 +283,35 @@ class TrainUI(ctk.CTk):
 
         return frame
 
+    def _reset_layout(self):
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+
+        for col in range(10):
+            self.scrollable_frame.grid_columnconfigure(col, weight=0, minsize=0, uniform='')
+
+        for row in range(10):
+            self.scrollable_frame.grid_rowconfigure(row, weight=0, minsize=0)
+
+    def _create_section(self, parent, title):
+        """Create a section frame with title label"""
+        section = ctk.CTkFrame(parent)
+
+        title_label = ctk.CTkLabel(section, text=title, font=ctk.CTkFont(weight="bold", size=14))
+        title_label.grid(row=0, column=0, sticky='w', padx=10, pady=(10, 5))
+        return section
+
     def create_general_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
+        self.scrollable_frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        self.scrollable_frame.pack(fill="both", expand=1)
 
-        # workspace dir
-        components.label(frame, 0, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run are saved")
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", command=self._on_workspace_dir_change)
+        WindowSizeNotifier(self, {
+            # 1400: lambda: GeneralTab.create_large_layout(self),
+            1100: lambda: GeneralTab.create_regular_layout(self),
+            890: lambda: GeneralTab.create_small_layout(self),
+        })
 
-        # cache dir
-        components.label(frame, 0, 2, "Cache Directory",
-                         tooltip="The directory where cached data is saved")
-        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir")
-
-        # continue from previous backup
-        components.label(frame, 2, 0, "Continue from last backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
-        components.switch(frame, 2, 1, self.ui_state, "continue_last_backup")
-
-        # only cache
-        components.label(frame, 2, 2, "Only Cache",
-                         tooltip="Only populate the cache, without any training")
-        components.switch(frame, 2, 3, self.ui_state, "only_cache")
-
-        # debug
-        components.label(frame, 4, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
-        components.switch(frame, 4, 1, self.ui_state, "debug_mode")
-
-        components.label(frame, 4, 2, "Debug Directory",
-                         tooltip="The directory where debug data is saved")
-        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir")
-
-        # tensorboard
-        components.label(frame, 6, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
-        components.switch(frame, 6, 1, self.ui_state, "tensorboard")
-
-        components.label(frame, 6, 2, "Always-On Tensorboard",
-                         tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
-        components.switch(frame, 6, 3, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
-
-        components.label(frame, 7, 0, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-        components.switch(frame, 7, 1, self.ui_state, "tensorboard_expose")
-        components.label(frame, 7, 2, "Tensorboard Port",
-                         tooltip="Port to use for Tensorboard link")
-        components.entry(frame, 7, 3, self.ui_state, "tensorboard_port")
-
-
-        # validation
-        components.label(frame, 8, 0, "Validation",
-                         tooltip="Enable validation steps and add new graph in tensorboard")
-        components.switch(frame, 8, 1, self.ui_state, "validation")
-
-        components.label(frame, 8, 2, "Validate after",
-                         tooltip="The interval used when validate training")
-        components.time_entry(frame, 8, 3, self.ui_state, "validate_after", "validate_after_unit")
-
-        # device
-        components.label(frame, 10, 0, "Dataloader Threads",
-                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
-
-        components.label(frame, 11, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
-        components.entry(frame, 11, 1, self.ui_state, "train_device")
-
-        components.label(frame, 12, 0, "Multi-GPU",
-                         tooltip="Enable multi-GPU training")
-        components.switch(frame, 12, 1, self.ui_state, "multi_gpu")
-        components.label(frame, 12, 2, "Device Indexes",
-                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
-        components.entry(frame, 12, 3, self.ui_state, "device_indexes")
-
-        components.label(frame, 13, 0, "Sequential model setup",
-                         tooltip="Multi-GPU: If enabled, loading and setting up the model is done for each GPU one after the other. This is slower, but can reduce peak RAM usage.")
-        components.switch(frame, 13, 1, self.ui_state, "sequential_model_setup")
-
-        components.label(frame, 14, 0, "Gradient Reduce Precision",
-                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
-                                 "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
-                                 "FLOAT_32: Reduce gradients in float32\n"
-                                 "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
-                         wide_tooltip=True)
-        components.options(frame, 14, 1, [str(x) for x in list(GradientReducePrecision)], self.ui_state,
-                           "gradient_reduce_precision")
-
-        components.label(frame, 14, 2, "Fused Gradient Reduce",
-                         tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
-        components.switch(frame, 14, 3, self.ui_state, "fused_gradient_reduce")
-
-        components.label(frame, 15, 0, "Async Gradient Reduce",
-                         tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
-        components.switch(frame, 15, 1, self.ui_state, "async_gradient_reduce")
-        components.label(frame, 15, 2, "Buffer size (MB)",
-                         tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
-        components.entry(frame, 15, 3, self.ui_state, "async_gradient_reduce_buffer")
-
-        components.label(frame, 16, 0, "Temp Device",
-                         tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 16, 1, self.ui_state, "temp_device")
-
-        frame.pack(fill="both", expand=1)
-        return frame
+        return self.scrollable_frame
 
     def create_model_tab(self, master):
         return ModelTab(master, self.train_config, self.ui_state)
@@ -472,53 +447,6 @@ class TrainUI(ctk.CTk):
         frame.pack(fill="both", expand=1)
         return frame
 
-    def lora_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
-
-        # lora model name
-        components.label(frame, 0, 0, "LoRA base model",
-                         tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.file_entry(
-            frame, 0, 1, self.ui_state, "lora_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # lora rank
-        components.label(frame, 1, 0, "LoRA rank",
-                         tooltip="The rank parameter used when creating a new LoRA")
-        components.entry(frame, 1, 1, self.ui_state, "lora_rank")
-
-        # lora rank
-        components.label(frame, 2, 0, "LoRA alpha",
-                         tooltip="The alpha parameter used when creating a new LoRA")
-        components.entry(frame, 2, 1, self.ui_state, "lora_alpha")
-
-        # Dropout Percentage
-        components.label(frame, 3, 0, "Dropout Probability",
-                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
-
-        # lora weight dtype
-        components.label(frame, 4, 0, "LoRA Weight Data Type",
-                         tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "lora_weight_dtype")
-
-        # For use with additional embeddings.
-        components.label(frame, 5, 0, "Bundle Embeddings",
-                         tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
-        components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
     def embedding_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         frame.grid_columnconfigure(0, weight=0)
@@ -530,7 +458,7 @@ class TrainUI(ctk.CTk):
         # embedding model name
         components.label(frame, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
-        components.file_entry(
+        components.path_entry(
             frame, 0, 1, self.ui_state, "embedding.model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
@@ -600,6 +528,10 @@ class TrainUI(ctk.CTk):
         components.label(frame, 4, 0, "Profiling Tool",
                          tooltip="Open the profiling tools.")
         components.button(frame, 4, 1, "Open", self.open_profiling_tool)
+
+        components.label(frame, 5, 0, "Queue Training",
+                 tooltip="Build batch/sweep scripts that call the CLI with multiple configs")
+        components.button(frame, 5, 1, "Open", self.open_queue_training_tool)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -706,6 +638,10 @@ class TrainUI(ctk.CTk):
     def open_profiling_tool(self):
         self.profiling_window.deiconify()
 
+    def open_queue_training_tool(self):
+        window = QueueTrainingUI(self)
+        self.wait_window(window)
+
     def generate_debug_package(self):
         zip_path = filedialog.askdirectory(
             initialdir=".",
@@ -727,7 +663,6 @@ class TrainUI(ctk.CTk):
             traceback.print_exc()
             self.on_update_status(f"Error generating debug package: {e}")
 
-
     def open_sample_ui(self):
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
@@ -743,6 +678,10 @@ class TrainUI(ctk.CTk):
 
     def __training_thread_function(self):
         error_caught = False
+
+        # Use centralized manager
+        self.tensorboard_manager.handle_training_start(self.train_config)
+
 
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
@@ -761,16 +700,16 @@ class TrainUI(ctk.CTk):
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
             error_caught = True
             traceback.print_exc()
+        finally:
+            trainer.end()
 
-        trainer.end()
+            # clear gpu memory
+            del trainer
 
-        # clear gpu memory
-        del trainer
-
-        self.training_thread = None
-        self.training_commands = None
-        torch.clear_autocast_cache()
-        torch_gc()
+            self.training_thread = None
+            self.training_commands = None
+            torch.clear_autocast_cache()
+            torch_gc()
 
         if error_caught:
             self.on_update_status("Error: check the console for details")
@@ -778,19 +717,15 @@ class TrainUI(ctk.CTk):
             self.on_update_status("Stopped")
         self.delete_eta_label()
 
-        # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
-        self.after(0, self._set_training_button_idle)
+        # Use centralized manager
+        self.tensorboard_manager.handle_training_end(self.train_config)
 
-        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
-            self.after(0, self._start_always_on_tensorboard)
+        self.after(0, self._set_training_button_idle)
 
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
             self._set_training_button_running()
-
-            if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._stop_always_on_tensorboard()
 
             self.training_commands = TrainCommands()
             torch_gc()
@@ -833,70 +768,24 @@ class TrainUI(ctk.CTk):
         if train_commands:
             train_commands.save()
 
-    def _check_start_always_on_tensorboard(self):
-        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
-            self._start_always_on_tensorboard()
+    def _on_workspace_dir_change_debounced(self, *args):
+        """Debounce workspace directory changes to avoid rapid restarts"""
+        if self.workspace_dir_debounce_id is not None:
+            with contextlib.suppress(Exception):
+                self.after_cancel(self.workspace_dir_debounce_id)
+        self.workspace_dir_debounce_id = self.after(1500, self._on_workspace_dir_change_actual)
 
-    def _start_always_on_tensorboard(self):
-        if self.always_on_tensorboard_subprocess:
-            self._stop_always_on_tensorboard()
+    def _on_workspace_dir_change_actual(self):
+        if (new := self.train_config.workspace_dir) == self.current_workspace_dir:
+            return
+        self.current_workspace_dir = new
+        self.tensorboard_manager.handle_workspace_change(self.train_config)
 
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
-        tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
-
-        os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-
-        tensorboard_args = [
-            tensorboard_executable,
-            "--logdir",
-            tensorboard_log_dir,
-            "--port",
-            str(self.train_config.tensorboard_port),
-            "--samples_per_plugin=images=100,scalars=10000",
-        ]
-
-        if self.train_config.tensorboard_expose:
-            tensorboard_args.append("--bind_all")
-
-        try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
-        except Exception:
-            self.always_on_tensorboard_subprocess = None
-
-    def _stop_always_on_tensorboard(self):
-        if self.always_on_tensorboard_subprocess:
-            try:
-                self.always_on_tensorboard_subprocess.terminate()
-                self.always_on_tensorboard_subprocess.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.always_on_tensorboard_subprocess.kill()
-            except Exception:
-                pass
-            finally:
-                self.always_on_tensorboard_subprocess = None
-
-    def _on_workspace_dir_change(self, new_workspace_dir: str):
-        if new_workspace_dir != self.current_workspace_dir:
-            self.current_workspace_dir = new_workspace_dir
-
-            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
-
-    def _on_workspace_dir_change_trace(self, *args):
-        new_workspace_dir = self.train_config.workspace_dir
-        if new_workspace_dir != self.current_workspace_dir:
-            self.current_workspace_dir = new_workspace_dir
-
-            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
-
-    def _on_always_on_tensorboard_toggle(self):
-        if self.train_config.tensorboard_always_on:
-            if not (self.training_thread and self.train_config.tensorboard):
-                self._start_always_on_tensorboard()
-        else:
-            if not (self.training_thread and self.train_config.tensorboard):
-                self._stop_always_on_tensorboard()
+    def _on_tensorboard_mode_change(self):
+        self.tensorboard_manager.handle_mode_change(
+            self.train_config,
+            is_training=self.training_thread is not None
+        )
 
     def _set_training_button_style(self, mode: str):
         if not self.training_button:
