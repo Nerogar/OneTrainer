@@ -1,4 +1,3 @@
-import subprocess
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
@@ -20,8 +19,6 @@ class BaseTrainer(
     TimedActionMixin,
     metaclass=ABCMeta,
 ):
-
-    tensorboard_subprocess: subprocess.Popen = None
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__()
