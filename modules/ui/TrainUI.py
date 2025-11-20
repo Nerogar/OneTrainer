@@ -815,16 +815,15 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             torch.clear_autocast_cache()
             torch_gc()
 
-        if error_caught:
-            self.on_update_status("Error: check the console for details")
-        else:
-            self.on_update_status("Stopped")
-        self.delete_eta_label()
+            if error_caught:
+                self.on_update_status("Error: check the console for details")
+            else:
+                self.on_update_status("Stopped")
+            self.delete_eta_label()
 
-        # Use centralized manager
-        self.tensorboard_manager.handle_training_end(self.train_config)
+            self.tensorboard_manager.handle_training_end(self.train_config)
 
-        self.after(0, self._set_training_button_idle)
+            self.after(0, self._set_training_button_idle)
 
     def start_training(self):
         if self.training_thread is None:
