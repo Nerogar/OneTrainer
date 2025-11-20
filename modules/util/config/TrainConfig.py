@@ -315,7 +315,6 @@ class TrainConfig(BaseConfig):
     # multi-GPU
     multi_gpu: bool
     device_indexes: str
-    sequential_model_setup: bool
     gradient_reduce_prevision: GradientReducePrecision
     fused_gradient_reduce: bool
     async_gradient_reduce: bool
@@ -878,7 +877,6 @@ class TrainConfig(BaseConfig):
         #multi-GPU
         data.append(("multi_gpu", False, bool, False))
         data.append(("device_indexes", "", str, False))
-        data.append(("sequential_model_setup", False, bool, False))
         data.append(("gradient_reduce_precision", GradientReducePrecision.FLOAT_32_STOCHASTIC, GradientReducePrecision, False))
         data.append(("fused_gradient_reduce", True, bool, False))
         data.append(("async_gradient_reduce", True, bool, False))
