@@ -9,60 +9,14 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TensorboardMode import TensorboardMode
 
 
-def get_tensorboard_run_name(config: TrainConfig) -> str:
-    """Extract run name from output_model_destination, falling back to prefix."""
-    if not config.output_model_destination or not config.output_model_destination.strip():
-        return config.save_filename_prefix
-
-    path = Path(config.output_model_destination)
-    name = path.name
-
-    # remove extension
-    if path.suffix:
-        name = path.stem
-
-    # fall back to prefix if no name could be extracted
-    if not name:
-        return config.save_filename_prefix
-
-    return name
-
-
 class TensorboardManager:
 
-    _instance = None
-    _lock = threading.Lock()
-
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
-        return cls._instance
-
     def __init__(self):
-        if self._initialized:
-            return
         self._process = None
-        self._config = None
-        self._mode = None
         self._previous_mode = None
-        self._initialized = True
 
     def _is_cloud_tunnel_enabled(self, config: TrainConfig) -> bool:
         return config.cloud.enabled and config.cloud.tensorboard_tunnel
-
-    def should_start(self, config: TrainConfig, is_training: bool = False) -> bool:
-        if self._is_cloud_tunnel_enabled(config):
-            return False
-
-        mode = config.tensorboard_mode
-        if mode == TensorboardMode.OFF:
-            return False
-        if mode == TensorboardMode.ALWAYS_ON:
-            return not is_training
-        return mode == TensorboardMode.TRAIN_ONLY and is_training
 
     def start(self, config: TrainConfig, mode: TensorboardMode | None = None) -> bool:
         if self._process is not None:
@@ -73,8 +27,6 @@ class TensorboardManager:
             return False
 
         self._process = start_filtered_tensorboard(config)
-        self._config = config
-        self._mode = effective_mode
         self._previous_mode = effective_mode
         return self._process is not None
 
@@ -84,8 +36,6 @@ class TensorboardManager:
 
         stop_tensorboard(self._process)
         self._process = None
-        self._config = None
-        self._mode = None
         return True
 
     def restart(self, config: TrainConfig) -> bool:
@@ -94,9 +44,6 @@ class TensorboardManager:
 
     def is_running(self) -> bool:
         return self._process is not None
-
-    def get_mode(self) -> TensorboardMode | None:
-        return self._mode
 
     def handle_training_start(self, config: TrainConfig):
         if config.tensorboard_mode == TensorboardMode.TRAIN_ONLY:
@@ -238,3 +185,10 @@ def stop_tensorboard(process: subprocess.Popen | None):
         with contextlib.suppress(Exception):
             if process.stdout:
                 process.stdout.close()
+
+
+_tensorboard_manager = TensorboardManager()
+
+
+def get_tensorboard_manager() -> TensorboardManager:
+    return _tensorboard_manager

@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
@@ -822,6 +823,24 @@ class TrainConfig(BaseConfig):
             return self.additional_embeddings + [self.embedding]
         else:
             return self.additional_embeddings
+
+    def get_run_name(self) -> str:
+        """Extract run name from output_model_destination, falling back to prefix."""
+        if not self.output_model_destination or not self.output_model_destination.strip():
+            return self.save_filename_prefix
+
+        path = Path(self.output_model_destination)
+        name = path.name
+
+        # remove extension
+        if path.suffix:
+            name = path.stem
+
+        # fall back to prefix if no name could be extracted
+        if not name:
+            return self.save_filename_prefix
+
+        return name
 
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")

@@ -184,7 +184,7 @@ class SampleWindow(ctk.CTkToplevel):
             progress = self.model.train_progress
             sample_path = os.path.join(
                 sample_dir,
-                f"{get_string_timestamp()}-training-sample-{progress.filename_string()}"
+                f"{self.current_train_config.get_run_name()}_{get_string_timestamp()}-training-sample-{progress.filename_string()}"
             )
 
             self.model.eval()

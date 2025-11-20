@@ -36,7 +36,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.tensorboard_util import TensorboardManager
+from modules.util.tensorboard_util import get_tensorboard_manager
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
@@ -133,7 +133,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.training_commands = None
 
         self.current_workspace_dir = self.train_config.workspace_dir
-        self.tensorboard_manager = TensorboardManager()
+        self.tensorboard_manager = get_tensorboard_manager()
 
         # Initialize tensorboard if needed
         if self.train_config.tensorboard_mode == TensorboardMode.ALWAYS_ON:
