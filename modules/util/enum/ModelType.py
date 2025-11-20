@@ -133,10 +133,20 @@ class ModelType(Enum):
     def is_stable_cascade(self):
         return self == ModelType.STABLE_CASCADE_1
 
+    def is_flow_matching(self) -> bool:
+        return self.is_stable_diffusion_3() \
+            or self.is_flux() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_sana() \
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream()
+
 
 class PeftType(Enum):
     LORA = 'LORA'
     LOHA = 'LOHA'
+    OFT_2 = 'OFT_2'
 
     def __str__(self):
         return self.value

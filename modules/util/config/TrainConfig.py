@@ -362,6 +362,7 @@ class TrainConfig(BaseConfig):
     enable_activation_offloading: bool
     layer_offload_fraction: float
     force_circular_padding: bool
+    compile: bool
 
     # data settings
     concept_file_name: str
@@ -498,6 +499,12 @@ class TrainConfig(BaseConfig):
     lora_decompose_output_axis: bool
     lora_weight_dtype: DataType
     bundle_additional_embeddings: bool
+
+    # oft
+    oft_block_size: int
+    oft_coft: bool
+    coft_eps: float
+    oft_block_share: bool
 
     # optimizer
     optimizer: TrainOptimizerConfig
@@ -918,6 +925,7 @@ class TrainConfig(BaseConfig):
         data.append(("enable_activation_offloading", True, bool, False))
         data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -1106,6 +1114,12 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
+
+        # oft
+        data.append(("oft_block_size", 32, int, False))
+        data.append(("oft_coft", False, bool, False))
+        data.append(("coft_eps", 1e-4, float, False))
+        data.append(("oft_block_share", False, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

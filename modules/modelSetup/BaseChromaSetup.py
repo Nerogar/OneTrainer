@@ -228,7 +228,7 @@ class BaseChromaSetup(
 
             image_seq_len = packed_latent_input.shape[1]
             image_attention_mask = torch.full((packed_latent_input.shape[0], image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)
-            attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
+            attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1) if not torch.all(text_attention_mask) else None
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
@@ -329,5 +329,5 @@ class BaseChromaSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()
