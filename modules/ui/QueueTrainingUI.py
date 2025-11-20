@@ -25,6 +25,7 @@ class QueueTrainingUI(ctk.CTkToplevel):
         self.base_config_path_var = ctk.StringVar()
         self.output_dir_var = ctk.StringVar(value="./queued_training/generated_configs")
         self.file_prefix_var = ctk.StringVar(value="queue_run")
+        self.power_action_var = ctk.StringVar(value="Do nothing")
 
         self.ui_state = UIState(self, {"script_path": "", "secrets_path": "", "base_config_path": ""})
         self.ui_state._UIState__vars.update({
@@ -94,15 +95,26 @@ class QueueTrainingUI(ctk.CTkToplevel):
         button_holder = ctk.CTkFrame(frame, fg_color="transparent")
         button_holder.grid(row=0, column=0, padx=10, pady=10, sticky="e")
 
-        generate_button = components.button(button_holder, row=0, column=0,
+        components.label(button_holder, row=0, column=0, text="On completion:", pad=5).grid_configure(sticky="e")
+
+        options = ["Do nothing", "Shutdown", "Sleep"]
+        if self.is_windows:
+            options.append("Deep Sleep")
+            options.append("Hibernate")
+
+        ctk.CTkOptionMenu(button_holder, variable=self.power_action_var, values=options).grid(row=0, column=1, padx=(0, 10), pady=5)
+
+        generate_button = components.button(button_holder, row=0, column=2,
                                            text="Generate Script", command=self._generate_script)
         generate_button.grid_configure(sticky="e")
 
     def _choose_script_path(self):
         ext = ".bat" if self.is_windows else ".sh"
-        if path := filedialog.asksaveasfilename(defaultextension=ext,
+        if path := filedialog.asksaveasfilename(parent=self, defaultextension=ext,
                 filetypes=[(("Batch" if self.is_windows else "Shell"), f"*{ext}"), ("All Files", "*.*")]):
             self.script_path_var.set(path)
+            self.lift()
+            self.focus_force()
 
     def _render_mode_frame(self, *_args):
         self._snapshot_mode_state()
@@ -201,8 +213,10 @@ class QueueTrainingUI(ctk.CTkToplevel):
             self.base_config_path_var.set("")
 
     def _choose_output_dir(self):
-        if path := filedialog.askdirectory():
+        if path := filedialog.askdirectory(parent=self):
             self.output_dir_var.set(path)
+            self.lift()
+            self.focus_force()
 
     def _add_loop_row(self, initial_path: str = ""):
         row_frame = ctk.CTkFrame(self.loop_rows_container, fg_color="transparent")
@@ -462,8 +476,29 @@ class QueueTrainingUI(ctk.CTkToplevel):
                 'cd "$ONE_TRAINER_DIR"', "source venv/bin/activate"
             ]
 
+        power_cmds = []
+        action = self.power_action_var.get()
+        if action == "Shutdown":
+            if self.is_windows:
+                power_cmds = ["shutdown /s /t 60"]
+            elif platform.system().lower() == "darwin":
+                power_cmds = ["sudo shutdown -h now"]
+            else:
+                power_cmds = ["sudo shutdown -h now"]
+        elif action == "Sleep":
+            if self.is_windows:
+                power_cmds = ["powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState([System.Windows.Forms.PowerState]::Suspend, $false, $false)\""]
+            elif platform.system().lower() == "darwin":
+                power_cmds = ["pmset sleepnow"]
+            else:
+                power_cmds = ["systemctl suspend"]
+        elif action == "Deep Sleep" and self.is_windows:
+            power_cmds = ["rundll32.exe powrprof.dll,SetSuspendState 0,1,0"]
+        elif action == "Hibernate" and self.is_windows:
+            power_cmds = ["shutdown /h || rundll32.exe powrprof.dll,SetSuspendState 0,1,0"]
+
         with open(script_file, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write("\n".join(header + commands) + "\n")
+            handle.write("\n".join(header + commands + power_cmds) + "\n")
 
         if not self.is_windows:
             script_file.chmod(script_file.stat().st_mode | 0o111)

@@ -555,8 +555,9 @@ def path_entry(
 
     # Browse button
     def open_dialog():
+        parent = master.winfo_toplevel()
         if path_type == "directory":
-            selected_path = filedialog.askdirectory()
+            selected_path = filedialog.askdirectory(parent=parent)
         else:
             filetypes = []
 
@@ -566,7 +567,18 @@ def path_entry(
                 filetypes.append((ext_name, ext_patterns))
 
             if allow_model_files:
-                filetypes.extend(MODEL_FILETYPES[1:])
+                current_format = ui_state.get_var(format_var_name).get() if use_model_validator else None
+                indices = {
+                    ModelFormat.DIFFUSERS.value: 1,
+                    ModelFormat.CKPT.value: 2,
+                    ModelFormat.SAFETENSORS.value: 3,
+                    ModelFormat.LEGACY_SAFETENSORS.value: 3,
+                }
+
+                if index := indices.get(current_format):
+                    filetypes.append(MODEL_FILETYPES[index])
+                else:
+                    filetypes.extend(MODEL_FILETYPES[1:])
             if allow_image_files:
                 filetypes.append(("Image", ' '.join(f"*.{x}" for x in supported_image_extensions())))
 
@@ -575,12 +587,12 @@ def path_entry(
             default_ext = valid_extensions[0] if valid_extensions else None
 
             if is_output:
-                kwargs = {"filetypes": filetypes}
+                kwargs = {"filetypes": filetypes, "parent": parent}
                 if default_ext:
                     kwargs["defaultextension"] = default_ext
                 selected_path = filedialog.asksaveasfilename(**kwargs)
             else:
-                selected_path = filedialog.askopenfilename(filetypes=filetypes)
+                selected_path = filedialog.askopenfilename(filetypes=filetypes, parent=parent)
 
         if selected_path:
             if path_modifier:
@@ -588,6 +600,9 @@ def path_entry(
             var.set(selected_path)
             if command:
                 command(selected_path)
+
+            parent.lift()
+            parent.focus_force()
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")

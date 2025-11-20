@@ -37,3 +37,4 @@ pixi.toml
 train.bat
 debug_report.log
 config_diff.txt
+/queued_training
