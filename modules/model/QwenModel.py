@@ -140,7 +140,7 @@ class QwenModel(BaseModel):
             tokenizer_output = self.tokenizer(
                 text,
                 max_length=PROMPT_MAX_LENGTH + DEFAULT_PROMPT_TEMPLATE_CROP_START,
-                padding='longest',
+                padding='max_length',
                 truncation=True,
                 return_tensors="pt"
             )
@@ -168,13 +168,18 @@ class QwenModel(BaseModel):
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
 
-        #prune tokens that are masked in all batch samples
-        #this is still necessary even though we are using 'longest' padding, because cached
-        #encoder outputs by MGDS are always PROMPT_MAX_LENGTH
+        #prune tokens that are masked in all batch samples:
         #this is good for efficiency, but also FIXME currently required by the diffusers pipeline:
         #https://github.com/huggingface/diffusers/issues/12344
         seq_lengths = tokens_mask.sum(dim=1)
         max_seq_length = seq_lengths.max().item()
+
+        #pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
+        #TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
+        #is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
+        if max_seq_length % 16 > 0 and (seq_lengths != max_seq_length).any():
+            max_seq_length += (16 - max_seq_length % 16)
+
         text_encoder_output = text_encoder_output[:, :max_seq_length, :]
         bool_attention_mask = tokens_mask[:, :max_seq_length].bool()
 
