@@ -41,6 +41,12 @@ class TimestepGenerator(ModelSetupNoiseMixin):
         generator = torch.Generator()
         generator.seed()
 
+
+        betas = None
+        if self.timestep_distribution == TimestepDistribution.SPEED:
+            # Create a linear beta schedule for visualization.
+            betas = torch.linspace(1e-4, 0.02, 1000).double()
+
         config = TrainConfig.default_values()
         config.timestep_distribution = self.timestep_distribution
         config.min_noising_strength = self.min_noising_strength
@@ -56,6 +62,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             generator=generator,
             batch_size=1000000,
             config=config,
+            betas=betas,
         )
 
 
