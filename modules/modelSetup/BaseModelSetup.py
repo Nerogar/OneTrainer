@@ -106,12 +106,26 @@ class BaseModelSetup(
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
-        for lr, parameter in zip(lrs, parameters, strict=True):
-            # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
-            name = parameter.split('/')[0]
 
-            if name not in reported_learning_rates:
-                reported_learning_rates[name] = lr
+        # Handle MuonWithAuxAdam's split parameter groups
+        if any('optim_type' in g for g in model.optimizer.param_groups):
+            for group in model.optimizer.param_groups:
+                name = group.get('name')
+                if not name or not group['params']:
+                    continue
+                # For MuonWithAuxAdam, parameter groups are split for Muon and Adam,
+                # but might retain the same base name (e.g., 'unet').
+                optim_type = group.get('optim_type', 'unknown')
+                unique_name = f"{name}_{optim_type}"
+                if unique_name not in reported_learning_rates:
+                    reported_learning_rates[unique_name] = group['lr']
+        else:
+            for lr, parameter in zip(lrs, parameters, strict=True):
+                # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
+                name = parameter.split('/')[0]
+
+                if name not in reported_learning_rates:
+                    reported_learning_rates[name] = lr
 
         reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
 
@@ -120,7 +134,7 @@ class BaseModelSetup(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
-        if config.optimizer.kourkoutas_beta and hasattr(model.optimizer, 'kourkoutas_helper'):
+        if hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
             stats = model.optimizer.kourkoutas_helper.last_beta2_stats
             if stats:
                 tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)

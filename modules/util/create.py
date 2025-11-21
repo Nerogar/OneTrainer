@@ -1,6 +1,6 @@
 import ast
 import importlib
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
@@ -129,6 +129,7 @@ from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
+from modules.util.build_muon_adam_key_fn import split_parameters_for_muon
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
@@ -495,6 +496,7 @@ def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
+        layer_key_fn: Callable | None = None,
 ) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
@@ -1172,6 +1174,134 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
             )
 
+        # MUON_ADV Optimizer
+        case Optimizer.MUON_ADV:
+            import inspect
+
+            from adv_optm import Muon_adv
+
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
+
+            # Prepare Adam-specific keyword arguments from the config
+            adam_kwargs = {}
+            if MuonWithAuxAdam:
+                adam_config_dict = optimizer_config.muon_adam_config.to_dict()
+                valid_adam_keys = {k for k in inspect.signature(Muon_adv.__init__).parameters if k.startswith('adam_')}
+                adam_kwargs = {
+                    key: adam_config_dict[key.removeprefix('adam_')]
+                    for key in valid_adam_keys
+                    if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
+                }
+
+            optimizer = Muon_adv(
+                params=params_for_optimizer,
+                lr=config.learning_rate,
+                beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
+                beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
+                normuon_eps=optimizer_config.normuon_eps if optimizer_config.normuon_eps is not None else 1e-8,
+                normuon_lr_scale=optimizer_config.normuon_lr_scale if optimizer_config.normuon_lr_scale is not None else 0.2,
+                low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
+                ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
+                accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                **adam_kwargs
+            )
+
+        # ADAMUON_ADV Optimizer
+        case Optimizer.ADAMUON_ADV:
+            import inspect
+
+            from adv_optm import AdaMuon_adv
+
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
+
+            # Prepare Adam-specific keyword arguments from the config
+            adam_kwargs = {}
+            if MuonWithAuxAdam:
+                adam_config_dict = optimizer_config.muon_adam_config.to_dict()
+                valid_adam_keys = {k for k in inspect.signature(AdaMuon_adv.__init__).parameters if k.startswith('adam_')}
+                adam_kwargs = {
+                    key: adam_config_dict[key.removeprefix('adam_')]
+                    for key in valid_adam_keys
+                    if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
+                }
+            optimizer = AdaMuon_adv(
+                params=params_for_optimizer,
+                lr=config.learning_rate,
+                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
+                    optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
+                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
+                rms_target=optimizer_config.rms_target if optimizer_config.rms_target is not None else 0.2,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
+                ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
+                normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
+                accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                **adam_kwargs
+            )
+
+        # MUON Optimizer
+        case Optimizer.MUON:
+            import torch.distributed as dist
+
+            from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
+
+            params_for_optimizer, ___ = split_parameters_for_muon(parameters, layer_key_fn, config)
+
+            final_param_groups  = []
+            for group in params_for_optimizer:
+                is_muon = group.get('optim_type') == 'muon'
+
+                if is_muon:
+                    final_group = {
+                        'params': group['params'],
+                        'lr': group['lr'],
+                        'use_muon': True,
+                        'momentum': optimizer_config.momentum if optimizer_config.momentum is not None else 0.95,
+                        'weight_decay': optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                    }
+                else:  # is adam
+                    adam_config = optimizer_config.muon_adam_config
+
+                    final_group = {
+                        'params': group['params'],
+                        'lr': group['lr'],
+                        'use_muon': False,
+                        'betas': (adam_config.beta1 if adam_config.beta1 is not None else 0.9,
+                                    adam_config.beta2 if adam_config.beta2 is not None else 0.95),
+                        'eps': adam_config.eps if adam_config.eps is not None else 1e-10,
+                        'weight_decay': adam_config.weight_decay if adam_config.weight_decay is not None else 0.0,
+                    }
+                final_param_groups.append(final_group)
+
+            # check the distributed status
+            is_distributed = dist.is_initialized() and dist.get_world_size() > 1
+
+            OptimizerClass = MuonWithAuxAdam if is_distributed else SingleDeviceMuonWithAuxAdam
+            optimizer = OptimizerClass(param_groups=final_param_groups )
+
+            # Add metadata back to the optimizer's param_groups for the framework to use.
+            for i, group in enumerate(optimizer.param_groups):
+                original_group = params_for_optimizer[i]
+                group['initial_lr'] = original_group.get('initial_lr', original_group['lr'])
+                group['name'] = original_group.get('name')
+                group['optim_type'] = original_group.get('optim_type')
+
+
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:
             from timm.optim.adabelief import AdaBelief
@@ -1271,7 +1401,16 @@ def create_optimizer(
             old_group_optimizer_mapping = state_dict['param_group_optimizer_mapping']
 
             new_param_groups = optimizer.state_dict()['param_groups']
-            new_group_mapping = parameter_group_collection.unique_name_mapping
+            if config.optimizer.MuonWithAuxAdam:
+                new_group_mapping = []
+                for group in optimizer.param_groups:
+                    original_name = group.get('name')
+
+                    optim_type = group.get('optim_type', 'unknown')
+                    unique_name = f"{original_name}_{optim_type}"
+                    new_group_mapping.append(unique_name)
+            else:
+                new_group_mapping = parameter_group_collection.unique_name_mapping
 
             state = {}
             param_groups = []
