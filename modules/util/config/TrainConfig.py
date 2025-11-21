@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
@@ -23,6 +24,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -302,7 +304,7 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
-    tensorboard: bool
+    tensorboard_mode: TensorboardMode
     tensorboard_expose: bool
     tensorboard_always_on: bool
     tensorboard_port: str
@@ -311,6 +313,13 @@ class TrainConfig(BaseConfig):
     validate_after_unit: TimeUnit
     continue_last_backup: bool
     include_train_config: ConfigPart
+
+    # validation settings
+    validation_auto_correct: bool
+    validation_show_tooltips: bool
+    use_friendly_names: bool
+    prevent_overwrite: bool
+    auto_prefix: bool
 
     # multi-GPU
     multi_gpu: bool
@@ -522,6 +531,7 @@ class TrainConfig(BaseConfig):
                 6: self.__migration_6,
                 7: self.__migration_7,
                 8: self.__migration_8,
+                9: self.__migration_9,
             }
         )
 
@@ -702,6 +712,7 @@ class TrainConfig(BaseConfig):
     def __migration_7(self, data: dict) -> dict:
         migrated_data = data.copy()
 
+        # Migrate lora_layers to layer_filter
         if "lora_layers" in migrated_data:
             migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
         if "lora_layer_preset" in migrated_data:
@@ -716,6 +727,21 @@ class TrainConfig(BaseConfig):
 
         if migrated_data["model_type"] != "STABLE_CASCADE_1" and migrated_data["model_type"] != "WUERSTCHEN_2":
             migrated_data["transformer"] = migrated_data["prior"]
+
+        return migrated_data
+
+    def __migration_9(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        # Migrate old tensorboard booleans to enum
+        tensorboard = migrated_data.pop("tensorboard", True)
+        tensorboard_always_on = migrated_data.pop("tensorboard_always_on", False)
+
+        if tensorboard_always_on:
+            migrated_data["tensorboard_mode"] = TensorboardMode.ALWAYS_ON
+        elif tensorboard:
+            migrated_data["tensorboard_mode"] = TensorboardMode.TRAIN_ONLY
+        else:
+            migrated_data["tensorboard_mode"] = TensorboardMode.OFF
 
         return migrated_data
 
@@ -797,6 +823,24 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
+    def get_run_name(self) -> str:
+        """Extract run name from output_model_destination, falling back to prefix."""
+        if not self.output_model_destination or not self.output_model_destination.strip():
+            return self.save_filename_prefix
+
+        path = Path(self.output_model_destination)
+        name = path.name
+
+        # remove extension
+        if path.suffix:
+            name = path.stem
+
+        # fall back to prefix if no name could be extracted
+        if not name:
+            return self.save_filename_prefix
+
+        return name
+
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")
         if os.path.exists(backups_path):
@@ -864,7 +908,7 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
-        data.append(("tensorboard", True, bool, False))
+        data.append(("tensorboard_mode", TensorboardMode.ALWAYS_ON, TensorboardMode, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
@@ -873,6 +917,13 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
+
+        # validation settings
+        data.append(("validation_auto_correct", True, bool, False))
+        data.append(("validation_show_tooltips", True, bool, False))
+        data.append(("use_friendly_names", False, bool, False))
+        data.append(("prevent_overwrite", True, bool, False))
+        data.append(("auto_prefix", False, bool, False))
 
         #multi-GPU
         data.append(("multi_gpu", False, bool, False))
