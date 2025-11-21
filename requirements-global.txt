@@ -47,7 +47,7 @@ prodigy-plus-schedule-free==2.0.1 # Prodigy plus optimizer
 adv_optm==1.1.3 # advanced optimizers
 
 # Profiling
-scalene==1.5.51
+scalene==1.5.55
 
 # ui
 customtkinter==5.2.2
