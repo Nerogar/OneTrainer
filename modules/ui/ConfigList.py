@@ -53,6 +53,7 @@ class ConfigList(metaclass=ABCMeta):
         self.show_toggle_button = show_toggle_button
         self.is_opening_window = False
         self._is_current_item_enabled = False
+        self._deferred_init_done = False
 
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(1, weight=1)
@@ -66,29 +67,42 @@ class ConfigList(metaclass=ABCMeta):
             self.element_list = None
 
             self.configs = []
-            self.__load_available_config_names()
-
+            # defer heavy operations to avoid blocking startup
             self.current_config = getattr(self.train_config, self.attr_name)
             self.widgets = []
-            self.__load_current_config(getattr(self.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
             components.button(self.top_frame, 0, 1, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=20, padx=5)
             components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
+
+            # defer loading config names and creating widgets
+            self.master.after(150, self.__deferred_initialization)
         else:
             self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
             self.top_frame.grid(row=0, column=0, sticky="nsew")
             components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, width=20, padx=5)
 
             self.current_config = getattr(self.train_config, self.attr_name)
+            self.widgets = []
 
             self.element_list = None
-            self._create_element_list()
+            # defer widget creation for non-external file configs too
+            self.master.after(100, self._create_element_list)
 
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
             self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
-            self._update_toggle_button_text()
+            if hasattr(self, 'widgets'):
+                self._update_toggle_button_text()
+
+    def __deferred_initialization(self):
+        if self._deferred_init_done:
+            return
+        self._deferred_init_done = True
+
+        self.__load_available_config_names()
+        self.__load_current_config(getattr(self.train_config, self.attr_name))
+        self.__create_configs_dropdown()  # refresh with loaded configs
 
 
 
@@ -123,6 +137,10 @@ class ConfigList(metaclass=ABCMeta):
 
     def _update_item_enabled_state(self):
         # Only count items that match current filters
+        if not hasattr(self, 'widgets') or not self.widgets:
+            self._is_current_item_enabled = False
+            return
+
         self._is_current_item_enabled = any(
             item.ui_state.get_var(self.enable_key).get()
             for i, item in enumerate(self.widgets)
@@ -162,7 +180,7 @@ class ConfigList(metaclass=ABCMeta):
     def _create_placeholder(self):
         placeholder = ctk.CTkLabel(
             self.element_list,
-            text="Either click the 'Add Concept' button or drag and drop a directory here to add a new concept",
+            text="Either click the 'Add Concept/Embedding' button or drag and drop a directory here to add a new concept/embeddings",
             text_color="gray50"
         )
         placeholder.grid(row=0, column=0, padx=20, pady=20)

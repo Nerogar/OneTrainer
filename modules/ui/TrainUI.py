@@ -124,10 +124,19 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.lora_tab = None
         self.cloud_tab = None
         self.additional_embeddings_tab = None
+        self.concepts_tab = None
+        self.sampling_tab = None
+        self.backup_tab = None
+        self.tools_tab = None
 
         self.top_bar_component = self.top_bar(self)
+        self.update_idletasks()
+
         self.content_frame(self)
+        self.update_idletasks()
+
         self.bottom_bar(self)
+        self.update_idletasks()
 
         self.training_thread = None
         self.training_callbacks = None
@@ -245,20 +254,92 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tabview = ctk.CTkTabview(frame)
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
-        self.general_tab = self.create_general_tab(self.tabview.add("general"))
-        self.model_tab = self.create_model_tab(self.tabview.add("model"))
-        self.data_tab = self.create_data_tab(self.tabview.add("data"))
-        self.concepts_tab = self.create_concepts_tab(self.tabview.add("concepts"))
-        self.training_tab = self.create_training_tab(self.tabview.add("training"))
-        self.sampling_tab = self.create_sampling_tab(self.tabview.add("sampling"))
-        self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
-        self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
-        self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
-        self.cloud_tab = self.create_cloud_tab(self.tabview.add("cloud"))
+        # track which tabs have been created
+        self._tabs_created = set()
 
-        self.change_training_method(self.train_config.training_method)
+        # only create the general tab immediately for fast startup
+        self.general_tab = self.create_general_tab(self.tabview.add("general"))
+        self._tabs_created.add("general")
+
+        # add placeholders for other tabs
+        for tab in ["model", "data", "concepts", "training", "sampling", "backup", "tools", "additional embeddings", "cloud"]:
+            self.tabview.add(tab)
+
+        # add dynamic tabs based on current config
+        if self.train_config.training_method == TrainingMethod.LORA:
+            self.tabview.add("LoRA")
+        elif self.train_config.training_method == TrainingMethod.EMBEDDING:
+            self.tabview.add("embedding")
+
+        # initialize other tab references as None
+        self.data_tab = None        # bind tab change event for lazy loading
+        self._original_set = self.tabview.set
+        self.tabview.set = self._lazy_tab_switch
+
+        # defer creation of remaining tabs significantly to show UI first
+        self.after(500, self._create_remaining_tabs)
 
         return frame
+
+    def _lazy_tab_switch(self, tab_name):
+        """Intercept tab switches to create tabs on-demand"""
+        if tab_name not in self._tabs_created:
+            self._create_tab_content(tab_name)
+
+        return self._original_set(tab_name)
+
+    def _create_tab_content(self, tab_name):
+        """Create content for a specific tab on-demand"""
+        if tab_name in self._tabs_created:
+            return
+
+        master = self.tabview._tab_dict[tab_name]
+        creators = {
+            "model": ("model_tab", self.create_model_tab),
+            "data": ("data_tab", self.create_data_tab),
+            "concepts": ("concepts_tab", self.create_concepts_tab),
+            "training": ("training_tab", self.create_training_tab),
+            "sampling": ("sampling_tab", self.create_sampling_tab),
+            "backup": ("backup_tab", self.create_backup_tab),
+            "tools": ("tools_tab", self.create_tools_tab),
+            "additional embeddings": ("additional_embeddings_tab", self.create_additional_embeddings_tab),
+            "cloud": ("cloud_tab", self.create_cloud_tab),
+        }
+
+        if tab_name in creators:
+            attr, method = creators[tab_name]
+            setattr(self, attr, method(master))
+        elif tab_name == "LoRA":
+            self.lora_tab = LoraTab(master, self.train_config, self.ui_state)
+        elif tab_name == "embedding":
+            self.embedding_tab(master)
+
+        self._tabs_created.add(tab_name)
+
+    def _create_remaining_tabs(self):
+        """Create remaining tabs in background after startup"""
+        tabs = ["model", "training", "data", "concepts", "sampling", "backup", "tools", "additional embeddings", "cloud"]
+        if self.train_config.training_method == TrainingMethod.LORA:
+            tabs.insert(1, "LoRA")
+        elif self.train_config.training_method == TrainingMethod.EMBEDDING:
+            tabs.insert(1, "embedding")
+
+        self._remaining_tabs_queue = [t for t in tabs if t not in self._tabs_created]
+        self._create_next_tab_deferred()
+
+    def _create_next_tab_deferred(self):
+        """Create one tab at a time with delays to keep UI responsive"""
+        if not hasattr(self, '_remaining_tabs_queue') or not self._remaining_tabs_queue:
+            # all tabs created, apply training method changes
+            self.change_training_method(self.train_config.training_method)
+            return
+
+        tab_name = self._remaining_tabs_queue.pop(0)
+        self._create_tab_content(tab_name)
+
+        # schedule next tab creation after a delay
+        if self._remaining_tabs_queue:
+            self.after(100, self._create_next_tab_deferred)
 
     def create_general_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -856,9 +937,12 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def save_default(self):
         self.top_bar_component.save_default()
-        self.concepts_tab.save_current_config()
-        self.sampling_tab.save_current_config()
-        self.additional_embeddings_tab.save_current_config()
+        if self.concepts_tab:
+            self.concepts_tab.save_current_config()
+        if self.sampling_tab:
+            self.sampling_tab.save_current_config()
+        if self.additional_embeddings_tab:
+            self.additional_embeddings_tab.save_current_config()
 
     def export_training(self):
         file_path = filedialog.asksaveasfilename(filetypes=[

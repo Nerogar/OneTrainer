@@ -43,7 +43,7 @@ class TopBar:
         self.config_ui_state = UIState(master, self.config_ui_data)
 
         self.configs = [("", path_util.canonical_join(self.dir, "#.json"))]
-        self.__load_available_config_names()
+        self._configs_loaded = False
 
         self.current_config = []
 
@@ -58,6 +58,8 @@ class TopBar:
         # dropdown
         self.configs_dropdown = None
         self.__create_configs_dropdown()
+
+        master.after(500, self.__load_available_config_names_deferred)
 
         # remove button
         # TODO
@@ -171,6 +173,13 @@ class TopBar:
                         name = os.path.splitext(name)[0]
                         self.configs.append((name, path))
             self.configs.sort()
+
+    def __load_available_config_names_deferred(self):
+        if self._configs_loaded:
+            return
+        self.__load_available_config_names()
+        self._configs_loaded = True
+        self.__create_configs_dropdown()
 
     def __save_to_file(self, name) -> str:
         name = path_util.safe_filename(name)

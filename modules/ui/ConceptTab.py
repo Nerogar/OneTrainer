@@ -179,13 +179,14 @@ class ConceptWidget(ctk.CTkFrame):
 
         self.grid_rowconfigure(1, weight=1)
 
-        # image
+        # image - start with placeholder, load actual image async
+        self._placeholder_image = self.__get_placeholder_image()
         self.image = ctk.CTkImage(
-            light_image=self.__get_preview_image(),
+            light_image=self._placeholder_image,
             size=(150, 150)
         )
-        image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=150, width=150)
-        image_label.grid(row=0, column=0)
+        self.image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=150, width=150)
+        self.image_label.grid(row=0, column=0)
 
         # name
         self.name_label = components.label(self, 1, 0, self.__get_display_name(), pad=5, wraplength=140)
@@ -224,14 +225,40 @@ class ConceptWidget(ctk.CTkFrame):
         )
         enabled_switch.place(x=110, y=0)
 
-        image_label.bind(
+        self.image_label.bind(
             "<Button-1>",
             lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
         )
 
+        # defer actual image
+        self.after(50, self.__load_preview_image_deferred)
+
     def __randomize_seed(self, concept: ConceptConfig):
         concept.seed = ConceptConfig.default_values().seed
         return concept
+
+    _placeholder_image_cache = None
+
+    def __get_placeholder_image(self):
+        if ConceptWidget._placeholder_image_cache:
+            return ConceptWidget._placeholder_image_cache
+
+        try:
+            image = load_image("resources/icons/icon.png", convert_mode="RGBA")
+            size = min(image.width, image.height)
+            image = image.crop(((image.width - size) // 2, (image.height - size) // 2, (image.width + size) // 2, (image.height + size) // 2))
+        except (OSError):
+            image = Image.new("RGBA", (150, 150), (200, 200, 200, 255))
+
+        ConceptWidget._placeholder_image_cache = image.resize((150, 150), Image.Resampling.BILINEAR)
+        return ConceptWidget._placeholder_image_cache
+
+    def __load_preview_image_deferred(self):
+        try:
+            actual_image = self.__get_preview_image()
+            self.image.configure(light_image=actual_image)
+        except Exception:
+            pass  # Keep placeholder on error
 
     def __get_display_name(self):
         if self.concept.name:
