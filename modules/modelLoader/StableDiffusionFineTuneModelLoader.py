@@ -1,61 +1,21 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
-from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
+from modules.modelLoader.GenericFineTuneModelLoader import make_fine_tune_model_loader
 from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.enum.ModelType import ModelType
-from modules.util.ModelNames import ModelNames
-from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
-
-class StableDiffusionFineTuneModelLoader(
-    BaseModelLoader,
-    ModelSpecModelLoaderMixin,
-    InternalModelLoaderMixin,
-):
-    def __init__(self):
-        super().__init__()
-
-    def _default_model_spec_name(
-            self,
-            model_type: ModelType,
-    ) -> str | None:
-        match model_type:
-            case ModelType.STABLE_DIFFUSION_15:
-                return "resources/sd_model_spec/sd_1.5.json"
-            case ModelType.STABLE_DIFFUSION_15_INPAINTING:
-                return "resources/sd_model_spec/sd_1.5_inpainting.json"
-            case ModelType.STABLE_DIFFUSION_20:
-                return "resources/sd_model_spec/sd_2.0.json"
-            case ModelType.STABLE_DIFFUSION_20_BASE:
-                return "resources/sd_model_spec/sd_2.0.json"
-            case ModelType.STABLE_DIFFUSION_20_INPAINTING:
-                return "resources/sd_model_spec/sd_2.0_inpainting.json"
-            case ModelType.STABLE_DIFFUSION_20_DEPTH:
-                return "resources/sd_model_spec/sd_2.0_depth.json"
-            case ModelType.STABLE_DIFFUSION_21:
-                return "resources/sd_model_spec/sd_2.1.json"
-            case ModelType.STABLE_DIFFUSION_21_BASE:
-                return "resources/sd_model_spec/sd_2.1.json"
-            case _:
-                return None
-
-    def load(
-            self,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-    ) -> StableDiffusionModel | None:
-        base_model_loader = StableDiffusionModelLoader()
-        embedding_loader = StableDiffusionEmbeddingLoader()
-
-        model = StableDiffusionModel(model_type=model_type)
-
-        self._load_internal_data(model, model_names.base_model)
-        model.model_spec = self._load_default_model_spec(model_type)
-
-        base_model_loader.load(model, model_type, model_names, weight_dtypes)
-        embedding_loader.load(model, model_names.base_model, model_names)
-
-        return model
+StableDiffusionFineTuneModelLoader = make_fine_tune_model_loader(
+    model_spec_map={
+        ModelType.STABLE_DIFFUSION_15: "resources/sd_model_spec/sd_3_2b_1.0.json",
+        ModelType.STABLE_DIFFUSION_15_INPAINTING: "resources/sd_model_spec/sd_3.5_1.0.json",
+        ModelType.STABLE_DIFFUSION_20: "resources/sd_model_spec/sd_2.0.json",
+        ModelType.STABLE_DIFFUSION_20_BASE: "resources/sd_model_spec/sd_2.0.json",
+        ModelType.STABLE_DIFFUSION_20_INPAINTING: "resources/sd_model_spec/sd_2.0_inpainting.json",
+        ModelType.STABLE_DIFFUSION_20_DEPTH: "resources/sd_model_spec/sd_2.0_depth.json",
+        ModelType.STABLE_DIFFUSION_21: "resources/sd_model_spec/sd_2.1.json",
+        ModelType.STABLE_DIFFUSION_21_BASE: "resources/sd_model_spec/sd_2.1.json",
+    },
+    model_class=StableDiffusionModel,
+    model_loader_class=StableDiffusionModelLoader,
+    embedding_loader_class=StableDiffusionEmbeddingLoader,
+)
