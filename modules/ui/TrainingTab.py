@@ -786,6 +786,20 @@ class TrainingTab:
         )
 
 
+    def __on_layer_filter_preset_change(self):
+        if not self.layer_selector:
+            return
+        selected = self.ui_state.get_var("layer_filter_preset").get()
+        self.__preset_set_layer_choice(selected)
+
+    def __hide_layer_entry(self):
+        if self.layer_entry and self.layer_entry.winfo_manager():
+            self.layer_entry.grid_remove()
+
+    def __show_layer_entry(self):
+        if self.layer_entry and not self.layer_entry.winfo_manager():
+            self.layer_entry.grid()
+
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
