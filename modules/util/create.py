@@ -1236,7 +1236,7 @@ def create_optimizer(
                 # Handle both dict (from JSON/Config) and Object (legacy/runtime)
                 adam_config_dict = adam_config if isinstance(adam_config, dict) else adam_config.to_dict()
 
-                valid_adam_keys = {k for k in inspect.signature(Muon_adv.__init__).parameters if k.startswith('adam_')}
+                valid_adam_keys = {k for k in inspect.signature(AdaMuon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
                     key: adam_config_dict[key.removeprefix('adam_')]
                     for key in valid_adam_keys
