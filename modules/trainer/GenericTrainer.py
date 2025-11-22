@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import json
+import math
 import os
 import shutil
 import traceback
@@ -783,13 +784,17 @@ class GenericTrainer(BaseTrainer):
                                 self.model, self.config, lr_scheduler, self.tensorboard
                             )
 
-                            self.tensorboard.add_scalar("loss/train_step", accumulated_loss.item(), train_progress.global_step)
-                            ema_loss = ema_loss or accumulated_loss.item()
+                            accumulated_loss_cpu = accumulated_loss.item()
+                            if math.isnan(accumulated_loss_cpu):
+                                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+
+                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
+                            ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1
                             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
-                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss.item() * (1 - ema_loss_decay))
+                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss_cpu * (1 - ema_loss_decay))
                             step_tqdm.set_postfix({
-                                'loss': accumulated_loss.item(),
+                                'loss': accumulated_loss_cpu,
                                 'smooth loss': ema_loss,
                             })
                             self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)

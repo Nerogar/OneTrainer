@@ -1,9 +1,11 @@
 import copy
 import math
 from abc import abstractmethod
+from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
+from modules.module.oft_utils import OFTRotationModule
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.ModuleFilter import ModuleFilter
@@ -332,6 +334,139 @@ class LoRAModule(PeftBase):
         pass
 
 
+class OFTModule(PeftBase):
+    oft_R: OFTRotationModule | None
+    rank: int
+    oft_block_size: int
+    coft: bool
+    coft_eps: float
+    block_share: bool
+    dropout_probability: float
+    adjustment_info: tuple[int, int] | None # for reporting
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
+        super().__init__(prefix, orig_module)
+        self.oft_block_size = oft_block_size
+        self.rank = 0
+        self.coft = coft
+        self.coft_eps = coft_eps
+        self.block_share = block_share
+        self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
+        self.oft_R = None
+        self.adjustment_info = None
+
+
+        if orig_module is not None:
+            self.initialize_weights()
+
+    def adjust_oft_parameters(self, in_features, params):
+        """
+        Adjust the OFT parameters to be divisible by the in_features dimension.
+        """
+        if params < in_features:
+            higher_params = params
+            while higher_params <= in_features and in_features % higher_params != 0:
+                higher_params += 1
+        else:
+            return in_features
+
+        lower_params = params
+        while lower_params > 1 and in_features % lower_params != 0:
+            lower_params -= 1
+
+        if (params - lower_params) <= (higher_params - params):
+            return lower_params
+        else:
+            return higher_params
+
+    def initialize_weights(self):
+        self._initialized = True
+
+        if isinstance(self.orig_module, nn.Linear):
+            in_features = self.orig_module.in_features
+        elif isinstance(self.orig_module, nn.Conv2d):
+            if self.orig_module.dilation[0] > 1 or self.orig_module.dilation[1] > 1:
+                raise ValueError("Conv2d with dilation > 1 is not supported by OFT.")
+            in_features = self.orig_module.in_channels * self.orig_module.kernel_size[0] * self.orig_module.kernel_size[1]
+        else:
+            raise NotImplementedError("Unsupported layer type for OFT")
+
+        oft_block_size = self.oft_block_size
+        if oft_block_size <= 0:
+            raise ValueError("Rank must be a positive.")
+
+        # Adjust oft_block_size to be a divisor of in_features
+        if in_features % oft_block_size != 0 or oft_block_size > in_features:
+            old_oft_block_size = oft_block_size
+            oft_block_size = self.adjust_oft_parameters(in_features, oft_block_size)
+            self.adjustment_info = (old_oft_block_size, oft_block_size)
+
+        # Calculate the number of blocks 'r'
+        r = in_features // oft_block_size
+
+        # Store the final, potentially adjusted values
+        self.rank = r
+        self.oft_block_size = oft_block_size
+
+        n_elements = self.oft_block_size * (self.oft_block_size - 1) // 2
+
+        self.oft_R = OFTRotationModule(
+            r=self.rank if not self.block_share else 1,
+            n_elements=n_elements,
+            block_size=self.oft_block_size,
+            in_features=in_features,
+            coft=self.coft,
+            coft_eps=self.coft_eps,
+            block_share=self.block_share,
+            use_cayley_neumann=True,
+            num_cayley_neumann_terms=5,
+            dropout_probability=self.dropout_probability,
+        )
+
+        nn.init.zeros_(self.oft_R.weight)
+
+    def forward(self, x, *args, **kwargs):
+        self.check_initialized()
+
+        # For Linear layers, rotating the input is mathematically equivalent to rotating the weights.
+        if isinstance(self.orig_module, nn.Linear):
+            rotated_x = self.oft_R(x)
+            return self.orig_forward(rotated_x, *args, **kwargs)
+
+        # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
+        orth_rotate = self.oft_R._cayley_batch(
+            self.oft_R.weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+        )
+        orth_rotate = self.oft_R.dropout(orth_rotate)
+
+        if self.block_share:
+            orth_rotate = orth_rotate.repeat(self.rank, 1, 1)
+
+        weight = self.orig_module.weight
+        weight_reshaped = weight.reshape(weight.shape[0], self.rank, self.oft_block_size)
+        rotated_weight_reshaped = torch.einsum("ork,rkc->orc", weight_reshaped, orth_rotate)
+
+        rotated_weight = rotated_weight_reshaped.reshape(weight.shape)
+
+        return self.op(x, rotated_weight, self.orig_module.bias, **self.layer_kwargs)
+
+    def apply_to_module(self):
+        # TODO
+        pass
+
+    def extract_from_module(self, base_module: nn.Module):
+        # TODO
+        pass
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.oft_R is not None
+
+    @property
+    def dropout(self):
+        return self.oft_R.dropout
+
+
 class DoRAModule(LoRAModule):
     """Weight-decomposed low rank adaptation.
 
@@ -432,6 +567,7 @@ class DoRAModule(LoRAModule):
 DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
+DummyOFTModule = OFTModule.make_dummy()
 
 
 class LoRAModuleWrapper:
@@ -481,6 +617,18 @@ class LoRAModuleWrapper:
             self.dummy_klass = DummyLoHaModule
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
+        elif self.peft_type == PeftType.OFT_2:
+            self.klass = OFTModule
+            self.dummy_klass = DummyOFTModule
+            self.additional_args = [
+                config.oft_block_size,
+                config.oft_coft,
+                config.coft_eps,
+                config.oft_block_share,
+            ]
+            self.additional_kwargs = {
+                'dropout_probability': config.dropout_probability,
+            }
 
         self.lora_modules = self.__create_modules(orig_module, config)
 
@@ -492,6 +640,7 @@ class LoRAModuleWrapper:
         selected = []
         deselected = []
         unsuitable = []
+        oft_adjustments = []
 
         for name, child_module in orig_module.named_modules():
             name = name.replace(".checkpoint.", ".")
@@ -499,10 +648,28 @@ class LoRAModuleWrapper:
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                lora_modules[name] = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                lora_module = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                lora_modules[name] = lora_module
+                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
+                    old, new = lora_module.adjustment_info
+                    oft_adjustments.append({'old': old, 'new': new})
                 selected.append(name)
             else:
                 deselected.append(name)
+
+        if oft_adjustments:
+            summary = defaultdict(int)
+            for adj in oft_adjustments:
+                summary[(adj['old'], adj['new'])] += 1
+
+            sorted_summary = sorted(summary.items(), key=lambda item: (item[0][0], item[0][1]))
+
+            summary_lines = [
+                f"  - {count} layer{'s' if count > 1 else ''} from {old} to {new}"
+                for (old, new), count in sorted_summary
+            ]
+            print(f"OFT Block Size automatically adjusted for {len(oft_adjustments)} layers. Changes:")
+            print("\n".join(summary_lines))
 
         if len(self.module_filters) > 0:
             if config.debug_mode:
@@ -537,6 +704,10 @@ class LoRAModuleWrapper:
 
     def _check_rank_matches(self, state_dict: dict[str, Tensor]):
         if not state_dict:
+            return
+
+        # For OFT, the comparison is not straightforward, so we skip it.
+        if self.peft_type == PeftType.OFT_2:
             return
 
         if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):

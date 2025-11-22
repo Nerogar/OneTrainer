@@ -63,8 +63,7 @@ class MultiTrainer(BaseTrainer):
 
         trainer = GenericTrainer(config, callbacks, TrainCommands())
         try:
-            for _ in multi.sequential(enabled=config.sequential_model_setup):
-                trainer.start()
+            trainer.start()
             trainer.train()
         except Exception:
             traceback.print_exc()

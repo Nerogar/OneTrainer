@@ -147,7 +147,7 @@ class BaseQwenSetup(
             #FIXME bug workaround for https://github.com/huggingface/diffusers/issues/12294
             image_attention_mask=torch.ones((packed_latent_input.shape[0], packed_latent_input.shape[1]), dtype=torch.bool, device=latent_image.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
-            attention_mask_2d = attention_mask[:, None, None, :] * attention_mask[:, None, :, None]
+            attention_mask_2d = attention_mask[:, None, None, :] if not torch.all(text_attention_mask) else None
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),

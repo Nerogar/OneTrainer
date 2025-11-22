@@ -78,73 +78,6 @@ class ModelTab:
         elif self.train_config.model_type.is_hi_dream():
             self.__setup_hi_dream_ui(base_frame)
 
-        self.__create_quantization_frame(self.scroll_frame, row=1, column=0)
-
-    def __create_quantization_frame(
-            self,
-            master,
-            row: int,
-            column: int,
-    ):
-        frame = ctk.CTkFrame(master=master, corner_radius=5, width=300)
-        frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_columnconfigure(1, weight=10)
-
-        presets = []
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify and de-duplicate with layer filter on training tab
-            presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            presets = flux_presets
-        elif self.train_config.model_type.is_qwen():
-            presets = qwen_presets
-        elif self.train_config.model_type.is_chroma():
-            presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_hi_dream():
-            presets = hidream_presets
-        else:
-            presets = {"full": []}
-
-        row = 0
-        components.layer_filter_entry(frame, row, 0, self.ui_state,
-            preset_var_name="quantization_layer_filter_preset", presets=presets,
-            preset_label="Quantization Layer Filter",
-            preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
-            entry_var_name="quantization_layer_filter",
-            entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
-            regex_var_name="quantization_layer_filter_regex",
-            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
-        )
-        row += 1
-
-
-        subframe = ctk.CTkFrame(master=frame, corner_radius=5)
-        subframe.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
-        # SVDQuant
-        components.label(subframe, row, 0, "SVDQuant Data Type",
-                         tooltip="What datatype to use for SVDQuant weights decomposition.")
-        components.options_kv(subframe, row, 1, [("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
-                              self.ui_state, "svd_dtype")
-        row += 1
-
-        components.label(subframe, row, 0, "SVDQuant Rank",
-                         tooltip="Rank for SVDQuant weights decomposition")
-        components.entry(subframe, row, 1, self.ui_state, "svd_rank")
-        row += 1
-
-
     def __setup_stable_diffusion_ui(self, frame):
         row = 0
         row = self.__create_base_dtype_components(frame, row)
@@ -485,12 +418,63 @@ class ModelTab:
 
             row += 1
 
+        presets = []
+        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify and de-duplicate with layer filter on training tab
+            presets = sd_presets
+        elif self.train_config.model_type.is_stable_diffusion_xl():
+            presets = sdxl_presets
+        elif self.train_config.model_type.is_stable_diffusion_3():
+            presets = sd3_presets
+        elif self.train_config.model_type.is_wuerstchen():
+            presets = sc_presets
+        elif self.train_config.model_type.is_pixart():
+            presets = pixart_presets
+        elif self.train_config.model_type.is_flux():
+            presets = flux_presets
+        elif self.train_config.model_type.is_qwen():
+            presets = qwen_presets
+        elif self.train_config.model_type.is_chroma():
+            presets = chroma_presets
+        elif self.train_config.model_type.is_sana():
+            presets = sana_presets
+        elif self.train_config.model_type.is_hunyuan_video():
+            presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_hi_dream():
+            presets = hidream_presets
+        else:
+            presets = {"full": []}
+
+        components.label(frame, row, 0, "Quantization")
+        components.layer_filter_entry(frame, row, 1, self.ui_state,
+            preset_var_name="quantization_layer_filter_preset", presets=presets,
+            preset_label="Layer Filter",
+            preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
+            entry_var_name="quantization_layer_filter",
+            entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
+            regex_var_name="quantization_layer_filter_regex",
+            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
+            frame_color="transparent",
+        )
+
         # compile
         components.label(frame, row, 3, "Compile transformer blocks",
                          tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
         components.switch(frame, row, 4, self.ui_state, "compile")
 
         row += 1
+
+        # SVDQuant
+        components.label(frame, row, 3, "SVDQuant Data Type",
+                         tooltip="What datatype to use for SVDQuant weights decomposition.")
+        components.options_kv(frame, row, 4, [("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
+                              self.ui_state, "svd_dtype")
+        row += 1
+
+        components.label(frame, row, 3, "SVDQuant Rank",
+                         tooltip="Rank for SVDQuant weights decomposition")
+        components.entry(frame, row, 4, self.ui_state, "svd_rank")
+        row += 1
+
 
         if has_text_encoder:
             # text encoder weight dtype
