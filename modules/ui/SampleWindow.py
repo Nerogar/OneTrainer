@@ -18,6 +18,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModuleFilter import ModuleFilter
 from modules.util.time_util import get_string_timestamp
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
@@ -124,10 +125,15 @@ class SampleWindow(ctk.CTkToplevel):
             else:
                 print("No backup found, loading without backup...")
 
+        quant_filters = [
+            ModuleFilter(pattern, use_regex=self.initial_train_config.quantization_layer_filter_regex)
+            for pattern in self.initial_train_config.quantization_layer_filter.split(",")
+        ]
         model = model_loader.load(
             model_type=self.initial_train_config.model_type,
             model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
+            quant_filters=quant_filters,
         )
         model.train_config = self.initial_train_config
 
