@@ -123,9 +123,10 @@ def build_muon_adam_key_fn(
             if unassigned_params_count > 0:
                 print(f"INFO: {unassigned_params_count} trainable tensor(s) were not in checked modules and defaulted to AdamW.")
 
-            unused_filters = [f._pattern for f in filters if not f.was_used()]
-            if unused_filters:
-                print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
+            if config.optimizer.muon_hidden_layers is not None:
+                unused_filters = [f._pattern for f in filters if not f.was_used()]
+                if unused_filters:
+                    print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
 
             print("----------------------------------------------\n")
         else:
@@ -162,6 +163,8 @@ def split_parameters_for_muon(
 
     # If not using AuxAdam, just use the original parameter groups
     if not (MuonWithAuxAdam and layer_key_fn):
+        for group in parameters:
+            group['optim_type'] = 'muon'
         return parameters, MuonWithAuxAdam
 
     final_param_groups = []

@@ -181,13 +181,13 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'k_warmup_steps': {'title': 'K-β Warmup Steps ', 'tooltip': 'When using Kourkoutas Beta, the number of initial training steps during which the dynamic β₂ logic is held off. In this period, β₂ is set to its fixed value to allow for initial training stability before the adaptive mechanism activates.', 'type': 'int'},
             'schedulefree_c': {'title': 'Schedule free averaging strength', 'tooltip': 'Larger values = more responsive (shorter averaging window); smaller values = smoother (longer window). Set to 0 to disable and use the original Schedule-Free rule. Short small batches (≈6-12); long/large-batch (≈50-200).', 'type': 'float'},
             'ns_steps': {'title': 'Newton-Schulz Iterations', 'tooltip': 'Controls the number of iterations for update orthogonalization. Higher values improve the updates quality but make each step slower. Lower values are faster per step but may be less effective.', 'type': 'int'},
-            'MuonWithAuxAdam': {'title': 'MuonWithAuxAdam', 'tooltip': 'whatever to use the standard way of Muon, non hidden layers fallback to ADAMW_ADV and MUON_ADV takes the rest.', 'type': 'bool'},
+            'MuonWithAuxAdam': {'title': 'MuonWithAuxAdam', 'tooltip': 'Whether to use the standard way of Muon. Non-hidden layers fallback to ADAMW, and MUON takes the rest. Note: The auxiliary Adam (ADAMW) is typically only relevant for training "full" LoRA (LoRA for all layers) or full finetune and is irrelevant for most common LoRA use cases.', 'type': 'bool'},
             'muon_hidden_layers': {'title': 'Hidden Layers', 'tooltip': 'Comma-separated list of hidden layers to train using Muon. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained using Muon. If None is provided it will default to using automatic way of finding hidden layers.', 'type': 'str'},
-            'muon_adam_regex': {'title': 'Use Regex', 'tooltip': 'Whatever to use regular expressions for hidden layers.', 'type': 'bool'},
+            'muon_adam_regex': {'title': 'Use Regex', 'tooltip': 'Whether to use regular expressions for hidden layers.', 'type': 'bool'},
             'muon_adam_lr': {'title': 'Auxiliary Adam LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer. If empty, it will use the main learning rate.', 'type': 'float'},
             'muon_te1_adam_lr': {'title': 'AuxAdam TE1 LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer for the first text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
             'muon_te2_adam_lr': {'title': 'AuxAdam TE2 LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer for the second text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
-            'rms_rescaling': {'title': 'RMS Rescaling', 'tooltip': 'RMS-aligned rescaling for the optimizer update. Allows for the reuse of existing Adam learning rate schedules.', 'type': 'bool'},
+            'rms_rescaling': {'title': 'RMS Rescaling', 'tooltip': 'Muon already scales its updates to approximate and use the same learning rate (LR) as Adam. This option integrates a more accurate method to match the Adam LR, but it is slower.', 'type': 'bool'},
             'normuon_variant': {'title': 'NorMuon Variant', 'tooltip': 'Enables the NorMuon optimizer variant, which combines Muon orthogonalization with per-neuron adaptive learning rates for better convergence and balanced parameter updates. Costs only one scalar state buffer per parameter group, size few KBs, maintaining high memory efficiency.', 'type': 'bool'},
             'beta2_normuon': {'title': 'NorMuon Beta2', 'tooltip': 'Exponential decay rate for the neuron-wise second-moment estimator in NorMuon (analogous to Adams beta2). Controls how past squared updates influence current normalization.', 'type': 'float'},
             'normuon_eps': {'title': 'NorMuon EPS', 'tooltip': 'Epsilon for NorMuon normalization stability.', 'type': 'float'},
@@ -264,12 +264,20 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             self.muon_adam_button.configure(state="normal" if muon_with_adam else "disabled")
 
     def open_muon_adam_window(self):
-        if self.train_config.optimizer.muon_adam_config is None:
-            adam_config = TrainOptimizerConfig.default_values()
+        adam_config = TrainOptimizerConfig.default_values()
+        current_state = self.train_config.optimizer.muon_adam_config
+
+        if current_state is None:
             adam_config.from_dict(OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV])
             adam_config.optimizer = Optimizer.ADAMW_ADV
-            self.train_config.optimizer.muon_adam_config = adam_config
+        elif isinstance(current_state, dict):
+            adam_config.from_dict(current_state)
+        else:
+            # Should not happen if TrainConfig defines it as dict, but for safety
+            adam_config = current_state
 
-        temp_adam_ui_state = UIState(self, self.train_config.optimizer.muon_adam_config)
+        temp_adam_ui_state = UIState(self, adam_config)
         window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state)
         self.wait_window(window)
+
+        self.train_config.optimizer.muon_adam_config = adam_config.to_dict()
