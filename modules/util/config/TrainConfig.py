@@ -315,7 +315,6 @@ class TrainConfig(BaseConfig):
     # multi-GPU
     multi_gpu: bool
     device_indexes: str
-    sequential_model_setup: bool
     gradient_reduce_prevision: GradientReducePrecision
     fused_gradient_reduce: bool
     async_gradient_reduce: bool
@@ -411,6 +410,11 @@ class TrainConfig(BaseConfig):
 
     # transformer
     transformer: TrainModelPartConfig
+
+    # quantization
+    quantization_layer_filter: str
+    quantization_layer_filter_preset: str
+    quantization_layer_filter_regex: bool
 
     # text encoder
     text_encoder: TrainModelPartConfig
@@ -880,7 +884,6 @@ class TrainConfig(BaseConfig):
         #multi-GPU
         data.append(("multi_gpu", False, bool, False))
         data.append(("device_indexes", "", str, False))
-        data.append(("sequential_model_setup", False, bool, False))
         data.append(("gradient_reduce_precision", GradientReducePrecision.FLOAT_32_STOCHASTIC, GradientReducePrecision, False))
         data.append(("fused_gradient_reduce", True, bool, False))
         data.append(("async_gradient_reduce", True, bool, False))
@@ -935,7 +938,7 @@ class TrainConfig(BaseConfig):
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))
         data.append(("huber_strength", 0.0, float, False))
-        data.append(("huber_delta", 0.1, float, False))
+        data.append(("huber_delta", 1.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
         data.append(("loss_weight_strength", 5.0, float, False))
@@ -977,7 +980,7 @@ class TrainConfig(BaseConfig):
         prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
 
-        # prior
+        # transformer
         transformer = TrainModelPartConfig.default_values()
         transformer.model_name = ""
         transformer.train = True
@@ -985,6 +988,11 @@ class TrainConfig(BaseConfig):
         transformer.learning_rate = None
         transformer.weight_dtype = DataType.NONE
         data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        #quantization layer filter
+        data.append(("quantization_layer_filter", "", str, False))
+        data.append(("quantization_layer_filter_preset", "full", str, False))
+        data.append(("quantization_layer_filter_regex", False, bool, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()
@@ -1067,11 +1075,6 @@ class TrainConfig(BaseConfig):
         data.append(("layer_filter", "", str, False))
         data.append(("layer_filter_preset", "full", str, False))
         data.append(("layer_filter_regex", False, bool, False))
-
-        #quantization layer filter
-        data.append(("quantization_layer_filter", "", str, False))
-        data.append(("quantization_layer_filter_preset", "full", str, False))
-        data.append(("quantization_layer_filter_regex", False, bool, False))
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
