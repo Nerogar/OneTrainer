@@ -74,7 +74,6 @@ class BaseConfig:
 
         for name in self.types:
             try:
-
                 if issubclass_safe(self.types[name], BaseConfig):
                     getattr(self, name).from_dict(data[name])
                 elif self.types[name] is list or get_origin(self.types[name]) is list:

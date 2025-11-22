@@ -241,7 +241,6 @@ class UIState:
         return new_vars
 
     def __set_vars(self, obj):
-
         is_dict = isinstance(obj, dict)
         is_config = isinstance(obj, BaseConfig)
         iterable = obj.items() if is_dict else vars(obj).items()
