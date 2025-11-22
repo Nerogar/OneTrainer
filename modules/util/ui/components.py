@@ -328,12 +328,22 @@ def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: 
     presets_list = list(presets.keys()) + ["custom"]
 
 
+    def hide_layer_entry():
+        if layer_entry and layer_entry.winfo_manager():
+            layer_entry.grid_remove()
+
+    def show_layer_entry():
+        if layer_entry and not layer_entry.winfo_manager():
+            layer_entry.grid()
+
+
     def preset_set_layer_choice(selected: str):
         if not selected or selected not in presets_list:
             selected = presets_list[0]
 
         if selected == "custom":
-            # Restore prior custom text and allow editing + regex toggle
+            # Allow editing + regex toggle
+            show_layer_entry()
             layer_entry.configure(state="normal", fg_color=layer_entry_fg_color, text_color=layer_entry_text_color)
             #layer_entry.cget('textvariable').set("")
             regex_label.grid()
@@ -363,14 +373,35 @@ def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: 
             regex_label.grid_remove()
             regex_switch.grid_remove()
 
+            if selected == "full" and not patterns:
+                hide_layer_entry()
+            else:
+                show_layer_entry()
+
 #        self.prior_selected = selected
 
     label(frame, 0, 0, preset_label,
                      tooltip=preset_tooltip)
+
+
+    ui_state.remove_all_var_traces(preset_var_name)
+
     layer_selector = options(
         frame, 0, 1, presets_list, ui_state, preset_var_name,
         command=preset_set_layer_choice
     )
+
+    def on_layer_filter_preset_change():
+        if not layer_selector:
+            return
+        selected = ui_state.get_var(preset_var_name).get()
+        preset_set_layer_choice(selected)
+
+    ui_state.add_var_trace(
+        preset_var_name,
+        on_layer_filter_preset_change,
+    )
+
     preset_set_layer_choice(layer_selector.get())
 
 def icon_button(master, row, column, text, command):

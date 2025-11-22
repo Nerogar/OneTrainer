@@ -778,12 +778,13 @@ class TrainingTab:
         components.layer_filter_entry(master, row, 0, self.ui_state,
             preset_var_name="layer_filter_preset", presets=presets,
             preset_label="Layer Filter",
-            preset_tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own. A blank custom field will train all layers.",
+            preset_tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own.\nA blank 'custom' field or 'Full' will train all layers.",
             entry_var_name="layer_filter",
             entry_tooltip="Comma-separated list of diffusion layers to train. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained",
             regex_var_name="layer_filter_regex",
             regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
         )
+
 
     def __open_optimizer_params_window(self):
         window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
