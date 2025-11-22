@@ -49,6 +49,9 @@ class UIState:
     def remove_var_trace(self, name, trace_id):
         self.__var_traces[name].pop(trace_id)
 
+    def remove_all_var_traces(self, name):
+        self.__var_traces[name] = {}
+
     def __call_var_traces(self, name):
         for trace in self.__var_traces[name].values():
             trace()
