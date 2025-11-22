@@ -168,9 +168,6 @@ class UIState:
     def __create_vars(self, obj):
         new_vars = {}
 
-        if obj is None:
-            return new_vars
-
         is_dict = isinstance(obj, dict)
         is_config = isinstance(obj, BaseConfig)
 
@@ -244,8 +241,6 @@ class UIState:
         return new_vars
 
     def __set_vars(self, obj):
-        if obj is None:
-            return
 
         is_dict = isinstance(obj, dict)
         is_config = isinstance(obj, BaseConfig)
@@ -253,8 +248,6 @@ class UIState:
 
         if is_config:
             for name, var_type in obj.types.items():
-                if name not in self.__vars:
-                    continue
                 obj_var = getattr(obj, name)
                 if issubclass_safe(var_type, BaseConfig):
                     var = self.__vars[name]
@@ -273,8 +266,6 @@ class UIState:
                     var.set("" if obj_var is None else str(obj_var))
         else:
             for name, obj_var in iterable:
-                if name not in self.__vars:
-                    continue
                 if isinstance(obj_var, str):
                     var = self.__vars[name]
                     var.set(obj_var)

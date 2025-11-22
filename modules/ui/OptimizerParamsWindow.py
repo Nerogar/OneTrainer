@@ -262,12 +262,20 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             self.muon_adam_button.configure(state="normal" if muon_with_adam else "disabled")
 
     def open_muon_adam_window(self):
-        if self.train_config.optimizer.muon_adam_config is None:
-            adam_config = TrainOptimizerConfig.default_values()
+        adam_config = TrainOptimizerConfig.default_values()
+        current_state = self.train_config.optimizer.muon_adam_config
+
+        if current_state is None:
             adam_config.from_dict(OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV])
             adam_config.optimizer = Optimizer.ADAMW_ADV
-            self.train_config.optimizer.muon_adam_config = adam_config
+        elif isinstance(current_state, dict):
+            adam_config.from_dict(current_state)
+        else:
+            # Should not happen if TrainConfig defines it as dict, but for safety
+            adam_config = current_state
 
-        temp_adam_ui_state = UIState(self, self.train_config.optimizer.muon_adam_config)
+        temp_adam_ui_state = UIState(self, adam_config)
         window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state)
         self.wait_window(window)
+
+        self.train_config.optimizer.muon_adam_config = adam_config.to_dict()
