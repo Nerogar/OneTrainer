@@ -409,6 +409,11 @@ class TrainConfig(BaseConfig):
     # transformer
     transformer: TrainModelPartConfig
 
+    # quantization
+    quantization_layer_filter: str
+    quantization_layer_filter_preset: str
+    quantization_layer_filter_regex: bool
+
     # text encoder
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
@@ -971,7 +976,7 @@ class TrainConfig(BaseConfig):
         prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
 
-        # prior
+        # transformer
         transformer = TrainModelPartConfig.default_values()
         transformer.model_name = ""
         transformer.train = True
@@ -979,6 +984,11 @@ class TrainConfig(BaseConfig):
         transformer.learning_rate = None
         transformer.weight_dtype = DataType.NONE
         data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        #quantization layer filter
+        data.append(("quantization_layer_filter", "", str, False))
+        data.append(("quantization_layer_filter_preset", "full", str, False))
+        data.append(("quantization_layer_filter_regex", False, bool, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()
@@ -1061,11 +1071,6 @@ class TrainConfig(BaseConfig):
         data.append(("layer_filter", "", str, False))
         data.append(("layer_filter_preset", "full", str, False))
         data.append(("layer_filter_regex", False, bool, False))
-
-        #quantization layer filter
-        data.append(("quantization_layer_filter", "", str, False))
-        data.append(("quantization_layer_filter_preset", "full", str, False))
-        data.append(("quantization_layer_filter_regex", False, bool, False))
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))

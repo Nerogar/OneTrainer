@@ -296,9 +296,9 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
-def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str):
-    frame = ctk.CTkFrame(master=master, corner_radius=5)
-    frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
+    frame = ctk.CTkFrame(master=master, corner_radius=5, fg_color=frame_color)
+    frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
     frame.grid_columnconfigure(0, weight=1)
 
     layer_entry = entry(
