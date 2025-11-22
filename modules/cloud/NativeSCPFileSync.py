@@ -8,11 +8,14 @@ from modules.util.config.CloudConfig import CloudConfig, CloudSecretsConfig
 class NativeSCPFileSync(BaseSSHFileSync):
     def __init__(self, config: CloudConfig, secrets: CloudSecretsConfig):
         super().__init__(config, secrets)
-        self.base_args=[
-                "scp",
+        self.base_args=["scp"]
+        key_file=secrets.expanded_key_file()
+        if key_file:
+            self.base_args.extend(["-i", key_file])
+        self.base_args.extend([
                 "-P", str(secrets.port),
                 "-o", "StrictHostKeyChecking=no",
-            ]
+            ])
 
     def __upload_batch(self,local_files,remote_dir : Path):
         args=self.base_args.copy()
