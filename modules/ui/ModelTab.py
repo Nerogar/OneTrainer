@@ -294,19 +294,15 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
-    def __create_dtype_options(self, include_none:bool=True, include_gguf=False, include_quantization=True) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_none:bool=True, include_gguf=False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
+            ("float8", DataType.FLOAT_8),
+            # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
+            ("nfloat4", DataType.NFLOAT_4),
         ]
-
-        if include_quantization:
-            options += [
-                ("float8", DataType.FLOAT_8),
-                # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
-                ("nfloat4", DataType.NFLOAT_4),
-            ]
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
