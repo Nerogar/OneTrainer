@@ -163,6 +163,8 @@ def split_parameters_for_muon(
 
     # If not using AuxAdam, just use the original parameter groups
     if not (MuonWithAuxAdam and layer_key_fn):
+        for group in parameters:
+            group['optim_type'] = 'muon'
         return parameters, MuonWithAuxAdam
 
     final_param_groups = []
