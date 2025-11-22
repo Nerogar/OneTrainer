@@ -793,7 +793,7 @@ class LayerOffloadConductor:
         sub_module_parameters = set(sum([list(x.parameters()) for x in self.__layers], []))
 
         def convert(t):
-            if t in sub_module_parameters:
+            if t in sub_module_parameters or t.is_meta:
                 return t
 
             return t.to(device=device)
