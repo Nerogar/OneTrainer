@@ -45,6 +45,14 @@ class DataType(Enum):
                 return torch.bfloat16
             case DataType.TFLOAT_32:
                 return torch.float32
+            case DataType.FLOAT_16_A8_FLOAT:
+                return torch.float16
+            case DataType.FLOAT_16_A8_INT:
+                return torch.float16
+            case DataType.BFLOAT_16_A8_FLOAT:
+                return torch.bfloat16
+            case DataType.BFLOAT_16_A8_INT:
+                return torch.bfloat16
             case _:
                 return None
 
