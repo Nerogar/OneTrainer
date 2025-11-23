@@ -124,10 +124,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 new_state_dict[new_k] = v
             state_dict = new_state_dict
 
-        #this loads the actual data from the state dict into tensors that are 'meta' tensors up to this point
         #tensors that will be quantized are loaded at their original dtype. non-quantized tensors are converted
         #to their intended dtype here
-        #TODO why not quantize here? would avoid to load the entire model first (high RAM) and then quantize (low RAM)
         for key, value in state_dict.items():
             module = sub_module
             tensor_name = key
