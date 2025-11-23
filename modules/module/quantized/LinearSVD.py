@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from contextlib import suppress
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
@@ -12,6 +13,11 @@ class BaseLinearSVD(
 ):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    @abstractmethod
+    def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout) -> torch.Tensor:
+        pass
+
 
 
 def _get_tensor_hash(t: torch.Tensor) -> str:
@@ -93,6 +99,24 @@ def make_svd_linear(linear_class):
         def forward(self, x: torch.Tensor) -> torch.Tensor:
             assert self.__svd_is_quantized
             assert not self.svd_down.requires_grad and not self.svd_up.requires_grad
-            return ((x @ self.svd_down.T) @ self.svd_up.T).to(x.dtype) + super().forward(x)
+            x_down = torch.nn.functional.linear(x, self.svd_down)
+            x_up = torch.nn.functional.linear(x_down, self.svd_up)
+            return x_up + super().forward(x)
+
+        def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
+            assert self.__svd_is_quantized
+            assert not self.svd_down.requires_grad and not self.svd_up.requires_grad
+            assert lora_down.bias is None and lora_up.bias is None
+
+            lora_rank = lora_down.weight.shape[0]
+            down_merged = torch.cat([lora_down.weight, self.svd_down], dim=0)
+            x_down = torch.nn.functional.linear(x, down_merged)
+            if dropout.p > 0.0 and self.training:
+                x_down[..., :lora_rank] = dropout(x_down[..., :lora_rank])
+
+            lora_up_scaled = lora_up.weight * (alpha / lora_rank)
+            up_merged = torch.cat([lora_up_scaled, self.svd_up], dim=1)
+            x_up = torch.nn.functional.linear(x_down, up_merged)
+            return x_up + super().forward(x)
 
     return LinearSVD
