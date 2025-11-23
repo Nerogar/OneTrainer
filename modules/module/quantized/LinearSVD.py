@@ -15,7 +15,7 @@ class BaseLinearSVD(
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout) -> torch.Tensor:
+    def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
         pass
 
 
