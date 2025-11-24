@@ -14,10 +14,6 @@ class DataType(Enum):
     NFLOAT_4 = 'NFLOAT_4'
     FLOAT_W8A8 = 'FLOAT_W8A8'
     INT_W8A8 = 'INT_W8A8'
-    FLOAT_8_SVD = 'FLOAT_8_SVD'
-    NFLOAT_4_SVD = 'NFLOAT_4_SVD'
-    FLOAT_W8A8_SVD = 'FLOAT_W8A8_SVD'
-    INT_W8A8_SVD = 'INT_W8A8_SVD'
     GGUF = 'GGUF'
     GGUF_A8_FLOAT = 'GGUF_A8_FLOAT'
     GGUF_A8_INT = 'GGUF_A8_INT'
@@ -52,11 +48,7 @@ class DataType(Enum):
                         DataType.INT_8,
                         DataType.FLOAT_W8A8,
                         DataType.INT_W8A8,
-                        DataType.NFLOAT_4,
-                        DataType.FLOAT_8_SVD,
-                        DataType.FLOAT_W8A8_SVD,
-                        DataType.INT_W8A8_SVD,
-                        DataType.NFLOAT_4_SVD]
+                        DataType.NFLOAT_4]
 
     def is_gguf(self):
         return self in [DataType.GGUF,
@@ -64,22 +56,16 @@ class DataType(Enum):
                         DataType.GGUF_A8_INT]
 
     def quantize_fp8(self):
-        return self == DataType.FLOAT_8 or self == DataType.FLOAT_8_SVD
+        return self == DataType.FLOAT_8
 
     def quantize_int8(self):
         return self == DataType.INT_8
 
     def quantize_fpW8A8(self):
-        return self == DataType.FLOAT_W8A8 or self == DataType.FLOAT_W8A8_SVD
+        return self == DataType.FLOAT_W8A8
 
     def quantize_intW8A8(self):
-        return self == DataType.INT_W8A8 or self == DataType.INT_W8A8_SVD
+        return self == DataType.INT_W8A8
 
     def quantize_nf4(self):
-        return self == DataType.NFLOAT_4 or self == DataType.NFLOAT_4_SVD
-
-    def quantize_svd(self):
-        return self in [DataType.FLOAT_8_SVD,
-                        DataType.NFLOAT_4_SVD,
-                        DataType.FLOAT_W8A8_SVD,
-                        DataType.INT_W8A8_SVD]
+        return self == DataType.NFLOAT_4

@@ -29,7 +29,6 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ModuleFilter import ModuleFilter
 from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -123,15 +122,14 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("loading the model")
 
-        quant_filters = [
-            ModuleFilter(pattern, use_regex=self.config.quantization_layer_filter_regex)
-            for pattern in self.config.quantization_layer_filter.split(",")
-        ]
+        if self.config.quantization.cache_dir is None:
+            self.config.quantization.cache_dir = self.config.cache_dir + "/quantization"
+            os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
         self.model = self.model_loader.load(
             model_type=self.config.model_type,
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
-            quant_filters=quant_filters,
+            quantization=self.config.quantization,
         )
         self.model.train_config = self.config
 

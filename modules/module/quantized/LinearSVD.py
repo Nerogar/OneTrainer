@@ -21,6 +21,7 @@ class BaseLinearSVD(
 
 
 def _get_tensor_hash(t: torch.Tensor) -> str:
+    print(t.device)
     t = t.flatten().to(torch.float32)
     vals = torch.stack([
         torch.sum(t),
@@ -35,9 +36,13 @@ def make_svd_linear(linear_class):
         linear_class,
         BaseLinearSVD,
     ):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, rank: int, svd_dtype: torch.dtype, cache_dir: str | None, max_cache_rank: int=128, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.__svd_is_quantized = False
+            self.rank = rank
+            self.svd_dtype = svd_dtype
+            self.cache_dir = cache_dir
+            self.max_cache_rank = max_cache_rank
 
             #use parameters instead of buffer to allow offloading:
             self.svd_up = torch.nn.Parameter(torch.empty(()), requires_grad=False)
@@ -50,7 +55,7 @@ def make_svd_linear(linear_class):
                 return super().unquantized_weight(dtype, device)
 
         @torch.no_grad()
-        def quantize(self, rank: int, svd_dtype: torch.dtype, device: torch.device | None = None, cache_dir: str | None = None, max_cache_rank: int = 128, **kwargs):
+        def quantize(self, device: torch.device | None = None):
             if self.__svd_is_quantized:
                 return
             self.__svd_is_quantized = True
@@ -61,8 +66,8 @@ def make_svd_linear(linear_class):
                 W = W.to(device=device)
 
             U = None
-            if cache_dir is not None:
-                filename = cache_dir + "/" + _get_tensor_hash(W) + ".pt"
+            if self.cache_dir is not None:
+                filename = self.cache_dir + "/" + _get_tensor_hash(W) + ".pt"
                 with suppress(FileNotFoundError):
                     U, S, Vh = torch.load(filename, map_location=W.device)
 
@@ -70,19 +75,19 @@ def make_svd_linear(linear_class):
                 #use full svd - torch.svd_lowrank is not reducing the quant range nearly as much:
                 U, S, Vh = torch.linalg.svd(W, full_matrices=False)
 
-                if cache_dir is not None:
+                if self.cache_dir is not None:
                     torch.save((
-                        U[:, :max_cache_rank].clone(),
-                        S[:max_cache_rank].clone(),
-                        Vh[:max_cache_rank, :].clone(),
+                        U[:, :self.max_cache_rank].clone(),
+                        S[:self.max_cache_rank].clone(),
+                        Vh[:self.max_cache_rank, :].clone(),
                     ), filename)
 
-            U_r = U[:, :rank]
-            S_r = S[:rank]
-            Vh_r = Vh[:rank, :]
+            U_r = U[:, :self.rank]
+            S_r = S[:self.rank]
+            Vh_r = Vh[:self.rank, :]
 
-            svd_down = Vh_r.clone().contiguous().to(svd_dtype)
-            svd_up = (U_r * S_r.unsqueeze(0)).clone().contiguous().to(svd_dtype)
+            svd_down = Vh_r.clone().contiguous().to(self.svd_dtype)
+            svd_up = (U_r * S_r.unsqueeze(0)).clone().contiguous().to(self.svd_dtype)
             weight = (W - (svd_up @ svd_down)).to(dtype=self.weight.dtype)
 
             if device is not None:
@@ -94,7 +99,7 @@ def make_svd_linear(linear_class):
             self.svd_up = torch.nn.Parameter(svd_up, requires_grad=False)
             self.svd_down = torch.nn.Parameter(svd_down, requires_grad=False)
             self.weight.data = weight
-            super().quantize(device=device, **kwargs)
+            super().quantize(device=device)
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
             assert self.__svd_is_quantized

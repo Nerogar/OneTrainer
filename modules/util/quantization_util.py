@@ -1,10 +1,9 @@
-import os
 from collections.abc import Callable
 from functools import partial
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.ModuleFilter import ModuleFilter
 
@@ -167,32 +166,58 @@ def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
         dtype: DataType,
         keep_in_fp32_modules: list[str] | None = None,
-        filters: list[ModuleFilter] | None = None,
+        quantization: QuantizationConfig | None = None,
         copy_parameters: bool = False,
 ):
+    kwargs = {}
     if dtype.quantize_nf4():
-        construct_fn = make_svd_linear(LinearNf4) if dtype.quantize_svd() else LinearNf4
+        linear_class = LinearNf4
     elif dtype.quantize_int8():
-        construct_fn = partial(make_svd_linear(bnb.nn.Linear8bitLt) if dtype.quantize_svd() else bnb.nn.Linear8bitLt, has_fp16_weights=False)
+        linear_class = bnb.nn.Linear8bitLt
+        kwargs = {'has_fp16_weights': False}
     elif dtype.quantize_fp8():
-        construct_fn = make_svd_linear(LinearFp8) if dtype.quantize_svd() else LinearFp8
+        linear_class = LinearFp8
     elif dtype.quantize_intW8A8():
-        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.int8, compute_dtype=torch.bfloat16)
+        linear_class = LinearW8A8
+        kwargs = {'dtype': torch.int8,
+                  'compute_dtype': torch.bfloat16}
     elif dtype.quantize_fpW8A8():
-        construct_fn = partial(make_svd_linear(LinearW8A8) if dtype.quantize_svd() else LinearW8A8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+        linear_class=LinearW8A8
+        kwargs = {'dtype': torch.float8_e4m3fn,
+                  'compute_dtype': torch.bfloat16}
     elif dtype == DataType.GGUF_A8_INT:
-        construct_fn = partial(LinearGGUFA8, dtype=torch.int8, compute_dtype=torch.bfloat16)
+        linear_class=LinearGGUFA8
+        kwargs = {'dtype': torch.int8,
+                  'compute_dtype': torch.bfloat16}
     elif dtype == DataType.GGUF_A8_FLOAT:
-        construct_fn = partial(LinearGGUFA8, dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+        linear_class=LinearGGUFA8
+        kwargs = {'dtype': torch.float8_e4m3fn,
+                  'compute_dtype': torch.bfloat16}
     else:
         return
+
+    if quantization is not None:
+        if quantization.svd_dtype != DataType.NONE:
+            if dtype.is_gguf():
+                raise ValueError("SVDQuant cannot be used with GGUF. GGUF is loaded pre-quantized from a file. SVDQuant requires the unquantized weights to be available.")
+            #construct_fn = partial(make_svd_linear(construct_fn), rank=quantization.svd_rank, svd_dtype=quantization.svd_dtype.torch_dtype(), cache_dir=quantization.cache_dir)
+            linear_class = make_svd_linear(linear_class)
+            kwargs.update({'rank': quantization.svd_rank,
+                           'svd_dtype': quantization.svd_dtype.torch_dtype(),
+                           'cache_dir': quantization.cache_dir})
+        quant_filters = [
+            ModuleFilter(pattern, use_regex=quantization.layer_filter_regex)
+            for pattern in quantization.layer_filter.split(",")
+        ]
+    else:
+        quant_filters = None
 
     convert_type = GGUFLinear if dtype.is_gguf() else nn.Linear
     __replace_linear_layers(
         parent_module=parent_module,
-        construct_fn=construct_fn,
+        construct_fn=partial(linear_class, **kwargs),
         keep_in_fp32_modules=keep_in_fp32_modules,
-        filters=filters,
+        filters=quant_filters,
         copy_parameters=copy_parameters,
         convert_type=convert_type,
     )
@@ -203,7 +228,7 @@ def replace_linear_with_quantized_layers(
         assert (not isinstance(module, convert_type)
                 or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))
                 or any(s in name.split('.') for s in keep_in_fp32_modules)
-                or (filters is not None and len(filters) > 0 and not any(f.matches(name) for f in filters))
+                or (quant_filters is not None and len(quant_filters) > 0 and not any(f.matches(name) for f in quant_filters))
                ), f"Linear layer {name} was not found in model for quantization"
 
 def is_quantized_parameter(
@@ -234,13 +259,11 @@ def is_quantized_parameter(
 
 def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
     if module is not None:
-        cache_dir = config.cache_dir + "/quantization"
-        os.makedirs(cache_dir, exist_ok=True)
         child_modules = list(module.modules())
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
             if isinstance(child_module, QuantizedModuleMixin):
-                child_module.compute_dtype = train_dtype.torch_dtype()
-                child_module.quantize(device=device, cache_dir=cache_dir, svd_dtype=config.svd_dtype.torch_dtype(), rank=config.svd_rank)
+                child_module.compute_dtype = train_dtype.torch_dtype() #FIXME
+                child_module.quantize(device=device)
 
 
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:

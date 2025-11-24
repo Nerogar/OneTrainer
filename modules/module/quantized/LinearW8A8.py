@@ -93,7 +93,7 @@ class LinearW8A8(
         return dequantize(self.weight.detach(), self.scale, self._compute_dtype).to(dtype)
 
     @torch.no_grad()
-    def quantize(self, device: torch.device | None = None, **kwargs):
+    def quantize(self, device: torch.device | None = None):
         if self.__is_quantized:
             return
         self.__is_quantized = True
@@ -129,7 +129,6 @@ class LinearW8A8(
             w = dequantize(self.weight, self.scale, compute_dtype=self._compute_dtype)
             y = torch.nn.functional.linear(x, w, self.bias.to(self._compute_dtype))
 
-        assert y.dtype == self._compute_dtype
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
 
 def run_benchmark(fn, desc, steps=10000, warmup=500, compile=False):
