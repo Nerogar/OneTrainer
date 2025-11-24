@@ -371,7 +371,7 @@ class ModelTab:
             # unet weight dtype
             components.label(frame, row, 3, "Override UNet Data Type",
                              tooltip="Overrides the unet weight data type")
-            components.options_kv(frame, row, 4, self.__create_dtype_options(),
+            components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   self.ui_state, "unet.weight_dtype")
 
             row += 1
