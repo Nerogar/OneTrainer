@@ -303,7 +303,6 @@ class ModelTab:
             # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
-
         if include_a8:
             options += [
                 ("float W8A8", DataType.FLOAT_W8A8),

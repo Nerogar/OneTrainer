@@ -70,8 +70,8 @@ def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     q = quantize_fp8(x, scale)
     return q, scale
 
-def dequantize(q: Tensor, scale: float | Tensor, compute_dtype: torch.dtype) -> Tensor:
-    return q.to(compute_dtype) * scale.to(compute_dtype)
+def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
+    return q.float() * scale
 
 
 from modules.module.quantized.LinearFp8 import LinearFp8
@@ -179,20 +179,16 @@ def replace_linear_with_quantized_layers(
         linear_class = LinearFp8
     elif dtype.quantize_intW8A8():
         linear_class = LinearW8A8
-        kwargs = {'dtype': torch.int8,
-                  'compute_dtype': torch.bfloat16}
+        kwargs = {'dtype': torch.int8}
     elif dtype.quantize_fpW8A8():
         linear_class=LinearW8A8
-        kwargs = {'dtype': torch.float8_e4m3fn,
-                  'compute_dtype': torch.bfloat16}
+        kwargs = {'dtype': torch.float8_e4m3fn}
     elif dtype == DataType.GGUF_A8_INT:
         linear_class=LinearGGUFA8
-        kwargs = {'dtype': torch.int8,
-                  'compute_dtype': torch.bfloat16}
+        kwargs = {'dtype': torch.int8}
     elif dtype == DataType.GGUF_A8_FLOAT:
         linear_class=LinearGGUFA8
-        kwargs = {'dtype': torch.float8_e4m3fn,
-                  'compute_dtype': torch.bfloat16}
+        kwargs = {'dtype': torch.float8_e4m3fn}
     else:
         return
 
@@ -261,10 +257,10 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
     if module is not None:
         child_modules = list(module.modules())
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
+            if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
+                child_module.compute_dtype = train_dtype.torch_dtype()
             if isinstance(child_module, QuantizedModuleMixin):
-                child_module.compute_dtype = train_dtype.torch_dtype() #FIXME
                 child_module.quantize(device=device)
-
 
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:
     assert isinstance(module, nn.Linear)
