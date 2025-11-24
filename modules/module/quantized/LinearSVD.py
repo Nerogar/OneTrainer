@@ -18,10 +18,7 @@ class BaseLinearSVD(
     def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
         pass
 
-
-
 def _get_tensor_hash(t: torch.Tensor) -> str:
-    print(t.device)
     t = t.flatten().to(torch.float32)
     vals = torch.stack([
         torch.sum(t),
