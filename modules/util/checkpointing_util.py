@@ -128,9 +128,6 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
 
     def forward(self, *args, **kwargs):
         call_id = _generate_call_index()
-        hidden_states = kwargs.get('hidden_states')
-        if hidden_states is not None:
-            print("hidden_states: ", hidden_states.dtype, hidden_states.numel())
         args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
 
         if torch.is_grad_enabled():
