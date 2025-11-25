@@ -8,14 +8,18 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "text_encoder": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_16"
     },
     "text_encoder_2": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_16"
+    },
+    "unet": {
+        "weight_dtype": "FLOAT_16"
     },
     "training_method": "LORA",
     "vae": {
         "weight_dtype": "FLOAT_32"
-    },
-    "weight_dtype": "FLOAT_16"
+    }
 }

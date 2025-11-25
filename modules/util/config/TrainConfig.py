@@ -254,7 +254,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("learning_rate", None, float, True))
-        data.append(("weight_dtype", DataType.NONE, DataType, False))
+        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
@@ -322,7 +322,6 @@ class TrainConfig(BaseConfig):
 
     # model settings
     base_model_name: str
-    weight_dtype: DataType
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
@@ -511,7 +510,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=9,
+            config_version=10,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -522,6 +521,7 @@ class TrainConfig(BaseConfig):
                 6: self.__migration_6,
                 7: self.__migration_7,
                 8: self.__migration_8,
+                9: self.__migration_9,
             }
         )
 
@@ -719,24 +719,46 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_9(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        def replace_dtype(part: str):
+            if part in migrated_data and migrated_data[part]["weight_dtype"] == DataType.NONE:
+                migrated_data[part]["weight_dtype"] = migrated_data["weight_dtype"]
+        replace_dtype("unet")
+        replace_dtype("prior")
+        replace_dtype("transformer")
+        replace_dtype("text_encoder")
+        replace_dtype("text_encoder_2")
+        replace_dtype("text_encoder_3")
+        replace_dtype("text_encoder_4")
+        replace_dtype("vae")
+        replace_dtype("effnet_encoder")
+        replace_dtype("decoder")
+        replace_dtype("decoder_text_encoder")
+        replace_dtype("decoder_vqgan")
+        migrated_data.pop("weight_dtype")
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
             self.fallback_train_dtype,
-            self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
-            self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
-            self.weight_dtype if self.transformer.weight_dtype == DataType.NONE else self.transformer.weight_dtype,
-            self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
-            self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
-            self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
-            self.weight_dtype if self.text_encoder_4.weight_dtype == DataType.NONE else self.text_encoder_4.weight_dtype,
-            self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
-            self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
-            self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
-            self.weight_dtype if self.decoder_text_encoder.weight_dtype == DataType.NONE else self.decoder_text_encoder.weight_dtype,
-            self.weight_dtype if self.decoder_vqgan.weight_dtype == DataType.NONE else self.decoder_vqgan.weight_dtype,
-            self.weight_dtype if self.lora_weight_dtype == DataType.NONE else self.lora_weight_dtype,
-            self.weight_dtype if self.embedding_weight_dtype == DataType.NONE else self.embedding_weight_dtype,
+            self.unet.weight_dtype,
+            self.prior.weight_dtype,
+            self.transformer.weight_dtype,
+            self.text_encoder.weight_dtype,
+            self.text_encoder_2.weight_dtype,
+            self.text_encoder_3.weight_dtype,
+            self.text_encoder_4.weight_dtype,
+            self.vae.weight_dtype,
+            self.effnet_encoder.weight_dtype,
+            self.decoder.weight_dtype,
+            self.decoder_text_encoder.weight_dtype,
+            self.decoder_vqgan.weight_dtype,
+            self.lora_weight_dtype,
+            self.embedding_weight_dtype,
         )
 
     def model_names(self) -> ModelNames:
@@ -884,7 +906,6 @@ class TrainConfig(BaseConfig):
 
         # model settings
         data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
-        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
@@ -959,7 +980,6 @@ class TrainConfig(BaseConfig):
         unet.train = True
         unet.stop_training_after = 0
         unet.learning_rate = None
-        unet.weight_dtype = DataType.NONE
         data.append(("unet", unet, TrainModelPartConfig, False))
 
         # prior
@@ -968,7 +988,6 @@ class TrainConfig(BaseConfig):
         prior.train = True
         prior.stop_training_after = 0
         prior.learning_rate = None
-        prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
 
         # prior
@@ -977,7 +996,6 @@ class TrainConfig(BaseConfig):
         transformer.train = True
         transformer.stop_training_after = 0
         transformer.learning_rate = None
-        transformer.weight_dtype = DataType.NONE
         data.append(("transformer", transformer, TrainModelPartConfig, False))
 
         # text encoder
@@ -986,7 +1004,6 @@ class TrainConfig(BaseConfig):
         text_encoder.stop_training_after = 30
         text_encoder.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder.learning_rate = None
-        text_encoder.weight_dtype = DataType.NONE
         data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
 
@@ -996,7 +1013,6 @@ class TrainConfig(BaseConfig):
         text_encoder_2.stop_training_after = 30
         text_encoder_2.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_2.learning_rate = None
-        text_encoder_2.weight_dtype = DataType.NONE
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_2_sequence_length", 77, int, True))
@@ -1007,7 +1023,6 @@ class TrainConfig(BaseConfig):
         text_encoder_3.stop_training_after = 30
         text_encoder_3.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_3.learning_rate = None
-        text_encoder_3.weight_dtype = DataType.NONE
         data.append(("text_encoder_3", text_encoder_3, TrainModelPartConfig, False))
         data.append(("text_encoder_3_layer_skip", 0, int, False))
 
@@ -1017,36 +1032,30 @@ class TrainConfig(BaseConfig):
         text_encoder_4.stop_training_after = 30
         text_encoder_4.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_4.learning_rate = None
-        text_encoder_4.weight_dtype = DataType.NONE
         data.append(("text_encoder_4", text_encoder_4, TrainModelPartConfig, False))
         data.append(("text_encoder_4_layer_skip", 0, int, False))
 
         # vae
         vae = TrainModelPartConfig.default_values()
         vae.model_name = ""
-        vae.weight_dtype = DataType.FLOAT_32
         data.append(("vae", vae, TrainModelPartConfig, False))
 
         # effnet encoder
         effnet_encoder = TrainModelPartConfig.default_values()
         effnet_encoder.model_name = ""
-        effnet_encoder.weight_dtype = DataType.NONE
         data.append(("effnet_encoder", effnet_encoder, TrainModelPartConfig, False))
 
         # decoder
         decoder = TrainModelPartConfig.default_values()
         decoder.model_name = ""
-        decoder.weight_dtype = DataType.NONE
         data.append(("decoder", decoder, TrainModelPartConfig, False))
 
         # decoder text encoder
         decoder_text_encoder = TrainModelPartConfig.default_values()
-        decoder_text_encoder.weight_dtype = DataType.NONE
         data.append(("decoder_text_encoder", decoder_text_encoder, TrainModelPartConfig, False))
 
         # decoder vqgan
         decoder_vqgan = TrainModelPartConfig.default_values()
-        decoder_vqgan.weight_dtype = DataType.NONE
         data.append(("decoder_vqgan", decoder_vqgan, TrainModelPartConfig, False))
 
         # masked training
