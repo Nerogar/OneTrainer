@@ -22,5 +22,7 @@
     "timestep_distribution": "INVERTED_PARABOLA",
     "noising_weight": 7.7,
     "layer_filter": "attn,ff.net",
-    "layer_filter_preset": "attn-mlp"
+    "layer_filter_preset": "attn-mlp",
+    "quantization_layer_filter": "transformer_block",
+    "quantization_layer_filter_preset": "blocks"
 }

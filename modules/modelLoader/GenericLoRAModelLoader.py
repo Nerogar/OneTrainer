@@ -5,6 +5,7 @@ from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLo
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.ModuleFilter import ModuleFilter
 
 
 def make_lora_model_loader(
@@ -33,6 +34,7 @@ def make_lora_model_loader(
                 model_type: ModelType,
                 model_names: ModelNames,
                 weight_dtypes: ModelWeightDtypes,
+                quant_filters: list[ModuleFilter] | None = None,
         ) -> model_class | None:
             base_model_loader = model_loader_class()
             lora_model_loader = lora_loader_class()
@@ -44,7 +46,7 @@ def make_lora_model_loader(
             model.model_spec = self._load_default_model_spec(model_type)
 
             if model_names.base_model is not None:
-                base_model_loader.load(model, model_type, model_names, weight_dtypes)
+                base_model_loader.load(model, model_type, model_names, weight_dtypes, quant_filters)
             lora_model_loader.load(model, model_names)
             if embedding_loader_class is not None:
                 embedding_loader.load(model, model_names.lora, model_names)
