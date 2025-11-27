@@ -66,9 +66,9 @@ class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
 
 class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
         ctx.save_for_backward(weight)
-        return fp8_forward_axiswise(x, weight, bias)
+        return fp8_forward_axiswise(x, weight, bias, compute_dtype)
 
     @staticmethod
     def backward(ctx, output: Tensor):
