@@ -98,12 +98,12 @@ class BaseHiDreamSetup(
                 config.enable_autocast_cache,
             )
 
-        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype)
-        quantize_layers(model.text_encoder_4, self.train_device, model.train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.transformer_train_dtype)
+        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype, config)
+        quantize_layers(model.text_encoder_4, self.train_device, model.train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.transformer_train_dtype, config)
 
     def _setup_embeddings(
             self,

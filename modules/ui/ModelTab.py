@@ -294,18 +294,28 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
-    def __create_dtype_options(self, include_none:bool=True, include_gguf=False) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_none: bool=True, include_gguf: bool=False, include_a8: bool=False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
-            ("float8", DataType.FLOAT_8),
+            ("float8 (W8)", DataType.FLOAT_8),
             # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
+        if include_a8:
+            options += [
+                ("float W8A8", DataType.FLOAT_W8A8),
+                ("int W8A8", DataType.INT_W8A8),
+            ]
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
+            if include_a8:
+                options += [
+                    ("GGUF A8 float", DataType.GGUF_A8_FLOAT),
+                    ("GGUF A8 int", DataType.GGUF_A8_INT),
+                ]
 
         if include_none:
             options.insert(0, ("", DataType.NONE))
@@ -361,7 +371,7 @@ class ModelTab:
             # unet weight dtype
             components.label(frame, row, 3, "Override UNet Data Type",
                              tooltip="Overrides the unet weight data type")
-            components.options_kv(frame, row, 4, self.__create_dtype_options(),
+            components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   self.ui_state, "unet.weight_dtype")
 
             row += 1
@@ -397,7 +407,7 @@ class ModelTab:
             # transformer weight dtype
             components.label(frame, row, 3, "Override Transformer Data Type",
                              tooltip="Overrides the transformer weight data type")
-            components.options_kv(frame, row, 4,  self.__create_dtype_options(include_gguf=True),
+            components.options_kv(frame, row, 4,  self.__create_dtype_options(include_gguf=True, include_a8=True),
                                   self.ui_state, "transformer.weight_dtype")
 
             row += 1
@@ -428,24 +438,40 @@ class ModelTab:
         else:
             presets = {"full": []}
 
-        components.label(frame, row, 0, "Quantization")
-        components.layer_filter_entry(frame, row, 1, self.ui_state,
-            preset_var_name="quantization_layer_filter_preset", presets=presets,
-            preset_label="Layer Filter",
-            preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
-            entry_var_name="quantization_layer_filter",
-            entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
-            regex_var_name="quantization_layer_filter_regex",
-            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
-            frame_color="transparent",
-        )
-
         # compile
         components.label(frame, row, 3, "Compile transformer blocks",
                          tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
         components.switch(frame, row, 4, self.ui_state, "compile")
 
         row += 1
+
+
+        components.label(frame, row, 0, "Quantization")
+        components.layer_filter_entry(frame, row, 1, self.ui_state,
+            preset_var_name="quantization.layer_filter_preset", presets=presets,
+            preset_label="Quantization Layer Filter",
+            preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
+            entry_var_name="quantization.layer_filter",
+            entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
+            regex_var_name="quantization.layer_filter_regex",
+            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
+            frame_color="transparent",
+        )
+
+        # SVDQuant - create vertical grids to match the size of layer_filter_entry
+        svd_label_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        svd_label_frame.grid(row=row, column=3, sticky="nsew")
+        svd_entry_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        svd_entry_frame.grid(row=row, column=4, sticky="nsew")
+        components.label(svd_label_frame, 0, 0, "SVDQuant",
+                         tooltip="What datatype to use for SVDQuant weights decomposition.")
+        components.options_kv(svd_entry_frame, 0, 0, [("disabled", DataType.NONE), ("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
+                              self.ui_state, "quantization.svd_dtype")
+        components.label(svd_label_frame, 1, 0, "SVDQuant Rank",
+                         tooltip="Rank for SVDQuant weights decomposition")
+        components.entry(svd_entry_frame, 1, 0, self.ui_state, "quantization.svd_rank")
+        row += 1
+
 
         if has_text_encoder:
             # text encoder weight dtype
