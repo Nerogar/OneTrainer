@@ -70,7 +70,11 @@ class OFTRotationModule(nn.Module):
         batch_size = vec.shape[0]
         matrix = torch.zeros(batch_size, block_size, block_size, device=vec.device, dtype=vec.dtype)
 
-        matrix[:, self.rows, self.cols] = vec
+        #the following two lines are equivalent to "matrix[:, self.rows, self.cols] = vec",
+        #but they work around a pytorch issue: https://github.com/pytorch/pytorch/issues/169179
+        batch_idx = torch.arange(batch_size, device=vec.device)[:, None]
+        matrix = matrix.index_put((batch_idx, self.rows, self.cols), vec)
+
         matrix = matrix - matrix.transpose(-2, -1)
         return matrix
 
