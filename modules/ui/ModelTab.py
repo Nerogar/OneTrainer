@@ -366,7 +366,7 @@ class ModelTab:
     ) -> int:
         if has_unet:
             # unet weight dtype
-            components.label(self.scroll_frame, row, 3, "UNet Data Type",
+            components.label(frame, row, 3, "UNet Data Type",
                              tooltip="The unet weight data type")
             components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   self.ui_state, "unet.weight_dtype")
