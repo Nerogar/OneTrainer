@@ -270,7 +270,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
     ) -> Tensor:
         loss_weight = batch['loss_weight']
         if self.__coefficients is None and betas is not None:
-            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
+            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas.to(train_device))
 
         self.__alphas_cumprod_fun = alphas_cumprod_fun
 
@@ -285,18 +285,22 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         # Scale Losses by Batch and/or GA (if enabled)
         losses = losses * config.loss_scaler.get_scale(batch_size=config.batch_size, accumulation_steps=config.gradient_accumulation_steps)
 
-        losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
+        losses *= loss_weight
 
         # Apply timestep based loss weighting.
         if 'timestep' in data:
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
+                case LossWeight.CONSTANT:
+                    pass
                 case LossWeight.MIN_SNR_GAMMA:
                     losses *= self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
                 case LossWeight.DEBIASED_ESTIMATION:
                     losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
                 case LossWeight.P2:
                     losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
+                case _:
+                    raise NotImplementedError(f"Loss weight function {config.loss_weight_fn} not implemented for diffusion models")
 
         return losses
 
@@ -311,7 +315,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
         loss_weight = batch['loss_weight']
         if self.__sigmas is None and sigmas is not None:
             num_timesteps = sigmas.shape[0]
-            all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=sigmas.device)
+            all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=train_device)
             self.__sigmas = all_timesteps / num_timesteps
 
         if data['loss_type'] == 'target':
@@ -324,13 +328,16 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         # Scale Losses by Batch and/or GA (if enabled)
         losses = losses * config.loss_scaler.get_scale(config.batch_size, config.gradient_accumulation_steps)
-
-        losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
+        losses *= loss_weight
 
         # Apply timestep based loss weighting.
         if 'timestep' in data:
             match config.loss_weight_fn:
+                case LossWeight.CONSTANT:
+                    pass
                 case LossWeight.SIGMA:
                     losses *= self.__sigma_loss_weight(data['timestep'], losses.device)
+                case _:
+                    raise NotImplementedError(f"Loss weight function {config.loss_weight_fn} not implemented for flow matching models")
 
         return losses

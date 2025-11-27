@@ -40,6 +40,8 @@
             "weight_decay": 0.0
         }
     },
-    "layer_filter": "transformer_block",
-    "layer_filter_preset": "blocks"
+    "quantization": {
+        "layer_filter": "transformer_block",
+        "layer_filter_preset": "blocks"
+    }
 }
