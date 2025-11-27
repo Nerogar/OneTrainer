@@ -24,5 +24,9 @@
     "output_dtype": "BFLOAT_16",
     "timestep_distribution": "LOGIT_NORMAL",
     "layer_filter": "attn,img_mlp,txt_mlp",
-    "layer_filter_preset": "attn-mlp"
+    "layer_filter_preset": "attn-mlp",
+    "quantization": {
+        "layer_filter": "transformer_block",
+        "layer_filter_preset": "blocks"
+    }
 }

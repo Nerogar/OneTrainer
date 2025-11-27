@@ -294,6 +294,26 @@ class TrainEmbeddingConfig(BaseConfig):
 
         return TrainEmbeddingConfig(data)
 
+class QuantizationConfig(BaseConfig):
+    layer_filter: str
+    layer_filter_preset: str
+    layer_filter_regex: bool
+    svd_dtype: DataType
+    svd_rank: int
+    cache_dir: str
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("layer_filter", "", str, False))
+        data.append(("layer_filter_preset", "full", str, False))
+        data.append(("layer_filter_regex", False, bool, False))
+        data.append(("svd_dtype", DataType.NONE, DataType, False))
+        data.append(("svd_rank", 16, int, False))
+        data.append(("cache_dir", None, str, True))
+        return QuantizationConfig(data)
 
 class TrainConfig(BaseConfig):
     training_method: TrainingMethod
@@ -407,6 +427,7 @@ class TrainConfig(BaseConfig):
 
     # transformer
     transformer: TrainModelPartConfig
+    quantization: QuantizationConfig
 
     # text encoder
     text_encoder: TrainModelPartConfig
@@ -990,13 +1011,17 @@ class TrainConfig(BaseConfig):
         prior.learning_rate = None
         data.append(("prior", prior, TrainModelPartConfig, False))
 
-        # prior
+        # transformer
         transformer = TrainModelPartConfig.default_values()
         transformer.model_name = ""
         transformer.train = True
         transformer.stop_training_after = 0
         transformer.learning_rate = None
         data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        #quantization layer filter
+        quantization = QuantizationConfig.default_values()
+        data.append(("quantization", quantization, QuantizationConfig, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from modules.module.oft_utils import OFTRotationModule
+from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.ModuleFilter import ModuleFilter
@@ -321,6 +322,8 @@ class LoRAModule(PeftBase):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
+        if isinstance(self.orig_module, BaseLinearSVD):
+            return self.orig_module.forward_with_lora(x, self.lora_down, self.lora_up, self.dropout, self.alpha)
 
         ld = self.lora_up(self.dropout(self.lora_down(x)))
         return self.orig_forward(x) + ld * (self.alpha / self.rank)
