@@ -384,8 +384,8 @@ class ModelTab:
                 )
 
             # prior weight dtype
-            components.label(frame, row, 3, "Override Prior Data Type",
-                             tooltip="Overrides the prior weight data type")
+            components.label(frame, row, 3, "Prior Data Type",
+                             tooltip="The prior weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "prior.weight_dtype")
 
