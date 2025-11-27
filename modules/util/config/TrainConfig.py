@@ -332,6 +332,8 @@ class TrainConfig(BaseConfig):
     layer_offload_fraction: float
     force_circular_padding: bool
     compile: bool
+    svd_dtype: DataType
+    svd_rank: int
 
     # data settings
     concept_file_name: str
@@ -408,6 +410,11 @@ class TrainConfig(BaseConfig):
 
     # transformer
     transformer: TrainModelPartConfig
+
+    # quantization
+    quantization_layer_filter: str
+    quantization_layer_filter_preset: str
+    quantization_layer_filter_regex: bool
 
     # text encoder
     text_encoder: TrainModelPartConfig
@@ -893,7 +900,9 @@ class TrainConfig(BaseConfig):
         data.append(("enable_activation_offloading", True, bool, False))
         data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
-        data.append(("compile", False, bool, False))
+        data.append(("compile", True, bool, False))
+        data.append(("svd_dtype", DataType.BFLOAT_16, DataType, False))
+        data.append(("svd_rank", 128, int, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -971,7 +980,7 @@ class TrainConfig(BaseConfig):
         prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
 
-        # prior
+        # transformer
         transformer = TrainModelPartConfig.default_values()
         transformer.model_name = ""
         transformer.train = True
@@ -979,6 +988,11 @@ class TrainConfig(BaseConfig):
         transformer.learning_rate = None
         transformer.weight_dtype = DataType.NONE
         data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        #quantization layer filter
+        data.append(("quantization_layer_filter", "", str, False))
+        data.append(("quantization_layer_filter_preset", "full", str, False))
+        data.append(("quantization_layer_filter_regex", False, bool, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()
