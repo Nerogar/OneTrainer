@@ -4,10 +4,10 @@ import traceback
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
-from modules.util.ModuleFilter import ModuleFilter
 
 from diffusers import (
     AutoencoderKLHunyuanVideo,
@@ -33,12 +33,12 @@ class HunyuanVideoModelLoader(
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
-            quant_filters: list[ModuleFilter],
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, vae_model_name,
-                include_text_encoder_1, include_text_encoder_2, quant_filters,
+                include_text_encoder_1, include_text_encoder_2, quantization,
             )
         else:
             raise Exception("not an internal model")
@@ -52,7 +52,7 @@ class HunyuanVideoModelLoader(
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
-            quant_filters: list[ModuleFilter],
+            quantization: QuantizationConfig,
     ):
         diffusers_sub = []
         transformers_sub = []
@@ -136,7 +136,7 @@ class HunyuanVideoModelLoader(
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
-            quant_filters,
+            quantization,
         )
 
         model.model_type = model_type
@@ -157,7 +157,7 @@ class HunyuanVideoModelLoader(
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
-            quant_filters: list[ModuleFilter],
+            quantization: QuantizationConfig,
     ):
         pipeline = HunyuanVideoPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -197,7 +197,7 @@ class HunyuanVideoModelLoader(
             print("text encoder 2 (clip l) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quant_filters,
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
@@ -219,14 +219,14 @@ class HunyuanVideoModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
-            quant_filters: list[ModuleFilter] | None = None,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2, quant_filters,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
             return
@@ -236,7 +236,7 @@ class HunyuanVideoModelLoader(
         try:
             self.__load_diffusers(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2, quant_filters,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
             return
@@ -246,7 +246,7 @@ class HunyuanVideoModelLoader(
         try:
             self.__load_safetensors(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2, quant_filters,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
             return
