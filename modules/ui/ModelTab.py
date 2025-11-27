@@ -438,18 +438,6 @@ class ModelTab:
         else:
             presets = {"full": []}
 
-        components.label(frame, row, 0, "Quantization")
-        components.layer_filter_entry(frame, row, 1, self.ui_state,
-            preset_var_name="quantization_layer_filter_preset", presets=presets,
-            preset_label="Layer Filter",
-            preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
-            entry_var_name="quantization_layer_filter",
-            entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
-            regex_var_name="quantization_layer_filter_regex",
-            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
-            frame_color="transparent",
-        )
-
         # compile
         components.label(frame, row, 3, "Compile transformer blocks",
                          tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
