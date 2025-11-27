@@ -28,7 +28,7 @@ def build_muon_adam_key_fn(
         patterns_list = [p.strip() for p in config.optimizer.muon_hidden_layers.split(',') if p.strip()]
         filters = [ModuleFilter(p, use_regex=config.optimizer.muon_adam_regex) for p in patterns_list]
         if True:
-            print(f"[MuonWithAuxAdam] Using custom non-hidden layer patterns: {patterns_list}")
+            print(f"[MuonWithAuxAdam] Using custom hidden layer patterns: {patterns_list}")
     else:
         # Default list of "hidden" parts.
         match model.model_type:
@@ -48,9 +48,11 @@ def build_muon_adam_key_fn(
                     'double_stream_blocks',
                     'single_stream_blocks',
                 ]
+            case _: # Unmatched cases
+                raise NotImplementedError(f"Default hidden layer patterns are not defined for model type: {model.model_type}")
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]
         if True:
-            print(f"[MuonWithAuxAdam] Using default non-hidden layer patterns for {model.model_type}.")
+            print(f"[MuonWithAuxAdam] Using default hidden layer patterns for {model.model_type}.")
 
 
     def get_optim_type(param_name: str, p: torch.nn.Parameter) -> str:
@@ -121,9 +123,10 @@ def build_muon_adam_key_fn(
             if unassigned_params_count > 0:
                 print(f"INFO: {unassigned_params_count} trainable tensor(s) were not in checked modules and defaulted to AdamW.")
 
-            unused_filters = [f._pattern for f in filters if not f.was_used()]
-            if unused_filters:
-                print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
+            if config.optimizer.muon_hidden_layers is not None:
+                unused_filters = [f._pattern for f in filters if not f.was_used()]
+                if unused_filters:
+                    print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
 
             print("----------------------------------------------\n")
         else:
@@ -156,21 +159,14 @@ def split_parameters_for_muon(
             if has_adam_params:
                 break
 
-    use_aux_adam = optimizer_config.MuonWithAuxAdam and has_adam_params
+    MuonWithAuxAdam = optimizer_config.MuonWithAuxAdam and has_adam_params
 
-    if not use_aux_adam:
-        # "Original Muon" mode. All params are muon.
-        final_param_groups = []
+    # If not using AuxAdam, just use the original parameter groups
+    if not (MuonWithAuxAdam and layer_key_fn):
         for group in parameters:
-            muon_group = group.copy()
-            muon_group['params'] = [p for p in group['params'] if p.requires_grad]
-            if not muon_group['params']:
-                continue
-            muon_group['optim_type'] = 'muon'
-            final_param_groups.append(muon_group)
-        return final_param_groups, False
+            group['optim_type'] = 'muon'
+        return parameters, MuonWithAuxAdam
 
-    # MuonWithAuxAdam mode
     final_param_groups = []
     for group in parameters:
         muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']

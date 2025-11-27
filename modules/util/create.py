@@ -1185,27 +1185,35 @@ def create_optimizer(
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
             if MuonWithAuxAdam:
-                adam_config_dict = optimizer_config.muon_adam_config.to_dict()
+                adam_config = optimizer_config.muon_adam_config
+                adam_config_dict = adam_config if isinstance(adam_config, dict) else adam_config.to_dict()
+
                 valid_adam_keys = {k for k in inspect.signature(Muon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
                     key: adam_config_dict[key.removeprefix('adam_')]
                     for key in valid_adam_keys
                     if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
                 }
-
+                # Manually construct adam_betas from beta1 and beta2
+                beta1_adam = adam_config_dict.get('beta1')
+                beta2_adam = adam_config_dict.get('beta2')
+                adam_kwargs['adam_betas'] = (
+                    beta1_adam if beta1_adam is not None else 0.9,
+                    beta2_adam if beta2_adam is not None else 0.99
+                )
             optimizer = Muon_adv(
                 params=params_for_optimizer,
                 lr=config.learning_rate,
                 beta1=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                rms_rescaling=optimizer_config.rms_rescaling if optimizer_config.rms_rescaling is not None else True,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
                 normuon_eps=optimizer_config.normuon_eps if optimizer_config.normuon_eps is not None else 1e-8,
-                normuon_lr_scale=optimizer_config.normuon_lr_scale if optimizer_config.normuon_lr_scale is not None else 0.2,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
@@ -1224,13 +1232,23 @@ def create_optimizer(
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
             if MuonWithAuxAdam:
-                adam_config_dict = optimizer_config.muon_adam_config.to_dict()
+                adam_config = optimizer_config.muon_adam_config
+                # Handle both dict (from JSON/Config) and Object (legacy/runtime)
+                adam_config_dict = adam_config if isinstance(adam_config, dict) else adam_config.to_dict()
+
                 valid_adam_keys = {k for k in inspect.signature(AdaMuon_adv.__init__).parameters if k.startswith('adam_')}
                 adam_kwargs = {
                     key: adam_config_dict[key.removeprefix('adam_')]
                     for key in valid_adam_keys
                     if key.removeprefix('adam_') in adam_config_dict and adam_config_dict[key.removeprefix('adam_')] is not None
                 }
+                # Manually construct adam_betas from beta1 and beta2
+                adam_beta1 = adam_config_dict.get('beta1')
+                adam_beta2 = adam_config_dict.get('beta2')
+                adam_kwargs['adam_betas'] = (
+                    adam_beta1 if adam_beta1 is not None else 0.9,
+                    adam_beta2 if adam_beta2 is not None else 0.99
+                )
             optimizer = AdaMuon_adv(
                 params=params_for_optimizer,
                 lr=config.learning_rate,
@@ -1238,7 +1256,7 @@ def create_optimizer(
                     optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
-                rms_target=optimizer_config.rms_target if optimizer_config.rms_target is not None else 0.2,
+                rms_rescaling=optimizer_config.rms_rescaling if optimizer_config.rms_rescaling is not None else True,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
@@ -1275,7 +1293,7 @@ def create_optimizer(
                         'weight_decay': optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                     }
                 else:  # is adam
-                    adam_config = optimizer_config.muon_adam_config
+                    adam_config = optimizer_config.muon_adam_config.to_dict()
 
                     final_group = {
                         'params': group['params'],
