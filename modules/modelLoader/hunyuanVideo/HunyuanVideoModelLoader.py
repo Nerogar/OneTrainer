@@ -41,7 +41,7 @@ class HunyuanVideoModelLoader(
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model, model_type, weight_dtypes, base_model_name, vae_model_name,
+                model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name,
                 include_text_encoder_1, include_text_encoder_2, quantization,
             )
         else:
@@ -256,7 +256,7 @@ class HunyuanVideoModelLoader(
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
@@ -266,7 +266,7 @@ class HunyuanVideoModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
@@ -276,7 +276,7 @@ class HunyuanVideoModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
