@@ -295,7 +295,7 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
-    def __create_dtype_options(self, include_none: bool=True, include_gguf: bool=False, include_a8: bool=False) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_gguf: bool=False, include_a8: bool=False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
@@ -318,9 +318,6 @@ class ModelTab:
                     ("GGUF A8 int", DataType.GGUF_A8_INT),
                 ]
 
-        if include_none:
-            options.insert(0, ("", DataType.NONE))
-
         return options
 
     def __create_base_dtype_components(self, frame, row: int) -> int:
@@ -341,11 +338,10 @@ class ModelTab:
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
-        # weight dtype
-        components.label(frame, row, 3, "Weight Data Type",
-                         tooltip="The base model weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(frame, row, 4, self.__create_dtype_options(False),
-                              self.ui_state, "weight_dtype")
+        # compile
+        components.label(frame, row, 3, "Compile transformer blocks",
+                         tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
+        components.switch(frame, row, 4, self.ui_state, "compile")
 
         row += 1
 
@@ -370,8 +366,8 @@ class ModelTab:
     ) -> int:
         if has_unet:
             # unet weight dtype
-            components.label(frame, row, 3, "Override UNet Data Type",
-                             tooltip="Overrides the unet weight data type")
+            components.label(frame, row, 3, "UNet Data Type",
+                             tooltip="The unet weight data type")
             components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   self.ui_state, "unet.weight_dtype")
 
@@ -388,8 +384,8 @@ class ModelTab:
                 )
 
             # prior weight dtype
-            components.label(frame, row, 3, "Override Prior Data Type",
-                             tooltip="Overrides the prior weight data type")
+            components.label(frame, row, 3, "Prior Data Type",
+                             tooltip="The prior weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "prior.weight_dtype")
 
@@ -406,8 +402,8 @@ class ModelTab:
                 )
 
             # transformer weight dtype
-            components.label(frame, row, 3, "Override Transformer Data Type",
-                             tooltip="Overrides the transformer weight data type")
+            components.label(frame, row, 3, "Transformer Data Type",
+                             tooltip="The transformer weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(include_gguf=True, include_a8=True),
                                   self.ui_state, "transformer.weight_dtype")
 
@@ -439,14 +435,6 @@ class ModelTab:
         else:
             presets = {"full": []}
 
-        # compile
-        components.label(frame, row, 3, "Compile transformer blocks",
-                         tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
-        components.switch(frame, row, 4, self.ui_state, "compile")
-
-        row += 1
-
-
         components.label(frame, row, 0, "Quantization")
         components.layer_filter_entry(frame, row, 1, self.ui_state,
             preset_var_name="quantization.layer_filter_preset", presets=presets,
@@ -476,8 +464,8 @@ class ModelTab:
 
         if has_text_encoder:
             # text encoder weight dtype
-            components.label(frame, row, 3, "Override Text Encoder Data Type",
-                             tooltip="Overrides the text encoder weight data type")
+            components.label(frame, row, 3, "Text Encoder Data Type",
+                             tooltip="The text encoder weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder.weight_dtype")
 
@@ -485,8 +473,8 @@ class ModelTab:
 
         if has_text_encoder_1:
             # text encoder 1 weight dtype
-            components.label(frame, row, 3, "Override Text Encoder 1 Data Type",
-                             tooltip="Overrides the text encoder 1 weight data type")
+            components.label(frame, row, 3, "Text Encoder 1 Data Type",
+                             tooltip="The text encoder 1 weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder.weight_dtype")
 
@@ -494,8 +482,8 @@ class ModelTab:
 
         if has_text_encoder_2:
             # text encoder 2 weight dtype
-            components.label(frame, row, 3, "Override Text Encoder 2 Data Type",
-                             tooltip="Overrides the text encoder 2 weight data type")
+            components.label(frame, row, 3, "Text Encoder 2 Data Type",
+                             tooltip="The text encoder 2 weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder_2.weight_dtype")
 
@@ -503,8 +491,8 @@ class ModelTab:
 
         if has_text_encoder_3:
             # text encoder 3 weight dtype
-            components.label(frame, row, 3, "Override Text Encoder 3 Data Type",
-                             tooltip="Overrides the text encoder 3 weight data type")
+            components.label(frame, row, 3, "Text Encoder 3 Data Type",
+                             tooltip="The text encoder 3 weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder_3.weight_dtype")
 
@@ -521,8 +509,8 @@ class ModelTab:
                 )
 
             # text encoder 4 weight dtype
-            components.label(frame, row, 3, "Override Text Encoder 4 Data Type",
-                             tooltip="Overrides the text encoder 4 weight data type")
+            components.label(frame, row, 3, "Text Encoder 4 Data Type",
+                             tooltip="The text encoder 4 weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "text_encoder_4.weight_dtype")
 
@@ -538,8 +526,8 @@ class ModelTab:
             )
 
             # vae weight dtype
-            components.label(frame, row, 3, "Override VAE Data Type",
-                             tooltip="Overrides the vae weight data type")
+            components.label(frame, row, 3, "VAE Data Type",
+                             tooltip="The vae weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "vae.weight_dtype")
 
@@ -557,8 +545,8 @@ class ModelTab:
         )
 
         # effnet encoder weight dtype
-        components.label(frame, row, 3, "Override Effnet Encoder Data Type",
-                         tooltip="Overrides the effnet encoder weight data type")
+        components.label(frame, row, 3, "Effnet Encoder Data Type",
+                         tooltip="The effnet encoder weight data type")
         components.options_kv(frame, row, 4, self.__create_dtype_options(),
                               self.ui_state, "effnet_encoder.weight_dtype")
 
@@ -581,8 +569,8 @@ class ModelTab:
         )
 
         # decoder weight dtype
-        components.label(frame, row, 3, "Override Decoder Data Type",
-                         tooltip="Overrides the decoder weight data type")
+        components.label(frame, row, 3, "Decoder Data Type",
+                         tooltip="The decoder weight data type")
         components.options_kv(frame, row, 4, self.__create_dtype_options(),
                               self.ui_state, "decoder.weight_dtype")
 
@@ -590,16 +578,16 @@ class ModelTab:
 
         if has_text_encoder:
             # decoder text encoder weight dtype
-            components.label(frame, row, 3, "Override Decoder Text Encoder Data Type",
-                             tooltip="Overrides the decoder text encoder weight data type")
+            components.label(frame, row, 3, "Decoder Text Encoder Data Type",
+                             tooltip="The decoder text encoder weight data type")
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "decoder_text_encoder.weight_dtype")
 
             row += 1
 
         # decoder vqgan weight dtype
-        components.label(frame, row, 3, "Override Decoder VQGAN Data Type",
-                         tooltip="Overrides the decoder vqgan weight data type")
+        components.label(frame, row, 3, "Decoder VQGAN Data Type",
+                         tooltip="The decoder vqgan weight data type")
         components.options_kv(frame, row, 4, self.__create_dtype_options(),
                               self.ui_state, "decoder_vqgan.weight_dtype")
 
