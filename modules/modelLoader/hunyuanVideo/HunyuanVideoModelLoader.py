@@ -146,7 +146,7 @@ class HunyuanVideoModelLoader(
                 quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype
+                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization
             )
         else:
             transformer = self._load_diffusers_sub_module(
