@@ -2,6 +2,7 @@ import ast
 import importlib
 from collections.abc import Callable, Iterable
 
+import modules.util.multi_gpu_util as multi
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
@@ -1274,7 +1275,6 @@ def create_optimizer(
 
         # MUON Optimizer
         case Optimizer.MUON:
-            import torch.distributed as dist
 
             from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 
@@ -1315,10 +1315,7 @@ def create_optimizer(
                     }
                 final_param_groups.append(final_group)
 
-            # check the distributed status
-            is_distributed = dist.is_initialized() and dist.get_world_size() > 1
-
-            OptimizerClass = MuonWithAuxAdam if is_distributed else SingleDeviceMuonWithAuxAdam
+            OptimizerClass = MuonWithAuxAdam if multi.world_size() > 1 else SingleDeviceMuonWithAuxAdam
             optimizer = OptimizerClass(param_groups=final_param_groups )
 
             # Add metadata back to the optimizer's param_groups for the framework to use.
