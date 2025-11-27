@@ -1293,16 +1293,25 @@ def create_optimizer(
                         'weight_decay': optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                     }
                 else:  # is adam
-                    adam_config = optimizer_config.muon_adam_config.to_dict()
+                    adam_config = optimizer_config.muon_adam_config
+                    if adam_config is None:
+                        adam_config = {}
+                    elif not isinstance(adam_config, dict):
+                        adam_config = adam_config.to_dict()
+
+                    beta1 = adam_config.get('beta1')
+                    beta2 = adam_config.get('beta2')
+                    eps = adam_config.get('eps')
+                    weight_decay = adam_config.get('weight_decay')
 
                     final_group = {
                         'params': group['params'],
                         'lr': group['lr'],
                         'use_muon': False,
-                        'betas': (adam_config.beta1 if adam_config.beta1 is not None else 0.9,
-                                    adam_config.beta2 if adam_config.beta2 is not None else 0.95),
-                        'eps': adam_config.eps if adam_config.eps is not None else 1e-10,
-                        'weight_decay': adam_config.weight_decay if adam_config.weight_decay is not None else 0.0,
+                        'betas': (beta1 if beta1 is not None else 0.9,
+                                  beta2 if beta2 is not None else 0.95),
+                        'eps': eps if eps is not None else 1e-10,
+                        'weight_decay': weight_decay if weight_decay is not None else 0.0,
                     }
                 final_param_groups.append(final_group)
 
