@@ -99,7 +99,6 @@ def build_muon_adam_key_fn(
         optim_type = param_map.get(id(p))
         if optim_type is None:
             optim_type = 'adam'
-            unassigned_params_count += 1
 
         if not optim_type == 'muon':
             adam_params_count += p.numel()
