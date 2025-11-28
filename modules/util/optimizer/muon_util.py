@@ -93,44 +93,27 @@ def build_muon_adam_key_fn(
                     param_map[id(p)] = get_optim_type(full_param_name, p)
                     all_processed_params.append(p)
 
-    # Print a summary for verification
-    if True:
-        muon_params_count, adam_params_count = 0, 0
-        muon_tensors, adam_tensors = 0, 0
-        unassigned_params_count = 0
+    # Print a verification
 
-        for p in all_processed_params:
-            optim_type = param_map.get(id(p))
-            if optim_type is None:
-                optim_type = 'adam'
-                unassigned_params_count += 1
+    for p in all_processed_params:
+        optim_type = param_map.get(id(p))
+        if optim_type is None:
+            optim_type = 'adam'
+            unassigned_params_count += 1
 
-            if optim_type == 'muon':
-                muon_params_count += p.numel()
-                muon_tensors += 1
-            else:
-                adam_params_count += p.numel()
-                adam_tensors += 1
+        if not optim_type == 'muon':
+            adam_params_count += p.numel()
+            adam_tensors += 1
 
-        total_params = muon_params_count + adam_params_count
-        if total_params > 0:
-            muon_percent = 100 * muon_params_count / total_params
-            adam_percent = 100 * adam_params_count / total_params
-            print("\n--- MuonWithAuxAdam Parameter Distribution ---")
-            print(f"Assigned to Muon : {muon_params_count:,} parameters ({muon_percent:.2f}%) in {muon_tensors} tensors.")
-            print(f"Assigned to AdamW: {adam_params_count:,} parameters ({adam_percent:.2f}%) in {adam_tensors} tensors.")
-            print(f"Total trainable  : {total_params:,} parameters")
-            if unassigned_params_count > 0:
-                print(f"INFO: {unassigned_params_count} trainable tensor(s) were not in checked modules and defaulted to AdamW.")
-
-            if config.optimizer.muon_hidden_layers is not None:
-                unused_filters = [f._pattern for f in filters if not f.was_used()]
-                if unused_filters:
-                    print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
-
+        if adam_params_count == 0:
+            print("\n[MuonWithAuxAdam] WARNING: 100% of trainable parameters are assigned to Muon.")
+            print("Consider disabling 'MuonWithAuxAdam' in your configuration since the auxiliary AdamW optimizer is not being used.")
             print("----------------------------------------------\n")
-        else:
-            print("\n[MuonWithAuxAdam] Warning: No trainable parameters found.\n")
+
+    if config.optimizer.muon_hidden_layers is not None:
+        unused_filters = [f._pattern for f in filters if not f.was_used()]
+        if unused_filters:
+            print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
 
 
     return lambda p: param_map.get(id(p), 'adam')
