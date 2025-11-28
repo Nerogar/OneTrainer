@@ -94,13 +94,14 @@ def build_muon_adam_key_fn(
                     all_processed_params.append(p)
 
     # Print a verification
-
+    adam_params_count = 0
     for p in all_processed_params:
         optim_type = param_map.get(id(p))
+
         if optim_type is None:
             optim_type = 'adam'
 
-        if not optim_type == 'muon':
+        if optim_type != 'muon':
             adam_params_count += p.numel()
 
         if adam_params_count == 0:
