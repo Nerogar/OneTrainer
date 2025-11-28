@@ -102,7 +102,6 @@ def build_muon_adam_key_fn(
 
         if not optim_type == 'muon':
             adam_params_count += p.numel()
-            adam_tensors += 1
 
         if adam_params_count == 0:
             print("\n[MuonWithAuxAdam] WARNING: 100% of trainable parameters are assigned to Muon.")
